@@ -102,7 +102,7 @@ Definition wp_sys_close_sconf_body
       !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
+    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* sys_close reads syscall argument 0, out of the trapframe page
@@ -115,7 +115,7 @@ Definition wp_sys_close_sconf_body
      PASS-THROUGH to fileclose, whose bound is at "ftable" (1) -- the
      LOWEST rank in the table, and nothing else sys_close touches (argfd,
      myproc) carries any order premise at all. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
@@ -170,6 +170,6 @@ Module Type SYSCLOSE.
              !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
       wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b lks.
 End SYSCLOSE.

@@ -189,7 +189,7 @@ Definition kfork_post
     (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
-    (K : nat) (mr : regfile) (rv : mword 64) (lks : gset nat) : iProp Σ :=
+    (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
   ( sie_cap_gpr mr K b pme ∗
     cpu_own lvl eb pme C b lks ∗
     (* THE PARENT COMES BACK VERBATIM on every arm -- kfork only reads it.
@@ -217,7 +217,7 @@ Definition wp_kfork_sconf_body
     (γa γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset nat) :=
+    (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_kfork <= K)%nat ->
@@ -234,7 +234,7 @@ Definition wp_kfork_sconf_body
   (* the floor of kfork's cone is wait_lock (8), taken after np->lock is
      released; allocproc's "proc" (9), the fd scan's "ftable"/"itable" and
      kalloc/uvmcopy's "kmem" all follow by [LockRank.locks_below_mono]. *)
-  locks_below lks (lock_rank "wait_lock") ->
+  locks_below lks "wait_lock" ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -264,7 +264,7 @@ Module Type KFORK.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset nat),
+      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
       wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
         m lvl K eb pme C b pid_p Vp lks.
 End KFORK.

@@ -58,7 +58,7 @@ Notation arg_int32 := trunc32.
 Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-    (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset nat) :=
+    (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argint in
   let ip := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -90,6 +90,6 @@ Module Type ARGINT.
   Parameter wp_argint_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset nat),
+      (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string),
       wp_argint_sconf_body m av n eb p C i tfp ws v old dqt b lks.
 End ARGINT.

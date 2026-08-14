@@ -476,7 +476,7 @@ Definition wp_dirlink_sconf_body
     (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -544,7 +544,7 @@ Definition wp_dirlink_sconf_body
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -722,7 +722,7 @@ Definition wp_dirlink_gen_body
     (ncount : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -797,7 +797,7 @@ Definition wp_dirlink_gen_body
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -976,7 +976,7 @@ Module Type DIRLINK.
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                             γa γf γpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum
@@ -1009,7 +1009,7 @@ Module Type DIRLINK.
       (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum

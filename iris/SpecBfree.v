@@ -112,7 +112,7 @@ Definition wp_bfree_gen_body
     (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -144,7 +144,7 @@ Definition wp_bfree_gen_body
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
   (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
      touches ranks lower.  One premise covers the whole cone. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
@@ -244,7 +244,7 @@ Definition wp_bfree_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqb : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -276,7 +276,7 @@ Definition wp_bfree_sconf_body
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
   (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
      touches ranks lower.  One premise covers the whole cone. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
@@ -361,7 +361,7 @@ Module Type BFREE.
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
                         pidv dq dqb m K eb C b lks.
@@ -381,7 +381,7 @@ Module Type BFREE.
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
                           pidv dq dqb m K eb C b lks.

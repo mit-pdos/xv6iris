@@ -102,7 +102,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     (γpr γl : gname) (γd : uart_names) (γv : disk_names)
     (m : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
-    (dm : pk_arg_desc) (lks : gset nat) :=
+    (dm : pk_arg_desc) (lks : gset string) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let msg := m !!! Regidx a0_idx in
   (panic_stack <= K)%nat ->
@@ -112,7 +112,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (* panic is printk + printk + self-jump; printk's bound is "pr" (14),
      and it reaches "uart" (15) under it via consputc. *)
-  locks_below lks (lock_rank "pr") ->
+  locks_below lks "pr" ->
   (* NOT about panic -- printk's precondition for acquire's panic arm.  See
      the header and PanicStub.v. *)
   panic_wp_any -∗
@@ -132,6 +132,6 @@ Module Type PANIC.
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
-      (dm : pk_arg_desc) (lks : gset nat),
+      (dm : pk_arg_desc) (lks : gset string),
       wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm lks.
 End PANIC.

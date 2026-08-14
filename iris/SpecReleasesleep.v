@@ -45,7 +45,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
     
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -59,7 +59,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      at once (LockRank.v).  releasesleep is BALANCED -- entry and exit
      [cpu_own] carry the same [lks] -- because the C's single return path
      releases lk->lk; the wakeup() in between is itself balanced. *)
-  locks_below lks (lock_rank "sleep lock") ->
+  locks_below lks "sleep lock" ->
   sie_cap_gpr m av b pme -∗
   cpu_own 0 eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -86,6 +86,6 @@ Module Type RELEASESLEEP.
 
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
 End RELEASESLEEP.

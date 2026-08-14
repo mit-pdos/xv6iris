@@ -385,7 +385,7 @@ Section ProofFreewalk.
 
   Definition fw_rec (l : nat) : Prop :=
     forall (CID0 : CpuId) (γa : gname) (mm : regfile) (t : ptree)
-           (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat),
+           (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string),
       wp_freewalk_sconf_body (CID:=CID0) γa mm t l K eb p C ilvl b lks.
 
   (* ================================================================== *)
@@ -393,7 +393,7 @@ Section ProofFreewalk.
   (* ================================================================== *)
   Local Lemma fw_epilogue `{CID0 : CpuId} (ilvl : nat) (γa : gname)
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (bpt : mword 44)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     (20 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
@@ -404,7 +404,7 @@ Section ProofFreewalk.
     (* THE FRESHNESS PREMISE: this epilogue acquires and releases
        [kmem.lock] internally (balanced -- [lks] is unchanged), so the
        caller must already hold only locks BELOW "kmem"'s rank. *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr mj (K - 6) b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -647,7 +647,7 @@ Section ProofFreewalk.
   Local Lemma fw_loop `{CID : CpuId} (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
       (γa : gname)
       (mm : regfile) (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset nat) :
+      (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset string) :
     (6 * S lvl + 14 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     (forall i : mword 9, fw_ok lvl t i) ->
@@ -660,7 +660,7 @@ Section ProofFreewalk.
     fw_thr mm m ->
     (* threaded on this recursion's own binder list too: it is what its
        [REC] call one level down, and its own [IH] back-edge, both need. *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr m (K - 6) b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -1292,7 +1292,7 @@ Section ProofFreewalk.
 
   Lemma wp_freewalk_sconf `{CID : CpuId} (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (ilvl : nat) (b : bool) (lks : gset nat)
+      (ilvl : nat) (b : bool) (lks : gset string)
     : wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b lks.
   Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) CID γa mm t K eb p C ilvl b lks). Qed.
 

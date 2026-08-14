@@ -506,7 +506,7 @@ Section WriteiDefs.
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
         (dn' dn0' : dinode) (n' : nat)
@@ -598,7 +598,7 @@ Section WriteiRet.
       (dist : nat) (dstb : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ncount n' : nat) (Sb Sb' : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc) (j : nat)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_writei <= K)%nat ->
     wi_sp m M ->
     (* the six registers this block does NOT restore are already back *)
@@ -981,7 +981,7 @@ Section WriteiJoin.
       (dist : nat) (dstb : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ncount u : nat) (Sb SbC : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_writei <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -1038,7 +1038,7 @@ Section WriteiJoin.
     (* the sixteen-byte receipt, as it stands BEFORE the flush *)
     wi16_pre (ba_bms A) ncount (S u) off n tot bm bm' Sb SbC ->
     uptd_ext (pv_upt V) P' ->
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1366,7 +1366,7 @@ Section WriteiSize.
       (dist : nat) (dstb : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ncount u : nat) (Sb SbC : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_writei <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -1416,7 +1416,7 @@ Section WriteiSize.
     (* the sixteen-byte receipt, travelling to the join unchanged *)
     wi16_pre (ba_bms A) ncount (S u) off n tot bm bm' Sb SbC ->
     uptd_ext (pv_upt V) P' ->
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1975,7 +1975,7 @@ Section WriteiLoop.
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat) (Sb : gset Z) (usv : mword 64)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_writei <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -2059,7 +2059,7 @@ Section WriteiLoop.
        SpecBfree.v's; [SpecWritei.v]'s [wp_writei_gen_body] /
        [wp_writei_sconf_body] now carry the same premise, threaded down to
        here from [wp_writei_gen]'s call to [wi_loop] (WriteiMain section). *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -3970,7 +3970,7 @@ Section WriteiMain.
       (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_writei_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                          cov logstart inodestart nib bmapstart size dev used γpr
                          ip inum bm data dn dn0
@@ -4975,7 +4975,7 @@ Section WriteiMain.
       (V : pprivate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                            cov logstart inodestart nib bmapstart size dev used γpr
                            ip inum bm data dn dn0

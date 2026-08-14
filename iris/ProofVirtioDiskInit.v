@@ -747,7 +747,7 @@ Section ProofVirtioDiskInit.
   Lemma wp_virtio_disk_init_sconf (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset nat)
+      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset string)
     : wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
                                      pd0 pav0 pu0 free0 lks.
   Proof.

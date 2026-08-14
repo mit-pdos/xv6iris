@@ -115,7 +115,7 @@ Definition wp_iunlock_sconf_body
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
   let ip : mword 64 := ientry k in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -126,7 +126,7 @@ Definition wp_iunlock_sconf_body
   (* THE FRESHNESS PREMISE: iunlock's own [holdingsleep] acquires and
      releases the sleeplock's inner "sleep lock" spinlock internally, so
      the caller must already hold only locks BELOW its rank. *)
-  locks_below lks (lock_rank "sleep lock") ->
+  locks_below lks "sleep lock" ->
   sie_cap_gpr m K b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -184,7 +184,7 @@ Module Type IUNLOCK.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
                             dn' bm' pidv dq m K eb p C b lks.
 End IUNLOCK.

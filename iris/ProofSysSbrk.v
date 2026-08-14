@@ -313,7 +313,7 @@ Section ProofSysSbrk.
      own [(b : bool)], and its continuation wrapped in [wp_next]. *)
   Local Lemma ss_eager `{CID0 : CpuId} (γa γf : gname)
       (m Me : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (sp0 : mword 64) (nw : mword 32) (b : bool) (lks : gset nat) :
+      (pid : mword 32) (V : pprivate) (sp0 : mword 64) (nw : mword 32) (b : bool) (lks : gset string) :
     (52 <= av)%nat ->
     Me !!! Regidx csp_rs1 = pa_stk sp0 6 ->
     Me !!! Regidx Rs0 = sp0 ->
@@ -498,7 +498,7 @@ Section ProofSysSbrk.
   (* =================================================================== *)
   Lemma wp_sys_sbrk_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string)
     : wp_sys_sbrk_sconf_body γa γf m av eb p C pid V v0 v1 b lks.
   Proof.
     cbv beta delta [wp_sys_sbrk_sconf_body].

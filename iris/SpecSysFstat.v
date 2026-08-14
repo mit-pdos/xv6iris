@@ -200,7 +200,7 @@ Definition wp_sys_fstat_sconf_body
     (fn : fstat_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
     (v : mword 64)                               (* syscall argument 0      *)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fstat in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -263,6 +263,6 @@ Module Type SYSFSTAT.
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (v : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b lks.
 End SYSFSTAT.

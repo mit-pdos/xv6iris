@@ -338,7 +338,7 @@ Section ProofFileread.
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string)
     : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].

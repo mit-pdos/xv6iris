@@ -530,7 +530,7 @@ Section ProofKerneltrapParts.
   Lemma kt_epi
       (m0 M : regfile) (sp0 ra0 s00 s10 s20 s30 vgap : mword 64)
       (ep epold : mword 64) (ms0 : mword 64)
-      (k lvl : nat) (C : iProp Σ) (va vb : mword 1) (lks : gset nat) :
+      (k lvl : nat) (C : iProp Σ) (va vb : mword 1) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     m0 !!! Regidx ra_idx = ra0 ->
     m0 !!! Regidx s0_idx = s00 ->

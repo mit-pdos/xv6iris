@@ -88,7 +88,7 @@ Section ProofSysFork.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset nat)
+      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string)
     : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
                              m lvl av eb p C b pid V lks.
   Proof.

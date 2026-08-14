@@ -69,14 +69,14 @@ Section SpecFilealloc.
 End SpecFilealloc.
 
 Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat) :=
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* filealloc's own frame is 4 slots (addi sp,sp,-32); acquire/release want 10
      below that. *)
   (14 <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-  locks_below lks (lock_rank "ftable") ->
+  locks_below lks "ftable" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -98,6 +98,6 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat),
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string),
       wp_filealloc_sconf_body γl γf m n eb p C K b lks.
 End FILEALLOC.

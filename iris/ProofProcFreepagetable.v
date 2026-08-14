@@ -230,7 +230,7 @@ Section ProofProcFreepagetable.
   Lemma wp_proc_freepagetable_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
     : wp_proc_freepagetable_sconf_body γa mm P K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_proc_freepagetable_sconf_body].

@@ -91,7 +91,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      (γs : list gname) (j : nat) (γl : gname)
     (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-    (dqt : dfrac) (b : bool) (lks : gset nat) :=
+    (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_pause in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -111,7 +111,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      "time"'s -- sys_pause acquires and releases [tickslock] (possibly many
      times, around each loop iteration's [sleep]) but is BALANCED overall,
      so [lks] is unchanged end to end. *)
-  locks_below lks (lock_rank "time") ->
+  locks_below lks "time" ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗
@@ -144,6 +144,6 @@ Module Type SYSPAUSE.
        (γs : list gname) (j : nat) (γl : gname)
       (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (dqt : dfrac) (b : bool) (lks : gset nat),
+      (dqt : dfrac) (b : bool) (lks : gset string),
       wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b lks.
 End SYSPAUSE.

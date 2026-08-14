@@ -102,7 +102,7 @@ Section ProofFreerange.
      migrated away from). *)
   Lemma frepi `{CID0 : CpuId}
       (m Me : regfile) (K ncnt : nat) (eb b : bool) (pcur : mword 64) (C : iProp Σ)
-      (γl : gname) (γk : gname * gname) (onf : option nat) (lks : gset nat) :
+      (γl : gname) (γk : gname * gname) (onf : option nat) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -113,7 +113,7 @@ Section ProofFreerange.
     (* THE FRESHNESS PREMISE: this iteration acquires and releases
        [kmem.lock] internally (balanced -- [lks] is unchanged), so the
        caller must already hold only locks BELOW "kmem"'s rank. *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     kernel_text -∗
     sie_cap_gpr Me (K - 6) b pcur -∗
     cpu_own ncnt eb pcur C b lks -∗
@@ -261,7 +261,7 @@ Section ProofFreerange.
   Lemma wp_freerange_sconf
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b lks.
   Proof.
     cbv beta delta [wp_freerange_sconf_body].

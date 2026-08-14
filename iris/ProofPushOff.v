@@ -235,7 +235,7 @@ Section ProofPushOff.
      px lks] the code after the flip wants.  The middle conjunct pair is what
      [intr_count_pre true k ebx] asks for, so that one is projected out. *)
   Lemma po_own_split `{GEN : GenId} `{CIDx : CpuId} (k : nat) (ebx : bool)
-      (px : mword 64) (Cx : iProp Σ) (bx : bool) (lks : gset nat) :
+      (px : mword 64) (Cx : iProp Σ) (bx : bool) (lks : gset string) :
     cpu_own k ebx px Cx bx lks -∗
     ⌜ bx = true -> k = 0%nat /\ ebx = true /\ lks = ∅ ⌝ ∗
     intr_count_pre bx k ebx ∗
@@ -259,7 +259,7 @@ Section ProofPushOff.
      at [b = false] the hart is pinned.  Same two-arm argument as
      [CpuOwn.cpu_own_transport]. *)
   Lemma po_cells_transport (CID0 CID1 : CpuId) (k : nat) (ebx : bool)
-      (px : mword 64) (bx : bool) (lks : gset nat) :
+      (px : mword 64) (bx : bool) (lks : gset string) :
     (bx = false \/ px = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
     (if bx then emp else cpu_priv (CID := CID0) k ebx px lks) -∗
     (if bx then emp else cpu_priv (CID := CID1) k ebx px lks).
@@ -617,7 +617,7 @@ Section ProofPushOff.
   Lemma wp_push_off_sconf `{GEN : GenId} `{CID : CpuId}
       (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_push_off_sconf_body m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_push_off_sconf_body].
@@ -1219,7 +1219,7 @@ Section ProofPushOff.
   (* pop_off's OWN [wp_next bexit] obligation ([bexit = true] there). *)
   Lemma wp_pop_off_sconf `{GEN : GenId} `{CID : CpuId}
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_pop_off_sconf_body m av n eb p C lks.
   Proof.
     cbv beta delta [wp_pop_off_sconf_body].

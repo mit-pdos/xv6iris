@@ -119,7 +119,7 @@ Section ProofVirtioDiskRw.
   Lemma wp_vdrw_p1
       (γd : disk_names) (γk : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (bno : mword 32) (lks : gset nat) :
+      (bno : mword 32) (lks : gset string) :
     let sp0 : Arch.pa := m !!! Regidx csp_rs1 in
     let bp  : Arch.pa := m !!! Regidx Ra0 in
     let wr  : mword 64 := m !!! Regidx Ra1 in
@@ -127,7 +127,7 @@ Section ProofVirtioDiskRw.
     (* acquire's order premise: every lock this hart already holds ranks
        below "virtio_disk"'s -- see the postcondition below for why this
        phase's OWN [lks] is not enough, it must also reach P6's release. *)
-    locks_below lks (lock_rank "virtio_disk") ->
+    locks_below lks "virtio_disk" ->
     sie_cap_gpr m K eb pj -∗
     cpu_own 0 eb pj C eb lks -∗
     (* NOT USED HERE: [wp_vdrw_p1] is pure prologue-plus-acquire, so the
@@ -148,13 +148,13 @@ Section ProofVirtioDiskRw.
            LockRank.v) via Acquire.wp_acquire_sconf and does not release it
            before this postcondition ("Lands at +0x036 holding the lock",
            above) -- SpecAcquire.v now confirms the held-lock set here is
-           [{[lock_rank "virtio_disk"]} ∪ lks], NOT [lks] unchanged.  This is
+           [{["virtio_disk"]} ∪ lks], NOT [lks] unchanged.  This is
            a LOCK-RETURNING phase, not a balanced one.  NOTE FOR THE NEXT
            READER: P2..P6 (ProofVirtioDiskRwB/C/D/E/F.v, none in this sweep's
            file list) continue this phase chain and almost certainly still
            thread the OLD bare [lks] through their own "holding the lock"
            cpu_own occurrences -- they need the matching fix, unverified here. *)
-        cpu_own 1 eb pj C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
+        cpu_own 1 eb pj C false ({["virtio_disk"]} ∪ lks) -∗
         arm_pay 0 eb pj -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗

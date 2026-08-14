@@ -68,7 +68,7 @@ Section ProofHoldingsleep.
 
   Lemma wp_holdingsleep_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset nat)
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
     : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
@@ -337,7 +337,7 @@ Section ProofHoldingsleep.
        [wp_next] index is the [false] we pass, so it collapses too -- the
        hart stays at [CIDacq] throughout, no transport needed. *)
     iApply (Myproc.wp_myproc_sconf Bj (trap_res b + (av - 6))%nat 1%nat b p C false
-              ({[lock_rank "sleep lock"]} ∪ lks)
+              ({["sleep lock"]} ∪ lks)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc").
@@ -483,7 +483,7 @@ Section ProofHoldingsleep.
     iDestruct (sl_res_close_held γsl slk R v Hvnz with "Hslk") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20
-              0%nat b p C (av - 6)%nat ({[lock_rank "sleep lock"]} ∪ lks)
+              0%nat b p C (av - 6)%nat ({["sleep lock"]} ∪ lks)
               ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR2] Hcnt Hpay").
@@ -495,7 +495,7 @@ Section ProofHoldingsleep.
        [Hfresh]'s bound gives the non-membership that collapses it back to
        the untouched [lks]. *)
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks);
+    iEval (rewrite (_ : ({["sleep lock"]} ∪ lks) ∖ {["sleep lock"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     assert (Hpc24 : ret_pc (D20 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.holdingsleep + 0x24))
       by (rewrite HD20ra; apply bv_eq; vm_compute; reflexivity).

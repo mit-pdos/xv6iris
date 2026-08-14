@@ -129,7 +129,7 @@ Section ProofBwrite.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bs bsd : list (bv 8)) (b : bool)
-      (Q : iProp Σ) (lks : gset nat)
+      (Q : iProp Σ) (lks : gset string)
     : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
                            pidv dev bno dq m K eb C bs bsd b Q lks.
   Proof.

@@ -153,7 +153,7 @@ Definition wp_prepare_return_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-    (epc : mword 64) (b : bool) (lks : gset nat) :=
+    (epc : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.prepare_return in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_prepare_return <= av)%nat ->
@@ -237,6 +237,6 @@ Module Type PREPARE_RETURN.
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
       (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-      (epc : mword 64) (b : bool) (lks : gset nat),
+      (epc : mword 64) (b : bool) (lks : gset string),
       wp_prepare_return_sconf_body γf ks pid V m av C p epc b lks.
 End PREPARE_RETURN.

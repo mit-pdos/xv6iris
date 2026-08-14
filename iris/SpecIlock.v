@@ -209,7 +209,7 @@ Definition wp_ilock_sconf_body
     (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ilock in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -235,7 +235,7 @@ Definition wp_ilock_sconf_body
      via bread/brelse (on the invalid-entry fill arm); bcache is the LOWER
      of the two, so one premise at its rank covers the whole cone via
      [locks_below_mono]. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread
@@ -348,7 +348,7 @@ Module Type ILOCK.
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g dev inum
                           pidv dq dqs m K eb C b lks.

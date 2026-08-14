@@ -270,7 +270,7 @@ Section CwBodies.
   (* ---- the function's own exit, as a [wp_next] at the entry hart ---- *)
 
   Definition cw_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
-      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) : iProp Σ :=
+      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        ∀ (mf : regfile) (r : Z) (P' : uptd),
          ⌜callee_saved m0 mf⌝ -∗
@@ -286,7 +286,7 @@ Section CwBodies.
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
      extension and the record compose, so the exit weakens along the loop. *)
   Lemma cw_ret_weaken `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
-      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (P1 : uptd) (n : Z) (lks : gset nat) :
+      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (P1 : uptd) (n : Z) (lks : gset string) :
     uptd_ext (pv_upt V) P1 ->
     cw_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
     cw_ret (CID0 := CID0) jp m0 av eb C pid (upd_upt V P1) n lks.
@@ -307,7 +307,7 @@ Section CwBodies.
   (* =================================================================== *)
   Lemma cw_epi `{CID : CpuId} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset nat) :
+      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 16%nat ->
@@ -501,7 +501,7 @@ Section CwBodies.
   (* =================================================================== *)
   Lemma cw_exit_done `{CID : CpuId} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset nat) :
+      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 16%nat ->
@@ -724,7 +724,7 @@ Section CwBodies.
   (* =================================================================== *)
   Lemma cw_exit_break `{CID : CpuId} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset nat) :
+      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 16%nat ->
@@ -942,7 +942,7 @@ Section CwBodies.
       (γa γf : gname) (γs : list gname) (jp : nat) (γlp γl : gname)
       (γu : uart_names) (γv : disk_names)
       (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (n : Z) (sp0 src : mword 64) (lks : gset nat) :
+      (pid : mword 32) (n : Z) (sp0 src : mword 64) (lks : gset string) :
     (jp < NPROC)%nat -> γs !! jp = Some γlp -> length γs = NPROC ->
     (n < 2 ^ 31)%Z ->
     (consolewrite_stack <= av)%nat ->
@@ -958,14 +958,14 @@ Section CwBodies.
       (true = false \/ proc_addr jp = zero_reg -> (CID : CPU) = CID0) ->
       (* consolewrite's own cone bottoms out at "proc" (11), NOT "kmem" (13):
          Uartwrite's CURRENT contract (SpecUartwrite.v) demands
-         [locks_below lks (lock_rank "proc")] -- its sleep_prepare/sleep calls
+         [locks_below lks "proc"] -- its sleep_prepare/sleep calls
          reach "proc" ahead of its own "uart" acquire -- and [locks_below_mono]
          only lifts a bound UP to a larger rank, never down.  A premise at
          "kmem" (13 > 11) could not supply Uartwrite's need at all.  "proc" is
          also low enough to cover EitherCopyin's anticipated "kmem" (13) floor
          once it is swept (11 <= 13), so it is the true floor of the whole
          cone, current and anticipated. *)
-      locks_below lks (lock_rank "proc") ->
+      locks_below lks "proc" ->
       kernel_text -∗
       sie_cap_gpr M (av - 16)%nat true (proc_addr jp) -∗
       cpu_own 0%nat eb (proc_addr jp) C true lks -∗
@@ -1519,7 +1519,7 @@ Section CwBodies.
       (γa : gname) (γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string)
     : wp_consolewrite_sconf_body γa γf γs jp γlp γu γv γl m av eb C pid V n b lks.
   Proof.
     cbv beta delta [wp_consolewrite_sconf_body].

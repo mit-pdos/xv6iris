@@ -134,7 +134,7 @@ Definition wp_iput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -168,7 +168,7 @@ Definition wp_iput_sconf_body
      truncate arm's nested acquiresleep, "log"/"bcache" via itrunc/iupdate.
      One bound covers all of them ([LockRank.locks_below_mono] /
      [locks_below_union_singleton] derive each at its own call site). *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   (* PARKING PREMISE -- UNCONDITIONAL.  iput MAY truncate, and no caller
      can know in advance which arm runs, so the bundle is not conditional.
      (Note (B1): under Route B the truncate arm's acquiresleep is the
@@ -329,7 +329,7 @@ Definition wp_iput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -354,7 +354,7 @@ Definition wp_iput_gen_body
   gs !! j = Some gl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   (* THE FRESHNESS PREMISE -- see [wp_iput_sconf_body]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
@@ -444,7 +444,7 @@ Module Type IPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb C b lks.
@@ -470,7 +470,7 @@ Module Type IPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
                        k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b lks.

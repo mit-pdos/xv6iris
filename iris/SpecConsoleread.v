@@ -110,7 +110,7 @@ Definition wp_consoleread_sconf_body
     (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -135,7 +135,7 @@ Definition wp_consoleread_sconf_body
      itself is unchanged end to end -- none of consoleread's other callees
      (myproc, killed, sleep_prepare, sleep, either_copyout) surface a lock
      of their own through this contract. *)
-  locks_below lks (lock_rank "cons") ->
+  locks_below lks "cons" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗
@@ -170,6 +170,6 @@ Module Type CONSOLEREAD.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γc : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
       wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b lks.
 End CONSOLEREAD.

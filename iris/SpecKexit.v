@@ -157,7 +157,7 @@ Definition wp_kexit_sconf_body
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
     (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     (pid : mword 32) (V : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
@@ -185,7 +185,7 @@ Definition wp_kexit_sconf_body
      "wait_lock" (10) and "proc" (11, nested while holding "wait_lock") are
      all higher and follow by [LockRank.locks_below_mono] /
      [locks_below_union_singleton] at each call site. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗
@@ -299,7 +299,7 @@ Module Type KEXIT.
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka

@@ -390,7 +390,7 @@ Section UwProps.
   Definition uw_next_cont `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset nat) : iProp Σ :=
+      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M' : regfile,
        ⌜ (S i < n)%nat ⌝ -∗
@@ -407,7 +407,7 @@ Section UwProps.
   Definition uw_exit_cont `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (lks : gset nat) : iProp Σ :=
+      (pidv : mword 32) (dqp : dfrac) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M' : regfile,
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n n ⌝ -∗
@@ -423,7 +423,7 @@ Section UwProps.
   Definition uw_head `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset nat) : iProp Σ :=
+      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M : regfile,
        ⌜ uw_loop_regs m0 M (pa_stk sp0 10) buf n i ⌝ -∗
@@ -439,7 +439,7 @@ Section UwProps.
   (* the tail's own continuation: uartwrite's postcondition, at ANY hart *)
   Definition uw_ret `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset nat) : iProp Σ :=
+      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf ⌝ -∗
@@ -483,7 +483,7 @@ Section UwBodies.
   Lemma uw_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γu : uart_names)
       (j : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (sp0 : mword 64)
-      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset nat) :
+      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset string) :
     let pj := proc_addr j in
     uw_tail_regs m0 M (pa_stk sp0 10) ->
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -751,7 +751,7 @@ Section UwBodies.
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset nat) :
+      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset string) :
     let pj := proc_addr j in
     (i < n)%nat ->
     (Z.of_nat n < 2 ^ 31)%Z ->
@@ -764,7 +764,7 @@ Section UwBodies.
        sleep_prepare AND sleep, both of which run before the acquire
        against the unchanged [lks] -- see SpecUartwrite.v.  The acquire
        call (at "uart", 15) widens this with [locks_below_mono]. *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
     procs_inv γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 10)%nat true pj -∗
@@ -1015,16 +1015,16 @@ Section UwBodies.
         assert (HcsK2 : callee_saved D2 K2).
         { rewrite /K2. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsK1]. }
         iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) K2
-                  0%nat true pj C (av - 10)%nat ({[lock_rank "uart"]} ∪ lks)
+                  0%nat true pj C (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HK2a0; apply uw_addv_0)
                   ltac:(unfold uartwrite_stack in Hav; lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu l with "Hown"). }
         iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hcnt".
         (* the release/park window: nothing is held across sleep() *)
-        pose proof (locks_below_not_elem lks (lock_rank "uart")
+        pose proof (locks_below_not_elem lks "uart"
                       ltac:(lkbelow)) as Hnotin.
-        assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
+        assert (Hsetback : ({["uart"]} ∪ lks) ∖ {["uart"]} = lks)
       by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hcnt".
         iEval (rewrite HK2ra P42) in "Hpc".
@@ -1174,16 +1174,16 @@ Section UwBodies.
         assert (HcsG4 : callee_saved D2 G4).
         { rewrite /G4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsG3]. }
         iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) G4
-                  0%nat true pj C (av - 10)%nat ({[lock_rank "uart"]} ∪ lks)
+                  0%nat true pj C (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HG4a0; apply uw_addv_0)
                   ltac:(unfold uartwrite_stack in Hav; lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu ((l ++ [f i])%list) with "Hown"). }
         iIntros (CIDr2 Hsr2 MR2) "Hcg Hpc %HcsR2 Hcnt".
         (* the byte's own turn is BALANCED: what it acquired it released *)
-        pose proof (locks_below_not_elem lks (lock_rank "uart")
+        pose proof (locks_below_not_elem lks "uart"
                       ltac:(lkbelow)) as Hnotin2.
-        assert (Hsetback2 : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
+        assert (Hsetback2 : ({["uart"]} ∪ lks) ∖ {["uart"]} = lks)
       by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback2) in "Hcnt".
         iEval (rewrite HG4ra P72) in "Hpc".
@@ -1274,14 +1274,14 @@ Section UwBodies.
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (k : nat) (lks : gset nat) :
+      (pidv : mword 32) (dqp : dfrac) (k : nat) (lks : gset string) :
     (Z.of_nat n < 2 ^ 31)%Z ->
     (j < NPROC)%nat -> γs !! j = Some γlp ->
     (uartwrite_stack <= av)%nat ->
     eb = true ->
     (* the turn's own lowest rank ("proc", 11 -- see [uw_one]), threaded
        unchanged to every [uw_one] turn *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     forall i : nat, (i + S k)%nat = n ->
     ⊢ kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
       procs_inv γs -∗ panic_wp_any -∗
@@ -1334,7 +1334,7 @@ Section ProofUartwrite.
       (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
-      (pidv : mword 32) (dqp : dfrac) (lks : gset nat)
+      (pidv : mword 32) (dqp : dfrac) (lks : gset string)
     : wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp lks.
   Proof.
     cbv beta delta [wp_uartwrite_sconf_body].

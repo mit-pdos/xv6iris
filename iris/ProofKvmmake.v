@@ -654,7 +654,7 @@ Section KvmmakeHouse.
      [ProofUvmdealloc.wp_uvmdealloc_epi] is. *)
   Lemma wp_kvmmake_epilogue_sconf `{CID0 : CpuId} (γa : gname)
       (mm Mf : regfile) (tf : ptree) (pas : nat -> mword 44)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -923,7 +923,7 @@ Section KvmmakeBody.
   Hypothesis wp_kalloc :
     forall `{CID : CpuId} (γl : gname) (γk : gname * gname)
       (fl : mword 64) (m : regfile) (on : option nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat),
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string),
       wp_kalloc_sconf_body γl γk fl m on n eb p C K b lks.
   Hypothesis wp_memset :
     forall `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat)
@@ -932,12 +932,12 @@ Section KvmmakeBody.
   Hypothesis wp_kvmmap :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
   Hypothesis wp_pms :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
       wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
 
   Ltac reg_neq :=
@@ -953,10 +953,10 @@ Section KvmmakeBody.
 
   Lemma wp_kmk_prologue_node `{CID0 : CpuId}
       (γa : gname) (mm : regfile) (K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) (b : bool) (lks : gset nat) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat ->
     (K_kvmmake < nb)%nat ->
     sie_cap_gpr mm K b p -∗
@@ -1209,10 +1209,10 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_uart `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset nat) :
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat ->
     (166 < nb)%nat ->
     (gsprev <= 0)%nat ->
@@ -1359,10 +1359,10 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_virtio `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset nat) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 2)%nat ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
@@ -1494,10 +1494,10 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_plic `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset nat) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 2)%nat ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
@@ -1629,10 +1629,10 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_text `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset nat) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 34)%nat ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
@@ -1780,10 +1780,10 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_data `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset nat) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 36)%nat ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
@@ -1957,10 +1957,10 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_tramp `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset nat) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     (48 <= K)%nat -> (166 < nb)%nat -> (gsprev <= 99)%nat ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
@@ -2114,7 +2114,7 @@ Section KvmmakeBody.
   (* pinning.                                                           *)
   (* ================================================================= *)
   Lemma wp_kvmmake_sconf_gen (γa : gname) (mm : regfile)
-      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :
+      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :
     wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks.
   Proof.
     unfold wp_kvmmake_sconf_body.
@@ -2270,7 +2270,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
   Definition wp_kvmmake_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
       : wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf (CID := CID'))

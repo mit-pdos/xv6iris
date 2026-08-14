@@ -605,7 +605,7 @@ Section KexecA.
   (*  callee below chains at the literal [true].                          *)
   (* =================================================================== *)
   Lemma kxc_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+      (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -927,7 +927,7 @@ Section KexecASeam.
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64)
       (n1 : nat) : iProp Σ :=
     let pj := proc_addr jp in
@@ -1118,7 +1118,7 @@ Section KexecAExit.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m Mt : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (68 <= K)%nat ->
     used' ⊆ used ->
@@ -1254,7 +1254,7 @@ Section KexecABad.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (C : iProp Σ) (lks : gset nat)
+      (m Mt : regfile) (K : nat) (C : iProp Σ) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
     (k < NINODE)%nat ->
@@ -1652,7 +1652,7 @@ Section KexecCBad.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (C : iProp Σ) (lks : gset nat)
+      (m Mt : regfile) (K : nat) (C : iProp Σ) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (P : uptd) (szf : mword 64) :
     (K_kexec <= K)%nat ->

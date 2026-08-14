@@ -654,7 +654,7 @@ Section KexecB2Body.
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
       (m Mt : regfile) (K : nat) (C : iProp Σ)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset nat) :
+      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok cov logstart ->
@@ -1208,7 +1208,7 @@ Section KexecB2Loops.
       (m : regfile) (K : nat) (C : iProp Σ)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
-      (ip : nat) (va : mword 64) (fz po : Z) (lks : gset nat) :
+      (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok cov logstart ->

@@ -51,7 +51,7 @@ Section ProofKfree.
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
 
-      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
     : wp_kfree_sconf_body γl γk lk fl m on n eb pcur C K b lks.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
@@ -630,7 +630,7 @@ Section ProofKfree.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
     iApply (Release.wp_release_sconf γl lk "kmem"%string (kmem_res γk fl) Rrel
-              n eb pcur C (K - 4)%nat ({[lock_rank "kmem"]} ∪ lks)
+              n eb pcur C (K - 4)%nat ({["kmem"]} ∪ lks)
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hkmem] Htok HRres Hcnt Hpay").
@@ -641,7 +641,7 @@ Section ProofKfree.
     rewrite -Hbmatch.
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
+    iEval (rewrite (_ : ({["kmem"]} ∪ lks) ∖ {["kmem"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     assert (Hpc54 : ret_pc (Rrel !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kfree + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }

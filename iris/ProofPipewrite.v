@@ -683,7 +683,7 @@ Section PwConts.
      paths land here: the n <= 0 arm, the loop exit and the copyin failure. *)
   Definition pw_tail `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (P' : uptd),
@@ -694,7 +694,7 @@ Section PwConts.
        pw_frame7 m sp0 -∗
        stack_own (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
+       cpu_own 1%nat eb (proc_addr j) C false ({["pipe"]} ∪ lks) -∗
        arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
@@ -707,7 +707,7 @@ Section PwConts.
      epilogue.  Reached when readopen == 0 or the process was killed. *)
   Definition pw_minus1 `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (P' : uptd),
@@ -717,7 +717,7 @@ Section PwConts.
        pw_frame5 m sp0 -∗
        pw_chslot sp0 -∗
        sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
+       cpu_own 1%nat eb (proc_addr j) C false ({["pipe"]} ∪ lks) -∗
        arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
@@ -730,7 +730,7 @@ Section PwConts.
      SHARE the epilogue closure. *)
   Definition pw_exits `{GEN : GenId} (CID0 : CPU) (γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
     (pw_tail CID0 γf γs j γl γp w q m av eb C lks pid V n sp0 pi
      ∧ pw_minus1 CID0 γf γs j γl γp w q m av eb C lks pid V n sp0 pi)%I.
@@ -738,7 +738,7 @@ Section PwConts.
   (* +0x8c: the loop BODY, entered with 0 <= i < n. *)
   Definition pw_loop `{GEN : GenId} (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi addr : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (i : Z) (M : regfile) (Pc : uptd),
@@ -749,7 +749,7 @@ Section PwConts.
        pw_frame5 m sp0 -∗
        pw_chslot sp0 -∗
        sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
+       cpu_own 1%nat eb (proc_addr j) C false ({["pipe"]} ∪ lks) -∗
        arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
@@ -924,7 +924,7 @@ Section PwGuard.
 
   Lemma pw_guard_step (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi addr : mword 64)
       (i : Z) (M : regfile) (Pc : uptd) :
     (0 < n)%Z -> (n < 2 ^ 31)%Z -> (0 <= i <= n)%Z ->
@@ -934,7 +934,7 @@ Section PwGuard.
     kernel_text -∗
     pw_frame7 m sp0 -∗ pw_frame5 m sp0 -∗ pw_chslot sp0 -∗
     sie_cap_gpr M (trap_res true + (av - 14))%nat false (proc_addr j) -∗
-    cpu_own 1%nat eb (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks) -∗
+    cpu_own 1%nat eb (proc_addr j) C false ({["pipe"]} ∪ lks) -∗
     arm_pay 0%nat eb (proc_addr j) -∗
     locked γl cpu_id -∗
     pipe_res γp pi -∗
@@ -1064,7 +1064,7 @@ Section ProofPipewrite.
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string)
     : wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b lks.
   Proof.
     cbv beta delta [wp_pipewrite_sconf_body].
@@ -1073,7 +1073,7 @@ Section ProofPipewrite.
        sleep) is reached with the held set still at [lks] (the entry set --
        see claude-notes/projects/lock-set.md's note on this function's
        region-crossing threading), so this one lift covers all of them. *)
-    assert (Hbelowproc : locks_below lks (lock_rank "proc"))
+    assert (Hbelowproc : locks_below lks "proc")
       by lkbelow.
     assert (Hav64 : (64 <= av)%nat) by (unfold pipewrite_stack in Hav; exact Hav).
     assert (H31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
@@ -1365,7 +1365,7 @@ Section ProofPipewrite.
         assert (HwdomW : forall r : regidx, r ∈ dom (rf_to_gmap T2)) by (intro r; apply rf_to_gmap_dom).
         assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
         iApply (Wakeup.wp_wakeup_sconf T2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false
-                  ({[lock_rank "pipe"]} ∪ lks)
+                  ({["pipe"]} ∪ lks)
                   HwK HwdomW Hlen Hwlvl ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
         all: try lkbelow.
@@ -1412,7 +1412,7 @@ Section ProofPipewrite.
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  T4 0%nat true (proc_addr j) C (av - 14)%nat ({[lock_rank "pipe"]} ∪ lks) HlkaT4 HavR
+                  T4 0%nat true (proc_addr j) C (av - 14)%nat ({["pipe"]} ∪ lks) HlkaT4 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -1482,7 +1482,7 @@ Section ProofPipewrite.
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  Q2 0%nat true (proc_addr j) C (av - 14)%nat ({[lock_rank "pipe"]} ∪ lks) HlkaQ2 HavR
+                  Q2 0%nat true (proc_addr j) C (av - 14)%nat ({["pipe"]} ∪ lks) HlkaQ2 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -2190,7 +2190,7 @@ Section ProofPipewrite.
           assert (Hlvl1 : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
           assert (Hav14 : (14 <= trap_res true + (av - 14))%nat) by lia.
           iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false
-                    ({[lock_rank "pipe"]} ∪ lks)
+                    ({["pipe"]} ∪ lks)
                     Ha0L3 Hj Hjlp Hlvl1 Hav14 ltac:(lkbelow)
                     with "Hcg Hown Htext Hpc Hpinv Hpanic").
           all: try lkbelow.
@@ -2349,7 +2349,7 @@ Section ProofPipewrite.
               assert (HwdomF : forall r : regidx, r ∈ dom (rf_to_gmap F2)) by (intro r; apply rf_to_gmap_dom).
               assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
               iApply (Wakeup.wp_wakeup_sconf F2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false
-                        ({[lock_rank "pipe"]} ∪ lks)
+                        ({["pipe"]} ∪ lks)
                         HwK HwdomF Hlen Hwlvl ltac:(lkbelow)
                         with "Hcg Hown Htext Hpc Hpanic Hpinv").
               all: try lkbelow.
@@ -2427,7 +2427,7 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
               iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp G2
                         (trap_res true + (av - 14))%nat 1%nat true C false
-                        ({[lock_rank "pipe"]} ∪ lks)
+                        ({["pipe"]} ∪ lks)
                         Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14 ltac:(lkbelow)
                         with "Hcg Hown Htext Hpc Hpinv Hpanic").
               all: try lkbelow.
@@ -2474,7 +2474,7 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsp. }
               iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                        G4 0%nat true (proc_addr j) C (av - 14)%nat ({[lock_rank "pipe"]} ∪ lks) HlkaG4 Hav10
+                        G4 0%nat true (proc_addr j) C (av - 14)%nat ({["pipe"]} ∪ lks) HlkaG4 Hav10
                         ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
               { iApply lock_finisher_close. }
@@ -2702,7 +2702,7 @@ Section ProofPipewrite.
                 with "[Hch]" as "Hbuf".
               { cbn [seq]. iSplitL "Hch"; [| done]. iEval (rewrite Ha2N5 pa_add_0). iExact "Hch". }
               iApply (Copyin.wp_copyin_sconf γa N5 Pc (pv_sz V) 1%nat (fun _ : nat => b0)
-                        (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks)
+                        (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false ({["pipe"]} ∪ lks)
                         HK50 Ha0N5 Ha1N5 Ha4N5 Hlen1 Hszb Hlvl1
                         with "Hcg Hown Htext Hpc Hpt Henv Hbuf").
               all: try lkbelow.

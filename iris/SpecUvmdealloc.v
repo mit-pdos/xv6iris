@@ -52,7 +52,7 @@ Import Defs.
 
 Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
-    (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmdealloc in
   let oldsz := mm !!! Regidx (mword_of_int 11) in
   let newsz := mm !!! Regidx (mword_of_int 12) in
@@ -67,7 +67,7 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
      [sz + n] an [sbrk] with a big negative argument computes. *)
   (uint oldsz <= uvm_maxsz)%Z ->
   (* order premise at the lowest rank this cone reaches. *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own 0%nat eb p C b lks -∗
   kernel_text -∗
@@ -92,6 +92,6 @@ Module Type UVMDEALLOC.
   Parameter wp_uvmdealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_uvmdealloc_sconf_body γa mm P K eb p C b lks.
 End UVMDEALLOC.

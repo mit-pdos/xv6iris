@@ -218,7 +218,7 @@ Section BallocDefs.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -336,7 +336,7 @@ Section BallocEpilogue.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
       (rv : mword 32)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
     ba_sp m M ->
     ba_thr3 m M ->
@@ -605,7 +605,7 @@ Section BallocOut.
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
     printk_gen_contract γpr γu γd ->
     ba_sp m M ->
@@ -988,7 +988,7 @@ Section BallocExhaust.
       (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
       (kk : nat) (bnoB : mword 32) (bsX bsdX : list (bv 8)) (dX : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
     printk_gen_contract γpr γu γd ->
     0 < size <= BPB ->
@@ -1000,7 +1000,7 @@ Section BallocExhaust.
     M !!! Regidx Rs8 = (mword_of_int 8192 : mword 64) ->
     (kk < NBUF)%nat ->
     (* ba_exhaust's own cone touches only "bcache" (brelse) *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1216,7 +1216,7 @@ Section BallocRestore.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (bi : Z)
       (u : nat) (cr : bool) (Sb : gset Z) (rv : mword 32)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
     ba_sp m M ->
     ba_thr9 m M ->
@@ -1485,7 +1485,7 @@ Section BallocBzero.
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
       (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (bsD : list (bv 8))
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
     0 < size <= BPB ->
     0 <= bi < size ->
@@ -1501,7 +1501,7 @@ Section BallocBzero.
     M !!! Regidx Rs7 = (sign_extend' 64 dev : mword 64) ->
     (* ba_bzero's own cone touches "log" (log_write) and "bcache"
        (bread/brelse) -- "log" is the floor *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -2056,7 +2056,7 @@ Section BallocAlloc.
       (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z)
       (kk : nat) (bnoB : mword 32) (bsdX : list (bv 8)) (dX : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_balloc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -2083,7 +2083,7 @@ Section BallocAlloc.
     (* ba_alloc's own cone touches "log" (log_write, directly and via
        ba_bzero) and "bcache" (brelse, directly and via ba_bzero) -- "log"
        is the floor *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -2508,7 +2508,7 @@ Section BallocScan.
       (used : gset Z) (u : nat) (cr : bool) (Sb : gset Z)
       (kk : nat) (bnoB : mword 32) (bsdX : list (bv 8)) (dX : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) (fuel : nat) :
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) (fuel : nat) :
     (K_balloc <= K)%nat ->
     printk_gen_contract γpr γu γd ->
     log_geom_ok cov logstart ->
@@ -2540,7 +2540,7 @@ Section BallocScan.
     (* ba_scan's own cone touches "log" (via ba_alloc's log_write) and
        "bcache" (via bread's inlining in ba_alloc/ba_exhaust) -- "log" is
        the floor *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 10)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -3380,7 +3380,7 @@ Section BallocMain.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : let pcE : mword 64 := mword_of_int KernelSyms.balloc in
       let pj := proc_addr j in
       let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -3398,7 +3398,7 @@ Section BallocMain.
       (* ba_main's own cone touches "log" (log_write, via ba_scan's
          ba_alloc) and "bcache" (bread, directly and via ba_scan) -- "log"
          is the floor *)
-      locks_below lks (lock_rank "log") ->
+      locks_below lks "log" ->
       sie_cap_gpr m K b pj -∗
       cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
@@ -4377,7 +4377,7 @@ Section BallocMain.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr u cr Sb
                          pidv dq dqb dqs m K eb C b lks.
@@ -4403,7 +4403,7 @@ Section BallocMain.
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u
                            pidv dq dqb dqs m K eb C b lks.

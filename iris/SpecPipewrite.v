@@ -84,7 +84,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipewrite in
   let pj := proc_addr j in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -108,7 +108,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      the whole cone touches, "pipe", covers every one of those:
      [locks_below_mono] lifts it to "proc" wherever a callee wants that
      instead (LockRank.v). *)
-  locks_below lks (lock_rank "pipe") ->
+  locks_below lks "pipe" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗
@@ -141,6 +141,6 @@ Module Type PIPEWRITE.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
       wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b lks.
 End PIPEWRITE.

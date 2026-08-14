@@ -94,7 +94,7 @@ Definition wp_syscall_sconf_body
     (R : gname -> mword 64 -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -157,6 +157,6 @@ Module Type SYSCALL.
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (lks : gset string),
       wp_syscall_sconf_body syscall_env γf γs j γl m av C pid V lks.
 End SYSCALL.

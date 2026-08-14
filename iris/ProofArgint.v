@@ -86,7 +86,7 @@ Section ProofArgint.
   Lemma wp_argint_sconf
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset nat)
+      (old : mword 32) (dqt : dfrac) (b : bool) (lks : gset string)
     : wp_argint_sconf_body m av n eb p C i tfp ws v old dqt b lks.
   Proof.
     cbv beta delta [wp_argint_sconf_body].

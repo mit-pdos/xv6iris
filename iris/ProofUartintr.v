@@ -145,7 +145,7 @@ Section UiCont.
 
   (* the caller's continuation, named once *)
   Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
-      (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
@@ -157,7 +157,7 @@ Section UiCont.
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
   Lemma ui_ret_cont_shift `{GEN : GenId} (CIDa CIDb : CpuId)  (m0 : regfile)
-      (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :
     (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     ui_ret_cont (CID0 := CIDa)  m0 av lvl eb pme C b lks -∗
     ui_ret_cont (CID0 := CIDb)  m0 av lvl eb pme C b lks.
@@ -189,7 +189,7 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   Lemma ui_tail `{CID0 : CpuId}
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (sp0 : mword 64) (b : bool) (lks : gset nat) :
+      (sp0 : mword 64) (b : bool) (lks : gset string) :
     ui_regs m0 M (pa_stk sp0 4) ->
     m0 !!! Regidx csp_rs1 = sp0 ->
     (uartintr_stack <= av)%nat ->
@@ -348,13 +348,13 @@ Section ProofUartintr.
      edge.  Hence the leading [∀ CIDk : CpuId] in the invariant. *)
   Lemma ui_rx (γu : uart_names) (γv : disk_names)
       (γs : list gname) (m0 : regfile) (av lvl : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) (b : bool) (lks : gset nat) :
+      (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) (b : bool) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     length γs = NPROC ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (uartintr_stack <= av)%nat ->
     (* the rx drain's own callee: consoleintr, directly at "cons" (5) *)
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     ⊢ ∀ (CIDe : CpuId) (M : regfile),
       ⌜ ui_regs m0 M (pa_stk sp0 4) ⌝ -∗
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
@@ -484,13 +484,13 @@ Section ProofUartintr.
   Lemma ui_rx_setup `{CID0 : CpuId} (γu : uart_names) (γv : disk_names)
        (γs : list gname)
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (sp0 : mword 64) (b : bool) (lks : gset nat) :
+      (sp0 : mword 64) (b : bool) (lks : gset string) :
     ui_regs m0 M (pa_stk sp0 4) ->
     m0 !!! Regidx csp_rs1 = sp0 ->
     length γs = NPROC ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (uartintr_stack <= av)%nat ->
-    locks_below lks (lock_rank "cons") ->
+    locks_below lks "cons" ->
     kernel_text -∗ dev_inv γu γv -∗
     procs_inv γs -∗ panic_wp_any -∗ console_caps γu -∗
     sie_cap_gpr M (av - 4)%nat b pme -∗
@@ -558,7 +558,7 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   Lemma wp_uartintr_sconf (γu : uart_names) (γv : disk_names)
       (γs : list gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_uartintr_sconf_body γu γv γs m av lvl eb pme C b lks.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].

@@ -111,7 +111,7 @@ Import Defs.
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
   (* a0 = pagetable, a1 = psz, a2 = dstva, a3 = src, a4 = len *)
   let src := mm !!! Regidx (mword_of_int 13) in
@@ -140,7 +140,7 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* copyout -> walkaddr -> walk; [walk] states its bound at "kmem" whether or
      not the alloc arm is taken *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗
@@ -167,6 +167,6 @@ Module Type COPYOUT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p C b lks.
 End COPYOUT.

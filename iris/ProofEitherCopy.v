@@ -408,7 +408,7 @@ Section ProofEitherCopyout.
   Lemma wp_either_copyout_sconf (γa : gname) (γf : gname)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset nat)
+      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
     : wp_either_copyout_sconf_body γa γf m av lvl eb p C pid V user len
         src_bytes dst_olds b lks.
   Proof.
@@ -1124,7 +1124,7 @@ Section ProofEitherCopyin.
   Lemma wp_either_copyin_sconf (γa : gname) (γf : gname)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset nat)
+      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
     : wp_either_copyin_sconf_body γa γf m av lvl eb p C pid V user len
         src_bytes dst_olds b lks.
   Proof.

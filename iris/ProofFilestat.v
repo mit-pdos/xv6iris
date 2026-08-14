@@ -193,7 +193,7 @@ Section ProofFilestat.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].

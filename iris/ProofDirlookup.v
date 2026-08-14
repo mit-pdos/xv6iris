@@ -266,7 +266,7 @@ Section ProofDirlookupMain.
   Definition dl_found_cont
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (ip nb pf pj ret_tgt : mword 64) (K : nat)
-      (b eb hasp : bool) (C : iProp Σ) (lks : gset nat) (dq dqd dqn : dfrac)
+      (b eb hasp : bool) (C : iProp Σ) (lks : gset string) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (gfs : fs_names) (bm : blkmap) (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (found : bool) (kk : nat) (kslot : nat) (q : Qp),
@@ -299,7 +299,7 @@ Section ProofDirlookupMain.
   Definition dl_loop_body
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
-      (b eb hasp : bool) (C : iProp Σ) (lks : gset nat) (dq dqd dqn : dfrac)
+      (b eb hasp : bool) (C : iProp Σ) (lks : gset string) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (gfs : fs_names) (bm : blkmap) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
     (∀ (i : nat) (Ml : regfile) (dol : nat -> bv 8) (mt10 : mword 64),
@@ -338,7 +338,7 @@ Section ProofDirlookupMain.
   Definition dl_latch_body
       (nrec : nat) (dn : dinode) (data : nat -> list (bv 8)) (s : list (bv 8))
       (m : regfile) (sp0 ip nb pf pj ret_tgt : mword 64) (K : nat)
-      (b eb hasp : bool) (C : iProp Σ) (lks : gset nat) (dq dqd dqn : dfrac)
+      (b eb hasp : bool) (C : iProp Σ) (lks : gset string) (dq dqd dqn : dfrac)
       (dev pofv pidv : mword 32) (fn : nat -> bv 8) (bn : bio_names)
       (gfs : fs_names) (bm : blkmap) (i : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (dol' : nat -> bv 8) (mt10' : mword 64),
@@ -388,7 +388,7 @@ Section ProofDirlookupMain.
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_dirlookup_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
                               ga gf cov logstart nib dev ip bm data dn
                               fn hasp pofv pidv dq dqd dqn m K eb C b lks.

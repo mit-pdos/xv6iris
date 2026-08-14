@@ -226,7 +226,7 @@ Section ProofProcPagetable.
 
   Lemma wp_proc_pagetable_core (γa : gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
     : wp_proc_pagetable_core_body γa mm tf dqtf lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_core_body].
@@ -1308,7 +1308,7 @@ Section SealProcPagetable.
 
   Lemma wp_proc_pagetable_sconf (γa : gname)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
     : wp_proc_pagetable_sconf_body γa mm tf dqtf lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_sconf_body].

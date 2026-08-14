@@ -74,7 +74,7 @@ Definition printint_stack : nat := 24%nat.
 
 Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat) :=
+    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let pcE := mword_of_int KernelSyms.printint in
@@ -84,7 +84,7 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (10 <= uint (m0 !!! Regidx a1_idx) <= 16)%Z ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* printint -> consputc -> uartputc_sync *)
-  locks_below lks (lock_rank "uart") ->
+  locks_below lks "uart" ->
   sie_cap_gpr m0 K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -106,6 +106,6 @@ Module Type PRINTINT.
   Parameter wp_printint_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat),
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string),
       wp_printint_sconf_body γl γd γv m0 K bs n eb C b p lks.
 End PRINTINT.

@@ -134,7 +134,7 @@ Section ProofWakeup.
   Definition wk_exit_body `{GEN : GenId}
       (pme spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (CID : CpuId) : iProp Σ :=
     (∀ Mexit : regfile,
        ⌜ Mexit !!! Regidx csp_rs1 = spF
@@ -157,7 +157,7 @@ Section ProofWakeup.
   Definition wk_loop_body `{GEN : GenId}
       (pme spF chan : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (CID0 : CpuId) (fuel : nat) (CID : CpuId) : iProp Σ :=
     (∀ (k : nat) (M : regfile),
        ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
@@ -208,14 +208,14 @@ Section ProofWakeup.
       (γs : list gname) (spF pme chan : mword 64)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (lvl : nat) (av : nat)
-      (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     length γs = NPROC ->
     (* the acquire/release + myproc push_off keep the transient +1 in range *)
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
     (* acquire's order premise, threaded to every iteration's acquire/release
        pair -- see [wp_wakeup_sconf] where it originates *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks "proc" ->
     procs_inv γs -∗
     (* acquire's "already holding" arm sits above panic() *)
     panic_wp_any -∗
@@ -513,7 +513,7 @@ Section ProofWakeup.
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
-                  lvl eb pme C av ({[lock_rank "proc"]} ∪ lks)
+                  lvl eb pme C av ({["proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
@@ -521,8 +521,8 @@ Section ProofWakeup.
         iIntros (CIDg Hsg mr) "Hcg Hpc %Hpinsr Hown".
         (* each iteration is BALANCED: what it acquired it released, so the
            set release hands back collapses to the loop invariant's [lks]. *)
-        pose proof (locks_below_not_elem lks (lock_rank "proc") Hfresh) as Hnotin.
-        assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+        pose proof (locks_below_not_elem lks "proc" Hfresh) as Hnotin.
+        assert (Hsetback : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks)
       by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hown".
         (* pc = wakeup+0x30 (release's return target). *)
@@ -853,7 +853,7 @@ Section ProofWakeup.
   Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId}
       
       (m : regfile) (γs : list gname) (pme : mword 64)
-      (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_wakeup_sconf_body m γs pme lvl K eb C b lks.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].

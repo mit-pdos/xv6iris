@@ -320,7 +320,7 @@ Section SsProps.
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (spd sp0 : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
@@ -331,7 +331,7 @@ Section SsProps.
       (∃ v : mword 64, pa_stk sp0 4 ↦₈ v) -∗
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
-      cpu_own 1 eb (proc_addr j) C false ({[lock_rank "log"]} ∪ lks) -∗
+      cpu_own 1 eb (proc_addr j) C false ({["log"]} ∪ lks) -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
@@ -342,7 +342,7 @@ Section SsProps.
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (spd sp0 : mword 64) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
@@ -353,7 +353,7 @@ Section SsProps.
       pa_stk sp0 4 ↦₈ (m !!! Regidx Rs2) -∗
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
-      cpu_own 1 eb (proc_addr j) C false ({[lock_rank "log"]} ∪ lks) -∗
+      cpu_own 1 eb (proc_addr j) C false ({["log"]} ∪ lks) -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
@@ -380,7 +380,7 @@ Section SsBodies.
   Lemma ss_tail_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (spd sp0 : mword 64) :
     let pj := proc_addr j in
     (K_sys_sync <= K)%nat ->
@@ -389,9 +389,9 @@ Section SsBodies.
     sp0 = m !!! Regidx csp_rs1 ->
     ss_regs0 m M spd ->
     (* the round trip's cancellation ([release]'s postcondition subtracts
-       "log" back off): [locks_add_del_below] needs [lock_rank "log" ∉ lks],
+       "log" back off): [locks_add_del_below] needs ["log" ∉ lks],
        which is exactly what this order premise gives. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
@@ -400,7 +400,7 @@ Section SsBodies.
     (∃ v : mword 64, pa_stk sp0 4 ↦₈ v) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    cpu_own 1 eb pj C false ({[lock_rank "log"]} ∪ lks) -∗
+    cpu_own 1 eb pj C false ({["log"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -498,11 +498,11 @@ Section SsBodies.
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) X3 0%nat eb pj C (K - 4)%nat
-              ({[lock_rank "log"]} ∪ lks)
+              ({["log"]} ∪ lks)
               Hrel_lka ltac:(pose proof (ss_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hrelcs Hown".
-    iEval (rewrite (locks_add_del_below (lock_rank "log") lks Hbelow)) in "Hown".
+    iEval (rewrite (locks_add_del_below "log" lks Hbelow)) in "Hown".
     assert (Hpc6a : ret_pc (X3 !!! Regidx Rra) = mword_of_int (SS + 0x6a))
       by (rewrite HX3ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc6a) in "Hpc".
@@ -638,7 +638,7 @@ Section SsBodies.
       (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (spd sp0 : mword 64) :
     let pj := proc_addr j in
     (K_sys_sync <= K)%nat ->
@@ -652,7 +652,7 @@ Section SsBodies.
        "log" covers the whole cone (LockRank.v: [locks_below_mono] lifts it to
        "proc", [locks_below_union_singleton] carries it across the "log" hold,
        [locks_add_del_below] cancels the release/re-acquire round trip). *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
@@ -665,7 +665,7 @@ Section SsBodies.
     pa_stk sp0 4 ↦₈ (m !!! Regidx Rs2) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    cpu_own 1 eb pj C false ({[lock_rank "log"]} ∪ lks) -∗
+    cpu_own 1 eb pj C false ({["log"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -673,9 +673,9 @@ Section SsBodies.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj HK Hj Hjl Hanch Hspd Hss Hbelow.
-    assert (Hbelowproc : locks_below lks (lock_rank "proc"))
+    assert (Hbelowproc : locks_below lks "proc")
       by lkbelow.
-    assert (Hbeloweproc : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "proc"))
+    assert (Hbeloweproc : locks_below ({["log"]} ∪ lks) "proc")
       by (apply locks_below_union_singleton; [vm_compute; lia | exact Hbelowproc]).
     iIntros "#Htext #Hlog #Hpanic #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
@@ -736,7 +736,7 @@ Section SsBodies.
       by (rewrite HA1a0; exact ss_log_nz).
     (* -------------------- sleep_prepare(&log) -------------------- *)
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl A1
-              (trap_res eb + (K - 4))%nat 1%nat eb C false ({[lock_rank "log"]} ∪ lks)
+              (trap_res eb + (K - 4))%nat 1%nat eb C false ({["log"]} ∪ lks)
               Hj Hjl HA1nz ss_noff2 ltac:(pose proof (ss_K22 K HK); lia) Hbeloweproc
               with "Hcg Hown Htext Hpc Hpinv Hpanic").
     all: try lkbelow.
@@ -787,11 +787,11 @@ Section SsBodies.
     (* -------------------- release(&log.lock) -------------------- *)
     iApply (Release.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) A3 0%nat eb pj C (K - 4)%nat
-              ({[lock_rank "log"]} ∪ lks)
+              ({["log"]} ∪ lks)
               Hrel_lka ltac:(pose proof (ss_K10 K HK); lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
     iIntros (CIDr Hsr mfr) "Hcg Hpc %Hrcs Hown".
-    iEval (rewrite (locks_add_del_below (lock_rank "log") lks Hbelow)) in "Hown".
+    iEval (rewrite (locks_add_del_below "log" lks Hbelow)) in "Hown".
     assert (Hp4a : ret_pc (A3 !!! Regidx Rra) = mword_of_int (SS + 0x4a))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4a) in "Hpc".
@@ -992,7 +992,7 @@ Section SsBodies.
       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (spd sp0 : mword 64) :
     let pj := proc_addr j in
     (K_sys_sync <= K)%nat ->
@@ -1008,7 +1008,7 @@ Section SsBodies.
     (∃ v : mword 64, pa_stk sp0 4 ↦₈ v) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
-    cpu_own 1 eb pj C false ({[lock_rank "log"]} ∪ lks) -∗
+    cpu_own 1 eb pj C false ({["log"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -1144,7 +1144,7 @@ Section ProofSysSync.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb C b lks.
   Proof.
     cbv beta delta [wp_sys_sync_sconf_body].

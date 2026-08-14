@@ -44,7 +44,7 @@ Definition wp_free_desc_sconf_body
      (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset nat) :=
+    (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.free_desc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_free_desc <= K)%nat ->
@@ -54,7 +54,7 @@ Definition wp_free_desc_sconf_body
   length γs = NPROC ->
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (* free_desc's only callee is wakeup, whose bound is "proc" (11). *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -90,6 +90,6 @@ Module Type FREEDESC.
        (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset nat),
+      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string),
       wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
 End FREEDESC.

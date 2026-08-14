@@ -96,7 +96,7 @@ Definition wp_write_head_sconf_body
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (Q : iProp Σ) (lks : gset nat) :=
+    (b : bool) (Q : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -111,7 +111,7 @@ Definition wp_write_head_sconf_body
   (* write_head reaches "bcache" (rank 4) via both bread (its own scan/
      recycle acquires) and brelse (its unlink/splice acquire); nothing in
      its cone touches a lower rank, so one premise covers both callees. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
@@ -198,7 +198,7 @@ Module Type WRITE_HEAD.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (Q : iProp Σ) (lks : gset nat),
+      (b : bool) (Q : iProp Σ) (lks : gset string),
       wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb C b Q lks.
 End WRITE_HEAD.

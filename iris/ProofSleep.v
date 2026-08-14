@@ -140,7 +140,7 @@ Section SleepJoin.
      to the entry hart (porting guide, "a helper lemma sharing the enclosing
      Section's Context"). *)
   Lemma cpu_own_ctx_take `{GEN : GenId} `{CID0 : CpuId}
-      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) (lks : gset nat) :
+      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) (lks : gset string) :
     cpu_own n eb p D false lks -∗ D ∗ cpu_own n eb p emp false lks.
   Proof.
     iIntros "[Hh HD]". iFrame "HD". rewrite cpu_own_off. iFrame "Hh".
@@ -150,17 +150,17 @@ Section SleepJoin.
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m mj : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 spd vgap : mword 64) (lks : gset nat) :
+      (sp0 spd vgap : mword 64) (lks : gset string) :
     let pj := proc_addr j in
     (20 <= av)%nat ->
     (j < NPROC)%nat ->
     (* [lks] IS THE SET SLEEP WAS ENTERED WITH, not the one it is holding
        here: the join is reached WITH p->lock still taken, so the ambient
-       [cpu_own] below carries [{[lock_rank "proc"]} ∪ lks] and the release at
+       [cpu_own] below carries [{["proc"]} ∪ lks] and the release at
        +0x22 hands [lks] back.  The ORDER premise is what makes that
        cancellation exact (via [locks_below_not_elem]), and it is the same one
        sleep's own acquire needed. *)
-    locks_below lks (lock_rank "proc"%string) ->
+    locks_below lks "proc"%string ->
     add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd ->
     sp0 = m !!! Regidx csp_rs1 ->
     (* NOTE: the old [⌜mj !!! x4 = cid_word⌝] premise is GONE -- [tp_pin]
@@ -184,7 +184,7 @@ Section SleepJoin.
     pc_is (mword_of_int (KernelSyms.sleep + 0x20)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    cpu_own 1 eb pj C false ({[lock_rank "proc"%string]} ∪ lks) -∗
+    cpu_own 1 eb pj C false ({["proc"%string]} ∪ lks) -∗
     (* the cells the RUNNING arm of the lock holds -- handed back by swtch on
        the park arm, never given up on the no-park one.  They go into the
        RUNNING lock at the release below, which is where the NEXT park will
@@ -307,7 +307,7 @@ Section SleepJoin.
     iDestruct "Hclm" as "[Hclmp Hclmx]".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
-              ({[lock_rank "proc"%string]} ∪ lks) Hlka
+              ({["proc"%string]} ∪ lks) Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
     (* release's exit index is [outb = eb]: at [eb = true] it re-enables at
@@ -319,8 +319,8 @@ Section SleepJoin.
        gives back, so the singleton insert and delete cancel -- which is
        exactly what [Hno] buys, once its ORDER bound is cashed for the
        non-membership the cancellation actually needs. *)
-    pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
-    assert (Hsetback : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
+    pose proof (locks_below_not_elem lks "proc"%string Hno) as Hnotin.
+    assert (Hsetback : ({["proc"%string]} ∪ lks) ∖ {["proc"%string]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     assert (Hpc26 : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
@@ -501,7 +501,7 @@ Section ProofSleepBody.
 
   Lemma wp_sleep_sconf
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
     : wp_sleep_sconf_body γs j γl m av eb C lks.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
@@ -510,10 +510,10 @@ Section ProofSleepBody.
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hext Hclmx Hcont".
     (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON.  swtch is contracted to
        run with p->lock and nothing else held (SpecSwtch.v pins
-       [{[lock_rank "proc"]}] on both sides), which is xv6's own
+       [{["proc"]}] on both sides), which is xv6's own
        [panic("sched locks")] discipline.  sleep's contract pins depth 0, so
        the entry set is forced empty and the set at the park is
-       [{[lock_rank "proc"]} ∪ ∅] -- the singleton itself. *)
+       [{["proc"]} ∪ ∅] -- the singleton itself. *)
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
        at level 0 they are forced equal ([CpuOwn.cpu_own_eb_agree]), so there
@@ -670,7 +670,7 @@ Section ProofSleepBody.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
        [false] and every leaf collapses with [wp_next_off] -- and the held SET
-       is [{[lock_rank "proc"]} ∪ lks] for exactly the same stretch, which is
+       is [{["proc"]} ∪ lks] for exactly the same stretch, which is
        what sched and the join half below are instantiated at. *)
     iIntros (CIDa Hsa ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu [Hpay Hclmp]".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
@@ -920,7 +920,7 @@ Section ProofSleepBody.
       assert (HC1ra : C1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sleep + 0x1c) : mword 64) 4)
         by (rewrite /C1 upd_eq; reflexivity).
       iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
-      (* the held set here is [{[lock_rank "proc"]} ∪ lks] with [lks = ∅];
+      (* the held set here is [{["proc"]} ∪ lks] with [lks = ∅];
          spell it as the bare singleton swtch's contract pins. *)
       iEval (rewrite Hlkempty locks_union_empty) in "Hcpuemp".
       iApply fupd_wp.
@@ -985,7 +985,7 @@ Section ProofSleepBody.
                       = mword_of_int (KernelSyms.sleep + 0x20)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc20) in "Hpc".
       (* re-inject the opaque context-slot payload into the returned bundle. *)
-      iAssert (cpu_own 1 eb (proc_addr j) C false ({[lock_rank "proc"%string]} ∪ lks))
+      iAssert (cpu_own 1 eb (proc_addr j) C false ({["proc"%string]} ∪ lks))
         with "[Hcpuemp HC]" as "Hcpu".
       { (* the bundle came back from swtch at the bare singleton the contract
            pins; [lks = ∅] is what makes that the same set. *)
@@ -1022,7 +1022,7 @@ Section ProofSleepBody.
   (* ===================================================================== *)
   Lemma wp_sleep_nested
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset string)
     : wp_sleep_nested_body γs j γl m av eb C n lks.
   Proof.
     cbv beta delta [wp_sleep_nested_body].
@@ -1313,15 +1313,15 @@ Section ProofSleepBody.
       { rewrite /proc_lock_res. iExists st0, ch0. iFrame "Hstate Hpg Hchan Hpub Hslot". }
       iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
                 (proc_lock_res γs γl (proc_addr j)) N7 (S n) eb pj C (av - 4)%nat
-                ({[lock_rank "proc"%string]} ∪ lks) Hlka
+                ({["proc"%string]} ∪ lks) Hlka
                 ltac:(lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
       iApply wp_next_off_intro.
       iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
       (* the no-park arm is BALANCED too: it took p->lock and gave it back, so
          the caller gets its own [lks] out at the same level [S n]. *)
-      pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
-      assert (Hsetback : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
+      pose proof (locks_below_not_elem lks "proc"%string Hno) as Hnotin.
+      assert (Hsetback : ({["proc"%string]} ∪ lks) ∖ {["proc"%string]} = lks)
         by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcpu".
       assert (Hpc26 : ret_pc (N7 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1538,7 +1538,7 @@ Section ProofSleepBody.
       (* +0x1c: sched() at noff = S (S n) >= 2 -- panic("sched locks").    *)
       (* ---------------------------------------------------------------- *)
       iApply (Sched.wp_sched_locks γs j γl Q1 (av - 4)%nat eb C n
-                ({[lock_rank "proc"%string]} ∪ lks)
+                ({["proc"%string]} ∪ lks)
                 Hj Hgl ltac:(lia) ltac:(lia)
                 with "Hcg Htext Hpc Hprocs Hlocked Hcpu Hpanic").
   Qed.

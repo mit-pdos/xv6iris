@@ -69,7 +69,7 @@ Import Defs.
 Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-    (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat) :=
+    (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmfree in
   let sz := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -96,7 +96,7 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* the table maps nothing above PGROUNDUP(sz): see the header *)
   dom um ⊆ vpn_run vpn0 n ->
   (* uvmfree -> uvmunmap/freewalk -> kfree *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗
@@ -117,6 +117,6 @@ Module Type UVMFREE.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat),
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string),
       wp_uvmfree_sconf_body γa mm uroot um K eb p C ilvl b lks.
 End UVMFREE.

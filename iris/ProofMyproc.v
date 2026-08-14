@@ -156,7 +156,7 @@ Section ProofMyproc.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_myproc_sconf
-      (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_myproc_sconf_body m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_myproc_sconf_body].

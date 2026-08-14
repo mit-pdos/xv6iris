@@ -137,7 +137,7 @@ Section UsertrapRes.
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1))%I.
 
   Definition ut_trap (pj : mword 64) (ksp : mword 64) (av : nat)
-      (C : iProp Σ) (lks : gset nat) : iProp Σ :=
+      (C : iProp Σ) (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
      (* the translation slot, in its KPT arm: THE KERNEL PAGE TABLE, on the
         SHARED tier ([KptShare.tlb_res_pt] inside), which is the whole point
@@ -183,7 +183,7 @@ Section UsertrapRes.
      once, stval twice) before ever folding them away. *)
   Lemma ut_trap_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
       (m : regfile) (ms : mword 64) (mie_v mdv0 menvcfg0 : mword 64)
-      (lks : gset nat) :
+      (lks : gset string) :
     sconf_ms_facts ms ->
     eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ->
     eq_vec (_get_Mstatus_SPP ms) ('b"1") = false ->
@@ -779,7 +779,7 @@ Section UsertrapRes.
      +0xa6 is reached at [true] from the syscall arm and at [false] from the
      other four. *)
   Definition ut_hold (Rsys : gname -> mword 64 -> iProp Σ)
-      (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) C b lks ∗
      trap_csrs_ext b ∗
      cpu_claim_ext b (un_pj N) ∗
@@ -814,7 +814,7 @@ Section UsertrapRes.
      [cpu_own 0 false pj C false] IS the two of them beside the caller's own
      frame.  ProofScheduler's [sc_flip_pre] is the same lemma at [C = emp];
      this one is [C]-generic because usertrap's frame is a parameter. *)
-  Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) (lks : gset string) :
     cpu_own 0%nat false pj C false lks -∗
     intr_count 0 false ∗ cpu_priv 0 true pj lks ∗ C.
   Proof.
@@ -872,7 +872,7 @@ Lemma ut_hold_transport
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> iProp Σ)
-    (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset nat) :
+    (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset string) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   ut_hold (CID := CID0) Rsys N V C b lks -∗ ut_hold (CID := CID1) Rsys N V C b lks.
 Proof.

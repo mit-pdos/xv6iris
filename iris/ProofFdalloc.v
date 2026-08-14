@@ -424,7 +424,7 @@ Section ProofFdalloc.
   Lemma wp_fdalloc_sconf
       (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
     : wp_fdalloc_sconf_body γf k D m av n eb p C pid V b lks.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].

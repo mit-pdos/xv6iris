@@ -351,7 +351,7 @@ Section ProofFetchaddr.
   (* =================================================================== *)
   Lemma wp_fetchaddr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string)
     : wp_fetchaddr_sconf_body γa γf m av eb p C pid V oldv b lks.
   Proof.
     cbv beta delta [wp_fetchaddr_sconf_body].

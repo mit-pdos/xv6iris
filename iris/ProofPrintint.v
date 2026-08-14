@@ -648,18 +648,18 @@ Section ProofPrintint.
 
   Hypothesis wp_consputc :
     forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat),
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string),
       wp_consputc_sconf_body γl γd γv m0 K bs n eb C b pcur lks.
 
   Lemma wp_printint_ploop (γl : gname) (γd : uart_names) (γv : disk_names) (K : nat)
-      (buf : mword 64) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (buf : mword 64) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (24 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     forall (j : nat) `(CID0 : CpuId) (bs : list (bv 8)) (mp : regfile),
     (j < 24)%nat ->
     mp !!! Regidx s1_idx = pa_add buf j ->
     mp !!! Regidx s2_idx = add_vec buf (mword_of_int (-1) : mword 64) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mp (K - 8)%nat b pcur -∗
     cpu_own n eb pcur C b lks -∗
     kernel_text -∗
@@ -811,7 +811,7 @@ Section ProofPrintint.
 
   Lemma wp_printint_tail `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m mt : regfile) (K nd : nat) (bs : list (bv 8))
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     let buf := pa_stk sp0 7 in
@@ -826,7 +826,7 @@ Section ProofPrintint.
     is_aligned_paddr (Physaddr (pa_stk sp0 7)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 6)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 5)) 8 = true ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mt (K - 8)%nat b pcur -∗
     cpu_own n eb pcur C b lks -∗
     kernel_text -∗
@@ -1045,7 +1045,7 @@ Section ProofPrintint.
 
   Lemma wp_printint_main `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names)
       (m mq : regfile) (K : nat) (x : mword 64) (bs : list (bv 8))
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
     let buf := pa_stk sp0 7 in
@@ -1060,7 +1060,7 @@ Section ProofPrintint.
     is_aligned_paddr (Physaddr (pa_stk sp0 7)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 6)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 5)) 8 = true ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mq (K - 8)%nat b pcur -∗
     cpu_own n eb pcur C b lks -∗
     kernel_text -∗
@@ -1364,7 +1364,7 @@ Section ProofPrintint.
 
   Lemma wp_printint_sconf_gen (γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat)
+      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string)
     : wp_printint_sconf_body γl γd γv m K bs n eb C b pcur lks.
   Proof.
     cbv beta delta [wp_printint_sconf_body].
@@ -1598,7 +1598,7 @@ End ProofPrintint.
 (* ===================================================================== *)
   Definition wp_printint_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat)
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string)
       : wp_printint_sconf_body γl γd γv m0 K bs n eb C b pcur lks :=
     wp_printint_sconf_gen
       (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' C' b' pcur' lks' =>

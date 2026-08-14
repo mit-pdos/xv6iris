@@ -52,11 +52,11 @@ Section CpuOwn.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     ((if b then ⌜ n = 0%nat /\ eb = true /\ lks = ∅ ⌝ else cpu_hart n eb p lks) ∗ C)%I.
 
   (* at the disabled index the bundle IS the cells + the token + the slot *)
-  Lemma cpu_own_off (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Lemma cpu_own_off (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     cpu_own n eb p C false lks ⊣⊢ cpu_hart n eb p lks ∗ C.
   Proof. reflexivity. Qed.
 
@@ -66,7 +66,7 @@ Section CpuOwn.
      below refutes it), because the arm already owns them. *)
   (* THE THEOREM THE WHOLE ABSTRACTION EXISTS FOR is the [lks = ∅] conjunct:
      a hart with interrupts ENABLED holds no spinlock. *)
-  Lemma cpu_own_on (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Lemma cpu_own_on (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     cpu_own n eb p C true lks ⊣⊢ ⌜ n = 0%nat /\ eb = true /\ lks = ∅ ⌝ ∗ C.
   Proof. reflexivity. Qed.
 
@@ -75,7 +75,7 @@ Section CpuOwn.
   Proof. iIntros "HC". iFrame "HC". iPureIntro. done. Qed.
 
   (* THE MOVE push_off makes at the enabled arm, and pop_off's inverse. *)
-  Lemma cpu_own_of_arm (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Lemma cpu_own_of_arm (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     cpu_own n eb p C true lks -∗
     cpu_hart 0 true p ∅ -∗
     cpu_own 0 true p C false ∅.
@@ -88,7 +88,7 @@ Section CpuOwn.
 
   (* the cells are EXCLUSIVE, so nobody holds them beside the enabled arm *)
   Lemma cpu_hart_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)
-      (lks lks' : gset nat) :
+      (lks lks' : gset string) :
     cpu_hart n eb p lks -∗ cpu_hart n' eb' p' lks' -∗ False.
   Proof.
     iIntros "(((_ & Hn & _ & _) & _) & _) (((_ & Hn' & _ & _) & _) & _)".
@@ -99,7 +99,7 @@ Section CpuOwn.
   Qed.
 
   Lemma cpu_own_arm_excl (n n' : nat) (eb eb' : bool) (p p' : mword 64)
-      (C : iProp Σ) (lks : gset nat) :
+      (C : iProp Σ) (lks : gset string) :
     sie_arm true p -∗ cpu_own n' eb' p' C false lks -∗ False.
   Proof.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hh) [Hh' _]".
@@ -132,7 +132,7 @@ Section CpuOwn.
      [eb = false].  At [b = false] with [n = S _] the match is [false]
      unconditionally and there is nothing to derive. *)
   Lemma cpu_own_eb_agree (m : regfile) (K : nat) (n : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (b : bool) {lks : gset nat} :
+      (p : mword 64) (C : iProp Σ) (b : bool) {lks : gset string} :
     sie_cap_gpr m K b p -∗ cpu_own n eb p C b lks -∗
     ⌜ match n with O => eb | S _ => false end = b ⌝.
   Proof.
@@ -154,7 +154,7 @@ Section CpuOwn.
      "state the contract at [b = false]" a VACUITY rather than a weakening for
      every level-0/enabled-base contract: there is no [b = false] instance. *)
   Lemma cpu_own_forces_on (m : regfile) (K : nat) (p : mword 64)
-      (C : iProp Σ) (b : bool) {lks : gset nat} :
+      (C : iProp Σ) (b : bool) {lks : gset string} :
     sie_cap_gpr m K b p -∗ cpu_own 0 true p C b lks -∗ ⌜ b = true ⌝.
   Proof.
     destruct b; [ by iIntros "_ _" |].
@@ -166,7 +166,7 @@ Section CpuOwn.
   (* ... and the dual, which needs no capability at all: the enabled index's
      own arm carries [⌜n = 0⌝]. *)
   Lemma cpu_own_forces_off (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (lks : gset nat) :
+      (lks : gset string) :
     cpu_own (S n) eb p C true lks -∗ False.
   Proof.
     iIntros "[%Hpure _]". destruct Hpure as [Hn _]. discriminate Hn.
@@ -216,7 +216,7 @@ Section CpuOwn.
      is enough -- both arms supply it, the enabled one because it forces
      [lks = ∅]. *)
   Lemma cpu_own_size_le (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
     cpu_own n eb p C b lks -∗ ⌜(size lks <= n)%nat⌝ ∗ cpu_own n eb p C b lks.
   Proof.
     destruct b.
@@ -240,7 +240,7 @@ Section CpuOwn.
      [SpecUsertrap], whose [lks] is equally abstract but whose depth is the
      same zero. *)
   Lemma cpu_own_zero_empty (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
     cpu_own 0%nat eb p C b lks -∗ ⌜lks = ∅⌝ ∗ cpu_own 0%nat eb p C b lks.
   Proof.
     iIntros "H". iDestruct (cpu_own_size_le with "H") as "[%Hsz H]".
@@ -248,10 +248,10 @@ Section CpuOwn.
   Qed.
 
   Lemma cpu_own_locks_swap (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (lks : gset nat) :
+      (lks : gset string) :
     cpu_own n eb p C false lks -∗
     cpu_locks lks ∗ ⌜(size lks <= n)%nat⌝ ∗
-    (∀ lks' : gset nat,
+    (∀ lks' : gset string,
        ⌜(size lks' <= n)%nat⌝ -∗ cpu_locks lks' -∗ cpu_own n eb p C false lks').
   Proof.
     iIntros "Hown".
@@ -271,7 +271,7 @@ Section CpuOwn.
      continuation) without disturbing the rest.  Index-generic: [C] is a
      frame at either arm. *)
   Lemma cpu_own_ctx_swap (n : nat) (eb : bool) (p : mword 64)
-      (C C' : iProp Σ) (b : bool) (lks : gset nat) :
+      (C C' : iProp Σ) (b : bool) (lks : gset string) :
     cpu_own n eb p C b lks -∗ (C -∗ C') -∗ cpu_own n eb p C' b lks.
   Proof.
     iIntros "[Hrest HC] HW". iFrame "Hrest". iApply ("HW" with "HC").
@@ -286,7 +286,7 @@ Section CpuOwn.
      holds a fraction of it -- so neither [c->proc] store is mask-changing
      and neither needs anything but this bundle. *)
   Lemma cpu_own_set_proc (n : nat) (eb : bool)
-      (p p' : mword 64) (C : iProp Σ) (lks : gset nat) :
+      (p p' : mword 64) (C : iProp Σ) (lks : gset string) :
     cpu_own n eb p C false lks -∗
     (cur_proc p ∗
      (cur_proc p' -∗ cpu_own n eb p' C false lks)).
@@ -314,7 +314,7 @@ End CpuOwn.
 (* ===================================================================== *)
 Lemma cpu_own_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (n : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) {lks : gset nat} :
+    (C : iProp Σ) (b : bool) {lks : gset string} :
   (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   cpu_own (CID := CID0) n eb p C b lks -∗ cpu_own (CID := CID1) n eb p C b lks.
 Proof.

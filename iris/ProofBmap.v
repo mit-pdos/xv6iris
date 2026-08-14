@@ -401,7 +401,7 @@ Section BmapKit.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_balloc_gen_body (GEN := GENa) (CID := CIDa)
                             γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u cr Sb
@@ -415,7 +415,7 @@ Section BmapKit.
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat) (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool) (lks : gset nat),
+      (K : nat) (b : bool) (lks : gset string),
       wp_log_write_gen_body (GEN := GENa) (CID := CIDa) bn γ γfs γd cov logstart dev k pidv bno
                               bs bsl bsd d u cr Sb m n eb p C K b lks.
 End BmapKit.
@@ -438,7 +438,7 @@ Definition bm_gen_stmt
     (n : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqd : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -579,7 +579,7 @@ Section BmapDefs.
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (fbn : nat) (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
         (Sb' : gset Z),
@@ -644,7 +644,7 @@ Section BmapEpilogue.
       (ip : mword 64) (bm bm' : blkmap) (data data' : nat -> list (bv 8))
       (fbn : nat) (n n' : nat) (cr : bool) (Sb Sb' : gset Z) (rv : mword 32)
       (pidv : mword 32) (dq dqd : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_bmap <= K)%nat ->
     bm_sp m M ->
     bm_thr5 m M ->
@@ -981,7 +981,7 @@ Section BmapRelease.
       (fbn : nat) (n n' : nat) (cr : bool) (Sb Sb' : gset Z) (rv : mword 32)
       (kk : nat) (ibn : mword 32) (bsX bsdX : list (bv 8)) (dX : bool)
       (pidv : mword 32) (dq dqd : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_bmap <= K)%nat ->
     bm_sp m M ->
     bm_thr6 m M ->
@@ -1005,7 +1005,7 @@ Section BmapRelease.
        no-alloc caller, so "bcache" -- the strongest bound BOTH can supply
        (the alloc-capable one by [locks_below_mono] down from "log", the
        no-alloc one directly) -- is what it takes. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1174,7 +1174,7 @@ Section BmapTail.
       (ip : mword 64) (bm bmI : blkmap) (data : nat -> list (bv 8))
       (fbn q : nat) (n nI : nat) (cr crb cri : bool) (Sb SbI : gset Z)
       (pidv : mword 32) (dq dqd : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_bmap <= K)%nat ->
     log_geom_ok cov logstart ->
     blkmap_wf cov logstart bmI ->
@@ -1227,11 +1227,11 @@ Section BmapTail.
        caller (both instantiations of BmapCore can supply it: the
        alloc-capable one via [locks_below_mono] down from "log", the
        no-alloc one directly). *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     (* log_write, by contrast, is reached only on the allocating arm, so
        the caller that cannot allocate (BmapNoallocProof, ak = None) never
        has to supply "log" -- only the unconditional "bcache" above. *)
-    (ak <> None -> locks_below lks (lock_rank "log")) ->
+    (ak <> None -> locks_below lks "log") ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -2171,14 +2171,14 @@ Section ProofBmapMain.
       (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
       (Hba : ak <> None -> balloc_contract)
       (Hlw : ak <> None -> log_write_contract)
       (* forwarded verbatim into [bm_indirect_tail]'s two lock premises --
          see that lemma's header for why the split is unconditional bcache
          / ak-gated log rather than one premise. *)
-      (Hbc : locks_below lks (lock_rank "bcache"))
-      (Hlog : ak <> None -> locks_below lks (lock_rank "log"))
+      (Hbc : locks_below lks "bcache")
+      (Hlog : ak <> None -> locks_below lks "log")
     : bm_gen_stmt γs j γl γu γd γk pd pav pu bn ak γfs
                   cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb C b lks.
   Proof.
@@ -3575,7 +3575,7 @@ Section BmapSeal.
       (n : nat)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr ip bm data fbn n
                          pidv dq dqd dqb dqs m K eb C b lks.
@@ -3661,7 +3661,7 @@ Section BmapSeal.
       (n : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_bmap_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                        cov logstart bmapstart size dev used γpr ip bm data fbn
                        n cr Sb
@@ -3749,7 +3749,7 @@ Section BmapNoallocSeal.
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_bmap_noalloc_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                  cov logstart dev ip bm data fbn pidv dq dqd
                                  m K eb C b lks.

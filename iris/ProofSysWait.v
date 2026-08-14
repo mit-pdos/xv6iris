@@ -95,7 +95,7 @@ Section ProofSysWait.
 
   Lemma wp_sys_wait_sconf
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate) (v0 : mword 64)
     : wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b lks pid V v0.
   Proof.

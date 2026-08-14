@@ -32,6 +32,6 @@ Module Userinit : USERINIT.
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (on : option nat) (v0 : mword 64) (b : bool) (lks : gset nat),
+      (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
       wp_userinit_sconf_body γa γs m0 K eb pj C on v0 b lks.
 End Userinit.

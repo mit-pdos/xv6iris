@@ -61,7 +61,7 @@ Definition wp_brelse_sconf_body
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset nat) :=
+    (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.brelse in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_brelse <= K)%nat ->
@@ -73,7 +73,7 @@ Definition wp_brelse_sconf_body
      rank-6 "sleep lock") only needs a HIGHER bound -- [locks_below_mono]
      gets there from this one, so "bcache" (the lowest rank brelse touches)
      is the only premise stated here. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -109,6 +109,6 @@ Module Type BRELSE.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset nat),
+      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string),
       wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b lks.
 End BRELSE.

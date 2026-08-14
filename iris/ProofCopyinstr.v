@@ -910,7 +910,7 @@ Section ProofCopyinstr.
   Local Lemma cs_loop (γa : gname)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ)
       (dst spr : mword 64) (maxn : nat)
-      (v10 v11 : mword 64) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (v10 v11 : mword 64) (b : bool) (pcur : mword 64) (lks : gset string) :
     (50 <= K)%nat ->
     (Z.of_nat maxn < 18446744073709551616)%Z ->
     (uint szv <= 2 ^ 38)%Z ->
@@ -929,7 +929,7 @@ Section ProofCopyinstr.
     m !!! Regidx Rs9 = (mword_of_int 1 : mword 64) ->
     m !!! Regidx Rs10 = v10 ->
     m !!! Regidx Rs11 = v11 ->
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr m (K - 12)%nat b pcur -∗
     cpu_own lvl eb pcur C b lks -∗
     kernel_text -∗
@@ -1895,7 +1895,7 @@ Section ProofCopyinstr.
   Lemma wp_copyinstr_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyinstr_sconf_body].

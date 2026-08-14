@@ -196,7 +196,7 @@ Section ProofFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (ilvl : nat) (lks : gset nat)
+      (ilvl : nat) (lks : gset string)
     : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
   Proof.
     cbv beta delta [wp_freeproc_sconf_body].

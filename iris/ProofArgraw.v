@@ -1237,7 +1237,7 @@ Section ProofArgraw.
   Lemma wp_argraw_sconf
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
-      (dqt : dfrac) (b : bool) (lks : gset nat)
+      (dqt : dfrac) (b : bool) (lks : gset string)
     : wp_argraw_sconf_body m av n eb p C i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_argraw_sconf_body].

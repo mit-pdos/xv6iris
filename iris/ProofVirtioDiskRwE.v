@@ -226,7 +226,7 @@ Section ProofVirtioDiskRwE.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
-      (kq : nat * positive) (lks : gset nat) : iProp Σ :=
+      (kq : nat * positive) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
@@ -244,7 +244,7 @@ Section ProofVirtioDiskRwE.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
+       cpu_own 1 eb (proc_addr j) C false ({["virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) -∗
@@ -266,7 +266,7 @@ Section ProofVirtioDiskRwE.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (h m2 t : nat) (q : nat) (pin : _)
-      (m0 : regfile) (kq : nat * positive) (lks : gset nat) : iProp Σ :=
+      (m0 : regfile) (kq : nat * positive) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ M : regfile,
        ⌜vdrw_regs M sp0 b wr sector
@@ -274,7 +274,7 @@ Section ProofVirtioDiskRwE.
         /\ M !!! Regidx Rs2 = (mword_of_int 1 : SailStdpp.Values.mword 64)
         /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
+       cpu_own 1 eb (proc_addr j) C false ({["virtio_disk"]} ∪ lks) -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b4) : mword 64) -∗
@@ -369,7 +369,7 @@ Section ProofVirtioDiskRwE.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (m0 : regfile) (kq : nat * positive)
-      (lks : gset nat) :
+      (lks : gset string) :
     (K_virtio_disk_rw <= K)%nat ->
     (j < NPROC)%nat -> γs !! j = Some γl ->
     (* THE BUFFER POINTER IS NON-NULL.  [sleep_prepare] panics on a zero
@@ -380,7 +380,7 @@ Section ProofVirtioDiskRwE.
     eq_vec (b : SailStdpp.Values.mword 64) (zero_reg : SailStdpp.Values.mword 64) = false ->
     (* the seam still holds disk.vdisk_lock; sleep_prepare/wakeup at
        "proc" (11) follow from this by [locks_below_mono]. *)
-    locks_below lks (lock_rank "virtio_disk") ->
+    locks_below lks "virtio_disk" ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -389,7 +389,7 @@ Section ProofVirtioDiskRwE.
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk
                  m0 kq lks -∗
     P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
-                    bs_disk m0 kq ({[lock_rank "virtio_disk"]} ∪ lks).
+                    bs_disk m0 kq ({["virtio_disk"]} ∪ lks).
   Proof.
     intros HK Hj Hjl Hbnz Hbelow.
     iIntros "#Htext #Hpanic #Hpinv #Hdinv #Hlk Hexit".
@@ -477,7 +477,7 @@ Section ProofVirtioDiskRwE.
       (* ================= sleep_prepare(b) ================= *)
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl W2
                 (trap_res eb + (K - 12))%nat 1%nat eb C false
-                ({[lock_rank "virtio_disk"]} ∪ lks)
+                ({["virtio_disk"]} ∪ lks)
                 Hj Hjl ltac:(rewrite HW2a0; exact Hbnz) vdrwb_lvl1
                 ltac:(pose proof (vdrw_K22 K HK); lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
@@ -535,7 +535,7 @@ Section ProofVirtioDiskRwE.
       (* ================= release(&disk.vdisk_lock) ================= *)
       iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string
                 (disk_res γd pd pav pu) W4 0%nat eb (proc_addr j) C (K - 12)%nat
-                ({[lock_rank "virtio_disk"]} ∪ lks)
+                ({["virtio_disk"]} ∪ lks)
                 HW4a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
       iIntros (CIDrl Hsrl mfr) "Hcg Hpc %Hrcs Hown". rgall.
@@ -572,7 +572,7 @@ Section ProofVirtioDiskRwE.
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
       (* the release above gave the virtio rank back; spell the set as the
          bare entry one sleep's contract names. *)
-      iEval (rewrite (locks_add_del_below (lock_rank "virtio_disk") lks Hbelow)) in "Hown".
+      iEval (rewrite (locks_add_del_below "virtio_disk" lks Hbelow)) in "Hown".
       iApply (Sleep.wp_sleep_sconf γs j γl W5 (K - 12)%nat eb C lks
                 Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").

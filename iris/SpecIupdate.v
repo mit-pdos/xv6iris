@@ -131,7 +131,7 @@ Definition wp_iupdate_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -185,7 +185,7 @@ Definition wp_iupdate_sconf_body
   (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  iupdate itself never
@@ -297,7 +297,7 @@ Definition wp_iupdate_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -351,7 +351,7 @@ Definition wp_iupdate_gen_body
   (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
@@ -457,7 +457,7 @@ Definition wp_iupdate_cred_body
     (u : nat) (Sb : gset Z) (cru : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -521,7 +521,7 @@ Definition wp_iupdate_cred_body
   (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -636,7 +636,7 @@ Definition wp_iupdate_credgen_body
     (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -671,7 +671,7 @@ Definition wp_iupdate_credgen_body
   (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
@@ -791,7 +791,7 @@ Definition wp_iupdate_link_body
     (u : nat) (Sb : gset Z) (cru : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -819,7 +819,7 @@ Definition wp_iupdate_link_body
   (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -930,7 +930,7 @@ Definition wp_iupdate_unlink_body
     (u : nat) (Sb : gset Z) (cru : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -959,7 +959,7 @@ Definition wp_iupdate_unlink_body
   (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
      ("bcache", 4) -- "log" is the lowest, so one premise there covers the
      whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -1025,7 +1025,7 @@ Module Type IUPDATE.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb C b lks.
@@ -1049,7 +1049,7 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
                           pidv dq dqd dqn dqs m K eb C b lks.
@@ -1072,7 +1072,7 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb C b lks.
@@ -1099,7 +1099,7 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
                               pidv dq dqd dqn dqs m K eb C b lks.
@@ -1125,7 +1125,7 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb C b lks.
@@ -1150,7 +1150,7 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                              pidv dq dqd dqn dqs m K eb C b lks.

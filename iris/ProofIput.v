@@ -421,9 +421,9 @@ Qed.
    iput's single nested acquiresleep, at exactly the held set iput has there
    ({[itable]} plus whatever its caller brought). *)
 Axiom iput_acquiresleep_order_ADMITTED :
-  forall lks : gset nat,
-    locks_below lks (lock_rank "itable") ->
-    locks_below ({[lock_rank "itable"]} ∪ lks) (lock_rank "sleep lock").
+  forall lks : gset string,
+    locks_below lks "itable" ->
+    locks_below ({["itable"]} ∪ lks) "sleep lock".
 
 (* ===================================================================== *)
 
@@ -451,7 +451,7 @@ Section IputCommon.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Lemma ip_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      `{GEN : GenId} `{CID : CpuId} (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+      `{GEN : GenId} `{CID : CpuId} (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -534,7 +534,7 @@ Section IputTail.
       (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m D : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 vg4 : mword 64) (lks : gset nat) :
+      (sp0 vg4 : mword 64) (lks : gset string) :
     let pj := proc_addr j in
     let ret_tgt := ret_pc (m !!! Regidx Rra) in
     let spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
@@ -554,13 +554,13 @@ Section IputTail.
     (* THE FRESHNESS PREMISE: the entry resource below already carries
        [itable]'s rank ([ref--; release(&itable.lock)] is the tail this
        lemma proves); [lks] is the caller's OWN held set, below it. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks "itable" ->
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x26) : mword 64) -∗
     sie_cap_gpr D (trap_res eb + (K - 4))%nat false pj -∗
-    cpu_own 1 eb pj C false ({[lock_rank "itable"]} ∪ lks) -∗
+    cpu_own 1 eb pj C false ({["itable"]} ∪ lks) -∗
     arm_pay 0 eb pj -∗
     (* the trap-CSR complement: a PURE PASS-THROUGH, threaded from the
        caller's own entry straight to release's continuation -- iput never
@@ -679,13 +679,13 @@ Section IputTail.
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
     iApply (Release.wp_release_sconf gtl itable_lock "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) D5
-              0%nat eb pj C (K - 4)%nat ({[lock_rank "itable"]} ∪ lks)
+              0%nat eb pj C (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+    iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     pose proof Hrelpins as Hrelpins_cs.
     assert (Hpc32 : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x32))
@@ -829,7 +829,7 @@ Section IputTail.
       (n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (sp0 vg4 : mword 64) (lks : gset nat) :
+      (sp0 vg4 : mword 64) (lks : gset string) :
     let pj := proc_addr j in
     let ret_tgt := ret_pc (m !!! Regidx Rra) in
     let spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
@@ -851,7 +851,7 @@ Section IputTail.
     (crb0 = true -> wb = false) ->
     (* THE FRESHNESS PREMISE -- see [ip_tail_exit]; this lemma's own entry
        is already past iput's FIRST [acquire(&itable.lock)]. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks "itable" ->
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
@@ -859,7 +859,7 @@ Section IputTail.
     ic_escrow cn gfs gi cov logstart k -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
-    cpu_own 1 eb pj C false ({[lock_rank "itable"]} ∪ lks) -∗
+    cpu_own 1 eb pj C false ({["itable"]} ∪ lks) -∗
     arm_pay 0 eb pj -∗
     (* pure pass-through, exactly as in [ip_tail_exit] above *)
     trap_csrs_ext eb -∗
@@ -1198,7 +1198,7 @@ Section ProofIput.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
                        k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b lks.
@@ -1211,7 +1211,7 @@ Section ProofIput.
        admitted acquiresleep order fact, the re-acquire at +0x82, and the
        shared tail) each want the bound at "itable" (14), which [mono]
        supplies once here rather than three times below. *)
-    assert (Hitbelow : locks_below lks (lock_rank "itable")) by lkbelow.
+    assert (Hitbelow : locks_below lks "itable") by lkbelow.
     pose proof HK as HK'. unfold K_iput in HK'.
     unfold iput_units in Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -1881,7 +1881,7 @@ Section ProofIput.
     pose proof (iput_acquiresleep_order_ADMITTED lks Hitbelow) as Hslbelow.
     iApply (ASL.wp_acquiresleep_nested_sconf (dq := dq) gs j gil gisl "inode"%string
               (ic_tok cn k) G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
-              ({[lock_rank "itable"]} ∪ lks)
+              ({["itable"]} ∪ lks)
               Hj ltac:(lia) ltac:(cbn; lia) Hslbelow
               with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs").
     { iEval (rewrite HG4a0). iExact "Hslk". }
@@ -2041,13 +2041,13 @@ Section ProofIput.
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_sconf gtl itable_lock "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) H3
-              0%nat eb pj C (K - 4)%nat ({[lock_rank "itable"]} ∪ lks)
+              0%nat eb pj C (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitab] Htok HRres Hcnt Hpay").
     { iExact "Hitab". }
     iIntros (CIDrl Hsrl mr1) "Hcg Hpc %Hpins1 Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
-    iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+    iEval (rewrite (_ : ({["itable"]} ∪ lks) ∖ {["itable"]} = lks);
            [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     pose proof Hpins1 as Hpins1_cs.
     assert (Hpc60 : ret_pc (H3 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x60))
@@ -2651,7 +2651,7 @@ Section ProofIput.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb C b lks.

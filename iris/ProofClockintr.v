@@ -92,7 +92,7 @@ Section ProofClockintr.
   (* [eb = true].  At any [S _] level the match is [false] outright.        *)
   (* ================================================================== *)
   Local Lemma ci_outb_false (M : regfile) (av n : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+      (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr M av false p -∗ cpu_own n eb p C false lks -∗
     ⌜ (match n with O => eb | S _ => false end) = false ⌝.
   Proof.
@@ -303,7 +303,7 @@ Section ProofClockintr.
   (* THE WHOLE FUNCTION.                                                 *)
   (* ================================================================== *)
   Lemma wp_clockintr_sconf  (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset nat)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset string)
     : wp_clockintr_sconf_body γl γs m n eb p C av lks.
   Proof.
     cbv beta delta [wp_clockintr_sconf_body].
@@ -637,12 +637,12 @@ Section ProofClockintr.
         exact HB2sp. }
       (* ===================== wakeup(&ticks) ===================== *)
       iApply (Wakeup.wp_wakeup_sconf D5 γs p
-                (S n) (av - 2)%nat eb C false ({[lock_rank "time"]} ∪ lks)
+                (S n) (av - 2)%nat eb C false ({["time"]} ∪ lks)
                 ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
                 ltac:(lia)
-                (locks_below_union_singleton lks (lock_rank "time") (lock_rank "proc")
+                (locks_below_union_singleton lks "time" "proc"
                    ltac:(vm_compute; lia)
                    ltac:(lkbelow))
                 with "Hcg Hcnt Htext Hpc Hpanic Hpi").
@@ -721,7 +721,7 @@ Section ProofClockintr.
       iEval (rewrite Hridx) in "Hcg".
       iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res E2
                 n eb p C (av - 2)%nat
-                ({[lock_rank "time"]} ∪ lks)
+                ({["time"]} ∪ lks)
                 ltac:(rewrite HE2a0; apply addv_sext0)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlkl] [Htok] [HR] Hcnt Hpay").
@@ -733,7 +733,7 @@ Section ProofClockintr.
       (* clockintr is BALANCED: the set release hands back collapses to the
          entry [lks] -- [Hfresh] is what makes the singleton insert/delete
          cancel. *)
-      assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      assert (Hsetback : ({["time"]} ∪ lks) ∖ {["time"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       assert (Hpc54 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.clockintr + 0x54))

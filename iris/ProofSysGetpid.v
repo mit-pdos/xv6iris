@@ -90,7 +90,7 @@ Section ProofSysGetpid.
   (* =================================================================== *)
   Lemma wp_sys_getpid_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
     : wp_sys_getpid_sconf_body γf m av n eb p C pid V b lks.
   Proof.
     cbv beta delta [wp_sys_getpid_sconf_body].

@@ -99,7 +99,7 @@ Section ProofFilealloc.
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
      two independent presentations of the same SIE state; see
      ProofFiledup.v's identical helper for the full comment. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
     sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
@@ -158,7 +158,7 @@ Section ProofFilealloc.
   Definition fa_epi_body
       (γf : gname) (m : regfile) (spr : mword 64) (K : nat) (b : bool)
       (p : mword 64) (C : iProp Σ) (n : nat) (eb : bool) (ret_tgt : mword 64)
-      (CID0 : CpuId) (lks : gset nat) : iProp Σ :=
+      (CID0 : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Rs1 = res
@@ -181,7 +181,7 @@ Section ProofFilealloc.
 
   Lemma wp_filealloc_sconf
       (γl γf : gname) (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
     : wp_filealloc_sconf_body γl γf m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_filealloc_sconf_body].
@@ -892,7 +892,7 @@ Section ProofFilealloc.
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) F4
                 n eb p C (K - 4)%nat
-                ({[lock_rank "ftable"]} ∪ lks)
+                ({["ftable"]} ∪ lks)
                 ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -901,7 +901,7 @@ Section ProofFilealloc.
       (* filealloc is BALANCED on this arm: the set release hands back
          collapses to the entry [lks] -- [Hfresh] makes the singleton
          insert/delete cancel. *)
-      assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
@@ -999,14 +999,14 @@ Section ProofFilealloc.
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) G3
                 n eb p C (K - 4)%nat
-                ({[lock_rank "ftable"]} ∪ lks)
+                ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
       (* filealloc is BALANCED on this arm too. *)
-      assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      assert (Hsetback : ({["ftable"]} ∪ lks) ∖ {["ftable"]} = lks)
       by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".

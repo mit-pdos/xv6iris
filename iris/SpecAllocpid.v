@@ -62,7 +62,7 @@ Section SpecAllocpid.
 End SpecAllocpid.
 
 Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -72,7 +72,7 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Ge
      rank below "nextpid" -- trivial for every caller ([lks = ∅] at every
      call site: it is dialed only from allocproc, which holds "proc" (11),
      strictly below "nextpid" (12)). *)
-  locks_below lks (lock_rank "nextpid") ->
+  locks_below lks "nextpid" ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -90,6 +90,6 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Ge
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_allocpid_sconf_body γp m av n eb p C b lks.
 End ALLOCPID.

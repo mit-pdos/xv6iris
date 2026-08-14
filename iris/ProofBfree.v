@@ -560,7 +560,7 @@ Section BfreeDefs.
       (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (bi : Z)
       (Bud : iProp Σ) (pidv : mword 32) (dq dqb : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -607,8 +607,8 @@ Section BfreeTail.
       (used : gset Z) (bi : Z) (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (kk : nat) (bnoB : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqb : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
-    locks_below lks (lock_rank "log") ->
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset string) :
+    locks_below lks "log" ->
     (K_bfree <= K)%nat ->
     bf_sp m M ->
     bf_thr m M ->
@@ -1034,7 +1034,7 @@ Section ProofBfreeMain.
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
                         pidv dq dqb m K eb C b lks.
@@ -1852,7 +1852,7 @@ Section ProofBfreeMain.
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
                           pidv dq dqb m K eb C b lks.

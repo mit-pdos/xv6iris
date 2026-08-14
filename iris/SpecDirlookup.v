@@ -187,7 +187,7 @@ Definition wp_dirlookup_sconf_body
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -216,7 +216,7 @@ Definition wp_dirlookup_sconf_body
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "bcache") ->
+  locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -304,7 +304,7 @@ Module Type DIRLOOKUP.
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                               γa γf cov logstart nib dev ip bm data dn
                               fn hasp pofv pidv dq dqd dqn m K eb C b lks.

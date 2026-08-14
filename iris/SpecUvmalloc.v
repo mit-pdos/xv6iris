@@ -76,7 +76,7 @@ Import Defs.
 Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (C : iProp Σ) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
   let oldsz := mm !!! Regidx (mword_of_int 11) in
   let newsz := mm !!! Regidx (mword_of_int 12) in
@@ -136,7 +136,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (* every loop iteration's kalloc (success) and kfree (mappages-failure
      rollback) are both bound at "kmem" (13); nothing else uvmalloc touches
      ranks lower.  One premise covers the whole cone. *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own 0%nat eb p C b lks -∗
   kernel_text -∗
@@ -180,6 +180,6 @@ Module Type UVMALLOC.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset nat),
+      (C : iProp Σ) (b : bool) (lks : gset string),
       wp_uvmalloc_sconf_body γa mm P xperm K eb p C b lks.
 End UVMALLOC.

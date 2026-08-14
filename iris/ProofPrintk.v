@@ -668,7 +668,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_epi `{CID0 : CpuId}
       (γpr : gname) (h : CPU) (m mc : regfile) (K AV : nat)
-      (n : nat) (eb : bool) (C R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (n : nat) (eb : bool) (C R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
     (34 <= K)%nat ->
@@ -691,7 +691,7 @@ Section ProofPrintk.
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
+      cpu_own n eb pcur C b (lks ∖ {["pr"]}) -∗
       R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -937,7 +937,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_exit `{CID0 : CpuId}
       (γpr : gname) (h : CPU) (m mc : regfile) (K AV : nat) (B : Z)
-      (n : nat) (eb : bool) (C R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (n : nat) (eb : bool) (C R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
     (34 <= K)%nat ->
@@ -966,7 +966,7 @@ Section ProofPrintk.
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
+      cpu_own n eb pcur C b (lks ∖ {["pr"]}) -∗
       R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1019,7 +1019,7 @@ Section ProofPrintk.
      back to 0x260.  One extra instruction, same tail. *)
   Lemma wp_printk_exit2fe `{CID0 : CpuId}
       (γpr : gname) (h : CPU) (m mc : regfile) (K AV : nat)
-      (n : nat) (eb : bool) (C R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (n : nat) (eb : bool) (C R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
     (34 <= K)%nat ->
@@ -1046,7 +1046,7 @@ Section ProofPrintk.
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
+      cpu_own n eb pcur C b (lks ∖ {["pr"]}) -∗
       R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1156,7 +1156,7 @@ Section ProofPrintk.
   Lemma wp_printk_setup `{CID0 : CpuId}
       (γpr : gname) (h : CPU) (m mp : regfile) (K KE : nat)
       (n : nat) (eb : bool) (C : iProp Σ) (dqf : dfrac)
-      (f : string) (R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (f : string) (R : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
@@ -1196,7 +1196,7 @@ Section ProofPrintk.
       ⌜ pk_fbyte f 0%nat = (mword_of_int 0 : mword 8) ⌝ -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
+      cpu_own n eb pcur C b (lks ∖ {["pr"]}) -∗
       fmt ↦ₛ{ dqf } f -∗ R -∗
       WP (Loop : expr riscv_lang)) -∗
     (* (b) a nonempty one: the loop head, with i = 0 and a0 = fmt[0] *)
@@ -1797,17 +1797,17 @@ Section ProofPrintk.
 
   Hypothesis wp_consputc :
     forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat),
+      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string),
       wp_consputc_sconf_body γl γd γv m0 K l n eb C b pcur lks.
 
   Lemma wp_printk_char `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     neq_vec (mc !!! Regidx a0_idx) (mc !!! Regidx (mword_of_int 19 : mword 5)) = true ->
     (* its one callee is consputc, whose cone runs up to "uart" (15) *)
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x7a) : mword 64) -∗
@@ -2067,12 +2067,12 @@ Section ProofPrintk.
 
   Hypothesis wp_printint :
     forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat),
+      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string),
       wp_printint_sconf_body γl γd γv m0 K l n eb C b pcur lks.
 
   Lemma wp_printk_arm_d `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -2080,7 +2080,7 @@ Section ProofPrintk.
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0xc8) : mword 64) -∗
@@ -2260,7 +2260,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_ld `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -2270,7 +2270,7 @@ Section ProofPrintk.
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0xac + 0) : mword 64) -∗
@@ -2425,7 +2425,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_lld `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -2435,7 +2435,7 @@ Section ProofPrintk.
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0xea + 0) : mword 64) -∗
@@ -2588,7 +2588,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_lu `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -2598,7 +2598,7 @@ Section ProofPrintk.
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x120 + 0) : mword 64) -∗
@@ -2753,7 +2753,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_llu `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -2763,7 +2763,7 @@ Section ProofPrintk.
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x13c + 0) : mword 64) -∗
@@ -2916,7 +2916,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_lx `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -2926,7 +2926,7 @@ Section ProofPrintk.
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x172 + 0) : mword 64) -∗
@@ -3071,7 +3071,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_llx `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -3081,7 +3081,7 @@ Section ProofPrintk.
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x18c + 0) : mword 64) -∗
@@ -3240,7 +3240,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_u `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -3248,7 +3248,7 @@ Section ProofPrintk.
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x106 + 0) : mword 64) -∗
@@ -3382,7 +3382,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_x `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (24 <= K)%nat ->
@@ -3390,7 +3390,7 @@ Section ProofPrintk.
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x158 + 0) : mword 64) -∗
@@ -3528,14 +3528,14 @@ Section ProofPrintk.
      consputc.  Like the value arms, but with no (base, sign) pair. *)
   Lemma wp_printk_arm_c `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (16 <= K)%nat ->
     (k < 7)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     mc !!! Regidx s0_idx = s0v ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x1ee + 0) : mword 64) -∗
@@ -3642,10 +3642,10 @@ Section ProofPrintk.
      for the leading character would not be simpler than these two. *)
   Lemma wp_printk_arm_pct `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x23a) : mword 64) -∗
@@ -3716,10 +3716,10 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_unknown `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x2ee) : mword 64) -∗
@@ -3905,7 +3905,7 @@ Section ProofPrintk.
      INDEX, not the string, and the string points-to has to stay put. *)
   Lemma wp_printk_str_loop (γd : uart_names) (γv : disk_names)
       (K : nat) (n : nat) (eb : bool) (C : iProp Σ) (γl : gname) (dq : dfrac)
-      (s : string) (sv : mword 64) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (s : string) (sv : mword 64) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     nonul s = true ->
@@ -3913,7 +3913,7 @@ Section ProofPrintk.
     (length (string_bytes s) - i <= fuel)%nat ->
     (i < length (string_bytes s))%nat ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = pa_add sv i ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x21e) : mword 64) -∗
@@ -4074,7 +4074,7 @@ Section ProofPrintk.
   Lemma wp_printk_arm_s `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (C : iProp Σ) (γl : gname) (dq : dfrac) (s : string) (Rest : iProp Σ)
-      (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (16 <= K)%nat ->
@@ -4083,7 +4083,7 @@ Section ProofPrintk.
     nonul s = true ->
     eq_vec (pk_vararg m k) zero_reg = false ->
     mc !!! Regidx s0_idx = s0v ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x202 + 0) : mword 64) -∗
@@ -4245,7 +4245,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_s_null `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (16 <= K)%nat ->
@@ -4253,7 +4253,7 @@ Section ProofPrintk.
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     pk_vararg m k = zero_reg ->
     mc !!! Regidx s0_idx = s0v ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x202 + 0) : mword 64) -∗
@@ -4450,14 +4450,14 @@ Section ProofPrintk.
 
   (* ---- one pass of the nibble loop, 0x1e0 .. 0x1f2 ---- *)
   Lemma wp_printk_hex_loop (γd : uart_names) (γv : disk_names)
-      (K : nat) (n : nat) (eb : bool) (C : iProp Σ) (γl : gname) (dg : mword 64) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (K : nat) (n : nat) (eb : bool) (C : iProp Σ) (γl : gname) (dg : mword 64) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     forall (q : nat) `(CID0 : CpuId) (mc : regfile) (l : list (bv 8)) (Rest : iProp Σ),
     (1 <= q <= 16)%nat ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat q) ->
     mc !!! Regidx (mword_of_int 25 : mword 5) = dg ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ pk_digits dg -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x1d4) : mword 64) -∗
@@ -4661,7 +4661,7 @@ Section ProofPrintk.
   (* ---- the arm around it, 0x1b4 .. 0x1f8 ---- *)
   Lemma wp_printk_arm_p `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
@@ -4670,7 +4670,7 @@ Section ProofPrintk.
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     mc !!! Regidx csp_rs1 = spd ->
     mc !!! Regidx s0_idx = s0v ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x1a8) : mword 64) -∗
@@ -7055,7 +7055,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_arm_num `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spd := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))) in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
@@ -7069,7 +7069,7 @@ Section ProofPrintk.
     mc !!! Regidx (mword_of_int 22 : mword 5) = (mword_of_int 10 : mword 64) ->
     mc !!! Regidx (mword_of_int 20 : mword 5) = mword_of_int (Z.of_nat i) ->
     mc !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat i + 1) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2) : mword 64) -∗
@@ -7328,7 +7328,7 @@ Section ProofPrintk.
   Lemma wp_printk_arm_str `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
       (C : iProp Σ) (γl : gname) (c0 c1 c2 : Ascii.ascii) (d : pk_arg_desc) (Rest : iProp Σ)
-      (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (b : bool) (pcur : mword 64) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let s0v := add_vec sp0 (sign_extend' 64 (mword_of_int (-64) : mword 12)) in
     (16 <= K)%nat ->
@@ -7338,7 +7338,7 @@ Section ProofPrintk.
     pk_desc_kind d = PkStr ->
     mc !!! Regidx s0_idx = s0v ->
     mc !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat i + 1) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2) : mword 64) -∗
@@ -7441,13 +7441,13 @@ Section ProofPrintk.
   (* '%%' and an unrecognised directive: two characters out, no vararg. *)
   Lemma wp_printk_arm_none `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (i : nat) (l : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (γl : gname) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat) :
+      (C : iProp Σ) (γl : gname) (c0 c1 c2 : Ascii.ascii) (Rest : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset string) :
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     fst (pk_dir c0 c1 c2) = None ->
     Ascii.eqb c0 pk_nul = false ->
     mc !!! Regidx (mword_of_int 9 : mword 5) = mword_of_int (Z.of_nat i + 1) ->
-    locks_below lks (lock_rank "uart") ->
+    locks_below lks "uart" ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + pk_entry c0 c1 c2) : mword 64) -∗
@@ -7593,7 +7593,7 @@ Section ProofPrintk.
     Variables (n : nat) (eb : bool) (C : iProp Σ) (dqf : dfrac).
     Variables (f : string) (descs : list pk_arg_desc).
     Variables (bo : bool) (pcur : mword 64).
-    Variables (lks : gset nat).
+    Variables (lks : gset string).
 
     Let sp0 : mword 64 := m !!! Regidx csp_rs1.
     Let spd : mword 64 := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 52 : mword 6))).
@@ -7613,7 +7613,7 @@ Section ProofPrintk.
        (15).  printk's own contract states its bound at "pr" (14) and
        [locks_below_mono] raises it, so the two instantiations below
        discharge this with [lkbelow]. *)
-    Hypothesis Hbelow : locks_below lks (lock_rank "uart").
+    Hypothesis Hbelow : locks_below lks "uart".
 
     (* the frame as the loop carries it: everything the prologue and setup
        built, with the va_list cursor at [k] arguments consumed *)
@@ -7640,7 +7640,7 @@ Section ProofPrintk.
           /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
         fmtv ↦ₛ{ dqf } f -∗
         ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
-        cpu_own n eb pcur C bo (lks ∖ {[lock_rank "pr"]}) -∗
+        cpu_own n eb pcur C bo (lks ∖ {["pr"]}) -∗
         panic_wp_any -∗
         uart_sent_sub γd (l ++ bs) -∗
         WP (Loop : expr riscv_lang))%I.
@@ -8190,7 +8190,7 @@ Section ProofPrintk.
 
   Lemma wp_printk_sconf_gen (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (dqf : dfrac)
-      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat)
+      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string)
     : wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks.
   Proof using All.
     cbv beta delta [wp_printk_sconf_body].
@@ -8285,13 +8285,13 @@ Section ProofPrintk.
     - (* the empty format string: no loop at all, and nothing was printed *)
       iApply (wp_printk_setup (CID0 := CIDacq) γpr ((CIDacq : CPU)) m0 mfin
                 (trap_res b + (K - 24))%nat K n eb C dqf f
-                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ({[lock_rank "pr"]} ∪ lks)
+                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ({["pr"]} ∪ lks)
                 ltac:(lia) eq_refl Houtb eq_refl Hnn Hfsp Hfs0 Hfs2 Hfkept
                 with "Hcg Htext Hpc Hlk Hheld Hcnt Hfmt H9 H10 H12 Hva Hrest Hdescs [-] []").
       2: { iIntros (CIDd1 Hstd1 mq) "%Hb Hcg Hpc Hlkb Hheldb Hcntb Hfmt H9b H10b H12b Hvab Hsvb S8b S19b S22b Hapb S24b HR".
            exfalso. destruct Hb as (_ & _ & _ & _ & _ & Hnzb & _). exact (Hnzb Hf0z). }
       iIntros (CIDse1 Hstse1 mf) "Hcg Hpc %Hz0 %Hfin Hcnt Hfmt Hdescs".
-      iEval (rewrite (locks_add_del_below (lock_rank "pr") lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
+      iEval (rewrite (locks_add_del_below "pr" lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
       iSpecialize ("Hcont" $! CIDse1 with "[%]"); [wp_next_chain|].
       iSpecialize ("Hcont" $! mf []).
       iEval (rewrite (app_nil_r bs)) in "Hcont".
@@ -8300,7 +8300,7 @@ Section ProofPrintk.
     - (* a nonempty one: setup, then the loop with the string length as fuel *)
       iApply (wp_printk_setup (CID0 := CIDacq) γpr ((CIDacq : CPU)) m0 mfin
                 (trap_res b + (K - 24))%nat K n eb C dqf f
-                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ({[lock_rank "pr"]} ∪ lks)
+                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ({["pr"]} ∪ lks)
                 ltac:(lia) eq_refl Houtb eq_refl Hnn Hfsp Hfs0 Hfs2 Hfkept
                 with "Hcg Htext Hpc Hlk Hheld Hcnt Hfmt H9 H10 H12 Hva Hrest Hdescs []").
       { iIntros (CIDd2 Hstd2 mf) "Hcg Hpc %Hz0 %Hfin Hcntb Hfmt HR". exfalso. exact (Hf0nz Hz0). }
@@ -8319,7 +8319,7 @@ Section ProofPrintk.
       { unfold pk_ap. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hap0) in "Hap".
       iApply (wp_printk_body7a γd γv γpr ((CIDacq : CPU)) γl m0
-                (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({[lock_rank "pr"]} ∪ lks)
+                (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({["pr"]} ∪ lks)
                 ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen ltac:(lkbelow)
                 (CID0 := CIDse2) mq 0%nat 0%nat bs
                 ltac:(exact (Hstse2 (or_introl eq_refl))) Hilen0 Hinv0 Hqsp Hqs0 Hqs2 Hqs4' Hqa0 Hqs9 Hqconsts
@@ -8334,14 +8334,14 @@ Section ProofPrintk.
           by (etransitivity;
               [ exact (Hstlh (or_introl eq_refl)) | exact (Hstse2 (or_introl eq_refl)) ]).
         iApply (wp_printk_loop6c γd γv γpr ((CIDacq : CPU)) γl m0
-                  (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({[lock_rank "pr"]} ∪ lks)
+                  (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({["pr"]} ∪ lks)
                   ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen ltac:(lkbelow)
                   (String.length f) (CID0 := CIDlh) mk k' p' ((bs ++ cs)%list)
                   Hhh2 ltac:(lia) Hplen' Hinv' Hksp Hks0 Hks2 Hks1 Hks9 Hkconsts
                   with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hcnt Hpan Hlk Hheld Hdev Hsub2 Htxl Hfr [Hcont]").
         rewrite /pk_loop_post.
         iIntros (CIDlp Hstlp mz cs') "Hcg Hpc %Hfin2 Hfmt Hdescs Hcnt _ #Hsub3".
-        iEval (rewrite (locks_add_del_below (lock_rank "pr") lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
+        iEval (rewrite (locks_add_del_below "pr" lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
         iSpecialize ("Hcont" $! CIDlp with "[%]");
           [ intros Hdx; etransitivity; [ exact (Hstlp Hdx) | exact Hhh2 ] | ].
         iSpecialize ("Hcont" $! mz ((cs ++ cs')%list)).
@@ -8351,7 +8351,7 @@ Section ProofPrintk.
       + (* the first directive already ended the string: e.g. f = "...%" *)
         rewrite /pk_loop_post.
         iIntros (CIDlp2 Hstlp2 mz cs) "Hcg Hpc %Hfin2 Hfmt Hdescs Hcnt _ #Hsub3".
-        iEval (rewrite (locks_add_del_below (lock_rank "pr") lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
+        iEval (rewrite (locks_add_del_below "pr" lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
         iSpecialize ("Hcont" $! CIDlp2 with "[%]");
           [ intros Hdx; etransitivity;
             [ exact (Hstlp2 Hdx) | exact (Hstse2 (or_introl eq_refl)) ] | ].
@@ -8369,7 +8369,7 @@ End ProofPrintk.
       (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) {dqf : dfrac}
-      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat)
+      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string)
       : wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks :=
     wp_printk_sconf_gen
       (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' C' b' pcur' lks' =>

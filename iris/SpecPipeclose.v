@@ -52,7 +52,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
     (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipeclose in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -75,7 +75,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      paths release pi->lock (the freeing one releases and only then kfree's
      the page), so entry and exit [cpu_own] carry the same [lks].  The kmem
      lock kfree takes is entirely inside kfree, after the release. *)
-  locks_below lks (lock_rank "pipe") ->
+  locks_below lks "pipe" ->
   sie_cap_gpr m av b pme -∗
   cpu_own n eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -106,6 +106,6 @@ Module Type PIPECLOSE.
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme C av b lks.
 End PIPECLOSE.

@@ -116,7 +116,7 @@ Section ProofPMS.
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (K lvl : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (g : nat)
-      (pas : nat -> mword 44) (b : bool) (lks : gset nat) :
+      (pas : nat -> mword 44) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -423,7 +423,7 @@ Section ProofPMS.
   Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm : regfile) (t : ptree)
       (m0 : gmap (mword 27) (mword 64)) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) (rem : nat) (b : bool) (lks : gset nat) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) (rem : nat) (b : bool) (lks : gset string) :
     forall (i : nat) (Mk : regfile) (tk : ptree) (gk : nat) (pas : nat -> mword 44),
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
@@ -456,7 +456,7 @@ Section ProofPMS.
     (forall j, (j < i)%nat -> node_kdata (pas j)) ->
     (* the loop's own kalloc call (+0x52) touches "kmem" (13); nothing else
        in its cone touches a lock (kvmmap's own Spec exposes no premise). *)
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x52)) -∗
@@ -1027,7 +1027,7 @@ Section ProofPMS.
   Lemma wp_proc_mapstacks_sconf
       `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
     : wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_proc_mapstacks_sconf_body].

@@ -119,7 +119,7 @@ Definition wp_consolewrite_sconf_body
     (γs : list gname) (j : nat) (γlp : gname)
     (γu : uart_names) (γv : disk_names) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat) :=
+    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consolewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -139,7 +139,7 @@ Definition wp_consolewrite_sconf_body
   eb = true ->
   (* the order premise, at the LOWEST rank this cone touches; every
      higher one follows by [locks_below_mono]. *)
-  locks_below lks (lock_rank "proc") ->
+  locks_below lks "proc" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
      released inside uartwrite's own loop -- be the only lock held. *)
@@ -180,6 +180,6 @@ Module Type CONSOLEWRITE.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat),
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
       wp_consolewrite_sconf_body γa γf γs j γlp γu γv γl m av eb C pid V n b lks.
 End CONSOLEWRITE.

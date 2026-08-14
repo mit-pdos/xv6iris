@@ -76,7 +76,7 @@ Section ProofSleepPrepare.
 
   Lemma wp_sleep_prepare_sconf (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
   Proof.
     cbv beta delta [wp_sleep_prepare_sconf_body].
@@ -337,15 +337,15 @@ Section ProofSleepPrepare.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C2 n eb pj C (av - 4)%nat
-              ({[lock_rank "proc"]} ∪ lks)
+              ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
     (* acquire handed back [{[rank "proc"]} ∪ lks]; release hands back that
        set minus the same singleton.  [Hno], via [locks_below_not_elem],
        says "proc" was fresh in [lks], so the round trip is a no-op. *)
-    pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin.
-    assert (Heqlks : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+    pose proof (locks_below_not_elem lks "proc" Hno) as Hnotin.
+    assert (Heqlks : ({["proc"]} ∪ lks) ∖ {["proc"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Heqlks) in "Hcpu".
     rewrite Hbeq in Hsrel.

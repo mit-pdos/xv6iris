@@ -585,7 +585,7 @@ Definition wp_filewrite_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat) :=
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -613,7 +613,7 @@ Definition wp_filewrite_sconf_body
   (* filewrite's FD_INODE arm is the whole cone: begin_op/end_op ("log", 3),
      ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
      so one premise there covers the whole cone via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj C b lks -∗
@@ -660,6 +660,6 @@ Module Type FILEWRITE.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat),
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string),
       wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
 End FILEWRITE.

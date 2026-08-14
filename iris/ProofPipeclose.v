@@ -91,7 +91,7 @@ Section ProofPipeclose.
      it is exactly what makes release's derived exit index equal pipeclose's
      own [b].  (Identical helper in ProofFiledup.v / ProofBunpin.v.) *)
   Local Lemma sie_b_agree (m0 : regfile) (n0 K0 : nat) (eb0 b0 : bool)
-      (p0 : mword 64) (C0 : iProp Σ) (lks : gset nat) :
+      (p0 : mword 64) (C0 : iProp Σ) (lks : gset string) :
     sie_cap_gpr m0 K0 b0 p0 -∗ cpu_own n0 eb0 p0 C0 b0 lks -∗
     ⌜ b0 = match n0 with O => eb0 | S _ => false end ⌝.
   Proof.
@@ -109,7 +109,7 @@ Section ProofPipeclose.
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme C av b lks.
   Proof.
     cbv beta delta [wp_pipeclose_sconf_body].
@@ -442,7 +442,7 @@ Section ProofPipeclose.
                sie_cap_gpr M (trap_res b + (av - 4))%nat false pme -∗
                pc_is (mword_of_int (KernelSyms.pipeclose + 0x24) : mword 64) -∗
                (* inside the critical section: acquire added "pipe"'s rank *)
-               cpu_own (S n) eb pme C false ({[lock_rank "pipe"%string]} ∪ lks) -∗
+               cpu_own (S n) eb pme C false ({["pipe"%string]} ∪ lks) -∗
                arm_pay n eb pme -∗
                locked γl cpu_id -∗
                pipe_res γp pi -∗
@@ -462,7 +462,7 @@ Section ProofPipeclose.
                  ⌜ callee_saved A4 M' ⌝ -∗
                  sie_cap_gpr M' (trap_res b + (av - 4))%nat false pme -∗
                  pc_is (mword_of_int (KernelSyms.pipeclose + 0x30) : mword 64) -∗
-                 cpu_own (S n) eb pme C false ({[lock_rank "pipe"%string]} ∪ lks) -∗
+                 cpu_own (S n) eb pme C false ({["pipe"%string]} ∪ lks) -∗
                  arm_pay n eb pme -∗
                  locked γl cpu_id -∗
                  pipe_res γp pi -∗
@@ -519,7 +519,7 @@ Section ProofPipeclose.
            the acquire/release pair compose back to [N]. *)
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  V2 n eb pme C (av - 4)%nat ({[lock_rank "pipe"%string]} ∪ lks)
+                  V2 n eb pme C (av - 4)%nat ({["pipe"%string]} ∪ lks)
                   HlkaV2 ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -528,8 +528,8 @@ Section ProofPipeclose.
         (* BALANCED: the rank acquire put in comes straight back out.  [Hno]
            is the ORDER premise; [locks_below_not_elem] turns it into the
            non-membership the set algebra needs. *)
-        pose proof (locks_below_not_elem lks (lock_rank "pipe"%string) Hno) as Hnotin.
-        assert (Hsetback : ({[lock_rank "pipe"%string]} ∪ lks) ∖ {[lock_rank "pipe"%string]} = lks)
+        pose proof (locks_below_not_elem lks "pipe"%string Hno) as Hnotin.
+        assert (Hsetback : ({["pipe"%string]} ∪ lks) ∖ {["pipe"%string]} = lks)
           by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hown".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hown".
@@ -673,7 +673,7 @@ Section ProofPipeclose.
       iEval (rewrite Houtb) in "Hcg".
       iApply (ReleaseCancel.wp_release_cancel_sconf γl pi "pipe" (pipe_res γp pi)
                 (pipe_dead γl γp) (pipe_bytes pi) K2 n eb pme C (av - 4)%nat
-                ({[lock_rank "pipe"%string]} ∪ lks)
+                ({["pipe"%string]} ∪ lks)
                 HlkaK2 ltac:(lia)
                 ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                 with "Hcg Htext Hpc Hopen Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] [] Hown Hpay").
@@ -684,8 +684,8 @@ Section ProofPipeclose.
       (* BALANCED on the freeing path too: release_cancel gives the rank back
          BEFORE kfree runs, so kfree (and its own "kmem" acquire) sees [lks].
          Same [locks_below_not_elem] step as at the plain release above. *)
-      pose proof (locks_below_not_elem lks (lock_rank "pipe"%string) Hno) as Hnotin'.
-      assert (Hsetback' : ({[lock_rank "pipe"%string]} ∪ lks) ∖ {[lock_rank "pipe"%string]} = lks)
+      pose proof (locks_below_not_elem lks "pipe"%string Hno) as Hnotin'.
+      assert (Hsetback' : ({["pipe"%string]} ∪ lks) ∖ {["pipe"%string]} = lks)
         by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback') in "Hown".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hown".
@@ -782,7 +782,7 @@ Section ProofPipeclose.
        composition as ProofKexit.v's [Hfresh_proc]. *)
     assert (Hpipe_lt_proc : (lock_rank "pipe" < lock_rank "proc")%nat)
       by (vm_compute; lia).
-    assert (Hfresh_proc : locks_below ({[lock_rank "pipe"%string]} ∪ lks) (lock_rank "proc")).
+    assert (Hfresh_proc : locks_below ({["pipe"%string]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hpipe_lt_proc |].
       lkbelow. }
     destruct w.
@@ -842,7 +842,7 @@ Section ProofPipeclose.
       (* wakeup runs INSIDE pi->lock's critical section and is balanced, so it
          threads the acquired set unchanged. *)
       iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb C false
-                ({[lock_rank "pipe"%string]} ∪ lks)
+                ({["pipe"%string]} ∪ lks)
                 HwK HwdomW Hlen Hwlvl Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpanic Hpinv").
       all: try lkbelow.
@@ -910,7 +910,7 @@ Section ProofPipeclose.
       (* wakeup runs INSIDE pi->lock's critical section and is balanced, so it
          threads the acquired set unchanged. *)
       iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb C false
-                ({[lock_rank "pipe"%string]} ∪ lks)
+                ({["pipe"%string]} ∪ lks)
                 HwK HwdomW Hlen Hwlvl Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpanic Hpinv").
       all: try lkbelow.

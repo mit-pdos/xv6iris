@@ -114,7 +114,7 @@ Section ProofSysExit.
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string)
     : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
                              γi cn γtl bmapstart inodestart nib size dqb dqs us

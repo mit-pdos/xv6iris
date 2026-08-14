@@ -60,7 +60,7 @@ Import Defs.
    [6 <= av] does NOT move: [av] is still the ENTRY usable count, which is what
    push_off's own 4-slot frame and the mycpu() call come out of. *)
 Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
      unbundled mstatus0; the statement stays mstatus0-free.  The noff/intena
@@ -128,7 +128,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
    [4 <= av] does NOT move even though [av] changed meaning: pop_off's own
    4-slot frame comes out of the ENTRY count [trap_res bexit + av >= av]. *)
 Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :=
+    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   let bexit := match n with O => eb | S _ => false end in
@@ -162,10 +162,10 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
       wp_push_off_sconf_body m av n eb p C b lks.
   Parameter wp_pop_off_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat),
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (lks : gset string),
       wp_pop_off_sconf_body m av n eb p C lks.
 End PUSHOFF.

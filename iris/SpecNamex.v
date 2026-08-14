@@ -308,7 +308,7 @@ Definition namex_post
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
-    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ) (lks : gset nat)
+    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
     (used : gset Z) (cwdv : mword 64)
@@ -362,7 +362,7 @@ Definition namex_postS
       ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
-    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ) (lks : gset nat)
+    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
     (used : gset Z) (cwdv : mword 64)
@@ -442,7 +442,7 @@ Definition wp_namex_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -492,7 +492,7 @@ Definition wp_namex_sconf_body
   (* (6) PARKING PREMISE *)
   eb = true ->
   (* ORDER PREMISE: same cone, same bound, as the _gen body below. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -588,7 +588,7 @@ Definition wp_namex_gen_body
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -644,7 +644,7 @@ Definition wp_namex_gen_body
   (* (7) ORDER PREMISE.  namex's cone bottoms out at itable.lock (2) --
      iget/iput/idup all state their bound there; ilock's "sleep lock" (6)
      and the bcache/log ranks above it follow by [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -723,7 +723,7 @@ Module Type NAMEX.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n
@@ -752,7 +752,7 @@ Module Type NAMEX.
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used cwdv plen pfun nfun npar n Sb

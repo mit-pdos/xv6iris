@@ -90,7 +90,7 @@ Section ItruncCont.
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (u : nat) (Sbf : gset Z)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -200,7 +200,7 @@ Section ItruncTail.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb0 : gset Z) (cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset string) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 <= inodestart ->
@@ -218,7 +218,7 @@ Section ItruncTail.
     M !!! Regidx Rs3 = ip ->
     (* it_tail's only lock-touching callee is the closing iupdate, at "log"
        (3). *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -677,7 +677,7 @@ Section ItruncDLoop.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
@@ -704,7 +704,7 @@ Section ItruncDLoop.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (fuel : nat) (lks : gset nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -727,7 +727,7 @@ Section ItruncDLoop.
     M !!! Regidx Rs3 = ip ->
     (* it_dloop's only lock-touching callee is bfree, at "log" (3), on its
        own binder list so the recursive back-edge re-proves it. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1257,7 +1257,7 @@ Section ItruncELoop.
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr4 m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
@@ -1286,7 +1286,7 @@ Section ItruncELoop.
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (fuel : nat) (lks : gset nat) :
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (fuel : nat) (lks : gset string) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -1311,7 +1311,7 @@ Section ItruncELoop.
     M !!! Regidx Rs4 = bnode kk ->
     (* it_eloop's only lock-touching callee is bfree, at "log" (3), on its
        own binder list so the recursive back-edge re-proves it. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1796,7 +1796,7 @@ Section ItruncIArm.
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
       (crb : bool) (Sb : gset Z) (e0 : nat) (w : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset nat) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
@@ -1825,7 +1825,7 @@ Section ItruncIArm.
       (data : nat -> list (bv 8))
       (pidv : mword 32) (dq dqd dqb : dfrac) (crb : bool) (Sb : gset Z) (e0 : nat)
       (w : nat)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset nat) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (eb : bool) (lks : gset string) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
     0 < size <= BPB ->
@@ -1848,7 +1848,7 @@ Section ItruncIArm.
     M !!! Regidx Ra1 = sign_extend' 64 (bm_ind bm : mword 32) ->
     (* it_iarm's cone: bread/brelse ("bcache", 4) for the indirect block,
        it_eloop and the block's own bfree ("log", 3) -- "log" is lowest. *)
-    locks_below lks (lock_rank "log") ->
+    locks_below lks "log" ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) C b lks -∗
     trap_csrs_ext eb -∗
@@ -2543,7 +2543,7 @@ Section ItruncMain.
       (data : nat -> list (bv 8)) (u : nat) (Sb : gset Z) (crb cru : bool)
       (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                          cov logstart bmapstart inodestart nib size dev used
                          ip inum dn dn0 bm data u Sb crb cru e0
@@ -3069,7 +3069,7 @@ Section ItruncMain.
       (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart bmapstart inodestart nib size dev used
                            ip inum dn dn0 bm data u

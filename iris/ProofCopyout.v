@@ -432,7 +432,7 @@ Section ProofCopyout.
      ~30 lines of ∀/wands per step.  Transparent on purpose; the ∀ binders
      stay visible at each [iAssert]. *)
   Definition co_tail_body
-      (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
       (rem done len : nat) (src_bytes : nat -> bv 8)
       (CIDh : CpuId) (Pd : uptd) (Md : regfile) (pa0 : mword 64) : iProp Σ :=
@@ -469,7 +469,7 @@ Section ProofCopyout.
      WP (Loop : expr riscv_lang))%I.
 
   Definition co_copy_body
-      (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+      (b : bool) (p : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset string)
       (szv : mword 64) (P : uptd) (spr va0 dstva src : mword 64)
       (rem done navail len : nat) (src_bytes : nat -> bv 8)
       (Pd : uptd) (pa0 : mword 64)
@@ -513,7 +513,7 @@ Section ProofCopyout.
   Local Lemma co_loop (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (src spr : mword 64) (b : bool) (lks : gset nat) :
+      (src spr : mword 64) (b : bool) (lks : gset string) :
     (* the 14-slot frame + vmfault's 38 *)
     (52 <= K)%nat ->
     (Z.of_nat len < 2 ^ 64)%Z ->
@@ -532,7 +532,7 @@ Section ProofCopyout.
     M !!! Regidx Rs8 = (mword_of_int 4096 : mword 64) ->
     M !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64) ->
     M !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ->
-    locks_below lks (lock_rank "kmem") ->
+    locks_below lks "kmem" ->
     sie_cap_gpr (CID:=CID0) M (K - 14)%nat b p -∗
     cpu_own (CID:=CID0) lvl eb p C b lks -∗
     kernel_text -∗
@@ -1669,7 +1669,7 @@ Section ProofCopyout.
   Lemma wp_copyout_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyout_sconf_body].

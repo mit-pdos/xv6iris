@@ -41,7 +41,7 @@ Import Defs.
 
 Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset nat) :=
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -51,7 +51,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
      sleeplock's inner "sleep lock" spinlock internally (balanced -- [lks]
      is unchanged across the whole call), so the caller must already hold
      only locks BELOW "sleep lock"'s rank. *)
-  locks_below lks (lock_rank "sleep lock") ->
+  locks_below lks "sleep lock" ->
   sie_cap_gpr m av b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -78,6 +78,6 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
 Module Type HOLDINGSLEEP.
   Parameter wp_holdingsleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset nat),
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset string),
       wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
 End HOLDINGSLEEP.

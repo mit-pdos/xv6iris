@@ -448,7 +448,7 @@ Section ProofArgfd.
   Lemma wp_argfd_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string)
     : wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b lks.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].

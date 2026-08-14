@@ -1082,7 +1082,7 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) (j : nat) (ret_tgt : mword 64)
+      (b : bool) (lks : gset string) (j : nat) (ret_tgt : mword 64)
       (CIDc : CpuId) : iProp Σ :=
     (∀ (mf : regfile) (ok made : bool)
        (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
@@ -1128,7 +1128,7 @@ Section ProofCreateMain.
      writes it, which is why [w5] is the one free slot value. *)
   Definition cr_tail_body
       (j : nat) (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (b : bool)
-      (lks : gset nat) (CIDt : CpuId) : iProp Σ :=
+      (lks : gset string) (CIDt : CpuId) : iProp Σ :=
     (∀ (Mt : regfile) (w5 : mword 64) (dnew : nat -> bv 8),
        ⌜cr_tregs m sp0 Mt⌝ -∗
        sie_cap_gpr Mt (K - 10)%nat b (proc_addr j) -∗
@@ -1163,7 +1163,7 @@ Section ProofCreateMain.
   (*  one [iDestruct] instead of a 230-line bullet.                        *)
   (* ------------------------------------------------------------------- *)
   Lemma cr_tail_half (j : nat) (m : regfile) (sp0 ret_tgt : mword 64)
-      (K : nat) (b : bool) (lks : gset nat) :
+      (K : nat) (b : bool) (lks : gset string) :
     ((K - 10) + 10)%nat = K ->
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
@@ -1437,7 +1437,7 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (lks : gset string)
       (CIDa : CpuId) : iProp Σ :=
     (∀ (Ma : regfile) (w5 : mword 64)
        (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
@@ -1555,7 +1555,7 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (lks : gset string)
       (* ---- what the found half froze, i.e. [cr_alloc_body]'s own binders *)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
@@ -1678,7 +1678,7 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (lks : gset string)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (nf nsl : nat -> bv 8)
@@ -1862,7 +1862,7 @@ Section ProofCreateMain.
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) :
+      (b : bool) (lks : gset string) :
     (K_create <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -3897,7 +3897,7 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (lks : gset nat) :
+      (C : iProp Σ) (b : bool) (lks : gset string) :
     (K_create <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -5130,7 +5130,7 @@ Section ProofCreateMain.
       (u : nat) (Sb : gset Z) (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (sp0 ret_tgt : mword 64) (K : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (lks : gset string)
       (kd : nat) (qd : Qp) (gd γil γisl : gname) (dind : mword 32)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8))
       (nf nsl : nat -> bv 8) :

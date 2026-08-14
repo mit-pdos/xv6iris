@@ -98,7 +98,7 @@ Import Defs.
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -122,7 +122,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* uvmcopy's cone reaches kalloc/kfree directly and, via its err-path
      uvmunmap, kfree again -- all bound at "kmem" (13), the lowest rank
      the cone touches. *)
-  locks_below lks (lock_rank "kmem") ->
+  locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗
@@ -165,6 +165,6 @@ Module Type UVMCOPY.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat),
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string),
       wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p C ilvl b lks.
 End UVMCOPY.

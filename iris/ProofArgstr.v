@@ -88,7 +88,7 @@ Section ProofArgstr.
   Lemma wp_argstr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset nat)
+      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
     : wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].

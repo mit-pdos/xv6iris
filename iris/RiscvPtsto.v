@@ -128,7 +128,7 @@ Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
    [set_solver] WORKS -- over [gset (mword n)] it fails with "No matching
    clauses for match", which is why the durable notes' discharge-by-named-lemma
    rule exists and why it no longer applies here. *)
-Definition lockSetR : cmra := authR (gset_disjUR nat).
+Definition lockSetR : cmra := authR (gset_disjUR string).
 
 (* The ghost layer is SPLIT IN TWO (claude-notes/design/crash.md): the
    FIXED layer -- [invGS] plus every functor (inG) class -- will survive

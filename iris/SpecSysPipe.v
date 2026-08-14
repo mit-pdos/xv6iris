@@ -164,7 +164,7 @@ Definition wp_sys_pipe_sconf_body
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
+    (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
      naming both would put TWO instance paths to [inG Σ fracR] in scope --
      they print identically and do not unify, so a [pipe_ref] built through
@@ -181,7 +181,7 @@ Definition wp_sys_pipe_sconf_body
   (* sys_pipe acquires no lock of its own -- it is a pure pass-through to its
      three fileclose calls (inside [sp_close2]), whose own lowest rank is
      "ftable" (1).  One premise covers the whole cone. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   sie_cap_gpr m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
@@ -246,6 +246,6 @@ Module Type SYSPIPE.
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
       wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
 End SYSPIPE.

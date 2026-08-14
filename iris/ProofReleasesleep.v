@@ -73,7 +73,7 @@ Section ProofReleasesleep.
   Lemma wp_releasesleep_sconf 
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
@@ -309,14 +309,14 @@ Section ProofReleasesleep.
     (* wakeup runs INSIDE the sleeplock's inner critical section, so the set
        it threads (unchanged -- wakeup is balanced) is the acquired one. *)
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs pme 1%nat (trap_res b + (av - 4))%nat b C false
-              ({[lock_rank "sleep lock"%string]} ∪ lks)
+              ({["sleep lock"%string]} ∪ lks)
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
               ltac:(lia)
               (* wakeup wants "proc" (11); the held set just gained "sleep
                  lock" (6), which is still strictly below it. *)
-              (locks_below_union_singleton lks (lock_rank "sleep lock"%string) (lock_rank "proc"%string)
+              (locks_below_union_singleton lks "sleep lock"%string "proc"%string
                  ltac:(vm_compute; lia)
                  ltac:(lkbelow))
               with "Hcg Hown Htext Hpc Hpanic Hpinv").
@@ -376,7 +376,7 @@ Section ProofReleasesleep.
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
               0%nat b pme C (av - 4)%nat
-              ({[lock_rank "sleep lock"%string]} ∪ lks)
+              ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [] HtokL HRsl Hown Hpay").
@@ -389,8 +389,8 @@ Section ProofReleasesleep.
        premise; [locks_below_not_elem] turns it into the non-membership the
        set algebra needs, and then the round trip is the identity -- which is
        what the postcondition's [cpu_own 0 b pme C b lks] wants. *)
-    pose proof (locks_below_not_elem lks (lock_rank "sleep lock"%string) Hno) as Hnotin.
-    assert (Hsetback : ({[lock_rank "sleep lock"%string]} ∪ lks) ∖ {[lock_rank "sleep lock"%string]} = lks)
+    pose proof (locks_below_not_elem lks "sleep lock"%string Hno) as Hnotin.
+    assert (Hsetback : ({["sleep lock"%string]} ∪ lks) ∖ {["sleep lock"%string]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hpc2c : ret_pc (Krel !!! Regidx (mword_of_int 1 : mword 5))

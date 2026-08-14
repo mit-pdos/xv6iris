@@ -85,7 +85,7 @@ Section ProofKerneltrap.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-      (ep sc tv : mword 64) (lks : gset nat)
+      (ep sc tv : mword 64) (lks : gset string)
     : wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu m av p C ep sc tv lks.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].

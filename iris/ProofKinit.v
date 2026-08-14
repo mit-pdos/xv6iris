@@ -47,7 +47,7 @@ Section ProofKinit.
   Lemma wp_kinit_sconf
       (m : regfile)
       (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ)
-      (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset nat)
+      (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string)
     : wp_kinit_sconf_body m ps K ncnt eb pcur C vlock vname vcpu b lks.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].

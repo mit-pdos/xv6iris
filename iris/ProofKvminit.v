@@ -62,7 +62,7 @@ Section KvminitBody.
      per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
       wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks.
 
   Ltac reg_neq :=
@@ -71,7 +71,7 @@ Section KvminitBody.
     end.
 
   Lemma wp_kvminit_sconf_gen (γa : gname) (mm : regfile)
-      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset nat) :
+      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :
     wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
@@ -279,7 +279,7 @@ End KvminitBody.
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset nat)
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
       : wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument
        insertion would silently resolve [KMK.wp_kvmmake_sconf]'s [CID] at

@@ -71,7 +71,7 @@ Section ProofProcdumpMain.
   Lemma wp_procdump_sconf
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-      (lks : gset nat)
+      (lks : gset string)
     : wp_procdump_sconf_body γpr γd γv m K eb p C b lks.
   Proof.
     cbv beta zeta delta [wp_procdump_sconf_body].

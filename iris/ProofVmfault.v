@@ -177,7 +177,7 @@ Section ProofVmfault.
   Lemma wp_vmfault_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset nat)
+      (C : iProp Σ) (b : bool) (lks : gset string)
     : wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_vmfault_sconf_body].

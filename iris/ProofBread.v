@@ -244,7 +244,7 @@ Section BreadDefs.
   Definition bd_cont `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) (lks : gset nat)
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) (lks : gset string)
       : iProp Σ :=
     (* THE LITERAL [true], matching SpecBread's crossing: bread PARKS (its
        acquiresleep sleeps), so its continuation is about an arbitrary hart
@@ -270,7 +270,7 @@ Section BreadDefs.
   Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) (lks : gset nat) :
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) (lks : gset string) :
     (* the guard is at the LITERAL [true] now, [bd_cont]'s own index *)
     (true = false \/ pj = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
     bd_cont (CID0 := CIDa)  j bn V pidv dev bno dq m K eb pj C lks -∗
@@ -322,7 +322,7 @@ Section BreadBlocks.
       (j : nat) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_out bsd : list (bv 8)) (d : bool) (lks : gset nat) :
+      (bs_out bsd : list (bv 8)) (d : bool) (lks : gset string) :
     (K_bread <= K)%nat ->
     bd_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
@@ -574,7 +574,7 @@ Section BreadBlocks.
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat) (q : Qp)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
@@ -929,7 +929,7 @@ Section BreadBlocks.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
@@ -946,14 +946,14 @@ Section BreadBlocks.
        release below needs [Hfresh] for its [Hsetback] simplification, and
        the ensuing acquiresleep call needs the bound lifted to "sleep lock"
        (rank 6) via [locks_below_mono]. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x48) : mword 64) -∗
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "bcache"]} ∪ lks) -∗
+    cpu_own 1 eb (proc_addr j) C false ({["bcache"]} ∪ lks) -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1093,13 +1093,13 @@ Section BreadBlocks.
     assert (HH5ra : H5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0x56) : mword 64) 4)
       by (rewrite /H5; apply upd_eq).
     iApply (R.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) H5
-              0%nat eb (proc_addr j) C (K - 6)%nat ({[lock_rank "bcache"]} ∪ lks)
+              0%nat eb (proc_addr j) C (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HH5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(unfold K_bread in HK; lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
-    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+    assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc5a : ret_pc (H5 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0x5a)).
@@ -1222,7 +1222,7 @@ Section BreadBlocks.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
@@ -1241,14 +1241,14 @@ Section BreadBlocks.
     M !!! Regidx Rs1 = bnode k ->
     (* the block owns "bcache" on entry (0x90..0xa8); see bread_hit's
        [Hbelow] for what this covers. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x90) : mword 64) -∗
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "bcache"]} ∪ lks) -∗
+    cpu_own 1 eb (proc_addr j) C false ({["bcache"]} ∪ lks) -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1467,13 +1467,13 @@ Section BreadBlocks.
     assert (HC4ra : C4 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0xa8) : mword 64) 4)
       by (rewrite /C4; apply upd_eq).
     iApply (R.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) C4
-              0%nat eb (proc_addr j) C (K - 6)%nat ({[lock_rank "bcache"]} ∪ lks)
+              0%nat eb (proc_addr j) C (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(unfold K_bread in HK; lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
-    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+    assert (Hsetback : ({["bcache"]} ∪ lks) ∖ {["bcache"]} = lks)
       by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpcac : ret_pc (C4 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0xac)).
@@ -1585,7 +1585,7 @@ Section BreadBlocks.
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) (lks : gset nat) :
+      (n : nat) (lks : gset string) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
@@ -1598,7 +1598,7 @@ Section BreadBlocks.
     (forall i, (i < NBUF)%nat -> ¬ (devs i = dev /\ bnos i = bno)) ->
     (* the whole backward scan runs while [bcache] is still held too; see
        bread_floop's [Hbelow]. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     forall (pre post : list nat) (M : regfile),
     (length pre <= n)%nat ->
     ord = (pre ++ post)%list ->
@@ -1612,7 +1612,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "bcache"]} ∪ lks) -∗
+    cpu_own 1 eb (proc_addr j) C false ({["bcache"]} ∪ lks) -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1869,7 +1869,7 @@ Section BreadBlocks.
       (bn : bio_names) (V : bio_view Σ)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset string) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
@@ -1884,7 +1884,7 @@ Section BreadBlocks.
     bd_regs m M ->
     (* still inside the critical section (0x64..0x78 is the backward scan's
        preamble); see bread_floop's [Hbelow] for what this is for. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     sie_cap_gpr M (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0x64) : mword 64) -∗
@@ -1892,7 +1892,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "bcache"]} ∪ lks) -∗
+    cpu_own 1 eb (proc_addr j) C false ({["bcache"]} ∪ lks) -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -2079,7 +2079,7 @@ Section BreadBlocks.
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) (lks : gset nat) :
+      (n : nat) (lks : gset string) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
@@ -2094,7 +2094,7 @@ Section BreadBlocks.
        what the recyc/hit exits (reached only from further down this call
        chain) need for their own [Hsetback] simplification after releasing
        it, and via [locks_below_mono] (4 <= 6) for their acquiresleep call. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks "bcache" ->
     forall (done rest : list nat) (M : regfile),
     (length rest <= n)%nat ->
     ord = (done ++ rest)%list ->
@@ -2112,7 +2112,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false ({[lock_rank "bcache"]} ∪ lks) -∗
+    cpu_own 1 eb (proc_addr j) C false ({["bcache"]} ∪ lks) -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -2151,7 +2151,7 @@ Section BreadBlocks.
                sie_cap_gpr Mx (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
                pc_is (mword_of_int (KernelSyms.bread + 0x36) : mword 64) -∗
                bd_frame m -∗
-               cpu_own 1 eb (proc_addr j) C false ({[lock_rank "bcache"]} ∪ lks) -∗
+               cpu_own 1 eb (proc_addr j) C false ({["bcache"]} ∪ lks) -∗
                arm_pay 0 eb (proc_addr j) -∗
                trap_csrs_ext eb -∗
                cpu_claim_ext eb (proc_addr j) -∗
@@ -2456,7 +2456,7 @@ Section ProofBread.
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat)
+      (b : bool) (lks : gset string)
     : wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
                           pidv dev bno dq m K eb C b lks.
   Proof.

@@ -161,7 +161,7 @@ Definition create_fresh_ty_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
     (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) (lks : gset nat) : Prop :=
+    (b : bool) (lks : gset string) : Prop :=
   let pj := proc_addr j in
   (* ---- ialloc's and ilock's own geometry, verbatim ---- *)
   (K_ialloc <= K)%nat ->
@@ -189,7 +189,7 @@ Definition create_fresh_ty_body
   (* the span's cone is ialloc ("log", 1) and ilock ("bcache", 2, and the
      inode sleeplock above it); "log" is the lower, so one premise there
      covers both via [locks_below_mono]. *)
-  locks_below lks (lock_rank "log") ->
+  locks_below lks "log" ->
   (* ---- THE TWO REAL CONTRACTS, AS HYPOTHESES.  This is what keeps
      [ProofIalloc] and [ProofIlock] load-bearing: the axiom below assumes
      nothing about either function, only about the record identity across
@@ -204,7 +204,7 @@ Definition create_fresh_ty_body
      (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool)
-     (lks' : gset nat),
+     (lks' : gset string),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                         γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
@@ -218,7 +218,7 @@ Definition create_fresh_ty_body
      (k' : nat) (s' : Qp) (g' : gname) (dev' inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
      (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool)
-     (lks' : gset nat),
+     (lks' : gset string),
      wp_ilock_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                          γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
                          nib' k' s' g' dev' inum' pidv' dq' dqs'
@@ -319,7 +319,7 @@ Module Type CREATE_FRESH_TY.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
       (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat),
+      (b : bool) (lks : gset string),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
                            u Sb pidv dq dqs dqn Ma K eb C b lks.
