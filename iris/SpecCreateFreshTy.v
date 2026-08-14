@@ -112,7 +112,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.

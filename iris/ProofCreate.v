@@ -135,7 +135,7 @@ Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import PanicStub.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecBmap SpecWritei.
 Require Import SpecIput SpecIalloc SpecIupdate.
 Require Import SpecIlock SpecIunlockput.
