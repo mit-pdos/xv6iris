@@ -5620,3 +5620,36 @@ Two things the stage must NOT do: regenerate the decode by hand (`make
 gen-code` has already produced `CodeCreate.v` at 332 bytes), and touch
 `wp_create_sconf_body` (frozen; the fix costs it nothing, which is §20.17.1's
 whole finding).
+
+
+### 20.18 THE C+D VERIFICATION (2026-08-14) — §20.10's stage C is struck from
+### the create path; the seam is caller-side; four rulings
+
+The report (session ledger; verified against a32b237c) is RATIFIED:
+
+1. **Stage C's read rows are STRUCK from the create critical path** —
+   SpecDirlink/SpecDirlookup/SpecIget/SpecNamex/ProofDirlookup/
+   ProofIreclaim/ProofNamex do NOT move.  SpecDirlink carries no
+   dir_links in/out (and MUST NOT gain one — it would oblige the re-park
+   at the dirlink and break the +0x128 ordering).  The deposit is
+   caller-side via B′'s dir_links_dirlink; the mint is a drop-in at
+   ProofIupdate's case_decide (ireg_write_link's fupd is byte-for-byte
+   ireg_write_au's).
+2. **The grey source is the FREE MINT** (link_mint_grey/ireg_link_grey,
+   mint-from-nothing, honest at the fail-after-".." instant): consistent
+   (g constrained nowhere; igrey concluded from nowhere), and its
+   permanent consequence — g can never again carry information, killing
+   §20.16.3's guarded clause and any g-keyed revival — is accepted
+   DELIBERATELY and recorded here rather than happening as a side effect.
+3. **The nlink-overflow fact takes shape (i)**: a premise on
+   wp_create_sconf_body about the dp record create is handed (honest
+   precondition, pushed to sys_open/sys_mkdir), PLUS a kernel-defects.md
+   CANDIDATE noting xv6 never checks nlink saturation.  NOT the bare
+   ∀-axiom (inconsistent at a literal), NOT a second span gate.
+4. **C4 (the SpecLogWrite AU wand for the nlink-lowering flush) is
+   PROBE-FIRST**: determine whether ProofLogWrite's ghost step holds
+   logged_at before the fsblock wand fires; if yes C4 is a re-ordering,
+   if no ireg_write_unlink's shape reopens §G.17 blocker 4.  Staging:
+   C1 → C2 → C3 (in flight as the dl16 repair) → D₀-a (C-OK-FILE end to
+   end, needing no grey/no unlink/no C4 — the result that makes every
+   later ruling cheap) → C4-probe → D₀-b → D₀-c.
