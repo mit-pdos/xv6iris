@@ -15,6 +15,7 @@ Require Import MinstretInv InstrBytes.
 Require Import KMap.
 Require Import KptExecMap.
 Require Import SmodeCore SmodeCorePt KptTree UptTree PtFetchGen.
+Require Import PtTree PtAdBits PtTreeAdue KptGhost KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -35,7 +36,7 @@ Section TrampFetchPt.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ INV ==∗
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ INV ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -82,7 +83,7 @@ Section TrampFetchPt.
     mstate_interp σ -∗
     INV -∗
     kmap_static_claims -∗
-    instr_bytes pa r ==∗
+    instr_bytes pa r ={⊤ ∖ ↑minstretN}=∗
     ∃ σf : mstate,
       ⌜ exec (fetch tt) σ = Some (r, σf) ⌝ ∗
       ⌜ σf.(mdev) = σ.(mdev) ⌝ ∗
@@ -587,7 +588,7 @@ Section TrampFetchInst.
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
-      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt root_ppn) ==∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt root_ppn) ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -634,6 +635,140 @@ Section TrampFetchInst.
               HA Hord HX HW HR Hcov with "Hpc0 Hpa0").
   Qed.
 
+  (* the SHARED-KERNEL instance: the mirror of [ktramp_fetch_habs] over the
+     shared residue [KptShare.tlb_res_pt] instead of the exclusive
+     [tlb_inv_pt] -- for kernel-side trampoline steps taken OUTSIDE the
+     satp-switch window, once the window's own exit no longer reseals the
+     exclusive invariant (TransPt.v's [tlb_inv_pt2_kcur]/[_kprev]).  Opening
+     [kpt_inv] happens ENTIRELY inside this one call (mask [⊤], since
+     nothing else is ever held open around a trampoline step), so [Habs]'s
+     fixed [==∗] shape needs no change. *)
+  Lemma ktramp_fetch_habs_share (root_ppn : mword 44) :
+    forall (va pa : mword 64) (σ : mstate),
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    svpn_of va = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_res_pt root_ppn) ={⊤ ∖ ↑minstretN}=∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      ⌜ pmpAddrMatchType_encdec_backwards
+          (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ⌝ ∗
+      ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ⌝ ∗
+      ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ⌝ ∗
+      ⌜ (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_res_pt root_ppn).
+  Proof.
+    intros va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
+    iIntros "Hri Hgh [#Hclaim Hres]".
+    iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hclaimva".
+    { rewrite Hvpn. iApply "Hclaim". }
+    iDestruct (tlb_res_pt_open with "Hres") as (satp0 tlbvec)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & Hsnap & Hpmp & #Hkinv)".
+    iDestruct "Hsnap" as (t0) "(%Htlbok0 & #Hlb0)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
+    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
+    iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
+    pose proof (pma_allows_all_pte_write _ Lpma) as Hpmaw.
+    pose proof (pma_allows_all_pte_read _ Lpma) as Hpmar.
+    assert (HA' : pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
+      by (rewrite Hpcv; exact HA).
+    assert (Hord' : zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false)
+      by (rewrite Hpav; exact Hord).
+    assert (HR' : eq_vec (_get_Pmpcfg_ent_R
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HR).
+    assert (HW' : eq_vec (_get_Pmpcfg_ent_W
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HW).
+    assert (Hcov' : (ram_base + ram_size
+      <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
+      by (rewrite Hpav; exact Hcov).
+    assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
+      by exact (exec_translationMode_S_sv39 satp0 σ LSXL Hsatpv Hmode).
+    assert (Hout : zero_extend' 64 (concat_vec
+        ((autocast (T := mword) ((autocast (T := mword)
+            (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
+    { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
+      rewrite pte_set_ad_ppn in Hid. exact Hid. }
+    (* ---- open the shared table for THIS instruction only ---- *)
+    iInv "Hkinv" as ">Hbody" "Hclose".
+    iEval (rewrite /kpt_body) in "Hbody".
+    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct (kmap_at_lookup with "HM Hclaimva") as %HMlk.
+    iDestruct (kpt_lb_agree t0 t with "Hlb0 Hlbt") as %Hcan0.
+    assert (Htlbok : tlb_ok_pt (mword_of_int 0) t tlbvec)
+      by exact (tlb_ok_pt_canon (mword_of_int 0) t0 t tlbvec Hcan0 Htlbok0).
+    pose proof Hspec as (Hbase & Hmapspec).
+    pose proof (Hmapspec (svpn_of va)) as Hmapv. rewrite HMlk in Hmapv.
+    destruct Hmapv as (p2 & p1 & a0 & d0 & Hmaps).
+    assert (Hlf : pte_set_ad (kpt_leaf_pte_of (svpn_of va) (tramp_ppn, KP_rx)) a0 d0
+                = pte_set_ad pte_tramp a0 d0)
+      by (unfold kpt_leaf_pte_of; cbn [fst snd]; apply kperm_rx_tramp_variant).
+    rewrite Hlf in Hmaps.
+    iMod (ptree_translateAddr_own (InstructionFetch tt) Supervisor root_ppn t
+            pte_tramp va pa satp0 tlbvec p2 p1 a0 d0 σ
+            (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum)
+            tramp_variant Hcanon Hout Hbase Hmaps Htlbok
+            Lmisa Lmenv Lhtif Lpriv Htm
+            (exec_effectivePrivilege_fetch _ _ σ)
+            (exec_is_shadow_stack_fetch σ)
+            Hsatpv Hppn Hasid Htlbv
+            HA' Hord' HR' HW' Hcov' Hpmar Hpmaw
+            with "Hri Hgh Htlb Ht")
+      as (σ' t' tlbvec') "(%Htrans & %Hmdev & %Hsregs & %Htsh & %Htlbok' & Hri & Hgh & Htlb & Ht)".
+    assert (Hcan' : ptree_canon t = ptree_canon t').
+    { destruct Htsh as [-> | (a1 & d1 & ->)]; [reflexivity |].
+      rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
+      symmetry.
+      exact (ptree_canon_set_leaf t (svpn_of va) p2 p1
+               (pte_set_ad pte_tramp a0 d0) a1 d1 Hmaps). }
+    iDestruct (kpt_lb_canon t t' Hcan' with "Hlbt") as "#Hlb'".
+    assert (Hspec' : kpt_tree_spec_gen root_ppn M t').
+    { destruct Htsh as [-> | (a1 & d1 & ->)]; [exact Hspec |].
+      rewrite <- (pte_set_ad_absorb pte_tramp a0 d0 a1 d1).
+      apply (kpt_tree_spec_gen_set_leaf root_ppn M t (svpn_of va) (tramp_ppn, KP_rx) p2 p1
+               (pte_set_ad pte_tramp a0 d0) a1 d1 Hspec Hmaps HMlk).
+      exists a0, d0. symmetry. exact Hlf. }
+    iMod ("Hclose" with "[Ht HM]") as "_".
+    { iNext. iExists t', M. iFrame "Ht HM Hlb'". iPureIntro. exact Hspec'. }
+    iAssert (pmp_config root_ppn) with "[Hpc Hpa]" as "Hpmp".
+    { iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
+                HA Hord HX HW HR Hcov with "Hpc Hpa"). }
+    iAssert (tlb_res_pt root_ppn) with "[Hsatp Htlb Hpmp]" as "Hres'".
+    { iApply (tlb_res_pt_intro root_ppn satp0 tlbvec' t' Hmode Hasid Hppn Htlbok'
+                with "Hsatp Htlb Hlb' Hpmp Hkinv"). }
+    iDestruct (tlb_res_pt_grant_facts root_ppn σ' with "Hri Hres'") as %(HA2 & Hord2 & HX2 & HW2 & HR2 & Hcov2).
+    iModIntro. iExists σ'.
+    iSplit; [iPureIntro; exact Htrans |].
+    iSplit; [iPureIntro; exact Hmdev |].
+    iSplit; [iPureIntro; exact Hsregs |].
+    iSplit; [iPureIntro; exact HA2 |].
+    iSplit; [iPureIntro; exact Hord2 |].
+    iSplit; [iPureIntro; exact HX2 |].
+    iSplit; [iPureIntro; exact Hcov2 |].
+    iFrame "Hri Hgh Hclaim Hres'".
+  Qed.
+
   (* the USER instance: [utlb_inv_pt uroot tfp um] absorbs the same fetch. *)
   Lemma utramp_fetch_habs (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
     forall (va pa : mword 64) (σ : mstate),
@@ -648,7 +783,7 @@ Section TrampFetchInst.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ==∗
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -699,6 +834,11 @@ Section TrampFetchInst.
   Definition wp_instr_ktramp_pt (root_ppn : mword 44) :=
     wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt root_ppn)
       (ktramp_fetch_habs root_ppn).
+  (* the SHARED-invariant mirror, for kernel trampoline steps taken with the
+     kernel table already folded back into [kpt_inv] (post-window). *)
+  Definition wp_instr_ktramp_pt_share (root_ppn : mword 44) :=
+    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_res_pt root_ppn)
+      (ktramp_fetch_habs_share root_ppn).
   Definition wp_instr_u_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :=
     wp_instr_tramp_pt (utlb_inv_pt uroot tfp um) (utramp_fetch_habs uroot tfp um).
 

@@ -292,15 +292,99 @@ other arm is a NO-OP before assuming the contract is right.** The
   have been vacuous. What that moved rather than closed is the dovetail
   below.
 - The whole-trap-loop theorem: Löb over trap rounds discharging
-  `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER. **This is the
-  next piece of trampoline work, and it now owes three explicit conversions**
-  (`completed/usertrap.md`, §"What is OWED to the trampoline halves"): the
-  kernel page table exclusive → shared (`completed/kpt-share.md`'s named
-  user-mode-under-shared-table follow-up, the largest of the three and the
-  one that gates the composition), the trapframe page physical → VA (36
-  words, one `phys_to_mem_claim` each, and it also owns `udata_cov`), and
-  `user_cfg C` ⟷ `sconf`'s config cells (free: no concrete `ucfg` is ever
-  built, so the composition just sets `uc_mie := MIE_S`). The resource cycle
-  is otherwise closed by construction — uservec's leftovers = usertrap's
-  entry bundle; usertrap's post = userret's pre; userret's leftovers =
-  uservec's bundle for the next round.
+  `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER. This owes
+  three explicit conversions (`completed/usertrap.md`, §"What is OWED to the
+  trampoline halves"): the kernel page table exclusive → shared, the
+  trapframe page physical → VA (36 words, one `phys_to_mem_claim` each, and
+  it also owns `udata_cov`), and `user_cfg C` ⟷ `sconf`'s config cells (free:
+  no concrete `ucfg` is ever built, so the composition just sets
+  `uc_mie := MIE_S`). The resource cycle is otherwise closed by construction
+  — uservec's leftovers = usertrap's entry bundle; usertrap's post =
+  userret's pre; userret's leftovers = uservec's bundle for the next round.
+- **The dovetail should be a functor, not a resource-shape coincidence.**
+  Mirror `UserretUser.v`'s shape (a functor over USERRET + USER whose
+  `wp_userret_user` runs userret, converts its post, and concludes by
+  *applying* USER's own WP): build `UservecUsertrap.v` the same way — run
+  uservec, prove as an actual proof obligation that the landing pc equals
+  usertrap's entry, convert the leftover resources into usertrap's entry
+  bundle, and conclude with `USERTRAP.wp_usertrap_body`. Do not leave
+  `SpecUservec`'s postcondition as a bare `pc_is` + resource pile that an
+  external argument has to match up.
+
+### The kpt exclusive → shared conversion — uservec's direction LANDED, userret's mirror and the call-site rewiring are not
+
+This is the largest of the three conversions and gates the composition; it
+turned out smaller than it looked once scoped precisely (see below), but the
+remaining work is still real. **Two things established as fact, not
+supposition, worth recording so nobody re-derives them:**
+
+- `KptShare.v`'s header comment ("the switch window... cannot be re-based on
+  a shared invariant") is WRONG, or at least no longer true. It can — but
+  only per-instruction: an Iris invariant's content must return within the
+  span of ONE atomic step, so the window's exclusive tree cannot be "checked
+  out" once for its whole multi-instruction duration the way it is today —
+  each absorption call that touches the kernel side must open+close
+  `KptShare.kpt_inv` itself. The window is short enough that this is only
+  ONE such call per direction (the window's own closing-instruction fetch;
+  see below), not an open-ended rework.
+- **Opening an invariant needs a masked fancy-update; bare `|==>` cannot do
+  it at all** — `iInv` fails outright with "the goal should be a fancy
+  update... or another modality that supports invariant opening" under a
+  bupd goal. `TrampStepPt.v`'s trampoline-step engine (`wp_instr_tramp_pt`'s
+  `Habs`/`INV` interface, and `tramp_fetch_pt` under it) was hardwired to
+  bare `==∗` throughout, so this genuinely required widening its modality to
+  `={⊤ ∖ ↑minstretN}=∗` (the mask already in force at every trampoline step,
+  inherited from `wp_exec_step_decode_execute_inv_priv`'s own
+  `minstretN`-excluding fupd — NOT `⊤`, which fails with "Goal and eliminated
+  modality must have the same mask"). This is backward-compatible: the three
+  existing bare-bupd `Habs` instances (`ktramp_fetch_habs`,
+  `utramp_fetch_habs`, `pt2_tramp_fetch_habs`) needed only their type
+  signature widened, zero proof-script changes — bupd embeds into fupd for
+  free, and `iModIntro`/`iMod` are modality-polymorphic. Verified by
+  rebuilding `UservecExitPt.v`/`UserretEntryPt.v` unchanged.
+
+**Landed, compiling clean against `/shared/xv6rocq`'s switch:**
+
+- `PtTree.v`: `tlb_cache_of_canon`, `tlb_ok_pt2_canon_{cur,prev}` — the
+  two-table canon-transfer lemmas (mirror `tlb_ok_pt_canon` per side).
+- `TrampStepPt.v`: `ktramp_fetch_habs_share` / `wp_instr_ktramp_pt_share` —
+  the single-table kernel trampoline step engine rebuilt over
+  `KptShare.tlb_res_pt` instead of `KptTree.tlb_inv_pt`. This is what a
+  POST-window kernel-side trampoline step (uservec's final `c.jalr`, and
+  whatever userret's mirror needs before its own window) runs against once
+  there is no exclusive tree left to reseal into.
+- `TransPt.v`: `tlb_inv_pt2_kcur` (+ `_intro`/`_open`/`_enter`/`_exit`) and
+  `pt2_tramp_fetch_habs_kcur` / `wp_instr_pt2_tramp_kcur` — the window
+  invariant and its one fetch-absorption call, with the kernel table in the
+  **current** slot (uservec's role: the switch installs the kernel root)
+  backed by `kpt_inv`+snapshot instead of exclusive `ptree_own`; `Sp` (the
+  **previous**, i.e. user, slot) is untouched — a per-process table
+  genuinely is exclusive and was never the problem.
+  `pt2_tramp_fetch_habs_kcur`'s proof is the real content: it inlines
+  `KptShare`'s "open, read/write, close, no ghost update needed because a
+  write-back is always canon-preserving" technique into `TransPt`'s own
+  five-way case split (O1/O2/O3-into-current/O3-into-previous/O2-previous),
+  opening `kpt_inv` for exactly the span of that one call. `Sp`'s
+  `pt2_tramp_spec` clauses are stated at the literal `tramp_vpn`, so every
+  vpn-indexed fact needs rebasing to `svpn_of va` via the `Hvpn` premise
+  before it can feed `ptree2_translateAddr_cases` — do this ONCE right after
+  destructuring `Hsel_p`/before folding `vpn := svpn_of va`
+  (`Hpres_p'` is the reusable form), not inline in each of the five arms.
+
+**Not yet done:**
+
+1. **userret's mirror** (`tlb_inv_pt2_kprev`-style: kernel plays the
+   **previous** slot, since userret's switch installs the *user* root as
+   current) — same technique, comparable size, not yet written.
+2. **Rewire the two trampoline proofs' call sites**
+   (`UservecExitPt.wp_uservec_exit_pt`, `UserretEntryPt.wp_userret_entry_pt`)
+   to the new lemmas. This is where `kpt_frame kroot` drops out of uservec's
+   PREMISES entirely (nothing to receive — `kpt_inv kroot` is persistent and
+   ambient) and `tlb_inv_pt kroot` drops out of its POSTCONDITION entirely
+   (nothing to hand over, for the same reason) — replaced by nothing, which
+   is the actual point: usertrap picks up the kernel table the same ambient
+   way every other kernel function does, and the seam stops being a
+   resource-conversion problem.
+3. Propagate through `SpecUservec.v` / `SpecUserret.v` / `ProofUservec.v` /
+   `ProofUserret.v` / their `Link*.v` (drop the now-gone threading), and only
+   then is `UservecUsertrap.v` (the functor above) buildable.
