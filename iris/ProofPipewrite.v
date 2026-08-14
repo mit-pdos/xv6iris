@@ -1440,9 +1440,10 @@ Section ProofPipewrite.
                        = mword_of_int (KernelSyms.pipewrite + 0x58)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjep) in "Hpc".
         rewrite /pw_epi.
-        (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
-           depth 0 makes that the empty set the exit continuation names. *)
-        iEval (rewrite Hlkempty) in "Hown".
+        (* the pipe lock's release left [({[rank "pipe"]} ∪ lks) ∖ {[rank
+           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set [pw_epi]'s
+           fixed [∅] binder names. *)
+        iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
         iSpecialize ("EPI" $! CIDp16 with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! mr P' with "[%] [%] [%] HF7 Hhi Hcg Hown Hpc Href Hpriv").
         + apply (pw_base_regs_cs m M mr (pa_stk sp0 14%nat) HcsMmr).
@@ -1539,9 +1540,10 @@ Section ProofPipewrite.
         assert (Hs2' : M' !!! Regidx Rs2 = (mword_of_int (-1) : mword 64)).
         { rewrite (Rrest (mword_of_int 18) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)). exact Hs2Q3. }
         rewrite /pw_epi.
-        (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
-           depth 0 makes that the empty set this exit names. *)
-        iEval (rewrite Hlkempty) in "Hown".
+        (* the pipe lock's release left [({[rank "pipe"]} ∪ lks) ∖ {[rank
+           "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set [pw_epi]'s
+           fixed [∅] binder names. *)
+        iEval (rewrite Hlkempty locks_union_empty locks_self_del) in "Hown".
         iSpecialize ("EPI" $! CIDrs with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! M' P' with "[%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpc Href Hpriv").
         + unfold pw_base_regs. split_and!; assumption.
@@ -2472,7 +2474,7 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsp. }
               iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                        G4 0%nat true (proc_addr j) C (av - 14)%nat lks HlkaG4 Hav10
+                        G4 0%nat true (proc_addr j) C (av - 14)%nat ({[lock_rank "pipe"]} ∪ lks) HlkaG4 Hav10
                         ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
               { iApply lock_finisher_close. }
@@ -2499,6 +2501,11 @@ Section ProofPipewrite.
               { rewrite /G5. apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMrl. }
               iDestruct (cpu_own_transport CIDrs CIDp50 0 true (proc_addr j) C true ltac:(wp_next_chain)
                            with "Hown") as "Hown".
+              (* the release above left [({[rank "pipe"]} ∪ lks) ∖ {[rank
+                 "pipe"]}]; [lks = ∅] at depth 0 makes that the empty set,
+                 which is renamed back to [lks] -- the bare entry set sleep's
+                 contract names. *)
+              iEval (rewrite Hlkempty locks_union_empty locks_self_del -Hlkempty) in "Hown".
               (* both extra premises are [emp] here: sleep is reached at noff 0
                  with interrupts ENABLED, so [trap_csrs_ext true = emp] and
                  [cpu_claim_ext true pj = emp] -- sleep's own acquire mints the
@@ -2695,7 +2702,7 @@ Section ProofPipewrite.
                 with "[Hch]" as "Hbuf".
               { cbn [seq]. iSplitL "Hch"; [| done]. iEval (rewrite Ha2N5 pa_add_0). iExact "Hch". }
               iApply (Copyin.wp_copyin_sconf γa N5 Pc (pv_sz V) 1%nat (fun _ : nat => b0)
-                        (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false lks
+                        (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false ({[lock_rank "pipe"]} ∪ lks)
                         HK50 Ha0N5 Ha1N5 Ha4N5 Hlen1 Hszb Hlvl1
                         with "Hcg Hown Htext Hpc Hpt Henv Hbuf").
               all: try lkbelow.

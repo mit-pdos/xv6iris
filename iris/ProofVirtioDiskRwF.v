@@ -749,6 +749,9 @@ Section VdrwfP6.
     (bv_unsigned sector * 512)%Z = (1024 * uint bno)%Z ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
     m !!! Regidx csp_rs1 = (sp0 : SailStdpp.Values.mword 64) ->
+    (* the vdisk lock is held across P6 (P1-P4's convention: its rank is
+       already in [lks]); free_desc's wakeup is at "proc". *)
+    locks_below lks (lock_rank "proc") ->
     kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
@@ -781,9 +784,9 @@ Section VdrwfP6.
         ▷ Q -∗
         WP (Loop : expr riscv_lang)) -∗
     P5.vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
-                    bs_disk m kq.
+                    bs_disk m kq lks.
   Proof.
-    intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m.
+    intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
     iIntros "#Htext #Hpanic #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
@@ -1914,7 +1917,7 @@ Section ProofVirtioDiskRwF.
     iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq lks
-              HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
+              HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl ltac:(lkbelow)
               with "Htext Hpanic Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
     iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".

@@ -1085,7 +1085,7 @@ Section UtE8.
     assert (HcsM2 : ut_cs m0 M2)
       by (rewrite /M2; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM1]).
     iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N) M2 nx 0%nat false
-              (un_pj N) C false HM2a0 Hj Hjl ltac:(vm_compute; reflexivity)
+              (un_pj N) C false lks HM2a0 Hj Hjl ltac:(vm_compute; reflexivity)
               ltac:(lia) with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
@@ -1118,7 +1118,7 @@ Section UtE8.
                           (concat_vec (mword_of_int 6 : mword 8) ('b"0"))))
                      = mword_of_int (UT + 0xfc)) by pcw.
       iEval (rewrite Hpfc) in "Hpc".
-      iApply (T.ut_fa Rsys N V pt ksp m0 mf av nx C false
+      iApply (T.ut_fa Rsys N V pt ksp m0 mf av nx C false lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N V C with "Hcpu Hcsrs Hclm [-]").

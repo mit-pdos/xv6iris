@@ -711,6 +711,7 @@ Section KforkMain.
               HK Hlvl
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpv Hcont [] [] []").
+    all: try lkbelow.
     - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
       iIntros (CID1 Hx1 Mt) "%HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hke HR".
       (* THE COLLAPSE.  allocproc's two not-found disjuncts are the same
