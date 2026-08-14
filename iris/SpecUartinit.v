@@ -69,7 +69,6 @@ Require Import InstrBytes.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
-Require Import WpLock.
 Require Import WpUart.
 Require Import UartTxInv.
 (* [lk_raw] / [lk_fresh] -- the three-cell spinlock bundle, before and after

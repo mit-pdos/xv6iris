@@ -1585,6 +1585,24 @@ Proof.
   rewrite Hent Hp0 pte_set_ad_absorb. reflexivity.
 Qed.
 
+(* the per-entry step of [tlb_ok_pt_canon], exposed standalone for the
+   two-table (shared-side) transfer below *)
+Lemma tlb_cache_of_canon (asid : mword 16) (t t' : ptree)
+    (vpn' : mword 27) (ent : TLB_Entry) :
+  ptree_canon t = ptree_canon t' ->
+  tlb_cache_of asid t vpn' ent -> tlb_cache_of asid t' vpn' ent.
+Proof.
+  intros Hcan (vpn & p2 & p1 & p0 & a & d & Hmaps & Hh & Hent).
+  pose proof (ptree_maps_canon t vpn p2 p1 p0 Hmaps) as Hmc.
+  rewrite Hcan in Hmc.
+  destruct (ptree_maps_canon_inv t' vpn p2 p1 (pte_canon p0) Hmc)
+    as (q0 & Hmaps' & Hq).
+  destruct (pte_canon_inv q0 p0 Hq) as (a' & d' & Hp0).
+  exists vpn, p2, p1, q0, a, d.
+  split; [exact Hmaps' |]. split; [exact Hh |].
+  rewrite Hent Hp0 pte_set_ad_absorb. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (* §7b TWO-TABLE TLB consistency: the satp-switch window.  Between a      *)
 (*     [csrw satp] and the following [sfence.vma], resident entries may   *)
@@ -1606,6 +1624,32 @@ Lemma tlb_ok_pt2_prev (asid : mword 16) (tp tc : ptree)
     (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
   tlb_ok_pt asid tp tlbvec -> tlb_ok_pt2 asid tp tc tlbvec.
 Proof. intros Hok vpn' ent Hget. left. exact (Hok vpn' ent Hget). Qed.
+
+(* the TRANSFER, per side: two-table coherence depends on whichever side
+   moved only through its canonical form -- the shared-table absorption
+   (TransPtShare.v) uses this to lift a hart's SNAPSHOT-relative coherence
+   to the tree it actually just opened. *)
+Lemma tlb_ok_pt2_canon_cur (asid : mword 16) (tp tc tc' : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  ptree_canon tc = ptree_canon tc' ->
+  tlb_ok_pt2 asid tp tc tlbvec -> tlb_ok_pt2 asid tp tc' tlbvec.
+Proof.
+  intros Hcan Hok vpn' ent Hget.
+  destruct (Hok vpn' ent Hget) as [Hp | Hc].
+  - left. exact Hp.
+  - right. exact (tlb_cache_of_canon asid tc tc' vpn' ent Hcan Hc).
+Qed.
+
+Lemma tlb_ok_pt2_canon_prev (asid : mword 16) (tp tp' tc : ptree)
+    (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+  ptree_canon tp = ptree_canon tp' ->
+  tlb_ok_pt2 asid tp tc tlbvec -> tlb_ok_pt2 asid tp' tc tlbvec.
+Proof.
+  intros Hcan Hok vpn' ent Hget.
+  destruct (Hok vpn' ent Hget) as [Hp | Hc].
+  - left. exact (tlb_cache_of_canon asid tp tp' vpn' ent Hcan Hp).
+  - right. exact Hc.
+Qed.
 
 
 (* walk-induced fills: the walker consults the CURRENT table, but the

@@ -37,6 +37,7 @@ Section ProofUser.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
 
   (* The base execute totality, closed by instantiating the 6 base memory
      Variables with their proven arms. *)
@@ -65,10 +66,10 @@ Section ProofUser.
   (* THE FINAL THEOREM: safety of arbitrary user-mode execution, with NO
      totality hypotheses -- the two totalities are now unconditional. *)
   Theorem wp_user_exec_closed :
-    wp_user_exec_closed_body C pt.
+    wp_user_exec_closed_body C pt Rut.
   Proof.
     cbv beta delta [wp_user_exec_closed_body].
-    apply (wp_user_exec_full C pt
+    apply (wp_user_exec_full C pt Rut
              base_exec_total_u_closed rvc_exec_total_u_closed).
   Qed.
 

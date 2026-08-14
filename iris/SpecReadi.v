@@ -185,16 +185,16 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* readi's own frame is 112 bytes (14 slots).  Its deepest callee is now
-   either_copyout at 58; bmap wants 56, bread 40, brelse 26.
+   bmap at 64 (itself dominated by balloc's out-of-blocks printk, 58, which
+   is itself dominated by printk's own real stack need, printk_stack = 48);
+   either_copyout wants 58, bread 40, brelse 26.
 
-   58, NOT 56, and it is the far end of a chain that starts in copyout: [psz]
-   has to outlive walkaddr / vmfault / memmove there, so gcc parked it in s11,
-   copyout's frame grew to 14 slots and its budget went 50 -> 52
-   (SpecCopyout.v), which pushed either_copyout 56 -> 58 (6 + 52), which
-   pushes this one 70 -> 72.  Note bmap is UNAFFECTED and still 56 -- it does
-   not reach copyout -- so the two are no longer equal and "both 56" is no
-   longer the right way to remember this number. *)
-Definition K_readi : nat := 72%nat.
+   64, NOT 56: bmap's own budget grew 56 -> 64 when SpecPrintk.v's general
+   contract stopped undercounting printk's frame (38 -> 48), which pushed
+   balloc's out-of-blocks arm 50 -> 58, which pushed bmap 56 -> 64 (6 + 58).
+   either_copyout's 58 (SpecCopyout.v's own, unrelated, [psz]-in-s11 chain)
+   does NOT reach printk, so it is unaffected and is no longer the max. *)
+Definition K_readi : nat := 78%nat.
 
 (* ===================================================================== *)
 (*  THE TWO PURE FUNCTIONS THE CONTRACT SPEAKS IN                        *)

@@ -40,7 +40,6 @@ Require Import RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import InstrBytes.
 Require Import RiscvExtras.
-Require Import PrintintArith.
 Require Import VcGen.
 Require Export W32Arith.
 Require Import ByteCursor.

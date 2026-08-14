@@ -187,7 +187,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
@@ -217,15 +217,16 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* dirlink's own frame is 80 bytes (10 slots); its deepest callee is
-   dirlookup (84); writei wants 70.
+   dirlookup (90); writei wants 78.
 
-   84, from the copyout chain: [psz] needs a callee-saved home in copyout, so
-   its frame grew to 14 slots and its bound went 50 -> 52 (SpecCopyout.v),
-   pushing either_copyout 56 -> 58, readi 70 -> 72 and dirlookup 82 -> 84.
-   writei is UNAFFECTED and still 70 -- it reaches either_copyIN, whose 56 did
-   not move -- so the two callees are no longer close and dirlookup alone
-   fixes this number. *)
-Definition K_dirlink : nat := 94%nat.
+   90, and dirlookup's dominant chain is now bmap's, not copyout's: printk's
+   real stack need (48, printk_stack) dominates bmap (64), which dominates
+   balloc's out-of-blocks arm (58), which dominates bmap's own callers,
+   readi (78) and dirlookup (90) -- SpecReadi.v / SpecDirlookup.v have the
+   arithmetic.  writei also grew (78, dominated by the same bmap chain, not
+   the copyout one), but stays under dirlookup, so dirlookup alone still
+   fixes this number: 10 + 90 = 100. *)
+Definition K_dirlink : nat := 100%nat.
 
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)

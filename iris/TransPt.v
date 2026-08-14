@@ -25,7 +25,7 @@ Require Import SmodePte PtAdBits Pt4kWalk CommonWalk PtTree PtTreeAdue KptPt.
 Require Import KptExecMap.
 Require Import Pt4kWalk.
 Require Import SmodeCore KptTree UptTree TrampStepPt.
-Require Import KMap.
+Require Import KMap MinstretInv KptGhost KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.
@@ -544,6 +544,225 @@ Section Pt2Inv.
 End Pt2Inv.
 
 (* ===================================================================== *)
+(* §2b THE SHARED-KERNEL WINDOW INVARIANT.  The mirror of [tlb_inv_pt2]     *)
+(*    with the CURRENT root's tree folded into [KptShare.kpt_inv] instead   *)
+(*    of exclusively owned -- uservec's role, where the switch installs    *)
+(*    the KERNEL table as [rc].  [_kprev] below is userret's mirror image  *)
+(*    (kernel plays the PREVIOUS slot).  Both exist because an Iris        *)
+(*    invariant can only be opened for the span of ONE atomic step, so the *)
+(*    shared side cannot be "checked out" once for the whole window the    *)
+(*    way the exclusive tree was -- it has to be re-opened at each         *)
+(*    absorption call that touches it (here: the window's one fetch).      *)
+(* ===================================================================== *)
+
+Section Pt2InvKcur.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Definition tlb_inv_pt2_kcur (rc : mword 44) (Sp : ptree -> Prop) : iProp Σ :=
+    (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp tc0 : ptree),
+       satp ↦ᵣ satp0 ∗
+       ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ⌝ ∗
+       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt2 (mword_of_int 0) tp tc0 tlbvec ⌝ ∗
+       ⌜ Sp tp ⌝ ∗
+       ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
+       ptree_own 2 (DfracOwn 1) tp ∗
+       pmp_config rc ∗
+       kpt_lb tc0 ∗ kpt_inv rc)%I.
+
+  Lemma tlb_inv_pt2_kcur_intro (rc : mword 44) (Sp : ptree -> Prop)
+      (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp tc0 : ptree) :
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ->
+    tlb_ok_pt2 (mword_of_int 0) tp tc0 tlbvec ->
+    Sp tp -> (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗
+    ptree_own 2 (DfracOwn 1) tp -∗ pmp_config rc -∗ kpt_lb tc0 -∗ kpt_inv rc -∗
+    tlb_inv_pt2_kcur rc Sp.
+  Proof.
+    intros Hmode Hasid Hppn Hok HSp Hpmaw.
+    iIntros "Hsatp Htlb Htp Hpmp Hlb0 Hkinv".
+    iExists satp0, tlbvec, tp, tc0. iFrame "Hsatp Htlb Htp Hpmp Hlb0 Hkinv".
+    iPureIntro. tauto.
+  Qed.
+
+  Lemma tlb_inv_pt2_kcur_open (rc : mword 44) (Sp : ptree -> Prop) :
+    tlb_inv_pt2_kcur rc Sp -∗
+    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp tc0 : ptree),
+      satp ↦ᵣ satp0 ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ⌝ ∗
+      tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt2 (mword_of_int 0) tp tc0 tlbvec ⌝ ∗
+      ⌜ Sp tp ⌝ ∗
+      ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
+      ptree_own 2 (DfracOwn 1) tp ∗
+      pmp_config rc ∗ kpt_lb tc0 ∗ kpt_inv rc.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* ENTER: right after [csrw satp] installs [rc].  The previous table
+     [Sp] arrives PARKED as [pt_frame Sp] (a per-process user table
+     genuinely is exclusive); the shared kernel side needs only a fresh
+     SNAPSHOT off [kpt_inv], never ownership -- one [iMod], no later. *)
+  Lemma tlb_inv_pt2_kcur_enter (rc : mword 44) (Sp : ptree -> Prop) (E : coPset)
+      (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp : ptree) :
+    ↑kptN ⊆ E ->
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ->
+    tlb_ok_pt (mword_of_int 0) tp tlbvec ->
+    Sp tp -> (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ ptree_own 2 (DfracOwn 1) tp -∗
+    pmp_config rc -∗ kpt_inv rc
+    ={E}=∗
+    tlb_inv_pt2_kcur rc Sp.
+  Proof.
+    intros HE Hmode Hasid Hppn Hok HSp Hpmaw.
+    iIntros "Hsatp Htlb Htp Hpmp #Hkinv".
+    iMod (kpt_inv_snapshot E rc HE with "Hkinv") as (tc0) "#Hlb0".
+    iModIntro.
+    iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tlbvec tp tc0
+              Hmode Hasid Hppn (tlb_ok_pt2_prev _ _ _ _ Hok) HSp Hpmaw
+              with "Hsatp Htlb Htp Hpmp Hlb0 Hkinv").
+  Qed.
+
+  (* EXIT: at the closing [sfence.vma].  [Sp]'s table leaves parked as
+     [pt_frame Sp]; the shared side hands back nothing but the persistent
+     snapshot -- [kpt_inv] never needed returning, and [tlb_ok_pt_empty]
+     re-seals at ANY tree once the sfence has emptied the TLB, so the
+     snapshot the caller already has is exactly what it needs. *)
+  Lemma tlb_inv_pt2_kcur_exit (rc : mword 44) (Sp : ptree -> Prop) :
+    tlb_inv_pt2_kcur rc Sp -∗
+    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tc0 : ptree),
+      satp ↦ᵣ satp0 ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ⌝ ∗
+      tlb ↦ᵣ tlbvec ∗
+      pmp_config rc ∗ kpt_lb tc0 ∗ kpt_inv rc ∗
+      pt_frame Sp.
+  Proof.
+    iIntros "Hinv".
+    iDestruct (tlb_inv_pt2_kcur_open with "Hinv") as (satp0 tlbvec tp tc0)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %HSp & %Hpmaw & Htp & Hpmp & Hlb0 & Hkinv)".
+    iExists satp0, tlbvec, tc0.
+    iFrame "Hsatp Htlb Hpmp Hlb0 Hkinv".
+    iSplit; [iPureIntro; exact Hmode |].
+    iSplit; [iPureIntro; exact Hasid |].
+    iSplit; [iPureIntro; exact Hppn |].
+    iExists tp. iFrame "Htp". iPureIntro. exact HSp.
+  Qed.
+
+End Pt2InvKcur.
+
+(* ===================================================================== *)
+(* §2c THE SHARED-KERNEL WINDOW INVARIANT, userret's mirror image: the     *)
+(*    switch installs the USER root as CURRENT, so the kernel table plays  *)
+(*    the PREVIOUS slot.  [kroot] is carried as its own parameter (unlike  *)
+(*    [_kcur], [rc] here is the USER root, not the kernel one).            *)
+(* ===================================================================== *)
+
+Section Pt2InvKprev.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Definition tlb_inv_pt2_kprev (rc kroot : mword 44) (Sc : ptree -> Prop) : iProp Σ :=
+    (∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp0 tc : ptree),
+       satp ↦ᵣ satp0 ∗
+       ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+       ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ⌝ ∗
+       tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt2 (mword_of_int 0) tp0 tc tlbvec ⌝ ∗
+       ⌜ Sc tc ⌝ ∗
+       ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
+       ptree_own 2 (DfracOwn 1) tc ∗
+       pmp_config rc ∗
+       kpt_lb tp0 ∗ kpt_inv kroot)%I.
+
+  Lemma tlb_inv_pt2_kprev_intro (rc kroot : mword 44) (Sc : ptree -> Prop)
+      (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp0 tc : ptree) :
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ->
+    tlb_ok_pt2 (mword_of_int 0) tp0 tc tlbvec ->
+    Sc tc -> (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗
+    ptree_own 2 (DfracOwn 1) tc -∗ pmp_config rc -∗ kpt_lb tp0 -∗ kpt_inv kroot -∗
+    tlb_inv_pt2_kprev rc kroot Sc.
+  Proof.
+    intros Hmode Hasid Hppn Hok HSc Hpmaw.
+    iIntros "Hsatp Htlb Htc Hpmp Hlb0 Hkinv".
+    iExists satp0, tlbvec, tp0, tc. iFrame "Hsatp Htlb Htc Hpmp Hlb0 Hkinv".
+    iPureIntro. tauto.
+  Qed.
+
+  Lemma tlb_inv_pt2_kprev_open (rc kroot : mword 44) (Sc : ptree -> Prop) :
+    tlb_inv_pt2_kprev rc kroot Sc -∗
+    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tp0 tc : ptree),
+      satp ↦ᵣ satp0 ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ⌝ ∗
+      tlb ↦ᵣ tlbvec ∗ ⌜ tlb_ok_pt2 (mword_of_int 0) tp0 tc tlbvec ⌝ ∗
+      ⌜ Sc tc ⌝ ∗
+      ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
+      ptree_own 2 (DfracOwn 1) tc ∗
+      pmp_config rc ∗ kpt_lb tp0 ∗ kpt_inv kroot.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  (* ENTER: right after [csrw satp] installs [rc] (the USER root).  The
+     caller already holds a fresh kernel-side snapshot from whatever left
+     it (e.g. [KptShare.tlb_res_pt]'s own [tlb_snap_ok] -- the TLB has not
+     moved since, so it is still valid); [Sc]'s table arrives PARKED as
+     [pt_frame Sc].  No fupd needed: unlike [_kcur_enter], nothing is
+     freshly minted here. *)
+  Lemma tlb_inv_pt2_kprev_enter (rc kroot : mword 44) (Sc : ptree -> Prop)
+      (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) :
+    _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ->
+    zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
+    autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ->
+    (forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0) ->
+    satp ↦ᵣ satp0 -∗ tlb ↦ᵣ tlbvec -∗ tlb_snap_ok tlbvec -∗
+    pt_frame Sc -∗ pmp_config rc -∗ kpt_inv kroot -∗
+    tlb_inv_pt2_kprev rc kroot Sc.
+  Proof.
+    intros Hmode Hasid Hppn Hpmaw.
+    iIntros "Hsatp Htlb Hsnap Hfr Hpmp #Hkinv".
+    iDestruct "Hsnap" as (tp0) "[%Htlbok0 #Hlb0]".
+    iDestruct "Hfr" as (tc) "[%HSc Htc]".
+    iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tlbvec tp0 tc
+              Hmode Hasid Hppn (tlb_ok_pt2_prev _ _ _ _ Htlbok0) HSc Hpmaw
+              with "Hsatp Htlb Htc Hpmp Hlb0 Hkinv").
+  Qed.
+
+  (* EXIT: at the closing [sfence.vma].  [Sc]'s table stays live (it is
+     about to become the running invariant); the shared kernel side hands
+     back nothing -- [kpt_inv] never needed returning. *)
+  Lemma tlb_inv_pt2_kprev_exit (rc kroot : mword 44) (Sc : ptree -> Prop) :
+    tlb_inv_pt2_kprev rc kroot Sc -∗
+    ∃ (satp0 : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (tc : ptree),
+      satp ↦ᵣ satp0 ∗
+      ⌜ _get_Satp64_Mode (Mk_Satp64 satp0) = ('b"1000" : mword 4) ⌝ ∗
+      ⌜ zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ⌝ ∗
+      ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = rc ⌝ ∗
+      tlb ↦ᵣ tlbvec ∗ ⌜ Sc tc ⌝ ∗
+      ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
+      ptree_own 2 (DfracOwn 1) tc ∗ pmp_config rc.
+  Proof.
+    iIntros "Hinv".
+    iDestruct (tlb_inv_pt2_kprev_open with "Hinv") as (satp0 tlbvec tp0 tc)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok & %HSc & %Hpmaw & Htc & Hpmp & _ & _)".
+    iExists satp0, tlbvec, tc.
+    iFrame "Hsatp Htlb Htc Hpmp".
+    repeat (iSplit; [done |]). done.
+  Qed.
+
+End Pt2InvKprev.
+
+(* ===================================================================== *)
 (* §3 THE TWO-TABLE INVARIANT ABSORBS TRANSLATION.  Premises: BOTH specs  *)
 (*    force a mapping of [va]'s vpn to an A/D variant of the same         *)
 (*    canonical leaf [w], and both specs survive an A/D write-back to     *)
@@ -809,7 +1028,7 @@ Section Pt2TrampInst.
     register_lookup cur_privilege σ.(sregs) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
-    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt2 rc Sp Sc ==∗
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_inv_pt2 rc Sp Sc ={⊤ ∖ ↑minstretN}=∗
     ∃ σ' : mstate,
       ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
@@ -879,6 +1098,574 @@ Section Pt2TrampInst.
 
 End Pt2TrampInst.
 
+(* the SHARED-KERNEL mirror of [pt2_tramp_fetch_habs]: [Sp]'s side is
+   exactly as before (a parked, exclusively-owned table genuinely needs
+   its own [pt2_tramp_spec] clause); the kernel side opens [kpt_inv]
+   for the span of this ONE fetch instead of drawing on an ambient [Sc].
+   The trampoline claim travels as an explicit resource (mirroring
+   [TrampStepPt.ktramp_fetch_habs_share]) since nothing else supplies it
+   once [Sc] is gone. *)
+Section Pt2TrampInstKcur.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma pt2_tramp_fetch_habs_kcur (rc : mword 44) (Sp : ptree -> Prop) :
+    pt2_tramp_spec Sp ->
+    forall (va pa : mword 64) (σ : mstate),
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    svpn_of va = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp) ={⊤ ∖ ↑minstretN}=∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      ⌜ pmpAddrMatchType_encdec_backwards
+          (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ⌝ ∗
+      ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ⌝ ∗
+      ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ⌝ ∗
+      ⌜ (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp).
+  Proof.
+    intros (Hsel_p & Hpres_p) va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
+    iIntros "Hri Hgh [#Hclaim Hinv]".
+    iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hclaimva".
+    { rewrite Hvpn. iApply "Hclaim". }
+    iDestruct (tlb_inv_pt2_kcur_open with "Hinv") as (satp0 tlbvec tp tc0)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok2 & %HSp & %Hpmawimpl & Htp & Hpmp & #Hlb0 & #Hkinv)".
+    pose proof (Hpmawimpl _ Lpma) as Hpmaw.
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
+    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
+    iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
+    destruct (Hsel_p tp HSp) as (pp2 & pp1 & ap & dp & Hmaps_p0).
+    assert (Hmaps_p : ptree_maps tp (svpn_of va) pp2 pp1 (pte_set_ad pte_tramp ap dp))
+      by (rewrite Hvpn; exact Hmaps_p0).
+    assert (Hpres_p' : forall t' (a1 d1 : mword 1), Sp t' ->
+              Sp (ptree_set_leaf t' (svpn_of va) (pte_set_ad pte_tramp a1 d1))).
+    { intros t' a1 d1 HSpt'. rewrite Hvpn. exact (Hpres_p t' a1 d1 HSpt'). }
+    set (vpn := svpn_of va) in *.
+    assert (HA' : pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
+      by (rewrite Hpcv; exact HA).
+    assert (Hord' : zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false)
+      by (rewrite Hpav; exact Hord).
+    assert (HR' : eq_vec (_get_Pmpcfg_ent_R
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HR).
+    assert (HW' : eq_vec (_get_Pmpcfg_ent_W
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HW).
+    assert (HX' : eq_vec (_get_Pmpcfg_ent_X
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HX).
+    assert (Hcov' : (ram_base + ram_size
+      <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
+      by (rewrite Hpav; exact Hcov).
+    pose proof (pma_allows_all_pte_read _ Lpma) as Hpmar.
+    assert (Hout : zero_extend' 64 (concat_vec
+        ((autocast (T := mword) ((autocast (T := mword)
+            (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
+    { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
+      rewrite pte_set_ad_ppn in Hid. exact Hid. }
+    assert (Hvarp : forall a d : mword 1, pte_pbmt0 (pte_set_ad pte_tramp a d))
+      by (intros a d; exact (proj2 (proj2 (proj2 (tramp_variant a d))))).
+    (* ---- open the shared table for THIS instruction only ---- *)
+    iInv "Hkinv" as ">Hbody" "Hclose".
+    iEval (rewrite /kpt_body) in "Hbody".
+    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct (kmap_at_lookup with "HM Hclaimva") as %HMlk.
+    iDestruct (kpt_lb_agree tc0 t with "Hlb0 Hlbt") as %Hcan0.
+    assert (Hok2' : tlb_ok_pt2 (mword_of_int 0) tp t tlbvec)
+      by exact (tlb_ok_pt2_canon_cur (mword_of_int 0) tp tc0 t tlbvec Hcan0 Hok2).
+    pose proof Hspec as (Hbase & Hmapspec).
+    pose proof (Hmapspec vpn) as Hmapv. rewrite HMlk in Hmapv.
+    destruct Hmapv as (pc2 & pc1 & ac & dc & Hmaps_c0).
+    assert (Hlf : pte_set_ad (kpt_leaf_pte_of vpn (tramp_ppn, KP_rx)) ac dc
+                = pte_set_ad pte_tramp ac dc)
+      by (unfold kpt_leaf_pte_of; cbn [fst snd]; apply kperm_rx_tramp_variant).
+    rewrite Hlf in Hmaps_c0.
+    iDestruct (ptree_own_path_mem σ (DfracOwn 1) tp vpn pp2 pp1 _ Hmaps_p with "Hgh Htp")
+      as %(Hsm2p & Hsm1p & Hsm0p).
+    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn pc2 pc1 _ Hmaps_c0 with "Hgh Ht")
+      as %(Hsm2c & Hsm1c & Hsm0c).
+    assert (Hbase_c : pt_base t = rc) by (rewrite Hbase; reflexivity).
+    destruct (ptree2_translateAddr_cases (InstructionFetch tt) rc va pte_tramp pa satp0 tp t tlbvec
+                pp2 pp1 pc2 pc1 ap dp ac dc σ
+                (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum)
+                Hcanon Hout Hvarp Hbase_c Hmaps_p Hmaps_c0 Hok2'
+                Hsm2c Hsm1c Hsm0c Hsm0p
+                Lmisa Lmenv Lhtif Lpriv LSXL
+                (exec_effectivePrivilege_fetch _ _ σ)
+                (exec_is_shadow_stack_fetch σ)
+                Hsatpv Hmode Hppn Hasid Htlbv
+                HA' Hord' HR' HW' Hcov' Hpmar Hpmaw)
+      as (σ' & Htrans & Hshape).
+    iAssert (pmp_config rc) with "[Hpc Hpa]" as "Hpmp".
+    { iApply (pmp_config_intro rc pmpcfg0 pmpaddr00
+                HA Hord HX HW HR Hcov with "Hpc Hpa"). }
+    destruct Hshape as [-> | [-> | [ (a1 & d1 & ->) | [ (a1 & d1 & ->) | -> ] ]]].
+    - (* O1: nothing moved *)
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro. iExists σ.
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; left; reflexivity |].
+      iSplit; [iPureIntro; exact HA' |].
+      iSplit; [iPureIntro; exact Hord' |].
+      iSplit; [iPureIntro; exact HX' |].
+      iSplit; [iPureIntro; exact Hcov' |].
+      iFrame "Hri Hgh Hclaim".
+      iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tlbvec tp tc0
+                Hmode Hasid Hppn Hok2 HSp Hpmawimpl
+                with "Hsatp Htlb Htp Hpmp Hlb0 Hkinv").
+    - (* O2: TLB fill from the current (shared) tree's walk -- [t] unchanged *)
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn pc2 pc1 (pte_set_ad pte_tramp ac dc) (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro. iExists (set_reg σ tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp t tv').
+      { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) tp t tlbvec vpn pc2 pc1
+                 (pte_set_ad pte_tramp ac dc) (pte_set_ad pte_tramp ac dc) Hmaps_c0
+                 (pte_set_ad_refl _) Hok2'). }
+      iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tv' tp tc0
+                Hmode Hasid Hppn (tlb_ok_pt2_canon_cur (mword_of_int 0) tp t tc0 tv'
+                  (eq_sym Hcan0) Hok') HSp Hpmawimpl
+                with "Hsatp Htlb Htp Hpmp Hlb0 Hkinv").
+    - (* O3cur: the Svadu write-back into the CURRENT (shared) tree *)
+      set (p0c := pte_set_ad pte_tramp ac dc) in *.
+      set (w' := pte_set_ad p0c a1 d1) in *.
+      assert (Habs : w' = pte_set_ad pte_tramp a1 d1)
+        by exact (pte_set_ad_absorb pte_tramp ac dc a1 d1).
+      pose proof (tramp_variant a1 d1) as (Hv' & Hl' & Hn' & Hp').
+      rewrite <- Habs in Hv', Hl', Hn', Hp'.
+      iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn pc2 pc1 p0c Hmaps_c0 with "Ht")
+        as "(Hs2 & Hs1 & Hs0 & Hrest)".
+      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pc1 vpn) p0c w' with "Hgh Hs0")
+        as "[Hgh Hs0]".
+      iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Ht".
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn pc2 pc1 w' (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      assert (Hcan' : ptree_canon t = ptree_canon (ptree_set_leaf t vpn w')).
+      { symmetry. exact (ptree_canon_set_leaf t vpn pc2 pc1 p0c a1 d1 Hmaps_c0). }
+      iDestruct (kpt_lb_canon t (ptree_set_leaf t vpn w') Hcan' with "Hlbt") as "#Hlb'".
+      assert (Hspec' : kpt_tree_spec_gen rc M (ptree_set_leaf t vpn w')).
+      { apply (kpt_tree_spec_gen_set_leaf rc M t vpn (tramp_ppn, KP_rx) pc2 pc1
+                 p0c a1 d1 Hspec Hmaps_c0 HMlk).
+        exists ac, dc. symmetry. exact Hlf. }
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists (ptree_set_leaf t vpn w'), M. iFrame "Ht HM Hlb'".
+        iPureIntro. exact Hspec'. }
+      iModIntro.
+      iExists (set_reg (MState σ.(sregs)
+                          (write_bytes σ.(mem) (pt_addr0 pc1 vpn) 8 w') σ.(mdev))
+                 tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp (ptree_set_leaf t vpn w') tv').
+      { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) tp (ptree_set_leaf t vpn w')
+                 tlbvec vpn pc2 pc1 w' w'
+                 (ptree_set_leaf_maps_self t vpn pc2 pc1 p0c w' Hmaps_c0 Hv' Hl' Hn' Hp')
+                 (pte_set_ad_refl _)
+                 (tlb_ok_pt2_set_leaf_cur (mword_of_int 0) tp t tlbvec vpn pc2 pc1 p0c a1 d1
+                    Hmaps_c0 Hv' Hl' Hn' Hp' Hok2')). }
+      iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tv' tp (ptree_set_leaf t vpn w')
+                Hmode Hasid Hppn Hok' HSp Hpmawimpl
+                with "Hsatp Htlb Htp Hpmp Hlb' Hkinv").
+    - (* O3prev: the Svadu write-back into the PREVIOUS (still exclusive) tree *)
+      set (p0p := pte_set_ad pte_tramp ap dp) in *.
+      set (w' := pte_set_ad p0p a1 d1) in *.
+      assert (Habs : w' = pte_set_ad pte_tramp a1 d1)
+        by exact (pte_set_ad_absorb pte_tramp ap dp a1 d1).
+      pose proof (tramp_variant a1 d1) as (Hv' & Hl' & Hn' & Hp').
+      rewrite <- Habs in Hv', Hl', Hn', Hp'.
+      iDestruct (ptree_own_path_upd (DfracOwn 1) tp vpn pp2 pp1 p0p Hmaps_p with "Htp")
+        as "(Hs2 & Hs1 & Hs0 & Hrest)".
+      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 pp1 vpn) p0p w' with "Hgh Hs0")
+        as "[Hgh Hs0]".
+      iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htp".
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn pp2 pp1 w' (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro.
+      iExists (set_reg (MState σ.(sregs)
+                          (write_bytes σ.(mem) (pt_addr0 pp1 vpn) 8 w') σ.(mdev))
+                 tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (HSp' : Sp (ptree_set_leaf tp vpn w')).
+      { rewrite Habs. exact (Hpres_p' tp a1 d1 HSp). }
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) (ptree_set_leaf tp vpn w') t tv').
+      { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) (ptree_set_leaf tp vpn w') t
+                 tlbvec vpn pp2 pp1 w' w'
+                 (ptree_set_leaf_maps_self tp vpn pp2 pp1 p0p w' Hmaps_p Hv' Hl' Hn' Hp')
+                 (pte_set_ad_refl _)
+                 (tlb_ok_pt2_set_leaf_prev (mword_of_int 0) tp t tlbvec vpn pp2 pp1 p0p a1 d1
+                    Hmaps_p Hv' Hl' Hn' Hp' Hok2')). }
+      iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tv' (ptree_set_leaf tp vpn w') tc0
+                Hmode Hasid Hppn (tlb_ok_pt2_canon_cur (mword_of_int 0)
+                  (ptree_set_leaf tp vpn w') t tc0 tv'
+                  (eq_sym Hcan0) Hok') HSp' Hpmawimpl
+                with "Hsatp Htlb Htp Hpmp Hlb0 Hkinv").
+    - (* O2prev: the previous tree already carried the bits -- memory untouched *)
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn pp2 pp1 (pte_set_ad pte_tramp ap dp) (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro. iExists (set_reg σ tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp t tv').
+      { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) tp t tlbvec vpn pp2 pp1
+                 (pte_set_ad pte_tramp ap dp) (pte_set_ad pte_tramp ap dp) Hmaps_p
+                 (pte_set_ad_refl _) Hok2'). }
+      iApply (tlb_inv_pt2_kcur_intro rc Sp satp0 tv' tp tc0
+                Hmode Hasid Hppn (tlb_ok_pt2_canon_cur (mword_of_int 0) tp t tc0 tv'
+                  (eq_sym Hcan0) Hok') HSp Hpmawimpl
+                with "Hsatp Htlb Htp Hpmp Hlb0 Hkinv").
+  Qed.
+
+End Pt2TrampInstKcur.
+
+(* userret's mirror: [Sc] (the USER table) is exclusive and abstract, exactly
+   as [Sp] was in [pt2_tramp_fetch_habs_kcur]; the KERNEL table now plays the
+   PREVIOUS slot and is opened from [kpt_inv] for the span of this one call.
+   [rc] is the CURRENT (user) root; [kroot] is the shared kernel root -- two
+   independent quantities, unlike [_kcur] where both coincided. *)
+Section Pt2TrampInstKprev.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma pt2_tramp_fetch_habs_kprev (rc kroot : mword 44) (Sc : ptree -> Prop) :
+    pt2_tramp_spec Sc ->
+    (forall t, Sc t -> pt_base t = rc) ->
+    forall (va pa : mword 64) (σ : mstate),
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    svpn_of va = tramp_vpn ->
+    zero_extend' 64 (concat_vec tramp_ppn
+       (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ⊢ reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc) ={⊤ ∖ ↑minstretN}=∗
+    ∃ σ' : mstate,
+      ⌜ exec (translateAddr (Virtaddr va) (InstructionFetch tt)) σ
+        = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+      ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+      ⌜ (σ'.(sregs) = σ.(sregs) \/
+         exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+      ⌜ pmpAddrMatchType_encdec_backwards
+          (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) = TOR ⌝ ∗
+      ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) = false ⌝ ∗
+      ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (register_lookup pmpcfg_n σ'.(sregs)) 0)) ('b"1") = true ⌝ ∗
+      ⌜ (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0) * 4)%Z ⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc).
+  Proof.
+    intros (Hsel_c & Hpres_c) Hbc va pa σ Hcanon Hvpn Hid Lmisa Lmenv Lhtif Lpriv LSXL Lpma.
+    iIntros "Hri Hgh [#Hclaim Hinv]".
+    iAssert (kmap_at (svpn_of va) tramp_ppn KP_rx) as "#Hclaimva".
+    { rewrite Hvpn. iApply "Hclaim". }
+    iDestruct (tlb_inv_pt2_kprev_open with "Hinv") as (satp0 tlbvec tp0 tc)
+      "(Hsatp & %Hmode & %Hasid & %Hppn & Htlb & %Hok2 & %HSc & %Hpmawimpl & Htc & Hpmp & #Hlb0 & #Hkinv)".
+    pose proof (Hpmawimpl _ Lpma) as Hpmaw.
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iDestruct (reg_valid_dq with "Hri Htlb") as %Htlbv.
+    iDestruct "Hpmp" as (pmpcfg0 pmpaddr00)
+      "(Hpc & Hpa & %HA & %Hord & %HX & %HW & %HR & %Hcov)".
+    iDestruct (reg_valid_dq with "Hri Hpc") as %Hpcv.
+    iDestruct (reg_valid_dq with "Hri Hpa") as %Hpav.
+    destruct (Hsel_c tc HSc) as (uc2 & uc1 & ua & ud & Hmaps_c0).
+    assert (Hmaps_c : ptree_maps tc (svpn_of va) uc2 uc1 (pte_set_ad pte_tramp ua ud))
+      by (rewrite Hvpn; exact Hmaps_c0).
+    assert (Hpres_c' : forall t' (a1 d1 : mword 1), Sc t' ->
+              Sc (ptree_set_leaf t' (svpn_of va) (pte_set_ad pte_tramp a1 d1))).
+    { intros t' a1 d1 HSct'. rewrite Hvpn. exact (Hpres_c t' a1 d1 HSct'). }
+    assert (Hbase_c : pt_base tc = rc) by exact (Hbc tc HSc).
+    set (vpn := svpn_of va) in *.
+    assert (HA' : pmpAddrMatchType_encdec_backwards
+      (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) = TOR)
+      by (rewrite Hpcv; exact HA).
+    assert (Hord' : zopz0zKzJ_u (zeros' 64)
+      (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) = false)
+      by (rewrite Hpav; exact Hord).
+    assert (HR' : eq_vec (_get_Pmpcfg_ent_R
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HR).
+    assert (HW' : eq_vec (_get_Pmpcfg_ent_W
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HW).
+    assert (HX' : eq_vec (_get_Pmpcfg_ent_X
+      (vec_access_dec (register_lookup pmpcfg_n σ.(sregs)) 0)) ('b"1") = true)
+      by (rewrite Hpcv; exact HX).
+    assert (Hcov' : (ram_base + ram_size
+      <= uint (vec_access_dec (register_lookup pmpaddr_n σ.(sregs)) 0) * 4)%Z)
+      by (rewrite Hpav; exact Hcov).
+    pose proof (pma_allows_all_pte_read _ Lpma) as Hpmar.
+    assert (Hout : zero_extend' 64 (concat_vec
+        ((autocast (T := mword) ((autocast (T := mword)
+            (PPN_of_PTE (pte_tramp : mword 64))) : mword 44)) : mword 44)
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
+    { rewrite <- (tramp_variant_ppn ('b"1") ('b"1")) in Hid.
+      rewrite pte_set_ad_ppn in Hid. exact Hid. }
+    assert (Hvarp : forall a d : mword 1, pte_pbmt0 (pte_set_ad pte_tramp a d))
+      by (intros a d; exact (proj2 (proj2 (proj2 (tramp_variant a d))))).
+    (* ---- open the shared KERNEL table (the PREVIOUS slot) for THIS
+       instruction only ---- *)
+    iInv "Hkinv" as ">Hbody" "Hclose".
+    iEval (rewrite /kpt_body) in "Hbody".
+    iDestruct "Hbody" as (t M) "(Ht & #Hlbt & HM & %Hspec)".
+    iDestruct (kmap_at_lookup with "HM Hclaimva") as %HMlk.
+    iDestruct (kpt_lb_agree tp0 t with "Hlb0 Hlbt") as %Hcan0.
+    assert (Hok2' : tlb_ok_pt2 (mword_of_int 0) t tc tlbvec)
+      by exact (tlb_ok_pt2_canon_prev (mword_of_int 0) tp0 t tc tlbvec Hcan0 Hok2).
+    pose proof Hspec as (Hbase & Hmapspec).
+    pose proof (Hmapspec vpn) as Hmapv. rewrite HMlk in Hmapv.
+    destruct Hmapv as (kp2 & kp1 & ka & kd & Hmaps_p0).
+    assert (Hlf : pte_set_ad (kpt_leaf_pte_of vpn (tramp_ppn, KP_rx)) ka kd
+                = pte_set_ad pte_tramp ka kd)
+      by (unfold kpt_leaf_pte_of; cbn [fst snd]; apply kperm_rx_tramp_variant).
+    rewrite Hlf in Hmaps_p0.
+    iDestruct (ptree_own_path_mem σ (DfracOwn 1) t vpn kp2 kp1 _ Hmaps_p0 with "Hgh Ht")
+      as %(_ & _ & Hsm0k).
+    iDestruct (ptree_own_path_mem σ (DfracOwn 1) tc vpn uc2 uc1 _ Hmaps_c with "Hgh Htc")
+      as %(Hsm2u & Hsm1u & Hsm0u).
+    destruct (ptree2_translateAddr_cases (InstructionFetch tt) rc va pte_tramp pa satp0 t tc tlbvec
+                kp2 kp1 uc2 uc1 ka kd ua ud σ
+                (fun a d mxr do_sum => tramp_variant_check_fetch a d mxr do_sum)
+                Hcanon Hout Hvarp Hbase_c Hmaps_p0 Hmaps_c Hok2'
+                Hsm2u Hsm1u Hsm0u Hsm0k
+                Lmisa Lmenv Lhtif Lpriv LSXL
+                (exec_effectivePrivilege_fetch _ _ σ)
+                (exec_is_shadow_stack_fetch σ)
+                Hsatpv Hmode Hppn Hasid Htlbv
+                HA' Hord' HR' HW' Hcov' Hpmar Hpmaw)
+      as (σ' & Htrans & Hshape).
+    iAssert (pmp_config rc) with "[Hpc Hpa]" as "Hpmp".
+    { iApply (pmp_config_intro rc pmpcfg0 pmpaddr00
+                HA Hord HX HW HR Hcov with "Hpc Hpa"). }
+    destruct Hshape as [-> | [-> | [ (a1 & d1 & ->) | [ (a1 & d1 & ->) | -> ] ]]].
+    - (* O1: nothing moved *)
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro. iExists σ.
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; left; reflexivity |].
+      iSplit; [iPureIntro; exact HA' |].
+      iSplit; [iPureIntro; exact Hord' |].
+      iSplit; [iPureIntro; exact HX' |].
+      iSplit; [iPureIntro; exact Hcov' |].
+      iFrame "Hri Hgh Hclaim".
+      iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tlbvec tp0 tc
+                Hmode Hasid Hppn Hok2 HSc Hpmawimpl
+                with "Hsatp Htlb Htc Hpmp Hlb0 Hkinv").
+    - (* O2: TLB fill from the current (EXCLUSIVE, user) tree's walk --
+         [t] untouched, so [kpt_inv] recloses unchanged *)
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn uc2 uc1 (pte_set_ad pte_tramp ua ud) (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro. iExists (set_reg σ tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) t tc tv').
+      { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) t tc tlbvec vpn uc2 uc1
+                 (pte_set_ad pte_tramp ua ud) (pte_set_ad pte_tramp ua ud) Hmaps_c
+                 (pte_set_ad_refl _) Hok2'). }
+      iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tv' tp0 tc
+                Hmode Hasid Hppn (tlb_ok_pt2_canon_prev (mword_of_int 0) t tp0 tc tv'
+                  (eq_sym Hcan0) Hok') HSc Hpmawimpl
+                with "Hsatp Htlb Htc Hpmp Hlb0 Hkinv").
+    - (* O3cur: the Svadu write-back into the CURRENT (EXCLUSIVE, user) tree
+         -- an ordinary write against [Htc]; [t]/[kpt_inv] untouched *)
+      set (p0u := pte_set_ad pte_tramp ua ud) in *.
+      set (w' := pte_set_ad p0u a1 d1) in *.
+      assert (Habs : w' = pte_set_ad pte_tramp a1 d1)
+        by exact (pte_set_ad_absorb pte_tramp ua ud a1 d1).
+      pose proof (tramp_variant a1 d1) as (Hv' & Hl' & Hn' & Hp').
+      rewrite <- Habs in Hv', Hl', Hn', Hp'.
+      iDestruct (ptree_own_path_upd (DfracOwn 1) tc vpn uc2 uc1 p0u Hmaps_c with "Htc")
+        as "(Hs2 & Hs1 & Hs0 & Hrest)".
+      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 uc1 vpn) p0u w' with "Hgh Hs0")
+        as "[Hgh Hs0]".
+      iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Htc".
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn uc2 uc1 w' (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro.
+      iExists (set_reg (MState σ.(sregs)
+                          (write_bytes σ.(mem) (pt_addr0 uc1 vpn) 8 w') σ.(mdev))
+                 tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (HSc' : Sc (ptree_set_leaf tc vpn w')).
+      { rewrite Habs. exact (Hpres_c' tc a1 d1 HSc). }
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) t (ptree_set_leaf tc vpn w') tv').
+      { apply (tlb_ok_pt2_fill_cur (mword_of_int 0) t (ptree_set_leaf tc vpn w')
+                 tlbvec vpn uc2 uc1 w' w'
+                 (ptree_set_leaf_maps_self tc vpn uc2 uc1 p0u w' Hmaps_c Hv' Hl' Hn' Hp')
+                 (pte_set_ad_refl _)
+                 (tlb_ok_pt2_set_leaf_cur (mword_of_int 0) t tc tlbvec vpn uc2 uc1 p0u a1 d1
+                    Hmaps_c Hv' Hl' Hn' Hp' Hok2')). }
+      iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tv' tp0 (ptree_set_leaf tc vpn w')
+                Hmode Hasid Hppn (tlb_ok_pt2_canon_prev (mword_of_int 0) t tp0 _ tv'
+                  (eq_sym Hcan0) Hok') HSc' Hpmawimpl
+                with "Hsatp Htlb Htc Hpmp Hlb0 Hkinv").
+    - (* O3prev: the Svadu write-back into the PREVIOUS (SHARED, kernel)
+         tree -- opened from [kpt_inv], reclosed with the updated tree and
+         the SAME snapshot (a write-back never moves the canonical form) *)
+      set (p0k := pte_set_ad pte_tramp ka kd) in *.
+      set (w' := pte_set_ad p0k a1 d1) in *.
+      assert (Habs : w' = pte_set_ad pte_tramp a1 d1)
+        by exact (pte_set_ad_absorb pte_tramp ka kd a1 d1).
+      pose proof (tramp_variant a1 d1) as (Hv' & Hl' & Hn' & Hp').
+      rewrite <- Habs in Hv', Hl', Hn', Hp'.
+      iDestruct (ptree_own_path_upd (DfracOwn 1) t vpn kp2 kp1 p0k Hmaps_p0 with "Ht")
+        as "(Hs2 & Hs1 & Hs0 & Hrest)".
+      iMod (phys_word_pointsto_write σ.(mem) (pt_addr0 kp1 vpn) p0k w' with "Hgh Hs0")
+        as "[Hgh Hs0]".
+      iDestruct ("Hrest" $! w' with "Hs2 Hs1 Hs0") as "Ht".
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn kp2 kp1 w' (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      assert (Hcan' : ptree_canon t = ptree_canon (ptree_set_leaf t vpn w')).
+      { symmetry. exact (ptree_canon_set_leaf t vpn kp2 kp1 p0k a1 d1 Hmaps_p0). }
+      iDestruct (kpt_lb_canon t (ptree_set_leaf t vpn w') Hcan' with "Hlbt") as "#Hlb'".
+      assert (Hspec' : kpt_tree_spec_gen kroot M (ptree_set_leaf t vpn w')).
+      { apply (kpt_tree_spec_gen_set_leaf kroot M t vpn (tramp_ppn, KP_rx) kp2 kp1
+                 p0k a1 d1 Hspec Hmaps_p0 HMlk).
+        exists ka, kd. symmetry. exact Hlf. }
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists (ptree_set_leaf t vpn w'), M. iFrame "Ht HM Hlb'".
+        iPureIntro. exact Hspec'. }
+      iModIntro.
+      iExists (set_reg (MState σ.(sregs)
+                          (write_bytes σ.(mem) (pt_addr0 kp1 vpn) 8 w') σ.(mdev))
+                 tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) (ptree_set_leaf t vpn w') tc tv').
+      { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) (ptree_set_leaf t vpn w') tc
+                 tlbvec vpn kp2 kp1 w' w'
+                 (ptree_set_leaf_maps_self t vpn kp2 kp1 p0k w' Hmaps_p0 Hv' Hl' Hn' Hp')
+                 (pte_set_ad_refl _)
+                 (tlb_ok_pt2_set_leaf_prev (mword_of_int 0) t tc tlbvec vpn kp2 kp1 p0k a1 d1
+                    Hmaps_p0 Hv' Hl' Hn' Hp' Hok2')). }
+      iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tv' (ptree_set_leaf t vpn w') tc
+                Hmode Hasid Hppn Hok' HSc Hpmawimpl
+                with "Hsatp Htlb Htc Hpmp Hlb' Hkinv").
+    - (* O2prev: the previous (kernel) tree already carried the bits --
+         memory untouched, only the TLB entry refreshes *)
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn kp2 kp1 (pte_set_ad pte_tramp ka kd) (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iMod ("Hclose" with "[Ht HM]") as "_".
+      { iNext. iExists t, M. iFrame "Ht HM Hlbt". iPureIntro. exact Hspec. }
+      iModIntro. iExists (set_reg σ tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HA' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hord' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact HX' | vm_compute; reflexivity] |].
+      iSplit; [iPureIntro; rewrite irrelevant_register_set; [exact Hcov' | vm_compute; reflexivity] |].
+      iFrame "Hri Hgh Hclaim".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) t tc tv').
+      { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) t tc tlbvec vpn kp2 kp1
+                 (pte_set_ad pte_tramp ka kd) (pte_set_ad pte_tramp ka kd) Hmaps_p0
+                 (pte_set_ad_refl _) Hok2'). }
+      iApply (tlb_inv_pt2_kprev_intro rc kroot Sc satp0 tv' tp0 tc
+                Hmode Hasid Hppn (tlb_ok_pt2_canon_prev (mword_of_int 0) t tp0 tc tv'
+                  (eq_sym Hcan0) Hok') HSc Hpmawimpl
+                with "Hsatp Htlb Htc Hpmp Hlb0 Hkinv").
+  Qed.
+
+End Pt2TrampInstKprev.
+
 (* ---- the two concrete spec instances: both page-table specs carry a
    trampoline clause and survive the trampoline A/D write-back ---------- *)
 
@@ -946,5 +1733,21 @@ Section Pt2TrampEngines.
       (HSp : pt2_tramp_spec Sp) (HSc : pt2_tramp_spec Sc)
       (Hbc : forall t, Sc t -> pt_base t = rc) :=
     wp_instr_tramp_pt (tlb_inv_pt2 rc Sp Sc) (pt2_tramp_fetch_habs rc Sp Sc HSp HSc Hbc).
+
+  (* the SHARED-KERNEL mirror: the kernel side needs only its persistent
+     [kmap_at] claim + [tlb_inv_pt2_kcur], no [pt2_tramp_spec]/[pt_base]
+     obligation of its own (both fold out of [kpt_inv]'s own invariant). *)
+  Definition wp_instr_pt2_tramp_kcur (rc : mword 44) (Sp : ptree -> Prop)
+      (HSp : pt2_tramp_spec Sp) :=
+    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kcur rc Sp)
+      (pt2_tramp_fetch_habs_kcur rc Sp HSp).
+
+  (* userret's mirror: the shared side is now [Sp] (the KERNEL table, the
+     PREVIOUS slot); [Sc] (the USER table, CURRENT) keeps its own
+     [pt2_tramp_spec]/[pt_base] obligations, exactly as [Sp] does above. *)
+  Definition wp_instr_pt2_tramp_kprev (rc kroot : mword 44) (Sc : ptree -> Prop)
+      (HSc : pt2_tramp_spec Sc) (Hbc : forall t, Sc t -> pt_base t = rc) :=
+    wp_instr_tramp_pt (kmap_at tramp_vpn tramp_ppn KP_rx ∗ tlb_inv_pt2_kprev rc kroot Sc)
+      (pt2_tramp_fetch_habs_kprev rc kroot Sc HSc Hbc).
 
 End Pt2TrampEngines.

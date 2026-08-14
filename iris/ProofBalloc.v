@@ -49,9 +49,9 @@
    THE OUT-OF-BLOCKS ARM IS LIVE and calls printk on its GENERAL path (at
    balloc time [panicking] is 0, so [SpecPrintk]'s panic-path contract does
    not apply).  Its contract arrives as the PURE hypothesis
-   [SpecPrintkGen.printk_gen_contract] rather than as a functor argument,
+   [SpecPrintk.printk_gen_contract] rather than as a functor argument,
    which is what keeps [Print Assumptions] on the linked theorem at the
-   standing six: [LinkPrintkGen]'s only instance is itself an [Axiom], and a
+   standing six: [LinkPrintk]'s only instance is itself an [Axiom], and a
    functor would import it here.  The format string is minted out of the
    [kernel_data] premise by [KernelDataInv.kernel_data_string]; it takes no
    varargs, so [descs = []].                                              *)
@@ -96,7 +96,7 @@ Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBalloc.
 Require Import PanicStub.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset.
 Require Import ProofBallocParts.
 Require Import SpecBalloc.

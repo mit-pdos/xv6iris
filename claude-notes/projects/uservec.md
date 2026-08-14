@@ -292,15 +292,228 @@ other arm is a NO-OP before assuming the contract is right.** The
   have been vacuous. What that moved rather than closed is the dovetail
   below.
 - The whole-trap-loop theorem: Löb over trap rounds discharging
-  `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER. **This is the
-  next piece of trampoline work, and it now owes three explicit conversions**
-  (`completed/usertrap.md`, §"What is OWED to the trampoline halves"): the
-  kernel page table exclusive → shared (`completed/kpt-share.md`'s named
-  user-mode-under-shared-table follow-up, the largest of the three and the
-  one that gates the composition), the trapframe page physical → VA (36
-  words, one `phys_to_mem_claim` each, and it also owns `udata_cov`), and
-  `user_cfg C` ⟷ `sconf`'s config cells (free: no concrete `ucfg` is ever
-  built, so the composition just sets `uc_mie := MIE_S`). The resource cycle
-  is otherwise closed by construction — uservec's leftovers = usertrap's
-  entry bundle; usertrap's post = userret's pre; userret's leftovers =
-  uservec's bundle for the next round.
+  `stvec_handler_wp` from USERVEC + USERTRAP + USERRET + USER. This owes
+  three explicit conversions (`completed/usertrap.md`, §"What is OWED to the
+  trampoline halves"): the kernel page table exclusive → shared, the
+  trapframe page physical → VA (36 words, one `phys_to_mem_claim` each, and
+  it also owns `udata_cov`), and `user_cfg C` ⟷ `sconf`'s config cells (free:
+  no concrete `ucfg` is ever built, so the composition just sets
+  `uc_mie := MIE_S`). The resource cycle is otherwise closed by construction
+  — uservec's leftovers = usertrap's entry bundle; usertrap's post =
+  userret's pre; userret's leftovers = uservec's bundle for the next round.
+- **The dovetail should be a functor, not a resource-shape coincidence.**
+  Mirror `UserretUser.v`'s shape (a functor over USERRET + USER whose
+  `wp_userret_user` runs userret, converts its post, and concludes by
+  *applying* USER's own WP): build `UservecUsertrap.v` the same way — run
+  uservec, prove as an actual proof obligation that the landing pc equals
+  usertrap's entry, convert the leftover resources into usertrap's entry
+  bundle, and conclude with `USERTRAP.wp_usertrap_body`. Do not leave
+  `SpecUservec`'s postcondition as a bare `pc_is` + resource pile that an
+  external argument has to match up.
+
+### The kpt exclusive → shared conversion — DONE, both directions, fully propagated
+
+This was the largest of the three conversions and gated the composition; it
+turned out smaller than it looked once scoped precisely (see below). Both
+directions, the call-site rewiring, and the Spec/Proof/Link propagation for
+uservec's and userret's own boundaries are landed and verified with a clean
+full-tree build (local `make -f CoqMakefile -j16 -k` and, independently, a
+from-scratch build on the GCP VM against the byte-identical switch — zero
+`Error` lines, `MAKEEXIT=0`). **Two things established as fact, not
+supposition, worth recording so nobody re-derives them:**
+
+- `KptShare.v`'s header comment ("the switch window... cannot be re-based on
+  a shared invariant") is WRONG, or at least no longer true. It can — but
+  only per-instruction: an Iris invariant's content must return within the
+  span of ONE atomic step, so the window's exclusive tree cannot be "checked
+  out" once for its whole multi-instruction duration the way it is today —
+  each absorption call that touches the kernel side must open+close
+  `KptShare.kpt_inv` itself. The window is short enough that this is only
+  ONE such call per direction (the window's own closing-instruction fetch;
+  see below), not an open-ended rework.
+- **Opening an invariant needs a masked fancy-update; bare `|==>` cannot do
+  it at all** — `iInv` fails outright with "the goal should be a fancy
+  update... or another modality that supports invariant opening" under a
+  bupd goal. `TrampStepPt.v`'s trampoline-step engine (`wp_instr_tramp_pt`'s
+  `Habs`/`INV` interface, and `tramp_fetch_pt` under it) was hardwired to
+  bare `==∗` throughout, so this genuinely required widening its modality to
+  `={⊤ ∖ ↑minstretN}=∗` (the mask already in force at every trampoline step,
+  inherited from `wp_exec_step_decode_execute_inv_priv`'s own
+  `minstretN`-excluding fupd — NOT `⊤`, which fails with "Goal and eliminated
+  modality must have the same mask"). This is backward-compatible: the three
+  existing bare-bupd `Habs` instances (`ktramp_fetch_habs`,
+  `utramp_fetch_habs`, `pt2_tramp_fetch_habs`) needed only their type
+  signature widened, zero proof-script changes — bupd embeds into fupd for
+  free, and `iModIntro`/`iMod` are modality-polymorphic. Verified by
+  rebuilding `UservecExitPt.v`/`UserretEntryPt.v` unchanged.
+
+**Landed, compiling clean against `/shared/xv6rocq`'s switch:**
+
+- `PtTree.v`: `tlb_cache_of_canon`, `tlb_ok_pt2_canon_{cur,prev}` — the
+  two-table canon-transfer lemmas (mirror `tlb_ok_pt_canon` per side).
+- `TrampStepPt.v`: `ktramp_fetch_habs_share` / `wp_instr_ktramp_pt_share` —
+  the single-table kernel trampoline step engine rebuilt over
+  `KptShare.tlb_res_pt` instead of `KptTree.tlb_inv_pt`. This is what a
+  POST-window (uservec) or PRE-window (userret) kernel-side trampoline step
+  runs against once there is no exclusive tree to reseal into / draw from.
+- `TransPt.v`: **both directions.** `tlb_inv_pt2_kcur` (+
+  `_intro`/`_open`/`_enter`/`_exit`) and `pt2_tramp_fetch_habs_kcur` /
+  `wp_instr_pt2_tramp_kcur` — kernel in the **current** slot (uservec: the
+  switch installs the kernel root). `tlb_inv_pt2_kprev` (+ the same four) and
+  `pt2_tramp_fetch_habs_kprev` / `wp_instr_pt2_tramp_kprev` — the mirror,
+  kernel in the **previous** slot (userret: the switch installs the *user*
+  root as current, so `rc` = user root and `kroot` = kernel root are two
+  independent parameters, unlike `_kcur` where they coincide). In both, the
+  shared side is backed by `kpt_inv`+snapshot instead of exclusive
+  `ptree_own`; the other (per-process, genuinely exclusive) side is
+  untouched. `_kcur_enter`/`_kprev_enter` differ in a way worth knowing:
+  `_kcur_enter` MINTS a fresh snapshot (`={E}=∗`, needs `kpt_inv_snapshot`)
+  because uservec's entry has nothing on hand yet; `_kprev_enter` is a PLAIN
+  WAND, because userret's steps 0–1 already hold an ordinary `tlb_res_pt`
+  residue (from running as ordinary shared kernel steps before the window)
+  and its snapshot carries straight through — no fupd needed. Both
+  `pt2_tramp_fetch_habs_{kcur,kprev}` inline `KptShare`'s "open, read/write,
+  close, no ghost update needed because a write-back is always
+  canon-preserving" technique into `TransPt`'s own five-way case split
+  (O1/O2/O3-into-current/O3-into-previous/O2-previous), opening `kpt_inv` for
+  exactly the span of that one call. The exclusive side's `pt2_tramp_spec`
+  clauses are stated at the literal `tramp_vpn`, so every vpn-indexed fact
+  needs rebasing to `svpn_of va` via the `Hvpn` premise before it can feed
+  `ptree2_translateAddr_cases` — do this ONCE right after destructuring
+  `Hsel_{p,c}`/before folding `vpn := svpn_of va` (`Hpres_{p,c}'` is the
+  reusable form), not inline in each of the five arms. `_kprev`'s exclusive
+  side additionally needs an explicit `Hbc : forall t, Sc t -> pt_base t =
+  rc` hypothesis (mirroring the fully-generic original `pt2_tramp_fetch_habs`)
+  since, unlike `_kcur`'s shared side, `Sc` here is abstract and carries no
+  `pt_base` fact of its own.
+- `UservecExitPt.wp_uservec_exit_pt` / `UserretEntryPt.wp_userret_entry_pt`:
+  rewired to the lemmas above. `kpt_frame kroot` is GONE from uservec's
+  premises (replaced by the persistent, ambient `kpt_inv kroot` — nothing to
+  receive) and from its postcondition (nothing to hand back — the exit fold
+  is the last touch). userret's premise is `tlb_res_pt kroot` (its steps 0–1
+  are ordinary shared kernel steps before the window even starts) and its
+  postcondition drops `kpt_frame kroot` the same way.
+- `SpecUservec.v` / `SpecUserret.v` / `ProofUservec.v` / `ProofUserret.v` /
+  their `Link*.v`: propagated — same substitutions (`kpt_frame kroot` →
+  `kpt_inv kroot` on uservec's entry and gone from its exit;
+  `tlb_inv_pt kroot` → `tlb_res_pt kroot` on userret's entry and gone from
+  its exit). Every one of these files' own `iIntros`/call-site plumbing
+  needed only the hypothesis dropped or its resource swapped — no proof
+  script logic changed, confirming the two exit lemmas' new shapes are
+  exactly what the whole-function proofs were already structured to consume.
+- `UserretUser.v` (the USERRET+USER dovetail, `UserretUser.wp_userret_user`
+  — the template the eventual `UservecUsertrap.v` should follow): updated
+  the same way (`tlb_inv_pt kroot` → `tlb_res_pt kroot`, `Hkfr` dropped from
+  the continuation). This is the one place outside the four files above that
+  actually calls `wp_userret_pt`, confirming the sweep's blast radius was
+  fully covered.
+
+**What's left for the whole-trap-loop composition** (`UservecUsertrap.v`,
+the dovetail sketched above): the trapframe page physical → VA conversion,
+`user_cfg C` ⟷ `sconf`'s config cells (checked free), and then building the
+functor itself. The kpt conversion no longer blocks any of it.
+
+## ARCHITECTURAL CORRECTION (superseding the paragraph above): no separate
+## dovetail file — uservec/usertrap/userret compose like any other caller/
+## callee pair (landed: `uservec-rut-threading` branch)
+
+User direction, overriding the "`UservecUsertrap.v` dovetail" plan sketched
+above: **do not build a functor/glue module on top of uservec and usertrap.**
+Treat the call the same as any other function-calls-function edge in this
+project — the CALLER's spec/proof depends on the CALLEE's spec module and
+invokes the callee's WP directly; the `Link*.v` file supplies the concrete
+callee proof as a functor argument. Concretely:
+
+- `ProofUservec.v` becomes `Module UservecProof (UT : USERTRAP) (UR :
+  USERRET) (US : USER) : USERVEC` — a functor, not a flat proof. Its tail
+  (currently a call into the sealed `SpecUservec.uservec_post` continuation,
+  see below) instead does the trapframe phys→VA conversion + `user_cfg ⟷
+  sconf` wiring, then calls `UT.wp_usertrap` directly, then chains into
+  `UR`/`US` (almost certainly via `UserretUser(UR)(US).wp_userret_user`,
+  already exactly this shape one level down). `userret` is simply "the
+  return address uservec supplies for the call to usertrap" — there is no
+  independent entity to dovetail; uservec's own spec depends on BOTH
+  `USERTRAP` and `USERRET` and chains them at the call site, exactly the
+  pattern `UserretUser.v` already established for userret→user.
+- `SpecUservec.v` correspondingly loses `uservec_post` and
+  `wp_uservec_pt_body`'s trailing continuation parameter: it concludes
+  directly in `WP (Loop : expr riscv_lang)`, with a new premise pinning the
+  jalr target to `KernelSyms.usertrap`'s real address.
+- The whole-execution Löb (discharging `stvec_handler_wp`, i.e. what used to
+  be pencilled in as a `UservecUsertrap.v`-level theorem) becomes an OUTER
+  `iLöb` inside `UservecProof.wp_uservec_pt` itself, self-referencing across
+  trap rounds — there is no other file left to put it in.
+
+**The `usertrap_res` exclusive-residue threading problem, and its
+resolution (landed).** `usertrap_res` genuinely cannot be released for the
+duration of user-mode execution: `UsertrapRes.v`'s `ut_own` (proc_priv,
+bio/fd/iref slots, `Rsys`/syscall_env — the non-`ut_caps` remainder) is
+exclusive kernel-side state that usertrap hands to the loop on entry and
+must get back unchanged on the next trap, so it has to ride inside
+`SpecUser.v`'s loop invariant across arbitrarily many user instructions.
+User's chosen shape (over "separate threaded parameter" and other
+alternatives): **an extra conjunct of `user_inv`/`user_trap_frame`
+themselves**, not a value threaded alongside them. Concretely:
+
+- `UserExec.v` gains `Context (Rut : uptd -> iProp Σ)` (right after `C`/
+  `pt`) and one more conjunct `Rut pt` on both `user_inv` and
+  `user_trap_frame`. `Rut` is deliberately ONE argument (not `uptd -> mword
+  64 -> iProp Σ` matching `usertrap_res`'s own `(pt, ksp)` key) — the
+  intended instantiation is `fun p => ∃ ksp, UT.usertrap_res p ksp`,
+  hiding `ksp` existentially inside `Rut` itself, so nothing in the
+  `User*.v` tower ever needs to know `ksp` exists. `user_step_obligation_
+  active` (the ACTIVE-hart residue) additionally needed a NEW `Rut pt -∗`
+  premise it didn't have before (nothing carried it from `user_inv`'s
+  destructure into its continuation `Hk` otherwise). `user_trap_frame_
+  intro` gained a matching `Rut pt -∗` premise.
+- **No constructor Parameter was needed on `SpecUsertrap.USERTRAP_RES`** —
+  this was the open question the session started with, and it resolved to
+  "moot": `Rut` is never independently CONSTRUCTED, only WRAPPED. Each round
+  of the outer Löb, `UservecProof`'s tail calls `UT.wp_usertrap`, receives
+  `R pt' ksp'` (= `UT.usertrap_res pt' ksp'`) straight from usertrap's own
+  postcondition, and builds that round's `Rut pt' := ∃ ksp, UT.usertrap_res
+  pt' ksp` via `iExists ksp'; iFrame` on the spot — a fresh closure supplied
+  as an ordinary value argument to `UR.wp_userret_pt`/`UserretUser`/
+  `US.wp_user_exec_closed` each time, never baked into a fixed Module. The
+  per-hart indexing (`usertrap_res` is a hart-indexed family — see
+  `SpecUsertrap.v`'s note above `wp_usertrap_body`) needs no extra plumbing
+  either: every Section in the `User*.v` tower already carries `Context
+  `{CID : CpuId}``, so `Rut`'s type at any USE site is already pinned to
+  that ambient hart.
+- **Blast radius, exhaustively swept** (confirmed via a dedicated Explore
+  agent before editing): `user_inv` has exactly 6 raw construction sites in
+  exactly 3 lemmas (`UserKernelBridge.userret_to_user_inv`,
+  `UserStep.user_step_obligation_holds` ×2 WAITING arms,
+  `UserClassify.active_step_branch` ×3 RETIRE/RETIRE/ENTER-WAIT arms);
+  `user_trap_frame` has exactly 1 (`UserExec.user_trap_frame_intro`, already
+  a chokepoint, reused by `UserClassify.deliver_user_trap` and
+  `UserStepFull.interrupt_branch`). Every per-instruction-family leaf lemma
+  across `UserMemClassify*.v`/`UserTotalU.v`/`UserClassifyAsm.v`/
+  `UserFetchPt.v`/`UserCsr.v`/`UserBits.v`/`UserTranslate.v`/`UserPtTree.v`
+  etc. proves only the fully abstract `active_step_obligation` (mentions
+  `mstate_interp`/`gpr_file`/`nextPC`/`user_pt_inv`/`user_cfg`, never
+  `user_inv`) — confirmed zero hits, zero of those files touched. Files
+  actually edited (11 total, all compiling and validated by a from-scratch
+  GCP `make proofs`, `MAKEEXIT=0`, 33 files rebuilt): `UserExec.v`,
+  `UserClassify.v`, `UserStep.v`, `UserStepFull.v`, `UserActiveClass.v`,
+  `UserKernelBridge.v`, `SpecUser.v`, `ProofUser.v`, `UserretUser.v`,
+  `SpecUservec.v`, `ProofUservec.v`. `UmodeCap.v`/`WpUmodeStep.v` (the
+  separate "verified tier" with its own concrete-frame twin `uv_trap_frame`)
+  were confirmed out of scope — comment-only mentions, different Section,
+  not an instance of `user_trap_frame`.
+- `SpecUservec.v`/`ProofUservec.v` got only the MINIMAL fix in this pass
+  (add `Rut` param, thread into `user_trap_frame_open`/`wp_uservec_pt_body`;
+  `Hrut` sits unused for the rest of `ProofUservec.v`'s ~1400-line proof —
+  fine, Iris's `iProp` is affine, an unconsumed spatial hypothesis is not an
+  error) — NOT yet the functor-over-USERTRAP/USERRET/USER restructuring
+  above, which is the next session's work. `uservec_post`/`Hcont`'s call
+  site (`ProofUservec.v` around the exit-switch tail, right after `Hcont`
+  is `iEval (rewrite /uservec_post)`d and specialized) is exactly where the
+  new tail (trapframe phys→VA + `user_cfg⟷sconf` + `UT.wp_usertrap` +
+  chain into `UR`/`US` + outer Löb) needs to be spliced in, replacing the
+  `iApply ("Hcont" with ...)` at the very end.
+- GOTCHA hit and worth recording: the GCP build command from earlier in this
+  project (`make -k proofs` run from `iris/`) fails with "No rule to make
+  target 'proofs'" — `proofs` is a ROOT-Makefile target (`Makefile:222`,
+  `proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile`), not an
+  `iris/CoqMakefile` one; run it from the repo root, not `iris/`.

@@ -34,6 +34,7 @@ Section UserStepFull.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
 
   (* ------------------------------------------------------------------- *)
   (* The interrupt branch: a pending delegated interrupt traps to stvec.  *)
@@ -67,8 +68,8 @@ Section UserStepFull.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
-    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang)) -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗ Rut pt -∗
+    ▷ (user_trap_frame C pt Rut -∗ WP (Loop : expr riscv_lang)) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
@@ -76,7 +77,7 @@ Section UserStepFull.
   Proof.
     iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
              Lmip Lmeip Lseip Lmie Lmdl Hd)
-      "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont".
+      "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hcont".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs0.
     (* minstret prelude: minstret_increment := should_inc *)
     destruct (exec_should_inc_minstret_Some
@@ -144,8 +145,8 @@ Section UserStepFull.
     iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
     iApply ("Hcont" with "[-]").
-    iApply (user_trap_frame_intro C pt _ _ _ _ _ (utrap_ms_ok elpv ms_v Hmsok)
-             with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg").
+    iApply (user_trap_frame_intro C pt Rut _ _ _ _ _ (utrap_ms_ok elpv ms_v Hmsok)
+             with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut").
   Qed.
 
   (* u_dispatch always delivers to Supervisor (uc_mm rules out M-destined). *)
@@ -183,10 +184,10 @@ Section UserStepFull.
            exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
              = Some (None, set_reg σ (R_bool minstret_increment) b)⌝ -∗
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
-        user_pt_inv pt -∗ user_cfg C -∗
+        user_pt_inv pt -∗ user_cfg C -∗ Rut pt -∗
         mstate_interp σ -∗ minstret_inv_body -∗
-        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang)) ∧
-           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang))) -∗
+        ▷ ((user_inv C pt Rut -∗ WP (Loop : expr riscv_lang)) ∧
+           (user_trap_frame C pt Rut -∗ WP (Loop : expr riscv_lang))) -∗
         |={Ei}=> ∃ s' : mstate,
           ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
           ▷ (mstate_interp s' ∗ minstret_inv_body ∗
@@ -207,10 +208,10 @@ Section UserStepFull.
     minstret_inv -∗
     wire_inv -∗
     active_class (⊤ ∖ ↑minstretN ∖ ↑wireN) -∗
-    user_step_obligation_active C pt.
+    user_step_obligation_active C pt Rut.
   Proof.
     iIntros "#Hhw #Hmin #Hwinv #Hclass".
-    iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hk".
+    iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hrut Hk".
     iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) with "Hmin").
     iIntros (σ) "Hint Hbody".
     (* borrow the wires: open [wire_inv] (E∖minstretN -> E∖minstretN∖wireN)
@@ -251,7 +252,7 @@ Section UserStepFull.
               ms_v sc_v stval_v sepc_v va g mst mi misa0 elp0 meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd
-              with "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg [Hk]")
+              with "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut [Hk]")
         as (s') "[%Hexec Hrest]".
       { iNext. iDestruct "Hk" as "[_ $]". }
       iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
@@ -284,7 +285,7 @@ Section UserStepFull.
                    (Tb mideleg _ Lmdl eq_refl) (uc_mm C)).
         rewrite Hd. reflexivity. }
       iMod ("Hclass" $! σ ms_v sc_v stval_v sepc_v va g Hmsok Lpriv Lms Lpc Hdisp_ab
-              with "[Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr] Hupt Hcfg Hint Hbody Hk")
+              with "[Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr] Hupt Hcfg Hrut Hint Hbody Hk")
         as (s') "[%Hexec Hrest]".
       { iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr". }
       iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }

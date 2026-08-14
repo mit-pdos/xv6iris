@@ -71,7 +71,7 @@
    and applies it at the [started = 1] store.  Its arguments are exactly the
    persistent facts whose GHOST NAMES main chooses: [γpr] when it allocates the
    [pr] lock out of printkinit's output (pr.lock protects the transmitter token
-   -- SpecPrintkGen.v), [γs] when it allocates the 64 proc locks out of
+   -- SpecPrintk.v), [γs] when it allocates the 64 proc locks out of
    procinit's ([SpecProcinit.procs_inv_alloc]), and [γk] when it allocates the
    vdisk_lock over [DiskInv.disk_res] out of virtio_disk_init's
    ([DiskBoot.disk_res_boot]) -- the disk's PAGES (its configuration identity)
@@ -143,7 +143,7 @@ Require Import SpecProcinit.
    unambiguously [SpecIinit]'s if that ever changes. *)
 Require Import IcacheBoot.
 Require Import SpecIinit SpecVirtioDiskInit.
-Require Import SpecFreerange SpecPrintkGen.
+Require Import SpecFreerange SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv KvmSpec BcacheInv SleepLock.
 Require Import VirtioModel DiskPtsto WpUart.
@@ -159,7 +159,7 @@ Require Import VirtioQueue VirtioProto DiskInv.
    named [lockG]/[fileG] instead, and [printk_env]/[procs_inv] then cannot
    resolve their [lockG] instance (spec-modules.md's Link-file gotcha, in a
    Spec file). *)
-Require Import WpLock TicksInv UartTxInv.
+Require Import WpLock TicksInv.
 Require Import FileInvDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.

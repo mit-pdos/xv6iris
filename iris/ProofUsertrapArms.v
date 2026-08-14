@@ -36,9 +36,9 @@
    only passed to printk / vmfault and their identity is irrelevant.)
 
    printk IS THE ASSUMED GENERAL PATH, TAKEN AS A HYPOTHESIS.  [PRINTK_GEN]'s
-   only instance is [LinkPrintkGen]'s [Axiom], so instantiating the functor
+   only instance is [LinkPrintk]'s [Axiom], so instantiating the functor
    here would carry that axiom into usertrap's [Print Assumptions] and, through
-   the trampoline, into everybody's.  [SpecPrintkGen.printk_gen_contract] is
+   the trampoline, into everybody's.  [SpecPrintk.printk_gen_contract] is
    the [Prop] twin of [SpecPanic.panic_wp_any] for exactly this reason, so
    [ut_56] takes it as an ordinary [->] premise and pushes the obligation up.
    ProofProcdumpLoop.v and ProofBalloc.v are the two worked call sites.  The
@@ -77,27 +77,25 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import InstrBytes.
-Require Import KernelText KernelDataInv KernelRvcDecode.
-Require Import WpGprCsrwCommon WpGprCsrwA.
+Require Import KernelText KernelDataInv.
+Require Import WpGprCsrwA.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpSconfBtype.
 Require Import WpSmodeIntr.        (* [wp_cli_s_sconf] *)
-Require Import WpKvminithart.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import KallocInv KvmSpec.
-Require Import BioInv DiskPtsto DiskInv WpUart FsBlocks LogInv FsCrash.
+Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import SchedCtx PanicStub.
 Require Import FileInvDefs.
-Require Import PrintkFmt.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecVmfault.
-Require Import SpecPrintk SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
 Require Import ProofUsertrapParts.

@@ -6,7 +6,7 @@
    [ProcdumpProof : PROCDUMP].
 
    procdump's callee is printk on its GENERAL path, carried as the Coq
-   hypothesis [SpecPrintkGen.printk_gen_contract] rather than as a functor
+   hypothesis [SpecPrintk.printk_gen_contract] rather than as a functor
    argument, so this proof takes no axiom from it and neither does any
    caller -- the SpecBalloc.v shape.  Consequently there is nothing for
    LinkProcdump.v to instantiate but the module itself.
@@ -47,9 +47,9 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* the numeric side conditions, mword-free and passed by name *)
-Lemma pd_K38 (K : nat) : (48 <= K)%nat -> (38 <= K - 10)%nat.
+Lemma pd_K48 (K : nat) : (58 <= K)%nat -> (48 <= K - 10)%nat.
 Proof. lia. Qed.
-Lemma pd_K10 (K : nat) : (48 <= K)%nat -> (10 <= K)%nat.
+Lemma pd_K10 (K : nat) : (58 <= K)%nat -> (10 <= K)%nat.
 Proof. lia. Qed.
 Lemma pd_NPROC_sub0 : (NPROC - 0)%nat = NPROC.
 Proof. reflexivity. Qed.
@@ -79,7 +79,7 @@ Section ProofProcdumpMain.
     (* ================================================================== *)
     (* +0x00 .. +0x1a -- the frame, the nine saves, a0 := "\n"            *)
     (* ================================================================== *)
-    iApply (wp_pd_prologue (CID0 := CID) m K b p HK with "Hcg Htext Hpc").
+    iApply (wp_pd_prologue (CID0 := CID) m K b p ltac:(lia) with "Hcg Htext Hpc").
     iIntros (CID1 Hs1 M) "%Hpro Hcg Hframe Hpc".
     pose proof (pd_regs_hi_of_pro m M Hpro) as HhiM.
     destruct Hpro as (Hprosp & _ & Hproa0 & _).
@@ -119,7 +119,7 @@ Section ProofProcdumpMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iPoseProof (panic_wp_any_at CID2 with "Hpanic") as "Hpanic2".
     iApply (Hpk CID2 M1 (K - 10)%nat eb p C DfracDiscarded pd_nl [] b
-              (pd_K38 K HK) pd_nl_len pd_nl_nonul
+              (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)
               with "Hcg Htext Hkdata Hpc Hpanic2 Hcnt Hpenv [Hnlstr] []").
@@ -158,7 +158,7 @@ Section ProofProcdumpMain.
     (* ================================================================== *)
     iPoseProof (wp_pd_loop (CID0 := CID4) γpr γd γv m
                   (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b C
-                  Hpk (pd_K38 K HK)
+                  Hpk (pd_K48 K HK)
                   with "Htext Hkdata Hpenv Hpanic [Hframe Hcont]") as "Hscan".
     { iIntros (CIDx Hsx Mx) "%Hxc Hcg Hcnt2 Hpc Hview".
       destruct Hxc as [Hxsp Hxhi].

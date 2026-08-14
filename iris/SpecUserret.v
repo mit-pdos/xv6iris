@@ -8,8 +8,11 @@
    process's sepc.  The continuation therefore receives a USER-privilege
    machine over [utlb_inv_pt] -- exactly what [userret_to_user_inv]
    (UserKernelBridge.v) repackages into [user_inv] for the user-execution
-   capstone -- with the kernel table parked as [kpt_frame kroot] for
-   uservec's return trip.
+   capstone.  The kernel table is SHARED throughout (KptShare.kpt_inv):
+   this spec takes it as the ordinary [tlb_res_pt kroot] residue on entry
+   and hands nothing back on exit -- the switch folds it straight into
+   [kpt_inv], so there is no parked [kpt_frame] for uservec's return trip
+   to pick up.
 
    Spec vocabulary shared with uservec/usertrap:
      [tf_pa tfp off]  the PHYSICAL address of the trapframe word at byte
@@ -38,7 +41,7 @@ Require Import WpGpr.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import PtTree.
-Require Import TrampPt KptTree UptTree TransPt UserretDefs.
+Require Import TrampPt KptTree UptTree TransPt KptShare UserretDefs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
@@ -98,7 +101,7 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
   sepc ↦ᵣ sepc0 -∗
   (* the trampoline claim, threaded to the entry switch *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
-  tlb_inv_pt kroot -∗
+  tlb_res_pt kroot -∗
   pt_frame (upt_tree_spec uroot tfp um) -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
@@ -177,7 +180,6 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
     tf_pa tfp 272 ↦ₚ₈{ dqm } vt5 -∗
     tf_pa tfp 280 ↦ₚ₈{ dqm } vt6 -∗
     tf_pa tfp 112 ↦ₚ₈{ dqm } va0f -∗
-    kpt_frame kroot -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

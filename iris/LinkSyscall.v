@@ -3,7 +3,7 @@
    syscall() has no proof: it is an indirect call through [syscalls[]], so
    proving it means proving the dispatch AND all twenty-two sys_* entries.
    This link supplies [SpecSyscall.SYSCALL] with an [Axiom], the way
-   [LinkPrintkGen.v] does for printk's general path and [LinkConsoleintr.v]
+   [LinkPrintk.v] does for printk's general path and [LinkConsoleintr.v]
    for consoleintr, which keeps usertrap's proof a functor over the interface
    and axiom-free in itself.  Discharging it later replaces this file and
    nothing else.

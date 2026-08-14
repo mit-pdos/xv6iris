@@ -141,7 +141,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -150,7 +149,6 @@ Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
-Require Import DirView.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
@@ -161,14 +159,14 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PipeInv.
-Require Import FileInv FileOff ProcInv.
+Require Import PipeInvDefs.
+Require Import FileOff ProcInv.
+Require Import FileInvDefs.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecWritei.
 Require Import SpecFileread.
-Require Import SpecConsolewrite.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -177,16 +175,18 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* filewrite's own frame is 12 slots ([c.addi16sp sp,sp,-96]: ra, s0, s1,
-   s2..s9 saved), and its deepest callee is CONSOLEWRITE at 72 -- not writei
-   at [K_writei] = 70, which is what it used to be.  consolewrite's own
-   sixteen-slot frame (a 32-byte bounce buffer lives in it) sits under
-   either_copyin's 56, and neither of its calls is made with interrupts off,
-   so nothing of [IntrDefs.trap_res] is spendable there;
-   [SpecConsolewrite.consolewrite_stack] has the accounting.  pipewrite (64),
-   begin_op / end_op / ilock / iunlock are all below both.  A CONSTANT, not a
-   per-arm bound: the stack a function may need is a property of the function
-   (durable-notes.md). *)
-Definition filewrite_stack : nat := (12 + consolewrite_stack)%nat.
+   s2..s9 saved), and its deepest callee is WRITEI again at [K_writei] = 78
+   -- not consolewrite at 72, which is what it was before [K_writei] grew
+   (SpecReadi.v's header traces the chain: printk's real stack need, 48, now
+   dominates bmap, which dominates balloc's out-of-blocks arm, which
+   dominates bmap's callers).  consolewrite's own sixteen-slot frame (a
+   32-byte bounce buffer lives in it) sits under either_copyin's 56, and
+   neither of its calls is made with interrupts off, so nothing of
+   [IntrDefs.trap_res] is spendable there; [SpecConsolewrite.consolewrite_stack]
+   has the accounting.  pipewrite (64), begin_op / end_op / ilock / iunlock
+   are all below both.  A CONSTANT, not a per-arm bound: the stack a
+   function may need is a property of the function (durable-notes.md). *)
+Definition filewrite_stack : nat := (12 + K_writei)%nat.
 
 (* &devsw[mj].write.  [struct devsw] is two function pointers with [read]
    FIRST, so the entry is 16 bytes and this field is at offset 8 -- which is

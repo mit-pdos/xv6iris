@@ -102,7 +102,7 @@ Require Import BlockWords.
 Require Import InodeInv.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import CodeBmap.
 Require Import PanicStub.
 Require Import SpecBalloc SpecBread SpecBrelse SpecLogWrite.

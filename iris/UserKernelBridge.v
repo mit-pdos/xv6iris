@@ -83,7 +83,7 @@ Section UserKernelBridge.
   (* to [user_cfg].                                                         *)
   (* -------------------------------------------------------------------- *)
   Lemma userret_to_user_inv
-      (C : ucfg) (pt : uptd)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (mstatus0 sepc0 sc_v stval_v mie_v mdv0 menvcfg0 senvcfg0 : mword 64)
       (stv medeleg_v mip_v : mword 64)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
@@ -140,13 +140,15 @@ Section UserKernelBridge.
     sstateen0 ↦ᵣ sstateen0v -∗
     (* ---- the user data pages ---- *)
     udata_own pt.(ud_data) -∗
-    user_inv C pt.
+    (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
+    Rut pt -∗
+    user_inv C pt Rut.
   Proof.
     intros HSXL HMXR HFS HVS HTVM HTSR Hdqc Hstvec Hmie Hmdl Hmedl Hmip
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hcov Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
-             Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata".
+             Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata Hrut".
     iDestruct "Hpc" as "[Hpcc Hnpc]".
     unfold user_inv.
     iExists (HART_ACTIVE tt), (sret_ms5 mstatus0), sc_v, stval_v, sepc0,
@@ -167,10 +169,13 @@ Section UserKernelBridge.
       iFrame "Hutlb Hdata".
       rewrite Hum in Hcov Hacc.
       iPureIntro. split; [exact Hcov | exact Hacc]. }
-    (* user_cfg *)
-    unfold user_cfg.
-    rewrite Hdqc Hstvec Hmie Hmdl Hmedl Hmip.
-    iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse".
+    iSplitL "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse".
+    { (* user_cfg *)
+      unfold user_cfg.
+      rewrite Hdqc Hstvec Hmie Hmdl Hmedl Hmip.
+      iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
+    (* Rut pt *)
+    iFrame "Hrut".
   Qed.
 
   (* -------------------------------------------------------------------- *)
@@ -187,8 +192,8 @@ Section UserKernelBridge.
   (* the mirror of [user_trap_frame_intro] (UserExec.v) and the clean entry *)
   (* point for that proof.                                                  *)
   (* -------------------------------------------------------------------- *)
-  Lemma user_trap_frame_open (C : ucfg) (pt : uptd) :
-    user_trap_frame C pt -∗
+  Lemma user_trap_frame_open (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :
+    user_trap_frame C pt Rut -∗
     ∃ (ms_v sc_v stval_v sepc_v : mword 64) (g : regfile),
       ⌜trap_mstatus_ok ms_v⌝ ∗
       hart_state ↦ᵣ HART_ACTIVE tt ∗
@@ -214,12 +219,13 @@ Section UserKernelBridge.
       menvcfg ↦ᵣ{ uc_dqc C } MENVCFG_S ∗
       senvcfg ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 64) ∗
       mstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 64) ∗
-      sstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 32).
+      sstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 32) ∗
+      Rut pt.
   Proof.
     iIntros "H".
     unfold user_trap_frame.
     iDestruct "H" as (ms_v sc_v stval_v sepc_v g)
-      "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hupt & Hcfg)".
+      "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hgpr & Hupt & Hcfg & Hrut)".
     iDestruct "Hpc" as "[Hpcc Hnpc]".
     unfold user_pt_inv.
     iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
@@ -228,7 +234,7 @@ Section UserKernelBridge.
       "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmse & Hsse)".
     iExists ms_v, sc_v, stval_v, sepc_v, g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr
-            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse".
+            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse Hrut".
     iPureIntro. split; [exact Hok | split; [exact Hcov | exact Hacc]].
   Qed.
 

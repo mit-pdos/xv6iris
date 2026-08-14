@@ -135,7 +135,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.

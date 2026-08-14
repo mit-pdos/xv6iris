@@ -44,7 +44,7 @@ From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import IcacheRef.
 Require Import IrefSlots.
-Require Import TicksInv UartTxInv.
+Require Import TicksInv.
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:

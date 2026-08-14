@@ -111,7 +111,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIalloc.
 Require Import PanicStub.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
 Require Import SpecIalloc.
 From Kernel Require KernelSyms.

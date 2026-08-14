@@ -524,21 +524,22 @@ Section UserStepObligation.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
 
   Theorem user_step_obligation_holds :
     minstret_inv -∗
-    user_step_obligation_active C pt -∗
-    user_step_obligation C pt.
+    user_step_obligation_active C pt Rut -∗
+    user_step_obligation C pt Rut.
   Proof.
     iIntros "#Hminstret #Hactive".
     iIntros "!> Hinv Hk".
     iDestruct "Hinv" as (hs ms_v sc_v stval_v sepc_v va va' g)
-      "(%Hhs & %Hms & %Hlock & Hregs & Hupt & Hcfg)".
+      "(%Hhs & %Hms & %Hlock & Hregs & Hupt & Hcfg & Hrut)".
     destruct hs as [u | [wr ib]].
     - (* ACTIVE: hand off to the residue obligation *)
       destruct u.
       rewrite (Hlock tt eq_refl).
-      iApply ("Hactive" with "[//] Hregs Hupt Hcfg Hk").
+      iApply ("Hactive" with "[//] Hregs Hupt Hcfg Hrut Hk").
     - (* WAITING: the WRS stay/wake step *)
       simpl in Hhs.
       iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
@@ -554,6 +555,7 @@ Section UserStepObligation.
         iExists (HART_WAITING (wr, ib)), ms_v, sc_v, stval_v, sepc_v, va, va', g.
         iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt".
         iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+        iFrame "Hrut".
         iPureIntro. split; [exact Hhs | split; [exact Hms | intros u Hu; discriminate Hu]].
       + (* WAKE: re-enter [user_inv] ACTIVE, pc in lock-step at [va'] *)
         iIntros "Hhs Hpc Hnpc Hmip Hmie".
@@ -562,6 +564,7 @@ Section UserStepObligation.
         iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g.
         iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt".
         iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+        iFrame "Hrut".
         iPureIntro. split; [exact Hms | intros u _; reflexivity].
   Qed.
 
@@ -569,9 +572,9 @@ Section UserStepObligation.
      user-execution theorem is [user_step_obligation_active] *)
   Corollary wp_user_exec_active :
     minstret_inv -∗
-    user_step_obligation_active C pt -∗
-    user_inv C pt -∗
-    stvec_handler_wp C pt -∗
+    user_step_obligation_active C pt Rut -∗
+    user_inv C pt Rut -∗
+    stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hminstret #Hactive Hinv Htrap".

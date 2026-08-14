@@ -1,21 +1,27 @@
 (* UserretEntryPt.v -- the userret PAGE-TABLE SWITCH over the pt2 window
    (TransPt.v): sfence.vma ; csrw satp,a0 ; sfence.vma, as three uniform
-   steps of the shared trampoline engine.
+   steps of the shared trampoline engine.  The KERNEL side is SHARED
+   throughout (KptShare.kpt_inv, TransPt.v's [_kprev] family -- the mirror
+   of uservec's [_kcur]: here the kernel table plays the PREVIOUS slot,
+   since the switch installs the USER root as current): nothing about the
+   kernel table is threaded in or out beyond the ordinary [tlb_res_pt]
+   residue steps 0-1 already run against.
 
-     step 1 (kernel invariant): the sfence flushes the TLB; the kernel
-       invariant re-seals with [tlb_ok_pt_empty].
-     step 2 (kernel invariant): the csrw installs the user root; the
-       kernel invariant DISSOLVES into the two-table window invariant
-       [tlb_inv_pt2] ([tlb_inv_pt2_enter]) -- the freshly parked user
-       table arrives as [pt_frame], every resident TLB entry is
-       kernel-provenance.
+     step 1 (SHARED kernel table): the sfence flushes the TLB; [tlb_res_pt]
+       re-seals with [tlb_ok_pt_empty].
+     step 2 (SHARED kernel table): the csrw installs the user root; the
+       kernel residue DISSOLVES into the two-table window invariant
+       [tlb_inv_pt2_kprev] ([tlb_inv_pt2_kprev_enter], a plain wand -- no
+       ownership ever leaves [kpt_inv]) -- the freshly parked user table
+       arrives as [pt_frame], every resident TLB entry is kernel-provenance.
      step 3 (window invariant): the fetch itself is absorbed by
-       [tlb_inv_pt2] (a hit on a stale kernel-provenance trampoline
+       [tlb_inv_pt2_kprev] (a hit on a stale kernel-provenance trampoline
        entry -- same physical page -- may Svadu-write-back into the
-       KERNEL tree through the cached pteAddr; a miss walks the USER
-       tree); then the sfence flushes the TLB, the window EXITS
-       ([tlb_inv_pt2_exit]): the kernel table parks as [pt_frame] for
-       the return trip and the user invariant [utlb_inv_pt] seals.     *)
+       KERNEL tree through the cached pteAddr, opened from [kpt_inv] for
+       the span of this one call; a miss walks the USER tree); then the
+       sfence flushes the TLB, the window EXITS ([tlb_inv_pt2_kprev_exit]):
+       the kernel side folds back into [kpt_inv] with nothing to return,
+       and the user invariant [utlb_inv_pt] seals.                       *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -31,7 +37,7 @@ Require Import WpSmodePtCtl.
 Require Import SmodePte PtTree.
 Require Import KMap KptExecMap.
 Require Import KptTree UptTree.
-Require Import TrampStepPt TransPt.
+Require Import TrampStepPt TransPt KptShare.
 Require Import UserretDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 From Kernel Require KernelSyms.
@@ -71,7 +77,7 @@ Section UserretEntryPt.
     (* stage C: the trampoline claim (held post-switch); the three switch
        instructions fetch through the kernel table's trampoline mapping *)
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
-    tlb_inv_pt kroot -∗
+    tlb_res_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
     pc_is (uva 0x9c) -∗
     gpr_file m -∗
@@ -86,7 +92,6 @@ Section UserretEntryPt.
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       utlb_inv_pt uroot tfp um -∗
-      kpt_frame kroot -∗
       pc_is (uva 0xac) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -111,7 +116,7 @@ Section UserretEntryPt.
        Unlike the sfence below this touches no architectural state: the
        Sail model retires it as the identity, so there is no TLB cell to
        re-seal and no privilege side condition to discharge. ============ *)
-    iApply (wp_instr_ktramp_pt kroot (uva 0x9c) (upa 0x9c) false ai_fencei
+    iApply (wp_instr_ktramp_pt_share kroot (uva 0x9c) (upa 0x9c) false ai_fencei
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -145,7 +150,7 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc0) in "Hpc".
     iNext.
     (* ============ STEP 1: sfence.vma under the kernel invariant ======== *)
-    iApply (wp_instr_ktramp_pt kroot (uva 0xa0) (upa 0xa0) false ai_sfence
+    iApply (wp_instr_ktramp_pt_share kroot (uva 0xa0) (upa 0xa0) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -173,14 +178,16 @@ Section UserretEntryPt.
       by (unfold s_pc1; tmig; exact Lms1).
     destruct (exec_execute_SFENCE_VMA_S s_pc1 Lpriv1p
                 ltac:(rewrite Lms1p; exact HTVM)) as (tlbz1 & Hex1 & Hnone1).
-    (* flush the invariant's TLB cell and re-seal with the empty vector *)
-    iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp1 tlbvec1 kt1 M)
-      "(Hsatp & %HkMode1 & %Hkasid1 & %Hkppn1 & Htlb & %Hokk1 & %Hspeck1 & HM & Hkt & Hpmp)".
+    (* flush the residue's TLB cell and re-seal with the empty vector; any
+       snapshot witnesses [tlb_ok_pt_empty] once the TLB is flushed *)
+    iDestruct (tlb_res_pt_open with "Hktlb") as (ksatp1 tlbvec1)
+      "(Hsatp & %HkMode1 & %Hkasid1 & %Hkppn1 & Htlb & Hsnap1 & Hpmp & #Hkinv1)".
+    iDestruct "Hsnap1" as (kt1) "[%Hokk1 #Hlb1]".
     iMod (reg_update _ tlb _ tlbz1 with "Hreg Htlb") as "[Hreg Htlb]".
-    iDestruct (tlb_inv_pt_intro kroot ksatp1 tlbz1 kt1 M HkMode1 Hkasid1 Hkppn1
+    iDestruct (tlb_res_pt_intro kroot ksatp1 tlbz1 kt1 HkMode1 Hkasid1 Hkppn1
                  (tlb_ok_pt_empty (mword_of_int 0) kt1 tlbz1
                     (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
-                 Hspeck1 with "Hsatp Htlb HM Hkt Hpmp") as "Hktlb".
+                 with "Hsatp Htlb Hlb1 Hpmp Hkinv1") as "Hktlb".
     iModIntro.
     iExists (set_reg s_pc1 tlb tlbz1).
     iSplitR.
@@ -194,7 +201,7 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc1) in "Hpc".
     iNext.
     (* ============ STEP 2: csrw satp,a0 -- ENTER the window ============= *)
-    iApply (wp_instr_ktramp_pt kroot (uva 0xa4) (upa 0xa4) false ai_csrw
+    iApply (wp_instr_ktramp_pt_share kroot (uva 0xa4) (upa 0xa4) false ai_csrw
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -238,15 +245,16 @@ Section UserretEntryPt.
                   ltac:(rewrite Lms2p; exact HSXL)) as Hex2.
     rewrite Lva2 in Hex2.
     rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) usatp HuMode) in Hex2.
-    (* dissolve the kernel invariant into the two-table window *)
-    iDestruct (tlb_inv_pt_open with "Hktlb") as (ksatp2 tlbvec2 kt2 M2)
-      "(Hsatp & %HkMode2 & %Hkasid2 & %Hkppn2 & Htlb & %Hokk2 & %Hspeck2 & HM & Hkt & Hpmp)".
-    (* stage C: the window's tramp premise comes from the claim vs the auth *)
-    iDestruct (kmap_at_lookup with "HM Hclaim") as %HMtramp.
+    (* dissolve the kernel residue into the two-table window; the kernel
+       side comes entirely from [kpt_inv] (a plain wand -- no ownership
+       ever left it), so no [kmap_at_lookup] against a mapping auth is
+       needed here at all *)
+    iDestruct (tlb_res_pt_open with "Hktlb") as (ksatp2 tlbvec2)
+      "(Hsatp & %HkMode2 & %Hkasid2 & %Hkppn2 & Htlb & Hsnap2 & Hpmp & #Hkinv2)".
     iMod (reg_update _ satp _ usatp with "Hreg Hsatp") as "[Hreg Hsatp]".
-    iDestruct (tlb_inv_pt2_enter uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
-                 usatp tlbvec2 kt2 HuMode Huasid Huppn Hokk2 Hspeck2 PtTreeAdue.pma_allows_all_pte_write
-                 with "Hsatp Htlb Hkt Hufr [Hpmp]") as "Hpt2".
+    iDestruct (tlb_inv_pt2_kprev_enter uroot kroot (upt_tree_spec uroot tfp um)
+                 usatp tlbvec2 HuMode Huasid Huppn PtTreeAdue.pma_allows_all_pte_write
+                 with "Hsatp Htlb Hsnap2 Hufr [Hpmp] Hkinv2") as "Hpt2".
     { iApply (pmp_config_reindex kroot uroot with "Hpmp"). }
     iModIntro.
     iExists (set_reg s_pc2 satp usatp).
@@ -262,8 +270,8 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc2) in "Hpc".
     iNext.
     (* ============ STEP 3: sfence.vma -- EXIT into the user invariant === *)
-    iApply (wp_instr_pt2_tramp uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
-              (kpt_pt2_tramp_spec_gen kroot M2 HMtramp) (upt_pt2_tramp_spec uroot tfp um Hwf)
+    iApply (wp_instr_pt2_tramp_kprev uroot kroot (upt_tree_spec uroot tfp um)
+              (upt_pt2_tramp_spec uroot tfp um Hwf)
               (upt_pt2_base uroot tfp um)
               (uva 0xa8) (upa 0xa8) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
@@ -279,8 +287,9 @@ Section UserretEntryPt.
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(intro; vm_compute; reflexivity)
-              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hpt2 Hpc Hi3").
-    iIntros (σ3 Hpceq3) "Hpriv Hms Hmie Hmdl Hmenv Hpt2 Hsi".
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv [$Hclaim $Hpt2] Hpc Hi3").
+    iIntros (σ3 Hpceq3) "Hpriv Hms Hmie Hmdl Hmenv Hpt2b Hsi".
+    iDestruct "Hpt2b" as "[_ Hpt2]".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv3.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms3.
@@ -292,9 +301,10 @@ Section UserretEntryPt.
       by (unfold s_pc3; tmig; exact Lms3).
     destruct (exec_execute_SFENCE_VMA_S s_pc3 Lpriv3p
                 ltac:(rewrite Lms3p; exact HTVM)) as (tlbz3 & Hex3 & Hnone3).
-    (* exit the window: the kernel table parks, the user invariant seals *)
-    iDestruct (tlb_inv_pt2_exit with "Hpt2") as (usatp3 tlbvec3 ut3)
-      "(Hsatp & %HuMode3 & %Huasid3 & %Huppn3 & Htlb & %Hspecu3 & %Hpmaw3 & Hut & Hpmp & Hkfr)".
+    (* exit the window: the kernel side folds back into [kpt_inv] with
+       nothing to return; the user invariant seals *)
+    iDestruct (tlb_inv_pt2_kprev_exit with "Hpt2") as (usatp3 tlbvec3 ut3)
+      "(Hsatp & %HuMode3 & %Huasid3 & %Huppn3 & Htlb & %Hspecu3 & %Hpmaw3 & Hut & Hpmp)".
     iMod (reg_update _ tlb _ tlbz3 with "Hreg Htlb") as "[Hreg Htlb]".
     iDestruct (utlb_inv_pt_intro uroot tfp um usatp3 tlbz3 ut3
                  HuMode3 Huasid3 Huppn3
@@ -313,9 +323,7 @@ Section UserretEntryPt.
     { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc3) in "Hpc".
     iNext.
-    iAssert (kpt_frame kroot) with "[Hkfr HM]" as "Hkfrm".
-    { iExists M2. iFrame "Hkfr HM". }
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hkfrm
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb
                           [$Hpc $Hnpc] Hfmap").
   Qed.
 

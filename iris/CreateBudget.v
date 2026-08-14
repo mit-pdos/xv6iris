@@ -62,10 +62,7 @@
    contracts will be checked against, landed first and on purpose. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import InodeInv.
-Require Import SpecBmap.
+Require Import LogInv.
 Require Import SpecIput.
 Require Import SpecWritei.
 Require Import SpecDirlink.

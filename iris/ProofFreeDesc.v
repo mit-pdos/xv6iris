@@ -42,7 +42,6 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
-Require Import ProcGeom.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext CpuOwn.
 Require Import FdSlots.

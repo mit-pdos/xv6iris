@@ -122,7 +122,7 @@ Require Import KallocInv.
 Require Import ByteCursor ByteBuf.
 Require Import PtreeType.
 Require Import UserPtTree.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import CodeCopyin.
