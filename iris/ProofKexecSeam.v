@@ -78,6 +78,7 @@ Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
+Require Import SpecKexec.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
