@@ -174,6 +174,15 @@ goals in a whole-function run each carry the WHOLE context forward, so a
 hypothesis crosses any number of them intact. Look at the failing `iApply`
 itself first. (Found in `ProofKexecA.kxc_a2`, at both `kxc_bad64` sites.)
 
+**Its sibling `[]` produces the SAME ERROR MESSAGE for the opposite reason,
+and the reason is not a bug at all.** `[]` proves that premise with an EMPTY
+spatial context, so anything you still need INSIDE the sub-goal — typically a
+caller's exit continuation that the *next* block will consume — is simply not
+there, and the failure surfaces as `iSpecialize: "Hcont" not found` several
+lines into the sub-proof. Whenever a bracketed premise is where the rest of
+the function is proved, list what it needs: `[Hcont]`, not `[]`.
+(`ProofKexec.v`'s phase-B `phnum = 0` arm.)
+
 Directly behind it sits the hart trap, because the next error looks like a
 non-error: **`iSpecialize: cannot instantiate (X -∗ …) with (X)` where both
 `X`s print identically** means the implicit `CID0` differs. A lemma whose

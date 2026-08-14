@@ -336,15 +336,24 @@ Section KexecCSetup.
         iref_slots 2 -∗
         WP (Loop : expr riscv_lang)) -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
-      ∀ (M' : regfile) (P' : uptd) (oldsz sz1 : mword 64),
+      ∀ (M' : regfile) (P' : uptd) (sz1 : mword 64),
+        (* THE TWO FACTS ABOUT [sz1] THE REST OF PHASE C RUNS ON, PUBLISHED
+           HERE BECAUSE THIS IS WHERE THEY ARE DISCOVERED.  The stack top is
+           [PGROUNDUP(szv) + 8192], so it is at least 8192 -- which is what
+           rules out the push loop's underflow (SpecKexec's blocker §7) and
+           is a premise of every later phase-C lemma; and [oldsz] is not an
+           unknown at all, it is [p->sz] as [proc_priv] already records it,
+           so the successor states quote [pv_sz V] rather than binding a
+           fresh variable phase D would then have nothing to tie down. *)
+        ⌜(8192 <= uint sz1)%Z⌝ -∗
         ( kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size
                      used2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
                      M' K C sp0 ra0 s00 s10 s20 pv av
-                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 0
+                     w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' (pv_sz V) sz1 0
           ∨ kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                        used2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
                        M' K C sp0 ra0 s00 s10 s20 pv av
-                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 0 ) -∗
+                       w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' (pv_sz V) sz1 0 ) -∗
         (* THE EXIT, HANDED BACK.  A [wp_next] continuation is LINEAR, so a
            block that owns a failure path cannot also leave its successor
            one: the caller supplies exactly one and whichever path runs
@@ -1566,7 +1575,9 @@ Section KexecCSetup.
         iSpecialize ("Hout" $! CID32 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID32 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hout" $! W8 Pfinal (pv_sz V) sz1 with "[-Hcont] Hcont").
+        iApply ("Hout" $! W8 Pfinal sz1 with "[%] [-Hcont] Hcont").
+        { rewrite uint_unsigned Hszu.
+          pose proof (bv_unsigned_in_range _ (pgroundup szv)) as [Hlo _]. lia. }
         iRight.
         rewrite /kxc_at_272.
         iSplitR.
@@ -1611,7 +1622,9 @@ Section KexecCSetup.
         iSpecialize ("Hout" $! CID32 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID32 true (proc_addr jp) _
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply ("Hout" $! W8 Pfinal (pv_sz V) sz1 with "[-Hcont] Hcont").
+        iApply ("Hout" $! W8 Pfinal sz1 with "[%] [-Hcont] Hcont").
+        { rewrite uint_unsigned Hszu.
+          pose proof (bv_unsigned_in_range _ (pgroundup szv)) as [Hlo _]. lia. }
         iLeft.
         rewrite /kxc_at_21a.
         iSplitR.
