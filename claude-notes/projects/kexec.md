@@ -365,15 +365,80 @@ rewrite's target doesn't match); bridge each call boundary to its OWN
 immediately-preceding `pose`d state (here, `Z2` to `T12` via plain
 `upd_ne`, since `Z2` only touched `Rra`), not further back.
 
-**Still open in phase C:** BOTH the `+0x358` and `+0x35c` connectors into
+**Progress past +0x264, same session, still "keep going" — the whole
+copyout-success arm's mechanical body is now done:** the ustack write
+(+0x250..+0x256, `kxc_pa_stk_add` — a new local lemma for the
+register-arithmetic-vs-`pa_stk`-resource address bridge, `stack_own_app`+
+`stack_own_1` to peel the one slot off `Hust`'s opaque region, `seq_S`+
+`big_sepL_app`+`big_sepL_singleton` to fold it onto `Hwr`), the loop
+counter increment (+0x25a), the argv-pointer bump and spill
+(+0x25c..+0x260), and the next-arg load (+0x264, extracting `Hargv`'s
+`S c` entry — same extract/use/restore idiom as every other array read
+this file uses). `admit`s right before the three-way final branch.
+Verified on the GCP VM (per this session's build-there steer): a full
+clean build, exit 0, zero errors.
+
+**A FOURTH class of hart-mismatch bug, distinct from the earlier `p`/CID0
+one, and genuinely non-obvious — spend real time on this note before
+touching another store's postcondition.** Diagnosing it burned a full
+debugging round because the failure ("LHS does not match any subterm")
+looks IDENTICAL whether it's a genuine content bug or a hart-CID mismatch,
+and — this is the trap — **the SAME-LOOKING fix (add or move an explicit
+`(CID := ...)` annotation) is required in some cases and WRONG in others,
+with no way to tell which from the code alone; only the compiler decides:**
+- **A store's postcondition (`wp_sd_s_sconf`, and presumably every other
+  `wp_s*_s_sconf`) pins `storeval := rget m rs2` to the ENTRY hart** — the
+  hart active when the instruction was ISSUED (i.e. whatever `iIntros`
+  bound just BEFORE that `iApply`), not the hart the continuation resumes
+  on. Bridging a returned store resource later needs
+  `rget_ne (CID := <entry hart>) m rs2`, named EXPLICITLY — omitting it
+  lets Coq default to the CURRENT ambient CID (the continuation's, i.e.
+  the WRONG one), which fails with no hint that a CID was even the issue.
+- **An ALU op's postcondition (`wp_cadd_s_sconf`, `wp_addi4_s_sconf`,
+  `wp_caddi_s_sconf`, …) does the OPPOSITE** — thanks to the `SrcOk`-based
+  "the read survives the rebinding" lifting these lemmas carry internally
+  (see their own family-note comments), the returned `wval` is restated at
+  the EXIT hart (the one the continuation's own `iIntros` binds). Bridging
+  these needs NO explicit CID at all (or, equivalently, the CURRENT
+  ambient CID, which after that `iIntros` already IS the exit hart) — and
+  explicitly annotating the ENTRY hart here is what fails, symmetrically.
+- **The diagnostic that actually resolves it**, since guessing between the
+  two costs a full compile round each time: force the term to print in
+  full via `Set Printing All. iDestruct "H" as "%probe".` (fails on a
+  non-pure resource, but the FAILURE MESSAGE prints the fully-elaborated
+  type) and read off the literal `@rget CIDxx ...` — that name IS the
+  answer, no more guessing needed. Used successfully twice now (`wp_mv_s_sconf`'s
+  CID0 gap, and this one) and worth reaching for FIRST next time, not last.
+
+**Two smaller mechanical gotchas from this same stretch, both cheap once
+named:**
+- `pa_add`'s own arithmetic (`pa_add p j := add_vec_int p (Z.of_nat j)`,
+  i.e. `j` is already a BYTE count, not a word count) means
+  `add_vec (pa_add p i) (mword_of_int j)` is NOT syntactically
+  `pa_add (pa_add p i) j` even though they are definitionally equal —
+  `pa_add_add` (the `pa_add(pa_add p i)j = pa_add p(i+j)` collapsing
+  lemma) needs an explicit `change ... with (pa_add (pa_add p i) j)` fold
+  first, or it reports "LHS does not match any subterm" against a goal
+  that looks like it should trivially match.
+- `rewrite pa_add_add. f_equal. lia.` on a goal `pa_add p X = pa_add p Y`
+  (X, Y equal `nat` expressions) intermittently failed `lia` with "Cannot
+  find witness" for reasons not fully run down (likely `f_equal` leaving a
+  goal shape `lia` can't zify cleanly through `pa_add`'s own definition);
+  the robust fix that always works is to prove the `nat` equation as its
+  OWN named `assert` first (`assert (Heq : (X = Y)%nat) by lia.`) and
+  `rewrite` it in, never relying on `f_equal` to hand `lia` a clean goal
+  through a non-transparent wrapper.
+
+**Still open in phase C:** the three-way final branch at
++0x268/+0x26a/+0x26e (natural end into `kxc_at_272`, loop-back into
+`kxc_at_21a (S c)`, or MAXARG-exceeded into the shared `-1` tail via yet
+ANOTHER stub); BOTH the `+0x358` and `+0x35c` connectors into
 `kxc_bad_1d6` (needs `kxc_ustack_collapse` first, to turn `kxc_frameC`'s
 split-at-`c` ustack back into `kxc_frame_at`'s uniform shape — see the
-design note above; the SAME connector code should serve both stubs, since
-both just do `mv s3,s4` before falling into the shared tail); the rest of
-the copyout-success arm (the ustack write at +0x250..+0x260, the loop
-counter increment at +0x25a, the argv-pointer bump and spill at
-+0x25c..+0x260, the next-arg load at +0x264, the three-way final branch
-at +0x268/+0x26a/+0x26e); `kxc_argv_loop` (the fuel-induction wrapper,
+design note above; the SAME connector code should serve both stubs AND
+the `+0x26e` one, since all three just do `mv s3,s4` before falling into
+the shared tail — worth writing ONE lemma the first time it's needed
+rather than three copies); `kxc_argv_loop` (the fuel-induction wrapper,
 mirroring `ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the
 closing `copyout` call joining into phase D at `+0x2a6`. Then phase D,
 then `ProofKexec.v` + `LinkKexec.v`.
