@@ -8169,3 +8169,70 @@ that compute them are `wp_auipc_s_sconf` + `wp_addi4_s_sconf` at
 `ltac:(rdok)` for the `ops_ok`).  The `c.lw a2,4(s1)` at +0x10e is
 `wp_clw_s_sconf`, not `wp_lw_s_sconf`: it is the ONLY compressed load on
 the arm.
+
+
+### Step 1 STOPPED mid-walk (2026-08-14).  **+0xf8 .. +0x130 IS WRITTEN AND
+### COMPILES** — all three `dirlink`s and both interior fall-throughs — and
+### the `++`/mint block has a RUNAWAY tactic in its head.  No `.v` in the
+### tree carries an `Admitted`; what landed is steps 1a and 1b
+
+**WHAT IS PROVEN AND WHAT IS NOT.**  The walk was developed against the
+mirror at ~3m30s per iteration with a trailing `Admitted`, and the
+prefix through the third `dirlink`'s post (`+0xf8` … `+0x130`, ~880 lines)
+reaches `MAKEEXIT=0`.  What is NOT written: the `++`/mint/C-OK block
+(drafted, ~286 lines, does not terminate — see below), and the three
+`fail:` entries.  **Neither the prefix nor the draft is committed**: a
+walk lemma is worth nothing until it is whole, and the tree's no-`Admitted`
+rule is the whole reason the parked-body architecture exists.  The drafts
+are parked on the mirror at `/shared/cr_mkdir_half_parts1to3.v.draft` and
+`/shared/cr_mkdir_half_part4.v.draft`.
+
+**THE STOP: A NON-TERMINATING STEP IN THE PARENT'S POST-`dirlink` ASSERT
+BLOCK.**  With the whole `++`/mint/C-OK block truncated away — leaving only
+`Hdpeq`/`subst dp03`, `Hp3ty`, `Hp3nl`, `Hp3szmax`, `Hp3iok`, `Hp3dok`,
+`Hp3nlnz` — the worker still spins: **>10 min and 22 GB against a 3m30s /
+5.6 GB baseline**, on a machine where the whole file is otherwise 3m30s.
+Two bisection probes localise it to that block and no further; the next run
+should localise the sentence with `coqc -time` (it STREAMS, so the last
+line of the log IS the stalling sentence — durable-notes) rather than by
+more truncation, which costs ten minutes per bit.  The two candidates worth
+checking first, both durable-notes shapes: `rewrite Hdp3` under a
+`reflexivity` that must unfold `SpecWritei.wi_dinode`'s `decide`, and the
+`Z.of_nat (16 * dir_slot …)` `lia` inside `Hp3szmax`.  Note the same three
+asserts are FINE for the child (`Hc1*`, `Hc2*`, both green): what is
+different here is that the parent's `k0` is a `dir_slot data (dir_nrec …)`
+term rather than a literal.
+
+**FIVE WALK-LEVEL FINDINGS, all paid for, none of them design questions:**
+
+* **only THREE `bltz`es live on this arm.**  +0x10a / +0x11e / +0x130; the
+  `fail:` label's fourth entry is +0xdc's, which `cr_alloc_half` already
+  routes.  The CFG listing above says four and means four ENTRIES, not four
+  on this arm.
+* **`cr_mkdir_half` needs NO premise for the failure family.**
+  `cr_fail_mkdir_half`'s premises are all persistent, so the proof
+  instantiates it itself, once per branch — three mutually exclusive
+  branches, one lemma, no extra hypothesis and no `□`.
+* **the returned name buffer must be re-introduced under a FRESH name.**
+  The rodata windows are `↦ₘ□`, so they land in the INTUITIONISTIC context
+  and the `iApply` does not consume them; re-introducing `Hdotw` after the
+  call fails with `iIntro: "Hdotw" not fresh`.  (An owned buffer — the
+  parent's `Hnb14` — may keep its name, which is why `cr_alloc_half` does.)
+* **the child's `dir_links` arrives at `dnc`, not at `cr_setf dnc …`.**  The
+  two are NOT interconvertible in general (the grey disjunct names
+  `nlink`), but at a FRESH child both big-ops are empty, so the conversion
+  is three lines off `Hcnrec0` and no `dir_links_eq` is wanted.
+* **`dl16_post`'s record-preservation clause has to be `subst`ed, not
+  `iEval`-rewritten.**  `dinode_at γi cinum dc01` is what the post hands
+  back and `dc1` is what the next call's `dn0` must be; `iEval (rewrite
+  (Hdc01 eq_refl)) in "Hcdiat"` silently does not fire, and
+  `assert … ; subst` does.
+
+**AND THE TWO DECODE-LEVEL ONES.**  `16 * 0 + jj - 16 * 0` is NOT
+definitionally `jj` (`Nat.sub` blocks on a variable), so every
+`dir_record_of_name` / `dir_link_at_dirlink` call needs
+`replace … with jj by lia` — hoist it into one `Hwin` assert per record
+rather than repeating it in three `ltac:`s.  And `bmap_alloced bmc bm1
+(16 * 0 / BSIZE)` does not match a `bmap_alloced bmc bm1 0` hypothesis
+syntactically; restate it at the divided index (`by exact`, the conversion
+is free) before rewriting it into the spend.
