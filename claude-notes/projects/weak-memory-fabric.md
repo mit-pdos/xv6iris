@@ -73,7 +73,17 @@ for the archive.
   graph.
 - **G5 — the composition** (`WeakRobustMain`/`WeakCompose` +
   `WeakEvPf`/`WeakEvAdequacy`): `robust_main` re-landed; `epf_step` as
-  the `wp_pf_step` instance; THE NEW CAPSTONE — event-language adequacy
+  the `wp_pf_step` instance; ALSO (user-approved 2026-08-14): MERGE THE
+  HART CONSTRUCTORS — one `Sail gen cpu (m : M unit) (fence)` replaces
+  `ELoop`/`ECycle`, with the boundary rule
+  `Sail (Ret tt) None ⟶ Sail (riscv_step tick) None (∃ tick)` and
+  `Loop gen cpu := Sail gen cpu (Ret tt) None` as NOTATION (the
+  boundary VALUE anchors the notation — `Ret tt` is unique since the
+  result type is unit; the tick is chosen at the step).  The infinite
+  CPU loop lives in the step relation + Löb, where nontermination
+  belongs (an in-monad loop is impossible — `mchild_wf`).  Deletes one
+  bookkeeping step per instruction and one corpse-arm family; the epf
+  instance merges its boundary transition identically; THE NEW CAPSTONE — event-language adequacy
   + generalized Layer 1, end to end, `main_premises` consumed as today
   (the phase-2 exhibit-level discharge is a separate follow-on);
   `Print Assumptions` = the 5 rv64d axioms.
