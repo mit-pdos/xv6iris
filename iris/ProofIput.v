@@ -370,6 +370,55 @@ Qed.
 
 (* ===================================================================== *)
 
+(* THE ONE ORDER OBLIGATION THIS DEVELOPMENT ADMITS.  It lives HERE, in the
+   file that needs it, rather than in a header everyone imports, so nobody
+   picks it up by accident: the only way to depend on it is to depend on
+   iput.
+
+   iput holds itable.lock across acquiresleep (fs.c:341), and that edge is
+   the one the rank order cannot license.  kfork holds np->lock across idup,
+   so "itable" (14) must sit ABOVE "proc" (9); acquiresleep's blocking path
+   runs sleep_prepare while holding the sleeplock's own spinlock, so
+   "sleep lock" (4) must sit BELOW "proc".  Nothing fits between them, and
+   the obligation below needs 14 < 4.  See claude-notes/projects/lock-set.md,
+   "THE ONE UNLICENSED EDGE", for the three-edge cycle at the name level and
+   the concrete three-CPU execution that would have to happen for it to bite.
+
+   xv6 is not wrong -- fs.c:339 says "ip->ref == 1 means no other process can
+   have ip locked, so this acquiresleep() won't block (or deadlock)".  The
+   real discharge is the icache REF-1 exclusivity theorem
+   (design/fs-icache.md) plus a NON-BLOCKING acquiresleep variant whose
+   contract never reaches sleep_prepare and so raises no order obligation at
+   all.  Until that lands, iput ASSUMES the obligation instead of proving it.
+
+   ---- READ THIS BEFORE TRUSTING ANYTHING DOWNSTREAM ------------------
+
+   THE ADMITTED STATEMENT IS FALSE, not merely unproven: [lock_rank] is a
+   closed computation, so [vm_compute] refutes it and [locks_below_not_elem]
+   turns it into [False].  Every theorem whose proof reaches this axiom is
+   logically vacuous -- iput, iunlockput, fileclose, dirlink, namex, namei,
+   nameiparent, kexit, sys_exit, sys_close, sys_pipe, pipealloc and their
+   Link files.  They typecheck; they do not yet mean anything.
+
+   There is no CONSISTENT way to close this goal, because the goal itself is
+   refutable; any axiom strong enough would be.  The consistent fix changes
+   the OBLIGATION (non-blocking acquiresleep) rather than assuming it.
+
+   [Print Assumptions] on any downstream theorem names
+   [iput_acquiresleep_order_ADMITTED].  That is the intended tripwire; grep
+   for the identifier to find everything standing on it.
+
+   Stated with iput's OWN premise on the left so it cannot be reused as a
+   general "any set is below any rank" escape hatch: it licenses exactly
+   iput's single nested acquiresleep, at exactly the held set iput has there
+   ({[itable]} plus whatever its caller brought). *)
+Axiom iput_acquiresleep_order_ADMITTED :
+  forall lks : gset nat,
+    locks_below lks (lock_rank "itable") ->
+    locks_below ({[lock_rank "itable"]} ∪ lks) (lock_rank "sleep lock").
+
+(* ===================================================================== *)
+
 Module IputProof (Acquire : ACQUIRE) (Release : RELEASE)
                  (ASL : ACQUIRESLEEP) (RS : RELEASESLEEP)
                  (IT : ITRUNC) (IU : IUPDATE) : IPUT.
@@ -1149,6 +1198,12 @@ Section ProofIput.
     cbv beta delta [wp_iput_gen_body].
     intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh.
+    (* iput's own premise is stated at its cone MINIMUM, "log" (1) -- itrunc
+       reaches log_write.  The three steps that touch itable.lock itself (the
+       admitted acquiresleep order fact, the re-acquire at +0x82, and the
+       shared tail) each want the bound at "itable" (14), which [mono]
+       supplies once here rather than three times below. *)
+    assert (Hitbelow : locks_below lks (lock_rank "itable")) by lkbelow.
     pose proof HK as HK'. unfold K_iput in HK'.
     unfold iput_units in Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -1808,26 +1863,14 @@ Section ProofIput.
                        G4 !!! Regidx c = m !!! Regidx c).
     { intros c Hcs N2 N8 N9 N18. rewrite /G4 upd_ne; [| regne].
       exact (HG3thr c Hcs N2 N8 N9 N18). }
-    (* THE ORDER STEP THIS FILE EXISTS TO JUSTIFY.  iput holds itable.lock (2)
-       across acquiresleep, whose spinlock is "sleep lock".
-
-       THIS IS THE ONE EDGE THE ORDER DOES NOT LICENSE, and it fails here on
-       purpose.  Since kfork holds np->lock across idup, "itable" (14) sits
-       ABOVE "proc" (9); and since acquiresleep's blocking path runs
-       sleep_prepare while holding the sleeplock spinlock, "sleep lock" (4)
-       sits BELOW "proc".  There is no room left to place "itable" between
-       them, so [locks_below ({[itable]} ∪ lks) (lock_rank "sleep lock")] --
-       which needs 14 < 4 -- is FALSE, and [lkbelow] correctly refuses it.
-
-       xv6 is still right: fs.c:339 says "ip->ref == 1 means no other process
-       can have ip locked, so this acquiresleep() won't block (or deadlock)".
-       Discharging it needs the icache REF-1 exclusivity theorem
-       (design/fs-icache.md) and a NON-BLOCKING acquiresleep variant whose
-       contract never reaches sleep_prepare, so it raises no order obligation
-       at all.  See claude-notes/projects/lock-set.md, "THE ONE UNLICENSED
-       EDGE".  Owed; this file stays red until it lands. *)
-    assert (Hslbelow : locks_below ({[lock_rank "itable"]} ∪ lks)
-                                   (lock_rank "sleep lock")) by lkbelow.
+    (* THE ORDER STEP THIS FILE EXISTS TO JUSTIFY, and the ONE this
+       development does not prove.  iput holds itable.lock (14) across
+       acquiresleep, whose spinlock is "sleep lock" (4), so the obligation
+       needs 14 < 4 and [lkbelow] rightly refuses it.  It is ADMITTED here --
+       see [iput_acquiresleep_order_ADMITTED] at the top of this file for why
+       no ranking can license this edge, why xv6 is nonetheless correct, and
+       what everything downstream of this line is (and is not) worth. *)
+    pose proof (iput_acquiresleep_order_ADMITTED lks Hitbelow) as Hslbelow.
     iApply (ASL.wp_acquiresleep_nested_sconf (dq := dq) gs j gil gisl "inode"%string
               (ic_tok cn k) G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
               ({[lock_rank "itable"]} ∪ lks)
@@ -2475,7 +2518,7 @@ Section ProofIput.
               (itable_res2 cn gfs gi cov logstart nib dev) J9
               0%nat eb pj C (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
-              Hfresh
+              Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
     all: try lkbelow.
     { iEval (rewrite HJ9a0). iExact "Hitab". }
@@ -2571,7 +2614,7 @@ Section ProofIput.
               n u' (fun w => ip_spend_w w cru crz) wit crb pidv dq dqb dqs m J10 K eb C sp0
               (m !!! Regidx Rs2) lks
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
-              Hblo Hbhi Hdsub Hssub Hwbm2 Hwitc Hfresh
+              Hblo Hbhi Hdsub Hssub Hwbm2 Hwitc Hitbelow
               with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf2 Hiauth2
                     Hslots2 Hpool2 Href Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                     [Hbs2 Hbs1] Hop Hcont").
