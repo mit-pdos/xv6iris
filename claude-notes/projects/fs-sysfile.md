@@ -6662,3 +6662,122 @@ size half is now proven content and only the type half is a gate.
 (§20.7), which needs the kernel's F2 or a refutation of §20.17.6(B) at the
 withdraw.  Then this file and its `Axiom` are deleted and `ProofCreate`
 loses one hypothesis and gains four instructions.
+
+
+### D₀ INCREMENT 3 STOPPED BEFORE ANY EDIT — the allocate half needs the
+### LINK LEDGER at the contract seam, and §20.10's stages C+D are what
+### build it.  Zero `.v` files touched.
+
+The walk agent read the gate, `cr_alloc_body`, `CreateBudget`, `CodeCreate`
+and every callee contract, verified the gate↔`cr_alloc_body` interface, and
+stopped at the FIRST `dirlink` — i.e. before the first instruction it could
+not have justified.  Three findings, in the order they bite.
+
+**FINDING 1 (decisive, and it blocks the SHORTEST SUCCESS ARM, not just
+`fail:`): NOTHING IN THE TREE CAN PRODUCE THE `ilink` TICKET A WRITTEN
+DIRECTORY RECORD NEEDS.**  `dirlink` takes the directory in PIECES
+(`inode_meta` / `inode_map` / `inode_blocks` / `dinode_at`) and hands them
+back at `data'`; `DirLinks.dir_links` is the caller's to rebuild, and its
+route is `dir_links_dirlink`, whose resource premise is `dir_link_at self
+dn' data' k0` — for a live record naming a FOREIGN inum, that is
+`ilink z ∨ (igrey z ∗ ⌜di_nlink home = 0⌝)`.  create's parent has
+`di_nlink dp ≠ 0` (its own guard), so the grey disjunct is unavailable and
+`ilink child_inum` is REQUIRED.  It cannot be got:
+
+* `ilink` is minted by `InodeRegion.ireg_write_link` ALONE, and **no
+  `Spec*.v` or `Proof*.v` in the tree names `ireg_write_link`, `ilink`,
+  `igrey`, `iclaim` or `dir_links`** — one grep, and it returns the
+  invariant layer only (`IcacheRef` / `InodeRegion` / `DirLinks` /
+  `IcacheEscrow` / one `IcacheBoot` row).
+* `SpecIalloc`'s post does not carry `iclaim`; `SpecIupdate`'s three bodies
+  go through `ireg_write_au` and pay out `ireg_out` = `dinode_at`-or-marker,
+  never a fragment; `SpecDirlink` has no `ilink inum` premise.
+
+That is exactly §20.6's create row (*"create's COMMIT … spend `iclaim`,
+mint one `ilink`"*) and §20.10's **stage C `SpecDirlink` row** plus **stage
+D**, and they are NOT BUILT.  The link ledger was landed as an INVARIANT
+(stage A) and as a payload twin (stage B, this campaign's B′) and has never
+reached a contract, because **create is the first function in the tree that
+changes a directory's records** — every landed caller passes `ic_loaded`
+through as a black box, so the seam has never been exercised.  It is not a
+proof difficulty: `ProofCreate` cannot call `iunlockput(dp)` at +0xca at
+all.
+
+**FINDING 2 (independent, machine-checked): A `dirlink` THAT RETURNS −1
+LEAVES create's `fail:` UNPAYABLE.**  `dl16_post` is guarded by
+`found = false -> tot = 16`, i.e. by the SUCCESS-APPEND arm, so on every
+route into `fail:` the only budget clause is the counted
+`(ncount - dirlink_units) <= n'`.  create reaches its first `dirlink` at
+`cr_uw w - ia_spend - iu_spend true` = 9 (w = false) or 8 (w = true), and
+`9 - 7 = 2 < iput_units = 3`: the `fail:` tail cannot call its FIRST
+`iunlockput`.  Checked on the mirror, in `CreateBudget`'s own vocabulary
+(not landed — `CreateBudget.v` is frozen; this is the text for whoever
+lands the repair):
+
+```coq
+Theorem cr_fail_counted_busts (w : bool) :
+  let u1 := cr_uw w - ia_spend in       (* ialloc, unconditional 1        *)
+  let u2 := u1 - iu_spend true in       (* iupdate(ip), absorbs           *)
+  let u3 := u2 - dirlink_units in       (* THE FAILING dirlink            *)
+  let u4 := u3 - iu_spend true in       (* fail: iupdate(ip), absorbs     *)
+  u4 < ip_need.
+Proof. destruct w; vm_compute; lia. Qed.
+
+Theorem cr_fail_would_fit_at_u0 : ip_need <= cr_u0 - dirlink_units.
+Theorem cr_fail_closes_with_credit (w crd cru al ind : bool) :
+  ip_need <= cr_uw w - ia_spend - iu_spend true - dl_spend w crd cru al ind.
+Theorem cr_fail_closes_at_zero (w : bool) :
+  ip_need <= cr_uw w - ia_spend - iu_spend true - 1.
+```
+
+The last two say what the repair is and that it is enough: **widen
+`dl16_post`'s guard from `tot = 16` to `0 < tot`** (which is `wi16_post`'s
+OWN guard already — `SpecWritei` never narrowed it, `SpecDirlink` did), and
+**add a `tot = 0` clause** (`ncount - 1 <= n'`: at `tot = 0` the only
+`log_write` dirlink runs is writei's trailing `iupdate`).  Both close every
+arm at every value of the reported booleans.  Note the ENTRY-side premise
+is fine at every arm (`dl_need false true = 6 <= 8`); it is only the SPEND
+bound that busts, which is W3's own recorded flag — *"`dirlink_units` still
+says 7 while the append arm provably spends `wi16_spend <= 4` — the slack
+is real and unclaimed; CREATE is the stage that consumes it"* — read at the
+FAILING arm, where the slack was never exposed at all.
+
+**FINDING 3 (known, and now bounded): the short-write resource hole is
+`tot = 1` ONLY.**  §20.17's note says *"`1 <= tot <= 15` has no route"*;
+`dir_link_at_dirlink` in fact takes `2 <= tot` (two bytes is the whole
+inum halfword), so `2..15` is covered and `tot = 1` alone is not.  It is
+unreachable in the kernel (writei's chunk is the whole sixteen-byte record
+or nothing) and no contract says so, so it rides on the same
+`tot = 0 \/ tot = 16` atomicity strengthening as finding 2's guard —
+one repair, not two.
+
+**WHAT IS NOT A BLOCKER, checked and worth not re-checking.**  The gate
+(`SpecCreateFreshTy`) instantiates against `cr_alloc_body` with every
+premise present and its `sie_cap_gpr Ma K` slot takes create's `K - 10`
+under `cr_kb`'s `HKia`/`HKil`; `di_nlink_stable` is *"does not fall"*, so
+create's two `nlink++` iupdates satisfy it; `ProofCreateParts` really does
+carry everything the walk needs (`cr_setf` + the five re-park lemmas,
+`cr_made_setf`, `cr_size_cap_fresh`/`_fresh2`, `cr_frm5`, and BOTH rodata
+windows `cr_dot_window` / `cr_dotdot_window` at the verified addresses);
+`create_fresh_ty`'s `wp_ialloc_gen_body` / `wp_ilock_sconf_body`
+hypotheses are supplied as `(fun CIDa => IA.wp_ialloc_gen (CID := CIDa))`
+(a bare `IA.wp_ialloc_gen` does not typecheck there — the parameter's
+binders are EXPLICIT, durable-notes' implicit-binder-in-a-body rule).
+
+**THE ORDERING FACT THE REPAIR MUST RESPECT (free, if it is noticed):**
+the `ilink` that pays for the `".."` record is minted at `dp->nlink++`,
+which in the binary runs at +0x128 — AFTER the `dirlink(ip, "..")` at
++0x102 that writes the record.  create may defer the child's `dir_links`
+re-park to the end of the arm (it hands `ic_loaded(ip)` out only in
+`create_locked`), so the order works; but a repair that obliges the
+re-park AT the dirlink does not.  And on `fail:` after a successful
+`".."`, `ip->nlink := 0` at +0x12e is what makes the GREY disjunct
+available — §20.8's orphaned `".."`, reached here for the first time.
+
+**WHAT D₀ MAY STILL LAND WITHOUT ANY OF THIS:** everything from +0x8a to
++0xb2 (slot-5 save, the gate span, the three `sh`s via `cr_setf`,
+`iupdate(ip)` at `cru := true` off the gate's union post, the `T_DIR`
+test) and ARM A-FAIL whole.  That is roughly a fifth of the allocate half
+and it would have to be parked behind a hypothesis covering the other
+four-fifths, so it is not an increment — the next D₀ launch is the one
+AFTER §20.10 stages C+D and the `SpecDirlink` spend repair.
