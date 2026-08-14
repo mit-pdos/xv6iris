@@ -1903,10 +1903,10 @@ Section ProofDirlookupMain.
             iEval (rewrite Hbb8e) in "Hpc".
             (* +0x8e jal ra,iget *)
             assert (Htgtig : add_vec (mword_of_int (DL + 0x8e) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094944 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2094644 : mword 21))
                       = mword_of_int KernelSyms.iget) by pcw.
             iApply (wp_jal_s_sconf (mword_of_int (DL + 0x8e)) Rra
-                      (mword_of_int 2094944 : mword 21) N6 (K - 12)%nat b
+                      (mword_of_int 2094644 : mword 21) N6 (K - 12)%nat b
                       ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                       with "Hcg Hpc Hi8e").
             iIntros (CIDB17 HqB17) "Hcg Hpc".

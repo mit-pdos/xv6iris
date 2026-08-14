@@ -1610,14 +1610,14 @@ Section IallocClaim.
     iEval (rewrite Hppaa) in "Hpc".
     (* ===== +0xaa jal ra,iget ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ialloc + 0xaa)) Rra
-              (mword_of_int 2096724 : mword 21) W9 (K - 8)%nat b
+              (mword_of_int 2096424 : mword 21) W9 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hiaa").
     iIntros (CID15 Hq15) "Hcg Hpc".
     set (WA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ialloc + 0xaa) : mword 64) 4)]> W9).
     assert (Htgtig : add_vec (mword_of_int (KernelSyms.ialloc + 0xaa) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2096724 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2096424 : mword 21))
                      = mword_of_int KernelSyms.iget) by pcw.
     iEval (rewrite Htgtig) in "Hpc".
     assert (HWAa0 : WA !!! Regidx Ra0 = (sign_extend' 64 dev : mword 64))

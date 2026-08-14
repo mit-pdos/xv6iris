@@ -46,6 +46,13 @@ SSH_KEY="${ROCQ_SSH_KEY:-$HOME/.ssh/id_ed25519}"
 FIREWALL_RULE="${ROCQ_FIREWALL_RULE:-rocq-allow-ssh}"
 SSH_SOURCE_RANGES="${ROCQ_SSH_SOURCE_RANGES:-0.0.0.0/0}"
 
+# Additional public keys to authorize for $SSH_USER, one per line in
+# authorized_keys format. Whoever can already reach this machine can reach the
+# VM, so mirroring the local authorized_keys is what lets a human ssh in
+# directly to look at a build the agent started. Missing file = just $SSH_KEY.
+# Set to /dev/null to authorize nothing but $SSH_KEY.
+EXTRA_AUTHORIZED_KEYS="${ROCQ_EXTRA_AUTHORIZED_KEYS:-$HOME/.ssh/authorized_keys}"
+
 # ---- idle shutdown -----------------------------------------------------
 # Seconds of continuous inactivity before the VM powers itself off.
 IDLE_LIMIT="${ROCQ_IDLE_LIMIT:-3600}"

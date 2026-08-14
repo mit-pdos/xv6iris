@@ -159,9 +159,9 @@ Section CodeIreclaim.
   Proof. mk_rvc (KernelSyms.ireclaim + 0x42) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.ireclaim + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma irci_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64) false (JAL (mword_of_int 2095902 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ireclaim + 0x44) (mword_of_int 0xb1fff0ef : mword 32)
-    (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64) (JAL (mword_of_int 2095902 : mword 21, Regidx (mword_of_int 1))) kd_b1fff0ef. Qed.
+  Lemma irci_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64) false (JAL (mword_of_int 2095602 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ireclaim + 0x44) (mword_of_int 0x9f3ff0ef : mword 32)
+    (mword_of_int (KernelSyms.ireclaim + 0x44) : mword 64) (JAL (mword_of_int 2095602 : mword 21, Regidx (mword_of_int 1))) kd_9f3ff0ef. Qed.
 
   Lemma irci_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.ireclaim + 0x48) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 19), ADD)).
   Proof. mk_rvc (KernelSyms.ireclaim + 0x48) (mword_of_int 0x89aa : mword 16)

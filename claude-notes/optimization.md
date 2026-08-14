@@ -145,6 +145,18 @@ worth 20× on individual files.
   - **A slow `set_solver` looks like a hanging `Qed` and HIDES COMPILE ERRORS** —
     the log stays 0 bytes while the main process burns tactic time, and a real
     type error further down sits in unflushed stderr behind it.
+- **Never `simplify_eq` inside a whole-function proof's Iris context** — like
+  `congruence`, it scans every hypothesis in scope looking for equalities to
+  substitute/discriminate, so cost tracks context size, not the one hypothesis
+  you meant to consume. Closing `(e', b') = (Ep, uint bno) -> …` this way cost
+  12–17 s **per call**, four calls in one file. Fix: `injection H as pat…`
+  names exactly the hypothesis and produces one pattern per NON-trivial
+  component — a component syntactically equal on both sides (`Ep = Ep`) is
+  dropped automatically, so a `(Ep, b') = (Ep, uint bno)` equality takes one
+  pattern (`as ->`) where a `(e', b') = (Ep, uint bno)` one — both sides
+  genuinely distinct — takes two (`as -> ->`); guess wrong and the error is
+  *"Unexpected introduction pattern (at most N was expected)"*, which names
+  the fix. Four-call fix took one file from 95 s to 35 s.
 - **Never `congruence` anywhere but LAST** in a peel's side-goal alternation
   (4–80 s per call), and never `done` / bare `cbn` / bare `reflexivity` as the
   last tactic of a step. The giveaway is that the tactic is *trivially*

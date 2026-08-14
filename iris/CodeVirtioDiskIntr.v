@@ -273,8 +273,8 @@ Section CodeVirtioDiskIntr.
   Proof. mk_base (KernelSyms.virtio_disk_intr + 0xa4) (mword_of_int 0xc2450513 : mword 32)
     (mword_of_int (KernelSyms.virtio_disk_intr + 0xa4) : mword 64) (ITYPE (mword_of_int 3108 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c2450513. Qed.
 
-  Lemma vti_a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_intr + 0xa8) : mword 64) false (JAL (mword_of_int 2075928 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.virtio_disk_intr + 0xa8) (mword_of_int 0xd19fa0ef : mword 32)
-    (mword_of_int (KernelSyms.virtio_disk_intr + 0xa8) : mword 64) (JAL (mword_of_int 2075928 : mword 21, Regidx (mword_of_int 1))) kd_d19fa0ef. Qed.
+  Lemma vti_a8 : kernel_text -∗ instr (mword_of_int (KernelSyms.virtio_disk_intr + 0xa8) : mword 64) false (JAL (mword_of_int 2075968 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.virtio_disk_intr + 0xa8) (mword_of_int 0xd41fa0ef : mword 32)
+    (mword_of_int (KernelSyms.virtio_disk_intr + 0xa8) : mword 64) (JAL (mword_of_int 2075968 : mword 21, Regidx (mword_of_int 1))) kd_d41fa0ef. Qed.
 
 End CodeVirtioDiskIntr.

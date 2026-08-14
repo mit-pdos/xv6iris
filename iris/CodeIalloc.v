@@ -295,9 +295,9 @@ Section CodeIalloc.
   Proof. mk_rvc (KernelSyms.ialloc + 0xa8) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.ialloc + 0xa8) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma iali_aa : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0xaa) : mword 64) false (JAL (mword_of_int 2096724 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.ialloc + 0xaa) (mword_of_int 0xe55ff0ef : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0xaa) : mword 64) (JAL (mword_of_int 2096724 : mword 21, Regidx (mword_of_int 1))) kd_e55ff0ef. Qed.
+  Lemma iali_aa : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0xaa) : mword 64) false (JAL (mword_of_int 2096424 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.ialloc + 0xaa) (mword_of_int 0xd29ff0ef : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0xaa) : mword 64) (JAL (mword_of_int 2096424 : mword 21, Regidx (mword_of_int 1))) kd_d29ff0ef. Qed.
 
   Lemma iali_ae : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0xae) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
   Proof. mk_rvc (KernelSyms.ialloc + 0xae) (mword_of_int 0x74a2 : mword 16)

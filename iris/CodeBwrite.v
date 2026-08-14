@@ -19,7 +19,6 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode10.
-Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -27,6 +26,7 @@ Require Import KernelDecode15.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
 Require Import KernelDecode23.
+Require Import KernelDecode26.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
@@ -115,8 +115,8 @@ Section CodeBwrite.
   Proof. mk_base (KernelSyms.bwrite + 0x2a) (mword_of_int 0x77e50513 : mword 32)
     (mword_of_int (KernelSyms.bwrite + 0x2a) : mword 64) (ITYPE (mword_of_int 1918 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_77e50513. Qed.
 
-  Lemma bwi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0x2e) : mword 64) false (JAL (mword_of_int 2087858 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bwrite + 0x2e) (mword_of_int 0xbb3fd0ef : mword 32)
-    (mword_of_int (KernelSyms.bwrite + 0x2e) : mword 64) (JAL (mword_of_int 2087858 : mword 21, Regidx (mword_of_int 1))) kd_bb3fd0ef. Qed.
+  Lemma bwi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0x2e) : mword 64) false (JAL (mword_of_int 2087898 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bwrite + 0x2e) (mword_of_int 0xbdbfd0ef : mword 32)
+    (mword_of_int (KernelSyms.bwrite + 0x2e) : mword 64) (JAL (mword_of_int 2087898 : mword 21, Regidx (mword_of_int 1))) kd_bdbfd0ef. Qed.
 
 End CodeBwrite.

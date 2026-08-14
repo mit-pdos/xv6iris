@@ -367,11 +367,6 @@ Lemma kd_70250513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1794 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
-Lemma kd_7a3000ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x7a3000ef : mword 32) : M instruction) s
-  = Some (JAL (mword_of_int 4002 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
-
 Lemma kd_850ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x850ff0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2093136 : mword 21, Regidx (mword_of_int 1)), s).
@@ -430,11 +425,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_b8dff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xb8dff0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2096012 : mword 21, Regidx (mword_of_int 1)), s).
-Proof. decode_bridge_ms. Qed.
-
-Lemma kd_c1bfd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xc1bfd0ef : mword 32) : M instruction) s
-  = Some (JAL (mword_of_int 2087962 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_cb3ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -535,11 +525,6 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_fd843603 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfd843603 : mword 32) : M instruction) s
   = Some (LOAD (mword_of_int 4056 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), false, 8), s).
-Proof. decode_bridge_ms. Qed.
-
-Lemma kd_feafd0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xfeafd0ef : mword 32) : M instruction) s
-  = Some (JAL (mword_of_int 2086890 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_ff3516e3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

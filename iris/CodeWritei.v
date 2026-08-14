@@ -257,9 +257,9 @@ Section CodeWritei.
   Proof. mk_rvc (KernelSyms.writei + 0x86) (mword_of_int 0x8556 : mword 16)
     (mword_of_int (KernelSyms.writei + 0x86) : mword 64) (RTYPE (Regidx (mword_of_int 21), zreg, Regidx (mword_of_int 10), ADD)) kd_8556 exec_execute_C_MV. Qed.
 
-  Lemma wri_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.writei + 0x88) : mword 64) false (JAL (mword_of_int 2095042 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.writei + 0x88) (mword_of_int 0xfc2ff0ef : mword 32)
-    (mword_of_int (KernelSyms.writei + 0x88) : mword 64) (JAL (mword_of_int 2095042 : mword 21, Regidx (mword_of_int 1))) kd_fc2ff0ef. Qed.
+  Lemma wri_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.writei + 0x88) : mword 64) false (JAL (mword_of_int 2095212 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.writei + 0x88) (mword_of_int 0x86dff0ef : mword 32)
+    (mword_of_int (KernelSyms.writei + 0x88) : mword 64) (JAL (mword_of_int 2095212 : mword 21, Regidx (mword_of_int 1))) kd_86dff0ef. Qed.
 
   Lemma wri_8c : kernel_text -∗ instr (mword_of_int (KernelSyms.writei + 0x8c) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (KernelSyms.writei + 0x8c) (mword_of_int 0x85aa : mword 16)

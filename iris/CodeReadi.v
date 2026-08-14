@@ -252,9 +252,9 @@ Section CodeReadi.
   Proof. mk_rvc (KernelSyms.readi + 0x80) (mword_of_int 0x855a : mword 16)
     (mword_of_int (KernelSyms.readi + 0x80) : mword 64) (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 10), ADD)) kd_855a exec_execute_C_MV. Qed.
 
-  Lemma rdi_082 : kernel_text -∗ instr (mword_of_int (KernelSyms.readi + 0x82) : mword 64) false (JAL (mword_of_int 2095290 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.readi + 0x82) (mword_of_int 0x8bbff0ef : mword 32)
-    (mword_of_int (KernelSyms.readi + 0x82) : mword 64) (JAL (mword_of_int 2095290 : mword 21, Regidx (mword_of_int 1))) kd_8bbff0ef. Qed.
+  Lemma rdi_082 : kernel_text -∗ instr (mword_of_int (KernelSyms.readi + 0x82) : mword 64) false (JAL (mword_of_int 2095460 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.readi + 0x82) (mword_of_int 0x965ff0ef : mword 32)
+    (mword_of_int (KernelSyms.readi + 0x82) : mword 64) (JAL (mword_of_int 2095460 : mword 21, Regidx (mword_of_int 1))) kd_965ff0ef. Qed.
 
   Lemma rdi_086 : kernel_text -∗ instr (mword_of_int (KernelSyms.readi + 0x86) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (KernelSyms.readi + 0x86) (mword_of_int 0x85aa : mword 16)

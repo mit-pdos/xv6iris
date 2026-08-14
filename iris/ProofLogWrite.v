@@ -2385,7 +2385,7 @@ Section ProofLogWrite.
           { iPureIntro. intros e' b' Hin.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hcap e' b' Hin).
-            - apply elem_of_singleton in Hin. simplify_eq. lia. }
+            - apply elem_of_singleton in Hin. injection Hin as -> ->. lia. }
           iExists nl, LB. iSplitR; [iPureIntro; exact HsumA|].
           (* ABSORB: W is unchanged, so LB is too, and the block is already
              in it -- which is exactly what [Hmem] says. *)
@@ -2399,7 +2399,7 @@ Section ProofLogWrite.
           { iPureIntro. intros b' Hin.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hreg b' Hin).
-            - apply elem_of_singleton in Hin. simplify_eq. exact HbnoLB. }
+            - apply elem_of_singleton in Hin. injection Hin as ->. exact HbnoLB. }
           rewrite /log_batch. iExists W, (<[uint bno := bs]> L), D.
           iSplitR; [iPureIntro; split; [exact HlenW | exact HnlB]|].
           iSplitR; [iPureIntro; exact HLB|].
@@ -2467,7 +2467,7 @@ Section ProofLogWrite.
           { iPureIntro. intros e' b' Hin.
             apply elem_of_union in Hin as [Hin|Hin].
             - exact (Hcap e' b' Hin).
-            - apply elem_of_singleton in Hin. simplify_eq. lia. }
+            - apply elem_of_singleton in Hin. injection Hin as -> ->. lia. }
           iExists (S nl), (LB ∪ {[uint bno]}).
           (* THE APPEND BRANCH IS UNREACHABLE UNDER A CREDIT: the scan
              reported [bno] absent from lh.block[], but a credit says it is
@@ -2485,7 +2485,7 @@ Section ProofLogWrite.
           { iPureIntro. intros b' Hin.
             apply elem_of_union in Hin as [Hin|Hin].
             - apply elem_of_union_l. exact (Hreg b' Hin).
-            - apply elem_of_singleton in Hin. simplify_eq.
+            - apply elem_of_singleton in Hin. injection Hin as ->.
               apply elem_of_union_r, elem_of_singleton. reflexivity. }
           rewrite /log_batch. iExists (W ++ [bno]), (<[uint bno := bs]> L),
                                      (<[uint bno := true]> D).
