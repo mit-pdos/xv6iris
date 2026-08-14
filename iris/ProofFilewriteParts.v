@@ -1125,13 +1125,13 @@ Section ProofFilewriteParts.
                     = mword_of_int (FW + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp72) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (FW + 0x72)) Ra4 Ra4
-              (mword_of_int 244 : mword 12) D2 K b
+              (mword_of_int 260 : mword 12) D2 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi72").
     iIntros (CID3 Hq3) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (D3 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (D2 !!! Regidx Ra4)
-                     (sign_extend' 64 (mword_of_int 244 : mword 12)))]> D2).
+                     (sign_extend' 64 (mword_of_int 260 : mword 12)))]> D2).
     assert (HD3a4 : D3 !!! Regidx Ra4 = (mword_of_int KernelSyms.devsw : mword 64)).
     { rewrite /D3 upd_eq /D2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HD3a5 : D3 !!! Regidx Ra5 = (mword_of_int (16 * mj) : mword 64)).

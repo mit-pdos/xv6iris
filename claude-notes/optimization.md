@@ -129,22 +129,81 @@ delta whitelist. What would fix it is a primitive-string `ident` upstream.
 This is the single most productive rule in this file — instances of it have been
 worth 20× on individual files.
 
-- **Never `set_solver` / `naive_solver` inside a whole-function proof.** It ends
-  in a search over *every* hypothesis in scope, and a capstone's context is ~200
-  register-chain facts over large mword terms. The goal's own size is
-  irrelevant: `fd0 ∉ ∅` cost 106 s. Use the named lemma
-  (`not_elem_of_empty`, `not_elem_of_singleton_2`, `union_least`,
-  `union_mono_r`, `elem_of_weaken`, `list_to_set_app_L`, …), or hoist the
-  obligation to a `Local Lemma` over set VARIABLES where the context is three
-  wide. `set_solver` is fine inside small definitional lemmas — it is the call
-  site that matters, not the tactic.
-  - Better still, do not create the goal: `dom_insert_lookup_L` (`is_Some (m !!
-    i) → dom (<[i:=x]> m) = dom m`) closes a "the slot was already live" domain
-    identity with no set reasoning at all, where `dom_insert_L` + `set_solver`
-    costs 145 s.
-  - **A slow `set_solver` looks like a hanging `Qed` and HIDES COMPILE ERRORS** —
+- **`set_solver` IS FIXED — the tree overrides it, and the old prohibition no
+  longer applies.** `iris/FastSetSolver.v` replaces stdpp's `set_solver` tree-wide
+  (hooked in from `RiscvModelBytes.v`, a transitive dependency of 1071 of the
+  1090 files; `BitmapEnc.v` and `CrashProto.v` import it directly). Read that
+  file's header for the measurements. The short version:
+  - stdpp's `set_solver` spends **~97 % of its time in three whole-context
+    sweeps that have nothing to do with sets** — `setoid_subst`, `set_unfold`'s
+    `csimpl in *`, and `naive_solver`'s `unfold … in *` / `simplify_eq/=`. The
+    step that actually reasons about sets is 0.5 s of a 19.9 s call.
+  - The override clears the hypotheses that cannot reach the goal (the
+    connected component of the goal in the "hypothesis mentions variable"
+    graph, plus every hypothesis mentioning a set operation) and then runs
+    stdpp's own pipeline on what is left. Cost becomes **linear** in the
+    context instead of quadratic-to-cubic: the 80-hypothesis benchmark goes
+    19.9 s → 0.10 s, and 640 hypotheses still cost 0.10 s where upstream needs
+    105 s at 160.
+  - **Solving power is unchanged, and this was checked properly.** The whole
+    stdpp 1.12.0 library was recompiled against the override with the fallback
+    DELETED (`set_solver := set_solver_fast`): all 55 files build clean and all
+    23 of stdpp's own test files produce output byte-identical to baseline, so
+    the filtered path alone discharges all **373** `set_solver` call sites in
+    stdpp. `iris/FastSetSolverTests.v` does the same for the 62 shapes this
+    tree discharges or works around. In normal use `set_solver` additionally
+    falls back to the unfiltered upstream tactic, so nothing that was provable
+    stops being provable; `set_solver_fast` / `set_solver_slow` name the halves.
+  - **If you change the filter, re-run it with the fallback deleted.** A green
+    tree proves nothing on its own — with the fallback in place `set_solver`
+    cannot fail, it can only get slow. Three of the four bugs found during
+    development (a missing `Control.enter`, a dropped `False` hypothesis, and
+    `@eq` missing from the walked connectives, which made every *set equation*
+    invisible to the filter) were exactly the kind the fallback hides.
+  - So **`set_solver` at capstone altitude is now fine**, and the hand-written
+    blocks that exist only to dodge it (`bmset_*` in `ProofBmap.v`, `wiset_*`
+    in `ProofWritei.v`, `cr_*` in `ProofCreate.v`, `gset_disj_*` in
+    `VirtioQueue.v`, `ip_*`/`ig_*`/`it_*`/`nx_*`/`bm_used_*`, …) are
+    retirable — they are correct, just no longer necessary. Retire them
+    opportunistically when you are in the file anyway, not as a sweep.
+  - **Measured on a REAL site, not a synthetic:** `ProofSysDup.v:836`'s
+    workaround (`ltac:(apply not_elem_of_empty)`, written because `set_solver`
+    there cost 106 s) put back to `ltac:(set_solver)` now costs **0.73 s**
+    (0.49 s filtering + 0.23 s solving) against **105.2 s** for the same
+    sentence with upstream — **144×**. That one site took two further fixes,
+    both worth knowing:
+    - **A goal reached through `ltac:(…)` inside a term is an EVAR**, and an
+      evar carries an instance listing every variable in scope. Walking into it
+      made the goal "mention" the whole context, so the filter kept everything.
+      `vars_of` now skips evar instances.
+    - **`Std.clear` is ALL-OR-NOTHING.** One name Coq refuses — something
+      outside the analysis still depends on it — fails the whole call, and then
+      NOTHING is cleared and the filter silently degrades to upstream with no
+      error anywhere. This is what kept that site at 105 s even once the
+      analysis was running correctly (0.05 s to decide, then a 105 s solve over
+      the context it had failed to clear). `clear_greedily` now bisects on
+      failure and keeps the halves that go.
+    - The general lesson: **a filter that fails open is invisible.** Both bugs
+      presented as "the tactic is just as slow as before", never as an error.
+      If the override ever looks like it is doing nothing, check that
+      `set_shrink` is in scope and that it is actually clearing, before
+      believing anything about the goal.
+  - **Two things the override does NOT fix**, both goal-side rather than
+    context-side, so the old workarounds stand: `gset (mword n)` still fails
+    (instance divergence — see the durable notes), and `set_unfold` still
+    unfolds a `list_to_set` over a literal-size list, so `gset Arch.pa` goals
+    at concrete sizes still must not go near it.
+  - Still true regardless: do not create the goal if you can avoid it.
+    `dom_insert_lookup_L` (`is_Some (m !! i) → dom (<[i:=x]> m) = dom m`) closes
+    a "the slot was already live" domain identity with no set reasoning at all.
+  - **A slow tactic looks like a hanging `Qed` and HIDES COMPILE ERRORS** —
     the log stays 0 bytes while the main process burns tactic time, and a real
     type error further down sits in unflushed stderr behind it.
+- **`naive_solver` on its own is still forbidden inside a whole-function
+  proof** — it is the half of the old `set_solver` that the override does not
+  reach when you call it directly. It ends in a search over *every* hypothesis
+  in scope, and a capstone's context is ~200 register-chain facts over large
+  mword terms.
 - **Never `simplify_eq` inside a whole-function proof's Iris context** — like
   `congruence`, it scans every hypothesis in scope looking for equalities to
   substitute/discriminate, so cost tracks context size, not the one hypothesis

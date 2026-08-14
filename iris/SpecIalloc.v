@@ -167,7 +167,9 @@ Lemma ialloc_fresh_shape (ty : mword 16) :
   bv_unsigned ty <> 0 -> fresh_shape (ialloc_fresh ty).
 Proof.
   intros Hty. rewrite /fresh_shape /ialloc_fresh /=.
-  split_and!; [exact Hty | reflexivity | reflexivity].
+  (* the fourth conjunct is [memset(dip,0,64)]'s own zero: [ialloc_fresh]
+     builds the record with [bv_0 16] at [nlink] (design §20.18 ruling 1) *)
+  split_and!; [exact Hty | reflexivity | reflexivity | reflexivity].
 Qed.
 
 Lemma ialloc_fresh_wf (ty : mword 16) : dinode_wf (ialloc_fresh ty).

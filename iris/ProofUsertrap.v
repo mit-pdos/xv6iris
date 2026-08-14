@@ -143,13 +143,19 @@ Section UtEntry.
      header. *)
   Lemma ut_entry (N : ut_names) (V : pprivate) (ksp : mword 64)
       (m : regfile) (av : nat) (C : iProp Σ)
-      (ms_v sc_v stval_v sepc_v : mword 64) :
+      (ms_v sc_v stval_v sepc_v : mword 64)
+      (mie_v mdv0 menvcfg0 : mword 64) :
     usertrap_entry_ms ms_v ->
     (K_usertrap <= av)%nat ->
     m !!! Regidx csp_rs1 = ksp ->
     m !!! Regidx Rtp = cid_word ->
+    mie_v = MIE_S ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int UT) -∗
+    hw_config -∗
+    minstret_inv -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms_v -∗
@@ -157,6 +163,9 @@ Section UtEntry.
     stval ↦ᵣ stval_v -∗
     sepc ↦ᵣ sepc_v -∗
     stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
+    mie ↦ᵣ mie_v -∗
+    mideleg ↦ᵣ mdv0 -∗
+    menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
     (* the trap enters from USERSPACE, which holds no kernel lock, so the
        held set here is the literal [∅] -- the same one the continuation
@@ -179,15 +188,17 @@ Section UtEntry.
        WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hentry Hav Hsp Htp.
+    intros Hentry Hav Hsp Htp Hmiev Hmask Hmenvv.
     destruct Hentry as (Htms & Hmsf & Hspie).
     destruct Htms as (Hsxl & Hmprv & Hmxr & Hspp & Hsie & Htvm & Htsr).
     pose proof (ut_nx_bound false av (av - 4)%nat Hav (trap_res_off (av - 4)%nat))
       as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
-    iIntros "#Htext Hpc Hhs Hpriv Hms Hsc Hst Hep Hstv Hgpr Htrap Henv Hcont".
-    iDestruct (ut_trap_open (un_pj N) ksp av C m ms_v ∅ Hmsf Hsie Hspp Hspie Hsp Htp
-                 with "Hhs Hpriv Hms Hgpr Htrap")
+    iIntros "#Htext Hpc #Hhw #Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
+             Hmie Hmdl Hmenv Hgpr Htrap Henv Hcont".
+    iDestruct (ut_trap_open (un_pj N) ksp av C m ms_v mie_v mdv0 menvcfg0 ∅
+                 Hmsf Hsie Hspp Hspie Hsp Htp Hmiev Hmask Hmenvv
+                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Htrap")
       as "(Hcg & Hcpu & Hclm & Hq & Hkpt & Hsret)".
     iPoseProof (uti_000 with "Htext") as "Hi00".
     iPoseProof (uti_002 with "Htext") as "Hi02".
@@ -391,16 +402,16 @@ Section UtEntry.
     iEval (rewrite Hp1a) in "Hpc".
     (* ---- +0x1a: addi a5,a5,3722 -- the pair sums to kernelvec ---- *)
     iApply (wp_addi4_s_sconf (mword_of_int (UT + 0x1a)) Ra5 Ra5
-              (mword_of_int 3908 : mword 12) M5 (av - 4)%nat false
+              (mword_of_int 3956 : mword 12) M5 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M6 := <[Regidx Ra5 := regval_into_reg
                    (add_vec (rget M5 Ra5)
-                      (sign_extend' 64 (mword_of_int 3908 : mword 12)))]> M5).
+                      (sign_extend' 64 (mword_of_int 3956 : mword 12)))]> M5).
     change (<[Regidx Ra5 := regval_into_reg
                (add_vec (rget M5 Ra5)
-                  (sign_extend' 64 (mword_of_int 3908 : mword 12)))]> M5) with M6.
+                  (sign_extend' 64 (mword_of_int 3956 : mword 12)))]> M5) with M6.
     assert (HM6sp : M6 !!! Regidx csp_rs1 = pa_stk ksp 4)
       by (rewrite /M6 upd_ne; [exact HM5sp | reg_neq]).
     assert (HM6a5 : rget M6 Ra5
@@ -670,7 +681,8 @@ Section UtDispatch.
 
   Lemma ut_dispatch (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
-      (ep sc st : mword 64) :
+      (ep sc st : mword 64)
+      (mie_v menvcfg0 : mword 64) :
     printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -682,6 +694,8 @@ Section UtDispatch.
     m !!! Regidx Rs1 = un_pj N ->
     m !!! Regidx Ra0 = un_pj N ->
     ut_cs m0 m ->
+    mie_v = MIE_S ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x30)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
@@ -692,10 +706,11 @@ Section UtDispatch.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0) -∗
+      (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') SY.syscall_env) pt ksp m0
+                     mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs.
+    intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -779,8 +794,10 @@ Section UtDispatch.
       { iApply (ud_hold N V C ep sc st with
                   "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
         rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-      iApply (S.ut_90 N V pt ksp m0 D2 av nx C ∅
+      iApply (S.ut_90 N V pt ksp m0 D2 av nx C
+                mie_v menvcfg0 ∅
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HD2sp HD2s1 HD2a0 HcsD2
+                Hmiev Hmenvv
                 with "Htext Hpc Hcg Hhold Hframe Hcont").
     - (* not a syscall: the device demultiplexer *)
       iPoseProof (uti_03a with "Htext") as "Hi3a".
@@ -876,8 +893,10 @@ Section UtDispatch.
         { iApply (ud_hold N V C ep sc st with
                     "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-        iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx C ∅
+        iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx C
+                  mie_v menvcfg0 ∅
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
+                  Hmiev Hmenvv
                   with "Htext Hpc Hcg Hhold Hframe Hcont").
       + (* no device: the two page-fault causes, then the fall-through *)
         iPoseProof (uti_042 with "Htext") as "Hi42".
@@ -949,8 +968,10 @@ Section UtDispatch.
           { iApply (ud_hold N V C ep sc st with
                       "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-          iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx C ∅
+          iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx C
+                    mie_v menvcfg0 ∅
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
+                    Hmiev Hmenvv
                     with "Htext Hpc Hcg Hhold Hframe Hcont").
         * iPoseProof (uti_04c with "Htext") as "Hi4c".
           iPoseProof (uti_050 with "Htext") as "Hi50".
@@ -1023,8 +1044,10 @@ Section UtDispatch.
              { iApply (ud_hold N V C ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-             iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx C ∅
+             iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx C
+                       mie_v menvcfg0 ∅
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
+                       Hmiev Hmenvv
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
           -- (* the unexpected-scause arm *)
              iApply (wp_beq_fall_s_sconf (mword_of_int (UT + 0x52))
@@ -1041,8 +1064,10 @@ Section UtDispatch.
              { iApply (ud_hold N V C ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-             iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx C ∅
+             iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx C
+                       mie_v menvcfg0 ∅
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
+                       Hmiev Hmenvv
                        with "Htext Hpc Hcg Hhold Hframe Hcont").
   Qed.
 
@@ -1070,6 +1095,16 @@ Definition usertrap_res
     `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
   ut_res SY.syscall_env.
 
+Lemma usertrap_res_tf_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res pt ksp -∗
+  ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+Proof. exact (ut_res_tf_open SY.syscall_env pt ksp). Qed.
+
 Section UtSeal.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -1087,13 +1122,15 @@ Section UtSeal.
   Qed.
 
   Lemma wp_usertrap (pt : uptd) (j : nat) (m : regfile)
-      (ms_v sc_v stval_v sepc_v ksp : mword 64) :
+      (ms_v sc_v stval_v sepc_v ksp : mword 64)
+      (mie_v mdv0 menvcfg0 : mword 64) :
     wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-      pt j m ms_v sc_v stval_v sepc_v ksp.
+      pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0.
   Proof.
     cbv beta delta [wp_usertrap_body].
-    intros pcE pj Hms Hj Hsp Htp.
-    iIntros "#Htext Hpc Hhs Hpriv Hms Hsc Hst Hep Hstv Hgpr HR Hcont".
+    intros pcE pj Hms Hj Hsp Htp Hmiev Hmask Hmenvv.
+    iIntros "#Htext Hpc #Hhw #Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
+             Hmie Hmdl Hmenv Hgpr HR Hcont".
     (* SCOPED: a bare [rewrite] would unfold [ut_res] inside the crossing's
        [usertrap_post] too, and the blocks state it folded. *)
     iEval (rewrite /usertrap_res /ut_res) in "HR".
@@ -1102,13 +1139,17 @@ Section UtSeal.
       by exact (proc_addr_nonzero j Hj).
     iDestruct (wp_next_true_swap pj (un_pj N) _ Hpjnz with "Hcont") as "Hcont".
     iApply (ut_entry SY.syscall_env N V ksp m av C ms_v sc_v stval_v sepc_v
-              Hms Hav Hsp Htp
-              with "Htext Hpc Hhs Hpriv Hms Hsc Hst Hep Hstv Hgpr Htrap Henv [Hcont]").
+              mie_v mdv0 menvcfg0
+              Hms Hav Hsp Htp Hmiev Hmask Hmenvv
+              with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
+                    Hmie Hmdl Hmenv Hgpr Htrap Henv [Hcont]").
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N V' pt ksp m M av (av - 4)%nat C sepc_v sc_v stval_v
+              mie_v menvcfg0
               (ut_printk (un_pr N) (un_u N) (un_v N)) Hwf Hav
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM
+              Hmiev Hmenvv
               with "Htext Hpc Hcg Hcpu Hclm Hraw Henv Hfr Hcont").
   Qed.
 

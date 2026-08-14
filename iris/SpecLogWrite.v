@@ -253,10 +253,32 @@ Definition wp_log_write_au_body
   log_credit γ cr Sb e0 (uint bno) -∗
   log_opSe γ (S u) Sb e0 -∗
   (* THE CALLER'S VIEW OF THE BLOCK, AS AN ATOMIC UPDATE -- see the header
-     note above.  Fired exactly once, at the ghost step. *)
-  (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
-     fsblock γfs (uint bno) bsl' ∗
-     (⌜bsl' = bsl⌝ -∗ fsblock γfs (uint bno) bs ={Efs, ⊤}=∗ Φfsb)) -∗
+     note above.  Fired exactly once, at the ghost step.
+
+     IT CARRIES ITS OWN ANCHOR, AND TAKES THE COMPARISON BACK (fs-log.md
+     §G.17, blocker 4; fs-icache.md §20.18's C4).  The fupd surrenders a
+     lower bound [log_epoch_lb γ v] BESIDE the half, and the closing wand
+     is handed [logged_at γ e0 (uint bno)] and [⌜v <= e0⌝] as inputs.  Two
+     things force that shape rather than the outer [vlb] premise's:
+
+     - the anchor of the ONE writer that owes a receipt
+       ([InodeRegion.ireg_write_unlink]) is the per-inum observation
+       counter, which is INSIDE the invariant the fupd opens -- so its
+       value is not nameable at the call site, only under this fupd;
+     - the comparison [v <= e0] is unprovable anywhere but the ghost step,
+       where the [ln_ep] auth is open (§G.14: two lower bounds on one
+       counter are incomparable), and it is free THERE.
+
+     A caller with no receipt to build takes [v := 0] and drops both wand
+     inputs -- that is [lw_au_lb0] below, one line, so every landed AU
+     supplier is unchanged.  The outer [log_epoch_lb γ vlb] premise and the
+     [log_opSwe] post are untouched: they are the DEPOSITOR's tier (a
+     receipt ordered against an anchor the caller can name), and this is
+     the WRITER's. *)
+  (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
+     fsblock γfs (uint bno) bsl' ∗ log_epoch_lb γ v ∗
+     (⌜bsl' = bsl⌝ -∗ logged_at γ e0 (uint bno) -∗ ⌜(v <= e0)%nat⌝ -∗
+      fsblock γfs (uint bno) bs ={Efs, ⊤}=∗ Φfsb)) -∗
   (* the checked-out buffer, payload still indexed at the old content *)
   bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -289,6 +311,33 @@ Definition wp_log_write_au_body
     bslot bn -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
+
+(* THE DEGENERATE ANCHOR, AS AN ADAPTER (fs-log.md §G.17, blocker 4).
+   Every AU supplier that owes NO receipt -- ialloc's [ireg_claim_au],
+   iupdate's two ordinary region steps, and the held-fsblock form below --
+   states its fupd without an anchor and without the two extra wand inputs.
+   This is the whole conversion: park the bound at ZERO, where
+   [LogInv.log_epoch_lb_0] mints it for free, and drop both inputs on the
+   way back in.  One line at each site, so the atomic-update premise can
+   carry the writer's anchor without any of them moving. *)
+Lemma lw_au_lb0 `{!riscvGS Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+    (γ : log_names) (γfs : fs_names) (bno : Z) (Efs : coPset)
+    (bs bsl : list (bv 8)) (Φfsb : iProp Σ) (e0 : nat) :
+  (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
+     fsblock γfs bno bsl' ∗
+     (⌜bsl' = bsl⌝ -∗ fsblock γfs bno bs ={Efs, ⊤}=∗ Φfsb))
+  -∗
+  (|={⊤, Efs}=> ∃ (bsl' : list (bv 8)) (v : nat),
+     fsblock γfs bno bsl' ∗ log_epoch_lb γ v ∗
+     (⌜bsl' = bsl⌝ -∗ logged_at γ e0 bno -∗ ⌜(v <= e0)%nat⌝ -∗
+      fsblock γfs bno bs ={Efs, ⊤}=∗ Φfsb)).
+Proof.
+  iIntros "Hau".
+  iMod (log_epoch_lb_0 γ) as "#Hlb0".
+  iMod "Hau" as (bsl') "[Hfsb Hcl]".
+  iModIntro. iExists bsl', 0%nat. iFrame "Hfsb Hlb0".
+  iIntros "%Hbs _ _ Hfsb". iApply ("Hcl" with "[//] Hfsb").
+Qed.
 
 (* THE EPOCH-EXPOSED GENERAL FORM (fs-log.md §G.20, the epoch tier).
    [wp_log_write_gen] with the birth epoch left OPEN on both sides: the

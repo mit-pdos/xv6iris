@@ -8,6 +8,10 @@
 # the resulting "notation was already used" warning project-wide.
 -arg -w
 -arg -notation-overridden
+SetShrink.v
+FastSetSolver.v
+FastSetSolverTests.v
+BvShift.v
 ArchReset.v
 RiscvModelBytes.v
 VirtioModel.v
@@ -1082,12 +1086,17 @@ ProofKexecSeam.v
 ProofKexecA.v
 ProofKexecB.v
 ProofKexecB2.v
+ProofKexecB3.v
+ProofKexecC.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
 SpecCreate.v
+SpecCreateFreshTy.v
 CreateBudget.v
 ProofCreateParts.v
+ProofCreate.v
+LinkCreateFreshTy.v
 ProofSysFstat.v
 ProofSysRead.v
 LinkSysRead.v

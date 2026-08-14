@@ -19,6 +19,7 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode08.
+Require Import KernelDecode09.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -28,10 +29,9 @@ Require Import KernelDecode16.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
-Require Import KernelDecode23.
-Require Import KernelDecode25.
-Require Import KernelDecode27.
+Require Import KernelDecode22.
 Require Import KernelDecode29.
+Require Import KernelDecode30.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -66,9 +66,9 @@ Section CodeAllocpid.
   Proof. mk_base (KernelSyms.allocpid + 0xa) (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.allocpid + 0xa) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00011517. Qed.
 
-  Lemma apdi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0xe) : mword 64) false (ITYPE (mword_of_int 2540 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.allocpid + 0xe) (mword_of_int 0x9ec50513 : mword 32)
-    (mword_of_int (KernelSyms.allocpid + 0xe) : mword 64) (ITYPE (mword_of_int 2540 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9ec50513. Qed.
+  Lemma apdi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0xe) : mword 64) false (ITYPE (mword_of_int 2556 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.allocpid + 0xe) (mword_of_int 0x9fc50513 : mword 32)
+    (mword_of_int (KernelSyms.allocpid + 0xe) : mword 64) (ITYPE (mword_of_int 2556 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9fc50513. Qed.
 
   Lemma apdi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x12) : mword 64) false (JAL (mword_of_int 2093558 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.allocpid + 0x12) (mword_of_int 0x9f6ff0ef : mword 32)
@@ -78,9 +78,9 @@ Section CodeAllocpid.
   Proof. mk_base (KernelSyms.allocpid + 0x16) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.allocpid + 0x16) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma apdi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x1a) : mword 64) false (ITYPE (mword_of_int 2204 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (KernelSyms.allocpid + 0x1a) (mword_of_int 0x89c78793 : mword 32)
-    (mword_of_int (KernelSyms.allocpid + 0x1a) : mword 64) (ITYPE (mword_of_int 2204 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_89c78793. Qed.
+  Lemma apdi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x1a) : mword 64) false (ITYPE (mword_of_int 2220 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.allocpid + 0x1a) (mword_of_int 0x8ac78793 : mword 32)
+    (mword_of_int (KernelSyms.allocpid + 0x1a) : mword 64) (ITYPE (mword_of_int 2220 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_8ac78793. Qed.
 
   Lemma apdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x1e) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 9), false, 4)).
   Proof. mk_rvc (KernelSyms.allocpid + 0x1e) (mword_of_int 0x4384 : mword 16)
@@ -98,9 +98,9 @@ Section CodeAllocpid.
   Proof. mk_base (KernelSyms.allocpid + 0x26) (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.allocpid + 0x26) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00011517. Qed.
 
-  Lemma apdi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x2a) : mword 64) false (ITYPE (mword_of_int 2512 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.allocpid + 0x2a) (mword_of_int 0x9d050513 : mword 32)
-    (mword_of_int (KernelSyms.allocpid + 0x2a) : mword 64) (ITYPE (mword_of_int 2512 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9d050513. Qed.
+  Lemma apdi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x2a) : mword 64) false (ITYPE (mword_of_int 2528 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.allocpid + 0x2a) (mword_of_int 0x9e050513 : mword 32)
+    (mword_of_int (KernelSyms.allocpid + 0x2a) : mword 64) (ITYPE (mword_of_int 2528 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_9e050513. Qed.
 
   Lemma apdi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.allocpid + 0x2e) : mword 64) false (JAL (mword_of_int 2093666 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.allocpid + 0x2e) (mword_of_int 0xa62ff0ef : mword 32)

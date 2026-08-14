@@ -83,9 +83,9 @@ Section CodeIinit.
   Proof. mk_base (KernelSyms.iinit + 0x16) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.iinit + 0x16) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma iii_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x1a) : mword 64) false (ITYPE (mword_of_int 2188 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.iinit + 0x1a) (mword_of_int 0x88c50513 : mword 32)
-    (mword_of_int (KernelSyms.iinit + 0x1a) : mword 64) (ITYPE (mword_of_int 2188 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_88c50513. Qed.
+  Lemma iii_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x1a) : mword 64) false (ITYPE (mword_of_int 2204 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.iinit + 0x1a) (mword_of_int 0x89c50513 : mword 32)
+    (mword_of_int (KernelSyms.iinit + 0x1a) : mword 64) (ITYPE (mword_of_int 2204 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_89c50513. Qed.
 
   Lemma iii_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x1e) : mword 64) false (JAL (mword_of_int 2087662 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.iinit + 0x1e) (mword_of_int 0xaeffd0ef : mword 32)
@@ -95,17 +95,17 @@ Section CodeIinit.
   Proof. mk_base (KernelSyms.iinit + 0x22) (mword_of_int 0x0001e497 : mword 32)
     (mword_of_int (KernelSyms.iinit + 0x22) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_0001e497. Qed.
 
-  Lemma iii_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x26) : mword 64) false (ITYPE (mword_of_int 2216 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.iinit + 0x26) (mword_of_int 0x8a848493 : mword 32)
-    (mword_of_int (KernelSyms.iinit + 0x26) : mword 64) (ITYPE (mword_of_int 2216 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_8a848493. Qed.
+  Lemma iii_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x26) : mword 64) false (ITYPE (mword_of_int 2232 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.iinit + 0x26) (mword_of_int 0x8b848493 : mword 32)
+    (mword_of_int (KernelSyms.iinit + 0x26) : mword 64) (ITYPE (mword_of_int 2232 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_8b848493. Qed.
 
   Lemma iii_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x2a) : mword 64) false (UTYPE (mword_of_int 31 : mword 20, Regidx (mword_of_int 19), AUIPC)).
   Proof. mk_base (KernelSyms.iinit + 0x2a) (mword_of_int 0x0001f997 : mword 32)
     (mword_of_int (KernelSyms.iinit + 0x2a) : mword 64) (UTYPE (mword_of_int 31 : mword 20, Regidx (mword_of_int 19), AUIPC)) kd_0001f997. Qed.
 
-  Lemma iii_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x2e) : mword 64) false (ITYPE (mword_of_int 816 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
-  Proof. mk_base (KernelSyms.iinit + 0x2e) (mword_of_int 0x33098993 : mword 32)
-    (mword_of_int (KernelSyms.iinit + 0x2e) : mword 64) (ITYPE (mword_of_int 816 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_33098993. Qed.
+  Lemma iii_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x2e) : mword 64) false (ITYPE (mword_of_int 832 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)).
+  Proof. mk_base (KernelSyms.iinit + 0x2e) (mword_of_int 0x34098993 : mword 32)
+    (mword_of_int (KernelSyms.iinit + 0x2e) : mword 64) (ITYPE (mword_of_int 832 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 19), ADDI)) kd_34098993. Qed.
 
   Lemma iii_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x32) : mword 64) false (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 18), AUIPC)).
   Proof. mk_base (KernelSyms.iinit + 0x32) (mword_of_int 0x00004917 : mword 32)

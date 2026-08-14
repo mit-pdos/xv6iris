@@ -2,9 +2,39 @@
 
 A register of bugs in the kernel *being verified*, as opposed to gaps in the
 proofs: an entry here means **the C code is wrong** and the stuck proof is the
-symptom. **The register is currently empty** — every defect this effort found
+symptom.  The register holds **no open entry**: every defect this effort found
 has been fixed upstream, and a fix's consequences for a contract are recorded
 with that contract, not here.
+
+## FIXED UPSTREAM (`117c0e7`) — an unchecked `nlink++` could wrap a link
+## count to zero, in `create`'s mkdir arm and in `sys_link`
+
+`nlink` is a `short` on disk, so at its maximum the `sh` stored 0 and the
+record became indistinguishable from a FREE inode while live directory
+entries still named it -- silent on-disk corruption, no panic, no error
+return.  The proof side found it because the link ledger (InodeRegion (L1)
+`w <= nlink`, (L3) `type = 0 -> nlink = 0`) makes the wrapping store
+*unprovable* rather than merely unsupported: `SpecIupdate.wp_iupdate_link`
+wants `bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1`, which at
+the wrap reads `0 = 65536`.  The ledger refusing a corrupting store is the
+ledger working.
+
+The fix is `NLINK_MAX 32767` in `fs.h` and one test at each of the two
+raising sites, each branching to the `fail:`/`return 0` path that already
+unwinds exactly that state.  **Three things it settles for the proofs**, and
+they are why the whole route was worth taking rather than carrying a gate:
+
+* the bound is now a FACT OF THE CODE, so no premise has to thread it and no
+  region invariant has to carry it -- which is what the "no name for dp"
+  objection made impossible (`projects/fs-sysfile.md`, D₀-b's stop).  The
+  planned L4 carrier (directory `nlink <= 1 + allocated count`) is retired.
+* **the guard is still a real two-way branch**: it refuses at 32767 and does
+  not rule the value out, so create's walk pays a case split (and its taken
+  arm) whether or not any invariant is ever added.
+* attainability was, and stays, a separate question: 32767 links to one
+  directory needs 32765 subdirectories, one inode each, so ialloc's A-FAIL
+  fires first on the shipped geometry.  Unreachable makes a defect safe, not
+  correct -- and `sys_link` on a regular file has no such argument at all.
 
 ## REFUTED CANDIDATE (2026-08-13) — create + concurrent unlink cannot bust
 ## the log: CROSS-TRANSACTION ABSORPTION covers namex's freeing iput

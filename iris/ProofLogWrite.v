@@ -550,14 +550,14 @@ Section LogWriteBlocks.
                     = mword_of_int (KernelSyms.log_write + 0xb2))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb2) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0xb2)) Ra0 Ra0 (mword_of_int 1284 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0xb2)) Ra0 Ra0 (mword_of_int 1300 : mword 12)
               E1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib2").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (E2 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (E1 !!! Regidx Ra0 : mword 64)
-                     (sign_extend' 64 (mword_of_int 1284 : mword 12)))]> E1).
+                     (sign_extend' 64 (mword_of_int 1300 : mword 12)))]> E1).
     assert (HE2a0 : E2 !!! Regidx Ra0 = log_addr).
     { rewrite /E2 upd_eq /E1 upd_eq. rewrite /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -869,14 +869,14 @@ Section LogWriteBlocks.
                     = mword_of_int (KernelSyms.log_write + 0x70))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp70) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x70)) Ra4 Ra4 (mword_of_int 1350 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x70)) Ra4 Ra4 (mword_of_int 1366 : mword 12)
               A3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi70").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (A4 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (A3 !!! Regidx Ra4 : mword 64)
-                     (sign_extend' 64 (mword_of_int 1350 : mword 12)))]> A3).
+                     (sign_extend' 64 (mword_of_int 1366 : mword 12)))]> A3).
     assert (HA4a4 : A4 !!! Regidx Ra4 = (mword_of_int KernelSyms.log : mword 64)).
     { rewrite /A4 upd_eq /A3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpp74 : add_vec_int (mword_of_int (KernelSyms.log_write + 0x70) : mword 64) 4
@@ -1090,14 +1090,14 @@ Section LogWriteBlocks.
                     = mword_of_int (KernelSyms.log_write + 0xa0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa0) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0xa0)) Ra4 Ra4 (mword_of_int 1302 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0xa0)) Ra4 Ra4 (mword_of_int 1318 : mword 12)
               B3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hia0").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (B4 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (B3 !!! Regidx Ra4 : mword 64)
-                     (sign_extend' 64 (mword_of_int 1302 : mword 12)))]> B3).
+                     (sign_extend' 64 (mword_of_int 1318 : mword 12)))]> B3).
     assert (HB4a4 : B4 !!! Regidx Ra4 = (mword_of_int KernelSyms.log : mword 64)).
     { rewrite /B4 upd_eq /B3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HB4a3 : B4 !!! Regidx Ra3
@@ -1359,14 +1359,14 @@ Section LogWriteBlocks.
                     = mword_of_int (KernelSyms.log_write + 0x5c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp5c) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x5c)) Ra5 Ra5 (mword_of_int 1370 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x5c)) Ra5 Ra5 (mword_of_int 1386 : mword 12)
               G3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5c").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     set (G4 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (G3 !!! Regidx Ra5 : mword 64)
-                     (sign_extend' 64 (mword_of_int 1370 : mword 12)))]> G3).
+                     (sign_extend' 64 (mword_of_int 1386 : mword 12)))]> G3).
     assert (HG4a5 : G4 !!! Regidx Ra5 = (mword_of_int KernelSyms.log : mword 64)).
     { rewrite /G4 upd_eq /G3 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (HG4a2 : G4 !!! Regidx Ra2
@@ -1905,13 +1905,13 @@ Section ProofLogWrite.
                     = mword_of_int (KernelSyms.log_write + 0x10))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x10)) Ra0 Ra0 (mword_of_int 1446 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x10)) Ra0 Ra0 (mword_of_int 1462 : mword 12)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (R5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (R4 !!! Regidx Ra0 : mword 64)
-                     (sign_extend' 64 (mword_of_int 1446 : mword 12)))]> R4).
+                     (sign_extend' 64 (mword_of_int 1462 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = log_addr).
     { rewrite /R5 upd_eq /R4 upd_eq /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -2210,7 +2210,17 @@ Section ProofLogWrite.
        content [bsl'] to the [bsl] the handle is indexed at -- the caller
        never has to know it in advance. ---- *)
     iApply fupd_wp.
-    iMod "Hau" as (bsl') "[Hfsb HauClose]".
+    (* THE WRITER'S ANCHOR, CASHED IN THE SAME BREATH (fs-log.md §G.17,
+       blocker 4).  The fupd hands out its own lower bound [v'] -- the one
+       resource the caller could not name outside its own invariant -- and
+       [Hepa], still open here, is what orders it against this batch's
+       epoch.  [Hwit] (minted above, both arms) and this comparison are the
+       two inputs the closing wand takes; together they are exactly
+       [InodeRegion.izrcpt]'s witness disjunct. *)
+    iMod "Hau" as (bsl' v') "(Hfsb & #Hvlb' & HauClose)".
+    (* [e0] is already [Ep] here -- a live entry is born at the current
+       epoch, [subst] above -- so this IS the comparison the wand wants. *)
+    iDestruct (log_epoch_lb_le γ Ep v' with "Hepa Hvlb'") as %Hvle'.
     iMod (fsblock_update γfs L (uint bno) bsl' bs bsl with "HLauth Hfsb HpL")
       as "((%Hbsl1 & %Hllk) & HLauth & Hfsb & HpL)".
     (* [Hbsl1 : bsl = bsl'] -- [fsblock_update]'s output is stated as
@@ -2218,7 +2228,7 @@ Section ProofLogWrite.
        on the LEFT.  Substituting [bsl'] away keeps [Hllk] in its old shape
        ([L !! uint bno = Some bsl]) for everything downstream. *)
     subst bsl'.
-    iMod ("HauClose" with "[//] Hfsb") as "HPhifsb".
+    iMod ("HauClose" with "[//] Hwit [//] Hfsb") as "HPhifsb".
     iModIntro.
     (* ---- THE d-TIE: the handle's dirty half against the batch's ---- *)
     rewrite (big_sepS_delete _ cov (uint bno) Hcovbno).
@@ -2253,13 +2263,13 @@ Section ProofLogWrite.
                     = mword_of_int (KernelSyms.log_write + 0x1c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
-    assert (Hna : add_vec (rget T1 Ra2) (sign_extend' 64 (mword_of_int 1478 : mword 12))
+    assert (Hna : add_vec (rget T1 Ra2) (sign_extend' 64 (mword_of_int 1494 : mword 12))
                   = lh_n_pa).
     { rgne. rewrite /T1 upd_eq /lh_n_pa /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hna) in "Hncell".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.log_write + 0x1c)) Ra2 Ra2
-              (mword_of_int 1478 : mword 12) T1 (trap_res b + (K - 4))%nat
+              (mword_of_int 1494 : mword 12) T1 (trap_res b + (K - 4))%nat
               (mword_of_int (Z.of_nat nl) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c Hncell").
@@ -2316,13 +2326,13 @@ Section ProofLogWrite.
                     = mword_of_int (KernelSyms.log_write + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2a) in "Hpc".
-    assert (Hoa : add_vec (rget T4 Ra5) (sign_extend' 64 (mword_of_int 1448 : mword 12))
+    assert (Hoa : add_vec (rget T4 Ra5) (sign_extend' 64 (mword_of_int 1464 : mword 12))
                   = l_out).
     { rgne. rewrite /T4 upd_eq /l_out /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hoa) in "Houtc".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.log_write + 0x2a)) Ra5 Ra5
-              (mword_of_int 1448 : mword 12) T4 (trap_res b + (K - 4))%nat
+              (mword_of_int 1464 : mword 12) T4 (trap_res b + (K - 4))%nat
               (mword_of_int (Z.of_nat out) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a Houtc").
@@ -2663,13 +2673,13 @@ Section ProofLogWrite.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3e) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.log_write + 0x3e)) Ra4 Ra4
-                (mword_of_int 1448 : mword 12) T8 (trap_res b + (K - 4))%nat false
+                (mword_of_int 1464 : mword 12) T8 (trap_res b + (K - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (T9 := <[Regidx Ra4 := regval_into_reg
                     (add_vec (T8 !!! Regidx Ra4 : mword 64)
-                       (sign_extend' 64 (mword_of_int 1448 : mword 12)))]> T8).
+                       (sign_extend' 64 (mword_of_int 1464 : mword 12)))]> T8).
       assert (HT9a4 : T9 !!! Regidx Ra4 = lh_block 0).
       { rewrite /T9 upd_eq /T8 upd_eq /lh_block /log_pa /log_addr /pa_add /add_vec_int.
         apply bv_eq; vm_compute; reflexivity. }
@@ -2762,8 +2772,11 @@ Section ProofLogWrite.
          iDestruct "HopW" as "(HopS & #Hwit & _)".
          iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hwit Hfsb Hlk Hslot").
          exact Hcs. }
-    iModIntro. iExists bsl. iFrame "Hfsb".
-    iIntros (_) "Hfsb". iModIntro. iExact "Hfsb".
+    (* the degenerate anchor inline: this form HOLDS the half, so it parks
+       the bound at zero (the [Hlb0] it already minted) and drops both of
+       the closing wand's new inputs *)
+    iModIntro. iExists bsl, 0%nat. iFrame "Hfsb Hlb0".
+    iIntros "_ _ _ Hfsb". iModIntro. iExact "Hfsb".
   Qed.
 
   (* THE HELD-fsblock CONTRACT, derived from the epoch-exposed one by

@@ -327,7 +327,7 @@ Section IlockDefs.
        whatever SIE was doing.  Spelled [b] this was sound only because the
        contract had no [b = false] instance. *)
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
-      ∀ (mf : regfile) (dn : dinode) (bm : blkmap),
+      ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C b lks -∗
@@ -345,6 +345,10 @@ Section IlockDefs.
         i_valid ip ↦₄ valid_word true -∗
         ic_loaded gfs gi cov logstart k inum dn bm -∗
         ity_shot g (di_type dn) -∗
+        (* §16.4's CLAIM BOX, exposed: [true] exactly on the fill sub-arm
+           [InodeRegion.ireg_withdraw] serves, where [fresh_shape] is a
+           theorem the arm already had and used to drop. *)
+        ⌜filled = true -> fresh_shape dn⌝ -∗
         WP (Loop : expr riscv_lang))%I.
 
 End IlockDefs.
@@ -361,12 +365,13 @@ Section IlockEpilogue.
       (cn : ic_names) (s : Qp) (g : gname)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
-      (dn : dinode) (bm : blkmap)
+      (dn : dinode) (bm : blkmap) (filled : bool)
       (pidv : mword 32) (dq dqs : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     (K_ilock <= K)%nat ->
     il_sp m M ->
     il_thr5 m M ->
+    (filled = true -> fresh_shape dn) ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -389,7 +394,7 @@ Section IlockEpilogue.
             dev inum pidv dq dqs j m K eb C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr.
+    intros HK Hsp Hthr Hfr.
     pose proof HK as HK'. unfold K_ilock in HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsb
               Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
@@ -590,9 +595,10 @@ Section IlockEpilogue.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     rewrite /il_cont.
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P4 dn bm with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb
-                     Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot").
+    iApply ("Hcont" $! P4 dn bm filled with "[%] Hcg Hcnt Hextc Hextm Hpc Hppid Hsb
+                     Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot [%]").
     { unfold callee_saved. split_and!; assumption. }
+    { exact Hfr. }
   Qed.
 
 End IlockEpilogue.
@@ -835,12 +841,12 @@ Section IlockLoad.
     iEval (rewrite Hpp42) in "Hpc".
     (* ===== +0x42 lw a1,1698(a1) : a1 := sb.inodestart ===== *)
     assert (Hsbadr : add_vec (rget L3 Ra1)
-                       (sign_extend' 64 (mword_of_int 1684 : mword 12))
+                       (sign_extend' 64 (mword_of_int 1700 : mword 12))
                      = sb_inodestart).
     { rgne. rewrite HL3a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ilock + 0x42)) Ra1 Ra1
-              (mword_of_int 1684 : mword 12) L3 (K - 4)%nat
+              (mword_of_int 1700 : mword 12) L3 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 Hsb").
     iIntros (CID5 Hq5) "Hcg Hpc Hsb".
@@ -1009,7 +1015,8 @@ Section IlockLoad.
     iAssert (|={⊤}=>
                ((IBLOCK inum inodestart) ↪[fs_L gfs]{#(1/2)} (diblk_bytes ds)) ∗
                ((dinode_at gi inum dn ∗
-                 (∃ (bm : blkmap) (data : nat -> list (bv 8)),
+                 (∃ (fl : bool) (bm : blkmap) (data : nat -> list (bv 8)),
+                    ⌜fl = true -> fresh_shape dn⌝ ∗
                     ⌜inode_ok cov logstart dn bm data⌝ ∗
                     ⌜dir_ok icfg_nib dn data⌝ ∗
                     dir_links (bv_unsigned inum) dn data ∗
@@ -1028,7 +1035,11 @@ Section IlockLoad.
           by exact (diblk_bytes_inj ds1 ds Hwf1 Hdswf (eq_sym Hbs1)).
         subst ds1. rewrite Hagr in Hagr1. subst dn0.
         iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
-        iExists bm0, data0.
+        (* THE ORDINARY FILL: the pool's allocated bundle, whose record has
+           real size and real blocks -- [fresh_shape] is FALSE here, which
+           is why the indicator is a boolean and not a fact. *)
+        iExists false, bm0, data0.
+        iSplitR; [iPureIntro; discriminate |].
         iSplitR; [iPureIntro; exact Hok0 |].
         iSplitR; [iPureIntro; exact Hdok0 |].
         iSplitL "Hdlk0"; [iExact "Hdlk0" |]. iFrame.
@@ -1041,9 +1052,14 @@ Section IlockLoad.
                   with "Hireg Hmk HL") as "(%Hfresh & Hdn & HL)".
           rewrite Hagr in Hfresh.
           iEval (rewrite Hagr) in "Hdn".
-          destruct Hfresh as (Hfty & Hfsz & Hfad).
+          pose proof Hfresh as Hfr0.
+          destruct Hfresh as (Hfty & Hfsz & Hfad & _).
           iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
-          iExists bm_empty, (fun _ => replicate BSIZE (bv_0 8)).
+          (* §16.4's CLAIM BOX: [ireg_withdraw] just PAID [fresh_shape], and
+             this is where it now leaves the function instead of being spent
+             on [inode_ok]/[dir_ok] and dropped. *)
+          iExists true, bm_empty, (fun _ => replicate BSIZE (bv_0 8)).
+          iSplitR; [iPureIntro; intros _; exact Hfr0 |].
           iSplitR.
           { iPureIntro. rewrite /inode_ok. split_and!.
             - exact (bm_empty_wf cov logstart).
@@ -1832,7 +1848,8 @@ Section IlockLoad.
       iApply ("Hpan" with "Htext Hpc Hcg"). }
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
-    iDestruct "Hal" as (bm data) "(%Hok & %Hdok & Hdlk & Hindres & Hblocks)".
+    iDestruct "Hal" as (fl bm data)
+      "(%Hfr & %Hok & %Hdok & Hdlk & Hindres & Hblocks)".
     destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
@@ -1896,8 +1913,8 @@ Section IlockLoad.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iEval (rewrite -valid_word_true) in "Hvalid".
     iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g cov logstart inodestart
-              k ip dev inum dn bm pidv dq dqs m Z0 K eb C b lks
-              HK HZ0sp HZ0thr
+              k ip dev inum dn bm fl pidv dq dqs m Z0 K eb C b lks
+              HK HZ0sp HZ0thr Hfr
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                     Hdep Hidev Hinumc Hvalid
                     [Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks Hdn Hdlk]
@@ -2293,9 +2310,12 @@ Section ProofIlockMain.
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
+      (* THE CACHED ARM REPORTS [filled = false]: the entry was loaded by
+         some earlier fill and its record is whatever that fill read, so
+         [fresh_shape] is not available and not claimed. *)
       iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g cov logstart
-                inodestart k ip dev inum dnp bmp pidv dq dqs m Q1 K eb C b lks
-                HK HQ1sp HQ1thr
+                inodestart k ip dev inum dnp bmp false pidv dq dqs m Q1 K eb C b lks
+                HK HQ1sp HQ1thr ltac:(discriminate)
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                       Hdep Hidev Hinumc Hvalid Hlk Hshot Hcont").
     - (* ---- UNCACHED: valid = 0, branch to +0x36 ---- *)

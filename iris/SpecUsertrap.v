@@ -97,8 +97,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile HartTp WpNext.
+Require Import MinstretInv.
 Require Import InstrBytes.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
@@ -108,6 +109,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
+Require Import ProcInv.
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
 Require Import BioInv.
@@ -180,10 +182,20 @@ Definition usertrap_entry_ms (ms : mword 64) : Prop :=
    see claude-notes/projects/usertrap.md.  [ksp] appears because [sie_cap] is
    keyed on sp, which is what the [m !!! sp = ksp] premise below licenses. *)
 Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (R : uptd -> mword 64 -> iProp Σ) (pt : uptd) (ksp : mword 64) (m : regfile) : iProp Σ :=
+    (R : uptd -> mword 64 -> iProp Σ) (pt : uptd) (ksp : mword 64) (m : regfile)
+    (mie_v menvcfg0 : mword 64) : iProp Σ :=
   let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   ( ∀ (pt' : uptd) (mf : regfile)
-      (ms' usatp uepc sc' stval' : mword 64),
+      (ms' usatp uepc sc' stval' mdv0 : mword 64),
+    (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
+       entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural
+       constant, so their exit value provably equals the entry one),
+       [mideleg] is a genuine existential inside [IntrDefs.sconf], and
+       nothing tracks "the same witness" across usertrap's internal
+       instruction-step lemmas (which carry [sconf] opaquely, never
+       re-destructuring it) -- so the caller only gets a FRESH value
+       satisfying the same mask, discovered at the exit. *)
+    ⌜and_vec mie_v (not_vec mdv0) = zeros' 64⌝ -∗
     (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE, and the ROOT IS
        NOT.  The first draft promised [ud_root pt' = ud_root pt] as well, on
        the strength of the vmfault arm (which only inserts leaves).  It is
@@ -231,6 +243,12 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
     stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
     pc_is ret_tgt -∗
     gpr_file mf -∗
+    (* the three [sconf] cells usertrap borrowed for its own call and hands
+       back UNCHANGED (usertrap never writes them) -- see [wp_usertrap_body]'s
+       matching entry premise. *)
+    mie ↦ᵣ mie_v -∗
+    mideleg ↦ᵣ mdv0 -∗
+    menvcfg ↦ᵣ menvcfg0 -∗
     R pt' ksp -∗
     WP (Loop : expr riscv_lang)).
 
@@ -250,7 +268,8 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
 Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : CpuId -> uptd -> mword 64 -> iProp Σ)
     (pt : uptd) (j : nat)
-    (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64) :=
+    (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
+    (mie_v mdv0 menvcfg0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.usertrap in
   let pj := proc_addr j in
   (* the trap delivered a legal S-mode configuration -- see above *)
@@ -261,7 +280,19 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      ra = uva 0x9c, i.e. userret -- usertrap RETURNS INTO userret. *)
   m !!! Regidx (mword_of_int 2 : mword 5) = ksp ->
   m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* the three [sconf] pins usertrap needs of the CSRs it borrows -- see the
+     matching conjunct of [mie]/[mideleg]/[menvcfg] below *)
+  mie_v = MIE_S ->
+  and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+  menvcfg0 = MENVCFG_S ->
   kernel_text -∗ pc_is pcE -∗
+  (* [hw_config]/[minstret_inv] are persistent, so borrowing a copy for the
+     duration of the call costs the caller nothing -- unlike [mie]/
+     [mideleg]/[menvcfg] below, which usertrap needs at FULL ownership
+     (it assembles [IntrDefs.sconf], hence [sie_cap_gpr], out of them for its
+     own internal kernel-tier step lemmas) and must therefore borrow and
+     give back explicitly, exactly like every other loose cell here. *)
+  hw_config -∗ minstret_inv -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   cur_privilege ↦ᵣ Supervisor -∗
   mstatus ↦ᵣ ms_v -∗
@@ -273,6 +304,9 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      [intr_res].  The dangling SIE quarter that pairs with it rides inside
      [R] -- see the header. *)
   stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
+  mie ↦ᵣ mie_v -∗
+  mideleg ↦ᵣ mdv0 -∗
+  menvcfg ↦ᵣ menvcfg0 -∗
   gpr_file m -∗
   (* everything kernel-side, abstractly, AT THE ENTRY HART *)
   R CID pt ksp -∗
@@ -280,7 +314,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      may return on a different hart -- and the bundle comes back at THAT
      hart, which is why [R] is a family (see the note above). *)
   wp_next true pj (fun (CID' : CpuId) =>
-    usertrap_post (CID := CID') (R CID') pt ksp m) -∗
+    usertrap_post (CID := CID') (R CID') pt ksp m mie_v menvcfg0) -∗
   WP (Loop : expr riscv_lang).
 
 (* THE MODULE TYPE'S INSTANCE LIST IS THE UNION OF THE FIVE CONES', NOT THE
@@ -311,6 +345,29 @@ Module Type USERTRAP_RES.
              !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId},
       uptd -> mword 64 -> iProp Σ.
+
+  (* THE TRAPFRAME BORROW.  [usertrap_res] owns the trapframe page at the
+     VA tier internally (via [ProcInv.proc_priv]/[tf_page]) -- it is the
+     ONE OWNER, per [UsertrapRes.ut_own]'s own header comment -- but uservec
+     ALSO owns the same page's bytes, at the physical tier, as [tf_pa]
+     cells (SpecUserret.v's vocabulary), for the whole 44-instruction save/
+     restore walk.  Rather than have [usertrap_res] itself borrow-and-return
+     the page (which would ripple [wp_usertrap_body]'s type and, through it,
+     ONLY every internal usertrap block that already threads [usertrap_res]
+     opaquely -- no external file), this accessor lets a HOLDER of
+     [usertrap_res] pull [tf_page] out for a moment and hand back a
+     (possibly different) one to reseal it -- exactly the shape uservec's
+     tail needs: open, convert its own [tf_pa] cells in, close. Concrete
+     proof: [UsertrapRes.usertrap_res_tf_open], via [proc_priv_split] +
+     [ut_own_priv]. *)
+  Parameter usertrap_res_tf_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res pt ksp -∗
+      ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
+        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
 End USERTRAP_RES.
 
 Module Type USERTRAP.
@@ -321,7 +378,8 @@ Module Type USERTRAP.
              !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
-      (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64),
+      (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
+      (mie_v mdv0 menvcfg0 : mword 64),
       wp_usertrap_body (fun h : CpuId => usertrap_res (CID := h))
-        pt j m ms_v sc_v stval_v sepc_v ksp.
+        pt j m ms_v sc_v stval_v sepc_v ksp mie_v mdv0 menvcfg0.
 End USERTRAP.

@@ -394,10 +394,22 @@ Proof. reflexivity. Qed.
 Lemma create_made_wf ty major minor : dinode_wf (create_made ty major minor).
 Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
 
+(* NO STANDALONE [icacheG] / [icfg] IN ANY CONTEXT BELOW, and that is
+   load-bearing rather than tidy.  [FileInvDefs.fileG] CARRIES both as
+   field instances ([file_icacheG], [file_icfg]), so a context binding
+   [!fileG Σ] AND [!icacheG Σ] has two [icacheG]s -- and create is the
+   first function where the two MEET: [ProcInv.cwd_ref] (which create
+   hands to [nameiparent]) resolves its [inode_held] through [fileG],
+   while every [ic_*] here would resolve through the standalone one.  The
+   two propositions then print IDENTICALLY and fail to unify, with
+   durable-notes' *"iSpecialize: cannot instantiate (P -∗ Q) with P"*.
+   Worse, the [Module Type] below would be UNPROVABLE while stating it,
+   because a sealer must supply the statement at INDEPENDENT instances.
+   [SpecKexec] already binds it this way for the same reason; keep it. *)
 Section CreateSpec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
   (* THE LOCKED-INODE PAYOUT.  Exactly [SpecIunlock]'s / [SpecIunlockput]'s
@@ -420,12 +432,41 @@ Section CreateSpec.
        ic_loaded γfs γi cov logstart k inum dn bm ∗
        ity_shot g (di_type dn) ∗
        inode_ref_short k (qi + s)%Qp qi dev inum)%I.
+
+  (* Assembled structurally, not by [iFrame]: at the syscall altitude this
+     is built at (hundreds of accumulated hypotheses), even a NAMED
+     [iFrame "H1 .. H10"] over these ten conjuncts measured 26-28 s per call
+     site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
+     [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
+     "Framing"). *)
+  Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
+      γil γisl :
+    is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) -∗
+    sleeplocked γisl -∗
+    sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
+    ic_deposit cn k (DepShr s dev inum g) -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word true -∗
+    ic_loaded γfs γi cov logstart k inum dn bm -∗
+    ity_shot g (di_type dn) -∗
+    inode_ref_short k (qi + s)%Qp qi dev inum -∗
+    create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
+  Proof.
+    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Href".
+    rewrite /create_locked. iExists γil, γisl.
+    iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
+    iSplitL "Hpid"; [iExact "Hpid" |]. iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
+    iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
+    iSplitL "Hshot"; [iExact "Hshot" | iExact "Href"].
+  Qed.
 End CreateSpec.
 
 Definition wp_create_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -480,6 +521,13 @@ Definition wp_create_sconf_body
   1 < ninodes ->
   ninodes <= 16 * Z.of_nat nib ->
   ninodes < 2 ^ 31 ->
+  (* ...and mkfs's own [ushort] geometry beside them, carried as a premise
+     rather than as a slot widening (D0-a): it is what makes the
+     [lw a2,4(s3)] at +0xb6 agree with dirlink's ZERO-extended halfword
+     argument.  BOTH of create's proof halves consume it ([cr_alloc_half],
+     [cr_fail_half]) and nothing below the seal supplies it, so the seal
+     is where it has to stand. *)
+  16 * Z.of_nat nib <= 2 ^ 16 ->
   bv_unsigned ty <> 0 ->
   (* ---- ialloc's no-inodes arm calls printk, not panic ---- *)
   printk_gen_contract γpr γu γd ->
@@ -603,7 +651,7 @@ Module Type CREATE.
   Parameter wp_create_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

@@ -79,13 +79,28 @@
    APPEND: [dir_first data nrec s = None], and writei ran at
    [off = 16 * dir_slot data nrec] -- the first FREE record, or [nrec]
    itself when every record is live, which is where the scan's own [s1]
-   lands.  writei's OWN -1 arm is DEAD here ([off <= size] because the slot
-   is at most [nrec], and [size + 16 <= MAXFILE*BSIZE] is a premise), so the
-   only failure left is a SHORT WRITE (bmap out of blocks), which is what
-   [a0 = -1 /\ tot < 16] reports.  On [tot = 16] the window holds
-   [dirent_bytes (de_of_name inum s)] -- strncpy NUL-pads, so the stored
-   record IS [DirentEnc.de_of_name] -- and the size is raised by writei's
-   own [wi_dinode].
+   lands.  TWO failures answer [a0 = -1 /\ tot < 16]: a SHORT WRITE (bmap
+   out of blocks), and writei's OWN -1 return.  The second is the FULL
+   DIRECTORY and nothing else -- [off <= size] because the slot is at most
+   [nrec], so writei's first reason ([size < off]) is dead, and its second
+   ([MAXFILE*BSIZE < off + 16]) forces [off = size = MAXFILE*BSIZE], since
+   [off] and [MAXFILE*BSIZE] are both multiples of sixteen and
+   [size <= MAXFILE*BSIZE].  It returns with EVERYTHING unchanged at
+   [tot = 0], which is what this arm's [tot = 0] corner already says, so it
+   needs no arm of its own: [wi_dinode] is the IDENTITY there (the append
+   offset is in range, so the size does not move, and the map is the one
+   [di_addrs] already names).
+
+   (Until D₀-a this contract carried a premise [size + 16 <= MAXFILE*BSIZE]
+   that killed writei's -1 return outright.  It was UNSUPPLIABLE: it is a
+   fact about [dp], the record nameiparent finds at RUN TIME, which no
+   caller's contract has a word for -- and dirlink itself destroys the
+   proposition by growing the directory, so it is not even preservable.  See
+   projects/fs-sysfile.md, the eleventh stop.)
+
+   On [tot = 16] the window holds [dirent_bytes (de_of_name inum s)] --
+   strncpy NUL-pads, so the stored record IS [DirentEnc.de_of_name] -- and
+   the size is raised by writei's own [wi_dinode].
 
    ---- THE RANGE CLAUSE IS EXACT (fs-icache.md §15.1(i), retrofitted) ----
 
@@ -260,6 +275,63 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
 Lemma dl_need_ind (crb ind : bool) : (dl_need crb ind <= dl_need crb true)%nat.
 Proof. destruct crb, ind; vm_compute; lia. Qed.
 
+(* ---- WHAT A *FAILING* APPEND SPENDS, AND WHY IT IS NOT [dl_spend].
+   TWO routes reach [tot = 0].  The cheap one is writei's own -1 return (the
+   FULL DIRECTORY, see the header): it answers before its loop and spends
+   NOTHING.  The other is the bmap-out-of-blocks break -- writei's remaining
+   break, the part-way [either_copyin], cannot happen here ([user = false])
+   and is the one that log_writes before it leaves.  So the loop broke
+   BEFORE its own [log_write] and the only log_writes that ran are bmap's
+   (the bitmap block and the bzero'ed block, on the arm where it allocated
+   one -- an allocated INDIRECT block followed by a failed data block is
+   exactly that arm) and the trailing [iupdate]: [dl_spend] minus its
+   data-block term, i.e. strictly less than the success arm.  That is the
+   larger of the two, so it is the one the constant has to cover.
+
+   THIS CONSTANT IS NOT THAT NUMBER, and the difference is the point.  The
+   credit-aware figure IS available at zero now
+   ([SpecWritei.wi16_spend_any], which is what the walk relays this clause
+   from), but it is a figure and this clause is a CONSTANT -- and four is
+   the honest maximum of that figure ([wi16_spend_le4]), reached by an
+   allocating INDIRECT window at an unpaid bitmap block.  So no constant
+   does better, and the per-call variation is what a caller would have to
+   read instead.  Four buys create's non-directory [fail:] entry (+0xc4)
+   and the first of its mkdir entries; the two INTERIOR mkdir entries run
+   with six in hand and need three, which every DIRECT window (and every
+   window at an already-logged bitmap block) provably gives --
+   [CreateBudget.cr_fail_mkdir_closes] / [_ind] are that arithmetic.
+   THE COLLAPSE HAS SINCE LANDED (D₀-b), so [dl16_post] no longer states
+   this constant at all: its spend clause is the credit-aware figure,
+   UNGUARDED, exactly as [SpecWritei.wi16_post] / [wi16_spend_any] are
+   split.  What survives here is the constant itself, which
+   [CreateBudget]'s [cr_fail_closes_at_zero] / [cr_fail_mkdir_at_zero_
+   busts] are stated at, together with the two bridges a caller that
+   prefers the constant to the figure still reaches it by. *)
+Definition dl0_spend : nat := 4%nat.
+
+(* the provenance, as an equation rather than as a comment: it IS writei's
+   coarse allowance for a window that straddles one block. *)
+Lemma dl0_spend_bmonly : dl0_spend = wi_cost_bmonly 0 16.
+Proof. vm_compute. reflexivity. Qed.
+
+(* ...and it dominates the credit-aware figure at every boolean, which is
+   what lets the walk relay THIS clause off writei's honest one. *)
+Lemma dl0_spend_covers (crb crd cru al ind : bool) :
+  (wi16_spend crb crd cru al ind <= dl0_spend)%nat.
+Proof. unfold dl0_spend. exact (wi16_spend_le4 crb crd cru al ind). Qed.
+
+(* ...in the shape the walk relays it in: writei's honest [tot = 0] bound
+   ([SpecWritei.wi16_spend_any]) landed on this clause's constant. *)
+Lemma dl0_of_spend (ncount n' : nat) (crb crd cru al ind : bool) :
+  ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat ->
+  ((ncount - dl0_spend)%nat <= n')%nat.
+Proof.
+  intro H. pose proof (dl0_spend_covers crb crd cru al ind). lia.
+Qed.
+
+Lemma dl0_spend_lt : (dl0_spend < dirlink_units)%nat.
+Proof. vm_compute. lia. Qed.
+
 (* ===================================================================== *)
 (*  THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW (GR-3 stage 3).         *)
 (*                                                                        *)
@@ -272,11 +344,55 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
 (*  weakening: dirlookup's [readi] prefix and the free-slot scan LOG        *)
 (*  NOTHING, so the set the writei call actually runs at IS [Sb].          *)
 (*                                                                        *)
-(*  GUARDED BY THE SUCCESS-APPEND ARM.  [found = false] is the append and  *)
-(*  [tot = 16] is the branchless [a0 = 0] of the arm's last clause; the    *)
-(*  SHORT-WRITE arm reports -1 and create does not price it.  The FOUND    *)
-(*  arm carries nothing beyond the counted net-zero clause -- it spends    *)
-(*  only iput, which create prices with [CreateBudget.ip_spend].           *)
+(*  GUARDED BY THE APPEND ARM ALONE -- [found = false] -- AND THEN SPLIT   *)
+(*  THE WAY writei SPLITS IT, because create PRICES THE FAILING APPEND     *)
+(*  TOO.  The old guard was [tot = 16], i.e. the success append: on every  *)
+(*  route into create's [fail:] the only surviving budget clause was then  *)
+(*  the counted [ncount - dirlink_units], and seven from the eight-or-nine *)
+(*  create reaches its first dirlink with leaves less than [iput_units]    *)
+(*  for the tail's first [iunlockput] -- create's failure arm was          *)
+(*  UNPAYABLE ([CreateBudget.cr_fail_counted_busts]).  Nothing forced that *)
+(*  guard, and nothing forces a [tot]-split at all:                       *)
+(*                                                                        *)
+(*    THE SPEND    -- UNGUARDED, the credit-aware figure, relayed from     *)
+(*                    [SpecWritei.wi16_spend_any].  One expression bounds  *)
+(*                    every arm: the -1 return spends nothing, the bmap    *)
+(*                    break leaves the data-block term unspent, and the    *)
+(*                    success append spends the figure exactly.  A         *)
+(*                    constant here ([dl0_spend]) would be four, and the   *)
+(*                    two INTERIOR mkdir entries reach their dirlink with  *)
+(*                    six in hand against an [iput_units] of three -- so   *)
+(*                    the per-call VARIATION, not the maximum, is what     *)
+(*                    they need ([CreateBudget.cr_fail_mkdir_closes]).     *)
+(*    THE ATOMICITY -- [tot = 0 \/ tot = 16], relayed VERBATIM from        *)
+(*                    [SpecWritei.wi16_atomic] at this call's single-block *)
+(*                    window ([dl_wi_blocks]).  It is not a convenience:   *)
+(*                    create's [fail:] arm must re-park the PARENT's       *)
+(*                    [DirLinks.dir_links] before it can [iunlockput] the  *)
+(*                    parent, and at [0 < tot < 16] there is no re-park at *)
+(*                    all -- [dir_link_at_dirlink] wants a ticket for the  *)
+(*                    record the partial write left ([2 <= tot], and the   *)
+(*                    only [ilink] in hand is the one the [fail:] flush    *)
+(*                    spends), [dir_links_dirlink_nop] wants [tot = 0],    *)
+(*                    and at [tot = 1] the record goes live at [inum mod   *)
+(*                    256], for which no fragment exists anywhere          *)
+(*                    (DirLinks' S5i note).  That is not a proof gap: a    *)
+(*                    live record naming an inode whose [nlink] the arm    *)
+(*                    then zeroes would BREAK (L1), so the arm is true     *)
+(*                    only where the write was all-or-nothing.  Writei's   *)
+(*                    seven exits are why it always is.                    *)
+(*    [0 < tot]    -- the MEMBERSHIP trio alone, and its guard is not      *)
+(*                    inherited but forced: at [tot = 0] writei never      *)
+(*                    log_wrote the target block, so nothing PUTS it in    *)
+(*                    [Sb'] -- it is in there only if the caller had       *)
+(*                    already logged it, which is [crd] and is the         *)
+(*                    caller's fact, not this contract's.                  *)
+(*                                                                        *)
+(*  This mirrors [SpecWritei.wi16_post] / [wi16_spend_any] exactly, which  *)
+(*  is what makes the relay two [exact]s.                                  *)
+(*                                                                        *)
+(*  The FOUND arm carries nothing beyond the counted net-zero clause -- it *)
+(*  spends only iput, which create prices with [CreateBudget.ip_spend].    *)
 (*                                                                        *)
 (*  [k0] is the append slot, i.e. the body's own [let k0 := dir_slot data  *)
 (*  nrec], taken as a parameter here for the same reason the arms take     *)
@@ -286,7 +402,7 @@ Proof. destruct crb, ind; vm_compute; lia. Qed.
 Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
     (ncount n' k0 tot : nat) (found : bool) (bm bm' : blkmap)
     (Sb Sb' : gset Z) : Prop :=
-  found = false -> tot = 16%nat ->
+  found = false ->
   let off := (16 * k0)%nat in
   let fbn := (off `div` BSIZE)%nat in
   let al := bmap_alloced bm bm' fbn in
@@ -295,9 +411,11 @@ Definition dl16_post (bmapstart : Z) (dinum : mword 32) (inodestart : Z)
   let crd := bool_decide (wi_tgt_blk bm' off ∈ Sb) in
   let cru := bool_decide (IBLOCK dinum inodestart ∈ Sb) in
   ((ncount - wi16_spend crb crd cru al ind)%nat <= n')%nat
-  /\ wi_tgt_blk bm' off ∈ Sb'
-  /\ IBLOCK dinum inodestart ∈ Sb'
-  /\ (al = true -> bmapstart ∈ Sb').
+  /\ (tot = 0%nat \/ tot = 16%nat)
+  /\ ((0 < tot)%nat ->
+        wi_tgt_blk bm' off ∈ Sb'
+        /\ IBLOCK dinum inodestart ∈ Sb'
+        /\ (al = true -> bmapstart ∈ Sb')).
 
 (* iput's two block-membership premises, for EVERY inum the inode region
    covers rather than for the one child dirlookup happens to return.  See
@@ -372,9 +490,9 @@ Definition wp_dirlink_sconf_body
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->
-  (* THE APPEND FITS.  This is what kills writei's own -1 arm: the write is
-     at [16*k0 <= size] and ends at [16*k0 + 16 <= size + 16]. *)
-  bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (* NO "THE APPEND FITS" PREMISE.  It used to sit here, killing writei's
+     own -1 return; it was unsuppliable (see the header) and the return is
+     routed through the [tot = 0] corner of the append arm instead. *)
   (* ---- writei's premises ---- *)
   (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d): writei's
      new premise, travelling.  dirlink's own [Htype] fixes [di_type dn] at
@@ -503,25 +621,27 @@ Definition wp_dirlink_sconf_body
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       log_op γ n' -∗
-      (* ---- THE [inode_ok] CONJUNCT A RE-PARKER NEEDS, AS A PRESERVATION
-         (fs-sysfile S5a finding 2) ----
+      (* ---- THE TWO [inode_ok] CONJUNCTS A RE-PARKER NEEDS, AS
+         PRESERVATIONS (fs-sysfile S5a finding 2; the cap, D₀-a repair 3b) --
          [InodeLock.inode_ok] has seven conjuncts and the arms below
          re-establish five of them ([blkmap_wf], [bm_covers],
          [di_addrs = bm_cells], [blk_holes_zero], and [di_type <> 0] through
-         [dn' = wi_dinode dn ...]).  Of the remaining two the SIZE CAP is
-         RECOVERABLE by the caller -- the append lands at slot
-         [k0 <= dir_nrec size] and writes at most sixteen bytes, so the new
-         size is at most [size + 16], which is this contract's own "the
-         append fits" premise, and [ProofCreateParts.cr_size_cap] is the
-         recovery.  [InodeInv.inode_sized] is NOT: the range clause above is
-         about [file_byte], a per-BYTE view, and pins no block's LENGTH.
+         [dn' = wi_dinode dn ...]).  The other two are writei's own two
+         preservation clauses (SpecWritei.v:661), relayed here VERBATIM,
+         guard included, because NEITHER is recoverable at this seam:
+         [InodeInv.inode_sized] because the range clause below is about
+         [file_byte], a per-BYTE view that pins no block's LENGTH, and the
+         SIZE CAP because the arithmetic that used to recover it
+         ([16*k0 + tot <= size + 16], [ProofCreateParts.cr_size_cap]) needed
+         "the append fits" -- the premise the eleventh stop retired.
 
-         So it is stated here exactly as [SpecWritei] states it (S3i), as a
-         PRESERVATION rather than a fact -- writei has handed it over since
-         S3i and the found arm has [data' = data], so it is free inside
-         [ProofDirlink].  It is a postcondition STRENGTHENING, so no existing
-         caller moves; without it create cannot re-park either inode after
-         any dirlink, which is every arm from +0xb4 on. *)
+         Relayed, the cap costs a caller nothing: the antecedent is about
+         its OWN entry record, and it is a conjunct of the [inode_ok] the
+         caller is about to rebuild.  Both are free inside [ProofDirlink]:
+         writei hands them over, and the found arm has [dn' = dn],
+         [data' = data]. *)
+      ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+       bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
       ⌜inode_sized data -> inode_sized data'⌝ -∗
       (* ---- THE TWO ARMS ---- *)
       ⌜if found
@@ -541,7 +661,19 @@ Definition wp_dirlink_sconf_body
           /\ bv_unsigned (di_size dn') < 2 ^ 31
           /\ bm_covers bm' (bv_unsigned (di_size dn'))
           /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-          /\ dn0' = dn'
+          (* THE FLUSHED RECORD, AS A PRESERVATION (D₀-a repair 3b).  The
+             success and short-write arms run writei's trailing [iupdate],
+             so the REGION's record becomes the metadata one and [dn0' = dn']
+             outright; writei's own -1 return (the full directory -- see the
+             header) runs no iupdate at all and answers [dn0' = dn0],
+             [dn' = dn].  Nothing here relates [dn0] to [dn], so the honest
+             clause is the implication -- and it is free for every caller,
+             because a caller holds the two as ONE record
+             ([IcacheEscrow.ic_loaded]'s single [dinode_at]; it is the same
+             fact [InodeRegion.di_type_stable_refl] discharges the type
+             premise from), and a caller that did not could not re-park
+             either way. *)
+          /\ (dn0 = dn -> dn0' = dn')
           /\ (tot <= 16)%nat
           (* THE RANGE CLAUSE: the record's bytes in the window and NOTHING
              ELSE.  writei's disturbed region is empty on the kernel arm --
@@ -604,9 +736,9 @@ Definition wp_dirlink_gen_body
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->
-  (* THE APPEND FITS.  This is what kills writei's own -1 arm: the write is
-     at [16*k0 <= size] and ends at [16*k0 + 16 <= size + 16]. *)
-  bv_unsigned (di_size dn) + 16 <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (* NO "THE APPEND FITS" PREMISE.  It used to sit here, killing writei's
+     own -1 return; it was unsuppliable (see the header) and the return is
+     routed through the [tot = 0] corner of the append arm instead. *)
   (* ---- writei's premises ---- *)
   (* TYPE STABILITY (fs-icache.md §19.6 Part 1, fs-sysfile S5d): writei's
      new premise, travelling.  dirlink's own [Htype] fixes [di_type dn] at
@@ -750,25 +882,27 @@ Definition wp_dirlink_gen_body
       ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
                  bm bm' Sb Sb'⌝ -∗
       log_opS γ n' Sb' -∗
-      (* ---- THE [inode_ok] CONJUNCT A RE-PARKER NEEDS, AS A PRESERVATION
-         (fs-sysfile S5a finding 2) ----
+      (* ---- THE TWO [inode_ok] CONJUNCTS A RE-PARKER NEEDS, AS
+         PRESERVATIONS (fs-sysfile S5a finding 2; the cap, D₀-a repair 3b) --
          [InodeLock.inode_ok] has seven conjuncts and the arms below
          re-establish five of them ([blkmap_wf], [bm_covers],
          [di_addrs = bm_cells], [blk_holes_zero], and [di_type <> 0] through
-         [dn' = wi_dinode dn ...]).  Of the remaining two the SIZE CAP is
-         RECOVERABLE by the caller -- the append lands at slot
-         [k0 <= dir_nrec size] and writes at most sixteen bytes, so the new
-         size is at most [size + 16], which is this contract's own "the
-         append fits" premise, and [ProofCreateParts.cr_size_cap] is the
-         recovery.  [InodeInv.inode_sized] is NOT: the range clause above is
-         about [file_byte], a per-BYTE view, and pins no block's LENGTH.
+         [dn' = wi_dinode dn ...]).  The other two are writei's own two
+         preservation clauses (SpecWritei.v:661), relayed here VERBATIM,
+         guard included, because NEITHER is recoverable at this seam:
+         [InodeInv.inode_sized] because the range clause below is about
+         [file_byte], a per-BYTE view that pins no block's LENGTH, and the
+         SIZE CAP because the arithmetic that used to recover it
+         ([16*k0 + tot <= size + 16], [ProofCreateParts.cr_size_cap]) needed
+         "the append fits" -- the premise the eleventh stop retired.
 
-         So it is stated here exactly as [SpecWritei] states it (S3i), as a
-         PRESERVATION rather than a fact -- writei has handed it over since
-         S3i and the found arm has [data' = data], so it is free inside
-         [ProofDirlink].  It is a postcondition STRENGTHENING, so no existing
-         caller moves; without it create cannot re-park either inode after
-         any dirlink, which is every arm from +0xb4 on. *)
+         Relayed, the cap costs a caller nothing: the antecedent is about
+         its OWN entry record, and it is a conjunct of the [inode_ok] the
+         caller is about to rebuild.  Both are free inside [ProofDirlink]:
+         writei hands them over, and the found arm has [dn' = dn],
+         [data' = data]. *)
+      ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+       bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
       ⌜inode_sized data -> inode_sized data'⌝ -∗
       (* ---- THE TWO ARMS ---- *)
       ⌜if found
@@ -788,7 +922,19 @@ Definition wp_dirlink_gen_body
           /\ bv_unsigned (di_size dn') < 2 ^ 31
           /\ bm_covers bm' (bv_unsigned (di_size dn'))
           /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
-          /\ dn0' = dn'
+          (* THE FLUSHED RECORD, AS A PRESERVATION (D₀-a repair 3b).  The
+             success and short-write arms run writei's trailing [iupdate],
+             so the REGION's record becomes the metadata one and [dn0' = dn']
+             outright; writei's own -1 return (the full directory -- see the
+             header) runs no iupdate at all and answers [dn0' = dn0],
+             [dn' = dn].  Nothing here relates [dn0] to [dn], so the honest
+             clause is the implication -- and it is free for every caller,
+             because a caller holds the two as ONE record
+             ([IcacheEscrow.ic_loaded]'s single [dinode_at]; it is the same
+             fact [InodeRegion.di_type_stable_refl] discharges the type
+             premise from), and a caller that did not could not re-park
+             either way. *)
+          /\ (dn0 = dn -> dn0' = dn')
           /\ (tot <= 16)%nat
           (* THE RANGE CLAUSE: the record's bytes in the window and NOTHING
              ELSE.  writei's disturbed region is empty on the kernel arm --

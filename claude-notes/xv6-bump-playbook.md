@@ -146,6 +146,26 @@ predicted. On a function whose new code duplicates an existing pair, check the
 shift map against the disassembly; the cheap tell is an offset that maps to
 itself inside a range where everything around it shifted.
 
+**AND THE WRONG MAP CAN BE PERFECTLY SELF-CONSISTENT, so "it all lines up" is
+not the check — the INSTRUCTION'S IDENTITY is.** `create` on `117c0e7` gained
+a guard whose taken arm is a byte-for-byte copy of an existing arm
+(`mv a0,s1 ; jal iunlockput ; li s2,0 ; c.j <funnel>`) reached by a `c.beqz`
+on the same register. difflib paired the NEW `c.beqz` with the old one and the
+new block with the old block, and produced a map that is coherent everywhere —
+14 bytes inserted at `+0x2e`, everything below shifted — but names the wrong
+instruction at exactly two places (the old guard's `c.beqz`, and the four-word
+block it jumps to). The truth is 14 bytes at `+0x30` and 10 more at `+0x8e`,
+with the old arm's block at `+0x84`. **Two cheap decisions settle it, and a
+proof written against the wrong reading does not typecheck (the registers do
+not line up), so this costs a build round, not a soundness hole:**
+
+* read what the branch's register HOLDS. The old `c.beqz` tests the value the
+  `lh` two instructions above loaded; the new one tests `s4 - 1`. A map that
+  moves the old branch onto the new one moves it across the intervening writes.
+* gcc emits the cold blocks in SOURCE order, so the arm belonging to the
+  earlier `if` is the one at the LOWER address — and each branch's own
+  immediate says which block is its own.
+
 Cross-check it against `git diff <old>..<new> -- kernel/` — the two should name
 the same functions. If the sweep says a function changed shape and the C did
 not, suspect the tooling, not gcc.
@@ -250,6 +270,86 @@ reach, so the flag is free only when it prints `no hand-written file`. Anything
 else on that line is the list to check by hand before trusting the run — the
 quarantine keeps offsets above the first reshape out of the map, but says
 nothing about whether the offsets BELOW it still mean what the proof thinks.
+
+### `fix_proof_imms.py` IS THE PRIMARY SWEEP, and it is keyed on the pc
+
+`relayout_*.py` map old immediate → new immediate and then look for the old
+VALUE near an anchor. `tools/fix_proof_imms.py` works the other way round: it
+finds every `mword_of_int (<sym> + <off>)` a proof spells, DECODES the new
+image at that pc, and rewrites the immediate that follows it. That is the
+right primary tool for a bump — it reaches sites no `KernelSyms.<sym> + off`
+anchor exists for, and a site it rewrites is right by construction rather than
+by a value coincidence. Run it, read the report, then `--update`.
+
+```sh
+git show HEAD:kernel-rocq/KernelInstrs.v > /tmp/old/OldKernelInstrs.v   # before `make dump`
+git show HEAD:kernel-rocq/KernelSyms.v   > /tmp/old/OldKernelSyms.v
+python3 tools/fix_proof_imms.py --old-image /tmp/old            # report
+python3 tools/fix_proof_imms.py --old-image /tmp/old --update   # apply
+```
+
+**`--old-image` IS NOT OPTIONAL, AND `--update` NOW REFUSES TO RUN WITHOUT
+IT.** Unguarded, the site → literal binding is POSITIONAL: the tool takes the
+first width-matching literal in the 260-char window, and where several anchors
+sit inside one window that binding is a PERMUTATION rather than the identity.
+It then writes instruction A's immediate onto B's literal, the next audit
+reports B stale, and fixing B re-breaks A — **a period-2 cycle, and the
+reported count can RISE**. Measured on the kexec merge: 431 in 102 files, one
+`--update`, 668 in 92 files; measured on one file in isolation, the pass-3
+text is byte-identical to the pass-1 text. The guard ("the literal must BE the
+pre-bump immediate at this pc") is what makes the fixed point *no change*
+rather than a cycle, because a neighbour's literal is not this pc's old
+immediate. The same run guarded reported **1** site — a known false positive.
+
+**SO AN UNGUARDED COUNT IS NOT A WORK LIST, AND IT IS NOT EVIDENCE OF
+ANYTHING.** Before believing a large report, check whether the functions it
+names even MOVED: group `KernelSyms.v` by delta first (§2). On the kexec merge
+every proof the report named was in the `+0` group with `+0` callees, so the
+true answer was zero sites and eleven commits written against the old image
+needed no sweep at all — which the build confirmed in one round.
+
+**IT IS STILL NOT SUFFICIENT, because the window can reach a neighbour whose
+CORRECT value is this pc's OLD one.** `ProofKforkB5` states two `auipc`/`addi`
+pairs for the same data symbol 16 bytes apart, so the second pair's correct
+immediate is the first pair's pre-bump one; the tool flags the second and
+would rewrite it. The tell is that the flagged literal sits in a DIFFERENT
+lemma from the anchor — check the report's sites against the disassembly one
+by one, and treat a nonzero report on a file the build accepts as a false
+positive until proven otherwise.
+
+**AND IT IS INVISIBLE TO A RESHAPED FUNCTION unless you relocate the old image
+for it.** The guard resolves the old immediate at `old_syms[sym] + off`, and
+after a reshape the proof's re-pointed offsets no longer name the same
+instruction in the old image, so every site is silently skipped. Build a
+SYNTHETIC old image whose bytes for that one function sit at the NEW offsets
+(`old_bytes[CR + o]` written to `CR + newoff(o)`) and run against that: every
+rewrite is then guarded by "this literal was the old immediate of the
+instruction that USED to be here", which is exactly the right question, and a
+wrong shift map shows up as sites that do not match rather than as a silent
+miss.
+
+Two defects of its own, both fixed, both worth knowing because their output
+reaches the build looking like something else:
+
+* it rewrote `raw` in place from the far end, so every earlier site's block
+  end was an offset into a string whose tail had already changed length, and
+  the slice cut mid-token (`(mword_of_int 32 : mword 12)` became
+  `(mword_of_int 05 mword 12)` — which then crashed the next GUARDED run
+  outright, because `int('05', 0)` is a `ValueError`, so the file's damage
+  presented as "the tool cannot be run with the guard").  It now splices in one
+  ascending pass into a fresh buffer, and a site's block stops at the next
+  site's literal as well as at the next pc anchor.
+* the substitution used to splice the new literal in by the OLD one's length,
+  so a width change corrupted the line — `4094 : mword 12` lost its ascription
+  and became `14 12`, and `998 -> 1014` became `101444444`. **After any
+  `--update`, verify that nothing but immediates moved**: normalise every
+  changed file with `s/mword_of_int\s+\d+/mword_of_int NUM/` and diff against
+  `git show HEAD:<file>` — the two must be identical. It is three lines of
+  Python and it catches the whole class.
+* `Notation KF := KernelSyms.kfork (only parsing).` did not parse, so the file
+  reported as "unresolvable alias" and was never checked at all — 31 files,
+  every create/namex/kfork/kexec proof among them. A large `unresolvable
+  alias:` count in the report is that failure, not a property of the tree.
 
 ### AN ALIAS DECLARED IN A SIBLING FILE MAKES THE BATCH REPORT A TRUTHFUL "0"
 

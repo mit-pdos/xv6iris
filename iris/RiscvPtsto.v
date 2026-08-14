@@ -16,6 +16,18 @@ Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the disk image map *)
    already does, and this file re-exports it. *)
 Require Import VirtioModel.
 Require Import PtreeType.   (* [ptree]: the carrier of the shared kernel table's ghost *)
+
+(* ---- the tree-wide [set_solver] override (see FastSetSolver.v) ----      *)
+(* This file is here as a PROPAGATION HUB, not because it uses sets: it is  *)
+(* [Require Import]ed DIRECTLY by 796 of the tree's 1090 files, and         *)
+(* [Require Export] only reaches a file that imports THIS one directly (or  *)
+(* through an unbroken chain of Exports, which this tree does not have).    *)
+(* Without a hub like this, a new proof would silently get stdpp's slow     *)
+(* [set_solver] -- which is exactly the trap the override exists to remove. *)
+(* EXPORT, not Import, and deliberately "dead": the nightly dead-import     *)
+(* sweep skips [Require Export] lines.                                     *)
+Require Export FastSetSolver.
+
 Local Open Scope Z_scope.
 
 (* Name [mword] locally (qualified target) rather than [Require Import

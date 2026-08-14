@@ -106,6 +106,7 @@ Section UserActiveClass.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
 
   (* every canonical/non-canonical va either fetches or faults; the
      tramp/tf pages are denied leaves (U=0), a genuinely unmapped canonical
@@ -241,12 +242,12 @@ Section UserActiveClass.
   Lemma active_class_intro (Ei : coPset) :
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
-    hw_config -∗ active_class C pt Ei.
+    hw_config -∗ active_class C pt Rut Ei.
   Proof.
     intros Hbase Hrvc.
     iIntros "#Hhw". iModIntro.
     iIntros (σ ms_v sc_v stval_v sepc_v va g).
-    iIntros "%Hmsok %Lpriv %Lms %Lpc %Hdisp Hregs Hupt Hcfg Hint Hbody Hcont".
+    iIntros "%Hmsok %Lpriv %Lms %Lpc %Hdisp Hregs Hupt Hcfg Hrut Hint Hbody Hcont".
     iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hnpc & Hgpr)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmsten & Hssten)".
@@ -274,10 +275,10 @@ Section UserActiveClass.
     { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
     iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmsten Hssten]"
       as "Hcfg". { iFrame. }
-    iApply (active_step_branch C pt Ei σ ms_v sc_v stval_v sepc_v va g mst mi
+    iApply (active_step_branch C pt Rut Ei σ ms_v sc_v stval_v sepc_v va g mst mi
               Hmsok Lpriv Lms Lpc Hdisp
               with "Hhw Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
-                    Hupt Hcfg Hob Hcont").
+                    Hupt Hcfg Hrut Hob Hcont").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -288,10 +289,10 @@ Section UserActiveClass.
   Lemma user_step_obligation_active_holds :
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
-    hw_config -∗ minstret_inv -∗ wire_inv -∗ user_step_obligation_active C pt.
+    hw_config -∗ minstret_inv -∗ wire_inv -∗ user_step_obligation_active C pt Rut.
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv".
-    iApply (wp_user_step_active C pt with "Hhw Hmin Hwinv").
+    iApply (wp_user_step_active C pt Rut with "Hhw Hmin Hwinv").
     iApply (active_class_intro (⊤ ∖ ↑minstretN ∖ ↑wireN) Hbase Hrvc with "Hhw").
   Qed.
 
@@ -301,11 +302,11 @@ Section UserActiveClass.
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
     hw_config -∗ minstret_inv -∗ wire_inv -∗
-    user_inv C pt -∗ stvec_handler_wp C pt -∗
+    user_inv C pt Rut -∗ stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv Hinv Htrap".
-    iApply (wp_user_exec_active C pt with "Hmin [] Hinv Htrap").
+    iApply (wp_user_exec_active C pt Rut with "Hmin [] Hinv Htrap").
     iApply (user_step_obligation_active_holds Hbase Hrvc with "Hhw Hmin Hwinv").
   Qed.
 

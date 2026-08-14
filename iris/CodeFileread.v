@@ -277,9 +277,9 @@ Section CodeFileread.
   Proof. mk_base (KernelSyms.fileread + 0x84) (mword_of_int 0x0001e717 : mword 32)
     (mword_of_int (KernelSyms.fileread + 0x84) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001e717. Qed.
 
-  Lemma fri_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) false (ITYPE (mword_of_int 418 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.fileread + 0x88) (mword_of_int 0x1a270713 : mword 32)
-    (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) (ITYPE (mword_of_int 418 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_1a270713. Qed.
+  Lemma fri_88 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) false (ITYPE (mword_of_int 434 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.fileread + 0x88) (mword_of_int 0x1b270713 : mword 32)
+    (mword_of_int (KernelSyms.fileread + 0x88) : mword 64) (ITYPE (mword_of_int 434 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_1b270713. Qed.
 
   Lemma fri_8c : kernel_text -∗ instr (mword_of_int (KernelSyms.fileread + 0x8c) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.fileread + 0x8c) (mword_of_int 0x97ba : mword 16)

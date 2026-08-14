@@ -88,7 +88,12 @@ DEFN_ADDR_RE = re.compile(
     r'Definition\s+([A-Za-z_][A-Za-z_0-9]*)\s*:\s*Z\s*:=\s*(.+?)\.(?![A-Za-z_0-9])', re.S)
 
 
-NOTATION_RE = re.compile(r'Notation\s+([A-Za-z_][A-Za-z_0-9]*)\s*:=\s*(KernelSyms\.[A-Za-z_][A-Za-z_0-9]*)\s*\.')
+# [(only parsing)] is how most of the tree declares its aliases, and without
+# the modifier group here the whole file goes UNRESOLVABLE -- 31 files,
+# including every create/namex/kfork/kexec proof, were invisible to this tool.
+NOTATION_RE = re.compile(
+    r'Notation\s+([A-Za-z_][A-Za-z_0-9]*)\s*:=\s*(KernelSyms\.[A-Za-z_][A-Za-z_0-9]*)'
+    r'\s*(?:\([^)]*\)\s*)?\.')
 
 
 def strip_comments(text):
@@ -240,6 +245,14 @@ def load_bytes(path):
 KIND_WIDTH = {'JAL21': 21, 'B13': 13, 'U20': 20, 'I12': 12, 'S12': 12,
               'CJ11': 11, 'CB8': 8}
 
+def lit(t):
+    """A Coq numeric literal.  NOT [int(t, 0)]: Python's base-0 rejects a
+    leading zero ([05] is old octal syntax) and the proofs do write one, so the
+    whole guarded run died with a ValueError on one line of one file."""
+    t = t.strip()
+    return int(t, 16) if t.lower().startswith('0x') else int(t, 10)
+
+
 PC_RE = re.compile(r'mword_of_int\s*\(\s*(?:KernelSyms\.)?([A-Za-z_][A-Za-z_0-9]*)\s*\+\s*(0x[0-9a-fA-F]+|\d+)\s*\)')
 # The width ascription is OPTIONAL: plenty of proof sites write a bare
 # [mword_of_int 2256].  When it is absent there is no width to cross-check, so
@@ -271,6 +284,10 @@ def main():
     ap.add_argument('--iris', default='iris')
     ap.add_argument('--kernel-rocq', default='kernel-rocq')
     ap.add_argument('--update', action='store_true')
+    ap.add_argument('--i-know-this-is-unguarded', action='store_true',
+                    dest='i_know_this_is_unguarded',
+                    help='allow --update with no --old-image.  It does not '
+                         'converge; see the check in main().')
     ap.add_argument('--window', type=int, default=1500,
                     help='chars after a pc in which its immediate must appear. '
                          'Wide on purpose: a relocation is often restated in an '
@@ -340,7 +357,7 @@ def main():
         edits = []
         pcs = []
         for m in PC_RE.finditer(text):
-            base, off = m.group(1), int(m.group(2), 0)
+            base, off = m.group(1), lit(m.group(2))
             if base in nots:
                 addr = nots[base] + off
             elif base in syms:
@@ -391,7 +408,7 @@ def main():
             im = None
             if oldv is not None:
                 for c in IMM_RE.finditer(seg):
-                    if int(c.group(1), 0) == oldv and (
+                    if lit(c.group(1)) == oldv and (
                             c.group(2) is None or int(c.group(2)) == KIND_WIDTH.get(kind)):
                         im = c
                         break
@@ -402,7 +419,7 @@ def main():
                         break
             if not im:
                 continue
-            have = int(im.group(1), 0)
+            have = lit(im.group(1))
             hw = int(im.group(2)) if im.group(2) else None
             if hw is not None and hw != KIND_WIDTH.get(kind):
                 continue
@@ -435,6 +452,23 @@ def main():
     if not args.update:
         return 1 if n_bad else 0
 
+    # WITHOUT [--old-image] THE SITE -> LITERAL BINDING IS POSITIONAL, and where
+    # several anchors sit inside one 260-char window it is a PERMUTATION rather
+    # than the identity: a pass writes instruction A's immediate onto B's
+    # literal, the next pass sees B stale and writes it back, and the reported
+    # count can rise instead of fall (a period-2 cycle, measured; 431 -> 668
+    # over one --update on the kexec merge).  The guard is what makes the fixed
+    # point "no change": it demands the literal BE that pc's pre-bump
+    # immediate, which a neighbour's literal is not.
+    if not args.old_image and not args.i_know_this_is_unguarded:
+        print("REFUSING to --update without --old-image (see the comment above "
+              "this check, and the playbook).  Snapshot the pre-bump image "
+              "first:\n"
+              "  git show <pre-bump>:kernel-rocq/KernelInstrs.v > OLD/OldKernelInstrs.v\n"
+              "  git show <pre-bump>:kernel-rocq/KernelSyms.v   > OLD/OldKernelSyms.v",
+              file=sys.stderr)
+        return 2
+
     total = 0
     for p, es in per_file.items():
         raw = open(p).read()
@@ -445,17 +479,43 @@ def main():
         # is a different instruction's immediate elsewhere in the file, and
         # successive passes flip it back and forth.
         anchors = sorted(all_pc[p])
-        for a, b, have, want, kind, base, off in sorted(es, key=lambda e: -e[0]):
-            nxt = next((x for x in anchors if x > a), len(raw))
+        starts = sorted(e[0] for e in es)
+        out = []
+        pos = 0
+        for a, b, have, want, kind, base, off in sorted(es):
+            # The block a site may rewrite ends at the next pc anchor OR at the
+            # NEXT SITE'S OWN LITERAL, whichever comes first.  Without the
+            # second bound the tool does not converge: two neighbouring
+            # instructions that shared an immediate before the bump have one
+            # block covering both literals, site X rewrites Y's to X's answer,
+            # the next audit reports Y stale, and fixing Y re-breaks X --
+            # which is how one --update can raise the count instead of
+            # lowering it (431 -> 668 over the kexec merge).
+            nxt = min(next((x for x in anchors if x > a), len(raw)),
+                      next((x for x in starts if x > a), len(raw)))
             wd = KIND_WIDTH[kind]
-            blk = raw[a:nxt]
+            # The ANCHOR literal is [a,b) and is replaced outright; the echoes
+            # are rewritten in the block that FOLLOWS it.  Substituting over a
+            # block that still contains the anchor and then splicing by the
+            # anchor's OLD length corrupts the source whenever the new literal
+            # has a different width -- it ate the [: mword 12] ascription of a
+            # 4094 -> 14 site and spliced 998 -> 1014 into "101444444", both of
+            # which are well-formed enough to reach the build as a mystery.
+            if a < pos:
+                continue
+            blk = raw[b:nxt]
             blk = re.sub(r'mword_of_int(\s+)(?:%d|0x%x)\b((?:\s*:\s*mword\s+%d)?)' % (have, have, wd),
                          lambda m: 'mword_of_int%s%d%s' % (m.group(1), want, m.group(2)), blk)
             head = ('0x%x' % want) if raw[a:b].startswith('0x') else str(want)
-            blk = head + blk[b - a:]
+            # ONE pass, ascending, splicing into a fresh buffer: rewriting
+            # [raw] in place from the far end leaves every earlier site's
+            # [nxt] pointing into a string whose tail has already moved, and
+            # the slice then cuts mid-token ([32 : mword 12] -> [05 mword 12]).
+            out.append(raw[pos:a]); out.append(head); out.append(blk)
+            pos = nxt
             total += 1
-            raw = raw[:a] + blk + raw[nxt:]
-        open(p, 'w').write(raw)
+        out.append(raw[pos:])
+        open(p, 'w').write(''.join(out))
     print("rewrote %d site(s) across %d file(s)" % (total, len(per_file)))
     return 0
 

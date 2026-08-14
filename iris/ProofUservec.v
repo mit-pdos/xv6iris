@@ -4,8 +4,9 @@
    the USER table installed) through the [csrw sscratch] / [li a0,TRAPFRAME]
    prologue, the 31 register-save stores into the TRAPFRAME page, the four
    kernel-context loads, and the satp switch back to the KERNEL table,
-   ending with the pc at [ret_pc vktr] (usertrap), [tlb_inv_pt kroot] live
-   and the user table parked as [pt_frame]. *)
+   ending with the pc at [ret_pc vktr] (usertrap), the kernel table folded
+   back into the ambient [kpt_inv kroot] and the user table parked as
+   [pt_frame]. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -44,14 +45,15 @@ Section UservecAllPt.
     iPureIntro. exact Hwf.
   Qed.
 
-  Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (kroot : mword 44)
+  Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (kroot : mword 44)
       (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)
       (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
        w272 w280 w112 : bv 64)
       (dqk : dfrac) :
-    wp_uservec_pt_body C pt kroot sscr0 vksat vksp vktr vkhart
+    wp_uservec_pt_body C pt Rut kroot sscr0 vksat vksp vktr vkhart
       w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
         w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
         w272 w280 w112 dqk.
@@ -64,16 +66,16 @@ Section UservecAllPt.
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
     intros Hstvec Hdqc HkMode Hkasid Hkppn.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hsscr Hkfr
+    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hsscr #Hkfr
              Hk0 Hk8 Hk16 Hk32
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280
              Htf112
              Hcont".
     (* ============ open the trapped machine ============ *)
-    iDestruct (user_trap_frame_open C pt with "Hframe") as (ms_v sc_v stval_v sepc_v g)
+    iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hfile &
         Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmie & Hmdl & Hmedl & Hmip &
-        Hmenv & Hsenv & Hmse & Hsse)".
+        Hmenv & Hsenv & Hmse & Hsse & Hrut)".
     pose proof Hok as Hok2.
     destruct Hok2 as (HSXL & HMPRV & HMXR & HSPP & HSIE & HTVM & HTSR).
     pose proof (uc_mm C) as Hmm.
@@ -1401,7 +1403,7 @@ Section UservecAllPt.
               HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwfu Ht1v HkMode Hkasid Hkppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr Hpc Hfile
                     Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
-    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hufr Hpc Hfile".
+    iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hpc Hfile".
     iClear "Hi_sf1".
     iClear "Hi_csrw_satp".
     iClear "Hi_sf2".
@@ -1417,7 +1419,7 @@ Section UservecAllPt.
        proof's ~600 steps; open it here, once, at the return. *)
     iEval (rewrite /uservec_post) in "Hcont".
     iSpecialize ("Hcont" $! g ms_v sc_v stval_v sepc_v with "[%]"); [ exact Hok |].
-    iApply ("Hcont" with "Hhs Hpriv Hms Hsc Hstval Hsepc Hsscr Hktlb Hufr Hdata Hcfg Hpc Hfile
+    iApply ("Hcont" with "Hhs Hpriv Hms Hsc Hstval Hsepc Hsscr Hufr Hdata Hcfg Hpc Hfile
              Hk0 Hk8 Hk16 Hk32
              Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280
              Htf112").

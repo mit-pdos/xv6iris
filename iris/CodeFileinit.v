@@ -17,6 +17,7 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode01.
+Require Import KernelDecode02.
 Require Import KernelDecode04.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
@@ -24,7 +25,6 @@ Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode17.
-Require Import KernelDecode21.
 Require Import KernelDecode24.
 Require Import KernelDecode30.
 Require Import KernelDecode31.
@@ -66,9 +66,9 @@ Section CodeFileinit.
   Proof. mk_base (KernelSyms.fileinit + 0x10) (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.fileinit + 0x10) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_0001e517. Qed.
 
-  Lemma fii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) false (ITYPE (mword_of_int 1190 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.fileinit + 0x14) (mword_of_int 0x4a650513 : mword 32)
-    (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) (ITYPE (mword_of_int 1190 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_4a650513. Qed.
+  Lemma fii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) false (ITYPE (mword_of_int 1206 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.fileinit + 0x14) (mword_of_int 0x4b650513 : mword 32)
+    (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) (ITYPE (mword_of_int 1206 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_4b650513. Qed.
 
   Lemma fii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x18) : mword 64) false (JAL (mword_of_int 2083608 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.fileinit + 0x18) (mword_of_int 0xb19fc0ef : mword 32)

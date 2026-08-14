@@ -354,6 +354,129 @@ Theorem cr_budget_needs_data_credit :
   u7 < ip_need.
 Proof. vm_compute. lia. Qed.
 
+(* ===================================================================== *)
+(*  3b. THE [fail:] TAIL AND THE DIRLINK THAT ENTERS IT (D₀ increment 3   *)
+(*      finding 2, machine-checked and now landed against the repaired    *)
+(*      [SpecDirlink.dl16_post]).                                         *)
+(*                                                                        *)
+(*  Every route into create's [fail:] at +0x12e is entered by a dirlink   *)
+(*  that returned -1, i.e. by a SHORT OR EMPTY append -- and the arm's    *)
+(*  first act after the (absorbing) [iupdate(ip)] is [iunlockput(ip)],    *)
+(*  which needs [ip_need] IN HAND.  So the entering dirlink's spend bound *)
+(*  is what decides whether create's failure arm is payable at all.       *)
+(* ===================================================================== *)
+
+(* THE REFUTATION THE REPAIR ANSWERS.  Before it, [dl16_post] was guarded
+   by [tot = 16] -- the SUCCESS append -- so on every route into [fail:]
+   the only surviving clause was the counted per-call constant
+   [dirlink_units = 7], and create's first dirlink runs with eight or nine
+   in hand.  Seven from those leaves TWO, and the tail's first
+   [iunlockput] wants three. *)
+Theorem cr_fail_counted_busts (w : bool) :
+  let u1 := cr_uw w - ia_spend in       (* ialloc, unconditional 1        *)
+  let u2 := u1 - iu_spend true in       (* iupdate(ip), absorbs           *)
+  let u3 := u2 - dirlink_units in       (* THE FAILING dirlink            *)
+  let u4 := u3 - iu_spend true in       (* fail: iupdate(ip), absorbs     *)
+  u4 < ip_need.
+Proof. destruct w; vm_compute; lia. Qed.
+
+(* ...and it is the SPEND bound and nothing else: the counted constant is
+   affordable as an ENTRY requirement at every arm ([dl_need false true]
+   is six against eight), and even at the very top of the op there is room
+   for a whole [dirlink_units] with an iput to spare. *)
+Theorem cr_fail_would_fit_at_u0 : ip_need <= cr_u0 - dirlink_units.
+Proof. vm_compute. lia. Qed.
+
+(* THE REPAIR'S FIRST CLAUSE, at [0 < tot] -- the short write (1..15) as
+   well as the success one.  The entering dirlink reports the credit-aware
+   [dl_spend], and the tail closes at EVERY value of the reported
+   booleans, [w] included. *)
+Theorem cr_fail_closes_with_credit (w crd cru al ind : bool) :
+  ip_need <= cr_uw w - ia_spend - iu_spend true - dl_spend w crd cru al ind.
+Proof. destruct w, crd, cru, al, ind; vm_compute; lia. Qed.
+
+(* THE REPAIR'S SECOND CLAUSE, at [tot = 0], AT THE FIGURE DIRLINK CAN
+   ACTUALLY PROVE ([SpecDirlink.dl0_spend] = writei's coarse four; the
+   honest spend is smaller and no contract exposes it).  It closes the two
+   routes whose failing dirlink is create's FIRST logging dirlink:
+     +0xc4  the non-directory link (ARM FAIL's non-dir entry), and
+     +0xf2  the mkdir path's [dirlink(ip, ".")].                        *)
+Theorem cr_fail_closes_at_zero (w : bool) :
+  ip_need <= cr_uw w - ia_spend - iu_spend true - dl0_spend.
+Proof. destruct w; vm_compute; lia. Qed.
+
+(* ...AND WHAT THE CONSTANT DOES NOT CLOSE.  The mkdir path's INTERIOR
+   entries (+0x106's [dirlink(ip, "..")] and +0x118's [dirlink(dp, name)])
+   both run with SIX in hand -- at either value of [w], since the first
+   dirlink hands the walk's unit straight back -- and four from six leaves
+   two.  THREE closes both, and three is what the honest [tot = 0] spend
+   is; [cr_fail_mkdir_closes] below is that, machine-checked at the figure
+   itself.  NOTHING STANDS BETWEEN THE TWO ANY MORE: writei states the
+   credit-aware spend at every [tot] ([SpecWritei.wi16_spend_any]) and
+   [SpecDirlink.dl16_post] now relays it UNGUARDED, so the interior entries
+   are priced by [cr_fail_mkdir_closes] / [_ind] and not by this constant.
+   The theorem stays because it is a true statement ABOUT THE CONSTANT, and
+   [dl0_spend] is still what a caller that prefers a constant reaches. *)
+Theorem cr_fail_mkdir_at_zero_busts (w : bool) :
+  let u1 := cr_uw w - ia_spend in
+  let u2 := u1 - iu_spend true in
+  let u3 := u2 - dl_spend w false false true false in    (* dirlink(ip,".")  *)
+  let u4 := u3 - dl_spend true true true false false in  (* dirlink(ip,"..") *)
+  (* both interior entries sit at six ... *)
+  u3 = 6 /\ u4 = 6 /\
+  (* ... where the proven figure busts ... *)
+  u3 - dl0_spend < ip_need /\ u4 - dl0_spend < ip_need /\
+  (* ... and the honest one would not. *)
+  ip_need <= u3 - 3 /\ ip_need <= u4 - 3.
+Proof. destruct w; vm_compute; lia. Qed.
+
+(* THE FLIP, AT THE FIGURE ITSELF.  Both interior entries close against the
+   credit-aware spend at EVERY value of the reported booleans, provided the
+   failing append's window is DIRECT -- and it is, for +0x106: that link
+   goes into the fresh child, whose slots 0 and 1 are both in its block 0.
+   The arithmetic is [wi16_spend]'s own worst corner at [ind = false],
+   which is three ([bmap_cost crb al false <= 2], the data-block term free
+   whenever [al], and one for an unabsorbed [iupdate]) against six in hand
+   and an [ip_need] of three.  [al] is in fact FALSE on this arm -- a
+   bmap that broke out of blocks allocated no data block, and a direct
+   window's indirect slot never moves ([SpecBmap] clause (e)) -- so the
+   real figure is at most two; the theorem does not need that. *)
+Theorem cr_fail_mkdir_closes (w crb crd cru al : bool) :
+  let u1 := cr_uw w - ia_spend in
+  let u2 := u1 - iu_spend true in
+  let u3 := u2 - dl_spend w false false true false in    (* dirlink(ip,".")  *)
+  let u4 := u3 - dl_spend true true true false false in  (* dirlink(ip,"..") *)
+  ip_need <= u3 - wi16_spend crb crd cru al false /\
+  ip_need <= u4 - wi16_spend crb crd cru al false.
+Proof. destruct w, crb, crd, cru, al; vm_compute; lia. Qed.
+
+(* ...AND ON THE INDIRECT PATH, WHICH IS +0x118's ([dirlink(dp, name)] goes
+   into the PARENT, of any size), the same holds as soon as the bitmap
+   block is already in the op's set -- and it is: the mkdir arm's FIRST
+   dirlink allocated the child's block 0, and an allocating writei reports
+   [bmapstart ∈ Sb'] ([SpecWritei.wi16_post]'s membership half, which is
+   exactly what that clause is for).  The one corner that does NOT close is
+   [crb = false] with an allocating indirect window, where the figure is
+   four; it is unreachable here for that reason. *)
+Theorem cr_fail_mkdir_closes_ind (w crd cru al : bool) :
+  let u1 := cr_uw w - ia_spend in
+  let u2 := u1 - iu_spend true in
+  let u3 := u2 - dl_spend w false false true false in
+  let u4 := u3 - dl_spend true true true false false in
+  ip_need <= u3 - wi16_spend true crd cru al true /\
+  ip_need <= u4 - wi16_spend true crd cru al true.
+Proof. destruct w, crd, cru, al; vm_compute; lia. Qed.
+
+(* ...AND THAT CORNER IS ATTAINED, WHICH IS WHY THE COLLAPSE HAD TO BE A
+   SHAPE CHANGE RATHER THAN A SMALLER CONSTANT.  An allocating INDIRECT
+   window at an unpaid bitmap block spends the full four
+   ([SpecWritei.wi16_spend_le4] is the bound; this is the witness), so
+   [SpecDirlink.dl0_spend = 4] was already the best constant available and
+   no arithmetic could have bought the interior mkdir entries their three.
+   What buys it is the per-call VARIATION -- the two theorems above. *)
+Lemma cr_wi16_spend_max : wi16_spend false false false true true = 4%nat.
+Proof. vm_compute. reflexivity. Qed.
+
 (* THE CREDIT ON THE INODE BLOCK IS LOAD BEARING TOO: an uncredited
    iupdate inside every dirlink costs three more units across the mkdir
    arm, and the late fail arm again runs out. *)

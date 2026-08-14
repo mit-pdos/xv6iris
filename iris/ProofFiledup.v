@@ -232,13 +232,13 @@ Section ProofFiledup.
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.filedup + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.filedup + 0x10))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filedup + 0x10)) Ra0 Ra0 (mword_of_int 0x428 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filedup + 0x10)) Ra0 Ra0 (mword_of_int 0x438 : mword 12)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1064 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1080 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = ftable_addr).
     { rewrite /R5 upd_eq /R4 upd_eq. rewrite /ftable_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -402,13 +402,13 @@ Section ProofFiledup.
     assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.filedup + 0x22) : mword 64) 4 = mword_of_int (KernelSyms.filedup + 0x26))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filedup + 0x26)) Ra0 Ra0 (mword_of_int 0x412 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filedup + 0x26)) Ra0 Ra0 (mword_of_int 0x422 : mword 12)
               D3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (D4 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (D3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1042 : mword 12)))]> D3).
+                  (add_vec (D3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1058 : mword 12)))]> D3).
     assert (HD4a0 : D4 !!! Regidx Ra0 = ftable_addr).
     { rewrite /D4 upd_eq /D3 upd_eq. rewrite /ftable_addr.
       apply bv_eq; vm_compute; reflexivity. }

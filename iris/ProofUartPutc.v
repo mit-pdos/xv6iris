@@ -476,12 +476,12 @@ Section ProofUartPutc.
     assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.uartputc_sync + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.uartputc_sync + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 addi a0,a0,-1544 -> &tx_lock *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x10)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 2574 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x10)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 2590 : mword 12)
               G0c (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CIDp8 Hsp8) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (G10 := <[Regidx (mword_of_int 10) := regval_into_reg (add_vec (G0c !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2574 : mword 12)))]> G0c).
+    set (G10 := <[Regidx (mword_of_int 10) := regval_into_reg (add_vec (G0c !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2590 : mword 12)))]> G0c).
     assert (HG10a0 : G10 !!! Regidx (mword_of_int 10 : mword 5) = a_tx_lock).
     { rewrite /G10 upd_eq. rewrite /G0c upd_eq.
       unfold a_tx_lock. apply bv_eq; vm_compute; reflexivity. }
@@ -552,14 +552,14 @@ Section ProofUartPutc.
     assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.uartputc_sync + 0x34) : mword 64) 4 = mword_of_int (KernelSyms.uartputc_sync + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp38) in "Hpc".
     (* +0x38 addi a0,a0,-1584 -> &tx_lock *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x38)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 2534 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.uartputc_sync + 0x38)) (mword_of_int 10) (mword_of_int 10) (mword_of_int 2550 : mword 12)
               H34 (trap_res b + (K - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi38").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (H38 := <[Regidx (mword_of_int 10) := regval_into_reg (add_vec (H34 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2534 : mword 12)))]> H34).
+    set (H38 := <[Regidx (mword_of_int 10) := regval_into_reg (add_vec (H34 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 2550 : mword 12)))]> H34).
     assert (HH38a0 : H38 !!! Regidx (mword_of_int 10 : mword 5) = a_tx_lock).
     { rewrite /H38 upd_eq. rewrite /H34 upd_eq.
       unfold a_tx_lock. apply bv_eq; vm_compute; reflexivity. }

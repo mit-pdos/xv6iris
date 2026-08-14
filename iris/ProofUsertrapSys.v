@@ -38,7 +38,7 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
 Require Import PageGeom.
 Require Import RegFile HartTp WpNext CpuOwn.
 Require Import WpMmodeLeafBase.
@@ -98,7 +98,8 @@ Section UtSysBlock.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (lks : gset nat) :
+      (m0 m : regfile) (av nx : nat) (C : iProp Σ)
+      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res false + nx)%nat = (av - 4)%nat ->
@@ -112,6 +113,8 @@ Section UtSysBlock.
        while the one at +0xa6 does. *)
     m !!! Regidx Ra0 = un_pj N ->
     ut_cs m0 m ->
+    mie_v = MIE_S ->
+    menvcfg0 = MENVCFG_S ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
@@ -119,10 +122,11 @@ Section UtSysBlock.
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
-      (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0) -∗
+      (fun CID' => usertrap_post (CID := CID') (ut_res SY.syscall_env) pt ksp m0
+                     mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     pose proof (ut_nx_bound_off av nx Hav Hnx) as Hkso.
     unfold K_syscall, K_sys_exit, K_kexit, kv_frame_slots in Hks, Hkso.
@@ -424,10 +428,12 @@ Section UtSysBlock.
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
-                n2 C true lks
+                n2 C true
+                mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
+                Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].

@@ -18,7 +18,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode01.
-Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
@@ -129,9 +128,9 @@ Section CodeUartinit.
   Proof. mk_base (KernelSyms.uartinit + 0x42) (mword_of_int 0x00012517 : mword 32)
     (mword_of_int (KernelSyms.uartinit + 0x42) : mword 64) (UTYPE (mword_of_int 18 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00012517. Qed.
 
-  Lemma uii_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) false (ITYPE (mword_of_int 2748 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uartinit + 0x46) (mword_of_int 0xabc50513 : mword 32)
-    (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) (ITYPE (mword_of_int 2748 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_abc50513. Qed.
+  Lemma uii_46 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) false (ITYPE (mword_of_int 2764 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uartinit + 0x46) (mword_of_int 0xacc50513 : mword 32)
+    (mword_of_int (KernelSyms.uartinit + 0x46) : mword 64) (ITYPE (mword_of_int 2764 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_acc50513. Qed.
 
   Lemma uii_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartinit + 0x4a) : mword 64) false (JAL (mword_of_int 638 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.uartinit + 0x4a) (mword_of_int 0x27e000ef : mword 32)

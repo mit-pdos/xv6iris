@@ -51,13 +51,14 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
-    (C : ucfg) (pt : uptd) :=
+    (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :=
   hw_config -∗ minstret_inv -∗ wire_inv -∗
-  user_inv C pt -∗ stvec_handler_wp C pt -∗
+  user_inv C pt Rut -∗ stvec_handler_wp C pt Rut -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USER.
   Parameter wp_user_exec_closed :
-    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd),
-      wp_user_exec_closed_body C pt.
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ),
+      wp_user_exec_closed_body C pt Rut.
 End USER.

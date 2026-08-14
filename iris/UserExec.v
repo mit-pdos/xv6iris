@@ -223,6 +223,15 @@ Section UserExec.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
+  (* The exclusive [usertrap_res]-shaped residue that must survive
+     UNCHANGED across arbitrary user-mode execution: usertrap's proof
+     (SpecUsertrap.v) hands it to the loop on trap entry and gets it back
+     unchanged on the next trap, so it rides inside [user_inv]/
+     [user_trap_frame] as one more conjunct, opaque to everything in this
+     file.  Concretely instantiated (by whoever closes the loop, e.g.
+     [UservecProof]) as [fun pt => ∃ ksp, UT.usertrap_res pt ksp]. *)
+  Context (Rut : uptd -> iProp Σ).
+
   Local Notation dqc := (uc_dqc C).
 
   (* the loop-constant config cells (fraction [dqc]: never written during
@@ -283,7 +292,8 @@ Section UserExec.
       ⌜forall u, hs = HART_ACTIVE u -> va' = va⌝ ∗
       user_regs hs ms_v sc_v stval_v sepc_v va va' g ∗
       user_pt_inv pt ∗
-      user_cfg)%I.
+      user_cfg ∗
+      Rut pt)%I.
 
   (* ------------------------------------------------------------------- *)
   (* The trapped frame: what a synchronous trap out of user mode hands the *)
@@ -306,7 +316,8 @@ Section UserExec.
       pc_is (stvec_base (uc_stvec C)) ∗
       gpr_file g ∗
       user_pt_inv pt ∗
-      user_cfg)%I.
+      user_cfg ∗
+      Rut pt)%I.
 
   (* assemble the trapped frame from the delivered cells (shared by every
      trap arm -- the values differ, the shape never does) *)
@@ -317,12 +328,12 @@ Section UserExec.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms' -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ stv' -∗ sepc ↦ᵣ sep' -∗
     PC ↦ᵣ stvec_base (uc_stvec C) -∗ nextPC ↦ᵣ stvec_base (uc_stvec C) -∗
-    gpr_file g -∗ user_pt_inv pt -∗ user_cfg -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg -∗ Rut pt -∗
     user_trap_frame.
   Proof.
-    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
+    iIntros (Hok) "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut".
     iExists ms', sc', stv', sep', g.
-    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg".
+    iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hgpr Hupt Hcfg Hrut".
     iSplitR; [ iPureIntro; exact Hok | ].
     iFrame "Hpc Hnpc".
   Qed.
@@ -356,6 +367,7 @@ Section UserExec.
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         user_pt_inv pt -∗
         user_cfg -∗
+        Rut pt -∗
         ▷ ((user_inv -∗ WP (Loop : expr riscv_lang)) ∧
            (user_trap_frame -∗ WP (Loop : expr riscv_lang))) -∗
         WP (Loop : expr riscv_lang)))%I.

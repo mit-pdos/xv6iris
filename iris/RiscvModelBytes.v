@@ -18,6 +18,23 @@ From stdpp Require Import gmap.
 From stdpp Require Import bitvector.definitions.
 From stdpp Require Import list_monad.
 
+(* The tree-wide [set_solver] override.  It lives here, rather than in each  *)
+(* file that uses [set_solver], because this file is a transitive dependency *)
+(* of 1071 of the tree's 1090 proof files -- so a NEW proof gets the fast    *)
+(* tactic without having to know it exists.  It adds no dependency this file *)
+(* did not already have ([stdpp.gmap] above already pulls in [stdpp.sets]);  *)
+(* the two set_solver-using files this does not reach (BitmapEnc.v and       *)
+(* CrashProto.v) import FastSetSolver.v directly.  See FastSetSolver.v.      *)
+(*                                                                          *)
+(* EXPORT, NOT IMPORT, AND THAT IS LOAD-BEARING TWICE OVER: it is what makes *)
+(* the override reach this file's importers at all, and it is what keeps the *)
+(* nightly dead-import sweep (.github/workflows/dead-imports.yml) from       *)
+(* deleting it.  By that sweep's definition this IS a dead import -- the     *)
+(* tree compiles without it, only slower -- and the sweep pushes to main on  *)
+(* its own; [Require Export] lines are skipped by default, which is the      *)
+(* protection being relied on here.                                          *)
+Require Export FastSetSolver.
+
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 

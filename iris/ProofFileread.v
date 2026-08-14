@@ -1168,13 +1168,13 @@ Section ProofFileread.
                              = mword_of_int (FR + 0x88)) by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Hpp88) in "Hpc".
              iApply (wp_addi4_s_sconf (mword_of_int (FR + 0x88)) Ra4 Ra4
-                       (mword_of_int 418 : mword 12) D6 (K - 6)%nat b
+                       (mword_of_int 434 : mword 12) D6 (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi88").
              iIntros (CID53 Hs53) "Hcg Hpc". iEval (rgne) in "Hcg".
              set (D7 := <[Regidx Ra4 := regval_into_reg
                            (add_vec (D6 !!! Regidx Ra4)
-                              (sign_extend' 64 (mword_of_int 418 : mword 12)))]> D6).
+                              (sign_extend' 64 (mword_of_int 434 : mword 12)))]> D6).
              assert (HD7a4 : D7 !!! Regidx Ra4
                              = (mword_of_int KernelSyms.devsw : mword 64)).
              { rewrite /D7 upd_eq /D6 upd_eq.
@@ -1758,9 +1758,9 @@ Section ProofFileread.
              (* v3: ilock also hands back the checkout descriptor's other
                 half, which iunlock consumes to select its own escrow arm
                 (design §14.8) *)
-             iIntros (CIDil Hsil mil dnl bml)
+             iIntros (CIDil Hsil mil dnl bml fl_)
                "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-                Hidev Hinum Hvalid Hlk #Hshot".
+                Hidev Hinum Hvalid Hlk #Hshot %Hfr_".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
              { rewrite HI2ra. apply bv_eq; vm_compute; reflexivity. }

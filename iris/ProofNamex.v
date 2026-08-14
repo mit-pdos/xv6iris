@@ -3195,9 +3195,9 @@ Section ProofNamexMain.
                    all: try lkbelow.
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
-                   iIntros (CIDil Hqil mil dnl bml)
+                   iIntros (CIDil Hqil mil dnl bml fl_)
                      "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hinos Hbs1 Hslkd Hslpid Hdep
-                      Hidev Hiinum Hivalid Hload #Hshot".
+                      Hidev Hiinum Hivalid Hload #Hshot %Hfr_".
                    assert (Hpcbc : ret_pc (V2 !!! Regidx Rra)
                             = mword_of_int (NX + 0xc6)).
                    { rewrite HV2ra. pcw. }
@@ -3331,7 +3331,7 @@ Section ProofNamexMain.
                                        exact (nx_nlz_eq _ Hnl0))
                                  ltac:(rewrite Htg07an; vm_compute; reflexivity)
                                  with "Hcg Hpc Hjnlz").
-                       iIntros (CIDN0 HqN0). iNext. iIntros "Hcg Hpc".
+                       iIntros (CIDN0 HqN0). iApply bi.later_intro. iIntros "Hcg Hpc".
                        iEval (rewrite Htg07an) in "Hpc".
                      iPoseProof (nxi_07a with "Htext") as "Hj54".
                      iPoseProof (nxi_07c with "Htext") as "Hj56".
@@ -3471,7 +3471,7 @@ Section ProofNamexMain.
                                ND3 (K - 12)%nat b
                                ltac:(rewrite Htgj5c; vm_compute; reflexivity)
                                with "Hcg Hpc Hj82").
-                     iIntros (CIDN4 HqN4). iNext. iIntros "Hcg Hpc".
+                     iIntros (CIDN4 HqN4). iApply bi.later_intro. iIntros "Hcg Hpc".
                      iEval (rewrite Htgj5c) in "Hpc".
                      iSpecialize ("Htail" $! CIDN4 with "[%]");
                        [wp_next_chain |].

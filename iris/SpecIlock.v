@@ -115,6 +115,35 @@
    the honest statement; every other panic in this tree is refuted, and the
    proof file says at which instruction this one is taken.
 
+   ---- THE CLAIM-BOX INDICATOR (fs-sysfile D₀, increment 1) -------------
+
+   The postcondition carries one more output, [filled : bool], and the
+   conditional fact [filled = true -> InodeRegion.fresh_shape dn].  This is
+   NOT new content: [InodeRegion.ireg_withdraw] already PROVES
+   [fresh_shape] and hands it to [ProofIlock]'s third fill sub-arm --
+   §16.4's CLAIM BOX, the first fill of an entry [ialloc] has just claimed
+   -- and that arm then spends it building [inode_ok] / [dir_ok] and drops
+   it.  The contract simply failed to expose proven content, and exposing
+   it is the point of the exercise.
+
+   IT HAS TO BE CONDITIONAL, and the boolean is the condition rather than a
+   premise, because [fresh_shape dn] is FALSE on the other two arms: a
+   cached entry and an ordinary fill both return a record with real size
+   and real blocks.  So [filled] means EXACTLY "this call took §16.4's
+   claim-box arm", the cached arm and the ordinary fill both report
+   [false], and a caller that cannot show [filled = true] is exactly where
+   it was before.
+
+   WHO WANTS IT: create's [ilock(ip)] at +0x98, on the inode [ialloc] just
+   claimed.  [SpecCreate]'s [made] arm needs [di_size dn = 0] and
+   [di_addrs dn = replicate 13 (bv_0 32)] -- for [ProofCreateParts.
+   cr_made_setf]'s [create_made] identity and for [dirlink(ip,".")]'s
+   "the append fits" premise, neither of which [InodeLock.inode_ok]'s
+   loose size cap can give -- and [fresh_shape] is exactly those two facts.
+   That leaves [di_type dn = ty] as the ONLY underivable half of create's
+   fresh-record obligation, which is what [LinkCreateFreshTy.v] assumes and
+   nothing more.  Every other caller ignores the pair.
+
    ilock SLEEPS (acquiresleep, and bread inside the uncached arm), so it
    threads the full running-process bundle.  It enters and returns at
    noff 0.  ONE [bslot]: bread's reference, which brelse gives back. *)
@@ -255,7 +284,7 @@ Definition wp_ilock_sconf_body
      [b = false] the [b] form would claim the function returns on the hart
      that called it, which is false. *)
   wp_next true pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (dn : dinode) (bm : blkmap),
+  ∀ (mf : regfile) (dn : dinode) (bm : blkmap) (filled : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b lks -∗
@@ -295,6 +324,10 @@ Definition wp_ilock_sconf_body
          vacuous.  A generation sees at most one fill (17.6), which is what
          makes that agreement sound. *)
       ity_shot g (di_type dn) -∗
+      (* THE CLAIM-BOX INDICATOR -- see the header.  Proven content, not a
+         new obligation: [InodeRegion.ireg_withdraw] pays [fresh_shape] to
+         §16.4's fill sub-arm and this clause is where it now leaves. *)
+      ⌜filled = true -> fresh_shape dn⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -23,15 +23,14 @@ Require Import KernelDecode05.
 Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
-Require Import KernelDecode12.
-Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
-Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
+Require Import KernelDecode22.
 Require Import KernelDecode25.
+Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode29.
 Require Import KernelDecode31.
@@ -73,9 +72,9 @@ Section CodeSysDup.
   Proof. mk_rvc (KernelSyms.sys_dup + 0xe) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_dup + 0xe) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma sdi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x10) : mword 64) false (JAL (mword_of_int 2096650 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_dup + 0x10) (mword_of_int 0xe0bff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_dup + 0x10) : mword 64) (JAL (mword_of_int 2096650 : mword 21, Regidx (mword_of_int 1))) kd_e0bff0ef. Qed.
+  Lemma sdi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x10) : mword 64) false (JAL (mword_of_int 2096626 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_dup + 0x10) (mword_of_int 0xdf3ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_dup + 0x10) : mword 64) (JAL (mword_of_int 2096626 : mword 21, Regidx (mword_of_int 1))) kd_df3ff0ef. Qed.
 
   Lemma sdi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x14) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_dup + 0x14) (mword_of_int 0x57fd : mword 16)
@@ -101,9 +100,9 @@ Section CodeSysDup.
   Proof. mk_rvc (KernelSyms.sys_dup + 0x22) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_dup + 0x22) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma sdi_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x24) : mword 64) false (JAL (mword_of_int 2096720 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_dup + 0x24) (mword_of_int 0xe51ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_dup + 0x24) : mword 64) (JAL (mword_of_int 2096720 : mword 21, Regidx (mword_of_int 1))) kd_e51ff0ef. Qed.
+  Lemma sdi_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x24) : mword 64) false (JAL (mword_of_int 2096696 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_dup + 0x24) (mword_of_int 0xe39ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_dup + 0x24) : mword 64) (JAL (mword_of_int 2096696 : mword 21, Regidx (mword_of_int 1))) kd_e39ff0ef. Qed.
 
   Lemma sdi_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x28) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.sys_dup + 0x28) (mword_of_int 0x892a : mword 16)
@@ -121,9 +120,9 @@ Section CodeSysDup.
   Proof. mk_rvc (KernelSyms.sys_dup + 0x30) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_dup + 0x30) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma sdi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) false (JAL (mword_of_int 2094012 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_dup + 0x32) (mword_of_int 0xbbcff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) (JAL (mword_of_int 2094012 : mword 21, Regidx (mword_of_int 1))) kd_bbcff0ef. Qed.
+  Lemma sdi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) false (JAL (mword_of_int 2093988 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_dup + 0x32) (mword_of_int 0xba4ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_dup + 0x32) : mword 64) (JAL (mword_of_int 2093988 : mword 21, Regidx (mword_of_int 1))) kd_ba4ff0ef. Qed.
 
   Lemma sdi_36 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_dup + 0x36) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.sys_dup + 0x36) (mword_of_int 0x87ca : mword 16)

@@ -36,8 +36,11 @@
        [kroot] (the premises mirror userret's user-satp premises with the
        roles swapped); the jalr target is [ret_pc vktr] (bit 0 cleared by
        the hardware), which a consumer pins to KernelSyms.usertrap.
-     - [kpt_frame kroot]: the parked kernel table (userret's post); the
-       exit switch re-seals it into the live [tlb_inv_pt kroot].
+     - [kpt_inv kroot]: the ambient, persistent shared-kernel-table
+       invariant (KptShare.v).  Nothing is threaded out on the far side:
+       the exit switch folds the table back into [kpt_inv] itself rather
+       than resealing an exclusive [tlb_inv_pt], so usertrap picks up the
+       kernel table the same ambient way every other kernel function does.
 
    The continuation is universally quantified over the trap frame's
    existentials (the user register file [g], the delivered mstatus and
@@ -60,7 +63,7 @@ Require Import WpGpr.
 Require Import KernelText.
 Require Import SmodeCore.
 Require Import PtTree.
-Require Import TrampPt KptTree UptTree TransPt UserretDefs.
+Require Import TrampPt KptTree UptTree TransPt KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
@@ -103,7 +106,6 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     stval ↦ᵣ stval_v -∗
     sepc ↦ᵣ sepc_v -∗
     sscratch ↦ᵣ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
-    tlb_inv_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
     udata_own (ud_data pt) -∗
     user_cfg C -∗
@@ -148,7 +150,7 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
 Global Typeclasses Opaque uservec_post.
 
 Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (C : ucfg) (pt : uptd) (kroot : mword 44)
+    (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
     (sscr0 : mword 64)
     (vksat vksp vktr vkhart : bv 64)
     (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
@@ -177,10 +179,10 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
      [wp_userret_pt] takes) *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* the machine, exactly as the trap delivers it *)
-  user_trap_frame C pt -∗
+  user_trap_frame C pt Rut -∗
   (* the kernel-side resources parked while user code ran *)
   sscratch ↦ᵣ sscr0 -∗
-  kpt_frame kroot -∗
+  kpt_inv kroot -∗
   tf_pa tfp 0 ↦ₚ₈{ dqk } vksat -∗
   tf_pa tfp 8 ↦ₚ₈{ dqk } vksp -∗
   tf_pa tfp 16 ↦ₚ₈{ dqk } vktr -∗
@@ -225,13 +227,14 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
 Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (kroot : mword 44) (sscr0 : mword 64)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (kroot : mword 44) (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)
       (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
        w272 w280 w112 : bv 64)
       (dqk : dfrac),
-      wp_uservec_pt_body C pt kroot sscr0 vksat vksp vktr vkhart
+      wp_uservec_pt_body C pt Rut kroot sscr0 vksat vksp vktr vkhart
         w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
         w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
         w272 w280 w112 dqk.

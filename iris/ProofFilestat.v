@@ -703,9 +703,9 @@ Section ProofFilestat.
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
-      iIntros (CIDil Hsil mil dnl bml)
+      iIntros (CIDil Hsil mil dnl bml fl_)
         "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hsb Hbslot Hheld Hslpid Hdep
-         Hidev Hinum Hvalid Hlk #Hshot".
+         Hidev Hinum Hvalid Hlk #Hshot %Hfr_".
       iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
       assert (Hpc2a : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (FST + 0x2a)).
       { rewrite HQ3ra. apply bv_eq; vm_compute; reflexivity. }
