@@ -421,6 +421,9 @@ Section KexecABody.
     (* ---- b = eb = true (see the header) ---- *)
     iDestruct (kxc_sie_b_agree m 0%nat K eb b (proc_addr jp) C lks with "Hcg Hcnt") as %Houtb.
     subst eb. cbn in Houtb. subst b.
+    (* depth 0 forces the held set empty, so begin_op's order premise ("log",
+       3) needs no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".

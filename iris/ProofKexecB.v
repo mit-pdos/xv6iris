@@ -498,7 +498,7 @@ Section KexecBBody.
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PPT.wp_proc_pagetable_core ga G2 tfr (DfracOwn (1/4)) 0%nat
-              (K - 68)%nat true (proc_addr jp) C None true
+              (K - 68)%nat true (proc_addr jp) C None true lks
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)
               with "Hcg Hcnt Htext Hpc [Htfc] Hka").

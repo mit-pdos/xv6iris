@@ -191,6 +191,13 @@ Proof. set_solver. Qed.
 Lemma locks_union_empty (r : nat) : ({[r]} : gset nat) ∪ ∅ = {[r]}.
 Proof. set_solver. Qed.
 
+(* the other half of the depth-0 story: a balanced release inside a body whose
+   entry set is forced empty leaves [∅ ∖ {[r]}], which is [∅].  Proved at an
+   ABSTRACT [X] so no call site ever runs [set_solver] against [lock_rank]'s
+   fifteen-way [String.eqb] chain. *)
+Lemma locks_empty_del (X : gset nat) : (∅ : gset nat) ∖ X = ∅.
+Proof. set_solver. Qed.
+
 (* the same at the premise a caller actually holds *)
 Lemma locks_add_del_below (r : nat) (lks : gset nat) :
   locks_below lks r -> ({[r]} ∪ lks) ∖ {[r]} = lks.

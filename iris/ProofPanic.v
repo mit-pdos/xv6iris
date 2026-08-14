@@ -366,7 +366,7 @@ Section ProofPanic.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID9) (dqf := DfracDiscarded)
               γpr γl γd γv P5 (K - 4)%nat bs n eb C pn_hdr [] b p lks
-              _ (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
+              (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
               with "Hcg Hown Htext Hkdata Hpc Hpan [Hhdr] [] Hlk Hdev Htx Hsub").

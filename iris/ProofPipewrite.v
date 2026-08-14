@@ -1412,7 +1412,7 @@ Section ProofPipewrite.
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  T4 0%nat true (proc_addr j) C (av - 14)%nat HlkaT4 HavR
+                  T4 0%nat true (proc_addr j) C (av - 14)%nat lks HlkaT4 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -1440,6 +1440,10 @@ Section ProofPipewrite.
                        = mword_of_int (KernelSyms.pipewrite + 0x58)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjep) in "Hpc".
         rewrite /pw_epi.
+        (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
+           depth 0 makes that the empty set the exit continuation names. *)
+        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
+        iEval (rewrite Hlkempty) in "EPI".
         iSpecialize ("EPI" $! CIDp16 with "[%]"); [wp_next_chain|].
         iApply ("EPI" $! mr P' with "[%] [%] [%] HF7 Hhi Hcg Hown Hpc Href Hpriv").
         + apply (pw_base_regs_cs m M mr (pa_stk sp0 14%nat) HcsMmr).
@@ -1478,7 +1482,7 @@ Section ProofPipewrite.
           apply kv_addv_zero. }
         assert (HavR : (10 <= av - 14)%nat) by lia.
         iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  Q2 0%nat true (proc_addr j) C (av - 14)%nat HlkaQ2 HavR
+                  Q2 0%nat true (proc_addr j) C (av - 14)%nat lks HlkaQ2 HavR
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
         { iApply lock_finisher_close. }
@@ -2181,7 +2185,7 @@ Section ProofPipewrite.
             rewrite Hs3L1. apply add_vec_zero_l. }
           assert (Hlvl1 : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
           assert (Hav14 : (14 <= trap_res true + (av - 14))%nat) by lia.
-          iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false
+          iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false lks
                     Ha0L3 Hj Hjlp Hlvl1 Hav14 Hbelowproc
                     with "Hcg Hown Htext Hpc Hpinv Hpanic").
           all: try lkbelow.
@@ -2416,7 +2420,7 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
               iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp G2
-                        (trap_res true + (av - 14))%nat 1%nat true C false
+                        (trap_res true + (av - 14))%nat 1%nat true C false lks
                         Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14 Hbelowproc
                         with "Hcg Hown Htext Hpc Hpinv Hpanic").
               all: try lkbelow.
@@ -2463,7 +2467,7 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|].
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMwMsp. }
               iApply (ReleaseGen.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                        G4 0%nat true (proc_addr j) C (av - 14)%nat HlkaG4 Hav10
+                        G4 0%nat true (proc_addr j) C (av - 14)%nat lks HlkaG4 Hav10
                         ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                         with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
               { iApply lock_finisher_close. }
@@ -2494,7 +2498,7 @@ Section ProofPipewrite.
                  with interrupts ENABLED, so [trap_csrs_ext true = emp] and
                  [cpu_claim_ext true pj = emp] -- sleep's own acquire mints the
                  pair out of the enabled SIE arm. *)
-              iApply (Sleep.wp_sleep_sconf γs j γlp G5 (av - 14)%nat true C
+              iApply (Sleep.wp_sleep_sconf γs j γlp G5 (av - 14)%nat true C lks
                         Hj Hjlp ltac:(lia) Hbelowproc
                         with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").
               all: try lkbelow.
@@ -2686,7 +2690,7 @@ Section ProofPipewrite.
                 with "[Hch]" as "Hbuf".
               { cbn [seq]. iSplitL "Hch"; [| done]. iEval (rewrite Ha2N5 pa_add_0). iExact "Hch". }
               iApply (Copyin.wp_copyin_sconf γa N5 Pc (pv_sz V) 1%nat (fun _ : nat => b0)
-                        (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false
+                        (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false lks
                         HK50 Ha0N5 Ha1N5 Ha4N5 Hlen1 Hszb Hlvl1
                         with "Hcg Hown Htext Hpc Hpt Henv Hbuf").
               all: try lkbelow.

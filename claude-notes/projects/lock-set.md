@@ -16,13 +16,12 @@ succeeds against the wrong remote and the pin stays an unknown object.)
 
 ## Where it stands
 
-Phase 1 is in: every hart owns `cpu_locks S`, a held-lock set tied to
-`lk->cpu` by co-ownership of that field, maintained by acquire and release.
-It is **hidden** — it rides inside `IntrDefs.cpu_hart` under
-`cpu_locks_any := ∃ S, cpu_locks S`, and no contract in the tree mentions it.
-So it currently proves nothing to a caller; it is the substrate.
+Every hart owns `cpu_locks S`, a held-lock set of RANKS tied to `lk->cpu` by
+co-ownership of that field, maintained by acquire and release, and `cpu_own`
+carries it as an index.  The existential wrapper `cpu_locks_any` that hid it
+during phase 1 is deleted; contracts name the set.
 
-## WHERE IT STANDS: the substrate is LANDED AND PROVEN, the clients are not
+## The substrate is LANDED AND PROVEN, the clients are most of the way
 
 `cpu_own` carries the held set as an index, and the acquire/release pair is
 proved against it.  Building clean: `LockRank.v`, `LockSet.v`, `WpLock.v`,
@@ -43,25 +42,45 @@ What that establishes, machine-checked rather than argued:
   set the caller NAMES and puts back a DIFFERENT one, which is what an
   acquisition actually does.
 
-### The premise is NON-MEMBERSHIP for now, not the order
+### The premise IS the order bound
 
-acquire takes `lock_rank s ∉ lks`, not `locks_below lks (lock_rank s)`.  It is
-all either obligation needs (minting the fragment; refuting the holder), and it
-lands first deliberately.  The bridge to the order form is already in place and
-unused: `LockRank.locks_below`, `locks_below_not_elem`,
-`LockSet.cpu_locks_insert_below`, `LockSet.cpu_locks_not_in_below`.  Phase 3 is
-a premise swap at two sites.
+acquire takes `locks_below lks (lock_rank s)`.  The non-membership form
+(`lock_rank s ∉ lks`) landed first and is gone; `locks_below_not_elem` derives
+it where the fragment mint and the holder refutation still want it.  The
+reason for the swap is that a caller needs MANY not-in facts and only ONE
+bound: `iput` states its bound at `"itable"` (2) and that one premise covers
+`itable`, the sleeplock spinlock (6) and `log` (3) all at once.
 
-**The known complication for the order phase** is `iput`: it calls
-`acquiresleep` while holding `itable.lock`.  That is NOT an order inversion --
-`"sleep lock"` (6) is above `itable` (2), and acquiring upward is what the rule
-permits.  The hazard is that `acquiresleep` may SLEEP, and `sched`'s
-`if (mycpu()->noff != 1) panic("sched locks")` forbids sleeping with another
-spinlock held.  The C is safe for a reason outside the lock layer entirely --
-`ip->ref == 1` means nobody else can have the inode locked, so the wait loop
-never runs -- so proving it needs the icache REF-1 exclusivity theorem
-(`design/fs-icache.md`) to reach a non-blocking `acquiresleep` variant.  Owed
-either way once `sleep`/`sched` get lock-set-aware contracts.
+**A contract must state its bound at the MINIMUM rank over its whole cone.**
+`locks_below lks r` gets STRONGER as `r` drops, and `locks_below_mono` only
+RAISES a bound, so a contract stating `"time"` (8) cannot deliver the `"cons"`
+(5) one of its callees wants.  `SpecDevintr` and `SpecKerneltrap` were both
+wrong this way -- they said `"time"`, for clockintr's tickslock, but devintr
+also dispatches uartintr -> consoleintr, which acquires `cons.lock` at 5.  An
+audit of every premise-carrying contract against the contracts it calls found
+no others; the check is worth re-running after any new premise lands.
+
+### The two tactics the sweep runs on
+
+`LockRank.lkbelow` discharges an order side condition by whichever of the five
+composition lemmas applies -- empty set, an exact hypothesis, a lower-ranked
+hypothesis (`locks_below_mono`), a `{[r]} ∪ _` tower
+(`locks_below_union_singleton`), a `_ ∖ X` (`locks_below_difference`), or a
+`lks = ∅` equation in scope.  It is GOAL-GUARDED (`lazymatch` on
+`locks_below _ _`), which is what makes `all: try lkbelow.` a safe no-op at a
+call site that passed the premise explicitly -- and that in turn is what let
+the same line go in after all 353 calls that can raise the goal without
+auditing each first.  It never unfolds `lock_rank` except under `vm_compute`
+on a goal that is two numerals; see the `locks_add_del` note below for what
+happens when `set_solver` gets near it.
+
+`CpuOwn.cpu_own_zero_empty` is the other half: at depth 0 the level/set
+coupling FORCES `lks = ∅`.  Every `wp_sys_*` body, `yield`, the trap tails,
+`namei`/`nameiparent`, and every panic tail derives it instead of demanding a
+bound -- which is what stops the premise cascading out of the syscall layer
+into `SpecSyscall` and `SpecUsertrap`.  Keep it as an EQUATION and never
+`subst`: substituting deletes `lks` from scope and breaks every later
+mention of it in the script (a dozen argument lists per file).
 
 ### `panic_wp_any` STAYS in acquire's contract
 
@@ -155,36 +174,49 @@ it, the enabled one because it forces `lks = ∅`.
   expected to have type `(size lks <= n)%nat`"*).  Annotate every coupling
   occurrence `%nat`.  Same trap bit `ProofLogWrite` on a `lock_rank` comparison.
 
-## WHAT IS LEFT: propagating the premise to the ~50 acquire call sites
+## The client sweep: the four defects it kept producing
 
-~100 files still fail, and they are almost all LOCK CLIENTS.  This part is NOT
-mechanical: each lock-holding region must NAME the set it actually holds,
-read off the C.  Two shapes:
+Propagating the premise took the tree from 72 failing files to a couple of
+dozen, and the residue sorted itself into four shapes that recur often enough
+to be worth naming.  Three are mechanical; the fourth is not.
 
-- **balanced** (acquire and release in the same function): thread `lks`
-  unchanged.  This is most of them and it is safe.
-- **asymmetric or region-crossing**: the set differs mid-body, and threading
-  `lks` unchanged TYPECHECKS while stating something false.  A green build does
-  not certify these.  Known instances:
-  - `ProofAllocproc` -- allocproc RETURNS holding `p->lock` ("return with
-    p->lock held", proc.c).  `SpecAllocproc` says `lks ∪ {[rank "proc"]}`,
-    `ProofAllocproc` says `lks`; they disagree, which is the good outcome.
-  - `ProofKexit` -- the `wait_lock` -> `p->lock` -> `release(wait_lock)` ->
-    `sched()` region, i.e. the non-LIFO case.
-  - `ProofKwait` -- three nesting levels (`wait_lock` + per-proc lock).
-  - `ProofIput`, `ProofVirtioDiskRw`/`RwB`, `ProofAcquiresleep`, `ProofBread`,
-    `ProofSleep`, `ProofPipewrite`, `ProofPrintk` -- lock held across a region
-    boundary; threaded unchanged pending review.
-  - `SpecKerneltrap` -- threaded a variable where it should be `∅`, to match
-    `IntrDefs`' handler precondition `cpu_hart 0 false p ∅`.
-  - `UsertrapRes.ut_res` -- existentially quantifies `lks`, which is the shape
-    this phase exists to remove.
+1. **A stray explicit `lks` at `cpu_own_transport`.**  That lemma takes
+   `{lks}` IMPLICITLY on purpose -- it is what kept its ~1000 call sites out
+   of this sweep entirely.  89 sites had an explicit one added anyway, where
+   it landed in the `wp_next_chain` proof's slot and surfaced as
+   `The term "lks" ... expected to have type "b = false ∨ p = zero_reg → ..."`.
 
-Done so far, as the pattern for the rest: `ProofSched`'s swtch seam is
-`{[lock_rank "proc"]}` (both directions -- `∅` occurs only in the scheduler
-loop between `release` and the next `acquire`, which is exactly where
-`intr_on()` sits), and `ProofBrelse.brelse_tail` is `{[lock_rank "bcache"]}`
-(`n = 1` says exactly one acquire).
+2. **A missing positional `lks`** at a callee whose binder list gained it.
+   Every premise argument then slides one place left, and the compiler names
+   the term at the offset where that SURFACED -- never where the hole is.
+   `lks` is always the LAST explicit binder, after `b`.
+
+3. **A local helper lemma with no order premise**, in a file whose main
+   contract has one.  The `locks_below` side goal then has nothing in scope,
+   `try lkbelow` is a no-op, and the NEXT tactic reports the failure -- often
+   as a partially-introduced `(CID14 < lock_rank "kmem")%nat`, because the
+   script's own `iIntros (CID14 ...)` ate the `∀ q, q ∈ lks →` prefix.
+
+4. **The held set spelled wrong across a region.**  This is the one a green
+   build would not have caught, and the one that has to be read off the C: a
+   region that holds a lock must SAY so.  `printk`'s epilogue takes
+   `{[lock_rank "pr"]} ∪ lks` and returns `lks`; `iget`'s scan-loop invariants
+   carry `{[lock_rank "itable"]} ∪ lks`; `consoleread` passes
+   `{[lock_rank "cons"]} ∪ lks` to everything it calls under the lock;
+   `acquiresleep`'s sleep_prepare runs BEFORE its release and so takes the
+   union, while its `sleep` runs after and takes the bare `lks`.
+
+A static check for (2) is NOT possible: `iApply` completes a partial argument
+list by unification, so a short one is normal and a scan that flags it drowns
+in false positives.  The build is the only oracle.
+
+### The sched crossing landed as designed
+
+`swtch` pins `{[lock_rank "proc"]}` on both sides, so `sleep` and `kexit`
+rewrite their held set to the bare singleton at the park -- `lks = ∅` from
+depth 0, then `locks_union_empty`.  That IS xv6's `panic("sched locks")`
+discipline, stated: a path that reaches `sched` holding anything else is
+genuinely a panic and should not be provable.
 
 ## The audit: xv6 never holds two spinlocks of the same NAME
 

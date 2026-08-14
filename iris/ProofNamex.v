@@ -5912,6 +5912,7 @@ Section ProofNamexMain.
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog
                     [Hcont]").
+    all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     rewrite /namex_postS.

@@ -970,7 +970,7 @@ Section ProofFilestat.
                 (fsn_cov fn) (fsn_logstart fn)
                 ikk (ssh/2)%Qp gsh icfg_dev inm
                 dnl bml
-                pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b
+                pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b lks
                 (fst_av_iunlock K HK) Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
@@ -1166,7 +1166,7 @@ Section ProofFilestat.
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Copyout.wp_copyout_sconf γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
-                (K - 10)%nat 0%nat eb pj C b
+                (K - 10)%nat 0%nat eb pj C b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
       all: try lkbelow.

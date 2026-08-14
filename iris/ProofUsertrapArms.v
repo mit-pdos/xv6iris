@@ -395,6 +395,7 @@ Section Ut56.
               ut_fmt1_descs false ltac:(lia) ut_fmt1_len ut_fmt1_nonul
               ut_fmt1_kinds ut_fmt1_ndescs
               with "Hcg Htext Hkd Hpc Hpw Hcpu Hpenv [Hf1] []").
+    all: try lkbelow.
     { rewrite HM5a0. iExact "Hf1". }
     { iApply ut_fmt1_descs_res. }
     iApply wp_next_off_intro. iIntros (P1) "Hcg Hpc %HcsP1 Hcpu _ _".
@@ -500,6 +501,7 @@ Section Ut56.
               ut_fmt2_descs false ltac:(lia) ut_fmt2_len ut_fmt2_nonul
               ut_fmt2_kinds ut_fmt2_ndescs
               with "Hcg Htext Hkd Hpc Hpw Hcpu Hpenv [Hf2] []").
+    all: try lkbelow.
     { rewrite HMAa0. iExact "Hf2". }
     { iApply ut_fmt2_descs_res. }
     iApply wp_next_off_intro. iIntros (P2) "Hcg Hpc %HcsP2 Hcpu _ _".

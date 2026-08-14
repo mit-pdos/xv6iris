@@ -1103,7 +1103,7 @@ Section ProofKwait.
       by (rewrite HU1a0; apply addv_sext0).
     (* ---- release(&pp->lock): level 2 -> 1, exit index still [false] ---- *)
     iApply (Release.wp_release_sconf γk (proc_addr k) "proc"%string
-              (proc_lock_res γs γk (proc_addr k)) U1 1%nat eb pme C (trap_res eb + (K - 10))%nat
+              (proc_lock_res γs γk (proc_addr k)) U1 1%nat eb pme C (trap_res eb + (K - 10))%nat _
               Hlkk ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
     (* the exit index of a release at level 1 is [false], so the hart is
@@ -1181,7 +1181,7 @@ Section ProofKwait.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
       by (rewrite HU4a0; apply addv_sext0).
     iApply (Release.wp_release_sconf γw wait_lock_addr "wait_lock"%string
-              wait_res U4 0%nat eb pme C (K - 10)%nat Hlkw ltac:(pose proof (kw_K10 K HK); lia)
+              wait_res U4 0%nat eb pme C (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok Hres Hown Hpay0").
     iIntros (CIDr2 Hsr2 mr) "Hcg Hpc %Hcsr Hown".
     iEval (rewrite (locks_add_del_below (lock_rank "wait_lock") lks Hbelow)) in "Hown".
@@ -1452,7 +1452,7 @@ Section ProofKwait.
                 with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
       iApply (proc_slots_unused_intro γs (proc_addr k) with "Hdorm Hpark"). }
     iApply (Release.wp_release_sconf γk (proc_addr k) "proc"%string
-              (proc_lock_res γs γk (proc_addr k)) R3 1%nat eb pme C (trap_res eb + (K - 10))%nat
+              (proc_lock_res γs γk (proc_addr k)) R3 1%nat eb pme C (trap_res eb + (K - 10))%nat _
               Hlkk2 ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
     (* level 1 -> 1: pinned hart, so collapse rather than re-anchor *)
@@ -1532,7 +1532,7 @@ Section ProofKwait.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
       by (rewrite HR6a0; apply addv_sext0).
     iApply (Release.wp_release_sconf γw wait_lock_addr "wait_lock"%string
-              wait_res R6 0%nat eb pme C (K - 10)%nat Hlkw ltac:(pose proof (kw_K10 K HK); lia)
+              wait_res R6 0%nat eb pme C (K - 10)%nat _ Hlkw ltac:(pose proof (kw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok [Hps] Hown Hpay0").
     { iExists (<[k := (zero_reg : mword 64)]> ps). iExact "Hps". }
     iIntros (CIDr2 Hsr2 mr) "Hcg Hpc %Hcsr Hown".
@@ -2364,7 +2364,7 @@ Section ProofKwait.
           { iApply (proc_lock_res_intro γs γk (proc_addr kk) st ch
                       with "Hstate Hpsg Hchan Hpub Hslots"). }
           iApply (Release.wp_release_sconf γk (proc_addr kk) "proc"%string
-                    (proc_lock_res γs γk (proc_addr kk)) S5 1%nat eb pme C (trap_res eb + (K - 10))%nat
+                    (proc_lock_res γs γk (proc_addr kk)) S5 1%nat eb pme C (trap_res eb + (K - 10))%nat _
                     Hlkc ltac:(pose proof (kw_K10 K HK); lia)
                     with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1").
           iApply wp_next_off_intro. iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
@@ -2739,7 +2739,7 @@ Section ProofKwait.
           by (rewrite HT5a0; apply addv_sext0).
         (* -------------------- release(&wait_lock) -------------------- *)
         iApply (Release.wp_release_sconf γw wait_lock_addr "wait_lock"%string
-                  wait_res T5 0%nat eb (proc_addr jj) C (K - 10)%nat Hlka
+                  wait_res T5 0%nat eb (proc_addr jj) C (K - 10)%nat _ Hlka
                   ltac:(pose proof (kw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok [Hps] Hown Hpay").
         { rewrite /wait_res. iExists px. iExact "Hps". }

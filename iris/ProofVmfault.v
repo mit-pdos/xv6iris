@@ -1489,7 +1489,7 @@ Section ProofVmfault.
       iDestruct (cpu_own_transport Cgr Ckf lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
-                (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p C (K - 6)%nat b
+                (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p C (K - 6)%nat b lks
                 ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 Hlvl Hbelow
                 with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").

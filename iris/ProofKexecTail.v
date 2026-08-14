@@ -1256,6 +1256,9 @@ Section KexecABad.
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
              Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
+    (* depth 0 with interrupts on forces the held set empty, so iunlockput's
+       order premise needs no hypothesis of this lemma's own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
@@ -1348,7 +1351,7 @@ Section KexecABad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true C true ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+              true C true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.

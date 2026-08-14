@@ -1704,13 +1704,14 @@ Section BmapTail.
       iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bms sz dev uc γpr ub crb SbI
                 pidv dq dqb dqs A1
-                (K - 6)%nat eb C b
+                (K - 6)%nat eb C b lks
                 HKba Hgeom0 Hprkc Hbgsz Hbg0 Hbgcov Hbglog
                 ltac:(intros Hc; specialize (Hcrb Hc); cbn in Hcrb;
                       exact (bmset_sing_in _ _ Hcrb))
                 Hj Hgl HA1a0
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbmres
                       Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
+      all: try lkbelow.
       iIntros (CID15 Hq15 mA) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl Harm".
       assert (Hpca2 : ret_pc (A1 !!! Regidx Rra : mword 64)
                       = mword_of_int (KernelSyms.bmap + 0xa2)) by (rewrite HA1ra; pcw).
@@ -2602,6 +2603,7 @@ Section ProofBmapMain.
                   Hj Hgl HD5a0
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbmres
                         Hprocs Hdevi Hdgeom Hdlock Hsl2 Hop").
+        all: try lkbelow.
         iIntros (CID18 Hq18 mD) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
         assert (Hpc2e : ret_pc (D5 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.bmap + 0x2e)) by (rewrite HD5ra; pcw).
@@ -3176,6 +3178,7 @@ Section ProofBmapMain.
                   Hj Hgl HP1a0
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hppid Hsbsz Hsbbm Hbmres
                         Hprocs Hdevi Hdgeom Hdlock Hsl2 Hop").
+        all: try lkbelow.
         iIntros (CID20 Hq20 mP) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbsz Hsbbm Hsl2 Harm".
         assert (Hpc54 : ret_pc (P1 !!! Regidx Rra : mword 64)
                         = mword_of_int (KernelSyms.bmap + 0x54)) by (rewrite HP1ra; pcw).

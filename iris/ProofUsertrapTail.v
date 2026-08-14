@@ -568,7 +568,7 @@ Section UtRet2.
          is what [sie_cap_gpr] was holding all along -- no [tp_pin_id] step. *)
       iExact "Hfile".
     - (* [ut_res] rebuilt at the exit hart *)
-      iExists N, V, av, C.
+      iExists N, V, av, C, lks.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
@@ -665,7 +665,7 @@ Section UtRet.
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) V
-              M1 nx C (un_pj N) uepc b ltac:(unfold K_prepare_return; lia) Hepc
+              M1 nx C (un_pj N) uepc b lks ltac:(unfold K_prepare_return; lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn Hcg Hcpu Hclmpay Hsepc Hscause Hstval
@@ -804,10 +804,9 @@ Section UtA6.
     iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (KI.wp_killed_sconf (CID := CID2) (un_s N) (un_j N) (un_l N)
-              M2 nx 0%nat b (un_pj N) C b
+              M2 nx 0%nat b (un_pj N) C b lks
               HM2a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
-              ltac:(exact (locks_below_mono lks (lock_rank "ftable")
-                             (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
+              ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
     all: try lkbelow.
     iIntros (CID3 Hk3 mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".

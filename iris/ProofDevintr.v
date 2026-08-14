@@ -1142,7 +1142,7 @@ Section ProofDevintr.
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x6e) : mword 64) 4)
           by (rewrite /K0 upd_eq; reflexivity).
         iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p C (av - 4)%nat lks
-                  ltac:(lia) ltac:(unfold devintr_stack in Hav; lia) Hbelow
+                  ltac:(lia) ltac:(unfold devintr_stack in Hav; lia) ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Htcap Htk").
         all: try lkbelow.
         iIntros (MC) "%HcsC Hcg Hcnt Hpc Htk2".

@@ -1851,7 +1851,7 @@ Section ProofFilewrite.
               icfg_nib ik (sh / 2)%Qp g
               icfg_dev inum
               pidv (DfracOwn (1/4)) (fwn_dqs fn)
-              D3 (K - 12)%nat eb C b
+              D3 (K - 12)%nat eb C b lks
               (fw_av_ilock K HK) P9 P1 P2 P3 P5 Hjp Hgsj
               ltac:(rewrite HD3a0; exact P8)
               (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
@@ -2063,7 +2063,7 @@ Section ProofFilewrite.
               (upd_upt V PI) MAXOPBLOCKS
               pidv (DfracOwn 1) (DfracOwn (1/2)) (DfracOwn (1/2))
               (fwn_dqs fn) (fwn_dqb fn) (fwn_dqbs fn)
-              Q6 (K - 12)%nat eb C b
+              Q6 (K - 12)%nat eb C b lks
               (fw_av_writei K HK)
               (fw_budget_ok (Z.to_nat (bv_unsigned v)) (Z.to_nat c) Hcb)
               P1 P2 P3 P4 P5 Hdaddr Hdty

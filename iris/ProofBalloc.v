@@ -957,7 +957,7 @@ Section BallocOut.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID13 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_epilogue (CID0 := CID13)  j γfs bn γ cov logstart bmapstart size
-              used u cr Sb (mword_of_int 0 : mword 32) pidv dq dqb dqs m QB K eb C b
+              used u cr Sb (mword_of_int 0 : mword 32) pidv dq dqb dqs m QB K eb C b lks
               HK HQBsp HQBthr HQBs1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
                     [Hbmr Hop] [Hcont]").
@@ -1195,7 +1195,7 @@ Section BallocExhaust.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID6 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_out (CID0 := CID6)  j γfs bn γ γpr γu γd cov logstart bmapstart
-              size used u cr Sb pidv dq dqb dqs m E3 K eb C b HK Hpk HE3sp HE3thr
+              size used u cr Sb pidv dq dqb dqs m E3 K eb C b lks HK Hpk HE3sp HE3thr
               with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hframe
                     Hppid Hsbsz Hsbbm Hsl Hbmr Hop [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID6) ltac:(wp_next_chain)
@@ -1453,7 +1453,7 @@ Section BallocRestore.
     iDestruct (IntrDefs.cpu_claim_ext_transport CID0 CID7 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_epilogue (CID0 := CID7)  j γfs bn γ cov logstart bmapstart size
-              used u cr Sb rv pidv dq dqb dqs m R7 K eb C b HK HR7sp HR7thr HR7s1
+              used u cr Sb rv pidv dq dqb dqs m R7 K eb C b lks HK HR7sp HR7thr HR7s1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
                     [Hfsb Hown Hbmr Hop] [Hcont]").
     { rewrite /ba_arms. iRight.

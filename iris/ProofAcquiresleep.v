@@ -292,7 +292,10 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own (S (S n)) eb (proc_addr j) C false lks -∗
+      (* HELD, same convention as [asl_exit]: [lks] is the OUTER set, this
+         stretch is entered still holding "sleep lock" (released by the
+         [+0x44 jal release] it covers). *)
+      cpu_own (S (S n)) eb (proc_addr j) C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
       arm_pay (S n) eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
@@ -311,7 +314,9 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own (S (S n)) eb (proc_addr j) C false lks -∗
+      (* HELD, same convention as [asl_loop]: [lks] is the OUTER set, this
+         loop iteration is entered still holding "sleep lock". *)
+      cpu_own (S (S n)) eb (proc_addr j) C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
       arm_pay (S n) eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗

@@ -1147,7 +1147,7 @@ Section IallocClaim.
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes ds) (diblk_bytes ds) bsd d0 -∗
     ia_cont (CID0 := CID0) γ bn inodestart ninodes nib dev ty u Sb
-            pidv dq dqs dqn j m K C b -∗
+            pidv dq dqs dqn j m K C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsp Hthr Hs1 Hs3 Hs5 Hs6 Hs2 Hkk Hbno Hcov Hlog
@@ -1459,7 +1459,7 @@ Section IallocClaim.
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
               (diblk_bytes ds) bsd d0 u
               false Sb e0 0%nat (⊤ ∖ ↑iregN) True%I
-              W5 0%nat true (proc_addr j) C (K - 8)%nat b
+              W5 0%nat true (proc_addr j) C (K - 8)%nat b lks
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HW5a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
@@ -1558,7 +1558,7 @@ Section IallocClaim.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq W7 (K - 8)%nat true (proc_addr j) C
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
-              bsd true b HKbl Hkk HW7a0
+              bsd true b lks HKbl Hkk HW7a0
               (* brelse's bound is "bcache"(4); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(exact (locks_below_mono lks (lock_rank "itable")

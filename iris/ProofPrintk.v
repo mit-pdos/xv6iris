@@ -1806,6 +1806,8 @@ Section ProofPrintk.
     (16 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     neq_vec (mc !!! Regidx a0_idx) (mc !!! Regidx (mword_of_int 19 : mword 5)) = true ->
+    (* its one callee is consputc, whose cone runs up to "uart" (15) *)
+    locks_below lks (lock_rank "uart") ->
     sie_cap_gpr mc K b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printk + 0x7a) : mword 64) -∗
@@ -1828,7 +1830,7 @@ Section ProofPrintk.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hn31 Hne.
+    intros HK Hn31 Hne Hbelow.
     assert (HK6 : (16 <= K)%nat) by lia.
     iIntros "Hcg #Htext Hpc Hcnt #Hpan #Hdev #Hsub #Htxl HR Hcont".
     iPoseProof (pki_7a with "Htext") as "Hi86".
@@ -1855,6 +1857,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID2) γl γd γv P1 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID3 Hst3 mk bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -2214,6 +2217,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID7 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID7) γl γd γv D6 K l n eb C b pcur lks HK14 HD6a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID8 Hst8 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID8 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -2362,6 +2366,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -2523,6 +2528,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID3 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID3) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID4 Hst4 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID4 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -2686,6 +2692,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -2847,6 +2854,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID3 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID3) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID4 Hst4 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID4 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3000,6 +3008,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID3 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID3) γl γd γv S2 K l n eb C b pcur lks HK14 HS2a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID4 Hst4 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID4 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3161,6 +3170,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3331,6 +3341,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3469,6 +3480,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3586,6 +3598,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID2) γl γd γv C2 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID3 Hst3 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3666,6 +3679,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID2) γl γd γv P2 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID3 Hst3 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -3739,6 +3753,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID2) γl γd γv U2 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID3 Hst3 m1 bs1) "Hcg Hcnt Hpc %Hcs1 #Hsent1".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs1 as [Hcs1 Hra1].
@@ -3767,6 +3782,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID5 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID5) γl γd γv U4 K (l ++ bs1)%list n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsent1").
+    all: try lkbelow.
     iIntros (CID6 Hst6 mf bs2) "Hcg Hcnt Hpc %Hcs2 #Hsent2".
     iDestruct (cpu_own_transport CID6 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs2 as [Hcs2 Hra2].
@@ -3924,6 +3940,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID1 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID1) γl γd γv L1 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID2 Hst2 m1 bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID2 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -4514,6 +4531,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID4) γl γd γv P4 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 m1 bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs as [Hcs Hra].
@@ -4732,6 +4750,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID4) γl γd γv Q3 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
+    all: try lkbelow.
     iIntros (CID5 Hst5 m1 bs1) "Hcg Hcnt Hpc %Hcs1 #Hsent1".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs1 as [Hcs1 Hra1].
@@ -4761,6 +4780,7 @@ Section ProofPrintk.
     iDestruct (cpu_own_transport CID0 CID7 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_consputc (CID0 := CID7) γl γd γv Q5 K (l ++ bs1)%list n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsent1").
+    all: try lkbelow.
     iIntros (CID8 Hst8 m2 bs2) "Hcg Hcnt Hpc %Hcs2 #Hsent2".
     iDestruct (cpu_own_transport CID8 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     destruct Hcs2 as [Hcs2 Hra2].
@@ -7995,7 +8015,7 @@ Section ProofPrintk.
                   (fmtv ↦ₛ{ dqf } f ∗
                    ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) ∗
                    pk_loop_frame k ∗ pk_loop_head (CID0 := CID0) i l)%I false pcur lks
-                  HK16 Hn31Sn Hne
+                  HK16 Hn31Sn Hne ltac:(lkbelow)
                   with "Hcg Htext Hpc Hcnt Hpan Hdev Hsent Htxl [$Hfmt $Hdescs $Hfr $Hhead]").
         iIntros (CIDchar Hstchar mk bs) "%Hcs2 Hcg Hpc Hcnt _ #Hsent2 (Hfmt & Hdescs & Hfr & Hhead)".
         iDestruct (cpu_own_transport CIDchar CID0 (S n) eb pcur C false ltac:(wp_next_chain) with "Hcnt") as "Hcnt".

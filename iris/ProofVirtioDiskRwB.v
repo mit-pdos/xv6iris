@@ -726,6 +726,7 @@ Section ProofVirtioDiskRwB.
         (* ==================== release(&disk.vdisk_lock) ==================== *)
         iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string
                   (disk_res γd pd pav pu) C3 0%nat eb (proc_addr j) C (K - 12)%nat
+                  ({[lock_rank "virtio_disk"]} ∪ lks)
                   HC3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
                   with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
         iIntros (CIDrl Hsrl mfr) "Hcg Hpc %Hrcs Hown". rgall.

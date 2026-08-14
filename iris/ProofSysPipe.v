@@ -1398,6 +1398,7 @@ Section ProofSysPipe.
               (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p C (av - 8)%nat b lks
               Hav24 eq_refl sp_noff0
               with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpanic Hua Hub Hb6 Hb7").
+    all: try lkbelow.
     iIntros (CID34 Hcr34 W0) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 Hpost".
     assert (Hpc26 : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x26))
       by (rewrite HQ3ra; apply bv_eq; vm_compute; reflexivity).

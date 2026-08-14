@@ -91,6 +91,11 @@ Section ProofKerneltrap.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal Hbelow.
     iIntros "Hcg Hmir Havail Hkptr Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
+    (* kerneltrap's contract pins depth 0, so the held set is FORCED empty --
+       which is what lets the yield arm hand [cpu_own ... ∅] to a contract
+       that pins [∅] (SpecYield.v), and what makes devintr's order premise
+       trivial. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause").
@@ -273,7 +278,7 @@ Section ProofKerneltrap.
         iApply (kt_epi m mmp (m !!! Regidx csp_rs1)
                   (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                   (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
-                  ep ep ms0 (av - 6)%nat 0 C ('b"1") ('b"1")
+                  ep ep ms0 (av - 6)%nat 0 C ('b"1") ('b"1") lks
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   Hmpsp Hmps2 Hmps1 Hepal Hms0f Hsie0 Hspp0 Hspie0 Hmpthr
@@ -357,6 +362,7 @@ Section ProofKerneltrap.
         (* [j < NPROC] and [length γs = NPROC] give a slot ghost for proc j *)
         assert (Hjl : (j < length γs)%nat) by (rewrite Hlen; exact Hj).
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].
+        iEval (rewrite Hlkempty) in "Hcpu".
         iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
                   with "Hcg Hcpu Htext Hpc Hprocs Hpanic
@@ -411,7 +417,7 @@ Section ProofKerneltrap.
         iApply (kt_epi m myd (m !!! Regidx csp_rs1)
                   (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                   (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
-                  ep ep' ms0 (av - 6)%nat 0 C va vb
+                  ep ep' ms0 (av - 6)%nat 0 C va vb lks
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                   Hydsp Hyds2 Hyds1 Hepal Hms0f Hsie0 Hspp0 Hspie0 Hydthr
@@ -448,7 +454,7 @@ Section ProofKerneltrap.
       iApply (kt_epi m D1 (m !!! Regidx csp_rs1)
                 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                 (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
-                ep ep ms0 (av - 6)%nat 0 C ('b"1") ('b"1")
+                ep ep ms0 (av - 6)%nat 0 C ('b"1") ('b"1") lks
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HD1sp HD1s2 HD1s1 Hepal Hms0f Hsie0 Hspp0 Hspie0 HD1thr

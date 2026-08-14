@@ -119,11 +119,12 @@ Section ProofProcdumpMain.
     iDestruct (cpu_own_transport CID CID2 0%nat eb p C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iPoseProof (panic_wp_any_at CID2 with "Hpanic") as "Hpanic2".
-    iApply (Hpk CID2 M1 (K - 10)%nat eb p C DfracDiscarded pd_nl [] b
+    iApply (Hpk CID2 M1 (K - 10)%nat eb p C DfracDiscarded pd_nl [] b lks
               (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)
               with "Hcg Htext Hkdata Hpc Hpanic2 Hcnt Hpenv [Hnlstr] []").
+    all: try lkbelow.
     { rewrite HM1a0. iExact "Hnlstr". }
     { done. }
     iIntros (CID3 Hs3 mP) "Hcg Hpc %Hcsp Hcnt _ _".
@@ -158,8 +159,8 @@ Section ProofProcdumpMain.
     (* the epilogue (+0x8e .. +0xa2) as its exit continuation.            *)
     (* ================================================================== *)
     iPoseProof (wp_pd_loop (CID0 := CID4) γpr γd γv m
-                  (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b C
-                  Hpk (pd_K48 K HK)
+                  (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b C lks
+                  Hpk (pd_K48 K HK) Hlkbelow
                   with "Htext Hkdata Hpenv Hpanic [Hframe Hcont]") as "Hscan".
     { iIntros (CIDx Hsx Mx) "%Hxc Hcg Hcnt2 Hpc Hview".
       destruct Hxc as [Hxsp Hxhi].

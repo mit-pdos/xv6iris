@@ -704,6 +704,7 @@ Section ProofProcdumpLoop.
                   ltac:(cbn [length]; lia)
                   Hfresh
                   with "Hcg Hkt Hkd Hpc Hpanic3 Hown Hpenv [Hfmt] [Hnmc2]").
+        all: try lkbelow.
         { rewrite Ha0_5c. iExact "Hfmt". }
         { iApply (pdl_descs_mk CIDq3 P5c sptr (pd_cur j) ss nm2 dq3
                     Ha2_5c Ha3_5c Hssn Hssz Hnm2 (pd_cur_nonzero j HjLe)
@@ -780,6 +781,7 @@ Section ProofProcdumpLoop.
                   ltac:(cbn [length]; lia)
                   Hfresh
                   with "Hcg Hkt Hkd Hpc Hpanic6 Hown Hpenv [Hnlstr] []").
+        all: try lkbelow.
         { rewrite Ha0_62. iExact "Hnlstr". }
         { done. }
         iIntros (CIDq7 Hsq7 mP2) "Hcg Hpc %Hcsp2 Hown _ _".

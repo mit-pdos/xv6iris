@@ -1337,7 +1337,7 @@ Section ProofWriteHead.
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) (lks : gset nat) (Q : iProp Σ)
+      (b : bool) (Q : iProp Σ) (lks : gset nat)
     : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb C b Q lks.
   Proof.

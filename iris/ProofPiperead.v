@@ -1579,6 +1579,7 @@ Section ProofPiperead.
           rewrite /X5 upd_ne; [| congruence]. apply HthrX; exact Hr. }
         iSpecialize ("EPI" $! CIDp29 with "[%]"); [wp_next_chain|].
         iEval (rewrite Hlkempty) in "EPI".
+        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
         iApply ("EPI" $! X7 P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 [Hc8] [Hc9] [Hc10] [Hc11] Hq12").
         { split_and!.
@@ -2557,6 +2558,10 @@ Section ProofPiperead.
         iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr"; [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".
+        (* the pipe lock's release left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at
+           depth 0 makes that the empty set the exit continuation names. *)
+        iEval (rewrite Hlkempty locks_empty_del) in "Hown".
+        iEval (rewrite Hlkempty) in "HEPI".
         iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
         iApply ("HEPI" $! N3 (pv_upt V) (mword_of_int (-1))
                   with "[%] [%] [%] Hcg Hpc Hown Href Hpriv

@@ -817,7 +817,7 @@ Section KexecB2Body.
     iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PFP.wp_proc_freepagetable_sconf ga T3 P (K - 68)%nat true
-              (proc_addr jp) C 0%nat true
+              (proc_addr jp) C 0%nat true lks
               ltac:(lia) kxc_lvl0 HT3a0
               ltac:(rewrite HT3a1 uint_unsigned;
                     exact (proc_pt_covered_maxsz P szf Hwf Hcov))

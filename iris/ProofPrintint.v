@@ -763,6 +763,7 @@ Section ProofPrintint.
       assert (Hcmp : neq_vec (P3 !!! Regidx s1_idx) (P3 !!! Regidx s2_idx) = negb (Nat.eqb _ 0))
         by (rewrite HP3s1 HP3s2; apply pa_add_neq_base;
             change (2^64) with 18446744073709551616; lia).
+      all: try lkbelow.
     - (* ---- j = 0: the cursor met the sentinel, fall through ---- *)
       iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x7e)) (mword_of_int 8182 : mword 13)
                 s2_idx s1_idx P3 (K - 8)%nat b

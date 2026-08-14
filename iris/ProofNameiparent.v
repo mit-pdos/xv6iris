@@ -364,6 +364,7 @@ Section ProofNameiparentMain.
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog").
+    all: try lkbelow.
     iIntros (CID8 Hq8 mf n' used' Sb' ok nf ipv w)
             "%Hcs Hcg Hcnt Hpc Hbmap Hinos %Hsub Hbits Hppid Hcwdc Hcwdr
              Hpath Hname Hbslot %Hssub %Hwbm %Hbudo Hlog Hok".

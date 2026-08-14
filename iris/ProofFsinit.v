@@ -1384,7 +1384,7 @@ Section FsinitMain.
     iApply (IL.wp_initlog_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev sb_base bs_hdr L D
               vlock vname vcpu v_start v_dev v_nc v_n
-              pidv dq (DfracOwn 1) Q9 (K - 4)%nat true C b
+              pidv dq (DfracOwn 1) Q9 (K - 4)%nat true C b lks
               ltac:(unfold K_initlog; lia) Hgeom Hj Hgl eq_refl Hhdr0
               HQ9a0 HQ9a1
               (* initlog's bound is "bcache"(4); fsinit's own is

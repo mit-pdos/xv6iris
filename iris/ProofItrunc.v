@@ -2245,7 +2245,7 @@ Section ItruncIArm.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat eb
-              (proc_addr jx) C (ind_bytes (bm_ent bm)) bsd0 d0 b
+              (proc_addr jx) C (ind_bytes (bm_ent bm)) bsd0 d0 b lks
               HKbl Hkk HB1a0
               (* brelse's bound is "bcache"(4); it_iarm's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
@@ -2380,7 +2380,7 @@ Section ItruncIArm.
               cov logstart bmapstart size dev
               (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT))
               (bm_ind bm : mword 32) (ind_bytes (bm_ent bm)) u' cr Sq e0
-              pidv dq dqb C2 (K - 6)%nat eb C b
+              pidv dq dqb C2 (K - 6)%nat eb C b lks
               HKbf2 ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog
               ltac:(destruct (bv_unsigned_in_range 32 (bm_ind bm))

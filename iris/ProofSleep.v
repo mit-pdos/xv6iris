@@ -987,7 +987,10 @@ Section ProofSleepBody.
       (* re-inject the opaque context-slot payload into the returned bundle. *)
       iAssert (cpu_own 1 eb (proc_addr j) C false ({[lock_rank "proc"%string]} ∪ lks))
         with "[Hcpuemp HC]" as "Hcpu".
-      { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
+      { (* the bundle came back from swtch at the bare singleton the contract
+           pins; [lks = ∅] is what makes that the same set. *)
+        rewrite Hlkempty locks_union_empty.
+        iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
       (* ONE application of the join half, at the DISPATCHING hart. *)
       iApply (sleep_join (CID0 := CIDs) γs j γl ch' m msch av eb C sp0 spd vgap lks
                 ltac:(lia) Hj Hno ltac:(reflexivity) ltac:(reflexivity)
