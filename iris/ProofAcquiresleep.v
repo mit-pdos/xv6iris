@@ -447,7 +447,7 @@ Section AslBodies.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HE2ra : E2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x3a) : mword 64) 4) by (rewrite /E2; apply upd_eq).
-    iApply (Myproc.wp_myproc_sconf E2 (trap_res eb + (av - 4))%nat 1%nat eb pj C false
+    iApply (Myproc.wp_myproc_sconf E2 (trap_res eb + (av - 4))%nat 1%nat eb pj C false _
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
@@ -883,8 +883,11 @@ Section AslBodies.
     (* sleep_prepare(slk): noff-balanced at level 1, index [false], so it
        neither moves the hart nor touches the lock we still hold. *)
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γpl L1 (trap_res eb + (av - 4))%nat 1%nat eb C false
+              ({[lock_rank "sleep lock"]} ∪ lks)
               Hj Hjpl Hchan ltac:(lia) ltac:(lia)
+              ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpinv Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "%Hspcs Hcg Hown Hpc".
     assert (Hpc22 : ret_pc (L1 !!! Regidx (mword_of_int 1 : mword 5))
@@ -981,8 +984,11 @@ Section AslBodies.
        dropped ours two instructions ago -- so all it takes beyond the
        running-thread bundle is the [_ext] complement, index-generic. *)
     iApply (Sleep.wp_sleep_sconf γs j γpl L5 (av - 4)%nat eb C
+              lks   (* the release above already cancelled the singleton *)
               Hj Hjpl ltac:(lia)
+              ltac:(lkbelow)
               with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").
+    all: try lkbelow.
     (* SLEEP RETURNS ON HART [CIDs]. *)
     iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpc Hextc Hextm".
     assert (Hpc2c : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1031,6 +1037,7 @@ Section AslBodies.
               ltac:(lia)
               Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HL7a0). iApply (is_sleeplock_lock with "Hslk"). }
     iIntros (CIDq Hsq ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
     iDestruct (trap_csrs_ext_transport CIDs CIDq eb pj ltac:(wp_next_chain)
@@ -1244,6 +1251,7 @@ Section ProofAcquiresleep.
               ltac:(lia)
               Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_lock with "Hslk"). }
     iIntros (CID11 Hs11 ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at
@@ -1567,6 +1575,7 @@ Section ProofAcquiresleep.
               ltac:(lia)
               Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_lock with "Hslk"). }
     iApply wp_next_off_intro.
     iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -1678,7 +1687,7 @@ Section ProofAcquiresleep.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmp) in "Hpc".
       assert (HE2ra : E2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x3a) : mword 64) 4) by (rewrite /E2; apply upd_eq).
-      iApply (Myproc.wp_myproc_sconf E2 (av - 4)%nat (S (S n)) eb pj C false
+      iApply (Myproc.wp_myproc_sconf E2 (av - 4)%nat (S (S n)) eb pj C false _
                 ltac:(lia)
                 ltac:(lia)
                 with "Hcg Hown Htext Hpc").
@@ -1975,8 +1984,11 @@ Section ProofAcquiresleep.
       assert (Hchan : eq_vec (L1 !!! Regidx (mword_of_int 10 : mword 5)) (zero_reg : mword 64) = false)
         by (rewrite HL1a0; exact Hslknz).
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γpl L1 (av - 4)%nat (S (S n)) eb C false
+                ({[lock_rank "sleep lock"]} ∪ lks)
                 Hj Hjpl Hchan ltac:(lia) ltac:(lia)
+                ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
+      all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (mfp) "%Hspcs Hcg Hown Hpc".
       assert (Hpc22 : ret_pc (L1 !!! Regidx (mword_of_int 1 : mword 5))
@@ -2061,8 +2073,11 @@ Section ProofAcquiresleep.
          panic("sched locks") and never comes back; its no-park arm (a wakeup
          cleared [p->chan] in the window) returns here, noff-balanced. *)
       iApply (Sleep.wp_sleep_nested γs j γpl L5 (av - 4)%nat eb C n
+                lks   (* the release above already cancelled the singleton *)
                 Hj Hjpl ltac:(lia) ltac:(lia)
+                ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
+      all: try lkbelow.
       iIntros (mfs) "%Hs_cs Hcg Hown Hpc".
       assert (Hpc2c : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.acquiresleep + 0x2c)) by (rewrite HL5ra; apply bv_eq; vm_compute; reflexivity).
@@ -2109,6 +2124,7 @@ Section ProofAcquiresleep.
                 ltac:(lia)
                 Hbelow
                 with "Hcg Hown Htext Hpc [] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HL7a0). iApply (is_sleeplock_lock with "Hslk"). }
       iApply wp_next_off_intro.
       iIntros (ms_b Macb) "%Hms_b Hcg Hpc %Hpinb Htok HRb Hown Hpay".

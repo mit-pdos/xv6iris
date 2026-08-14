@@ -985,6 +985,7 @@ Section WriteiJoin.
     (* the sixteen-byte receipt, as it stands BEFORE the flush *)
     wi16_pre (ba_bms A) ncount (S u) off n tot bm bm' Sb SbC ->
     uptd_ext (pv_upt V) P' ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1024,7 +1025,7 @@ Section WriteiJoin.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hadr Hwf' Hhz' Hsz' Hcov'
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
-           Hlo Hhi Hhi1 Hsbsub Hwi16 Hext.
+           Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hidev Hinum
@@ -1140,6 +1141,7 @@ Section WriteiJoin.
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl2 Hlb0 Hcrdu Hop").
+    all: try lkbelow.
     iIntros (CID3 Hq3 mI) "%Hcs1 Hcg Hcnt Hextc Hextm Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsb Hdn Hsl2 Hop Hwit".
     (* the borrow closes: nothing below wi_join wants the fraction *)
@@ -1355,6 +1357,7 @@ Section WriteiSize.
     (* the sixteen-byte receipt, travelling to the join unchanged *)
     wi16_pre (ba_bms A) ncount (S u) off n tot bm bm' Sb SbC ->
     uptd_ext (pv_upt V) P' ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1394,7 +1397,7 @@ Section WriteiSize.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hhi1 Hsbsub
-           Hwi16 Hext.
+           Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
     (* the coverage the join needs: whichever size [wi_dinode] installs is
@@ -1652,7 +1655,7 @@ Section WriteiSize.
                 Hcovf Hrngt Hsized'
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
-                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext
+                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -1858,7 +1861,7 @@ Section WriteiSize.
                 Hcovf Hrngt Hsized'
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
-                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext
+                Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -1985,6 +1988,19 @@ Section WriteiLoop.
     M !!! Regidx Rs9 = (mword_of_int 1024 : mword 64) ->
     M !!! Regidx Rs8 = (mword_of_int (-1) : mword 64) ->
     printk_gen_contract (ba_pr A) γu γd ->
+    (* THE ORDER PREMISE.  Every callee this iteration reaches that carries
+       one wants its own rank: bread and brelse want "bcache" (4,
+       SpecBread.v / SpecBrelse.v), log_write wants "log" (3,
+       SpecLogWrite.v) -- the lowest of the three, so it is the one premise
+       stated here, and [locks_below_mono] widens it to "bcache" at the
+       bread/brelse call sites.  [lks] is unchanged across the iteration
+       (every one of those calls is push/pop-BALANCED and returns the same
+       [lks] it was given), so the very same [Hbelow] is what the back-edge
+       call to [IH] needs too -- nothing about it is loop-varying.  Mirrors
+       SpecBfree.v's; [SpecWritei.v]'s [wp_writei_gen_body] /
+       [wp_writei_sconf_body] now carry the same premise, threaded down to
+       here from [wp_writei_gen]'s call to [wi_loop] (WriteiMain section). *)
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -2037,7 +2053,7 @@ Section WriteiLoop.
       intros CID0 tot bmI dataI wroteI PI nI SI M
              Htotlt HwfI HhzI HsizedI HcovSI HcovTI HrangeI HkerI HextI
              HW1 HW2 HW3 HW4 HW5 HWsb Hfresh
-             Hsp Hs5 Hs7 Hs4 Hs2 Hs6 Hs3 Hs9 Hs8 Hprkc;
+             Hsp Hs5 Hs7 Hs4 Hs2 Hs6 Hs3 Hs9 Hs8 Hprkc Hbelow;
       [ exfalso; pose proof (wi_blocks_pos (off + tot) (n - tot) ltac:(lia)); lia |].
     remember ((off + tot) `div` BSIZE)%nat as fbn eqn:Hfbne.
     remember ((off + tot) `mod` BSIZE)%nat as o eqn:Hoe.
@@ -2156,6 +2172,7 @@ Section WriteiLoop.
                     Hblocks Hppid
                     Hszc Hbmsc Hbmres
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
+    all: try lkbelow.
     iIntros (CIDa4 Hqa4 mB bm2 nB data2 uMid Sb2)
       "%Hcs1 %HuMid %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hextc Hextm Hpc Hppid
        Hszc Hbmsc Hbmres Hidev Hmap %Hdep2 Hblocks Hsl %Hbud2 Hop".
@@ -2296,7 +2313,7 @@ Section WriteiLoop.
                    (concat_vec (mword_of_int 23 : mword 8) ('b"0"))))
               = mword_of_int (WI + 0xbc)) by pcw.
       iEval (rewrite Htgtbc) in "Hpc".
-      iDestruct (cpu_own_transport CIDa4 CIDa6 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDa4 CIDa6 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CIDa4 CIDa6 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -2329,7 +2346,7 @@ Section WriteiLoop.
                    still 0 and the success guard [0 < tot] cannot fire *)
                 ltac:(intros Hpos Hone; exfalso;
                       destruct (Hfresh Hone) as (Ht0 & _); lia)
-                HextI
+                HextI Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -2419,7 +2436,7 @@ Section WriteiLoop.
         by lkp.
       assert (HB3s9 : B3 !!! Regidx Rs9 = (mword_of_int 1024 : mword 64)) by lkp.
       assert (HB3s8 : B3 !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)) by lkp.
-      iDestruct (cpu_own_transport CIDa4 CIDa8 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDa4 CIDa8 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CIDa4 CIDa8 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -2438,7 +2455,10 @@ Section WriteiLoop.
                 B3 (K - 14)%nat eb C b lks
                 HKbr Hblt' eq_refl Hbcov'
                 eq_refl Hj Hgl HB3a0 HB3a1
+                ltac:(exact (locks_below_mono lks (lock_rank "log")
+                               (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+      all: try lkbelow.
       iIntros (CIDa9 Hqa9 mBr kkb bsB bsdB dB)
         "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
       iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
@@ -2573,7 +2593,7 @@ Section WriteiLoop.
       assert (Hpp : add_vec_int (mword_of_int (WI + 0xa6) : mword 64) 2
                     = mword_of_int (WI + 0xa8)) by pcw.
       iEval (rewrite Hpp) in "Hpc". clear Hpp.
-      iDestruct (cpu_own_transport CIDa9 CIDa14 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDa9 CIDa14 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CIDa9 CIDa14 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -2805,7 +2825,7 @@ Section WriteiLoop.
                         = pa_add (m !!! Regidx Ra2 : mword 64) tot) by lkp.
         assert (HD8a3 : D8 !!! Regidx Ra3
                         = (mword_of_int (Z.of_nat mm) : mword 64)) by lkp.
-        iDestruct (cpu_own_transport CIDa14 CIDb8 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CIDa14 CIDb8 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iEval (rewrite -HD8a0) in "Hwin".
         iEval (rewrite -HD8a2) in "Hsrcw".
@@ -2821,6 +2841,7 @@ Section WriteiLoop.
                         rewrite Hbsz in Hmmo; lia)
                   ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                   with "Hcg Hcnt Htext Hpc Hkenv Hwin Hsrcw").
+        all: try lkbelow.
         iIntros (CIDb9 Hqb9 mE) "%HcsE Hcg Hcnt Hpc Hpost".
         assert (Hpc64 : ret_pc (D8 !!! Regidx Rra : mword 64)
                         = mword_of_int (WI + 0x64)) by (rewrite HD8ra; pcw).
@@ -2970,7 +2991,7 @@ Section WriteiLoop.
                           = add_vec_int (mword_of_int (WI + 0x6a) : mword 64) 4)
             by (rewrite /F2; apply upd_eq).
           assert (HF2a0 : F2 !!! Regidx Ra0 = bnode kkb) by lkp.
-          iDestruct (cpu_own_transport CIDb9 CIDc3 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CIDb9 CIDc3 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKlw : (K_log_write <= K - 14)%nat) by (unfold K_log_write; lia).
           iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
@@ -2986,7 +3007,9 @@ Section WriteiLoop.
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HF2a0 Hbcovlw Hbloglw
                     ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
+                    Hbelow
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsla Hop Hfsb1 Hheld").
+          all: try lkbelow.
           iIntros (CIDc4 Hqc4 mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
           (* the count log_write left, as a variable: [S uX] when it absorbed,
              [uX] when it spent.  Naming it keeps the rest of this iteration
@@ -3107,7 +3130,7 @@ Section WriteiLoop.
                           = add_vec_int (mword_of_int (WI + 0x70) : mword 64) 4)
             by (rewrite /F4; apply upd_eq).
           assert (HF4a0 : F4 !!! Regidx Ra0 = bnode kkb) by lkp.
-          iDestruct (cpu_own_transport CIDc4 CIDc6 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CIDc4 CIDc6 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKbl : (K_brelse <= K - 14)%nat) by (unfold K_brelse; lia).
           (* BORROW the pid share for brelse.  The bracket is now at
@@ -3121,7 +3144,10 @@ Section WriteiLoop.
                     F4 (K - 14)%nat eb
                     (proc_addr j) C (wi_splice (data2 fbn) o mm g) bsdB true b lks
                     HKbl Hkklt HF4a0
+                    ltac:(exact (locks_below_mono lks (lock_rank "log")
+                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
+          all: try lkbelow.
           iIntros (CIDc7 Hqc7 mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
           iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
           assert (Hpc74 : ret_pc (F4 !!! Regidx Rra : mword 64)
@@ -3296,7 +3322,7 @@ Section WriteiLoop.
             destruct nL as [| uY];
               [exfalso; pose proof (wi_inv_bud_pos (ba_bms A) W 0%nat _ (proj1 Hinv3));
                lia|].
-            iDestruct (cpu_own_transport CIDc7 CIDc11 0 eb (proc_addr j) C b lks
+            iDestruct (cpu_own_transport CIDc7 CIDc11 0 eb (proc_addr j) C b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (IntrDefs.trap_csrs_ext_transport CIDa14 CIDc11 eb (proc_addr j)
                          ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -3368,7 +3394,7 @@ Section WriteiLoop.
                                     (wi_blocks off n) W off n _
                                     ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
                                     ltac:(lia) ltac:(lia))))
-                      ltac:(lia) HsbSb3 Hwi16B Hext2
+                      ltac:(lia) HsbSb3 Hwi16B Hext2 Hbelow
                       with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                             Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                             Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -3400,7 +3426,7 @@ Section WriteiLoop.
               replace (n - tot - (BSIZE - o))%nat with (n - (tot + mm))%nat in Hs
                 by lia.
               exact Hs. }
-            iDestruct (cpu_own_transport CIDc7 CIDc11 0 eb (proc_addr j) C b lks
+            iDestruct (cpu_own_transport CIDc7 CIDc11 0 eb (proc_addr j) C b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
             iDestruct (IntrDefs.trap_csrs_ext_transport CIDa14 CIDc11 eb (proc_addr j)
                          ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -3428,7 +3454,7 @@ Section WriteiLoop.
                             pose proof (wi_blocks_pos (off + (tot + mm))%nat
                                           (n - (tot + mm))%nat ltac:(lia));
                             lia)
-                      HG3sp HG3s5 HG3s7 HG3s4 HG3s2 HG3s6 HG3s3 HG3s9 HG3s8 Hprkc
+                      HG3sp HG3s5 HG3s7 HG3s4 HG3s2 HG3s6 HG3s3 HG3s9 HG3s8 Hprkc Hbelow
                       with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx
                             Hkenv Hprocs
                             Hdevi Hdgeom Hdlock Hframe Hidev Hinum
@@ -3485,7 +3511,7 @@ Section WriteiLoop.
             by (rewrite /J2; apply upd_eq).
           assert (HJ2a0 : J2 !!! Regidx Ra0 = bnode kkb) by lkp.
           assert (HJ2s1 : J2 !!! Regidx Rs1 = bnode kkb) by lkp.
-          iDestruct (cpu_own_transport CIDb9 CIDd3 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CIDb9 CIDd3 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKlw : (K_log_write <= K - 14)%nat) by (unfold K_log_write; lia).
           iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
@@ -3501,7 +3527,9 @@ Section WriteiLoop.
                     HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                     Hkklt HJ2a0 Hbcovlw Hbloglw
                     ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
+                    Hbelow
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsla Hop Hfsb1 Hheld").
+          all: try lkbelow.
           iIntros (CIDd4 Hqd4 mL) "Hcg Hcnt Hpc %HcsL Hop Hfsb1 Hheld Hsla".
           (* the count log_write left, as a variable: [S uX] when it absorbed,
              [uX] when it spent.  Naming it keeps the rest of this iteration
@@ -3604,7 +3632,7 @@ Section WriteiLoop.
                           = add_vec_int (mword_of_int (WI + 0xb8) : mword 64) 4)
             by (rewrite /J4; apply upd_eq).
           assert (HJ4a0 : J4 !!! Regidx Ra0 = bnode kkb) by lkp.
-          iDestruct (cpu_own_transport CIDd4 CIDd6 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CIDd4 CIDd6 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (HKbl : (K_brelse <= K - 14)%nat) by (unfold K_brelse; lia).
           (* the same borrow on the break arm *)
@@ -3616,7 +3644,10 @@ Section WriteiLoop.
                     J4 (K - 14)%nat eb
                     (proc_addr j) C (wi_splice (data2 fbn) o mm g) bsdB true b lks
                     HKbl Hkklt HJ4a0
+                    ltac:(exact (locks_below_mono lks (lock_rank "log")
+                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
+          all: try lkbelow.
           iIntros (CIDd7 Hqd7 mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl1".
           iDestruct ("Hsrcback" with "Hppid") as "Hsrc".
           assert (Hpcbc : ret_pc (J4 !!! Regidx Rra : mword 64)
@@ -3648,7 +3679,7 @@ Section WriteiLoop.
           destruct nL as [| uY];
             [exfalso; pose proof (wi_inv_bud_pos (ba_bms A) W 0%nat _ (proj1 Hinv3));
              lia|].
-          iDestruct (cpu_own_transport CIDd7 CIDd7 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CIDd7 CIDd7 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (IntrDefs.trap_csrs_ext_transport CIDa14 CIDd7 eb (proc_addr j)
                        ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -3689,7 +3720,7 @@ Section WriteiLoop.
                        block ([wi16_fresh]) *)
                     ltac:(intros Hpos Hone; exfalso;
                           destruct (Hfresh Hone) as (Ht0 & _); lia)
-                    Hext2
+                    Hext2 Hbelow
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                           Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -3842,7 +3873,7 @@ Section WriteiMain.
   Proof.
     cbv beta delta [wp_writei_gen_body].
     intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
-           Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4.
+           Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow.
     (* the whole allocation side travels as ONE record from here down *)
     set (A := MkBmAlloc γ bmapstart size used dqb dqbs γpr).
     pose proof HK as HK'. unfold K_writei in HK'.
@@ -3992,7 +4023,7 @@ Section WriteiMain.
         iSplitL "Hmn"; [iExact "Hmn"|]. iSplitL "Hml"; [iExact "Hml"|].
         iExact "Hmz". }
       assert (HVid : upd_upt V (pv_upt V) = V) by apply wi_upd_upt_id.
-      iDestruct (cpu_own_transport CID CIDx3 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID CIDx3 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CID CIDx3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -4398,7 +4429,7 @@ Section WriteiMain.
         iSplitL "Hf9"; [iExact "Hf9"|]. iSplitL "HfA"; [iExact "HfA"|].
         iSplitL "HfB"; [iExact "HfB"|]. iSplitL "HfC"; [iExact "HfC"|].
         iSplitL "HfD"; [iExact "HfD"|]. iExact "HfE". }
-      iDestruct (cpu_own_transport CID CIDy3 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID CIDy3 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CID CIDy3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -4552,7 +4583,7 @@ Section WriteiMain.
          back on every path.  This arm needs only that [ncount <> 0]. *)
       destruct ncount as [| unc];
         [exfalso; unfold wi_cost_bmonly in Hcost; lia|].
-      iDestruct (cpu_own_transport CID CIDz3 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID CIDz3 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (IntrDefs.trap_csrs_ext_transport CID CIDz3 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -4578,6 +4609,7 @@ Section WriteiMain.
                    success guard cannot fire *)
                 ltac:(unfold wi16_pre; intros Hpos; exfalso; lia)
                 ltac:(apply uptd_ext_refl)
+                ltac:(lkbelow)
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
@@ -4760,7 +4792,7 @@ Section WriteiMain.
                     = (mword_of_int (Z.of_nat 0%nat) : mword 64)) by lkp.
     assert (HU3s9 : U3 !!! Regidx Rs9 = (mword_of_int 1024 : mword 64)) by lkp.
     assert (HU3s8 : U3 !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)) by lkp.
-    iDestruct (cpu_own_transport CID CIDp17 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID CIDp17 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (IntrDefs.trap_csrs_ext_transport CID CIDp17 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -4791,7 +4823,7 @@ Section WriteiMain.
               (* the loop is entered at the caller's own state, so the
                  single-block clause is four reflexivities *)
               ltac:(unfold wi16_fresh; intros _; split_and!; reflexivity)
-              HU3sp HU3s5 HU3s7 HU3s4 HU3s2 HU3s6 HU3s3 HU3s9 HU3s8 Hprkc
+              HU3sp HU3s5 HU3s7 HU3s4 HU3s2 HU3s6 HU3s3 HU3s9 HU3s8 Hprkc Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hprocs
                     Hdevi Hdgeom Hdlock Hframe Hidev Hinum
@@ -4832,7 +4864,7 @@ Section WriteiMain.
   Proof.
     cbv beta delta [wp_writei_sconf_body].
     intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
-           Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4.
+           Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres #Hireg Hdn Hsrc
@@ -4843,11 +4875,12 @@ Section WriteiMain.
               ip inum bm data dn dn0 user off n src_bytes V ncount Sb0
               pidv dq dqd dqn dqs dqb dqbs m K eb C b lks
               HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr Hdtnz Hstab Hnlk
-              Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4
+              Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres Hireg Hdn Hsrc
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+    all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf tot bm' data' dn' dn0' n' wrote dist dstb P' used' Sb')

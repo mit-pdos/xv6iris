@@ -278,6 +278,7 @@ Section ProofIunlockputMain.
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk Hstok Hpid Hppid
                     Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot").
+    all: try lkbelow.
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
     assert (Hpc10 : ret_pc (R4 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlockput + 0x10))
@@ -358,6 +359,7 @@ Section ProofIunlockputMain.
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hnlz Hlogop").
+    all: try lkbelow.
     iIntros (CID11 Hq11 mP n' used' Sb' wp)
             "%HcsP Hcg Hcnt Htc Hclm Hpc Hppid Hbms Hins %Hsub Hbitmap Hbslots
              %Hssub %Hwbm %Hwc %Hbud Hlogop Hslot".
@@ -609,6 +611,7 @@ Section ProofIunlockputMain.
                     Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hpar
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").
+    all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".

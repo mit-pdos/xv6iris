@@ -205,6 +205,10 @@ Definition wp_virtio_disk_init_sconf_body
   (* the protocol is in its not-live arm at entry -- which is what the
      caller's config half [c0] identifies with the invariant's *)
   virtio_live c0 = false ->
+  (* virtio_disk_init's cone reaches kalloc (three page allocations) --
+     "kmem" (13) -- and initlock/memset, which need no premise; "kmem" is
+     the whole cone.  Mirrors SpecBfree.v's. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m K false pp -∗
   cpu_own 0%nat eb pp C false lks -∗
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi

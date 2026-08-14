@@ -331,7 +331,7 @@ Section ProofSysClose.
     : wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
-    intros pcE ret_tgt Harg Hn Hav.
+    intros pcE ret_tgt Harg Hn Hav Hbelow.
     unfold sys_close_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
@@ -851,7 +851,9 @@ Section ProofSysClose.
         as "[Hfcenv Hfcback]".
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p C (av - 4)%nat b lks
                 ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
+                Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href Hfcenv").
+      all: try lkbelow.
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".
       iDestruct ("Hfcback" with "Hout") as "[Hpenv Hfenv]".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))

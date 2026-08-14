@@ -508,6 +508,13 @@ Section ProofSleepBody.
     intros pcE pj ret_tgt Hj Hgl Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hext Hclmx Hcont".
+    (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON.  swtch is contracted to
+       run with p->lock and nothing else held (SpecSwtch.v pins
+       [{[lock_rank "proc"]}] on both sides), which is xv6's own
+       [panic("sched locks")] discipline.  sleep's contract pins depth 0, so
+       the entry set is forced empty and the set at the park is
+       [{[lock_rank "proc"]} ∪ ∅] -- the singleton itself. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
        at level 0 they are forced equal ([CpuOwn.cpu_own_eb_agree]), so there
        is nothing to derive and nothing to case-split on.  sleep's own
@@ -659,6 +666,7 @@ Section ProofSleepBody.
               ltac:(lia)
               Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
        [false] and every leaf collapses with [wp_next_off] -- and the held SET
@@ -912,6 +920,9 @@ Section ProofSleepBody.
       assert (HC1ra : C1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sleep + 0x1c) : mword 64) 4)
         by (rewrite /C1 upd_eq; reflexivity).
       iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
+      (* the held set here is [{[lock_rank "proc"]} ∪ lks] with [lks = ∅];
+         spell it as the bare singleton swtch's contract pins. *)
+      iEval (rewrite Hlkempty locks_union_empty) in "Hcpuemp".
       iApply fupd_wp.
       (* the store to p->state above moved the CELL; the mirror follows here,
          which the whole variable permits with no side condition.  This is the
@@ -924,7 +935,6 @@ Section ProofSleepBody.
          many scheduler rounds pass in between -- so the park carries p->lock's
          own rank across the crossing, and the set here is the held one. *)
       iApply (Sched.wp_sched_sconf γs j γl SLEEPING ch0 C1 (trap_res eb + (av - 4))%nat eb
-                ({[lock_rank "proc"%string]} ∪ lks)
                 Hj Hgl (park_ok_SLEEPING) ltac:(lia)
                 with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc").
       { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
@@ -1167,6 +1177,7 @@ Section ProofSleepBody.
               ltac:(lia)
               Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite Ha0_N4). iExact "Hislock". }
     iApply wp_next_off_intro.
     iIntros (ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".

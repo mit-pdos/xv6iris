@@ -288,6 +288,7 @@ Section ProofKkill.
                 (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme C av b lks
                 ltac:(lia) ltac:(lia) Hno
                 with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HM22a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
       assert (Hpc26 : ret_pc (M22 !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x26))

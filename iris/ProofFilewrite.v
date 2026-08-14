@@ -1485,6 +1485,10 @@ Section ProofFilewrite.
        r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
        r <> Rs6 -> r <> Rs7 -> r <> Rs8 -> r <> Rs9 ->
        M !!! Regidx r = m !!! Regidx r) ->
+    (* the loop body's cone: begin_op/end_op ("log", 3), ilock ("bcache",
+       4), iunlock ("sleep lock", 6) -- "log" is the lowest, on this
+       recursion's own binder list so the back-edge re-proves it. *)
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M (K - 12)%nat b pj -∗
     cpu_own 0%nat eb pj C b lks -∗
     kernel_text -∗
@@ -1558,7 +1562,7 @@ Section ProofFilewrite.
     intro W. revert CID0.
     induction W as [| W IH];
       intros CID0 iz PI SI M Hfuel Hiz Hext
-             HMsp HMs2 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMthr.
+             HMsp HMs2 HMs4 HMs5 HMs6 HMs7 HMs8 HMs9 HMthr Hbelow.
     { (* NO FUEL.  The loop is entered only at [i < n], so [n - i] is at
          least one and the zero case is vacuous. *)
       exfalso. lia. }
@@ -1771,8 +1775,10 @@ Section ProofFilewrite.
     iApply (BeginOp.wp_begin_op_sconf gs jx glp (fwn_bio fn) (fwn_log fn)
               (fwn_fs fn) (fwn_cov fn) (fwn_logstart fn) icfg_dev
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb C b
-              (_ fw_av_begin_op K HK) Hjp Hgsj
+              _ (fw_av_begin_op K HK) Hjp Hgsj
+              Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlog Hppid Hprocs").
+    all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDbo Hsbo mbo) "%Hcsbo Hcg Hcnt _ _ Hpc Hppid Hlogop".
@@ -1835,7 +1841,7 @@ Section ProofFilewrite.
     iDestruct "Hbsl" as "[Hbsl1 Hbsl2]".
     iDestruct (proc_priv_core_pid (proc_addr jx) pidv (upd_upt V PI) with "Hpriv")
       as "[Hppid Hpbk2]".
-    iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) C b lks
+    iDestruct (cpu_own_transport CIDbo CIDa3 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
@@ -1848,9 +1854,14 @@ Section ProofFilewrite.
               D3 (K - 12)%nat eb C b
               (fw_av_ilock K HK) P9 P1 P2 P3 P5 Hjp Hgsj
               ltac:(rewrite HD3a0; exact P8)
+              (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
+                 and [locks_below_mono] weakens it. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "log")
+                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hit Hesc Hireg
                     Hslk2 Hshrl Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1").
+    all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDil Hsil mil dnl bml)
@@ -2037,7 +2048,7 @@ Section ProofFilewrite.
       exact (Hilcs r Hr). }
     iAssert (bslots (fwn_bio fn) 3) with "[Hbsl1 Hbsl2]" as "Hbsl".
     { rewrite fw_bslots3. iFrame "Hbsl1 Hbsl2". }
-    iDestruct (cpu_own_transport CIDil CIDa9 0%nat eb (proc_addr jx) C b lks
+    iDestruct (cpu_own_transport CIDil CIDa9 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Writei.wp_writei_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
@@ -2073,6 +2084,7 @@ Section ProofFilewrite.
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
                     Hireg Hdnat [Hpriv] Hprocs Hdev Hgeo Hdlk Hbsl Hlogop").
+    all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     (* [fw_writei_src] is NOT applied here and does not need to be: the
@@ -2261,7 +2273,7 @@ Section ProofFilewrite.
       rewrite /X1 upd_ne; [exact HX0s1 | vm_compute; discriminate]. }
     iDestruct (proc_priv_core_pid (proc_addr jx) pidv
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk3]".
-    iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) C b lks
+    iDestruct (cpu_own_transport CIDwi CIDb4 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlock.wp_iunlock_sconf gs (fwn_fs fn) (fwn_ireg fn)
               (fwn_ic fn) gil gisl
@@ -2270,9 +2282,14 @@ Section ProofFilewrite.
               inum dn' bm'
               pidv (DfracOwn (1/4)) X2 (K - 12)%nat eb (proc_addr jx) C b
               (fw_av_iunlock K HK) P9 ltac:(rewrite HX2a0; exact P8)
+              (* iunlock's bound is "sleep lock"(6); fw_loop's own is
+                 "log"(3), and [locks_below_mono] weakens it. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "log")
+                             (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
               with "Hcg Hcnt Htext Hpc Hpanic Hit Hesc Hslk2
                     Hheld Hslpid Hppid Hprocs
                     Hdep Hidev Hinum Hvalid Hlk [Hshot]").
+    all: try lkbelow.
     { rewrite Htyq. iExact "Hshot". }
     iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb".
     iDestruct ("Hpbk3" with "Hppid") as "Hpriv".
@@ -2318,7 +2335,7 @@ Section ProofFilewrite.
       by (rewrite /X3 upd_ne; [exact Hius1 | vm_compute; discriminate]).
     iDestruct (proc_priv_core_pid (proc_addr jx) pidv
                  (upd_upt (upd_upt V PI) P') with "Hpriv") as "[Hppid Hpbk4]".
-    iDestruct (cpu_own_transport CIDiu CIDb5 0%nat eb (proc_addr jx) C b lks
+    iDestruct (cpu_own_transport CIDiu CIDb5 0%nat eb (proc_addr jx) C b
                  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jx glp (fwn_uart fn) (fwn_disk fn)
               (fwn_dlock fn) (fwn_pd fn) (fwn_pav fn) (fwn_pu fn)
@@ -2326,8 +2343,10 @@ Section ProofFilewrite.
               (fwn_cov fn) (fwn_logstart fn) icfg_dev n'
               pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb C b lks
               (fw_av_end_op K HK) P1 Hjp Hgsj
+              Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hcrash Hgc
                     Hppid Hprocs Hdev Hgeo Hdlk Hlogop").
+    all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CIDeo Hseo meo) "%Hcseo Hcg Hcnt _ _ Hpc Hppid".
@@ -2512,7 +2531,7 @@ Section ProofFilewrite.
                         Hb10 Hb11 Hb12").
         iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
         destruct Hcsr as (Hcsf & Hrv & Hdisj).
-        iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) C b lks
+        iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin rv P' used'
@@ -2539,7 +2558,7 @@ Section ProofFilewrite.
         iEval (rewrite Htgtcc2) in "Hpc".
         (* THE BACK EDGE.  [IH] at the fuel [fw_i_advance] decreases and at
            the three carried components: [iz + c], [P'], [used']. *)
-        iDestruct (cpu_own_transport CIDeo CIDc3 0%nat eb (proc_addr jx) C b lks
+        iDestruct (cpu_own_transport CIDeo CIDc3 0%nat eb (proc_addr jx) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* [wp_next] IS HART-INDEXED TOO, and the back edge re-anchors the
            induction at [CIDc3].  The contract's crossing is held at the
@@ -2571,6 +2590,7 @@ Section ProofFilewrite.
                   ltac:(intros r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9;
                         rewrite (HY1cs r Hr N1 N4);
                         exact (HB0thr2 r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9))
+                  Hbelow
                   with "Hcg Hcnt Htext Hpc Hpanic Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
@@ -2639,7 +2659,7 @@ Section ProofFilewrite.
                       Hb10 Hb11 Hb12").
       iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
       destruct Hcsr as (Hcsf & Hrv & Hdisj).
-      iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) C b lks
+      iDestruct (cpu_own_transport CIDeo CIDe 0%nat eb (proc_addr jx) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin rv P' used'
@@ -2660,7 +2680,7 @@ Section ProofFilewrite.
     : wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
   Proof.
     cbv beta delta [wp_filewrite_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb.
+    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
@@ -3032,6 +3052,7 @@ Section ProofFilewrite.
                   (fc_wbool Cf) q P2 (K - 12)%nat eb C pidv V n b
                   Hj Hgs Hlens HP2a2 (fw_n_range n Hn) (fw_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
+        all: try lkbelow.
         { iEval (rewrite HP2a0). iExact "Hpipe". }
         iIntros (CIDpw Hspw mf P') "%Hcspw %Hupt %Hretpw Hcg Hcnt Hpc Hpref Hpriv".
         assert (Hpc5a : ret_pc (P2 !!! Regidx Rra) = mword_of_int (FW + 0x5a)).
@@ -3457,6 +3478,7 @@ Section ProofFilewrite.
                           (fw_av_cons K HK) Heb
                           with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Htxlk
                                 Hprocs Hpanic").
+                all: try lkbelow.
                 iIntros (CIDcw Hscw mf r P') "%Hcscw %Hupt %Hrr %Hra0 Hcg Hcnt Hpc Hpriv".
                 assert (Hpc80 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FW + 0x80)).
                 { rewrite HE2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3755,7 +3777,7 @@ Section ProofFilewrite.
                                  Hb10 Hb11 Hb12").
                  iIntros (CIDe Hse mfin rv) "%Hcsr Hcg Hpc".
                  destruct Hcsr as (Hcsf & Hrv & Hdisj).
-                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj C b lks
+                 iDestruct (cpu_own_transport CID CIDe 0%nat eb pj C b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                  iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
                  assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
@@ -4121,7 +4143,7 @@ Section ProofFilewrite.
                  (* [cpu_own] IS HART-INDEXED and the loop lemma states it at
                     ITS OWN [CID0]; the walk still holds the ENTRY hart's copy.
                     One transport, exactly as the -1 exit does before [Hcont]. *)
-                 iDestruct (cpu_own_transport CID CID28 0%nat eb pj C b lks
+                 iDestruct (cpu_own_transport CID CID28 0%nat eb pj C b
                               ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                  iApply (fw_loop (CID0 := CID28) γa γf γs j γlp k q Cf fn pidv V
                            m K eb C n b sp0 w12 pj lks
@@ -4135,6 +4157,7 @@ Section ProofFilewrite.
                            HL7sp HL7s2 HL7s4 HL7s5 HL7s6 HL7s7 HL7s8 HL7s9
                            ltac:(intros r Hr A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11;
                                  exact (HL7thr r Hr A1 A2 A4 A6 A7 A8 A9 A10 A11))
+                           Hbelow
                            with "Hcg Hcnt Htext Hpc Hpanic Hprocs
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]

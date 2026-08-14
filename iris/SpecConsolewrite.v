@@ -137,6 +137,9 @@ Definition wp_consolewrite_sconf_body
   (consolewrite_stack <= av)%nat ->
   (* PARKING PREMISE (hart-generic scheduler protocol).  See SpecSched.v. *)
   eb = true ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
      released inside uartwrite's own loop -- be the only lock held. *)

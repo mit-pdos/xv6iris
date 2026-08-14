@@ -1164,6 +1164,7 @@ Section ProofScheduler.
                 (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg emp n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
                 with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HM1a0). iExact "Hislock". }
       (* acquire's crossing index is its ENTRY [ebc] (a trap can land on its
          first instruction, before push_off disables) -- idle hatch again. *)

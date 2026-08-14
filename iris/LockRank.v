@@ -148,6 +148,31 @@ Qed.
 Lemma size_del (r : nat) (lks : gset nat) : size (lks ∖ {[r]}) <= size lks.
 Proof. apply subseteq_size. set_solver. Qed.
 
+(* THE RELEASE STEP OF THE COUPLING: a set that CONTAINED the rank strictly
+   shrinks, which is what takes [size lks <= S n] to [size (lks ∖ {[r]}) <= n]
+   -- i.e. exactly pop_off's unwind premise. *)
+Lemma size_del_lt (r : nat) (lks : gset nat) (n : nat) :
+  r ∈ lks -> size lks <= S n -> size (lks ∖ {[r]}) <= n.
+Proof.
+  intros Hin Hle.
+  rewrite size_difference; [| set_solver ].
+  rewrite size_singleton.
+  assert (0 < size lks).
+  { destruct (decide (size lks = 0)) as [Hz | Hz]; [| lia ].
+    apply size_empty_inv in Hz. set_solver. }
+  lia.
+Qed.
+
+(* the coupling at level 0, as an equation -- pop_off's re-enable branch needs
+   it in several places and it should not be re-derived at each *)
+Lemma size_le_zero_empty (lks : gset nat) : size lks <= 0 -> lks = ∅.
+Proof. intros H. apply leibniz_equiv, size_empty_inv. lia. Qed.
+
+(* the empty set fits under any level -- stated so a call site needs no
+   [rewrite size_empty] whose LHS may not appear syntactically *)
+Lemma size_empty_le (n : nat) : size (∅ : gset nat) <= n.
+Proof. rewrite size_empty. lia. Qed.
+
 (* THE TWO COUPLING STEPS, stated so a call site needs no arithmetic of its
    own -- the proof files open [Z_scope], so a bare [lia] on these [nat] goals
    there is fighting the scope rather than the maths. *)
@@ -176,3 +201,48 @@ Proof. intros Hb. apply locks_add_del, locks_below_not_elem, Hb. Qed.
    below is all a nested caller ever states. *)
 Lemma locks_below_singleton (r r' : nat) : r < r' -> locks_below {[r]} r'.
 Proof. intros Hlt q Hq. apply elem_of_singleton in Hq. subst q. exact Hlt. Qed.
+
+(* THE CALL-SITE DISCHARGER.
+
+   Every order premise a caller must supply has one of five shapes, and they
+   nest: the held set is built by [∪ {[r]}] on acquire and [∖ {[r]}] on
+   release, starting from either [∅] or the caller's own abstract [lks].  So
+   the goal is always a tower of those constructors bottoming out in [∅] or in
+   a [locks_below lks _] hypothesis already in scope, and the rank comparison
+   at each layer is between two closed [lock_rank "..."] calls, which
+   [vm_compute] settles.
+
+   Do NOT reach for [set_solver] here.  [lock_rank] is a 15-way [String.eqb]
+   chain and [set_solver]'s membership case analysis normalises every
+   occurrence of it; see the note on [locks_add_del] above for what that
+   costs.  This tactic never unfolds [lock_rank] except under [vm_compute] on
+   a goal that is purely two numerals. *)
+Ltac lkbelow_go :=
+  first
+    [ exact (locks_below_empty _)
+    | assumption
+    | apply locks_below_singleton; vm_compute; lia
+    | apply locks_below_union_singleton; [ vm_compute; lia | lkbelow_go ]
+    | apply locks_below_difference; lkbelow_go
+    | match goal with
+      | [ H : locks_below ?S ?r' |- locks_below ?S ?r ] =>
+          apply (locks_below_mono S r' r H); vm_compute; lia
+      end
+      (* the depth-zero bodies keep [lks] in scope and carry [lks = ∅] as a
+         hypothesis rather than substituting it away -- substituting breaks
+         every later mention of [lks] in the script. *)
+    | match goal with
+      | [ H : ?S = ∅ |- locks_below ?S _ ] =>
+          rewrite H; exact (locks_below_empty _)
+      end ].
+
+(* GUARDED, so that [all: try lkbelow] is a safe no-op on every goal that is
+   not an order side-condition.  That is how the call sites use it: a caller
+   whose callee raises the premise writes [all: try lkbelow.] after the
+   [iApply], and a caller that already passed the premise as an explicit
+   argument raises no such goal and is unaffected.  Without the guard the
+   [assumption] branch above could close an unrelated goal. *)
+Ltac lkbelow :=
+  lazymatch goal with
+  | |- locks_below _ _ => lkbelow_go
+  end.

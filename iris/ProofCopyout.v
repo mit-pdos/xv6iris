@@ -532,6 +532,7 @@ Section ProofCopyout.
     M !!! Regidx Rs8 = (mword_of_int 4096 : mword 64) ->
     M !!! Regidx Rs9 = (mword_of_int 274877906943 : mword 64) ->
     M !!! Regidx Rs10 = (mword_of_int (-4096) : mword 64) ->
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr (CID:=CID0) M (K - 14)%nat b p -∗
     cpu_own (CID:=CID0) lvl eb p C b lks -∗
     kernel_text -∗
@@ -557,7 +558,7 @@ Section ProofCopyout.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     induction fuel as [| fuel IH];
       intros rem done Pc M dstva CID0 Hfuel Hrem Hsum Hext
-             Hsp Hs11 Hs4 Hs5 Hs6 Hs7 Hs8 Hs9 Hs10;
+             Hsp Hs11 Hs4 Hs5 Hs6 Hs7 Hs8 Hs9 Hs10 Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
     (* the descriptor's root is the caller's root, so [p->pagetable] and s7
@@ -1024,6 +1025,7 @@ Section ProofCopyout.
                              ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact HNs9)
                     ltac:(rewrite (HW3o Rs10 ltac:(vm_compute; reflexivity)
                              ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)); exact HNs10)
+                    Hlkbelow
                     with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc Hexit"). }
       (* the [bgeu] itself *)
       destruct (zopz0zKzJ_u (T2 !!! Regidx Rs5) (T2 !!! Regidx Rs2)) eqn:Hbg.
@@ -1351,6 +1353,7 @@ Section ProofCopyout.
       iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 14)%nat lvl eb p C b lks
                 ltac:(lia) (rget_tp F5) HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
+      all: try lkbelow.
       iIntros (CIDm6 Hsm6 mf) "Hcg Hcnt Hpc %Hvfcs Hvfpay".
       pose proof (co_pin_callee_saved F5 mf Hvfcs) as Hvfcs'.
       iEval (rewrite HF5a2') in "Hvfpay".
@@ -1670,7 +1673,7 @@ Section ProofCopyout.
     : wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyout_sconf_body].
-    intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl.
+    intros pcE src ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hsrc Hcont".
@@ -2553,6 +2556,7 @@ Section ProofCopyout.
               HK Hlen64 Hszb Hlvl len len 0%nat P Q10 (mm !!! Regidx Ra2) CIDpr25
               ltac:(lia) ltac:(lia) ltac:(lia) (uptd_ext_sz_refl szv P)
               HQ10sp HQ10s11 HQ10s4 HQ10s5 HQ10s6 HQ10s7 HQ10s8 HQ10s9 HQ10s10
+              Hlkbelow
               with "Hcg Hcnt Htext Hpc Hpt Henv Hsrc Hepi").
   Qed.
 

@@ -515,7 +515,7 @@ Section ProofFreeDesc.
     : wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
-    intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl.
+    intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl Hbelow.
     unfold K_free_desc in HK.
     assert (HK2 : (2 <= K)%nat) by lia.
     assert (HKw : (18 <= K - 2)%nat) by lia.
@@ -808,7 +808,9 @@ Section ProofFreeDesc.
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15)  E2 γs
               pme lvl (K - 2)%nat eb C b
               _ HKw HE2dom Hlen Hlvl
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hpi").
+    all: try lkbelow.
     iIntros (CIDw Hdw MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
     destruct HcsW as [HcsW HdomW].
     assert (Hpc56 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.free_desc + 0x56))

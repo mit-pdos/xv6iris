@@ -95,6 +95,8 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (uint sz <= uvm_maxsz)%Z ->
   (* the table maps nothing above PGROUNDUP(sz): see the header *)
   dom um ⊆ vpn_run vpn0 n ->
+  (* uvmfree -> uvmunmap/freewalk -> kfree *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗

@@ -491,6 +491,8 @@ Definition wp_namex_sconf_body
   eq_vec (m !!! Regidx (mword_of_int 11 : mword 5)) zero_reg = negb npar ->
   (* (6) PARKING PREMISE *)
   eb = true ->
+  (* ORDER PREMISE: same cone, same bound, as the _gen body below. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -639,6 +641,10 @@ Definition wp_namex_gen_body
   eq_vec (m !!! Regidx (mword_of_int 11 : mword 5)) zero_reg = negb npar ->
   (* (6) PARKING PREMISE *)
   eb = true ->
+  (* (7) ORDER PREMISE.  namex's cone bottoms out at itable.lock (2) --
+     iget/iput/idup all state their bound there; ilock's "sleep lock" (6)
+     and the bcache/log ranks above it follow by [locks_below_mono]. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

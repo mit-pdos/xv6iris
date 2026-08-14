@@ -333,6 +333,7 @@ Section ProofFilealloc.
               n eb p C (K - 4)%nat b lks
               HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc16 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.filealloc + 0x16)).

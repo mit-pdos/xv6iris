@@ -55,6 +55,7 @@ Module PrintkGen : PRINTK_GEN.
               ltac:(rewrite /printk_stack; lia)
               Hlen Hnonul Hkinds Hdlen ltac:(lia)
               with "Hcap Hcpu Htext Hkdata Hpc Hpa Hfmt Hdescs Hprlk Hdev Htxl Hsub0").
+    all: try lkbelow.
     iIntros (CID2 Hpin).
     iDestruct ("Hcont" $! CID2 Hpin) as "Hcont2".
     iIntros (mf cs) "Hcap2 Hcpu2 Hpc2 %Hpost Hfmt2 Hdescs2 Hsub2".

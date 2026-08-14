@@ -275,7 +275,7 @@ Section ProofUvmcreate.
     : wp_uvmcreate_sconf_body γa mm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_uvmcreate_sconf_body].
-    intros ret_tgt Hlvl HK Hcid.
+    intros ret_tgt Hlvl HK Hcid Hbelow.
     pose proof (uvc_cap_bounds K HK) as (Hc4 & Hc2 & Hc14).
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -412,7 +412,9 @@ Section ProofUvmcreate.
               _ Hc14
               ltac:(reflexivity)
               Hlvl
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+    all: try lkbelow.
     iIntros (CID7 Hs7 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

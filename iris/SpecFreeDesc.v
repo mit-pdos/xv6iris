@@ -53,6 +53,8 @@ Definition wp_free_desc_sconf_body
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* free_desc's only callee is wakeup, whose bound is "proc" (11). *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

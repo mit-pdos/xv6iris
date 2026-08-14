@@ -995,6 +995,7 @@ Section ProofSysDup.
     iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p C (av - 6)%nat b lks
               ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
               with "Hcg Hcpu Htext Hpc Hftab Hpanic Hunit Href").
+    all: try lkbelow.
     iIntros (CID23 Hk23 G3) "Hcg Hcpu Hpc [%HcsG3 %HG3a0] Href0 Href1".
     assert (Hpc36 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x36))
       by (rewrite HG2ra; apply bv_eq; vm_compute; reflexivity).

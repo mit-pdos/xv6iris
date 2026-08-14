@@ -823,6 +823,7 @@ Section KexecB2Body.
                     exact (proc_pt_covered_maxsz P szf Hwf Hcov))
               ltac:(rewrite HT3a1; exact Hbelow)
               with "Hcg Hcnt Htext Hpc Hpt Hka").
+    all: try lkbelow.
     iIntros (CID4 Hsq4 mr) "Hcg Hcnt Hpc %Hcspf".
     assert (Hpc32e : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KXB + 0x32e))
       by (rewrite HT3ra; pcw).
@@ -1855,6 +1856,7 @@ Section KexecB2Loops.
                 ltac:(rewrite HD6a1; vm_compute; reflexivity) HD6a3 HD6a4
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
+      all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
       { rewrite /cpu_claim_ext. done. }
       { iSplitL "Hdst"; [iExact "Hdst" | iExact "Hppid"]. }

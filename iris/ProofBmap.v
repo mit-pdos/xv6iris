@@ -992,6 +992,12 @@ Section BmapRelease.
      \/ (bv_unsigned (blkmap_get bm fbn) = 0
          /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
     bm_ledger_ok ak cr bm bm' fbn n n' Sb Sb' ->
+    (* bm_release's whole cone is BL.wp_brelse_sconf, at "bcache" (4).  This
+       lemma is shared, via BmapCore, by both the alloc-capable and the
+       no-alloc caller, so "bcache" -- the strongest bound BOTH can supply
+       (the alloc-capable one by [locks_below_mono] down from "log", the
+       no-alloc one directly) -- is what it takes. *)
+    locks_below lks (lock_rank "bcache") ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1012,7 +1018,7 @@ Section BmapRelease.
             pidv dq dqd j m K eb C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs1 Hs4 Hkk Hwf' Hag Hkeep Hnoal Hrv Hdat Hled.
+    intros HK Hsp Hthr Hs1 Hs4 Hkk Hwf' Hag Hkeep Hnoal Hrv Hdat Hled Hbc.
     pose proof HK as HK'. unfold K_bmap in HK'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hprocs Hframe Hppid
               Hidev Hmap Hblocks Hkit Hlk Hcont".
@@ -1069,8 +1075,9 @@ Section BmapRelease.
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev ibn dq T1 (K - 6)%nat eb (proc_addr j) C bsX bsdX dX b
-              _ HKbl Hkk HT1a0
+              _ HKbl Hkk HT1a0 Hbc
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+    all: try lkbelow.
     iIntros (CID3 Hq3 mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc88 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bmap + 0x88)).
@@ -1121,7 +1128,7 @@ Section BmapRelease.
       iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
       iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
       iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
-    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* [brelse] does not thread the trap-CSR complement, so it stays at the
        entry hart across the whole call -- transport it across the WIDER
@@ -1206,6 +1213,17 @@ Section BmapTail.
     M !!! Regidx Rs1 = (sign_extend' 64 (bm_ind bmI : mword 32) : mword 64) ->
     M !!! Regidx Rs2 = ip ->
     M !!! Regidx Rs3 = (mword_of_int (Z.of_nat q) : mword 64) ->
+    (* the tail's own bread of the indirect block is UNCONDITIONAL on [ak]
+       -- the no-alloc caller reaches it too, reading an already-populated
+       entry -- so its floor, "bcache" (4), is required outright of every
+       caller (both instantiations of BmapCore can supply it: the
+       alloc-capable one via [locks_below_mono] down from "log", the
+       no-alloc one directly). *)
+    locks_below lks (lock_rank "bcache") ->
+    (* log_write, by contrast, is reached only on the allocating arm, so
+       the caller that cannot allocate (BmapNoallocProof, ak = None) never
+       has to supply "log" -- only the unconditional "bcache" above. *)
+    (ak <> None -> locks_below lks (lock_rank "log")) ->
     sie_cap_gpr M (K - 6)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -1233,7 +1251,7 @@ Section BmapTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom HwfI Hfbn Hq Hagr Hindnz HakI Haknz Hn3i Hcrb Hcri Hled0 Hbud2
-           HSbI Hba Hlw Hj Hgl Hsp Hthr Hs1 Hs2 Hs3.
+           HSbI Hba Hlw Hj Hgl Hsp Hthr Hs1 Hs2 Hs3 Hbc Hlog.
     pose proof HK as HK'. unfold K_bmap in HK'.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -1339,7 +1357,7 @@ Section BmapTail.
     assert (HI2thr : bm_thr6 m I2).
     { intros c Hcs N2 N8 N9 N18 N19 N20.
       rewrite /I2 upd_ne; [| regne]. exact (HI1thr c Hcs N2 N8 N9 N18 N19 N20). }
-    iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID0 CID3 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -1350,10 +1368,11 @@ Section BmapTail.
     assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bmI) dq
-              I2 (K - 6)%nat eb C b
-              HKbr Hilt' eq_refl Hicov' eq_refl Hj Hgl HI2a0 HI2a1
+              I2 (K - 6)%nat eb C b lks
+              HKbr Hilt' eq_refl Hicov' eq_refl Hj Hgl HI2a0 HI2a1 Hbc
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
+    all: try lkbelow.
     iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc6c : ret_pc (I2 !!! Regidx Rra : mword 64)
@@ -1586,6 +1605,7 @@ Section BmapTail.
       pose proof (Hn3i ltac:(discriminate)) as Hn3.
       pose proof (Hba ltac:(discriminate)) as Hballoc.
       pose proof (Hlw ltac:(discriminate)) as Hlogwrite.
+      pose proof (Hlog ltac:(discriminate)) as Hbelow_log.
       iDestruct (bm_kit_elim γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev nI
                    SbI eq_refl with "Hkit")
         as "(%Hbgok & #Hlctx & Hsl & Hop & Hsbsz & Hsbbm & Hbmg)".
@@ -1661,7 +1681,7 @@ Section BmapTail.
       assert (HA1thr : bm_thr6 m A1).
       { intros c Hcs N2 N8 N9 N18 N19 N20.
         rewrite /A1 upd_ne; [| regne]. exact (HA0thr c Hcs N2 N8 N9 N18 N19 N20). }
-      iDestruct (cpu_own_transport CID4 CID14 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID4 CID14 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID4 CID14 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -1710,7 +1730,7 @@ Section BmapTail.
       { intros c Hcs N2 N8 N9 N18 N19 N20.
         rewrite (callee_saved_lookup Hcs2_cs c Hcs).
         exact (HA1thr c Hcs N2 N8 N9 N18 N19 N20). }
-      iDestruct (cpu_own_transport CID15 CID15 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID15 CID15 0 eb (proc_addr j) C b
                    ltac:(intro; reflexivity) with "Hcnt") as "Hcnt".
       iDestruct "Harm" as "[(%Ha0z & Hbmres & Hop) | Hsucc]".
       + (* ---------- balloc FAILED: brelse and return 0 ---------- *)
@@ -1765,7 +1785,7 @@ Section BmapTail.
           destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
             [exfalso; exact (Hindnz Hz1)|].
           iEval (rewrite -Huind). iExact "Hindblk". }
-        iDestruct (cpu_own_transport CID15 CID17 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID15 CID17 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         (* balloc DOES thread the trap-CSR complement through its own
            continuation (its contract hands it back, pass-through, just
@@ -1789,7 +1809,7 @@ Section BmapTail.
                   ltac:(left; split;
                         [apply moi32_small; lia
                         | rewrite Hgetq; exact Hentz])
-                  ltac:(left; reflexivity) Hled0
+                  ltac:(left; reflexivity) Hled0 Hbc
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hprocs Hframe
                         Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
         iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID17) ltac:(wp_next_chain)
@@ -1918,7 +1938,7 @@ Section BmapTail.
         assert (HG2thr : bm_thr6 m G2).
         { intros c Hcs N2 N8 N9 N18 N19 N20.
           rewrite /G2 upd_ne; [| regne]. exact (HG1thr c Hcs N2 N8 N9 N18 N19 N20). }
-        iDestruct (cpu_own_transport CID15 CID20 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID15 CID20 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         assert (HKlw : (K_log_write <= K - 6)%nat) by (unfold K_log_write; lia).
         iDestruct (bm_slots_split bn 1 1 with "Hsl") as "[Hsl1 Hslr]".
@@ -1931,6 +1951,7 @@ Section BmapTail.
                   ltac:(rewrite Huind; exact Hilog)
                   ltac:(intros Hc; rewrite Huind HS1;
                         exact (bmset_in_l3 _ _ _ _ (Hcri Hc)))
+                  Hbelow_log
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl1 Hop Hindblk Hheld").
         iIntros (CID21 Hq21 mL) "Hcg Hcnt Hpc %Hcs3 Hop Hindblk Hheld Hsl1".
         assert (Hpcb0 : ret_pc (G2 !!! Regidx Rra : mword 64)
@@ -2006,7 +2027,7 @@ Section BmapTail.
                      ltac:(rewrite Hgetq; exact Hentz) HgetJf HgetJ
                      with "Hblocks Hfsb Htok") as "Hblocks".
         iDestruct (bm_slots_join bn 1 1 with "Hslr Hsl1") as "Hsl".
-        iDestruct (cpu_own_transport CID21 CID22 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID21 CID22 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         (* balloc DOES thread it (fresh at its own return hart [CID15]), but
            log_write does not, so it stays at [CID15] across the log_write
@@ -2071,7 +2092,7 @@ Section BmapTail.
                         | rewrite HgetJf; exact Hblknz])
                   ltac:(right; split;
                         [rewrite -(Hagr fbn Hfbnlt) Hgetq; exact Hentz | reflexivity])
-                  Hledger
+                  Hledger Hbc
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hprocs Hframe
                         Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
         iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID22) ltac:(wp_next_chain)
@@ -2097,7 +2118,7 @@ Section BmapTail.
         destruct (decide (bv_unsigned (bm_ind bmI) = 0)) as [Hz1|_];
           [exfalso; exact (Hindnz Hz1)|].
         iEval (rewrite -Huind). iExact "Hindblk". }
-      iDestruct (cpu_own_transport CID4 CID12 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID4 CID12 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID4 CID12 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2113,7 +2134,7 @@ Section BmapTail.
                 ltac:(intros Hc; split; [exact (HakI Hc) | reflexivity])
                 ltac:(right; split;
                       [exact (eq_sym Hgetq) | rewrite Hgetq; exact Hentnz])
-                ltac:(left; reflexivity) Hled0
+                ltac:(left; reflexivity) Hled0 Hbc
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hprocs Hframe
                       Hppid Hidev Hmap Hblocks Hkit Hheld [Hcont]").
       iApply (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
@@ -2144,6 +2165,11 @@ Section ProofBmapMain.
       (b : bool) (lks : gset nat)
       (Hba : ak <> None -> balloc_contract)
       (Hlw : ak <> None -> log_write_contract)
+      (* forwarded verbatim into [bm_indirect_tail]'s two lock premises --
+         see that lemma's header for why the split is unconditional bcache
+         / ak-gated log rather than one premise. *)
+      (Hbc : locks_below lks (lock_rank "bcache"))
+      (Hlog : ak <> None -> locks_below lks (lock_rank "log"))
     : bm_gen_stmt γs j γl γu γd γk pd pav pu bn ak γfs
                   cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb C b lks.
   Proof.
@@ -2554,7 +2580,7 @@ Section ProofBmapMain.
         assert (HD5thr : bm_thr5 m D5).
         { intros c Hcs N2 N8 N9 N18 N19.
           rewrite /D5 upd_ne; [| regne]. exact (HD4thr c Hcs N2 N8 N9 N18 N19). }
-        iDestruct (cpu_own_transport CID CID17 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID CID17 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID CID17 eb (proc_addr j)
                      ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2641,7 +2667,7 @@ Section ProofBmapMain.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
             iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
             iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
-          iDestruct (cpu_own_transport CID18 CID20 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CID18 CID20 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           (* balloc DOES thread the trap-CSR complement through its own
              continuation, fresh at its own return hart [CID18] -- transport
@@ -2773,7 +2799,7 @@ Section ProofBmapMain.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
             iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
             iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
-          iDestruct (cpu_own_transport CID18 CID22 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CID18 CID22 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           (* balloc DOES thread the trap-CSR complement through its own
              continuation, fresh at its own return hart [CID18] -- transport
@@ -2852,7 +2878,7 @@ Section ProofBmapMain.
           iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
           iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
           iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
-        iDestruct (cpu_own_transport CID CID15 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID CID15 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID CID15 eb (proc_addr j)
                      ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -3128,7 +3154,7 @@ Section ProofBmapMain.
         assert (HP1thr : bm_thr5 m P1).
         { intros c Hcs N2 N8 N9 N18 N19.
           rewrite /P1 upd_ne; [| regne]. exact (HP0thr c Hcs N2 N8 N9 N18 N19). }
-        iDestruct (cpu_own_transport CID CID19 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID CID19 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID CID19 eb (proc_addr j)
                      ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -3225,7 +3251,7 @@ Section ProofBmapMain.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
             iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
             iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
-          iDestruct (cpu_own_transport CID20 CID22 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CID20 CID22 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           (* balloc DOES thread the trap-CSR complement through its own
              continuation, fresh at its own return hart [CID20] -- transport
@@ -3364,7 +3390,7 @@ Section ProofBmapMain.
             iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
             iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
             iSplitL "Hf5"; [iExact "Hf5"|]. iExact "Hf6". }
-          iDestruct (cpu_own_transport CID20 CID25 0 eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CID20 CID25 0 eb (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           (* balloc DOES thread the trap-CSR complement through its own
              continuation, fresh at its own return hart [CID20] -- transport
@@ -3423,6 +3449,7 @@ Section ProofBmapMain.
                     ltac:(intros c Hcs N2 N8 N9 N18 N19 N20;
                           exact (HP2thr c Hcs N2 N8 N9 N18 N19))
                     ltac:(rewrite /bmI; cbn [bm_ind]; exact HP2s1) HP2s2 HP2s3
+                    Hbc Hlog
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hprocs
                           Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                           Haddrs Hindblk2 Hindtok2 Hblocks Hsl Hkit [Hcont]").
@@ -3468,7 +3495,7 @@ Section ProofBmapMain.
           iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
           iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
           iSplitL "Hf5"; [iExact "Hf5"|]. iExact "Hf6". }
-        iDestruct (cpu_own_transport CID CID18 0 eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CID CID18 0 eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CID CID18 eb (proc_addr j)
                      ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -3497,6 +3524,7 @@ Section ProofBmapMain.
                   ltac:(intros c Hcs N2 N8 N9 N18 N19 N20;
                         exact (HJ4thr c Hcs N2 N8 N9 N18 N19))
                   HJ4s1 HJ4s2 HJ4s3
+                  Hbc Hlog
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hprocs
                         Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                         Haddrs Hindblk Hindtok Hblocks Hsl Hkit [Hcont]").
@@ -3540,7 +3568,7 @@ Section BmapSeal.
                          pidv dq dqd dqb dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_bmap_sconf_body].
-    intros pcE pj ret_tgt bnw HK Hn5 Hgeom Hbgok Hprkc Hfbn Hwf Hj Hgl Ha0 Ha1.
+    intros pcE pj ret_tgt bnw HK Hn5 Hgeom Hbgok Hprkc Hfbn Hwf Hj Hgl Ha0 Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx
               Hidev Hmap Hblocks Hppid
               Hsbsz Hsbbm Hbmres
@@ -3567,6 +3595,9 @@ Section BmapSeal.
                     exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
                     exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
+              ltac:(exact (locks_below_mono lks (lock_rank "log")
+                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(intros _; exact Hbelow)
               HK
               ltac:(intros _; pose proof (bmap_need_le4 false (bmap_ind fbn)); lia)
               ltac:(intros Hc; discriminate Hc)
@@ -3574,6 +3605,7 @@ Section BmapSeal.
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
+    all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
@@ -3625,7 +3657,7 @@ Section BmapSeal.
   Proof.
     cbv beta delta [wp_bmap_gen_body].
     intros pcE pj ret_tgt bnw HK Hneed Hgeom Hbgok Hprkc Hcrp Hfbn Hwf Hj Hgl
-           Ha0 Ha1.
+           Ha0 Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx
               Hidev Hmap Hblocks Hppid
               Hsbsz Hsbbm Hbmres
@@ -3646,6 +3678,9 @@ Section BmapSeal.
                     exact (BA.wp_balloc_gen (GEN := GEN0) (CID := CID0)))
               ltac:(intros _ GEN0 CID0;
                     exact (LW.wp_log_write_gen (GEN := GEN0) (CID := CID0)))
+              ltac:(exact (locks_below_mono lks (lock_rank "log")
+                             (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
+              ltac:(intros _; exact Hbelow)
               HK ltac:(intros _; exact Hneed)
               ltac:(intros Hc; cbn [bm_bmsset ba_bms];
                     exact (bmset_sing_sub _ _ (Hcrp Hc)))
@@ -3653,6 +3688,7 @@ Section BmapSeal.
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
+    all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf bm' n' data' Sb') "%Hcs %Hwf' %Hag %Hkeep %Hnoal %Harm
@@ -3708,12 +3744,14 @@ Section BmapNoallocSeal.
                                  m K eb C b lks.
   Proof.
     cbv beta delta [wp_bmap_noalloc_sconf_body].
-    intros pcE pj ret_tgt bnw HK Hgeom Hfbn Hwf Hnz Hj Hgl Ha0 Ha1.
+    intros pcE pj ret_tgt bnw HK Hgeom Hfbn Hwf Hnz Hj Hgl Ha0 Ha1 Hbelow.
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hidev Hmap Hblocks Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn None γfs
               cov logstart dev ip bm data fbn 0%nat false ∅ pidv dq dqd m K eb C b lks
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
+              ltac:(intros Hc; exfalso; exact (Hc eq_refl))
+              Hbelow
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               HK ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               ltac:(intros Hc; discriminate Hc)
@@ -3721,6 +3759,7 @@ Section BmapNoallocSeal.
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic [] Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl [] [Hcont]").
+    all: try lkbelow.
     { iApply bm_prk_none. }
     { iApply bm_kit_none. }
     iEval (rewrite /wp_next).

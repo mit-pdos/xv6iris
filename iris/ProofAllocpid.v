@@ -239,6 +239,7 @@ Section ProofAllocpid.
     iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p C (av - 4)%nat b lks
               Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq0) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".
     (* ===================== CRITICAL SECTION (fixed b = false) ===================== *)

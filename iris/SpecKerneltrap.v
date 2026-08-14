@@ -253,6 +253,11 @@ Definition wp_kerneltrap_sconf_body
   (* the saved epc is instruction-aligned, so restoring it lands verbatim
      (sepc's write legalizes through the same bit-0 clear [ret_pc] is) *)
   ret_pc ep = ep ->
+  (* kerneltrap dispatches devintr, whose cone bottoms out at cons.lock
+     ("cons", 5) through uartintr -> consoleintr -- BELOW clockintr's
+     tickslock (8) and virtio's (9), and a bound has to be stated at the
+     minimum, since [locks_below_mono] raises but never lowers. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av false p -∗
   (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
      SPIE = 1.  This is the [sret_bits] travelling half, which is what

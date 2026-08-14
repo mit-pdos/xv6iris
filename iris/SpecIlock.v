@@ -202,6 +202,11 @@ Definition wp_ilock_sconf_body
   gs !! j = Some gl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* ilock's cone touches "sleep lock"(6) via acquiresleep and "bcache"(4)
+     via bread/brelse (on the invalid-entry fill arm); bcache is the LOWER
+     of the two, so one premise at its rank covers the whole cone via
+     [locks_below_mono]. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread

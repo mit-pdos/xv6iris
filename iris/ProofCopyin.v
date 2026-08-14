@@ -601,6 +601,7 @@ Section ProofCopyin.
     m !!! Regidx Rs9 = szv ->
     m !!! Regidx Rs10 = (mword_of_int 1 : mword 64) ->
     m !!! Regidx Rs11 = v11 ->
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr m (K - 12) b p -∗
     cpu_own lvl eb p C b lks -∗
     kernel_text -∗
@@ -628,7 +629,8 @@ Section ProofCopyin.
     intro fuel.
     revert CID0.
     induction fuel as [| fuel IH];
-      intros CID0 done rem Pc m fd Hfuel Hrem Hsum Hext Hsp Hs4 Hs5 Hs6 Hs7 Hs8 Hs9 Hs10 Hs11;
+      intros CID0 done rem Pc m fd Hfuel Hrem Hsum Hext Hsp Hs4 Hs5 Hs6 Hs7 Hs8 Hs9 Hs10 Hs11
+        Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -976,6 +978,7 @@ Section ProofCopyin.
           iApply (IH CIDg4' (done + n)%nat (rem - n)%nat Pd G3 fd'
                     HF1 HF2 HF3 (uptd_ext_sz_trans szv P Pc Pd Hext Hextd)
                     HG3sp HG3s4 HG3s5 HG3s6 HG3s7 HG3s8 HG3s9 HG3s10 HG3s11
+                    Hlkbelow
                     with "Hcg Hcnt Htext Hpc Hpt Henv Hdst HEXIT").
       }
       (* ---- +0x32 bgeu s4,s1 : n = min(4096 - off, rem) ---- *)
@@ -1250,6 +1253,7 @@ Section ProofCopyin.
     iApply (Vmfault.wp_vmfault_sconf γa (tp_pin V5) Pc szv (K - 12) lvl eb p C b
               _ ltac:(lia) HV5tp HV5a0' HV5a1' Hszb Hlvl
               with "Hcg Hcnt Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CIDvf Hsvf mv) "Hcg Hcnt Hpc %Hvcs Hvpost".
     iEval (rewrite HV5a2' Hidem) in "Hvpost".
     assert (Hret74 : ret_pc (tp_pin (CID:=CIDv4) V5 !!! Regidx Rra) = mword_of_int (KernelSyms.copyin + 0x74)).
@@ -1381,7 +1385,7 @@ Section ProofCopyin.
     : wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyin_sconf_body].
-    intros pcE dst ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl.
+    intros pcE dst ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
     iPoseProof (cii_00 with "Htext") as "Hi00".
@@ -1739,6 +1743,7 @@ Section ProofCopyin.
               HK Hlen64 Hszb Hlvl len 0%nat len P R10 dst_olds
               HL1 HL2 HL3 (uptd_ext_sz_refl szv P)
               HR10sp HR10s4 HR10s5 HR10s6 HR10s7 HR10s8 HR10s9 HR10s10 HR10s11
+              Hlkbelow
               with "Hcg Hcnt Htext Hpc Hpt Henv Hdst").
     iIntros (CIDl Hsl mj res P' g) "%Hjsp %Hjs11 %Hja0 %Hres %Hjext
                             Hcg Hcnt Hpc Hpt Hdst".

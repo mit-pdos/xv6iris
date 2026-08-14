@@ -48,6 +48,9 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z ->
   pt_rep0 t m ->
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
+  (* order premise at the lowest rank this cone reaches: kvmmap -> mappages
+     -> walk -> kalloc ("kmem", 13). *)
+  locks_below lks (lock_rank "kmem") ->
   match on with
   | None => panic_wp_any   (* hart-GENERIC: the panic arm is reached after
                               [b]-generic instructions, i.e. possibly on a

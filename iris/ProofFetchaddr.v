@@ -366,6 +366,10 @@ Section ProofFetchaddr.
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     iIntros "Hcg Hcpu #Htext Hpc Hpriv #Henv Hip Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iPoseProof (fai_00 with "Htext") as "Hi00".
     iPoseProof (fai_02 with "Htext") as "Hi02".
     iPoseProof (fai_04 with "Htext") as "Hi04".
@@ -919,6 +923,7 @@ Section ProofFetchaddr.
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p C b
                   _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
+        all: try lkbelow.
         iIntros (CID20 Hk20 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
         assert (Hpc2e : ret_pc (A7 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x2e))
           by (rewrite HA7ra; apply bv_eq; vm_compute; reflexivity).

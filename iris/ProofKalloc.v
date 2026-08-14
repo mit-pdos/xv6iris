@@ -181,6 +181,7 @@ Section ProofKalloc.
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc16 : ret_pc (mA !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x16)).

@@ -83,6 +83,9 @@ Definition wp_bwrite_sconf_body
   (* a0 is the buffer *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
   cpu_own 0 eb pj C b lks -∗

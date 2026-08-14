@@ -200,7 +200,7 @@ Section ProofFreeproc.
     : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
   Proof.
     cbv beta delta [wp_freeproc_sconf_body].
-    intros pcE pa ret_tgt HK Hilvl Ha0.
+    intros pcE pa ret_tgt HK Hilvl Ha0 Hlkbelow.
     pose proof (fr_cap K HK) as (Hc4 & Hckf & Hcpf).
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -727,6 +727,7 @@ Section ProofFreeproc.
                   ltac:(rewrite HB2a1; exact Hszr)
                   ltac:(rewrite HB2a1; exact Hbelow)
                   with "Hcg Hcpu Htext Hpc Hpt Henv").
+        all: try lkbelow.
         iIntros (CIDp6 Hsp6 mr) "Hcg Hcpu Hpc %Hcs".
         assert (Hret22 : ret_pc (B2 !!! Regidx Rra) = mword_of_int (FR + 0x22)).
         { rewrite HB2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -848,7 +849,9 @@ Section ProofFreeproc.
                 (mword_of_int (KernelSyms.kmem + 24)) T1 None ilvl eb pme C
                 (K - 4)%nat false lks
                 Hckf eq_refl eq_refl Hilvl
+                Hlkbelow
                 with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail Hpanic").
+      all: try lkbelow.
       { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HT1a0; exact Htfval |].
         iEval (rewrite HT1a0). iExact "Hpage". }
       iIntros (CIDk Hsk mrk) "Hcg Hcpu Hpc %Hcsk _".

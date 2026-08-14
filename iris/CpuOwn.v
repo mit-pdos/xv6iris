@@ -232,6 +232,21 @@ Section CpuOwn.
       iApply (cpu_locks_lvl_intro n lks Hsz with "Hlks").
   Qed.
 
+  (* AT DEPTH ZERO THE HELD SET IS FORCED EMPTY, so a contract whose [cpu_own]
+     pins [n = 0] -- every syscall body, [yield], the trap tails -- needs no
+     order premise of its own: it DERIVES [lks = ∅], and every order goal its
+     callees raise is then [locks_below ∅ _].  That is what keeps the premise
+     from cascading out of the syscall layer and into [SpecSyscall] /
+     [SpecUsertrap], whose [lks] is equally abstract but whose depth is the
+     same zero. *)
+  Lemma cpu_own_zero_empty (eb : bool) (p : mword 64) (C : iProp Σ)
+      (b : bool) (lks : gset nat) :
+    cpu_own 0%nat eb p C b lks -∗ ⌜lks = ∅⌝ ∗ cpu_own 0%nat eb p C b lks.
+  Proof.
+    iIntros "H". iDestruct (cpu_own_size_le with "H") as "[%Hsz H]".
+    iFrame "H". iPureIntro. exact (size_le_zero_empty lks Hsz).
+  Qed.
+
   Lemma cpu_own_locks_swap (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (lks : gset nat) :
     cpu_own n eb p C false lks -∗

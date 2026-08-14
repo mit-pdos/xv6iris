@@ -92,6 +92,10 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      [lvl] is otherwise generic -- vmfault runs at whatever nesting its
      caller holds (usertrap at 0, pipewrite/piperead's copies at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* vmfault's whole cone bottoms out at "kmem" (13): the kalloc for the new
+     page and, on the mappages-failure arm, the kfree that undoes it.
+     ismapped/mappages take no lock, so one premise covers everything. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗

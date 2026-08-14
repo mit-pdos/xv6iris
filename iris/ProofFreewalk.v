@@ -491,6 +491,7 @@ Section ProofFreewalk.
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl
               Hfresh
               with "Hcg Hcnt Htext Hpc Hlock [Hpre] Havail Hpanic").
+    all: try lkbelow.
     { rewrite HE1a0. iExact "Hpre". }
     iIntros (CIDkf Hskf mk) "Hcg Hcnt Hpc %Hkcs _".
     iEval (rewrite Hret4e) in "Hpc".
@@ -657,6 +658,9 @@ Section ProofFreewalk.
     m !!! Regidx Rs2 = add_vec (mword_of_int 4096) (page_base (pt_base t)) ->
     m !!! Regidx Rs3 = page_base (pt_base t) ->
     fw_thr mm m ->
+    (* threaded on this recursion's own binder list too: it is what its
+       [REC] call one level down, and its own [IH] back-edge, both need. *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr m (K - 6) b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -681,7 +685,7 @@ Section ProofFreewalk.
     intro rem.
     revert CID.
     induction rem as [| rem' IH];
-      intros CID d m Hrem Hd0 Hsum Hsp Hs1 Hs2 Hs3 Hthr;
+      intros CID d m Hrem Hd0 Hsum Hsp Hs1 Hs2 Hs3 Hthr Hbelow;
       [ destruct (Nat.nle_succ_0 0 Hrem) |].
     iIntros "Hcg Hcnt #Htext Hpc #Hcl Hdone Htodo #Henv Hcont".
     assert (Hdlt : (0 <= d < 512)%Z) by lia.
@@ -777,7 +781,7 @@ Section ProofFreewalk.
       iDestruct (cpu_own_transport CIDx CIDt3 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (IH CIDt3 (d + 1) T1 ltac:(lia) ltac:(lia) ltac:(lia)
-                HT1sp HT1s1 HT1s2 HT1s3 HT1thr
+                HT1sp HT1s1 HT1s2 HT1s3 HT1thr Hbelow
                 with "Hcg Hcnt Htext Hpc Hcl Hdone Htodo Henv Hcont"). }
     (* ================================================================ *)
     (*  THE BODY: read the slot, classify it, maybe recurse.             *)
@@ -976,14 +980,13 @@ Section ProofFreewalk.
     assert (Hlt : (l < lvl)%nat) by (exact (fw_kid_lt lvl t (mword_of_int d) l c Hkid)).
     assert (HKrec : (6 * S l + 14 <= K - 6)%nat) by lia.
     iEval (rewrite /fw_slot Hkid) in "Hch".
-    (* UNSURE (flagged for review): [REC] is [fw_rec l], wrapping
-       [wp_freewalk_sconf_body] from SpecFreewalk.v, which has not yet
-       gained the held-lock-set argument -- so handing it a [lks]-carrying
-       [cpu_own] here is ahead of that file's own sweep; see the identical
-       note at this lemma's top-level entry point below. *)
+    (* [REC] is [fw_rec l], wrapping [wp_freewalk_sconf_body] from
+       SpecFreewalk.v at the SAME rank ("kmem"), so [Hbelow] passes
+       straight through with no [locks_below_mono] needed. *)
     iDestruct (cpu_own_transport CID CIDb9 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (REC l Hlt CIDb9 γa B6 c (K - 6)%nat eb p C ilvl b _ HKrec Hilvl HB6a0 Hfok
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hch Henv").
     iIntros (CIDrec Hsrec mr) "Hcg Hcnt Hpc %Hrcs".
     iEval (rewrite Hret42) in "Hpc".
@@ -1047,9 +1050,9 @@ Section ProofFreewalk.
   (* ================================================================== *)
   Local Lemma fw_body (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l) : fw_rec lvl.
   Proof.
-    unfold fw_rec. intros CID0 γa mm t K eb p C ilvl b.
+    unfold fw_rec. intros CID0 γa mm t K eb p C ilvl b lks.
     cbv beta delta [wp_freewalk_sconf_body].
-    intros pcE ret_tgt HK Hilvl Ha0 Hfree.
+    intros pcE ret_tgt HK Hilvl Ha0 Hfree Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc Hptree #Henv Hcont".
@@ -1253,24 +1256,21 @@ Section ProofFreewalk.
        both callees below take a FRESH inline continuation ([-]). *)
     assert (Hshift12 : b = false \/ p = zero_reg -> (CID12 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift12 with "Hcont") as "Hcont".
-    (* UNSURE (flagged for review): [wp_freewalk_sconf_body] (SpecFreewalk.v)
-       has not yet gained the held-lock-set argument, so [Hcnt] here is still
-       typed at the OLD [cpu_own] arity and there is no incoming [lks] to
-       thread.  [fw_loop] / [fw_epilogue] below are this file's own internal
-       lemmas and DO now take [lks] (freewalk itself acquires no lock), so ∅
-       is threaded as the placeholder witness until SpecFreewalk.v's contract
-       is swept and an incoming set is actually available here. *)
+    (* [wp_freewalk_sconf_body] (SpecFreewalk.v) now carries the caller's
+       real held-lock set [lks] and the "kmem" bound [Hbelow] on it; both
+       [fw_loop] and [fw_epilogue] take the SAME [lks] and premise (freewalk
+       itself acquires no lock, so [lks] is unchanged end to end). *)
     iDestruct (cpu_own_transport CID0 CID12 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (fw_loop (CID:=CID12) lvl REC γa mm t K eb p C spr ilvl b ∅ HK Hilvl (fw_ok_of lvl t Hfree)
+    iApply (fw_loop (CID:=CID12) lvl REC γa mm t K eb p C spr ilvl b lks HK Hilvl (fw_ok_of lvl t Hfree)
               512%nat 0%Z R6 ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
-              HR6sp HR6s1 HR6s2 HR6s3 HR6thr
+              HR6sp HR6s1 HR6s2 HR6s3 HR6thr Hbelow
               with "Hcg Hcnt Htext Hpc Hclaim [] Htodo Henv").
     { rewrite /fw_done. rewrite (seqZ_nil 0 0 ltac:(lia)). done. }
     iIntros (CIDj Hsj mj) "(%Hjsp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hdone".
-    iApply (fw_epilogue (CID0:=CIDj) ilvl γa mm mj K sp0 (pt_base t) eb p C b ∅
+    iApply (fw_epilogue (CID0:=CIDj) ilvl γa mm mj K sp0 (pt_base t) eb p C b lks
               ltac:(lia) Hilvl Hspm Hjsp Hjs3 Hjthr
-              (locks_below_empty (lock_rank "kmem"))
+              Hbelow
               with "Hcg Hcnt Htext Hpc [Hdone] Henv Hk1 Hk2 Hk3 Hk4 Hk5 [Hk6]").
     { iApply (pt_slots_kfree_pre (pt_base t) Hpv with "Hkmapb Hdone"). }
     { iExists u6. iExact "Hk6". }
@@ -1294,7 +1294,7 @@ Section ProofFreewalk.
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (ilvl : nat) (b : bool) (lks : gset nat)
     : wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b lks.
-  Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) CID γa mm t K eb p C ilvl b). Qed.
+  Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) CID γa mm t K eb p C ilvl b lks). Qed.
 
 End ProofFreewalk.
 

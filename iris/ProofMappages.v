@@ -453,6 +453,7 @@ Section ProofMappages.
     pt_present_mono t tk ->
     pt_nodes tk = (pt_nodes t + consumed)%nat ->
     (consumed + pt_missing tk (vpn_at vpn0 k) (npages - k) <= pt_missing t vpn0 npages)%nat ->
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x3e)) -∗
@@ -490,7 +491,8 @@ Section ProofMappages.
     revert CID0.
     induction rem as [| rem' IH]; intros CID0 k Mk tk consumed va pa vpn0 ppn0 sp0 spr ret_tgt
       Hlvl HK Hkrem Hrem Hroot Hvaal Hpaal Hpermreg Hpok Hvab Hpab Hnone
-      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hpresk Hnodes Hinv;
+      Hsp Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hpresk Hnodes Hinv
+      Hlkbelow;
       [lia |].
     iIntros "Hcg Hcnt #Htext Hpc
              Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
@@ -622,6 +624,7 @@ Section ProofMappages.
               Hrep
               HW4'tp
               with "Hcg Hcnt Htext Hpc Hptree Henv").
+    all: try lkbelow.
     iIntros (CIDw Hsw mr t' g) "Hcg Hcnt Hpc Hptree %Hg Henv %Hkcs %Hsame %Hoffw %Hpresw %Hmissw %Hpay".
     iEval (rewrite <- (avail_sub_add on consumed g)) in "Henv".
     assert (Ht'nodes : pt_nodes t' = (pt_nodes t + (consumed + g))%nat) by lia.
@@ -1147,6 +1150,7 @@ Section ProofMappages.
               (eq_trans Hag26 Hmr26)
               (eq_trans Hag27 Hmr27)
               HbaseS HrepS HpresS HnodesS HinvS
+              Hlkbelow
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00ex
                     Hptree Henv Hcont").
@@ -1161,7 +1165,7 @@ Section ProofMappages.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
-      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone.
+      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -1605,6 +1609,7 @@ Section ProofMappages.
               ltac:(peel_reg)
               eq_refl Hrep (pt_present_mono_refl t) ltac:(lia)
               Hinv0
+              Hlkbelow
               with "Hcg Hcnt Htext Hpc
                     Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 [S10]
                     Hptree Henv").

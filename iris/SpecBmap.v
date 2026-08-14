@@ -302,6 +302,9 @@ Definition wp_bmap_sconf_body
   (* a0 = ip; a1 = bn, sign-extended as the RV64 ABI passes a uint *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
+     the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bmap holds no lock of its
@@ -488,6 +491,9 @@ Definition wp_bmap_gen_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  (* bmap ALLOCATES here, so its cone reaches balloc -> log_write ("log", 3);
+     the bread/brelse floor ("bcache", 4) follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
@@ -705,6 +711,9 @@ Definition wp_bmap_noalloc_sconf_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  (* the NO-ALLOC bmap never reaches log_write, so its floor is just the
+     bread/brelse one -- requiring "log" of its callers would be over-strong. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR -- see the allocating

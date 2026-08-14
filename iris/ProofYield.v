@@ -635,6 +635,7 @@ Section ProofYield.
               ltac:(lia)
               (locks_below_empty (lock_rank "proc"))
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
        [false] and every leaf collapses with [wp_next_off]. *)
@@ -756,7 +757,6 @@ Section ProofYield.
     iMod (pstate_whole_update (proc_addr j) RUNNING RUNNABLE with "Hpg") as "Hpg".
     iModIntro.
     iApply (Sched.wp_sched_sconf γs j γl RUNNABLE ch0 C1 (trap_res eb + (av - 4))%nat eb
-              ({[lock_rank "proc"]} ∪ ∅)
               Hj Hgl (park_ok_RUNNABLE) ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }

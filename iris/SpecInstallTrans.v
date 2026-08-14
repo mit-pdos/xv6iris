@@ -169,6 +169,10 @@ Definition wp_install_trans_sconf_body
      side (see the header). *)
   (forall (i : nat) (w : SailStdpp.Values.mword 32),
      W !! i = Some w -> L !! uint w = Some (Lw i)) ->
+  (* install_trans directly breads/bwrites/brelses/bunpins, all against
+     "bcache" (4); it takes no lock of its own and calls no other function
+     with a lower bound, so this is the one premise its whole cone needs. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO

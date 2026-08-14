@@ -86,6 +86,10 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   mm !!! Regidx (mword_of_int 10) = page_base (pt_base t) ->
   (* the table maps nothing: the panic arm is dead *)
   pt_free_ok lvl t ->
+  (* freewalk's only lock-touching callee is kfree, at every node it frees
+     -- including the recursive descent, whose own instance of this same
+     contract carries the identical bound. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗

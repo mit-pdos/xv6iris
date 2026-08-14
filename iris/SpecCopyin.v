@@ -103,6 +103,8 @@ Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* vmfault's kalloc keeps its transient noff increment in int range;
      [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* order premise at the lowest rank this cone reaches. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗

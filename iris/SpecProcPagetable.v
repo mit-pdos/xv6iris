@@ -104,6 +104,8 @@ Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (exists nb, on = Some nb /\ (K_proc_pagetable < nb)%nat) ->
   subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->
   (uint tf + 4096 < 2 ^ 56)%Z ->
+  (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗
@@ -140,6 +142,8 @@ Definition wp_proc_pagetable_core_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   (40 <= K)%nat ->
   subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->
   (uint tf + 4096 < 2 ^ 56)%Z ->
+  (* proc_pagetable -> uvmcreate/mappages -> kalloc *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_pagetable) -∗

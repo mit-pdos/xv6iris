@@ -427,6 +427,10 @@ Section ProofGrowproc.
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     iIntros "Hcg Hcpu #Htext Hpc Hpriv #Henv Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iPoseProof (gpi_00 with "Htext") as "Hi00".
     iPoseProof (gpi_02 with "Htext") as "Hi02".
     iPoseProof (gpi_04 with "Htext") as "Hi04".
@@ -1039,6 +1043,7 @@ Section ProofGrowproc.
                       exact Hnewle)
                 ltac:(rewrite HC3pa1 HC3pa2; exact Hfresh)
                 with "Hcg Hcpu Htext Hpc Hpt Henv").
+      all: try lkbelow.
       iIntros (CID21 Hn21 mr) "Hcg Hcpu Hpc %Hcsr Hpost".
       assert (Hpc32 : ret_pc (C3p !!! Regidx Rra) = mword_of_int (KernelSyms.growproc + 0x32))
         by (rewrite HC3pra; apply bv_eq; vm_compute; reflexivity).
@@ -1327,6 +1332,7 @@ Section ProofGrowproc.
               ltac:(lia) HE3a0
               ltac:(rewrite HE3a1; exact Hszmax)
               with "Hcg Hcpu Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CID17 Hn17 md) "Hcg Hcpu Hpc %Hcsd %Hdret Hpt".
     rewrite HE3a1 HE3a2 in Hdret.
     iEval (rewrite HE3a1 HE3a2) in "Hpt".

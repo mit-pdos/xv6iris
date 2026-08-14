@@ -92,7 +92,7 @@ Section ProofArgstr.
     : wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
-    intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31.
+    intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31 Hlkbelow.
     unfold argstr_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -388,6 +388,7 @@ Section ProofArgstr.
     iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
+    all: try lkbelow.
     iIntros (CID14 Hk14 mr P' buf_new) "%Hcsr %Hext Hcg Hcpu Hpc Hpriv Hbuf %Hret".
     iEval (rewrite HA3a1) in "Hbuf".
     assert (Hpc1c : ret_pc (A3 !!! Regidx Rra) = mword_of_int (KernelSyms.argstr + 0x1c))

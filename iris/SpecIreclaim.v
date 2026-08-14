@@ -241,6 +241,12 @@ Definition wp_ireclaim_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol) -- bread and
      begin_op both sleep *)
   eb = true ->
+  (* ireclaim's cone is the union of its callees': bread/brelse ("bcache",
+     4), printk ("pr", 14), iget/iput ("itable", 2), begin_op/end_op
+     ("log", 3), ilock ("bcache", 4), iunlock ("sleep lock", 6) --
+     "itable" is the lowest, so one premise there covers the whole cone
+     via [locks_below_mono]. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

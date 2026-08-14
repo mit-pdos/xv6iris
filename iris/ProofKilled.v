@@ -228,6 +228,7 @@ Section ProofKilled.
               Hn ltac:(lia)
               Hfresh
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hp12 : ret_pc (B1 !!! Regidx kl_ra) = mword_of_int (KernelSyms.killed + 0x12))

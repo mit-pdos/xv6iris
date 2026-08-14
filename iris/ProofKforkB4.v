@@ -372,6 +372,7 @@ Section KforkB4Proof.
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
               Hfresh
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hshr").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".
     (* THE GATHER: the share comes back at the fraction it left at (nothing

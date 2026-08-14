@@ -38,6 +38,8 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   lvl = 0%nat ->
   (50 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
+  (* kvminit -> kvmmake -> kvmmap -> mappages -> walk -> kalloc *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvminit) -∗

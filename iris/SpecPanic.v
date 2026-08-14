@@ -110,6 +110,9 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   pk_desc_kind dm = PkStr ->
   (* printk holds pr.lock while the cone below takes tx_lock: [+2], not [+1] *)
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+  (* panic is printk + printk + self-jump; printk's bound is "pr" (14),
+     and it reaches "uart" (15) under it via consputc. *)
+  locks_below lks (lock_rank "pr") ->
   (* NOT about panic -- printk's precondition for acquire's panic arm.  See
      the header and PanicStub.v. *)
   panic_wp_any -∗

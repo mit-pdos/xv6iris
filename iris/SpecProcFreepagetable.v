@@ -95,6 +95,8 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
   (* ...and the table maps nothing at or above it.  See the header: this is
      [ProcInv.proc_priv]'s [p->sz] invariant, not a new obligation. *)
   um_below sz P.(ud_um) ->
+  (* proc_freepagetable -> uvmunmap/uvmfree -> kfree *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗

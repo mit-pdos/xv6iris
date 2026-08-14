@@ -836,6 +836,7 @@ Section ProofAllocproc.
                 (proc_lock_res γs γl (proc_addr k)) L2 lvl eb pme C (K - 4)%nat b lks
                 (ap_lvl1 lvl Hlvl) ltac:(pose proof (ap_K10 K HK); lia) Hbelow
                 with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HL2a0). iExact "Hislock". }
       iIntros (CIDf Hsf ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".
       assert (Hp22 : ret_pc (L2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x22))
@@ -948,6 +949,7 @@ Section ProofAllocproc.
                   ({[lock_rank "proc"]} ∪ lks)
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K14 K HK); lia) (ap_below_nextpid lks Hbelow)
                   with "Hcg Hcpu Htext Hpc Hpidlk Hpanic").
+        all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mfa) "%Hcsfa Hcg Hcpu Hpc".
         assert (Hp3c : ret_pc (F1 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x3c))
           by (rewrite HF1ra; apply bv_eq; vm_compute; reflexivity).
@@ -1045,6 +1047,7 @@ Section ProofAllocproc.
                   ltac:(pose proof (ap_K14 K HK); lia) ltac:(reflexivity) (ap_lvlS lvl Hlvl)
                   (ap_below_kmem lks Hbelow)
                   with "Hcg Hcpu Htext Hpc Hkmem Havail Hpanic").
+        all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mka) "Hcg Hcpu Hpc %Hcska Hkpost".
         assert (Hp46 : ret_pc (F3 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x46))
           by (rewrite HF3ra; apply bv_eq; vm_compute; reflexivity).
@@ -1187,6 +1190,7 @@ Section ProofAllocproc.
                     (trap_res b + (K - 4))%nat eb pme C (S lvl) ({[lock_rank "proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HT2a0
                     with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell] Henv").
+          all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
@@ -1406,6 +1410,7 @@ Section ProofAllocproc.
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K36 K HK); lia)
                   (ap_tf_align tfr Hpvtf) (ap_tf_bound tfr Hpvtf)
                   with "Hcg Hcpu Htext Hpc [Htfcell] Henv").
+        all: try lkbelow.
         { iEval (rewrite HF6a0). iExact "Htfcell". }
         iApply wp_next_off_intro.
         iIntros (mpt) "Hcg Hcpu Hpc Htfcell Hppt %Hcspt".
@@ -1549,6 +1554,7 @@ Section ProofAllocproc.
                     (trap_res b + (K - 4))%nat eb pme C (S lvl) ({[lock_rank "proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HU2a0
                     with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell Htfpage] Henv").
+          all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
@@ -2243,6 +2249,7 @@ Section SealAllocproc.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hpidlk Henv Hcont".
     iApply (Core.wp_allocproc_core γa γp γf γs m lvl K eb pme C (Some nb) b lks HK Hlvl Hbelow
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hpidlk Henv").
+    all: try lkbelow.
     iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
     iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx|].
     iApply ("Hcont" $! mr with "[%] Hpc [Hpost]"); [exact Hcs|].

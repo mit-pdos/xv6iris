@@ -164,6 +164,11 @@ Section ProofMyproc.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
+    (* THE PRE-PUSH BOUND.  myproc pushes and pops without acquiring anything,
+       so the held set is the same on both sides; grabbing [size lks <= n]
+       here, BEFORE the push, is exactly the unwind premise pop_off asks its
+       caller for (SpecPushOff.v). *)
+    iDestruct (cpu_own_size_le with "Hown") as "[%Hszlks Hown]".
     iPoseProof (mpi_00 with "Htext") as "Hi00".
     iPoseProof (mpi_02 with "Htext") as "Hi02".
     iPoseProof (mpi_04 with "Htext") as "Hi04".
@@ -429,7 +434,7 @@ Section ProofMyproc.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
     iApply (PushOff.wp_pop_off_sconf B9 (av - 4)%nat n eb p C _
-              ltac:(lia)
+              ltac:(lia) Hszlks
               with "Hcg Hown Hpay Htext Hpc").
     rewrite -Hbmatch.
     iIntros (CIDpp Hspp MP2) "Hcg Hown Hpc %Hmp2".

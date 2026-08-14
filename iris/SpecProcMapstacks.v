@@ -50,6 +50,10 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   pt_rep0 t m ->
   (forall i : nat, (i < 64)%nat -> m !! kstack_vpn i = None) ->
   (exists nb, on = Some nb /\ (64 + kstacks_missing t < nb)%nat) ->
+  (* proc_mapstacks kalloc's a page for each of the 64 kernel stacks: its
+     cone touches "kmem" (13) via the per-iteration kalloc call, and nothing
+     lower (kvmmap's own Spec exposes no locks_below premise). *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗

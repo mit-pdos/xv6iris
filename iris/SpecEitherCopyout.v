@@ -127,6 +127,8 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
   (* myproc's push_off, and vmfault's kalloc inside copyout, keep their
      transient noff increments in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
+  (* either_copyout -> copyout -> walkaddr -> walk *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m av b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

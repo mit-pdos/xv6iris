@@ -157,6 +157,10 @@ Definition wp_pipealloc_sconf_body
   (74 <= K)%nat ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* pipealloc's cone bottoms out at ftable.lock (1), via
+     filealloc/fileclose; kalloc's "kmem" (13) is reached from this one
+     by [LockRank.locks_below_mono]. *)
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing

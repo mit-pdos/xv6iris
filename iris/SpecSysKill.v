@@ -63,6 +63,10 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 18 for argint's, 16 for kkill's *)
   (22 <= av)%nat ->
+  (* sys_kill's cone is exactly kkill's: it acquires each "proc" lock
+     (rank 11, LockRank.v) in turn.  argint exposes no locks_below premise
+     of its own. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

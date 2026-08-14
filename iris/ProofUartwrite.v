@@ -760,8 +760,11 @@ Section UwBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     uw_loop_regs m0 M (pa_stk sp0 10) buf n i ->
-    (* acquire's order premise -- see [uw_iter]/[wp_uartwrite_sconf] *)
-    locks_below lks (lock_rank "uart") ->
+    (* THE LOWEST RANK IN THE TURN'S CONE: "proc" (11), reached by
+       sleep_prepare AND sleep, both of which run before the acquire
+       against the unchanged [lks] -- see SpecUartwrite.v.  The acquire
+       call (at "uart", 15) widens this with [locks_below_mono]. *)
+    locks_below lks (lock_rank "proc") ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
     procs_inv γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 10)%nat true pj -∗
@@ -886,8 +889,9 @@ Section UwBodies.
                    with "Hcnt") as "Hcnt".
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Q2 (av - 10)%nat 0%nat true C true lks
                 Hj Hjlp ltac:(rewrite HQ2a0; vm_compute; reflexivity) ltac:(lia)
-                ltac:(unfold uartwrite_stack in Hav; lia)
+                ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
                 with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+      all: try lkbelow.
       iIntros (CIDp Hsp' MP) "%HcsP Hcg Hcnt Hpc".
       iEval (rewrite HQ2ra P50) in "Hpc".
       assert (HregsP : uw_loop_regs m0 MP (pa_stk sp0 10) buf n i).
@@ -927,8 +931,11 @@ Section UwBodies.
                    with "Hcnt") as "Hcnt".
       iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γu) Q4
                 0%nat true pj C (av - 10)%nat true lks ltac:(lia)
-                ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
+                ltac:(unfold uartwrite_stack in Hav; lia)
+                ltac:(exact (locks_below_mono lks (lock_rank "proc")
+                               (lock_rank "uart") Hfresh ltac:(vm_compute; lia)))
                 with "Hcg Hcnt Ht Hpc [Hlk] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
       iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR Hcnt Hpay".
       iEval (rewrite HQ4ra P56) in "Hpc".
@@ -1016,7 +1023,9 @@ Section UwBodies.
         { iApply (tx_res_intro γu l with "Hown"). }
         iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hcnt".
         (* the release/park window: nothing is held across sleep() *)
-        pose proof (locks_below_not_elem lks (lock_rank "uart") Hfresh) as Hnotin.
+        pose proof (locks_below_not_elem lks (lock_rank "uart")
+                      (locks_below_mono lks (lock_rank "proc") (lock_rank "uart")
+                         Hfresh ltac:(vm_compute; lia))) as Hnotin.
         assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
       by (apply locks_add_del; assumption).
         iEval (rewrite Hsetback) in "Hcnt".
@@ -1042,8 +1051,9 @@ Section UwBodies.
         iDestruct (cpu_own_transport CIDr CIDa5 0 true pj C true ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (Sleep.wp_sleep_sconf γs j γlp K3 (av - 10)%nat true C lks Hj Hjlp
-                  ltac:(unfold uartwrite_stack in Hav; lia)
+                  ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
                   with "Hcg Hcnt Ht Hpc Hpinv Hpanic [] []").
+        all: try lkbelow.
         { rewrite /trap_csrs_ext. done. }
         { rewrite /cpu_claim_ext. done. }
         iIntros (CIDs Hss MS) "%HcsS Hcg Hcnt Hpc _ _".
@@ -1173,7 +1183,9 @@ Section UwBodies.
         { iApply (tx_res_intro γu ((l ++ [f i])%list) with "Hown"). }
         iIntros (CIDr2 Hsr2 MR2) "Hcg Hpc %HcsR2 Hcnt".
         (* the byte's own turn is BALANCED: what it acquired it released *)
-        pose proof (locks_below_not_elem lks (lock_rank "uart") Hfresh) as Hnotin2.
+        pose proof (locks_below_not_elem lks (lock_rank "uart")
+                      (locks_below_mono lks (lock_rank "proc") (lock_rank "uart")
+                         Hfresh ltac:(vm_compute; lia))) as Hnotin2.
         assert (Hsetback2 : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
       by (apply locks_add_del; assumption).
         iEval (rewrite Hsetback2) in "Hcnt".
@@ -1270,8 +1282,9 @@ Section UwBodies.
     (j < NPROC)%nat -> γs !! j = Some γlp ->
     (uartwrite_stack <= av)%nat ->
     eb = true ->
-    (* acquire's order premise, threaded to every [uw_one] turn *)
-    locks_below lks (lock_rank "uart") ->
+    (* the turn's own lowest rank ("proc", 11 -- see [uw_one]), threaded
+       unchanged to every [uw_one] turn *)
+    locks_below lks (lock_rank "proc") ->
     forall i : nat, (i + S k)%nat = n ->
     ⊢ kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
       procs_inv γs -∗ panic_wp_any -∗

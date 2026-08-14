@@ -75,7 +75,7 @@ Section KvminitBody.
     wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
-    intros Hlvl HK Hex.
+    intros Hlvl HK Hex Hlkbelow.
     destruct Hex as (nb & Hon & Hnbk). subst lvl. subst on.
     pose proof (kii_cap_bounds K HK) as (Hc2 & HKmk).
     iIntros "Hcg Hcnt #Htext Hpc Hcell Henv Hcont".
@@ -166,6 +166,7 @@ Section KvminitBody.
               eq_refl HKmk
               ltac:(exists nb; split; [reflexivity | exact Hnbk])
               with "Hcg Hcnt Htext Hpc Henv").
+    all: try lkbelow.
     iIntros (CID6 Hs6 mr t pas) "Hcg Hcnt Hpc Hptree %Ha0 %Hrep %Hnodes Henv %Hcs %Hpasok Hpages".
     assert (Hret0c : ret_pc (J !!! Regidx (mword_of_int 1)) = mword_of_int (KernelSyms.kvminit + 0x0c)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

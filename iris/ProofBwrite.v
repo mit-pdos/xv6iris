@@ -134,7 +134,7 @@ Section ProofBwrite.
                            pidv dev bno dq m K eb C bs bsd b Q lks.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
-    intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0.
+    intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
     unfold K_bwrite in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanicany #Hbio Hppid Hprocs
@@ -329,8 +329,9 @@ Section ProofBwrite.
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb C b _ HKhsl
+              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb C b _ HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanicany Hppid").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hpid". }
     iIntros (CID9 Hs9 mH) "%Hhs Hcg Hcnt Hpc Hstok Hpid Hppid".
@@ -449,6 +450,7 @@ Section ProofBwrite.
               Q
               _ HKrw Hbno Hkdata Hj Hgl
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanicany Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm").
+    all: try lkbelow.
     { iEval (rewrite HD3a0). iExact "Hbuf". }
     iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hextc Hextm Hpc Hbuf Hdisk HQ".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".

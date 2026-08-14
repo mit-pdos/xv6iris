@@ -922,6 +922,7 @@ Section ProofReparentLoop.
                   ltac:(lia)
                   Hno
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
+        all: try lkbelow.
         iIntros (CIDq Hsq Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
         assert (Hpc44 : ret_pc (M40 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KernelSyms.reparent + 0x44)).

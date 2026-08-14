@@ -790,6 +790,7 @@ Section ProofBrelse.
               "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b C b lks
               ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hpid". }
     iIntros (CID11 Hs11 mH) "%Hhs Hcg Hcnt Hpc Hstok Hpid Hppid".
@@ -869,8 +870,9 @@ Section ProofBrelse.
                  with "Hcnt") as "Hcnt".
     iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b C b lks
-              ltac:(lia) Hfresh_sl
+              ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hpanic Hprocs").
+    all: try lkbelow.
     { iEval (rewrite HH2a0). iExact "Hslk". }
     { iEval (rewrite HH2a0). iExact "Hpid". }
     iIntros (CID15 Hs15 mR) "%Hcs2 Hcg Hcnt Hpc".
@@ -950,6 +952,7 @@ Section ProofBrelse.
               0%nat b p C (K - 4)%nat b lks
               ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HU3a0). iExact "Hlock". }
     (* acquire returns with interrupts OFF ([sie_cap_gpr _ _ false _]), so the
        whole critical section below runs at the literal [false] index and

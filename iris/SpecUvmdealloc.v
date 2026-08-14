@@ -66,6 +66,8 @@ Definition wp_uvmdealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG
      the run empty -- which is what lets growproc call this at the wrapped
      [sz + n] an [sbrk] with a big negative argument computes. *)
   (uint oldsz <= uvm_maxsz)%Z ->
+  (* order premise at the lowest rank this cone reaches. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own 0%nat eb p C b lks -∗
   kernel_text -∗

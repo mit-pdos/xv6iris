@@ -408,6 +408,7 @@ Section ProofWakeup.
                 ltac:(lia)
                 Hfresh
                 with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
       (* acquire returned: pc = wakeup+0x3e, cpu_own (S lvl) + trap_csrs_pay lvl eb.

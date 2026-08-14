@@ -38,6 +38,8 @@ Definition wp_kinit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   (22 <= K)%nat ->
   ncnt = 0%nat ->
   prun phystop s1entry ps ->
+  (* kinit -> freerange -> kfree -> acquire(kmem.lock), rank 13 *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m K b pcur -∗
   cpu_own ncnt eb pcur C b lks -∗
   (* [kernel_data] supplies the "kmem" string literal kinit's [auipc a1 /

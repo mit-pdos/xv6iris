@@ -182,6 +182,10 @@ Definition wp_iupdate_sconf_body
   γs !! j = Some γl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
+     ("bcache", 4) -- "log" is the lowest, so one premise there covers the
+     whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  iupdate itself never
@@ -344,6 +348,10 @@ Definition wp_iupdate_gen_body
   γs !! j = Some γl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
+     ("bcache", 4) -- "log" is the lowest, so one premise there covers the
+     whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
@@ -510,6 +518,10 @@ Definition wp_iupdate_cred_body
      parking thread hands the trap CSRs across the crossing only with an
      enabled base.  See SpecSched.v / SpecSleep.v. *)
   eb = true ->
+  (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
+     ("bcache", 4) -- "log" is the lowest, so one premise there covers the
+     whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -656,6 +668,10 @@ Definition wp_iupdate_credgen_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* iupdate's cone: bread ("bcache", 4), log_write ("log", 3), brelse
+     ("bcache", 4) -- "log" is the lowest, so one premise there covers the
+     whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗

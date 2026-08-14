@@ -52,7 +52,7 @@ Section ProofKinit.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
     intros pcE ret_tgt lk fl c_name c_cpu endaddr phystop s1entry
-      HK Hncnt Hprun.
+      HK Hncnt Hprun Hlkbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic Hlock Hname Hcpu Hflw Hpages Hcont".
@@ -325,8 +325,9 @@ Section ProofKinit.
     iApply (Freerange.wp_freerange_sconf γl γk lk fl R12 ps (K - 2) ncnt eb pcur C b lks
               ltac:(lia) Hncnt
               ltac:(reflexivity) ltac:(reflexivity)
-              ltac:(rewrite HR12a1 HR12a0; exact Hprun)
+              ltac:(rewrite HR12a1 HR12a0; exact Hprun) Hlkbelow
               with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hpanic] [Havail]").
+    all: try lkbelow.
     { iExact "Hpanic". }
     { iExact "Havail". }
     iIntros (CIDfr Hsfr mfr) "Hcg Hcnt Hpc %Hfrcs Havail".

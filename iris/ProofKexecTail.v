@@ -1302,18 +1302,19 @@ Section KexecABad.
       by (rewrite /B2 upd_ne; [exact HB1a0 | nz]).
     assert (HB2sp : B2 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /B2 upd_ne; [exact HB1sp | nz]).
-    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
-              B2 (K - 68)%nat true C true
+              B2 (K - 68)%nat true C true lks
               ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDu Hsu M1 n3 used3) "%Hcsu Hcg Hcnt _ _ Hpc Hppid Hbm Hins %Hu3
@@ -1343,13 +1344,14 @@ Section KexecABad.
       by (rewrite /B3; apply upd_eq).
     assert (HB3sp : B3 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /B3 upd_ne; [exact HM1sp | nz]).
-    iDestruct (cpu_own_transport CIDu CIDj2 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CIDu CIDj2 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
               true C true ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDe Hse M2) "%Hcse Hcg Hcnt _ _ Hpc Hppid".
@@ -1412,7 +1414,7 @@ Section KexecABad.
     (* ---- close the process back up and take the shared exit ---- *)
     iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
     rewrite kxc_upd_cwd_id.
-    iDestruct (cpu_own_transport CIDe CIDd 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CIDe CIDd 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iAssert (iref_slots 2) with "[Hirs Hirs1]" as "Hirs2".
     { change 2%nat with (1 + 1)%nat. rewrite iref_slots_op.

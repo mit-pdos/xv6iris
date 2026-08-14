@@ -465,6 +465,10 @@ Definition wp_filestat_sconf_body
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   (* PARKING PREMISE (hart-generic scheduler protocol): ilock sleeps. *)
   eb = true ->
+  (* filestat's cone: ilock ("bcache", 4) and iunlock ("sleep lock", 6) --
+     "bcache" is the lower, so one premise there covers both via
+     [locks_below_mono]. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj C b lks -∗

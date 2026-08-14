@@ -102,6 +102,8 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
   (* myproc's push_off, and vmfault's kalloc inside copyin, keep their
      transient noff increments in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
+  (* order premise at the lowest rank this cone reaches. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m av b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

@@ -382,7 +382,7 @@ Section ProofFetchstr.
     : wp_fetchstr_sconf_body γa γf m av n eb p C pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
-    intros pcE buf ret_tgt Hn Hav Hmax Hmax31.
+    intros pcE buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
     unfold fetchstr_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -796,6 +796,7 @@ Section ProofFetchstr.
               (av - 6)%nat n eb p C b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
+    all: try lkbelow.
     iIntros (CID18 Hk18 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
     iEval (rewrite HA5a2) in "Hbuf".
     assert (Hpc26 : ret_pc (A5 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchstr + 0x26))

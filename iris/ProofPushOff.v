@@ -1879,7 +1879,17 @@ Section ProofPushOff.
                   with "Hcg [Htok] Htcp [Hnoff Hint Hproc Hlks] Hclm Hpc Hi24").
         { iApply (intr_count_pack_S_on 0 with "Htok"). }
         { rewrite /cpu_priv /cpu_cells.
-          iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
+          (* THE RE-ENABLE HANDS THE ARM AN EMPTY SET, and the coupling is what
+             produces it: [Hszlks : size lks <= 0] relevels to [cpu_locks_lvl 0
+             lks], and [cpu_locks_lvl_zero] turns that into [lks = ∅].  So
+             "interrupts back on implies no spinlock held" is DERIVED here
+             rather than assumed. *)
+          iSplitL "Hnoff Hint Hproc";
+            [| iDestruct (cpu_locks_lvl_relevel _ 0 _ ltac:(exact Hszlks) with "Hlks")
+                 as "Hlks0";
+               iDestruct (cpu_locks_lvl_zero with "Hlks0") as "[Hlk ->]";
+               iApply (cpu_locks_lvl_intro 0 ∅ ltac:(exact (size_empty_le 0))
+                         with "Hlk") ].
           iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
           iSplitL "Hnoff". { iEval (rewrite Hdec). iExact "Hnoff". }
           iSplitL "Hint". { iExists intenav. iExact "Hint". }
@@ -1903,7 +1913,8 @@ Section ProofPushOff.
         subst mf.
         iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain|].
         iApply ("Hcont" with "Hcg [HC] Hpc [%]").
-        { iApply (cpu_own_on_intro with "HC"). }
+        { rewrite (size_le_zero_empty lks Hszlks).
+          iApply (cpu_own_on_intro p C with "HC"). }
         unfold callee_saved. repeat split.
         * rewrite upd_eq HcspP7 Hsp0up. reflexivity.
         * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).

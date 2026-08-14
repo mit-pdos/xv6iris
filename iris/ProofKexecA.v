@@ -450,7 +450,7 @@ Section KexecABody.
     assert (HN1ra : N1 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KXA + 0x20) : mword 64) 4)
       by (rewrite /N1; apply upd_eq).
-    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf N1 (K - 68)%nat 0%nat true (proc_addr jp) C true lks
               ltac:(vm_compute; reflexivity) ltac:(lia)
@@ -493,12 +493,13 @@ Section KexecABody.
       by (rewrite /N3; apply upd_eq).
     assert (HN3s1 : N3 !!! Regidx Rs1 = (proc_addr jp))
       by (rewrite /N3 upd_ne; [exact HN2s1 | nz]).
-    iDestruct (cpu_own_transport CIDm CIDj2 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CIDm CIDj2 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat true C true lks
               ltac:(unfold K_begin_op; lia) Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlogc Hppid Hprocs").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDb Hsb M3) "%Hcsb Hcg Hcnt _ _ Hpc Hppid Hlog".
@@ -543,7 +544,7 @@ Section KexecABody.
       by (rewrite /N5; apply upd_eq).
     assert (HN5a0 : N5 !!! Regidx Ra0 = pv)
       by (rewrite /N5 upd_ne; [exact HN4a0 | nz]).
-    iDestruct (cpu_own_transport CIDb CIDj3 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CIDb CIDj3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iEval (rewrite /cwd_ref) in "Hcref".
     (* namei names the path buffer by ITS OWN a0; ours is [pv]. *)
@@ -619,7 +620,7 @@ Section KexecABody.
       iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd [Hcref] Hppid") as "Hpriv".
       { iEval (rewrite /cwd_ref). iExact "Hcref". }
       rewrite kxc_upd_cwd_id.
-      iDestruct (cpu_own_transport CIDn CIDz 0%nat true (proc_addr jp) C true lks
+      iDestruct (cpu_own_transport CIDn CIDz 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont32" $! CIDz with "[%]"); [wp_next_chain |].
       (* hand the exit back, re-anchored at [CIDz] (the crossing fact by NAME,
@@ -693,13 +694,14 @@ Section KexecABody.
       assert (HP1ra : P1 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KXA + 0x88) : mword 64) 4)
         by (rewrite /P1; apply upd_eq).
-      iDestruct (cpu_own_transport CIDn CIDj4 0%nat true (proc_addr jp) C true lks
+      iDestruct (cpu_own_transport CIDn CIDj4 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
                 true C true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
+      all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
       { rewrite /cpu_claim_ext. done. }
       iIntros (CIDe1 Hse1 M5) "%Hcse Hcg Hcnt _ _ Hpc Hppid".
@@ -736,7 +738,7 @@ Section KexecABody.
       iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd [Hcref] Hppid") as "Hpriv".
       { iEval (rewrite /cwd_ref). iExact "Hcref". }
       rewrite kxc_upd_cwd_id.
-      iDestruct (cpu_own_transport CIDe1 CIDz2 0%nat true (proc_addr jp) C true lks
+      iDestruct (cpu_own_transport CIDe1 CIDz2 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       (* the register facts at +0x072 *)
       assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 68).
@@ -1027,7 +1029,7 @@ Section KexecABody.
       by (rewrite /Q2; apply upd_eq).
     assert (HQ2a0 : Q2 !!! Regidx Ra0 = ientry k)
       by (rewrite /Q2 upd_ne; [exact HQ1a0 | nz]).
-    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
@@ -1035,6 +1037,7 @@ Section KexecABody.
               ltac:(unfold K_ilock; lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDil Hsil M1 dnl bml) "%Hcsil Hcg Hcnt _ _ Hpc Hppid Hins Hbs1
@@ -1209,7 +1212,7 @@ Section KexecABody.
       rewrite /Q4 upd_ne; [| regne]. rewrite /Q3 upd_ne; [| regne].
       exact (HM1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     iEval (rewrite -HQ8a2) in "Helfb".
-    iDestruct (cpu_own_transport CIDil CID9 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CIDil CID9 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry k) bml datl dnl false 0%nat 64%nat fb V
@@ -1220,6 +1223,7 @@ Section KexecABody.
               ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3' HQ8a4'
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap Hblocks
                     [Helfb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     { iSplitL "Helfb"; [iExact "Helfb" | iExact "Hppid"]. }
@@ -1384,7 +1388,7 @@ Section KexecABody.
         iEval (rewrite Htgt90) in "Hpc".
         iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
         rewrite kxc_upd_cwd_id.
-        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true lks
+        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
@@ -1438,7 +1442,7 @@ Section KexecABody.
         iEval (rewrite Hpp064) in "Hpc".
         iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
         rewrite kxc_upd_cwd_id.
-        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true lks
+        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
@@ -1509,7 +1513,7 @@ Section KexecABody.
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
       rewrite kxc_upd_cwd_id.
-      iDestruct (cpu_own_transport CIDrd CID11 0%nat true (proc_addr jp) C true lks
+      iDestruct (cpu_own_transport CIDrd CID11 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
         with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".

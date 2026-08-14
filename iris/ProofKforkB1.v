@@ -224,6 +224,7 @@ Section KforkB1Proof.
               (trap_res b + (K - 8))%nat eb pme C (S lvl) ({[lock_rank "proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
               with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henv").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hcpu Hpc %Hcsfp Hheld Hdorm".
     assert (Hp82 : ret_pc (T1 !!! Regidx Rra) = mword_of_int (KF + 0x82))

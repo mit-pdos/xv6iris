@@ -50,7 +50,7 @@ Section ProofKvmmap.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
-      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone.
+      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -230,6 +230,7 @@ Section ProofKvmmap.
               Hrep
               ltac:(rewrite HP6a1; exact Hnone)
               with "Hcg Hcnt Htext Hpc Hptree Henv").
+    all: try lkbelow.
     iIntros (CID9 Hs9 mr t' k g)
       "Hcg Hcnt Hpc Hptree %Hnodes Henv %Hkcs %Hbase' %Hrep' %Hpresent %Hmiss %Hpay".
     (* pc back at +0x12; the frame cells recovered *)

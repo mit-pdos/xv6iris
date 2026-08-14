@@ -577,6 +577,7 @@ Section VtPrologue.
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string (disk_res γd pd pav pu) A6
               n eb pme C (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
     iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
     assert (Hpc1e : ret_pc (A6 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x1e))
@@ -2725,11 +2726,15 @@ Section VtLoopProof.
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (sp0 : mword 64) (lks : gset nat) :
     (22 <= av)%nat -> length γs = NPROC -> (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+    (* the loop enters with "virtio_disk" already held (the prologue's
+       acquire); wakeup's own order premise ("proc") is derived from this at
+       the +0x6e call site via [locks_below_union_singleton]/[locks_below_mono] *)
+    locks_below lks (lock_rank "virtio_disk") ->
     kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     vt_loop γd pd pav pu m av lvl eb pme C sp0 lks.
   Proof.
-    intros Hav Hlen Hlvl.
+    intros Hav Hlen Hlvl Hfresh.
     iIntros "#Htext #Hpanic #Hpi #Hdinv #Hgeom".
     iLöb as "IH". rewrite {2}/vt_loop.
     iIntros (MB) "%Hregs Hcg Hpc Hown Hst Hexit".
@@ -2798,9 +2803,18 @@ Section VtLoopProof.
       by (intro r; apply rf_to_gmap_dom).
     assert (HwK : (18 <= trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat) by lia.
     assert (Hwlvl : (Z.of_nat (S lvl) + 1 < 2 ^ 31)%Z) by lia.
+    (* wakeup's own order premise: the loop enters with "virtio_disk" already
+       held ([Hfresh] widened past it, then the acquire's own singleton added
+       back on top) -- "virtio_disk" (9) < "proc" (11) *)
+    assert (Hwproc : locks_below ({[lock_rank "virtio_disk"]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [vm_compute; lia |].
+      apply (locks_below_mono lks (lock_rank "virtio_disk") (lock_rank "proc") Hfresh).
+      vm_compute; lia. }
     iApply (Wakeup.wp_wakeup_sconf W γs pme (S lvl)
               (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb C false _ HwK HWdom Hlen Hwlvl
+              Hwproc
               with "Hcg Hown Htext Hpc Hpanic Hpi").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (MW) "[%HcsW %HdomW] Hcg Hown #Htext2 Hpc".
     assert (Hpc72 : ret_pc (W !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x72))
@@ -2873,13 +2887,13 @@ Section VtLoopProof.
       by (apply vt_dom_delete_seq; [exact Hdomfl | lia]).
     assert (Hwin : (np - nr <= 2)%nat)
       by (apply (vt_window_le np nr fl pk tr); assumption).
-    assert (Hfresh : (nr `mod` 8)%nat ∉ mod8 (dom (delete nr fl))).
+    assert (Hlkbelow : (nr `mod` 8)%nat ∉ mod8 (dom (delete nr fl))).
     { rewrite Hfl'. apply vt_mod8_head_fresh. lia. }
     assert (Hmod8 : mod8 (dom fl) = mod8 (dom (delete nr fl)) ∪ {[ (nr `mod` 8)%nat ]})
       by (apply vt_mod8_split; exact Hnrin).
     iEval (rewrite Hmod8) in "Hring".
     iDestruct (ring_slots_put pav (mod8 (dom (delete nr fl))) (nr `mod` 8)%nat
-                 Hq8 Hfresh with "[Hcell] Hring") as "Hring".
+                 Hq8 Hlkbelow with "[Hcell] Hring") as "Hring".
     { iExists (vr_head (vs_req sl)). iExact "Hcell". }
     (* the parked payoff *)
     iDestruct "Hrest" as "[Hperm Hrest]".
@@ -3069,7 +3083,7 @@ Section ProofVirtioDiskIntr.
       (* [vt_loop] also spells the window index with [outb]. *)
       iEval (rewrite -Hbeq) in "Hcg".
       iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme C sp0 lks
-                    HKav Hlen Hlvl
+                    HKav Hlen Hlvl Hfresh
                     with "Htext Hpanic Hpi Hdinv Hgeom") as "Hloop".
       iApply ("Hloop" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring] Hexit").
       { split_and!.

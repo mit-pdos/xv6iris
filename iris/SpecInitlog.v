@@ -155,6 +155,10 @@ Definition wp_initlog_sconf_body
   (* the two arguments (RV64 ABI: the [int dev] arrives sign-extended) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sb ->
+  (* initlog's cone (its own bread/brelse, install_trans's bread/brelse/
+     bwrite/bunpin, write_head's bread/bwrite/brelse) never dips below
+     "bcache" (4); [initlock] itself carries no order premise. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

@@ -77,6 +77,11 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (* the transient noff increment (wakeup's per-proc lock) stays in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (uartintr_stack <= av)%nat ->
+  (* uartintr's cone: it takes no lock of its own, and the lowest rank its
+     call tree touches is "cons" (5, LockRank.v), through consoleintr; the
+     THRE arm's wakeup call needs only the higher "proc" (11), which
+     [locks_below_mono] recovers from this one bound. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

@@ -873,6 +873,7 @@ Section ProofDevintr.
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p C false
                   _ Hlen ltac:(lia) ltac:(unfold devintr_stack, uartintr_stack in *; lia)
                   with "Hcg Hcnt Htext Hpc Hdev Hpinv Hpanic Hccaps").
+        all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
         destruct HcsU as [HcsU HdomU].
         assert (Hpc4c : ret_pc (U0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x4c))
@@ -978,10 +979,12 @@ Section ProofDevintr.
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x4e) : mword 64) 4)
           by (rewrite /V1 upd_eq; reflexivity).
         iApply (VirtioDiskIntr.wp_virtio_disk_intr_sconf γs γu γv γdk pd pav pu
-                  V1 (av - 4)%nat lvl eb p C false
+                  V1 (av - 4)%nat lvl eb p C false lks
                   ltac:(unfold devintr_stack, K_virtio_disk_intr in *; lia)
                   ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
+                  ltac:(lkbelow)
                   with "Hcg Hcnt Htext Hpc Hpanic Hpinv Hdev Hgeom Hdlk").
+        all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MV) "%HcsV Hcg Hcnt Htext2 Hpc".
         destruct HcsV as [HcsV HdomV].
         assert (Hpc52 : ret_pc (V1 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x52))
@@ -1141,6 +1144,7 @@ Section ProofDevintr.
         iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p C (av - 4)%nat lks
                   ltac:(lia) ltac:(unfold devintr_stack in Hav; lia) Hbelow
                   with "Hcg Hcnt Htext Hpc Htcap Htk").
+        all: try lkbelow.
         iIntros (MC) "%HcsC Hcg Hcnt Hpc Htk2".
         assert (Hpc72 : ret_pc (K0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x72))
           by (rewrite HK0ra; pcw).

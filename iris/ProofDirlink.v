@@ -1232,7 +1232,7 @@ Section ProofDirlinkMain.
     cbv beta delta [wp_dirlink_gen_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
            Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
-           Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
+           Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb Hbelow.
     (* [Hcinb] -- the LINKED inum's range -- is NOT used below: dirlink's
        [sh] stores sixteen bits whatever they are.  It rides in the contract
        for the writer-side [DirView.dir_ok] re-park (fs-icache.md §15.1(i),
@@ -1701,6 +1701,7 @@ Section ProofDirlinkMain.
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                     Hitb2 Hitbl Hesc Hislot").
+    all: try lkbelow.
     { done. }
     iIntros (CIDdl Hsdl mdl found kk kslot qq)
       "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnm Hppid Hbs1 Hres".
@@ -1769,7 +1770,7 @@ Section ProofDirlinkMain.
       iDestruct (dl_slk_acc cn kslot Hkslot with "Hslks") as (gil gisl) "#Hslk".
       iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
         [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-      iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDdl CID14 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       (* THE SET-FORM iput, at ALL THREE credits false -- dirlink presents no
          absorption of its own; what it needs from the gen form is the
@@ -1780,16 +1781,18 @@ Section ProofDirlinkMain.
       iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                 gil gisl cov logstart bmapstart inodestart nib size dev used
                 kslot qq (zero_extend' 32 (dir_inum data kk : mword 16) : mword 32)
-                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb C b
+                ncount Sb false false false edl pidv dq dqb dqs E1 (K - 10)%nat eb C b lks
                 ltac:(exact HKip) Hkslot
                 ltac:(intros Hc; discriminate Hc)
                 ltac:(intros Hc; discriminate Hc)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
                 Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le _ _ ncount Hnc)) Hj Hgs
                 HE1a0
+                Hbelow
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl [] Hop").
+      all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       { iEval (cbn beta iota). iEmpIntro. }
@@ -1847,7 +1850,7 @@ Section ProofDirlinkMain.
                 "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hde").
       { exact (dl_tregs_of_eregs m sp0 ip nb _ E2 HE2e). }
       iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
-      iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf true bm data dn dn0 nn uu Sbp 0%nat with
@@ -2243,7 +2246,7 @@ Section ProofDirlinkMain.
            by hand at :2659).  [user = false] here, so it is the buffer and
            the caller's own fraction, and the post returns both together. *)
         iCombine "Hsrc Hppid" as "Hsrc".
-        iDestruct (cpu_own_transport CIDa CIDA11 0%nat eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CIDa CIDA11 0%nat eb (proc_addr j) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         (* THE SET-FORM writei.  Its [wi16_post] IS [dl16_post] at this
            call's own window -- same offset, same booleans, same entry set,
@@ -2255,7 +2258,7 @@ Section ProofDirlinkMain.
                   false (16 * k0)%nat 16%nat
                   (fun jj => dirent_bytes (de_of_name inum s) !!! jj)
                   dl_dummyV ncount Sb
-                  pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb C b
+                  pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb C b lks
                   ltac:(exact HKwi)
                   ltac:(rewrite (dl_wi_cost_bmonly k0);
                         exact (dl_4le _ _ ncount Hnc))
@@ -2273,6 +2276,7 @@ Section ProofDirlinkMain.
                         Hidev Hiinum Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr
                         Hiregi Hdat Hsrc Hprocs Hdev Hgeom Hdlk Hbsl
                         Hop").
+        all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used'
@@ -2426,7 +2430,7 @@ Section ProofDirlinkMain.
                   "[%] Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hsrc").
         { exact HV10t. }
         iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
-        iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
         iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' Sbw tot with
@@ -2495,7 +2499,7 @@ Section ProofDirlinkMain.
           exact HQ1p. }
         iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-        iDestruct (cpu_own_transport CIDdl CID16 0%nat eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CIDdl CID16 0%nat eb (proc_addr j) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iPoseProof ("Hafter" $! CID16) as "Ha".
         iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
@@ -2810,12 +2814,12 @@ Section ProofDirlinkMain.
                    ∗ p_pid (proc_addr j) ↦₄{dq} pidv)%I
             with "[Hde Hppid]" as "Hdst".
           { iEval (rewrite HL6a2). iFrame. }
-          iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) C b lks
+          iDestruct (cpu_own_transport CIDl CIDB6 0%nat eb (proc_addr j) C b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (RD.wp_readi_sconf gs j gl gu gd gk pd pav pu bn gfs ga gf
                     cov logstart dev ip bm data dn
                     false (16 * i)%nat 16%nat dol dl_dummyV
-                    pidv dq dqd L6 (K - 10)%nat eb C b
+                    pidv dq dqd L6 (K - 10)%nat eb C b lks
                     ltac:(exact HKrd) Hlg Hbmwf Hbmcov Hszb
                     ltac:(lia)
                     ltac:(intros _; change (Z.of_nat 16%nat) with 16; lia)
@@ -2823,8 +2827,13 @@ Section ProofDirlinkMain.
                     ltac:(cbn [negb]; rewrite HL6a1 dlk_zero_moi;
                           exact (eq_vec_refl _))
                     HL6a3' HL6a4'
+                    (* readi's own floor is "bcache"(4); dirlink's is
+                       "itable"(2), and [locks_below_mono] weakens it. *)
+                    ltac:(exact (locks_below_mono lks (lock_rank "itable")
+                                   (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
+          all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
           iIntros (CIDrd Hsrd mrd tot P')
@@ -3034,7 +3043,7 @@ Section ProofDirlinkMain.
             iEval (rewrite Hbb70) in "Hpc".
             iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
               [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-            iDestruct (cpu_own_transport CIDrd CIDB11 0%nat eb (proc_addr j) C b lks
+            iDestruct (cpu_own_transport CIDrd CIDB11 0%nat eb (proc_addr j) C b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iPoseProof ("Hafter" $! CIDB11) as "Ha".
             iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
@@ -3154,7 +3163,7 @@ Section ProofDirlinkMain.
                iEval (rewrite Htgt30) in "Hpc".
                assert (Hgtc : Z.of_nat (S i) * 16 < bv_unsigned (di_size dn)).
                { rewrite -(dl_offmul (S i)). apply Z.ltb_lt. exact Hge. }
-               iDestruct (cpu_own_transport CIDrd CIDB12 0%nat eb (proc_addr j) C b lks
+               iDestruct (cpu_own_transport CIDrd CIDB12 0%nat eb (proc_addr j) C b
                             ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                iSpecialize ("IHf" $! CIDB12 with "[%]"); [wp_next_chain |].
                iApply ("IHf" $! (S i) N3 (fun jj => file_byte data (16 * i + jj)%nat)
@@ -3261,7 +3270,7 @@ Section ProofDirlinkMain.
                iEval (rewrite Htgt70b) in "Hpc".
                iDestruct (dl_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
                  [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
-               iDestruct (cpu_own_transport CIDrd CIDB15 0%nat eb (proc_addr j) C b lks
+               iDestruct (cpu_own_transport CIDrd CIDB15 0%nat eb (proc_addr j) C b
                             ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                iPoseProof ("Hafter" $! CIDB15) as "Ha".
                iSpecialize ("Ha" with "[%]"); [wp_next_chain |].
@@ -3273,7 +3282,7 @@ Section ProofDirlinkMain.
                           Hdat Hppid Hbsl Hislot Hop Hqc").
                { exact HN5p. } }
         (* ---------- the loop is entered at +0x30 with off = 0 ---------- *)
-        iDestruct (cpu_own_transport CIDdl CID21 0%nat eb (proc_addr j) C b lks
+        iDestruct (cpu_own_transport CIDdl CID21 0%nat eb (proc_addr j) C b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hloop" $! (S nrec) CID21 with "[%]"); [wp_next_chain |].
         iApply ("Hloop" $! 0%nat Q4 dolds0 with
@@ -3322,7 +3331,7 @@ Section ProofDirlinkMain.
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
            Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb
            Hcinb Hbmgeo Hpkc
-           Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
+           Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlog #Hkenv
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
               #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
@@ -3340,11 +3349,12 @@ Section ProofDirlinkMain.
               pidv dq dqd dqn dqs dqb dqbs dqf m K eb C b lks
               HK Htype Hbmcov Hszb Hinums Hfit Hstab Hnlk Hlg Hbmwf Hholes
               Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
-              Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb
+              Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
                     Hiregi Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
                     Hitb2 Hitbl Hesc Hslks Hislot Hop [Hcont]").
+    all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     iIntros (mf found bm' data' dn' dn0' n' used' Sb' tot)

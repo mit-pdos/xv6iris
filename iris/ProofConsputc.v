@@ -216,7 +216,7 @@ Section ProofConsputc.
     : wp_consputc_sconf_body γl γd γv m K bs n eb C b p lks.
   Proof.
     cbv beta delta [wp_consputc_sconf_body].
-    intros ra_i pcE ra0 ret_tgt HK Hn.
+    intros ra_i pcE ra0 ret_tgt HK Hn Hbelow.
     assert (HK16 : (16 <= K)%nat) by (unfold consputc_stack in HK; exact HK).
     pose proof (cp_cap_bounds K HK16) as (Hc2 & HK4).
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hdev #Htxl #Hsub Hcont".
@@ -336,7 +336,7 @@ Section ProofConsputc.
       assert (Htgtu1 : add_vec (mword_of_int (KernelSyms.consputc + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 1710 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu1) in "Hpc".
       iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (wp_uartputc γl γd γv T2 (K - 2)%nat bs n eb C b p lks HK4 Hn
+      iApply (wp_uartputc γl γd γv T2 (K - 2)%nat bs n eb C b p lks HK4 Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Hpanic Hdev Htxl Hsub").
       iIntros (CID8 Hs8 mf1) "Hcg Hcpu Hpc %Hcs1 #Hsent1".
       destruct Hcs1 as [Hcs1 Hra1].
@@ -362,7 +362,7 @@ Section ProofConsputc.
       assert (Htgtu2 : add_vec (mword_of_int (KernelSyms.consputc + 0x26) : mword 64) (sign_extend' 64 (mword_of_int 1702 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu2) in "Hpc".
       iDestruct (cpu_own_transport CID8 CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (wp_uartputc γl γd γv T4 (K - 2)%nat _ n eb C b p lks HK4 Hn
+      iApply (wp_uartputc γl γd γv T4 (K - 2)%nat _ n eb C b p lks HK4 Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Hpanic Hdev Htxl Hsent1").
       iIntros (CID11 Hs11 mf2) "Hcg Hcpu Hpc %Hcs2 #Hsent2".
       destruct Hcs2 as [Hcs2 Hra2].
@@ -388,7 +388,7 @@ Section ProofConsputc.
       assert (Htgtu3 : add_vec (mword_of_int (KernelSyms.consputc + 0x2c) : mword 64) (sign_extend' 64 (mword_of_int 1696 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu3) in "Hpc".
       iDestruct (cpu_own_transport CID11 CID13 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (wp_uartputc γl γd γv T6 (K - 2)%nat _ n eb C b p lks HK4 Hn
+      iApply (wp_uartputc γl γd γv T6 (K - 2)%nat _ n eb C b p lks HK4 Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Hpanic Hdev Htxl Hsent2").
       iIntros (CID14 Hs14 mf3) "Hcg Hcpu Hpc %Hcs3 #Hsent3".
       destruct Hcs3 as [Hcs3 Hra3].
@@ -450,7 +450,7 @@ Section ProofConsputc.
       assert (Htgtu : add_vec (mword_of_int (KernelSyms.consputc + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 1724 : mword 21)) = mword_of_int KernelSyms.uartputc_sync) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtu) in "Hpc".
       iDestruct (cpu_own_transport CID CID7' n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (wp_uartputc γl γd γv F1 (K - 2)%nat bs n eb C b p lks HK4 Hn
+      iApply (wp_uartputc γl γd γv F1 (K - 2)%nat bs n eb C b p lks HK4 Hn Hbelow
                 with "Hcg Hcpu Htext Hpc Hpanic Hdev Htxl Hsub").
       iIntros (CID8' Hs8' mf) "Hcg Hcpu Hpc %Hcsf #Hsent".
       destruct Hcsf as [Hcsf Hraf].

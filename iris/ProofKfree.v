@@ -513,6 +513,7 @@ Section ProofKfree.
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hkmem] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc44 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kfree + 0x44)).

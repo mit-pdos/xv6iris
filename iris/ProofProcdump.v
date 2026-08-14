@@ -71,10 +71,11 @@ Section ProofProcdumpMain.
   Lemma wp_procdump_sconf
       (γpr : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_procdump_sconf_body γpr γd γv m K eb p C b.
+      (lks : gset nat)
+    : wp_procdump_sconf_body γpr γd γv m K eb p C b lks.
   Proof.
     cbv beta zeta delta [wp_procdump_sconf_body].
-    intros HK Hpk.
+    intros HK Hpk Hlkbelow.
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv Hview Hcont".
     (* ================================================================== *)
     (* +0x00 .. +0x1a -- the frame, the nine saves, a0 := "\n"            *)

@@ -686,6 +686,9 @@ Definition wp_fileread_sconf_body
   Z.of_nat MAXFILE * Z.of_nat BSIZE + n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)
   eb = true ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj C b lks -∗

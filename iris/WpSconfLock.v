@@ -589,7 +589,7 @@ Section WpSconfLock.
       lock_cpu lk ↦₈ lk_cpu_val st ∗
       (lock_cpu lk ↦₈ lk_cpu_val (Some (cpu_id, false)) ==∗
          lk_cpu_res (Some (cpu_id, false)) lk r ∗
-         (locked_pre γl cpu_id ∗ cpu_locks_at cpu_id (S ∖ {[r]}))).
+         (locked_pre γl cpu_id ∗ cpu_locks_at cpu_id (S ∖ {[r]}) ∗ ⌜r ∈ S⌝)).
   Proof.
     iIntros "Hg Hcpures [Htok Hcl]".
     iMod (lock_clrcpu γl st cpu_id with "Hg Htok") as "(%Hst & Hg & Htok)".
@@ -604,6 +604,7 @@ Section WpSconfLock.
     iSplitL "Hcell"; [ iExact "Hcell" | ].
     iIntros "Hcell".
     iModIntro. rewrite lk_cpu_res_win. iFrame "Hcell Htok Hcl".
+    iPureIntro. exact Hin.
   Qed.
 
   (* acquire's [c.sd a0,16(lk)] -- lk->cpu := mycpu(): the acquire window
@@ -691,6 +692,9 @@ Section WpSconfLock.
       pc_is (add_vec_int pc 4) -∗
       locked_pre γl h0 -∗
       cpu_locks_at h0 (S ∖ {[lock_rank s]}) -∗
+      (* the rank WAS held -- so the caller knows the set strictly shrank,
+         which is what pop_off's unwind premise needs. *)
+      ⌜lock_rank s ∈ S⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -712,15 +716,15 @@ Section WpSconfLock.
     iApply (wp_sd_lkcpu_lockopen_gen false γl lk s R Dc pc
               (mword_of_int 0 : mword 5) rs1 imm m n
               (locked γl h0 ∗ cpu_locks_at h0 S)%I
-              (locked_pre γl h0 ∗ cpu_locks_at h0 (S ∖ {[lock_rank s]}))%I
+              (locked_pre γl h0 ∗ cpu_locks_at h0 (S ∖ {[lock_rank s]}) ∗ ⌜lock_rank s ∈ S⌝)%I
               (Some (h0, false)) b
               Hpacpu Hsv
               (lkcpu_give_exchange γl lk (lock_rank s) S)
               ltac:(iIntros "[Htok _]"; iApply Href; iExact "Htok")
               with "Hcg Hpc Hinstr Hlock [Htok Hcl] [Hcont]").
     { iFrame "Htok Hcl". }
-    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc [Htok Hcl]".
-    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok Hcl").
+    iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc (Htok & Hcl & %Hin)".
+    iApply ("Hcont" $! CID1 with "[] Hcg Hpc Htok Hcl [%]"); [ | exact Hin ].
     iPureIntro. exact Hs1.
   Qed.
 

@@ -188,6 +188,7 @@ Section ProofSetkilled.
               (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hp10 : ret_pc (B1 !!! Regidx sk_ra) = mword_of_int (KernelSyms.setkilled + 0x10))

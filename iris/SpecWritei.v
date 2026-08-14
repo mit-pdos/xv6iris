@@ -558,6 +558,10 @@ Definition wp_writei_sconf_body
      [eb = true].  Both have since been generalized, so the allocating
      path is reachable at either index and the restriction is gone.  See
      claude-notes/completed/eb-generic-sweep.md ("Round 13"). *)
+  (* writei's loop reaches bread/log_write/brelse, whose bound is at "log"
+     (3); nothing writei's cone touches ranks lower.  One premise covers the
+     whole cone (mirrors SpecBfree.v's). *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
@@ -834,6 +838,10 @@ Definition wp_writei_gen_body
   m !!! Regidx (mword_of_int 13 : mword 5) = (mword_of_int (Z.of_nat off) : mword 64) ->
   m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
   (* NO eb-GATED RESTRICTION HERE -- see [wp_writei_sconf_body] above. *)
+  (* writei's loop reaches bread/log_write/brelse, whose bound is at "log"
+     (3); nothing writei's cone touches ranks lower.  One premise covers the
+     whole cone (mirrors SpecBfree.v's). *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  Same pure-pass-through

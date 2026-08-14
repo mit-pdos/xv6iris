@@ -452,6 +452,9 @@ Section ProofProcdumpLoop.
       (lks : gset nat) :
     printk_gen_contract γpr γd γv ->
     (48 <= K')%nat ->
+    (* procdump's own cone touches no lock directly -- printk (rank "pr") is
+       the only callee, and it is the whole order premise. *)
+    locks_below lks (lock_rank "pr") ->
     kernel_text -∗ kernel_data -∗ printk_env γpr γd γv -∗ panic_wp_any -∗
     (* THE EXIT CONTINUATION, at the epilogue entry, taken as a PREMISE *)
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
@@ -471,7 +474,7 @@ Section ProofProcdumpLoop.
       ([∗ list] k ∈ seq j (NPROC - j), proc_dump_slot (proc_addr k)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpk HK.
+    intros Hpk HK Hfresh.
     iIntros "#Hkt #Hkd #Hpenv #Hpanic Hqexit".
     iAssert (∀ (fuel : nat),
       wp_next (CID0 := CID0) b p (fun (CIDf : CpuId) =>
@@ -695,10 +698,11 @@ Section ProofProcdumpLoop.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iPoseProof (panic_wp_any_at CIDq3 with "Hpanic") as "Hpanic3".
         iApply (Hpk CIDq3 P5c K' eb p C DfracDiscarded pd_fmt
-                  [PkANum; PkAStr DfracDiscarded ss; PkAStr dq3 nm2] b
+                  [PkANum; PkAStr DfracDiscarded ss; PkAStr dq3 nm2] b lks
                   ltac:(lia) pd_fmt_len pd_fmt_nonul
                   ltac:(rewrite pd_fmt_kinds; reflexivity)
                   ltac:(cbn [length]; lia)
+                  Hfresh
                   with "Hcg Hkt Hkd Hpc Hpanic3 Hown Hpenv [Hfmt] [Hnmc2]").
         { rewrite Ha0_5c. iExact "Hfmt". }
         { iApply (pdl_descs_mk CIDq3 P5c sptr (pd_cur j) ss nm2 dq3
@@ -767,13 +771,14 @@ Section ProofProcdumpLoop.
           by (rewrite /P62; apply pdl_hi_upd;
               [vm_compute; reflexivity | exact Hrh60]).
         iPoseProof (pd_nl_str with "Hkd") as "Hnlstr".
-        iDestruct (cpu_own_transport CIDq4 CIDq6 0%nat eb p C b lks
+        iDestruct (cpu_own_transport CIDq4 CIDq6 0%nat eb p C b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iPoseProof (panic_wp_any_at CIDq6 with "Hpanic") as "Hpanic6".
-        iApply (Hpk CIDq6 P62 K' eb p C DfracDiscarded pd_nl [] b
+        iApply (Hpk CIDq6 P62 K' eb p C DfracDiscarded pd_nl [] b lks
                   ltac:(lia) pd_nl_len pd_nl_nonul
                   ltac:(rewrite pd_nl_kinds; reflexivity)
                   ltac:(cbn [length]; lia)
+                  Hfresh
                   with "Hcg Hkt Hkd Hpc Hpanic6 Hown Hpenv [Hnlstr] []").
         { rewrite Ha0_62. iExact "Hnlstr". }
         { done. }
@@ -871,7 +876,7 @@ Section ProofProcdumpLoop.
         iDestruct (pdl_slot_mk (proc_addr j) dqs dqp dqn st pid nm Hnm
                      with "Hst Hpid Hnmc") as "Hslot".
         iDestruct (pdl_prefix_step j with "Hpre Hslot") as "Hpre".
-        iDestruct (cpu_own_transport CIDf CID3 0%nat eb p C b lks
+        iDestruct (cpu_own_transport CIDf CID3 0%nat eb p C b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iSpecialize ("Hadv" $! CID3 with "[%]"); [wp_next_chain|].
         iApply ("Hadv" $! H70 with "[%] Hqx Hcg Hown Hpc Hpre Hsuf").
@@ -937,7 +942,7 @@ Section ProofProcdumpLoop.
                          = mword_of_int (KernelSyms.procdump + 0x56)) by pcw.
         iEval (rewrite Htgt56) in "Hpc".
         iPoseProof (pd_qqq_str with "Hkd") as "Hqqq".
-        iDestruct (cpu_own_transport CIDf CID5 0%nat eb p C b lks
+        iDestruct (cpu_own_transport CIDf CID5 0%nat eb p C b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iSpecialize ("Hprint" $! CID5 with "[%]"); [wp_next_chain|].
         iApply ("Hprint" $! H76 (mword_of_int pd_qqq_a : mword 64) pd_qqq nm
@@ -1104,7 +1109,7 @@ Section ProofProcdumpLoop.
                         = mword_of_int (KernelSyms.procdump + 0x56)) by pcw.
       iEval (rewrite Htgt56b) in "Hpc".
       iPoseProof (pd_state_str k Hk6 with "Hkd") as "Hsstr".
-      iDestruct (cpu_own_transport CIDf CID10 0%nat eb p C b lks
+      iDestruct (cpu_own_transport CIDf CID10 0%nat eb p C b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hprint" $! CID10 with "[%]"); [wp_next_chain|].
       iApply ("Hprint" $! H86 (pd_state_p k) (pd_state_name k) nm

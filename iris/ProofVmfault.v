@@ -181,7 +181,7 @@ Section ProofVmfault.
     : wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_vmfault_sconf_body].
-    intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl.
+    intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -841,9 +841,10 @@ Section ProofVmfault.
       iDestruct (cpu_own_transport CID Cka lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-                A1 None lvl eb p C (K - 6)%nat b
-                ltac:(lia) ltac:(reflexivity) Hlvl
+                A1 None lvl eb p C (K - 6)%nat b _
+                ltac:(lia) ltac:(reflexivity) Hlvl Hbelow
                 with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+      all: try lkbelow.
       iIntros (Ckr Hskr mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
       assert (Hret3e : ret_pc (A1 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x3e)).
       { rewrite HA1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1287,10 +1288,11 @@ Section ProofVmfault.
       iDestruct (cpu_own_transport Ckr Cmg lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Mappages.wp_mappages_sconf γa G6 t m_ad 1%nat 22 lvl (K - 6)%nat
-                eb p C None b
+                eb p C None b _
                 Hlvl ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh
                 with "Hcg Hcnt Htext Hpc Hptree Henv2").
+      all: try lkbelow.
       iIntros (Cgr Hsgr mg t' k g) "Hcg Hcnt Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
       rewrite HG6a1 in Hrep'. rewrite HG6a3 in Hrep'.
       assert (Hret5a : ret_pc (G6 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x5a)).
@@ -1489,8 +1491,9 @@ Section ProofVmfault.
       iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
                 (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p C (K - 6)%nat b
                 ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
-                Hlvl
+                Hlvl Hbelow
                 with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+      all: try lkbelow.
       { rewrite /kfree_pre HF2a0.
         iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
       iIntros (Cfr Hsfr mfk) "Hcg Hcnt Hpc %Hfcs _".

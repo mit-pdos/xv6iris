@@ -350,6 +350,10 @@ Section ProofSysFstat.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic Hpriv #Hkenv #Hprocs Henv Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* PIN THE INDEX.  [eb = true] plus [cpu_own_eb_agree] at level 0 makes
        [b] the literal [true], which is what lets argaddr's and argfd's
        [wp_next b] crossings meet filestat's and this contract's [wp_next
@@ -801,6 +805,7 @@ Section ProofSysFstat.
                 S3 (av - 4)%nat eb C b lks
                 ltac:(unfold filestat_stack; lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
+      all: try lkbelow.
       iIntros (CID20 Hs20 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "Henv".

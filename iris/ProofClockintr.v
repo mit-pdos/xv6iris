@@ -504,6 +504,7 @@ Section ProofClockintr.
                 ltac:(lia)
                 Hbelow
                 with "Hcg Hcnt Htext Hpc [Hlkl] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HB2a0). iExact "Hlkl". }
       iApply wp_next_off_intro.
       iIntros (ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -636,12 +637,16 @@ Section ProofClockintr.
         exact HB2sp. }
       (* ===================== wakeup(&ticks) ===================== *)
       iApply (Wakeup.wp_wakeup_sconf D5 γs p
-                (S n) (av - 2)%nat eb C false
+                (S n) (av - 2)%nat eb C false ({[lock_rank "time"]} ∪ lks)
                 ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
                 ltac:(lia)
+                (locks_below_union_singleton lks (lock_rank "time") (lock_rank "proc")
+                   ltac:(vm_compute; lia)
+                   (locks_below_mono lks (lock_rank "time") (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
                 with "Hcg Hcnt Htext Hpc Hpanic Hpi").
+      all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
       destruct HcsW as [HcsW _].

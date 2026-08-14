@@ -230,7 +230,7 @@ Section ProofProcPagetable.
     : wp_proc_pagetable_core_body γa mm tf dqtf lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_core_body].
-    intros pp tfp ret_tgt Hlvl HK Htfal Htfb.
+    intros pp tfp ret_tgt Hlvl HK Htfal Htfb Hlkbelow.
     pose proof (ppt_cap_bounds K HK) as (Hc4 & Hc18 & Hc32 & Hc36 & Hc22).
     set (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -554,6 +554,7 @@ Section ProofProcPagetable.
     iApply (UV.wp_uvmcreate_sconf γa Jp lvl (K - 4)%nat eb p C on b
               _ Hlvl Hc18 HcidJp
               with "Hcg Hcnt Htext Hpc Henv").
+    all: try lkbelow.
     iIntros (CIDuv Hsuv mr0) "Hcg Hcnt Hpc %Hucs Hpost".
     assert (Hjpra : Jp !!! Regidx (mword_of_int 1 : mword 5) = J !!! Regidx (mword_of_int 1 : mword 5)).
     { rewrite /Jp. apply (rget_ne J (mword_of_int 1) ltac:(vm_compute; discriminate)). }
@@ -737,6 +738,7 @@ Section ProofProcPagetable.
               (pt_rep0_empty b0)
               ltac:(intros i Hi; apply lookup_empty)
               with "Hcg Hcnt Htext Hpc Hptree Henv").
+    all: try lkbelow.
     iIntros (CIDmp1 Hsmp1 mr1 t1 k1 g1) "Hcg Hcnt Hpc Hptree %Hnodes1 Henv %Hcs1 %Hbase1 %Hrep1 %Hmono1 %Hg1miss %Hret1".
     assert (Hretm1 : ret_pc (M9 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x2e)).
     { rewrite /M9 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -835,6 +837,7 @@ Section ProofProcPagetable.
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
                   with "Hcg Hcnt Htext Hpc Hbare Henv0").
+        all: try lkbelow.
         iIntros (CIDa5 Hsa5 mr3) "Hcg Hcnt Hpc %Hcsuf".
         assert (Hret62 : ret_pc (T3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x62)).
         { rewrite HT3ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -991,6 +994,7 @@ Section ProofProcPagetable.
               ltac:(intros i Hi; rewrite Hsvpn2; rewrite (ppt_lt1 i Hi);
                     rewrite vpn_at_0; exact ppt_m1_tf)
               with "Hcg Hcnt Htext Hpc Hptree Henv").
+    all: try lkbelow.
     iIntros (CIDmp2 Hsmp2 mr2 t2 k2 g2) "Hcg Hcnt Hpc Hptree %Hnodes2 Henv %Hcs2 %Hbase2 %Hrep2 %Hmono2 %Hg2miss %Hret2".
     assert (Hretm2 : ret_pc (N8 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x48)).
     { rewrite /N8 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1205,6 +1209,7 @@ Section ProofProcPagetable.
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)
                   with "Hcg Hcnt Htext Hpc Hupt Henv0").
+        all: try lkbelow.
         iIntros (CIDc4 Hsc4 mr4) "Hcg Hcnt Hpc %Hcsuf2".
         assert (Hret80 : ret_pc (W6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_pagetable + 0x80)).
         { rewrite HW6ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1307,11 +1312,12 @@ Section SealProcPagetable.
     : wp_proc_pagetable_sconf_body γa mm tf dqtf lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_proc_pagetable_sconf_body].
-    intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb.
+    intros pp tfp ret_tgt Hlvl HK Hex Htfal Htfb Hlkbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "Hcg Hcnt #Htext Hpc Htfcell Henv Hcont".
     iApply (Core.wp_proc_pagetable_core γa mm tf dqtf lvl K eb p C (Some nb) b lks
               Hlvl HK Htfal Htfb with "Hcg Hcnt Htext Hpc Htfcell Henv [Hcont]").
+    all: try lkbelow.
     iIntros (CIDr Hsr mr) "Hcg Hcnt Hpc Htfcell Hpost %Hcs".
     iDestruct "Hpost" as "[(%t & %Hrv & Hptree & %Hrep & %Hnt & Henv)
                            | (_ & %Hfail & _)]";

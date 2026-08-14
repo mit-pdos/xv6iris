@@ -372,6 +372,10 @@ Section ProofUvmalloc.
     (forall j : nat, (j < n)%nat ->
        (pu + 4096 * Z.of_nat j + 4096 <= 274877898752)%Z ->
        P.(ud_um) !! vpn_at (svpn_of (pgroundup oldsz)) j = None) ->
+    (* every iteration's kalloc/kfree is balanced against "kmem" (13); the
+       loop's own body touches nothing lower.  One premise for the whole
+       cone, fixed across every iteration since [lks] never changes. *)
+    locks_below lks (lock_rank "kmem") ->
     forall (rem i : nat) `(CID0 : CpuId) (Pi : uptd) (M : regfile) (av : mword 64),
     (i + rem = n)%nat -> (1 <= rem)%nat ->
     bv_unsigned av = (pu + 4096 * Z.of_nat i)%Z ->
@@ -400,7 +404,7 @@ Section ProofUvmalloc.
     ua_exit (CID0 := CID0) mm P (svpn_of (pgroundup oldsz)) n K eb p C b lks sp0 spr oldsz newsz -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hab Hoin Hnchar Hfresh.
+    intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hab Hoin Hnchar Hfresh Hbelow.
     assert (HKka : (14 <= K - 10)%nat) by (clear -HK; lia).
     assert (HKms : (2 <= K - 10)%nat) by (clear -HK; lia).
     assert (HKmp : (32 <= K - 10)%nat) by (clear -HK; lia).
@@ -511,7 +515,9 @@ Section ProofUvmalloc.
     iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               B1 None 0%nat eb p C (K - 10)%nat b
               _ HKka ltac:(reflexivity) ltac:(vm_compute; reflexivity)
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+    all: try lkbelow.
     iIntros (CIDu2 Hsu2 mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
     assert (Hret3a : ret_pc (B1 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x3a)).
     { rewrite HB1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -669,6 +675,7 @@ Section ProofUvmalloc.
       iApply (Uvmdealloc.wp_uvmdealloc_sconf γa N4 Pi (K - 10)%nat eb p C b
                 _ HKud HN4a0 Hudo
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
+      all: try lkbelow.
       iIntros (CIDu9 Hsu9 md) "Hcg Hcnt Hpc %Hdcs _ Hpt".
       iEval (rewrite HN4a1 HN4a2 Hpgpu Hnpd) in "Hpt".
       assert (Hret70 : ret_pc (N4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x70)).
@@ -1045,10 +1052,11 @@ Section ProofUvmalloc.
     { intros j Hj. assert (Hj0 : j = 0%nat) by (clear -Hj; lia). subst j.
       rewrite vpn_at_0 HB11a1. exact Hmadnone. }
     iApply (Mappages.wp_mappages_sconf γa B11 t m_ad 1%nat (Z.lor xperm 18) 0%nat
-              (K - 10)%nat eb p C None b
+              (K - 10)%nat eb p C None b _
               ltac:(reflexivity) HKmp HB11root Hmpva Hmppa Hmpsz ltac:(clear; lia)
               HB11a4 (proj1 Hperm) Hmpvab Hmppab Hrep Hmpfresh
               with "Hcg Hcnt Htext Hpc Hptree Henv").
+    all: try lkbelow.
     iIntros (CIDu25 Hsu25 mg t' k g) "Hcg Hcnt Hpc Hptree %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
     rewrite HB11a1 in Hrep'. rewrite HB11a3 in Hrep'.
     assert (Hret54 : ret_pc (B11 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x54)).
@@ -1359,9 +1367,12 @@ Section ProofUvmalloc.
       ua_thr_peel. apply Hmgthr; assumption. }
     iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) F2 None 0%nat eb p C (K - 10)%nat b
+              _
               HKka ltac:(reflexivity) ltac:(reflexivity)
               ltac:(vm_compute; reflexivity)
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+    all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
     iIntros (CIDu38 Hsu38 mfk) "Hcg Hcnt Hpc %Hfcs _".
@@ -1456,8 +1467,9 @@ Section ProofUvmalloc.
     assert (Hudo2 : (uint (G4 !!! Regidx Ra1) <= uvm_maxsz)%Z)
       by (rewrite HG4a1; exact Hudold).
     iApply (Uvmdealloc.wp_uvmdealloc_sconf γa G4 Pi (K - 10)%nat eb p C b
-              HKud HG4a0 Hudo2
+              _ HKud HG4a0 Hudo2
               with "Hcg Hcnt Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CIDu43 Hsu43 md2) "Hcg Hcnt Hpc %Hd2cs _ Hpt".
     iEval (rewrite HG4a1 HG4a2 Hpgpu Hnpd) in "Hpt".
     assert (Hret98 : ret_pc (G4 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x98)).
@@ -1564,7 +1576,7 @@ Section ProofUvmalloc.
     : wp_uvmalloc_sconf_body γa mm P xperm K eb p C b lks.
   Proof.
     cbv beta delta [wp_uvmalloc_sconf_body].
-    intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr.
+    intros pcE oldsz newsz vpn0 n ret_tgt HK Htp Hroot Hxp Hxrng Hperm Hobd Hnbd Hfr Hbelow.
     assert (Hnd : n = uvma_np oldsz newsz) by reflexivity.
     assert (HK10 : (10 <= K)%nat) by (clear -HK; lia).
     assert (HKback : ((K - 10) + 10)%nat = K) by (clear -HK; lia).
@@ -2372,6 +2384,7 @@ Section ProofUvmalloc.
     iApply (ua_loop γa mm P xperm K eb p C sp0 spr oldsz newsz pu nz n b lks
               HK Hxrng Hperm Hb3 Hb5 Hb8 Hpuv (eq_sym Hnz) Hpumod Hpu0 Hab Hoin
               Hnchar Hfrg
+              Hbelow
               n 0%nat CIDu85 P R12 (pgroundup oldsz) Hsum0 Hn1 Hav0
               (uptd_ext_refl P) (dom_run_0 (dom P.(ud_um)) (svpn_of (pgroundup oldsz)))
               HR12sp HR12s2 HR12s3 HR12s4 HR12s5 HR12s6 HR12s7 HR12thr

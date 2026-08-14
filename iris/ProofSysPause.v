@@ -1192,7 +1192,21 @@ Section SpBodies.
     assert (HlL0 : sp_lregs L0 tk) by exact (sp_lregs_cs M L0 tk HcsNL0 Hln').
     assert (HL0ra : L0 !!! Regidx (mword_of_int 1 : mword 5)
                     = add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x4a) : mword 64) 4) by (rewrite /L0; apply upd_eq).
-    iApply (Myproc.wp_myproc_sconf L0 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) C false lks Hn1 ltac:(lia)
+    (* myproc/killed/sleep_prepare all run here with the tickslock STILL
+       held (the C releases it only after sleep_prepare), so the ambient
+       held set is [{[lock_rank "time"]} ∪ lks], matching [Hown]'s actual
+       type -- not the bare [lks] this stretch is entered with.  "proc"
+       (11) outranks "time" (8), so [Hfresh]'s bound lifts by
+       [locks_below_mono] and carries across the held "time" singleton by
+       [locks_below_union_singleton], exactly [ProofKexit]'s
+       wait_lock -> proc shape. *)
+    assert (Htime_lt_proc : (lock_rank "time" < lock_rank "proc")%nat)
+      by (vm_compute; lia).
+    assert (Hfresh_proc : locks_below ({[lock_rank "time"]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [exact Htime_lt_proc |].
+      apply (locks_below_mono lks (lock_rank "time")); [exact Hfresh | lia]. }
+    iApply (Myproc.wp_myproc_sconf L0 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) C false
+              ({[lock_rank "time"]} ∪ lks) Hn1 ltac:(lia)
               with "Hcg Hown Htext Hpc").
     iApply wp_next_off_intro. iIntros (msM mfm) "%HmsM Hcg Hown Hpc %Hmp".
     destruct Hmp as (Hmpcs & Hmpa0).
@@ -1222,9 +1236,11 @@ Section SpBodies.
                     = add_vec_int (mword_of_int (KernelSyms.sys_pause + 0x4e) : mword 64) 4) by (rewrite /L1; apply upd_eq).
     assert (HL1a0 : L1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
     { rewrite /L1 upd_ne; [| reg_neq]. rewrite Hmpa0. reflexivity. }
-    iApply (Killed.wp_killed_sconf γs j γl L1 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) C false lks
-              HL1a0 Hj Hjl Hn1 ltac:(lia)
+    iApply (Killed.wp_killed_sconf γs j γl L1 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) C false
+              ({[lock_rank "time"]} ∪ lks)
+              HL1a0 Hj Hjl Hn1 ltac:(lia) Hfresh_proc
               with "Hcg Hown Htext Hpc Hpinv Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfk kl) "%Hkf Hcg Hown Hpc".
     destruct Hkf as (Hkcs & Hka0).
     assert (Hl52 : ret_pc (L1 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x52))
@@ -1316,9 +1332,10 @@ Section SpBodies.
         by (rewrite Heb; change (trap_res true) with kv_frame_slots; lia).
       (* =================== sleep_prepare(&ticks) =================== *)
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl L3
-                (trap_res eb + (av - 8))%nat 1%nat eb C false lks
-                Hj Hjl HL3nz Hn1 Hpav
+                (trap_res eb + (av - 8))%nat 1%nat eb C false ({[lock_rank "time"]} ∪ lks)
+                Hj Hjl HL3nz Hn1 Hpav Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
+      all: try lkbelow.
       iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc".
       assert (Hl5a : ret_pc (L3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x5a))
         by (rewrite HL3ra; pcstep).
@@ -1403,7 +1420,10 @@ Section SpBodies.
       iDestruct (cpu_own_transport CIDr CIDj 0 eb (proc_addr j) C eb ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Sleep.wp_sleep_sconf γs j γl L6 (av - 8)%nat eb C lks Hj Hjl ltac:(lia)
+                ltac:(exact (locks_below_mono lks (lock_rank "time") (lock_rank "proc")
+                               Hfresh ltac:(vm_compute; lia)))
                 with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").
+      all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       (* SLEEP RETURNS ON HART [CIDs]. *)
@@ -1455,6 +1475,7 @@ Section SpBodies.
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res L8 0%nat eb (proc_addr j) C
                 (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc [] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HL8a0). iExact "Hlk2". }
       iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR Hown Hpay".
       assert (Hl6a : ret_pc (L8 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x6a))
@@ -1562,6 +1583,7 @@ Section SpBodies.
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res Q2 0%nat eb pj C (av - 8)%nat true lks
               Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
     iIntros (CIDa Hsa msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR Hown Hpay".
     assert (Hq26 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x26))

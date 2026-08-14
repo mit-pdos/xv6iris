@@ -83,6 +83,8 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (printint_stack <= K)%nat ->
   (10 <= uint (m0 !!! Regidx a1_idx) <= 16)%Z ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* printint -> consputc -> uartputc_sync *)
+  locks_below lks (lock_rank "uart") ->
   sie_cap_gpr m0 K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

@@ -47,6 +47,8 @@ Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z ->
   pt_rep0 t m ->
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
+  (* order premise at the lowest rank this cone reaches. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.mappages) -∗

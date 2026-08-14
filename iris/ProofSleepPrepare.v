@@ -254,6 +254,7 @@ Section ProofSleepPrepare.
               (proc_lock_res γs γl (proc_addr j)) B2 n eb pj C (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HB2a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hp18 : ret_pc (B2 !!! Regidx spr_ra) = mword_of_int (KernelSyms.sleep_prepare + 0x18))

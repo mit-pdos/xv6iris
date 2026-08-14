@@ -603,6 +603,7 @@ Section ProofIget.
               (itable_res2 cn γfs γi cov logstart nib dev) mA
               n eb p C (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x20)).
@@ -947,7 +948,7 @@ Section ProofIget.
                             /\ M !! e = None) ⌝ -∗
       sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
-      cpu_own (S n) eb p C false lks -∗
+      cpu_own (S n) eb p C false ({[lock_rank "itable"]} ∪ lks) -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
@@ -982,7 +983,7 @@ Section ProofIget.
                               /\ M !! e = None) ⌝ -∗
         sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
-        cpu_own (S n) eb p C false lks -∗
+        cpu_own (S n) eb p C false ({[lock_rank "itable"]} ∪ lks) -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗

@@ -245,8 +245,11 @@ Section ProofRelease.
               ltac:(rgne; exact Hacpu) Href
               with "Hcg Hpc Hi12 Hlock Htoken Hlks").
     iApply wp_next_off_intro.
-    iIntros "Hcg Hpc Htoken Hlks".
-    (* release only ever SHRINKS the set, so the coupling survives outright. *)
+    iIntros "Hcg Hpc Htoken Hlks %Hin".
+    (* The rank WAS held ([Hin], out of the leaf's own [cpu_locks_delete]), so
+       the set STRICTLY shrank: [size lks <= S n] becomes
+       [size (lks ∖ {[rank s]}) <= n], which is exactly pop_off's unwind
+       premise below.  That is the whole compositional argument. *)
     iDestruct ("Hownback" $! (lks ∖ {[lock_rank s]})
                  ltac:(exact (size_del_le (lock_rank s) lks (S n) Hsz)) with "Hlks") as "Hown".
     assert (Hpc16 : add_vec_int (mword_of_int (KernelSyms.release + 0x12) : mword 64) 4 = mword_of_int (KernelSyms.release + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
@@ -286,8 +289,12 @@ Section ProofRelease.
     assert (HcspM1 : M1 !!! Regidx csp_rs1 = spr).
     { rewrite /M1 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspR3. }
+    (* pop_off's UNWIND PREMISE, discharged exactly as the discipline says:
+       the coupling gave [size lks <= S n] on the way in, the cpu-field clear
+       above deleted this lock's rank, so the set now fits under [n]. *)
     iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p C _
               ltac:(lia)
+              ltac:(exact (size_del_lt (lock_rank s) lks n Hin Hsz))
               with "Hcg Hown Hpay Htext Hpc").
     iIntros (CIDpo Hspo mf) "Hcg Hown Hpc %Hmf".
     iEval (rewrite upd_eq) in "Hpc".

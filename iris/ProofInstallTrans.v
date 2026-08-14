@@ -1214,6 +1214,10 @@ Section InstallTransBlocks.
     (t < n)%nat ->
     (n - t <= fuel)%nat ->
     it_lregs m M t ->
+    (* install_trans's own cone: it directly breads/bwrites/brelses/bunpins
+       against "bcache"(4) only.  Threaded on this recursive helper's own
+       binder list -- every recursive call re-proves it unchanged. *)
+    locks_below lks (lock_rank "bcache") ->
     sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C eb lks -∗
     trap_csrs_ext eb -∗
@@ -1251,7 +1255,7 @@ Section InstallTransBlocks.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
-    induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Hregs.
+    induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Hregs Hbelow.
     { exfalso. exact (it_fuel_absurd t n Ht Hfuel). }
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs".
     iIntros "#Hdev #Hgeo #Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hrest Hslots".
@@ -1447,8 +1451,10 @@ Section InstallTransBlocks.
               ltac:(rewrite Hubnol; exact (it_lt_lit _ Hslotrange))
               ltac:(reflexivity) ltac:(rewrite Hubnol; exact Hslotcov) ltac:(reflexivity)
               Hj Hgl HA5a0 HA5a1
+              Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu1").
+    all: try lkbelow.
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
     destruct Hpair1 as [Hcs1 Hmf1a0].
     assert (Hpc82 : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x82)).
@@ -1557,8 +1563,10 @@ Section InstallTransBlocks.
               ltac:(exact (it_lt_lit _ Hwrange))
               ltac:(reflexivity) ltac:(exact Hwcov) ltac:(reflexivity)
               Hj Hgl HA9a0 HA9a1
+              Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu2").
+    all: try lkbelow.
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
     destruct Hpair2 as [Hcs2 Hmf2a0].
     assert (Hpc90 : ret_pc (A9 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x90)).
@@ -1770,11 +1778,12 @@ Section InstallTransBlocks.
     iDestruct (cpu_claim_ext_transport CIDb2 CIDa18 eb (proc_addr j) ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iApply (Bwrite.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k2 pidv dev w dq B7 (K - 10)%nat eb C
-              (Lw t) bsd2 eb R
-              (_ it_Kbwrite K HK)
+              (Lw t) bsd2 eb R lks
+              (it_Kbwrite K HK)
               ltac:(exact (it_lt_lit _ Hwrange)) ltac:(reflexivity) Hj Hgl Hk2 HB7a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hhold [HR]").
+    all: try lkbelow.
     (* THIS ENTRY'S CRASH PERMIT, out of the generator, at the home block the
        code is about to overwrite: the threaded resource goes in and comes
        back through the write's own [▷ Q]. *)
@@ -1850,7 +1859,9 @@ Section InstallTransBlocks.
     iApply (Bunpin.wp_bunpin_sconf bn (fs_view γfs γd dev cov) k2 qref dev w
               B9 0%nat eb (proc_addr j) C (K - 10)%nat eb lks
               (it_Kbunpin K HK) it_noff0 Hk2 HB9a0
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hbio Hpanic Hbref").
+    all: try lkbelow.
     iIntros (CIDb4 Hsb4 mf5) "Hcg Hcnt Hpc %Hcs5 Hu3".
     assert (Hpcb0 : ret_pc (B9 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0xb0)).
     { rewrite HB9ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1935,7 +1946,9 @@ Section InstallTransBlocks.
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k1 pidv dev bnol dq
               B11 (K - 10)%nat eb (proc_addr j) C (Lw t) bsd1 d1 eb lks
               (it_Kbrelse K HK) Hk1 HB11a0
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk1").
+    all: try lkbelow.
     iIntros (CIDb5 Hsb5 mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu4".
     assert (Hpc5a : ret_pc (B11 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x5a)).
     { rewrite HB11ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1991,7 +2004,9 @@ Section InstallTransBlocks.
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k2 pidv dev w dq
               B13 (K - 10)%nat eb (proc_addr j) C (Lw t) (Lw t) false eb lks
               (it_Kbrelse K HK) Hk2 HB13a0
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk2").
+    all: try lkbelow.
     iIntros (CIDb6 Hsb6 mf7) "%Hcs7 Hcg Hcnt Hpc Hppid Hu5".
     assert (Hpc60 : ret_pc (B13 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x60)).
     { rewrite HB13ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2145,7 +2160,7 @@ Section InstallTransBlocks.
       iDestruct (it_cont_shift (CIDa := CID0) (CIDb := CIDa30)  j bn γfs logstart n W
                    Lw L D pidv dq m K eb C eb R lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa30 (S t) B16 (it_more t n Ht Hmore) (it_fuel_step t n fuel Hfuel)
-                HB16regs
+                HB16regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio [] Hppid Hprocs
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hrest
                       Hslots Hperm HR Hcont").
@@ -2179,7 +2194,7 @@ Section ProofInstallTrans.
                                   pidv dq m K eb C b R lks.
   Proof.
     cbv beta delta [wp_install_trans_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hj Hgl Hstage Ha0 Hshape Hnd Hwok HLw.
+    intros pcE pj ret_tgt HK Hgeom Hj Hgl Hstage Ha0 Hshape Hnd Hwok HLw Hbelow.
     destruct Hshape as [HnW Hn30].
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs".
     iIntros "#Hdev #Hgeo #Hdlock Hncell Hblks HauthL HauthD Hents Hslots #Hperm HR Hcont".
@@ -2751,7 +2766,7 @@ Section ProofInstallTrans.
       iApply (it_loop n γs j γl γu γd γk pd pav pu bn γfs cov logstart dev
                 n W Lw L D pidv dq m K eb C R lks
                 HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw
-                CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs
+                CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hents
                       Hslots Hperm HR Hcont").

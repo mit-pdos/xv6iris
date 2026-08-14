@@ -178,6 +178,10 @@ Definition wp_sys_pipe_sconf_body
      assumed about it: argaddr does not check, and copyout is the check. *)
   pv_tf V !! tf_arg_idx 0 = Some v ->
   (sys_pipe_stack <= av)%nat ->
+  (* sys_pipe acquires no lock of its own -- it is a pure pass-through to its
+     three fileclose calls (inside [sp_close2]), whose own lowest rank is
+     "ftable" (1).  One premise covers the whole cone. *)
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m av b p -∗
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock

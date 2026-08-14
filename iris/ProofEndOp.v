@@ -1274,6 +1274,7 @@ Section EndOpBlocks.
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HE4a0). iExact "Hlock". }
     iIntros (CIDb1 Hsb1 ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres Hcnt Hpay".
     assert (Hpc50 : ret_pc (E4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x50)).
@@ -1436,6 +1437,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomF Hlen eo_noff1
               Hbelow_wk1
               with "Hcg Hcnt Htext Hpc Hpanic Hprocs").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hcnt Htext2 Hpc".
     iEval (rewrite HF4ra) in "Hpc".
     clear HF4ra.
@@ -1773,6 +1775,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
                     [Hmirc]").
+    all: try lkbelow.
     (* THE COMMIT POINT's fupd (phase C2b/D1 stage 4).  The durable state
        jumps to the log's contents over the home map -- computable from the
        PRE-write image, so the fupd needs to know nothing about the disk --
@@ -1885,6 +1888,7 @@ Section EndOpBlocks.
               (conj HnW Hn30) Hnd Hwok HLw'
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
                     [] [Hmirc]").
+    all: try lkbelow.
     (* THE INSTALL fupds, one per entry, out of one generator: each reads the
        committed header picture out of the mirror half and hands it straight
        back, because recovery re-installs a logged block from its slot no
@@ -1998,6 +2002,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
                     [Hmirc]").
+    all: try lkbelow.
     { by iApply big_sepL_nil. }
     { iExists bs1. iExact "Hhdr". }
     (* THE CLEAR's fupd: the on-disk log is emptied, so recovery becomes the
@@ -2469,6 +2474,7 @@ Section EndOpBlocks.
               (locks_below_mono lks (lock_rank "log") (lock_rank "bcache") Hbelow ltac:(vm_compute; lia))
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu1").
+    all: try lkbelow.
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
     destruct Hpair1 as [Hcs1 Hmf1a0].
     assert (Hpcc6 : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xc6)).
@@ -2642,6 +2648,7 @@ Section EndOpBlocks.
               (locks_below_mono lks (lock_rank "log") (lock_rank "bcache") Hbelow ltac:(vm_compute; lia))
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu2").
+    all: try lkbelow.
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
     destruct Hpair2 as [Hcs2 Hmf2a0].
     assert (Hpcd4 : ret_pc (B4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xd4)).
@@ -2990,6 +2997,7 @@ Section EndOpBlocks.
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hmirc]").
+    all: try lkbelow.
     (* THE LOG-FILL fupd (phase C2b/D1 stage 4): with the ON-DISK header
        still clean -- which is what the mirror half in hand says, and what
        makes the batch's [log_mirror_clean] the right thing to park in the
@@ -3107,6 +3115,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk2 HH4a0
               (locks_below_mono lks (lock_rank "log") (lock_rank "bcache") Hbelow ltac:(vm_compute; lia))
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk2").
+    all: try lkbelow.
     iIntros (CIDb4 Hsb4 mf5) "%Hcs5 Hcg Hcnt Hpc Hppid Hu2".
     assert (Hpcf2 : ret_pc (H4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xf2)).
     { rewrite HH4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3203,6 +3212,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk1 HH6a0
               (locks_below_mono lks (lock_rank "log") (lock_rank "bcache") Hbelow ltac:(vm_compute; lia))
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk1").
+    all: try lkbelow.
     iIntros (CIDb5 Hsb5 mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu1".
     assert (Hpcf8 : ret_pc (H6 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xf8)).
     { rewrite HH6ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3553,6 +3563,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomE Hlen eo_noff1
               Hbelow_wk2
               with "Hcg Hcnt Htext Hpc Hpanic Hprocs").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hcnt Htext2 Hpc".
     iEval (rewrite HE3ra) in "Hpc".
     clear HE3ra.
@@ -3975,6 +3986,7 @@ Section ProofEndOp.
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hlock". }
     iIntros (CIDq Hsq ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres Hcnt Hpay".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x1a)).

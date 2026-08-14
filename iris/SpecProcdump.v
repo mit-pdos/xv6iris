@@ -161,6 +161,10 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (58 <= K)%nat ->
   (* the callee, as a hypothesis and not a functor -- see the header *)
   printk_gen_contract γpr γd γv ->
+  (* procdump takes no lock of its own (the header's whole point); its one
+     callee, printk, is entered at rank "pr" -- the lowest (only) rank this
+     cone touches, so this is the whole order premise. *)
+  locks_below lks (lock_rank "pr") ->
   sie_cap_gpr m K b p -∗
   (* the interrupt level is left exactly as found: printk's acquire/release *)
   cpu_own 0%nat eb p C b lks -∗

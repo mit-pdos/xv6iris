@@ -104,6 +104,10 @@ Section ProofSysWait.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
              #Hlk #Henv Hpriv Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iPoseProof (swi_00 with "Htext") as "Hi00".
     iPoseProof (swi_02 with "Htext") as "Hi02".
     iPoseProof (swi_04 with "Htext") as "Hi04".
@@ -291,6 +295,7 @@ Section ProofSysWait.
     iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb C b pid V lks
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk Henv Hpriv").
+    all: try lkbelow.
     iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpriv".
     destruct Hkw as (HcsKw & HKwa0).
     assert (Hpp1a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (SW + 0x1a))

@@ -366,6 +366,10 @@ Section ProofSysWrite.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* PIN THE INDEX.  [eb = true] plus [cpu_own_eb_agree] at level 0 makes
        [b] the literal [true], which is what lets argaddr's, argint's and
        argfd's [wp_next b] crossings meet filewrite's and this contract's
@@ -947,6 +951,7 @@ Section ProofSysWrite.
                 ltac:(unfold filewrite_stack, K_writei, consolewrite_stack; lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
+      all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P' used')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       (* THE SET COMES BACK EXISTENTIALLY (SpecSysWrite.write_env_frame): on

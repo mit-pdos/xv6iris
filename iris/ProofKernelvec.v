@@ -1677,6 +1677,7 @@ Section KernelvecHandler.
               (kv_m2 Me) (46 + av) p emp%I pc0 sc tv ∅
               Hgs ltac:(unfold kerneltrap_stack; lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
+    all: try lkbelow.
     { rewrite /cpu_own. iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)
     iIntros (CIDn Hsn mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".

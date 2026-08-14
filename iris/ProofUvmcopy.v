@@ -461,6 +461,9 @@ Section ProofUvmcopy.
     M !!! Regidx Rs1 = iv ->
     M !!! Regidx Rs7 = page_base Pnew.(ud_root) ->
     uc_thr mm M ->
+    (* uc_err's one callee is uvmunmap, whose do_free-!=0 call bottoms out
+       at kfree's "kmem" (13) bound; nothing else here touches a lock. *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr M (K - 10)%nat b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -471,7 +474,7 @@ Section ProofUvmcopy.
     uc_exit mm Pold Pnew vpn0 n K eb p C spr ilvl b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hilvl Hvpn0 Hiv Hjb Hext Hout Hfr Hsp Hs1 Hs7 Hthr.
+    intros HK Hilvl Hvpn0 Hiv Hjb Hext Hout Hfr Hsp Hs1 Hs7 Hthr Hbelow.
     assert (HKuu : (22 <= K - 10)%nat) by (clear -HK; lia).
     iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hexit".
     iPoseProof (uci_6c with "Htext") as "Hi6c".
@@ -580,8 +583,9 @@ Section ProofUvmcopy.
       assert (Hu0 : uint (mword_of_int 0 : mword 64) = 0%Z) by (vm_compute; reflexivity).
       rewrite Hu0. clear -Hjb. lia. }
     iApply (Uvmunmap.wp_uvmunmap_sconf γa N5 Pj j (K - 10)%nat eb p C ilvl b
-              _ HKuu Hilvl HN5a0 Hual HN5a2 Hua3 Hurng
+              _ HKuu Hilvl HN5a0 Hual HN5a2 Hua3 Hurng Hbelow
               with "Hcg Hcnt Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CIDe6 Hse6 mu) "Hcg Hcnt Hpc %Hucs Hpt".
     iEval (rewrite HN5a1 Hvpn0) in "Hpt".
     assert (Hret7a : ret_pc (N5 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmcopy + 0x7a)).
@@ -662,6 +666,11 @@ Section ProofUvmcopy.
     M !!! Regidx Rs6 = page_base Pold.(ud_root) ->
     M !!! Regidx Rs7 = page_base Pnew.(ud_root) ->
     uc_thr mm M ->
+    (* uc_loop's cone reaches kalloc/kfree directly (both bound at "kmem",
+       13) and, via [uc_err], kfree again through uvmunmap.  mappages is
+       also in the cone but carries no order premise of its own to pass
+       (SpecMappages.v/SpecWalk.v -- outside this pass's file list). *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr M (K - 10)%nat b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -681,7 +690,7 @@ Section ProofUvmcopy.
     intro rem.
     induction rem as [| rem IH];
       intros j Pj M iv CID0 Hsum Hrem Hiv Hext Hout Hfacts
-             Hsp Hs1 Hs4 Hs5 Hs6 Hs7 Hthr;
+             Hsp Hs1 Hs4 Hs5 Hs6 Hs7 Hthr Hbelow;
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hexit".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -863,7 +872,7 @@ Section ProofUvmcopy.
       iDestruct (wp_next_shift Hshiftrec with "Hexit") as "Hexit".
       iApply (IH (S j) Pk T1 (add_vec iv (mword_of_int 4096)) CIDt4
                 ltac:(clear -Hsum; lia) ltac:(clear -Hrne; lia) Hivs
-                Htext2 Htout Htfacts HT1sp HT1s1 HT1s4 HT1s5 HT1s6 HT1s7 HT1thr
+                Htext2 Htout Htfacts HT1sp HT1s1 HT1s4 HT1s5 HT1s6 HT1s7 HT1thr Hbelow
                 with "Hcg Hcnt Htext Hpc Hpo Hpt Henv2 Hexit"). }
     (* ================================================================ *)
     (*  THE BODY.  walk(old, i, 0) on the PARENT.                        *)
@@ -1147,8 +1156,9 @@ Section ProofUvmcopy.
                  with "Hcnt") as "Hcnt".
     iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               B3 None ilvl eb p C (K - 10)%nat b
-              _ HKka ltac:(reflexivity) Hilvl
+              _ HKka ltac:(reflexivity) Hilvl Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+    all: try lkbelow.
     iIntros (CIDl12 Hsl12 mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
     assert (Hret44 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmcopy + 0x44)).
     { rewrite HB3ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1214,7 +1224,7 @@ Section ProofUvmcopy.
       iApply (uc_err (CID0 := CIDl14) γa mm Pold Pnew Pj vpn0 n j K eb p C spr iv C1 ilvl b lks
                 HK Hilvl Hvpn0 Hiv ltac:(clear -Hjb; lia) Hext Hout
                 ltac:(intros i Hi; apply Hfresh; clear -Hi Hjn; lia)
-                HC1sp HC1s1 HC1s7 HC1thr
+                HC1sp HC1s1 HC1s7 HC1thr Hbelow
                 with "Hcg Hcnt Htext Hpc Hpo Hpt Henv2 Hexit"). }
     (* ========== kalloc returned a page ========== *)
     set (r := (mk !!! Regidx Ra0 : mword 64)).
@@ -1506,6 +1516,7 @@ Section ProofUvmcopy.
               _ Hilvl HKmp HD6root Hmpva Hmppa Hmpsz ltac:(clear; lia)
               HD6a4 (proj1 Hperm) Hmpvab Hmppab Hrepc Hmpfresh
               with "Hcg Hcnt Htext Hpc Hptreec Henv2").
+    all: try lkbelow.
     iIntros (CIDl26 Hsl26 mg tc' k g) "Hcg Hcnt Hpc Hptreec %Hnodes _ %Hgcs %Hbase' %Hrep' %Hmono %Hmiss %Hmpay".
     rewrite HD6a1 in Hrep'. rewrite HD6a3 in Hrep'. rewrite Hvj in Hrep'.
     assert (Hret64 : ret_pc (D6 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmcopy + 0x64)).
@@ -1640,8 +1651,9 @@ Section ProofUvmcopy.
     iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) F2 None ilvl eb p C (K - 10)%nat b
               _ HKka ltac:(reflexivity) ltac:(reflexivity)
-              Hilvl
+              Hilvl Hbelow
               with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+    all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
     iIntros (CIDl30 Hsl30 mf) "Hcg Hcnt Hpc %Hfcs _".
@@ -1662,7 +1674,7 @@ Section ProofUvmcopy.
     iApply (uc_err (CID0 := CIDl30) γa mm Pold Pnew Pj vpn0 n j K eb p C spr iv mf ilvl b lks
               HK Hilvl Hvpn0 Hiv ltac:(clear -Hjb; lia) Hext Hout
               ltac:(intros i Hi; apply Hfresh; clear -Hi Hjn; lia)
-              Hfsp Hfs1 Hfs7 Hfthr
+              Hfsp Hfs1 Hfs7 Hfthr Hbelow
               with "Hcg Hcnt Htext Hpc Hpo Hpt Henv2 Hexit").
   Qed.
 
@@ -1677,7 +1689,7 @@ Section ProofUvmcopy.
     : wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmcopy_sconf_body].
-    intros pcE sz vpn0 n ret_tgt HK Hilvl Htp Hroot Hrootn Hszb Hfresh.
+    intros pcE sz vpn0 n ret_tgt HK Hilvl Htp Hroot Hrootn Hszb Hfresh Hbelow.
     assert (Hvpn0 : svpn_of (mword_of_int 0 : mword 64) = vpn0) by reflexivity.
     assert (Hnd : n = uvm_np sz) by reflexivity.
     assert (HK10 : (10 <= K)%nat) by (clear -HK; lia).
@@ -2273,7 +2285,7 @@ Section ProofUvmcopy.
               n 0%nat Pnew R7 (mword_of_int 0) CIDr18
               ltac:(clear -Hn1; lia) Hn1 Hiv0 (uptd_ext_refl Pnew)
               ltac:(intros v _; reflexivity) ltac:(intros i Hi; exfalso; clear -Hi; lia)
-              HR7sp HR7s1 HR7s4 HR7s5 HR7s6 HR7s7 HR7thr
+              HR7sp HR7s1 HR7s4 HR7s5 HR7s6 HR7s7 HR7thr Hbelow
               with "Hcg Hcnt Htext Hpc Hpo Hpt Henv Hepi").
   Qed.
 

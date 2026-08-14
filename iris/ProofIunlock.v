@@ -375,6 +375,7 @@ Section ProofIunlockMain.
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
+    all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     { iEval (rewrite HR6a0). iExact "Hpid". }
     iIntros (CID12 Hq12 mH) "%Hhs Hcg Hcnt Hpc Hstok Hpid Hppid".
@@ -532,7 +533,9 @@ Section ProofIunlockMain.
     iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
               (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b lks
               ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hpanic Hprocs").
+    all: try lkbelow.
     { iEval (rewrite HR9a0). iExact "Hslk". }
     { iEval (rewrite HR9a0). iExact "Hpid". }
     iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc".

@@ -116,6 +116,8 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   (uint szv <= 2 ^ 38)%Z ->
   (* vmfault's kalloc keeps its transient noff increment in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* copyinstr -> walkaddr -> walk *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗

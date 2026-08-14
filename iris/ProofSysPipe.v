@@ -589,6 +589,9 @@ Section ProofSysPipe.
       = mword_of_int KernelSyms.fileclose ->
     add_vec (mword_of_int zd : mword 64) (sign_extend' 64 imm2)
       = mword_of_int KernelSyms.fileclose ->
+    (* sp_close2's own two fileclose calls want "ftable" (1); nothing else in
+       its body touches a lock. *)
+    locks_below lks (lock_rank "ftable") ->
     sie_cap_gpr Mt nav b p -∗
     cpu_own 0%nat eb p C b lks -∗
     (* THE COMPLEMENT, THREADED THROUGH BOTH CLOSES.  fileclose takes it at
@@ -635,9 +638,12 @@ Section ProofSysPipe.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hnav Hs0 Hr1 Hr2 Hs04 Hs812 Hs1618 Ht1 Ht2.
+    intros Hnav Hs0 Hr1 Hr2 Hs04 Hs812 Hs1618 Ht1 Ht2 Hbelow.
     iIntros "Hcg Hcpu Hextc Hextm #Htext Hpc #Hftab #Hpanic Hi0 Hi4 Hi8 Hic Hi10
               Hc6 Hc7 Href0 Href1 Hpenv Hfenv Hcont".
+    (* depth 0 forces the held set empty, so every [locks_below] the callees
+       raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* [eb = b] -- this block runs at push_off level 0 (the [cpu_own 0] above),
        so [CpuOwn.cpu_own_eb_agree] gives it outright.  Used ONLY to align the
        complement's [eb]-guard with the [b]-spelled chain facts; do NOT
@@ -675,8 +681,9 @@ Section ProofSysPipe.
     iDestruct (fileclose_env_frame fn on us 0%nat eb p Cf0 with "Hpenv Hfenv")
       as "[Hfcenv0 Hfcback0]".
     iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p C nav b lks
-              Hnav sp_noff0 HD2a0
+              Hnav sp_noff0 HD2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href0 Hfcenv0").
+    all: try lkbelow.
     iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 Hunit0 Hout0".
     iDestruct ("Hfcback0" with "Hout0") as "[Hpenv Hfenv]".
     iDestruct "Hpenv" as (on1) "Hpenv".
@@ -725,8 +732,9 @@ Section ProofSysPipe.
     iDestruct (fileclose_env_frame fn on1 us1 0%nat eb p Cf1 with "Hpenv Hfenv")
       as "[Hfcenv1 Hfcback1]".
     iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p C nav b lks
-              Hnav sp_noff0 HF2a0
+              Hnav sp_noff0 HF2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href1 Hfcenv1").
+    all: try lkbelow.
     iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 Hunit1 Hout1".
     iDestruct ("Hfcback1" with "Hout1") as "[Hpenv Hfenv]".
     assert (HpcG1 : ret_pc (F2 !!! Regidx Rra) = mword_of_int ze)
@@ -959,7 +967,7 @@ Section ProofSysPipe.
     : wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_pipe_sconf_body].
-    intros pcE ret_tgt Harg Hav.
+    intros pcE ret_tgt Harg Hav Hbelow.
     (* Every callee's stack bound, discharged HERE: [lia] is unreliable once
        the context is full of bitvectors (durable-notes.md's zify-hook
        gotcha), and each of these is used inside an [iApply] deep in the
@@ -1660,7 +1668,7 @@ Section ProofSysPipe.
       iApply (sp_close2 (CID0 := CID43)  γfl γf fn on us Y0 (av - 8)%nat eb p C sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2092038 : mword 21) (mword_of_int 2092030 : mword 21) b lks
-                Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g
+                Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       iSpecialize ("Hepi" $! CID44 with "[%]"); [wp_next_chain|].
@@ -1883,7 +1891,7 @@ Section ProofSysPipe.
       iApply (sp_close2 (CID0 := CID53)  γfl γf fn on us F2 (av - 8)%nat eb p C sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2092038 : mword 21) (mword_of_int 2092030 : mword 21) b lks
-                Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g
+                Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       iSpecialize ("Hepi" $! CID54 with "[%]"); [wp_next_chain|].
@@ -2208,6 +2216,7 @@ Section ProofSysPipe.
               (av - 8)%nat 0%nat eb p C b lks
               Hav52 HA6a0 HA6a1 HA6a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henva Hbufhi").
+    all: try lkbelow.
     iIntros (CID61 Hcr61 B0 Pa) "Hcg Hcpu Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
     iEval (rewrite HA6a3) in "Hbufhi".
     iDestruct (word4_pointsto_intro _ _ _ Halhi with "Hbufhi") as "Hhi".
@@ -2381,7 +2390,7 @@ Section ProofSysPipe.
       iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 us2 E4 (av - 8)%nat eb p C sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
                 (mword_of_int 2092078 : mword 21) (mword_of_int 2092070 : mword 21) b lks
-                Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg
+                Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
       iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       (* +0xb2 c.j +0x28 -- into the shared epilogue *)
@@ -2645,6 +2654,7 @@ Section ProofSysPipe.
               (av - 8)%nat 0%nat eb p C b lks
               Hav52 HC7a0 HC7a1 HC7a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hbuflo").
+    all: try lkbelow.
     iIntros (CID76 Hcr76 D0 Pb) "Hcg Hcpu Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".
     iEval (rewrite HC7a3) in "Hbuflo".
     iDestruct (word4_pointsto_intro _ _ _ Hallo with "Hbuflo") as "Hlo".

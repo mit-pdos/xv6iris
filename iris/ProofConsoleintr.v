@@ -769,6 +769,7 @@ Section ProofConsoleintr.
               ltac:(unfold consoleintr_stack in HK; lia)
               ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia) Hbelow_proc
               with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hcnt _ Hpc". rgall.
     iEval (rewrite HW4ra) in "Hpc".
     assert (Hp16a : ret_pc (add_vec_int (mword_of_int (CT + 0x166) : mword 64) 4)
@@ -918,11 +919,15 @@ Section ProofConsoleintr.
     (consoleintr_stack <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
+    (* the entry [cpu_own] is at the plain [lks] -- consputc's own [uart]
+       premise is reached by [lkbelow] pushing this across the [cons]
+       singleton [ct_kill_prop]'s continuation adds. *)
+    locks_below lks (lock_rank "cons") ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     ct_kill_prop (CID0 := CID) γc pme m0 K lvl eb C b sp0 lks.
   Proof.
-    intros HK Hlvl Hb. subst b.
+    intros HK Hlvl Hb Hbelow. subst b.
     iIntros "#Ht #Hpanic #Hdev #Htxl #Hsub".
     rewrite /ct_kill_prop.
     iLöb as "IH".
@@ -1102,6 +1107,7 @@ Section ProofConsoleintr.
               [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HL6ra) in "Hpc".
     assert (Hp0d2 : ret_pc (add_vec_int (mword_of_int (CT + 0xce) : mword 64) 4)
@@ -1215,6 +1221,9 @@ Section ProofConsoleintr.
     (consoleintr_stack <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
+    (* same "cons" bound as the sibling arms: this one reaches consputc,
+       whose cone runs up to "uart" (15). *)
+    locks_below lks (lock_rank "cons") ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
@@ -1228,7 +1237,7 @@ Section ProofConsoleintr.
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb C b sp0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hcs HK Hlvl Hchain.
+    intros Hsp Hcs HK Hlvl Hchain Hbelow.
     iIntros "#Ht #Hpanic #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest WAKE EXIT".
     iPoseProof (cnti_12e with "Ht") as "Hi12e".
     iPoseProof (cnti_130 with "Ht") as "Hi130".
@@ -1268,6 +1277,7 @@ Section ProofConsoleintr.
               (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HD2ra) in "Hpc".
     assert (Hp134 : ret_pc (add_vec_int (mword_of_int (CT + 0x130) : mword 64) 4)
@@ -1457,6 +1467,9 @@ Section ProofConsoleintr.
     (consoleintr_stack <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (b = false \/ pme = zero_reg -> (CIDq : CPU) = (CID : CPU)) ->
+    (* same "cons" bound as the sibling arms: the backspace path also
+       reaches consputc, whose cone runs up to "uart" (15). *)
+    locks_below lks (lock_rank "cons") ->
     kernel_text -∗ panic_wp_any -∗
     dev_inv γu γv -∗ is_txlock γtx γu -∗ uart_sent_sub γu [] -∗
     sie_cap_gpr M (trap_res b + (K - 6))%nat false pme -∗
@@ -1469,7 +1482,7 @@ Section ProofConsoleintr.
     ct_exit_prop (CID0 := CID) γc pme m0 K lvl eb C b sp0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp Hcs HK Hlvl Hchain.
+    intros Hsp Hcs HK Hlvl Hchain Hbelow.
     iIntros "#Ht #Hpanic #Hdev #Htxl #Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT".
     iPoseProof (cnti_0f0 with "Ht") as "Hi0f0".
     iPoseProof (cnti_0f4 with "Ht") as "Hi0f4".
@@ -1626,6 +1639,7 @@ Section ProofConsoleintr.
               (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HB8ra) in "Hpc".
     assert (Hp12c : ret_pc (add_vec_int (mword_of_int (CT + 0x128) : mword 64) 4)
@@ -1946,6 +1960,7 @@ Section ProofConsoleintr.
               (trap_res b + (K - 6))%nat [] (S lvl) eb C false pme ({[lock_rank "cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HF2ra) in "Hpc".
     assert (Hp054 : ret_pc (add_vec_int (mword_of_int (CT + 0x50) : mword 64) 4)
@@ -2521,7 +2536,7 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x12e)) by pcw.
       iEval (rewrite Hj12e) in "Hpc".
       iApply (ct_cr (CIDq := CIDq) γtx γc γu γv pme m0 G7 K lvl eb C b sp0 lks
-                HG7sp (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain
+                HG7sp (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
                 with "Ht Hpanic Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest
                       WAKE EXIT"). }
     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x4a)) (mword_of_int 228 : mword 13)
@@ -2722,7 +2737,7 @@ Section ProofConsoleintr.
     { iApply (ct_mk_wake γc γs pme m K lvl eb C b sp0 lks HK Hlen Hlvl Hbm Hbelow
                 with "Ht Hpanic Hpinv"). }
     iAssert (ct_kill_prop (CID0 := CID) γc pme m K lvl eb C b sp0 lks) as "KILL".
-    { iApply (ct_mk_kill γtx γc γu γv pme m K lvl eb C b sp0 lks HK Hlvl Hbm
+    { iApply (ct_mk_kill γtx γc γu γv pme m K lvl eb C b sp0 lks HK Hlvl Hbm Hbelow
                 with "Ht Hpanic Hdev Htxl Hsub"). }
     (* ---- +0x014 acquire(&cons.lock) ---- *)
     iDestruct (cpu_own_transport CID CIDp9 lvl eb pme C b ltac:(wp_next_chain)
@@ -2730,6 +2745,7 @@ Section ProofConsoleintr.
     iApply (Acquire.wp_acquire_sconf γc "cons"%string cons_res P5 lvl eb pme C
               (K - 6)%nat b lks ltac:(lia) ltac:(unfold consoleintr_stack in HK; lia) Hbelow
               with "Hcg Hcnt Ht Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HP5a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
     iEval (rewrite HP5ra) in "Hpc".
@@ -2825,7 +2841,7 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0xf0)) by pcw.
       iEval (rewrite Hj0f0) in "Hpc".
       iApply (ct_bs (CIDq := CIDaq) γtx γc γu γv pme m S2 K lvl eb C b sp0 lks
-                HS2sp HS2cs HK Hlvl Hchain
+                HS2sp HS2cs HK Hlvl Hchain Hbelow
                 with "Ht Hpanic Hdev Htxl Hsub Hcg Hpc Hcnt Hpay Hlocked Hres Hrest EXIT"). }
     iApply (wp_beq_fall_s_sconf (mword_of_int (CT + 0x22)) (mword_of_int 206 : mword 13)
               Ra5 Rs1 S2 (trap_res b + (K - 6))%nat false ltac:(nz) ltac:(nz)

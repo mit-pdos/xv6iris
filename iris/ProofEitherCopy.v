@@ -413,7 +413,7 @@ Section ProofEitherCopyout.
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
-    intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl.
+    intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl Hlkbelow.
     unfold either_copyout_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -884,6 +884,7 @@ Section ProofEitherCopyout.
                 (av - 6)%nat lvl eb p C b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
+      all: try lkbelow.
       iIntros (CID21 Hs21 mr P') "Hcg Hcpu Hpc Hpt Hsrc %Hcsr %Hext %Hret".
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x2c))
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).
@@ -1123,12 +1124,12 @@ Section ProofEitherCopyin.
   Lemma wp_either_copyin_sconf (γa : gname) (γf : gname)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-      (src_bytes dst_olds : nat -> bv 8) (b : bool)
+      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset nat)
     : wp_either_copyin_sconf_body γa γf m av lvl eb p C pid V user len
-        src_bytes dst_olds b.
+        src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
-    intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl.
+    intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl Hlkbelow.
     unfold either_copyin_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -1397,7 +1398,7 @@ Section ProofEitherCopyin.
        of an ordinary leaf's own footprint), so it is still anchored at the
        ENTRY hart -- re-anchor it at [CID13] before crossing into myproc. *)
     iDestruct (cpu_own_transport CID CID13 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p C b
+    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p C b _
               Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID14 Hs14 ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -1590,8 +1591,9 @@ Section ProofEitherCopyin.
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Copyin.wp_copyin_sconf γa U5 (pv_upt V) (pv_sz V) len dst_olds
                 (av - 6)%nat lvl eb p C b
-                HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
+                _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
+      all: try lkbelow.
       iIntros (CID21 Hs21 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hdst %Hcsr %Hext %Hret".
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyin + 0x2c))
         by (rewrite HU5ra; apply bv_eq; vm_compute; reflexivity).

@@ -382,6 +382,10 @@ Definition wp_itrunc_sconf_body
   γs !! j = Some γl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* itrunc's cone: bfree ("log", 3), bread/brelse ("bcache", 4) on the
+     indirect arm, and its closing iupdate ("log", 3) -- "log" is the
+     lowest, so one premise there covers the whole cone. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  itrunc itself never
@@ -551,6 +555,10 @@ Definition wp_itrunc_gen_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* itrunc's cone: bfree ("log", 3), bread/brelse ("bcache", 4) on the
+     indirect arm, and its closing iupdate ("log", 3) -- "log" is the
+     lowest, so one premise there covers the whole cone. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗

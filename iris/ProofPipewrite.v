@@ -1068,7 +1068,14 @@ Section ProofPipewrite.
     : wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b lks.
   Proof.
     cbv beta delta [wp_pipewrite_sconf_body].
-    intros pcE pj pi ret_tgt Hj Hjlp Hlen Ha2 Hnrange Hav Heb. subst eb.
+    intros pcE pj pi ret_tgt Hj Hjlp Hlen Ha2 Hnrange Hav Heb Hbelow. subst eb.
+    (* every callee that wants "proc" (wakeup / killed / sleep_prepare /
+       sleep) is reached with the held set still at [lks] (the entry set --
+       see claude-notes/projects/lock-set.md's note on this function's
+       region-crossing threading), so this one lift covers all of them. *)
+    assert (Hbelowproc : locks_below lks (lock_rank "proc"))
+      by (apply (locks_below_mono lks (lock_rank "pipe") (lock_rank "proc") Hbelow);
+          vm_compute; lia).
     assert (Hav64 : (64 <= av)%nat) by (unfold pipewrite_stack in Hav; exact Hav).
     assert (H31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
     assert (H63 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
@@ -1079,6 +1086,11 @@ Section ProofPipewrite.
     assert (Hn31 : (n < 2 ^ 31)%Z) by (destruct Hnrange as [_ HB]; exact HB).
     assert (Hn31L : (n < 2147483648)%Z) by (rewrite H31 in Hn31; exact Hn31).
     iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hpanic Hcont".
+    (* pipewrite's contract pins depth 0, so the held set is FORCED empty.
+       Keep the equation rather than substituting it: the script still names
+       [lks] in a dozen argument lists, and the interrupts-on arms hand back
+       a [cpu_own] whose set is the literal [∅] the SIE seam reconstructs. *)
+    iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
     assert (Hbt : b = true) by (symmetry; exact Hbm).
     clear Hbm. subst b.
@@ -1313,6 +1325,7 @@ Section ProofPipewrite.
           rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_ne; [| reg_neq].
           rewrite /E1 upd_ne; [| reg_neq]. exact B11. }
       iSpecialize ("Hcont" $! CIDp15 with "[%]"); [wp_next_chain|].
+      iEval (rewrite Hlkempty) in "Hcont".
       iApply ("Hcont" $! E9 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv").
       - exact HcsE9.
       - exact Hext.
@@ -1352,9 +1365,10 @@ Section ProofPipewrite.
         assert (HwK : (18 <= trap_res true + (av - 14))%nat) by lia.
         assert (HwdomW : forall r : regidx, r ∈ dom (rf_to_gmap T2)) by (intro r; apply rf_to_gmap_dom).
         assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
-        iApply (Wakeup.wp_wakeup_sconf T2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false
-                  HwK HwdomW Hlen Hwlvl
+        iApply (Wakeup.wp_wakeup_sconf T2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false lks
+                  HwK HwdomW Hlen Hwlvl Hbelowproc
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
+        all: try lkbelow.
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
         assert (HraT2 : T2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x10c) : mword 64) 4)
           by (rewrite /T2; apply upd_eq).
@@ -1730,7 +1744,7 @@ Section ProofPipewrite.
     assert (Hav10 : (10 <= av - 14)%nat) by lia.
     iDestruct (cpu_own_transport CID CIDp30 0 true pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Myproc.wp_myproc_sconf A5 (av - 14)%nat 0%nat true pj C true
+    iApply (Myproc.wp_myproc_sconf A5 (av - 14)%nat 0%nat true pj C true _
               Hlvl0 Hav10 with "Hcg Hown Htext Hpc").
     iIntros (CIDmp Hsmp ms M0) "%Hms Hcg Hown Hpc %HcsM0". rgall.
     destruct HcsM0 as [HcsM0 Ha0M0].
@@ -1788,9 +1802,10 @@ Section ProofPipewrite.
     iDestruct (cpu_own_transport CIDmp CIDp33 0 true pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (AcquireGen.wp_acquire_gen_sconf γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
-              (pipe_dead γl γp) B3 0%nat true pj C (av - 14)%nat true Hlvl0 Hav10
+              (pipe_dead γl γp) B3 0%nat true pj C (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
               ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
               with "Hcg Hown Htext Hpc [] Href Hpanic").
+    all: try lkbelow.
     { rgall. iEval (rewrite Ha0B3). iExact "Hopen". }
     iIntros (CIDaq Hsaq ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres Hown Hpay". rgall.
     iEval (rewrite HraB3) in "Hpc".
@@ -2167,8 +2182,9 @@ Section ProofPipewrite.
           assert (Hlvl1 : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
           assert (Hav14 : (14 <= trap_res true + (av - 14))%nat) by lia.
           iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false
-                    Ha0L3 Hj Hjlp Hlvl1 Hav14
+                    Ha0L3 Hj Hjlp Hlvl1 Hav14 Hbelowproc
                     with "Hcg Hown Htext Hpc Hpinv Hpanic").
+          all: try lkbelow.
           iApply wp_next_off_intro. iIntros (K0 kl) "%Hkfacts Hcg Hown Hpc". rgall.
           destruct Hkfacts as [Hkcs Hka0].
           assert (HraL3 : L3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x94) : mword 64) 4)
@@ -2323,9 +2339,10 @@ Section ProofPipewrite.
               assert (HwK : (18 <= trap_res true + (av - 14))%nat) by lia.
               assert (HwdomF : forall r : regidx, r ∈ dom (rf_to_gmap F2)) by (intro r; apply rf_to_gmap_dom).
               assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
-              iApply (Wakeup.wp_wakeup_sconf F2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false
-                        HwK HwdomF Hlen Hwlvl
+              iApply (Wakeup.wp_wakeup_sconf F2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false lks
+                        HwK HwdomF Hlen Hwlvl Hbelowproc
                         with "Hcg Hown Htext Hpc Hpanic Hpinv").
+              all: try lkbelow.
               iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
               assert (HraF2 : F2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x6e) : mword 64) 4)
                 by (rewrite /F2; apply upd_eq).
@@ -2400,8 +2417,9 @@ Section ProofPipewrite.
                 apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
               iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp G2
                         (trap_res true + (av - 14))%nat 1%nat true C false
-                        Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14
+                        Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14 Hbelowproc
                         with "Hcg Hown Htext Hpc Hpinv Hpanic").
+              all: try lkbelow.
               iApply wp_next_off_intro. iIntros (Msp) "%Hspcs Hcg Hown Hpc". rgall.
               iEval (rewrite HraG2) in "Hpc".
               assert (Hpp78 : ret_pc (add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x74) : mword 64) 4)
@@ -2477,8 +2495,9 @@ Section ProofPipewrite.
                  [cpu_claim_ext true pj = emp] -- sleep's own acquire mints the
                  pair out of the enabled SIE arm. *)
               iApply (Sleep.wp_sleep_sconf γs j γlp G5 (av - 14)%nat true C
-                        Hj Hjlp ltac:(lia)
+                        Hj Hjlp ltac:(lia) Hbelowproc
                         with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").
+              all: try lkbelow.
               { rewrite /trap_csrs_ext. done. }
               { rewrite /cpu_claim_ext. done. }
               iIntros (CIDsl0 Hssl0 Msl) "%Hslcs Hcg Hown Hpc _ _". rgall.
@@ -2522,9 +2541,10 @@ Section ProofPipewrite.
               iDestruct (cpu_own_transport CIDsl0 CIDp52 0 true pj C true ltac:(wp_next_chain)
                            with "Hown") as "Hown".
               iApply (AcquireGen.wp_acquire_gen_sconf γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
-                        (pipe_dead γl γp) G7 0%nat true pj C (av - 14)%nat true Hlvl0 Hav10
+                        (pipe_dead γl γp) G7 0%nat true pj C (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
                         with "Hcg Hown Htext Hpc [] Href Hpanic").
+              all: try lkbelow.
               { rgall. iEval (rewrite Ha0G7). iExact "Hopen". }
               iIntros (CIDsl Hssl ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres Hown Hpay". rgall.
               iEval (rewrite HraG7) in "Hpc".
@@ -2669,6 +2689,7 @@ Section ProofPipewrite.
                         (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) C false
                         HK50 Ha0N5 Ha1N5 Ha4N5 Hlen1 Hszb Hlvl1
                         with "Hcg Hown Htext Hpc Hpt Henv Hbuf").
+              all: try lkbelow.
               iApply wp_next_off_intro. iIntros (mr P' dst_new) "Hcg Hown Hpc Hpt Hbuf %Hcsr %Hextr %Hret". rgall.
               assert (HraN5 : N5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0xba) : mword 64) 4)
                 by (rewrite /N5; apply upd_eq).

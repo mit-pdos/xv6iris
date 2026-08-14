@@ -690,6 +690,7 @@ Section VdrwfP6.
     iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme C va vl vf vn false
               Hav Hi8 HN7a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14".
     destruct Hf as (Hcs & _).
     assert (Hret : ret_pc (N7 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x20c))

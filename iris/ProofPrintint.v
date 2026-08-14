@@ -659,6 +659,7 @@ Section ProofPrintint.
     (j < 24)%nat ->
     mp !!! Regidx s1_idx = pa_add buf j ->
     mp !!! Regidx s2_idx = add_vec buf (mword_of_int (-1) : mword 64) ->
+    locks_below lks (lock_rank "uart") ->
     sie_cap_gpr mp (K - 8)%nat b pcur -∗
     cpu_own n eb pcur C b lks -∗
     kernel_text -∗
@@ -688,7 +689,7 @@ Section ProofPrintint.
        cases are left as the bullets below. Every step is single-goal: the
        loaded byte is put into the leaf's address form BEFORE the [iApply]
        (rather than framed in a bracket), which is what keeps it that way. *)
-    induction j as [|j' IH]; intros CID0 bs mp Hj24 Hs1 Hs2;
+    induction j as [|j' IH]; intros CID0 bs mp Hj24 Hs1 Hs2 Hlkbelow;
       iIntros "Hcg Hcnt #Htext Hpc Hbuf #Hpanic #Hdev #Htxl #Hsent Hcont";
       iPoseProof (pii_74 with "Htext") as "Hi74";
       iPoseProof (pii_78 with "Htext") as "Hi78";
@@ -722,7 +723,7 @@ Section ProofPrintint.
         by (apply bv_eq; vm_compute; reflexivity);
       iEval (rewrite Htgtc) in "Hpc";
       iDestruct (cpu_own_transport CID0 CIDj1 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt";
-      iApply (wp_consputc (CID0 := CIDj1) γl γd γv P2 (K - 8)%nat bs n eb C b pcur lks HK16 Hn31
+      iApply (wp_consputc (CID0 := CIDj1) γl γd γv P2 (K - 8)%nat bs n eb C b pcur lks HK16 Hn31 Hlkbelow
                 with "Hcg Hcnt Htext Hpc Hpanic Hdev Htxl Hsent");
       iIntros (CIDcp Hscp mc cs) "Hcg Hcnt Hpc %Hcs #Hsent2";
       destruct Hcs as [Hcs Hra];
@@ -792,7 +793,7 @@ Section ProofPrintint.
       iDestruct (cpu_own_transport CIDcp CIDbn n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (IH CIDbn (bs ++ cs)%list P3 ltac:(lia)
                 ltac:(rewrite HP3s1; apply pa_add_back1; reflexivity)
-                HP3s2
+                HP3s2 Hlkbelow
                 with "Hcg Hcnt Htext Hpc Hbuf Hpanic Hdev Htxl Hsent2").
       iIntros (CIDf Hsf mf cs2) "%Hk2 Hcg Hcnt Hpc Hbuf #Hsent3".
       iEval (rewrite -app_assoc) in "Hsent3".
@@ -824,6 +825,7 @@ Section ProofPrintint.
     is_aligned_paddr (Physaddr (pa_stk sp0 7)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 6)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 5)) 8 = true ->
+    locks_below lks (lock_rank "uart") ->
     sie_cap_gpr mt (K - 8)%nat b pcur -∗
     cpu_own n eb pcur C b lks -∗
     kernel_text -∗
@@ -846,7 +848,7 @@ Section ProofPrintint.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spd buf HK Hn31 Hn1 Hn22 Ha4 Hsp Hs2 Hkept Hal7 Hal6 Hal5.
+    intros sp0 spd buf HK Hn31 Hn1 Hn22 Ha4 Hsp Hs2 Hkept Hal7 Hal6 Hal5 Hlkbelow.
     iIntros "Hcg Hcnt #Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hpanic #Hdev #Htxl #Hsent Hcont".
     iPoseProof (pii_5c with "Htext") as "Hi5c".
     iPoseProof (pii_60 with "Htext") as "Hi60".
@@ -985,7 +987,7 @@ Section ProofPrintint.
        the very end once the epilogue has run. *)
     iDestruct (cpu_own_transport CID0 CIDsu n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint_ploop γl γd γv K buf n eb C b pcur lks HK Hn31 (nd - 1)%nat CIDsu bs T7
-              ltac:(lia) HT7s1 HT7s2
+              ltac:(lia) HT7s1 HT7s2 Hlkbelow
               with "Hcg Hcnt Htext Hpc Hbuf Hpanic Hdev Htxl Hsent").
     iIntros (CIDpl Hspl mf cs) "%Hk Hcg Hcnt Hpc Hbuf #Hsent2".
     (* +0x82 ld s1,40(sp) : undo the lazy save *)
@@ -1057,6 +1059,7 @@ Section ProofPrintint.
     is_aligned_paddr (Physaddr (pa_stk sp0 7)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 6)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 5)) 8 = true ->
+    locks_below lks (lock_rank "uart") ->
     sie_cap_gpr mq (K - 8)%nat b pcur -∗
     cpu_own n eb pcur C b lks -∗
     kernel_text -∗
@@ -1080,7 +1083,7 @@ Section ProofPrintint.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 spd buf HK Hn31 Hbase Ha0 Hsp Hs0 Hkept Hal7 Hal6 Hal5.
+    intros sp0 spd buf HK Hn31 Hbase Ha0 Hsp Hs0 Hkept Hal7 Hal6 Hal5 Hlkbelow.
     iIntros "Hcg Hcnt #Htext #Hdig Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hpanic #Hdev #Htxl #Hsent Hcont".
     iPoseProof (pii_12 with "Htext") as "Hi12".
     iPoseProof (pii_16 with "Htext") as "Hi16".
@@ -1218,7 +1221,7 @@ Section ProofPrintint.
       iDestruct (wp_next_shift HshiftA with "Hcont") as "Hcont".
       iDestruct (cpu_own_transport CID0 CIDtk n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (wp_printint_tail (CID0 := CIDtk) γl γd γv m mf K i' bs n eb C b pcur lks HK Hn31
-                Hi1 ltac:(lia) Hf4 Hmfsp Hmfs2 Hmfcs Hal7 Hal6 Hal5
+                Hi1 ltac:(lia) Hf4 Hmfsp Hmfs2 Hmfcs Hal7 Hal6 Hal5 Hlkbelow
                 with "Hcg Hcnt Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanic Hdev Htxl Hsent Hcont").
     - (* a sign digit: buf[i'] = '-' , then the tail with n = i'+1 *)
       iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x44)) (mword_of_int 24 : mword 13)
@@ -1319,7 +1322,7 @@ Section ProofPrintint.
                       rewrite /S2 upd_ne; [| reg_neq]; rewrite /S1 upd_ne; [exact Hmfsp | reg_neq])
                 ltac:(rewrite /S4 upd_ne; [| reg_neq]; rewrite /S3 upd_ne; [| reg_neq];
                       rewrite /S2 upd_ne; [| reg_neq]; rewrite /S1 upd_ne; [exact Hmfs2 | reg_neq])
-                HS4cs Hal7 Hal6 Hal5
+                HS4cs Hal7 Hal6 Hal5 Hlkbelow
                 with "Hcg Hcnt Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanic Hdev Htxl Hsent Hcont").
   Qed.
 
@@ -1364,7 +1367,7 @@ Section ProofPrintint.
     : wp_printint_sconf_body γl γd γv m K bs n eb C b pcur lks.
   Proof.
     cbv beta delta [wp_printint_sconf_body].
-    intros ra_i a1_i pcE ra0 ret_tgt HK Hbase Hn31.
+    intros ra_i a1_i pcE ra0 ret_tgt HK Hbase Hn31 Hlkbelow.
     pose proof (pi_cap_bounds K HK) as (HK8 & HK16).
     assert (HK24 : (24 <= K)%nat) by (unfold printint_stack in HK; lia).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hdev #Htxl #Hsent Hcont".
@@ -1491,7 +1494,7 @@ Section ProofPrintint.
                 ltac:(intros c Hc Nsp N8 N18;
                       pose proof (is_cs_idx_true_neq t1_idx c ltac:(vm_compute; reflexivity) Hc) as Nt1;
                       rewrite /N1 upd_ne; [ exact (HW2cs c Hc Nsp N8 N18) | congruence ])
-                Hal7 Hal6 Hal5
+                Hal7 Hal6 Hal5 Hlkbelow
                 with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hpanic Hdev Htxl Hsent Hcont").
     - (* sign != 0: test the value *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x0a)) (mword_of_int 3 : mword 8)
@@ -1553,7 +1556,7 @@ Section ProofPrintint.
                         pose proof (is_cs_idx_true_neq a0_idx c ltac:(vm_compute; reflexivity) Hc) as Na0;
                         rewrite /G2 upd_ne; [| congruence];
                         rewrite /G1 upd_ne; [ exact (HW2cs c Hc Nsp N8 N18) | congruence ])
-                  Hal7 Hal6 Hal5
+                  Hal7 Hal6 Hal5 Hlkbelow
                   with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hpanic Hdev Htxl Hsent Hcont").
       + (* xx >= 0: the same [t1 := 0] path as the sign==0 case *)
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x0c)) (mword_of_int 130 : mword 13)
@@ -1582,7 +1585,7 @@ Section ProofPrintint.
                   ltac:(intros c Hc Nsp N8 N18;
                         pose proof (is_cs_idx_true_neq t1_idx c ltac:(vm_compute; reflexivity) Hc) as Nt1;
                         rewrite /N1 upd_ne; [ exact (HW2cs c Hc Nsp N8 N18) | congruence ])
-                  Hal7 Hal6 Hal5
+                  Hal7 Hal6 Hal5 Hlkbelow
                   with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hpanic Hdev Htxl Hsent Hcont").
   Qed.
 

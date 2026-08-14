@@ -241,6 +241,10 @@ Section SpecFreeproc.
        increment in int range *)
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     mm !!! Regidx (mword_of_int 10 : mword 5) = pa ->
+    (* freeproc's own kfree(trapframe) is direct, at "kmem"(13); the
+       proc_freepagetable arm's own callees carry no order premise of their
+       own yet, so this is the whole cone this contract needs to state. *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr mm K false pme -∗
     cpu_own ilvl eb pme C false lks -∗
     kernel_text -∗

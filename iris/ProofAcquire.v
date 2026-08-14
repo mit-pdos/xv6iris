@@ -844,6 +844,7 @@ Section OfGen.
     iApply (G.wp_acquire_gen_sconf γl s R emp%I False%I m n eb p C av b lks
               Hpos Hav Hbelow (lock_refute_False _) (fun i => lock_refute_False _)
               with "Hcg Hown Htext Hpc [] [] Hpanic").
+    all: try lkbelow.
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
     iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hown Hpay".

@@ -152,6 +152,10 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
   (K_kwait <= av)%nat ->
   (* the PARKING premise: everything that sleeps needs it (SpecSched.v) *)
   eb = true ->
+  (* kwait acquires wait_lock (10) and, nested under it, each pp->lock ("proc",
+     11); freeproc/either_copyout reach "kmem" (13).  10 is the floor, and the
+     nested acquires follow by [locks_below_union_singleton]/[locks_below_mono]. *)
+  locks_below lks (lock_rank "wait_lock") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗

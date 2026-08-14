@@ -91,6 +91,9 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
+  (* piperead acquires the pipe lock (7); killed/sleep_prepare/sleep/wakeup all
+     sit at "proc" (11), strictly higher, so this ONE premise covers the cone. *)
+  locks_below lks (lock_rank "pipe") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗

@@ -395,7 +395,7 @@ Section ProofDirlookupMain.
   Proof.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
-           Hinums Hj Hgs Ha0 Hposs Heb.
+           Hinums Hj Hgs Ha0 Hposs Heb Hbelow.
     pose proof HK as HK'. unfold K_dirlookup in HK'.
     (* readi's contract has its OWN [let pj := proc_addr j], so everything it
        hands back is phrased at [proc_addr j] while ours is phrased at the
@@ -1533,8 +1533,11 @@ Section ProofDirlookupMain.
                   Hj Hgs HL6a0
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
+                  ltac:(exact (locks_below_mono lks (lock_rank "itable")
+                                 (lock_rank "bcache") Hbelow ltac:(vm_compute; lia)))
                   with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
+        all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
         iIntros (CIDrd Hsrd mrd tot P')
@@ -1936,7 +1939,9 @@ Section ProofDirlookupMain.
                       ltac:(unfold K_iget; lia)
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
+                      Hbelow
                       with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hislot").
+            all: try lkbelow.
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href".
             destruct Higp as (Hcsig & Hkslot & Higa0).
             assert (Higregs : dlk_regs m sp0 ip nb pf (16 * i) mig)

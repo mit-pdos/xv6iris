@@ -437,7 +437,7 @@ Section UtEntry.
       by (rewrite /M7 upd_ne; [exact HM6sp | reg_neq]).
     assert (HM7ra : M7 !!! Regidx Rra = mword_of_int (UT + 0x26))
       by (rewrite /M7 upd_eq; pcw).
-    iApply (MP.wp_myproc_sconf M7 (av - 4)%nat 0%nat false (un_pj N) C false
+    iApply (MP.wp_myproc_sconf M7 (av - 4)%nat 0%nat false (un_pj N) C false _
               ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
     iApply wp_next_off_intro.
@@ -820,6 +820,7 @@ Section UtDispatch.
                 Hlen ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                 ltac:(unfold devintr_stack; lia)
                 with "Hcg Hcpu Htext Hpc Hsc Hdc [-]").
+      all: try lkbelow.
       iIntros (mg) "[%Hcsg %Hga0] Hcg Hcpu Hsc Hpc".
       assert (Hret3e : ret_pc (D3 !!! Regidx Rra) = mword_of_int (UT + 0x3e))
         by (rewrite HD3ra; pcw).

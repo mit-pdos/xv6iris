@@ -46,6 +46,11 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
   (* the kvm chain runs on the ambient CPU: kalloc's push/pop addresses
      this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* walk allocates a fresh page-table node (via kalloc) whenever the
+     descent finds an empty slot; kalloc's own bound is "kmem" (13), and
+     nothing else in walk's cone touches a lock.  One premise covers the
+     whole cone. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗ cpu_own lvl eb p C b lks -∗
   kernel_text -∗
   pc_is (mword_of_int KernelSyms.walk) -∗

@@ -240,6 +240,7 @@ Section ProofReleasesleep.
               ltac:(lia)
               Hno
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
     iIntros (CIDacq Hsacq ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hown Hpay".
     assert (Hpc18 : ret_pc (Kacq !!! Regidx (mword_of_int 1 : mword 5))
@@ -313,7 +314,14 @@ Section ProofReleasesleep.
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
               ltac:(lia)
+              (* wakeup wants "proc" (11); the held set just gained "sleep
+                 lock" (6), which is still strictly below it. *)
+              (locks_below_union_singleton lks (lock_rank "sleep lock"%string) (lock_rank "proc"%string)
+                 ltac:(vm_compute; lia)
+                 (locks_below_mono lks (lock_rank "sleep lock"%string) (lock_rank "proc"%string) Hno
+                    ltac:(vm_compute; lia)))
               with "Hcg Hown Htext Hpc Hpanic Hpinv").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hown Htext2 Hpc".
     assert (Hpc26 : ret_pc (Cwk !!! Regidx (mword_of_int 1 : mword 5))

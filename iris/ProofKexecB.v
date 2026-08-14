@@ -495,13 +495,14 @@ Section KexecBBody.
       by (rewrite /tfp /tfr; apply page_base_of_valid; exact Hpvtf).
     assert (Htfpeq : tfp = ud_tfp (pv_upt V)).
     { apply kxc_page_base_inj. rewrite Hbasetf. reflexivity. }
-    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true lks
+    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PPT.wp_proc_pagetable_core ga G2 tfr (DfracOwn (1/4)) 0%nat
               (K - 68)%nat true (proc_addr jp) C None true
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)
               with "Hcg Hcnt Htext Hpc [Htfc] Hka").
+    all: try lkbelow.
     { iEval (rewrite HG2a0). iExact "Htfc". }
     iIntros (CID4 Hsq4 mr) "Hcg Hcnt Hpc Htfc Hppt %Hcspt".
     iEval (rewrite HG2a0) in "Htfc".
@@ -790,7 +791,7 @@ Section KexecBBody.
         iIntros (CID15 Hsq15). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt1a2) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-        iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) C true lks
+        iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
         iApply ("Hcont1a2" $! G4 ef P v67).
@@ -1049,7 +1050,7 @@ Section KexecBBody.
         iIntros (CID24 Hsq24). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt12c) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-        iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) C true lks
+        iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iApply ("Hcont12c" $! G11 ef P).
@@ -1174,7 +1175,7 @@ Section KexecBBody.
       iIntros (CID8 Hsq8). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-      iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) C true lks
+      iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) C true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hkeep)".

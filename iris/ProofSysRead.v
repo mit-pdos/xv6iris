@@ -341,6 +341,10 @@ Section ProofSysRead.
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* PIN THE INDEX.  [eb = true] plus [cpu_own_eb_agree] at level 0 makes
        [b] the literal [true], which is what lets argaddr's, argint's and
        argfd's [wp_next b] crossings meet fileread's and this contract's
@@ -919,6 +923,7 @@ Section ProofSysRead.
                 _ ltac:(unfold fileread_stack, K_readi; lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 Hn0 Hnmax Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
+      all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".
       iDestruct ("Hfback" with "Hfout") as "[Henv Hdev]".

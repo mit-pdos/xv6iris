@@ -118,6 +118,8 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (fetchstr_stack <= av)%nat ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int (Z.of_nat maxn) : mword 64) ->
   (Z.of_nat maxn < 2 ^ 31)%Z ->
+  (* fetchstr -> copyinstr -> walkaddr -> walk *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

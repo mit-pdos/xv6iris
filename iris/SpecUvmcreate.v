@@ -65,6 +65,9 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   (18 <= K)%nat ->
   (* kalloc's push/pop addresses this cpu's cells through tp *)
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* uvmcreate's one callee is kalloc, whose bound is at "kmem" (13);
+     nothing else in its cone touches a lock.  One premise covers it. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.uvmcreate) -∗

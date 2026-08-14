@@ -510,6 +510,7 @@ Section ProofUartPutc.
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p C (K - 4)%nat b lks
               Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HG14a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hret14 : ret_pc (G14 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x18))

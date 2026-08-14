@@ -610,6 +610,10 @@ Section BreadBlocks.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
     iIntros "Hcg #Htext Hpc #Hpanic #Hesc Hframe Hcnt Hextc Hextm #Hprocs Hppid".
     iIntros "#Hdev #Hgeom #Hdlock Hstok Hpid Hbown Hbref Hcont".
+    (* the tail runs at depth 0 -- bread's own acquire/release around the
+       buffer table is already behind it -- so the held set is forced empty
+       and the rw call's order premise needs no hypothesis of its own. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hbref" as "(Hrtok & Hrdev & Hrbno)".
     iPoseProof (bdi_b4 with "Htext") as "Hib4".
     iPoseProof (bdi_b6 with "Htext") as "Hib6".
@@ -802,6 +806,7 @@ Section BreadBlocks.
                 HKrw Hbno Hkdata Hj Hgl
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprocs
                       Hdev Hgeom Hdlock [Hbuf] Hdb []").
+      all: try lkbelow.
       { iEval (rewrite HT4a0). rewrite /bpa. iExact "Hbuf". }
       (* bread's rw call is a READ: no disk byte moves, so the identity
          permit at the trivial receipt is the honest one.  Permits are
@@ -1155,6 +1160,7 @@ Section BreadBlocks.
               (locks_below_mono lks (lock_rank "bcache") (lock_rank "sleep lock") Hbelow
                  ltac:(vm_compute; lia))
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
+    all: try lkbelow.
     { iEval (rewrite HH7a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDs], handing the complement
        back too. *)
@@ -1527,6 +1533,7 @@ Section BreadBlocks.
               (locks_below_mono lks (lock_rank "bcache") (lock_rank "sleep lock") Hbelow
                  ltac:(vm_compute; lia))
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
+    all: try lkbelow.
     { iEval (rewrite HC6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDs], handing the complement
        back too. *)
@@ -2709,6 +2716,7 @@ Section ProofBread.
               ltac:(vm_compute; reflexivity) ltac:(unfold K_bread in HK; lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     (* acquire returns with interrupts OFF, so the whole bget interior below
        runs at the literal [false] index and the hart is pinned at [CIDq].

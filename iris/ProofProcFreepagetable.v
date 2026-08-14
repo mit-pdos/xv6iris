@@ -234,7 +234,7 @@ Section ProofProcFreepagetable.
     : wp_proc_freepagetable_sconf_body γa mm P K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_proc_freepagetable_sconf_body].
-    intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow.
+    intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
@@ -780,6 +780,7 @@ Section ProofProcFreepagetable.
               ltac:(rewrite HD2a1; exact Hbnd)
               ltac:(rewrite HD2a1; exact Hdom)
               with "Hcg Hcpu Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CID27 Hs27 mr3) "Hcg Hcpu Hpc %Hcs3".
     assert (Hret3a : ret_pc (D2 !!! Regidx Rra) = mword_of_int (KernelSyms.proc_freepagetable + 0x3a)).
     { rewrite HD2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

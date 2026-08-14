@@ -548,6 +548,9 @@ Section WriteHeadBlocks.
        f (4 * S i' + jj)%nat = nth_byte (W !!! i') jj) ->
     wh_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
+    (* wh_tail's own acquire (via brelse's unlink/splice) is at "bcache"
+       (rank 4); nothing below it is touched here. *)
+    locks_below lks (lock_rank "bcache") ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -576,7 +579,7 @@ Section WriteHeadBlocks.
     wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb C b lks Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
+    intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1 Hbelow.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
@@ -673,6 +676,7 @@ Section WriteHeadBlocks.
               _ HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm]").
+    all: try lkbelow.
     (* THE CALLER'S OWN PERMIT, at the header image this function assembled
        (phase C2b/D1 stage 3).  [Hbnou] is what makes the two spellings of
        the block number agree: the contract states the write's index at
@@ -778,8 +782,9 @@ Section WriteHeadBlocks.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat eb (proc_addr j) C
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
-              _ HKbl Hk HT4a0
+              _ HKbl Hk HT4a0 Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+    all: try lkbelow.
     iIntros (CID6 Hs6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hslot".
     assert (Hpc52 : ret_pc (T4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x52)).
     { rewrite HT4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1041,6 +1046,10 @@ Section WriteHeadBlocks.
     n = length W ->
     (n <= LOGBLOCKS)%nat ->
     (kk < NBUF)%nat ->
+    (* the loop itself acquires nothing; its exit falls into [wh_tail],
+       which wants "bcache" (rank 4) for brelse -- threaded through
+       unchanged since the loop body never nests a deeper acquire. *)
+    locks_below lks (lock_rank "bcache") ->
     forall (i : nat) (M : regfile) (f : nat -> bv 8),
     (i < n)%nat ->
     (n - i <= fuel)%nat ->
@@ -1082,7 +1091,7 @@ Section WriteHeadBlocks.
     wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K eb C b lks Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk.
+    intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hbelow.
     (* CID0 is GENERALIZED: the loop body crosses [wp_next]s, so the hart the
        back-edge re-enters at is not the one the block was entered at. *)
     iInduction fuel as [|fuel] "IH" forall (CID0);
@@ -1271,7 +1280,7 @@ Section WriteHeadBlocks.
                 dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K eb C b lks Q
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
-                HS3regs HS3s1
+                HS3regs HS3s1 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
@@ -1330,10 +1339,10 @@ Section ProofWriteHead.
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool) (lks : gset nat) (Q : iProp Σ)
     : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb C b lks Q.
+                               cov logstart dev n W L pidv dq m K eb C b Q lks.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hj Hgl Hbatch.
+    intros pcE pj ret_tgt HK Hgeom Hj Hgl Hbatch Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct Hbatch as [HnW HnB].
     unfold K_write_head in HK.
@@ -1602,10 +1611,11 @@ Section ProofWriteHead.
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
-              mA (K - 4)%nat eb C b
-              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1
+              mA (K - 4)%nat eb C b lks
+              HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot").
+    all: try lkbelow.
     iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x20)).
@@ -1766,7 +1776,7 @@ Section ProofWriteHead.
                 bsh bs0 bsd0 d0 f1 m B2 K eb C b lks Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
-                HB2regs HB2s1
+                HB2regs HB2s1 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
@@ -1929,7 +1939,7 @@ Section ProofWriteHead.
       iApply (wh_loop (CID0 := CID21)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 m K eb C b lks (S n') Q
-                HK Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1
+                HK Hbnolt Huint Hj Hgl HnW HnB HA Hbelow 0%nat B7 f1
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB7regs HB7s1 HB7a4 HB7a5 HB7a2

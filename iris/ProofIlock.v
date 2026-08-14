@@ -659,6 +659,10 @@ Section IlockLoad.
     bv_unsigned inum < 16 * Z.of_nat nib ->
     (j < NPROC)%nat ->
     gs !! j = Some gl ->
+    (* il_load reaches bread/brelse, whose bound is "bcache" (4); it is the
+       whole point of this helper (the fill arm), so it needs the premise
+       threaded on its own binder list just like [wp_ilock_sconf] itself. *)
+    locks_below lks (lock_rank "bcache") ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
@@ -693,7 +697,7 @@ Section IlockLoad.
             dev inum pidv dq dqs j m K eb C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl.
+    intros HK Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
     pose proof HK as HK'. unfold K_ilock in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
@@ -947,8 +951,10 @@ Section IlockLoad.
               (fs_view gfs gd dev cov) pidv dev bno dq
               L7 (K - 4)%nat eb C b
               _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
+              Hbelow
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
+    all: try lkbelow.
     iIntros (CID9 Hq9 mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc4e : ret_pc (L7 !!! Regidx Rra : mword 64)
@@ -1683,7 +1689,9 @@ Section IlockLoad.
               pidv dev bno dq H1 (K - 4)%nat eb (proc_addr j) C
               (diblk_bytes ds) bsd0 d0b b
               _ HKbl Hkk HH1a0
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
+    all: try lkbelow.
     iIntros (CID33 Hq33 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl".
     assert (Hpc94 : ret_pc (H1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x94)) by (rewrite HH1ra; pcw).
@@ -1938,7 +1946,7 @@ Section ProofIlockMain.
                           pidv dq dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_ilock_sconf_body].
-    intros pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0.
+    intros pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
     pose proof HK as HK'. unfold K_ilock in HK'.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
@@ -2188,9 +2196,14 @@ Section ProofIlockMain.
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  gs j gil gisl "inode"%string
-              (ic_tok cn k) R6 pidv (K - 4)%nat eb C b
+              (ic_tok cn k) R6 pidv (K - 4)%nat eb C b lks
               Hj ltac:(lia)
+              (* acquiresleep's bound is "sleep lock"(6); ilock's own is
+                 "bcache"(4), and [locks_below_mono] weakens it. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "bcache")
+                             (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
+    all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa], handing the complement
        back too. *)
@@ -2319,6 +2332,7 @@ Section ProofIlockMain.
                 cn s g cov logstart inodestart nib dev k ip inum
                 pidv dq dqs m Q1 K eb C b lks
                 HK HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
+                Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
                       Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont").

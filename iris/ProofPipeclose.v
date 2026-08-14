@@ -423,6 +423,7 @@ Section ProofPipeclose.
               ltac:(lia) ltac:(lia) Hno
               ltac:(iApply pipe_ref_dead) ltac:(intro i; iApply locked_pre_dead)
               with "Hcg Hown Htext Hpc [] Href Hpanic").
+    all: try lkbelow.
     { iEval (rewrite Ha0A4). iExact "Hopen". }
     iIntros (CIDaq Hsaq ms M0) "%Hms Href Hcg Hpc %HcsM0 Hlocked Hres Hown Hpay".
     iEval (rewrite HraA4) in "Hpc".
@@ -732,7 +733,13 @@ Section ProofPipeclose.
                    with "Hown") as "Hown".
       iApply (Kfree.wp_kfree_sconf γkl γk klk kfl K4 on n eb pme C (av - 4)%nat b lks
                 ltac:(lia) Hklk Hkfl ltac:(lia)
+                (* release_cancel already handed the "pipe" rank back
+                   ([Hsetback'] above), so [Hown] here carries plain [lks]
+                   again; kfree's "kmem" (13) outranks "pipe" (7), so [Hno]
+                   weakens straight across with no [_union_singleton] step. *)
+                ltac:(apply (locks_below_mono lks (lock_rank "pipe")); [exact Hno | vm_compute; lia])
                 with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail Hpanic").
+      all: try lkbelow.
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
         iApply (pipe_bytes_page_own with "Hword Hcpu Hbytes"). }
       iIntros (CIDkf Hskf mk) "Hcg Hown Hpc %Hcsk Havail".
@@ -768,6 +775,16 @@ Section ProofPipeclose.
     { rewrite (callee_saved_lookup HcsM0 (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact Hs2A4. }
     iPoseProof (pci_14 with "Htext") as "Hi14".
     iDestruct "Hres" as (nr nw ro wo vname bs) "(Hnm & Hnr & Hnw & Hro & Hwo & Hst0 & Hst1 & %Hcnt & %Hbslen & Hdat & Hslack)".
+    (* "proc" (11) outranks "pipe" (7), already held across the critical
+       section: weaken [Hno]'s bound up to 11, then push it across the held
+       "pipe" singleton -- needed for wakeup's own acquire of every
+       proc's lock.  Same [locks_below_mono] / [locks_below_union_singleton]
+       composition as ProofKexit.v's [Hfresh_proc]. *)
+    assert (Hpipe_lt_proc : (lock_rank "pipe" < lock_rank "proc")%nat)
+      by (vm_compute; lia).
+    assert (Hfresh_proc : locks_below ({[lock_rank "pipe"%string]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [exact Hpipe_lt_proc |].
+      apply (locks_below_mono lks (lock_rank "pipe")); [exact Hno | vm_compute; lia]. }
     destruct w.
     - (* ===== writable: the branch falls through, the WRITE end closes ===== *)
       assert (Hbz : eq_vec (rget M0 (mword_of_int 18 : mword 5)) (zero_reg : mword 64) = false)
@@ -826,8 +843,9 @@ Section ProofPipeclose.
          threads the acquired set unchanged. *)
       iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb C false
                 ({[lock_rank "pipe"%string]} ∪ lks)
-                HwK HwdomW Hlen Hwlvl
+                HwK HwdomW Hlen Hwlvl Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpanic Hpinv").
+      all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
       assert (HraW2 : W2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.pipeclose + 0x20) : mword 64) 4)
@@ -893,8 +911,9 @@ Section ProofPipeclose.
          threads the acquired set unchanged. *)
       iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb C false
                 ({[lock_rank "pipe"%string]} ∪ lks)
-                HwK HwdomW Hlen Hwlvl
+                HwK HwdomW Hlen Hwlvl Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpanic Hpinv").
+      all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
       assert (HraW2 : W2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.pipeclose + 0x4a) : mword 64) 4)

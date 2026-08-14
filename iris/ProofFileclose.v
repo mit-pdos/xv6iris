@@ -324,6 +324,7 @@ Section ProofFileclose.
               n eb p C (K - 8)%nat b lks
               HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (FC + 0x18)).
@@ -1129,7 +1130,10 @@ Section ProofFileclose.
                   (mword_of_int (KernelSyms.kmem + 24)) on
                   P3 n eb p C (K - 8)%nat b
                   _ Hw1 Hav22 Hn2 eq_refl eq_refl
+                  (locks_below_mono lks (lock_rank "ftable") (lock_rank "pipe")
+                     Hbelow ltac:(vm_compute; lia))
                   with "Hcg Hcnt Htext Hpc Hispipe Hpref Hkmem Hav Hprocs Hpanic").
+        all: try lkbelow.
         iIntros (CIDp5 Hsp5 mp) "Hcg Hcnt Hpc %Hpcs Hav".
         pose proof Hpcs as Hpcs_cs.
         assert (Hpca0 : ret_pc (P3 !!! Regidx Rra) = mword_of_int (FC + 0xa0)).
@@ -1385,8 +1389,10 @@ Section ProofFileclose.
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
                     (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat eb C b lks
                     ltac:(unfold K_begin_op; lia) Hjlt Hgl
-                    (locks_below_mono _ _ _ Hbelow ltac:(vm_compute; lia))
+                    (locks_below_mono lks (lock_rank "ftable") (lock_rank "log")
+                       Hbelow ltac:(vm_compute; lia))
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hlog Hpid Hprocs").
+          all: try lkbelow.
           iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hextc Hextm Hpc Hpid Hop".
           pose proof Hbcs as Hbcs_cs.
           assert (Hpcae : ret_pc (B1 !!! Regidx Rra) = mword_of_int (FC + 0xae)).
@@ -1450,14 +1456,17 @@ Section ProofFileclose.
                     (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
                     (fcn_dev fn) us kk qq inum MAXOPBLOCKS
                     (fcn_pid fn) (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
-                    B3 (K - 8)%nat eb C b
+                    B3 (K - 8)%nat eb C b lks
                     ltac:(unfold K_iput; lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
                     Hist0 Hiblk Hiblog Hinb Hcovb
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
+                    (locks_below_mono lks (lock_rank "ftable") (lock_rank "itable")
+                       Hbelow ltac:(vm_compute; lia))
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                           Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
+          all: try lkbelow.
           iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hextc Hextm Hpc Hpid Hsbb Hsbi
                                           %Hussub Hbmres Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
@@ -1496,9 +1505,11 @@ Section ProofFileclose.
                     (fcn_dev fn) ni (fcn_pid fn) (fcn_dq fn)
                     B4 (K - 8)%nat eb C b lks
                     ltac:(unfold K_end_op; lia) Hgeom Hjlt Hgl
-                    (locks_below_mono _ _ _ Hbelow ltac:(vm_compute; lia))
+                    (locks_below_mono lks (lock_rank "ftable") (lock_rank "log")
+                       Hbelow ltac:(vm_compute; lia))
                     with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
                           Hprocs Hdev Hgeo Hdlk Hop").
+          all: try lkbelow.
           iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpid".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).

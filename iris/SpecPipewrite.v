@@ -102,6 +102,13 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
+  (* pipewrite acquires "pipe" (7) DIRECTLY, and while holding it reaches
+     "proc" (11) via wakeup / sleep_prepare / killed -- its own re-acquire
+     after sleep is at the entry [lks] again.  ONE premise at the LOWEST rank
+     the whole cone touches, "pipe", covers every one of those:
+     [locks_below_mono] lifts it to "proc" wherever a callee wants that
+     instead (LockRank.v). *)
+  locks_below lks (lock_rank "pipe") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗

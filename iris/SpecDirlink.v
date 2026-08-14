@@ -424,6 +424,9 @@ Definition wp_dirlink_sconf_body
     = (zero_extend' 64 (inum : mword 16) : mword 64) ->
   (* PARKING PREMISE *)
   eb = true ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -660,6 +663,9 @@ Definition wp_dirlink_gen_body
     = (zero_extend' 64 (inum : mword 16) : mword 64) ->
   (* PARKING PREMISE *)
   eb = true ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

@@ -111,6 +111,11 @@ Definition wp_sys_close_sconf_body
   (* push_off's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (sys_close_stack <= av)%nat ->
+  (* sys_close acquires no lock itself; its whole cone is the pure
+     PASS-THROUGH to fileclose, whose bound is at "ftable" (1) -- the
+     LOWEST rank in the table, and nothing else sys_close touches (argfd,
+     myproc) carries any order premise at all. *)
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing

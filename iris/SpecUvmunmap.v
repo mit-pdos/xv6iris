@@ -97,6 +97,9 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      This is what keeps every vpn it clears different from [tramp_vpn] and
      [tf_vpn], so the tree spec survives. *)
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+  (* [do_free != 0] here, so every iteration's kfree bounds this call at
+     "kmem" (13); nothing else in the cone touches a lock. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗
@@ -154,6 +157,9 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
   mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
   (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+  (* [do_free != 0] here too, so kfree's bound at "kmem" (13) is the whole
+     cone. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗

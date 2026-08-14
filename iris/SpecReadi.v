@@ -303,6 +303,11 @@ Definition wp_readi_sconf_body
     = sign_extend' 64 (mword_of_int (Z.of_nat off) : mword 32) ->
   m !!! Regidx (mword_of_int 14 : mword 5)
     = sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32) ->
+  (* readi's cone: its own bread and brelse both directly acquire "bcache"
+     (rank 4, LockRank.v); bmap (BMAP_NOALLOC) and either_copyout expose no
+     locks_below premise of their own, so "bcache" is the lowest -- and
+     only -- bound this contract states. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires

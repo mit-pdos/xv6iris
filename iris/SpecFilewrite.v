@@ -610,6 +610,10 @@ Definition wp_filewrite_sconf_body
   0 <= n < 2 ^ 31 ->
   (* PARKING PREMISE (hart-generic scheduler protocol): every arm sleeps. *)
   eb = true ->
+  (* filewrite's FD_INODE arm is the whole cone: begin_op/end_op ("log", 3),
+     ilock ("bcache", 4), iunlock ("sleep lock", 6) -- "log" is the lowest,
+     so one premise there covers the whole cone via [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj C b lks -∗

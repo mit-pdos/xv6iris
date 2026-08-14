@@ -74,6 +74,9 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   let ret_tgt := ret_pc ra0 in
   (consputc_stack <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "uart") ->
   sie_cap_gpr m0 K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

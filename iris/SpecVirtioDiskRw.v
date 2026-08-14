@@ -97,6 +97,8 @@ Definition wp_virtio_disk_rw_sconf_body
   (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data bp) k)) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  (* order premise at the lowest rank this cone reaches. *)
+  locks_below lks (lock_rank "virtio_disk") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
   cpu_own 0 eb pj C b lks -∗

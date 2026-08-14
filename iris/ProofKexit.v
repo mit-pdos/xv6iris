@@ -705,6 +705,7 @@ Section KexitLoop.
         iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj C av b lks
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
                   with "Hcg Hown Htce Hcce Htext Hpc Hft Hpanic Href Hfcenv").
+        all: try lkbelow.
         iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
         iEval (rewrite Hfnj Hfndq Hfnpid) in "Hpidq".
@@ -842,6 +843,11 @@ Section KexitPark.
     intros pj Hj Hgl Hav Hregs Hof Hcwd Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
     iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl Hinit Hsp Hir Hpriv".
+    (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON: swtch is contracted at
+       [{[lock_rank "proc"]}] on both sides (SpecSwtch.v), xv6's own
+       [panic("sched locks")] discipline.  [kx_park] enters at depth 0, so the
+       entry set is forced empty and the set at the park is the singleton. *)
+    iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     (* [eb = b] at level 0 -- for the complement's transport guard ONLY (it is
        indexed by [eb]; every crossing fact here is spelled at [b]).  NOT
        [subst b]. *)
@@ -908,6 +914,7 @@ Section KexitPark.
               P2 0 eb pj C av b lks ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HP2a0). iExact "Hwl". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD: index [false] throughout. *)
     iIntros (CIDa Hsa msa macq) "%Hmsfa Hcg Hpc %Hcsa Hlkw Hres Hown Hpay".
@@ -973,10 +980,22 @@ Section KexitPark.
       by (rewrite /P4 upd_ne; [exact HP3s3 | vm_compute; discriminate]).
     assert (HP4s4 : P4 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P4 upd_ne; [exact HP3s4 | vm_compute; discriminate]).
+    (* "proc" (11) outranks "wait_lock" (10), already held: weaken [Hfresh]'s
+       bound up to 11, then push it across the held "wait_lock" singleton --
+       needed here for reparent's own wakeup/acquire of every pp->lock, and
+       reused below for kexit's wakeup(p->parent) and its own
+       [acquire(&p->lock)]. *)
+    assert (Hwl_lt_proc : (lock_rank "wait_lock" < lock_rank "proc")%nat)
+      by (vm_compute; lia).
+    assert (Hfresh_proc : locks_below ({[lock_rank "wait_lock"]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [exact Hwl_lt_proc |].
+      apply (locks_below_mono lks (lock_rank "wait_lock")); [exact Hfresh | lia]. }
     iApply (Reparent.wp_reparent_sconf (CID := CIDa)  P4 γs pj ip ps dqi 1%nat (trap_res b + av)%nat eb C false
               ({[lock_rank "wait_lock"]} ∪ lks)
               ltac:(unfold K_reparent; lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
+              Hfresh_proc
               with "Hcg Hown Htext Hpc Hpanic Hprocs Hinit Hpar").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (Mrp) "[%Hcsr %Hdomr] Hcg Hown Htext2 Hpc Hinit Hpar".
     (* reparent's output table is indexed by the a0 IT saw, which is [p] *)
@@ -1035,15 +1054,9 @@ Section KexitPark.
       by (rewrite /P6 upd_ne; [exact HP5s3 | vm_compute; discriminate]).
     assert (HP6s4 : P6 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P6 upd_ne; [exact HP5s4 | vm_compute; discriminate]).
-    (* "proc" (11) outranks "wait_lock" (10), already held: weaken [Hfresh]'s
-       bound up to 11, then push it across the held "wait_lock" singleton --
-       needed here for wakeup's own acquire/release of every p->lock, and
-       reused below for kexit's own [acquire(&p->lock)]. *)
-    assert (Hwl_lt_proc : (lock_rank "wait_lock" < lock_rank "proc")%nat)
-      by (vm_compute; lia).
-    assert (Hfresh_proc : locks_below ({[lock_rank "wait_lock"]} ∪ lks) (lock_rank "proc")).
-    { apply locks_below_union_singleton; [exact Hwl_lt_proc |].
-      apply (locks_below_mono lks (lock_rank "wait_lock")); [exact Hfresh | lia]. }
+    (* [Hfresh_proc] ("proc" outranks the held "wait_lock") was already
+       derived above for reparent's call; wakeup and kexit's own
+       [acquire(&p->lock)] below reuse it unchanged. *)
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDa)  P6 γs
               pj 1%nat (trap_res b + av)%nat eb C false
               ({[lock_rank "wait_lock"]} ∪ lks)
@@ -1051,6 +1064,7 @@ Section KexitPark.
               ltac:(lia)
               Hfresh_proc
               with "Hcg Hown Htext Hpc Hpanic Hprocs").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (Mwk) "[%Hcsw %Hdomw] Hcg Hown Htext3 Hpc".
     assert (Hpc7a : ret_pc (P6 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1114,6 +1128,7 @@ Section KexitPark.
               ltac:(lia) ltac:(lia)
               Hfresh_proc
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hislock". }
     iApply wp_next_off_intro.
     iIntros (msb mlk) "%Hmsfb Hcg Hpc %Hcsl Hlkp HR Hown Hpay2".
@@ -1290,6 +1305,7 @@ Section KexitPark.
        record came out of p->lock at the take-out above and rides the
        crossing beside the whole hart tag. *)
     iDestruct (kx_cpu_own_ctx_take with "Hown") as "[HC Hcpuemp]".
+    iEval (rewrite Hlkempty locks_union_empty) in "Hcpuemp".
     iApply fupd_wp.
     (* the store of ZOMBIE moved the cell; the mirror follows.  ZOMBIE is
        unclaimed, so this is the claim being spent for good -- kexit never
@@ -1300,7 +1316,6 @@ Section KexitPark.
        window, whose index carries the reserve: [trap_res b + av].  The park is
        index-generic, so it just rides through at that index. *)
     iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
-              (({[lock_rank "proc"]} ∪ ({[lock_rank "wait_lock"]} ∪ lks)) ∖ {[lock_rank "wait_lock"]})
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
                     [Hpriv Hsp Hir] Hpay Hcpuemp Hoc Htag Hvc").
@@ -1495,7 +1510,11 @@ Section KexitRest.
     iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn γ γfs cov logstart dev
               pid (DfracOwn (1/4)) Q0 av eb C b lks
               ltac:(unfold K_begin_op; lia) Hj Hgl
+              (* "log" (3) outranks "itable" (2), [Hfresh]'s own bound. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "itable")
+                             (lock_rank "log") Hfresh ltac:(vm_compute; lia)))
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hlog Hpidq Hprocs").
+    all: try lkbelow.
     iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpidq Hop".
     assert (Hpc50 : ret_pc (Q0 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x50))
@@ -1566,6 +1585,7 @@ Section KexitRest.
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hitab Hitinv Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
+    all: try lkbelow.
     iIntros (CID5 Hs5 mip n' us') "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi
                                    %Hussub Hbmres Hbsl %Hn' Hop Hislot".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1611,6 +1631,7 @@ Section KexitRest.
               ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
               Hfresh_log
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
+    all: try lkbelow.
     iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x5c))

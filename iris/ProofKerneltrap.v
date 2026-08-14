@@ -85,11 +85,11 @@ Section ProofKerneltrap.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-      (ep sc tv : mword 64)
-    : wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu m av p C ep sc tv.
+      (ep sc tv : mword 64) (lks : gset nat)
+    : wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu m av p C ep sc tv lks.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
-    intros pcE ret_tgt Hlen Hav Hsc Hepal.
+    intros pcE ret_tgt Hlen Hav Hsc Hepal Hbelow.
     iIntros "Hcg Hmir Havail Hkptr Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
@@ -126,10 +126,12 @@ Section ProofKerneltrap.
       by (rewrite /D0 upd_ne; [exact HMs2 | vm_compute; discriminate]).
     (* devintr's caps are the whole device complement, threaded persistently *)
     iApply (Devintr.wp_devintr_sconf γu γv γdk γtl γs pd pav pu
-              D0 (av - 6)%nat 0 false p C (DfracOwn 1) sc
+              D0 (av - 6)%nat 0 false p C (DfracOwn 1) sc lks
               Hlen ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
+              Hbelow
               with "Hcg Hcpu Htext Hpc Hscause Hcaps").
+    all: try lkbelow.
     iIntros (mdi) "[%Hcs_di %Hdia0] Hcg Hcpu Hscause Hpc".
     assert (Hpc2e : ret_pc (D0 !!! Regidx ra_idx)
                     = mword_of_int (KernelSyms.kerneltrap + 0x2e))
@@ -236,7 +238,7 @@ Section ProofKerneltrap.
       assert (HD2thr : kt_thr m D2).
       { intros r Hr Hsp Hs0 Hs1 Hs2 Hs3.
         rewrite /D2 upd_ne; [| ktne_ra ]. apply HD1thr; assumption. }
-      iApply (Myproc.wp_myproc_sconf D2 (av - 6)%nat 0 false p C false
+      iApply (Myproc.wp_myproc_sconf D2 (av - 6)%nat 0 false p C false _
                 ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
                 with "Hcg Hcpu Htext Hpc").

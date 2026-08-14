@@ -122,6 +122,11 @@ Definition wp_sys_exit_sconf_body
   (* the PARKING premise, inherited from kexit: everything that sleeps or
      parks needs it *)
   eb = true ->
+  (* THE FRESHNESS PREMISE, INHERITED FROM KEXIT.  sys_exit acquires no lock
+     of its own -- it is a pure pass-through to kexit, whose own lowest rank
+     is "ftable" (1), via the fileclose loop -- so this is exactly kexit's
+     own premise, unconsumed. *)
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0%nat eb pj C b lks -∗

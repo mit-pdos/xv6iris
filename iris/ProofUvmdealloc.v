@@ -340,7 +340,7 @@ Section ProofUvmdealloc.
     : wp_uvmdealloc_sconf_body γa mm P K eb p C b lks.
   Proof.
     cbv beta delta [wp_uvmdealloc_sconf_body].
-    intros pcE oldsz newsz ret_tgt HK Hroot Hob.
+    intros pcE oldsz newsz ret_tgt HK Hroot Hob Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt Henv Hcont".
@@ -1060,6 +1060,7 @@ Section ProofUvmdealloc.
     iApply (Uvmunmap.wp_uvmunmap_sconf γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C 0%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CID24 Hs24 mr) "Hcg Hcpu Hpc %Hcs Hpt".
     iEval (rewrite HB6a1) in "Hpt".
     assert (Hret42 : ret_pc (B6 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmdealloc + 0x42)).

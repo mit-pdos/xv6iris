@@ -691,7 +691,7 @@ Section ProofPrintk.
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b lks -∗
+      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
       R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -757,7 +757,7 @@ Section ProofPrintk.
     iEval (rewrite HAV) in "Hcg". iEval (rewrite -Houtb) in "Hcg".
     (* ===================== release(&pr.lock) ===================== *)
     iApply (Release.wp_release_sconf γpr pk_pr_lock "pr"%string (emp : iProp Σ) L3
-              n eb pcur C (K - 24)%nat
+              n eb pcur C (K - 24)%nat lks
               ltac:(rewrite HL3a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hlk Hlkd [] Hcnt Hpay").
     { done. }
@@ -966,7 +966,7 @@ Section ProofPrintk.
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b lks -∗
+      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
       R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -978,7 +978,7 @@ Section ProofPrintk.
     iIntros (CIDr Hsr mf) "%Hpost Hcg Hpc Hsv".
     assert (Hhr : (CIDr : CPU) = h)
       by (etransitivity; [ exact (Hsr (or_introl eq_refl)) | exact Hh ]).
-    iDestruct (cpu_own_transport CID0 CIDr (S n) eb pcur C false lks Hsr with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID0 CIDr (S n) eb pcur C false Hsr with "Hcnt") as "Hcnt".
     iDestruct (wp_next_retarget CID0 CIDr b pcur _ ltac:(intros _; exact (Hsr (or_introl eq_refl))) with "Hcont") as "Hcont".
     destruct Hpost as (Hkeep & E9 & E19 & E20 & E21 & E22 & E23 & E24 & E26 & E27).
     iEval (rewrite Hnext) in "Hpc".
@@ -1046,7 +1046,7 @@ Section ProofPrintk.
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b lks -∗
+      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
       R -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -1060,7 +1060,7 @@ Section ProofPrintk.
     iIntros (CIDr Hsr mf) "%Hpost Hcg Hpc Hsv".
     assert (Hhr : (CIDr : CPU) = h)
       by (etransitivity; [ exact (Hsr (or_introl eq_refl)) | exact Hh ]).
-    iDestruct (cpu_own_transport CID0 CIDr (S n) eb pcur C false lks Hsr with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID0 CIDr (S n) eb pcur C false Hsr with "Hcnt") as "Hcnt".
     iDestruct (wp_next_retarget CID0 CIDr b pcur _ ltac:(intros _; exact (Hsr (or_introl eq_refl))) with "Hcont") as "Hcont".
     destruct Hpost as (Hkeep & E9 & E19 & E20 & E21 & E22 & E23 & E24 & E26 & E27).
     assert (Hp288 : mword_of_int (KernelSyms.printk + 0x2fe + 18) = (mword_of_int (KernelSyms.printk + 0x310) : mword 64))
@@ -1196,7 +1196,7 @@ Section ProofPrintk.
       ⌜ pk_fbyte f 0%nat = (mword_of_int 0 : mword 8) ⌝ -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx
         /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
-      cpu_own n eb pcur C b lks -∗
+      cpu_own n eb pcur C b (lks ∖ {[lock_rank "pr"]}) -∗
       fmt ↦ₛ{ dqf } f -∗ R -∗
       WP (Loop : expr riscv_lang)) -∗
     (* (b) a nonempty one: the loop head, with i = 0 and a0 = fmt[0] *)
@@ -1388,7 +1388,7 @@ Section ProofPrintk.
       assert (Hcc7 : false = false \/ pcur = zero_reg -> (CID7 : CPU) = (CID0 : CPU)) by wp_next_chain.
       assert (Hh7 : (CID7 : CPU) = h)
         by (etransitivity; [ exact (Hcc7 (or_introl eq_refl)) | exact Hh ]).
-      iDestruct (cpu_own_transport CID0 CID7 (S n) eb pcur C false lks Hcc7 with "Hcnt") as "Hcnt".
+      iDestruct (cpu_own_transport CID0 CID7 (S n) eb pcur C false Hcc7 with "Hcnt") as "Hcnt".
       iDestruct (wp_next_retarget CID0 CID7 b pcur _ ltac:(intros _; exact (Hcc7 (or_introl eq_refl))) with "Kend") as "Kend".
       iApply (wp_printk_epi (CID0 := CID7) γpr h m Q4 KE K n eb C (fmt ↦ₛ{ dqf } f ∗ R)%I b pcur lks
                 HKE HAV Houtb Hh7 HQ4sp HQ4cs
@@ -1571,7 +1571,7 @@ Section ProofPrintk.
       assert (Htgtl : add_vec (mword_of_int (KernelSyms.printk + 0x64) : mword 64) (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 11 : mword 11) ('b"0")))) = mword_of_int (KernelSyms.printk + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtl) in "Hpc".
       assert (Hcc23 : false = false \/ pcur = zero_reg -> (CID23 : CPU) = (CID0 : CPU)) by wp_next_chain.
-      iDestruct (cpu_own_transport CID0 CID23 (S n) eb pcur C false lks Hcc23 with "Hcnt") as "Hcnt".
+      iDestruct (cpu_own_transport CID0 CID23 (S n) eb pcur C false Hcc23 with "Hcnt") as "Hcnt".
       iSpecialize ("Kloop" $! CID23 with "[%]"); [wp_next_chain|].
       iApply ("Kloop" $! C6 with "[%] Hcg Hpc Hlk Hheld Hcnt Hfmt H9 H10 H12 Hva
                 [S9 S19 S20 S21 S22 S23 S24 S26 S27] T8 T19 T22 Hap T24 HR").
@@ -1797,8 +1797,8 @@ Section ProofPrintk.
 
   Hypothesis wp_consputc :
     forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64),
-      wp_consputc_sconf_body γl γd γv m0 K l n eb C b pcur.
+      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat),
+      wp_consputc_sconf_body γl γd γv m0 K l n eb C b pcur lks.
 
   Lemma wp_printk_char `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (mc : regfile) (K : nat) (l : list (bv 8)) (n : nat) (eb : bool)
@@ -1853,7 +1853,7 @@ Section ProofPrintk.
     assert (Htgtc : add_vec (mword_of_int (KernelSyms.printk + 0x66) : mword 64) (sign_extend' 64 (mword_of_int 2096418 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID2) γl γd γv P1 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID2) γl γd γv P1 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID3 Hst3 mk bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2064,8 +2064,8 @@ Section ProofPrintk.
 
   Hypothesis wp_printint :
     forall `{CID0 : CpuId} (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64),
-      wp_printint_sconf_body γl γd γv m0 K l n eb C b pcur.
+      (l : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (pcur : mword 64) (lks : gset nat),
+      wp_printint_sconf_body γl γd γv m0 K l n eb C b pcur lks.
 
   Lemma wp_printk_arm_d `{CID0 : CpuId} (γd : uart_names) (γv : disk_names)
       (m mc : regfile) (K : nat) (k : nat) (l : list (bv 8)) (n : nat) (eb : bool)
@@ -2212,7 +2212,7 @@ Section ProofPrintk.
     { rewrite /D6 upd_ne; [| reg_neq]. rewrite /D5 upd_ne; [| reg_neq]. rewrite HD4a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID7 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID7) γl γd γv D6 K l n eb C b pcur HK14 HD6a1 Hn31
+    iApply (wp_printint (CID0 := CID7) γl γd γv D6 K l n eb C b pcur lks HK14 HD6a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID8 Hst8 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID8 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2360,7 +2360,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2521,7 +2521,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID3 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID3) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID3) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID4 Hst4 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID4 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2684,7 +2684,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2845,7 +2845,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID3 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID3) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID3) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID4 Hst4 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID4 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2998,7 +2998,7 @@ Section ProofPrintk.
     { rewrite /S2 upd_ne; [| reg_neq]. rewrite HS1a1.
       rewrite (uint_moi_small 16 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID3 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID3) γl γd γv S2 K l n eb C b pcur HK14 HS2a1 Hn31
+    iApply (wp_printint (CID0 := CID3) γl γd γv S2 K l n eb C b pcur lks HK14 HS2a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID4 Hst4 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID4 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3159,7 +3159,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 16 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3329,7 +3329,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 10 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3467,7 +3467,7 @@ Section ProofPrintk.
     { rewrite /S3 upd_ne; [| reg_neq]. rewrite HS2a1.
       rewrite (uint_moi_small 16 ltac:(change (2^64) with 18446744073709551616; lia)). lia. }
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur HK14 HS3a1 Hn31
+    iApply (wp_printint (CID0 := CID4) γl γd γv S3 K l n eb C b pcur lks HK14 HS3a1 Hn31
               with "Hcg Hcnt Htext Hkdata Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3584,7 +3584,7 @@ Section ProofPrintk.
     assert (Htgtc : add_vec (mword_of_int (KernelSyms.printk + 0x1fc) : mword 64) (sign_extend' 64 (mword_of_int 2096012 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID2) γl γd γv C2 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID2) γl γd γv C2 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID3 Hst3 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3664,7 +3664,7 @@ Section ProofPrintk.
     assert (Htgtc : add_vec (mword_of_int (KernelSyms.printk + 0x23c) : mword 64) (sign_extend' 64 (mword_of_int 2095948 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID2) γl γd γv P2 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID2) γl γd γv P2 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID3 Hst3 mf bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3737,7 +3737,7 @@ Section ProofPrintk.
     assert (Htgtc1 : add_vec (mword_of_int (KernelSyms.printk + 0x2f2) : mword 64) (sign_extend' 64 (mword_of_int 2095766 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc1) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID2 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID2) γl γd γv U2 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID2) γl γd γv U2 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID3 Hst3 m1 bs1) "Hcg Hcnt Hpc %Hcs1 #Hsent1".
     iDestruct (cpu_own_transport CID3 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3765,7 +3765,7 @@ Section ProofPrintk.
     assert (Htgtc2 : add_vec (mword_of_int (KernelSyms.printk + 0x2f8) : mword 64) (sign_extend' 64 (mword_of_int 2095760 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc2) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID5 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID5) γl γd γv U4 K (l ++ bs1)%list n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID5) γl γd γv U4 K (l ++ bs1)%list n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsent1").
     iIntros (CID6 Hst6 mf bs2) "Hcg Hcnt Hpc %Hcs2 #Hsent2".
     iDestruct (cpu_own_transport CID6 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -3922,7 +3922,7 @@ Section ProofPrintk.
     assert (Htgtc : add_vec (mword_of_int (KernelSyms.printk + 0x21e) : mword 64) (sign_extend' 64 (mword_of_int 2095978 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID1 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID1) γl γd γv L1 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID1) γl γd γv L1 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID2 Hst2 m1 bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID2 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4512,7 +4512,7 @@ Section ProofPrintk.
     assert (Htgtc : add_vec (mword_of_int (KernelSyms.printk + 0x1de) : mword 64) (sign_extend' 64 (mword_of_int 2096042 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID4) γl γd γv P4 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID4) γl γd γv P4 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 m1 bs) "Hcg Hcnt Hpc %Hcs #Hsent".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4730,7 +4730,7 @@ Section ProofPrintk.
     assert (Htgtc1 : add_vec (mword_of_int (KernelSyms.printk + 0x1be) : mword 64) (sign_extend' 64 (mword_of_int 2096074 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc1) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID4 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID4) γl γd γv Q3 K l n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID4) γl γd γv Q3 K l n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsub").
     iIntros (CID5 Hst5 m1 bs1) "Hcg Hcnt Hpc %Hcs1 #Hsent1".
     iDestruct (cpu_own_transport CID5 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -4759,7 +4759,7 @@ Section ProofPrintk.
     assert (Htgtc2 : add_vec (mword_of_int (KernelSyms.printk + 0x1c6) : mword 64) (sign_extend' 64 (mword_of_int 2096066 : mword 21)) = mword_of_int KernelSyms.consputc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtc2) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID7 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (wp_consputc (CID0 := CID7) γl γd γv Q5 K (l ++ bs1)%list n eb C b pcur HK6 Hn31
+    iApply (wp_consputc (CID0 := CID7) γl γd γv Q5 K (l ++ bs1)%list n eb C b pcur lks HK6 Hn31
               with "Hcg Hcnt Htext Hpc Hpan Hdev Htxl Hsent1").
     iIntros (CID8 Hst8 m2 bs2) "Hcg Hcnt Hpc %Hcs2 #Hsent2".
     iDestruct (cpu_own_transport CID8 CID0 n eb pcur C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -7594,7 +7594,7 @@ Section ProofPrintk.
           /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
         fmtv ↦ₛ{ dqf } f -∗
         ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m j) d) -∗
-        cpu_own n eb pcur C bo lks -∗
+        cpu_own n eb pcur C bo (lks ∖ {[lock_rank "pr"]}) -∗
         panic_wp_any -∗
         uart_sent_sub γd (l ++ bs) -∗
         WP (Loop : expr riscv_lang))%I.
@@ -8144,20 +8144,20 @@ Section ProofPrintk.
 
   Lemma wp_printk_sconf_gen (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (dqf : dfrac)
-      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64)
-    : wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p.
+      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat)
+    : wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks.
   Proof using All.
     cbv beta delta [wp_printk_sconf_body].
-    intros rai a0i pcE0 ra00 rtgt fmtv0 HK Hflen Hnn Hkinds Hdlen Hn2.
+    intros rai a0i pcE0 ra00 rtgt fmtv0 HK Hflen Hnn Hkinds Hdlen Hn2 Hbelow.
     unfold printk_stack in HK.
     assert (HK24 : (24 <= K)%nat) by lia.
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpan Hfmt Hdescs #Hlk #Hdev #Htxl #Hsub Hcont".
-    iDestruct (cpu_own_eb_agree m0 K n eb p C b ∅ with "Hcg Hcnt") as %Houtb.
+    iDestruct (cpu_own_eb_agree m0 K n eb p C b with "Hcg Hcnt") as %Houtb.
     (* ---------- the prologue: the 24-slot push ---------- *)
     iApply (wp_printk_prologue m0 K b p HK24 with "Hcg Htext Hpc").
     iIntros (CIDpro Hstpro mp) "%Hpro Hcg Hpc H9 H10 H12 Hva Hrest".
     destruct Hpro as (Hpsp & Hps0 & Hps2 & Hpkept).
-    iDestruct (cpu_own_transport CID CIDpro n eb p C b ∅ ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CIDpro n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* ---------- acquire(&pr.lock) : 0x1e .. 0x26 ---------- *)
     iPoseProof (pki_1e with "Htext") as "Hi1e".
     iPoseProof (pki_22 with "Htext") as "Hi22".
@@ -8199,11 +8199,12 @@ Section ProofPrintk.
     assert (HA3s2 : A3 !!! Regidx s2_idx = mp !!! Regidx s2_idx).
     { rewrite /A3 upd_ne; [| reg_neq]. rewrite /A2 upd_ne; [| reg_neq].
       rewrite /A1 upd_ne; [reflexivity | reg_neq]. }
-    iDestruct (cpu_own_transport CIDpro CIDa3 n eb p C b ∅ ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CIDpro CIDa3 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_retarget CID CIDa3 b p _ ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acquire.wp_acquire_sconf (CID := CIDa3) γpr "pr"%string (emp : iProp Σ) A3
-              n eb p C (K - 24)%nat b ltac:(lia) ltac:(lia)
+              n eb p C (K - 24)%nat b lks ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [] Hpan").
+    all: try lkbelow.
     { iEval (rewrite HA3a0). iExact "Hlk". }
     iIntros (CIDacq Hstacq ms mfin) "%Hms Hcg Hpc %HcsA Hlkd Hemp Hcnt Hpay".
     assert (Hretacq : ret_pc (A3 !!! Regidx ra_idx) = mword_of_int (KernelSyms.printk + 0x2a))
@@ -8238,12 +8239,13 @@ Section ProofPrintk.
     - (* the empty format string: no loop at all, and nothing was printed *)
       iApply (wp_printk_setup (CID0 := CIDacq) γpr ((CIDacq : CPU)) m0 mfin
                 (trap_res b + (K - 24))%nat K n eb C dqf f
-                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ∅
+                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ({[lock_rank "pr"]} ∪ lks)
                 ltac:(lia) eq_refl Houtb eq_refl Hnn Hfsp Hfs0 Hfs2 Hfkept
                 with "Hcg Htext Hpc Hlk Hheld Hcnt Hfmt H9 H10 H12 Hva Hrest Hdescs [-] []").
       2: { iIntros (CIDd1 Hstd1 mq) "%Hb Hcg Hpc Hlkb Hheldb Hcntb Hfmt H9b H10b H12b Hvab Hsvb S8b S19b S22b Hapb S24b HR".
            exfalso. destruct Hb as (_ & _ & _ & _ & _ & Hnzb & _). exact (Hnzb Hf0z). }
       iIntros (CIDse1 Hstse1 mf) "Hcg Hpc %Hz0 %Hfin Hcnt Hfmt Hdescs".
+      iEval (rewrite (locks_add_del_below (lock_rank "pr") lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
       iSpecialize ("Hcont" $! CIDse1 with "[%]"); [wp_next_chain|].
       iSpecialize ("Hcont" $! mf []).
       iEval (rewrite (app_nil_r bs)) in "Hcont".
@@ -8252,7 +8254,7 @@ Section ProofPrintk.
     - (* a nonempty one: setup, then the loop with the string length as fuel *)
       iApply (wp_printk_setup (CID0 := CIDacq) γpr ((CIDacq : CPU)) m0 mfin
                 (trap_res b + (K - 24))%nat K n eb C dqf f
-                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ∅
+                (([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d))%I b p ({[lock_rank "pr"]} ∪ lks)
                 ltac:(lia) eq_refl Houtb eq_refl Hnn Hfsp Hfs0 Hfs2 Hfkept
                 with "Hcg Htext Hpc Hlk Hheld Hcnt Hfmt H9 H10 H12 Hva Hrest Hdescs []").
       { iIntros (CIDd2 Hstd2 mf) "Hcg Hpc %Hz0 %Hfin Hcntb Hfmt HR". exfalso. exact (Hf0nz Hz0). }
@@ -8271,7 +8273,7 @@ Section ProofPrintk.
       { unfold pk_ap. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hap0) in "Hap".
       iApply (wp_printk_body7a γd γv γpr ((CIDacq : CPU)) γl m0
-                (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ∅
+                (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({[lock_rank "pr"]} ∪ lks)
                 ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen
                 (CID0 := CIDse2) mq 0%nat 0%nat bs
                 ltac:(exact (Hstse2 (or_introl eq_refl))) Hilen0 Hinv0 Hqsp Hqs0 Hqs2 Hqs4' Hqa0 Hqs9 Hqconsts
@@ -8286,13 +8288,14 @@ Section ProofPrintk.
           by (etransitivity;
               [ exact (Hstlh (or_introl eq_refl)) | exact (Hstse2 (or_introl eq_refl)) ]).
         iApply (wp_printk_loop6c γd γv γpr ((CIDacq : CPU)) γl m0
-                  (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ∅
+                  (trap_res b + (K - 24))%nat K n eb C dqf f descs b p ({[lock_rank "pr"]} ∪ lks)
                   ltac:(lia) eq_refl Houtb ltac:(lia) Hn2 Hflen Hnn Hdlen
                   (String.length f) (CID0 := CIDlh) mk k' p' ((bs ++ cs)%list)
                   Hhh2 ltac:(lia) Hplen' Hinv' Hksp Hks0 Hks2 Hks1 Hks9 Hkconsts
                   with "Hcg Htext Hkdata Hpc Hfmt Hdescs Hcnt Hpan Hlk Hheld Hdev Hsub2 Htxl Hfr [Hcont]").
         rewrite /pk_loop_post.
         iIntros (CIDlp Hstlp mz cs') "Hcg Hpc %Hfin2 Hfmt Hdescs Hcnt _ #Hsub3".
+        iEval (rewrite (locks_add_del_below (lock_rank "pr") lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
         iSpecialize ("Hcont" $! CIDlp with "[%]");
           [ intros Hdx; etransitivity; [ exact (Hstlp Hdx) | exact Hhh2 ] | ].
         iSpecialize ("Hcont" $! mz ((cs ++ cs')%list)).
@@ -8302,6 +8305,7 @@ Section ProofPrintk.
       + (* the first directive already ended the string: e.g. f = "...%" *)
         rewrite /pk_loop_post.
         iIntros (CIDlp2 Hstlp2 mz cs) "Hcg Hpc %Hfin2 Hfmt Hdescs Hcnt _ #Hsub3".
+        iEval (rewrite (locks_add_del_below (lock_rank "pr") lks Hbelow)) in "Hcnt".  (* the acquire/release pair is BALANCED: give the caller its own set back *)
         iSpecialize ("Hcont" $! CIDlp2 with "[%]");
           [ intros Hdx; etransitivity;
             [ exact (Hstlp2 Hdx) | exact (Hstse2 (or_introl eq_refl)) ] | ].
@@ -8319,13 +8323,13 @@ End ProofPrintk.
       (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) {dqf : dfrac}
-      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64)
-      : wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p :=
+      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat)
+      : wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks :=
     wp_printk_sconf_gen
-      (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' C' b' pcur' =>
-         Consputc.wp_consputc_sconf (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' C' b' pcur')
-      (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' C' b' pcur' =>
-         Printint.wp_printint_sconf (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' C' b' pcur')
-      γpr γl γd γv m0 K bs n eb C dqf f descs b p.
+      (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' C' b' pcur' lks' =>
+         Consputc.wp_consputc_sconf (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' C' b' pcur' lks')
+      (fun `{CID0 : CpuId} γl' γd' γv' m' K' bs' n' eb' C' b' pcur' lks' =>
+         Printint.wp_printint_sconf (CID:=CID0) γl' γd' γv' m' K' bs' n' eb' C' b' pcur' lks')
+      γpr γl γd γv m0 K bs n eb C dqf f descs b p lks.
 
 End PrintkProof.

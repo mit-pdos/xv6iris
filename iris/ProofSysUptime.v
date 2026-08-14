@@ -259,6 +259,7 @@ Section ProofSysUptime.
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hlk". }
     iIntros (CID9 Hs9 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
     assert (Hpc16 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x16))

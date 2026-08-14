@@ -186,6 +186,9 @@ Section ProofNameiparentMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
+    (* depth 0 forces the held set empty, so every [locks_below] the callees
+       raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iEval (rewrite -Hpjd) in "Hcg".
     iEval (rewrite -Hpjd) in "Hcnt".
     iEval (rewrite -Hpjd) in "Hppid".
@@ -571,6 +574,9 @@ Section ProofNameiparentMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
+    (* depth 0 forces the held set empty, so every [locks_below] the callees
+       raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     iDestruct "Hlog" as (Sb0) "Hlog".
     iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib

@@ -133,6 +133,10 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (forall i, (i < n)%nat ->
      (bv_unsigned (pgroundup oldsz) + 4096 * Z.of_nat i + 4096 <= uvm_maxsz)%Z ->
      P.(ud_um) !! vpn_at vpn0 i = None) ->
+  (* every loop iteration's kalloc (success) and kfree (mappages-failure
+     rollback) are both bound at "kmem" (13); nothing else uvmalloc touches
+     ranks lower.  One premise covers the whole cone. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own 0%nat eb p C b lks -∗
   kernel_text -∗

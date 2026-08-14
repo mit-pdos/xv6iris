@@ -73,6 +73,9 @@ Section WpIntrOff.
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m (trap_res b + n)%nat false p -∗
+      (* the exit set is [lks] -- and at [b = true] the entry arm already
+         forced [lks = ∅], which is exactly what the dismantled arm pays out
+         ([WpSconfCsr.cpu_priv_pay_on] hands back [cpu_priv 0 true p ∅]). *)
       cpu_own 0%nat false p C false lks -∗
       trap_csrs -∗
       (* THE RUNNING CLAIM, on the same two-sided split as [trap_csrs_ext]
@@ -89,7 +92,9 @@ Section WpIntrOff.
     destruct b.
     - (* ---- ENABLED: the real flip.  Everything comes out of the arm. ---- *)
       iIntros "Hcg Hcpu _ Hpc Hinstr Hcont".
-      iDestruct "Hcpu" as "[_ HC]".
+      (* [b = true]: the arm's own conjunct pins the set empty, which is the
+         set the arm pays back. *)
+      iDestruct "Hcpu" as "[%Hpure HC]". destruct Hpure as (_ & _ & ->).
       iApply (wp_csrci_sstatus_x0_s_sconf pc m n true with "Hcg [] Hpc Hinstr [HC Hcont]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
       iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".

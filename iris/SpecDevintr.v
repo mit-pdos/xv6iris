@@ -180,11 +180,15 @@ Definition wp_devintr_sconf_body
      stay in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (devintr_stack <= av)%nat ->
-  (* devintr's clock branch dispatches to clockintr, which acquires "time"
-     (rank 8, LockRank.v) directly -- devintr itself acquires nothing, so
-     this is the only order premise its contract needs. Trivial at every
-     real call site: devintr always runs at trap entry, [lks = ∅]. *)
-  locks_below lks (lock_rank "time") ->
+  (* devintr itself acquires nothing, but it dispatches three cones and the
+     premise has to be stated at the MINIMUM rank over all of them -- a bound
+     is STRENGTHENED by lowering it, and [locks_below_mono] only RAISES, so a
+     bound at "time" would not deliver the one uartintr wants.  The three:
+     clockintr -> tickslock ("time", 8); virtio_disk_intr -> "virtio_disk"
+     (9); uartintr -> consoleintr -> cons.lock ("cons", 5).  Minimum is 5.
+     Trivial at every real call site: devintr always runs at trap entry,
+     where [lks = ∅]. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av false p -∗
   cpu_own lvl eb p C false lks -∗
   kernel_text -∗ pc_is pcE -∗

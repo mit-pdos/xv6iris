@@ -197,7 +197,7 @@ Section ProofFilestat.
     : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
-    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb.
+    intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -694,11 +694,13 @@ Section ProofFilestat.
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb C b
-                (_ fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                _ (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
+                Hbelow
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                       Hslk Hshr Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
+      all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
       iIntros (CIDil Hsil mil dnl bml)
@@ -971,9 +973,14 @@ Section ProofFilestat.
                 pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b
                 (fst_av_iunlock K HK) Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
+                (* iunlock's bound is "sleep lock"(6); filestat's own is
+                   "bcache"(4), and [locks_below_mono] weakens it. *)
+                ltac:(exact (locks_below_mono lks (lock_rank "bcache")
+                               (lock_rank "sleep lock") Hbelow ltac:(vm_compute; lia)))
                 with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
                       Hheld Hslpid Hppid Hprocs
                       Hdep Hidev Hinum Hvalid Hlk Hshot").
+      all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
       (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
@@ -1162,6 +1169,7 @@ Section ProofFilestat.
                 (K - 10)%nat 0%nat eb pj C b
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
+      all: try lkbelow.
       iIntros (CID32 Hs32 mco P') "Hcg Hcnt Hpc Hpt Hbuf %Hcsco %Hext %Hret".
       iEval (rewrite HU6a3) in "Hbuf".
       iDestruct ("Hpback" $! P' ltac:(exact Hext) with "Hszc Hptc Hpt") as "Hpriv".

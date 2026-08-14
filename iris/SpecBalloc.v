@@ -182,6 +182,9 @@ Definition wp_balloc_sconf_body
   γs !! j = Some γl ->
   (* the uint argument arrives sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  balloc holds no lock of its
@@ -334,6 +337,9 @@ Definition wp_balloc_gen_body
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
+  (* the order premise, at the LOWEST rank this cone touches; every
+     higher one follows by [locks_below_mono]. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as

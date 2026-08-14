@@ -108,6 +108,10 @@ Definition wp_write_head_sconf_body
   γs !! j = Some γl ->
   (* the batch's shape: the cells below read the write set W *)
   (n = length W /\ (n <= LOGBLOCKS)%nat) ->
+  (* write_head reaches "bcache" (rank 4) via both bread (its own scan/
+     recycle acquires) and brelse (its unlink/splice acquire); nothing in
+     its cone touches a lower rank, so one premise covers both callees. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗

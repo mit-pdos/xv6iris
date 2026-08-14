@@ -119,6 +119,10 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* the child's map is free over the run (mappages panics on a remap, and
      it is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
+  (* uvmcopy's cone reaches kalloc/kfree directly and, via its err-path
+     uvmunmap, kfree again -- all bound at "kmem" (13), the lowest rank
+     the cone touches. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own ilvl eb p C b lks -∗
   kernel_text -∗

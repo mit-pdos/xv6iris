@@ -1326,6 +1326,7 @@ Section ProofIput.
               ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hitab". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x18)).
@@ -1807,21 +1808,19 @@ Section ProofIput.
                        G4 !!! Regidx c = m !!! Regidx c).
     { intros c Hcs N2 N8 N9 N18. rewrite /G4 upd_ne; [| regne].
       exact (HG3thr c Hcs N2 N8 N9 N18). }
-    (* "sleep lock" (6) outranks "itable" (2): weaken [Hfresh]'s bound up to
-       6 ([locks_below_mono]), push it across the held "itable" singleton
-       ([locks_below_union_singleton]), then read off the non-membership
-       [wp_acquiresleep_nested_sconf] wants at the FULL entry set (which is
-       what [Hcnt] here actually holds). *)
-    assert (Hitable_lt_sleep : (lock_rank "itable" < lock_rank "sleep lock")%nat)
-      by (vm_compute; lia).
-    assert (Hfreshsl' : lock_rank "sleep lock" ∉ ({[lock_rank "itable"]} ∪ lks)).
-    { apply locks_below_not_elem.
-      apply locks_below_union_singleton; [exact Hitable_lt_sleep |].
-      apply (locks_below_mono lks (lock_rank "itable")); [exact Hfresh | lia]. }
+    (* THE ORDER STEP THIS FILE EXISTS TO JUSTIFY.  iput holds itable.lock (2)
+       across acquiresleep, whose spinlock is "sleep lock" (6) -- acquiring
+       UPWARD, so no inversion.  [Hfresh] is iput's own entry bound at
+       "itable"; [lkbelow] weakens it to 6 ([locks_below_mono]) and pushes it
+       across the held "itable" singleton ([locks_below_union_singleton]) to
+       reach the bound the nested acquiresleep states at the FULL entry set,
+       which is what [Hcnt] here actually holds. *)
+    assert (Hslbelow : locks_below ({[lock_rank "itable"]} ∪ lks)
+                                   (lock_rank "sleep lock")) by lkbelow.
     iApply (ASL.wp_acquiresleep_nested_sconf (dq := dq) gs j gil gisl "inode"%string
               (ic_tok cn k) G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
               ({[lock_rank "itable"]} ∪ lks)
-              Hj ltac:(lia) ltac:(cbn; lia) Hfreshsl'
+              Hj ltac:(lia) ltac:(cbn; lia) Hslbelow
               with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs").
     { iEval (rewrite HG4a0). iExact "Hslk". }
     iApply wp_next_off_intro.
@@ -2140,9 +2139,14 @@ Section ProofIput.
               (InodeRegion.di_type_stable_refl dn)
               (InodeRegion.di_nlink_stable_refl dn Htyne2)
               Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0
+              (* itrunc's bound is "log"(3); iput's own is "itable"(2), and
+                 [locks_below_mono] weakens it. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "itable")
+                             (lock_rank "log") Hfresh ltac:(vm_compute; lia)))
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
                     Hdevi Hdgeom Hdlock [Hbs2 Hbs1] Hcrui [Hop]").
+    all: try lkbelow.
     { rewrite /inode_map. iFrame. }
     { iApply (bslots_op bn 2 1). iFrame. }
     { rewrite Hun. iExact "Hop". }
@@ -2277,9 +2281,14 @@ Section ProofIput.
               (InodeRegion.di_nlink_stable_free (di_free dn) (di_trunc dn)
                  eq_refl (ip_nlink_zero (di_nlink dn) Hnl0))
               (di_free_addrs dn) ltac:(reflexivity) Hj Hgsj HJ4a0
+              (* iupdate's bound is "log"(3); iput's own is "itable"(2), and
+                 [locks_below_mono] weakens it. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "itable")
+                             (lock_rank "log") Hfresh ltac:(vm_compute; lia)))
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 Hlb0
                     Hcrdu [Hop]").
+    all: try lkbelow.
     { rewrite Hu'1. iExact "Hop". }
     iIntros (CIDiu Hsiu mfu)
       "%Hcsu Hcg Hcnt Hextc Hextm Hpc Hppid Hidv Hinh Hmeta Hmap Hins Hdat Hbs2 Hop Hwit".
@@ -2392,7 +2401,12 @@ Section ProofIput.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string (ic_tok cn k)
               J6 pidv pj (K - 4)%nat eb C eb lks ltac:(lia)
+              (* releasesleep's bound is "sleep lock"(6); iput's own is
+                 "itable"(2), and [locks_below_mono] weakens it. *)
+              ltac:(exact (locks_below_mono lks (lock_rank "itable")
+                             (lock_rank "sleep lock") Hfresh ltac:(vm_compute; lia)))
               with "Hcg Hcnt Htext Hpc [] Hstok [Hspid] Hictok Hpanic Hprocs").
+    all: try lkbelow.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
     { iEval (rewrite HJ6a0). iExact "Hspid". }
     iIntros (CIDrs Hsrs mrs) "%Hcsr Hcg Hcnt Hpc".
@@ -2455,6 +2469,7 @@ Section ProofIput.
               ltac:(lia) ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HJ9a0). iExact "Hitab". }
     iIntros (CIDac2 Hsac2 ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 Hcnt Hpay".
     (* [Hextc]/[Hextm] were last actually re-derived at [CIDiu] (iupdate's
@@ -2601,6 +2616,7 @@ Section ProofIput.
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlogc Hitab Hinv Hesc Hireg Hslk
                     Href Hbms Hins Hbm Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots [] Hop
                     [Hcont]").
+    all: try lkbelow.
     { iEval (cbn beta iota). iEmpIntro. }
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".

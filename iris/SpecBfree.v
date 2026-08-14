@@ -142,6 +142,9 @@ Definition wp_bfree_gen_body
   (* the two uint arguments arrive sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
+  (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
+     touches ranks lower.  One premise covers the whole cone. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
@@ -271,6 +274,9 @@ Definition wp_bfree_sconf_body
   (* the two uint arguments arrive sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
+  (* bfree reaches log_write, whose bound is at "log" (3); nothing bfree
+     touches ranks lower.  One premise covers the whole cone. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/

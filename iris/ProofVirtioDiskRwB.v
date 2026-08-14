@@ -108,6 +108,7 @@ Section VdrwbFreeAt.
                               (sign_extend' 64 jimm)) 0) ('b"0") = true ->
     ret_pc (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + off + 4) : mword 64) 4)
       = (mword_of_int (KernelSyms.virtio_disk_rw + off + 8) : mword 64) ->
+    locks_below lks (lock_rank "proc") ->
     sie_cap_gpr M av false pme -∗
     cpu_own 1 eb pme C false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) -∗
@@ -128,7 +129,7 @@ Section VdrwbFreeAt.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav Hi8 Hfri Hlen Haddr Hp4 Hjt Hjal Hret.
+    intros Hav Hi8 Hfri Hlen Haddr Hp4 Hjt Hjal Hret Hlkbelow.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hi0 Hi4 Hidx Hbun Hslot Hcont".
     (* ---- lw a0, imm(s0) ---- *)
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) Ra0 Rs0 imm M av
@@ -170,6 +171,7 @@ Section VdrwbFreeAt.
     iApply (FreeDesc.wp_free_desc_sconf γs pd i N2 av 1%nat eb pme C va vl vf vn false lks
               Hav Hi8 HN2a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14". rgall.
     destruct Hf as (Hcs & _).
     iEval (rewrite HN2ra Hret) in "Hpc".
@@ -287,6 +289,15 @@ Section ProofVirtioDiskRwB.
     (K_virtio_disk_rw <= K)%nat ->
     (j < NPROC)%nat -> γs !! j = Some γl -> length γs = NPROC ->
     vdrw_regs M0 sp0 b wr sector -> vdrw_hi M0 m0 ->
+    (* THE LOWEST RANK IN THIS CONTINUATION'S CONE: "virtio_disk" (9), not
+       "proc" (11).  [lks] is the held set BELOW the lock this function
+       itself already holds (the outer P1 phase's acquire needed exactly
+       this bound to take it), so it is what P2.3's retry loop needs again
+       at its re-acquire ([Acquire] below) -- a DIRECT match, no widening.
+       [locks_below_mono] (9 <= 11) lifts it to "proc" for the loop's
+       [SleepPrepare]/[Sleep] calls, both of which run with the lock
+       released, against this same [lks]. *)
+    locks_below lks (lock_rank "virtio_disk") ->
     sie_cap_gpr M0 (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
     cpu_own 1 eb (proc_addr j) C false lks -∗
     trap_csrs -∗
@@ -301,7 +312,7 @@ Section ProofVirtioDiskRwB.
     vdrw_p2_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0 lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hj Hjl Hlen Hregs Hhi0.
+    intros HK Hj Hjl Hlen Hregs Hhi0 Hbelow.
     iIntros "Hcg Hown Htc Hclm #Htext Hpc #Hpanic #Hpinv
              #Hgeom #Hlk Htok HR Hscr Hexit".
     iPoseProof (rwi_036 with "Htext") as "Hi036".
@@ -635,7 +646,10 @@ Section ProofVirtioDiskRwB.
                   (trap_res eb + (K - 12))%nat 1%nat eb C false lks
                   Hj Hjl ltac:(rewrite HB3a0; vm_compute; reflexivity) vdrwb_lvl1
                   ltac:(pose proof (vdrw_K22 K HK); lia)
+                  ltac:(exact (locks_below_mono lks (lock_rank "virtio_disk")
+                                 (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
                   with "Hcg Hown Htext Hpc Hpinv Hpanic").
+        all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc". rgall.
         assert (Hr0a0 : ret_pc (B3 !!! Regidx Rra)
                         = mword_of_int (KernelSyms.virtio_disk_rw + 0x0a0))
@@ -744,7 +758,7 @@ Section ProofVirtioDiskRwB.
         (* ============================ sleep() ============================
            THE PARK.  No condition lock in the contract at all: the caller
            holds NOTHING here beyond its own frame and the complement pair. *)
-        iDestruct (cpu_own_transport CIDrl CIDjs 0 eb (proc_addr j) C eb lks
+        iDestruct (cpu_own_transport CIDrl CIDjs 0 eb (proc_addr j) C eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iDestruct (trap_csrs_ext_transport CIDlp CIDjs eb (proc_addr j)
                      ltac:(wp_next_chain) with "Hextc") as "Hextc".
@@ -752,7 +766,10 @@ Section ProofVirtioDiskRwB.
                      ltac:(wp_next_chain) with "Hextm") as "Hextm".
         iApply (Sleep.wp_sleep_sconf γs j γl C4 (K - 12)%nat eb C lks
                   Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
+                  ltac:(exact (locks_below_mono lks (lock_rank "virtio_disk")
+                                 (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
                   with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").
+        all: try lkbelow.
         (* SLEEP RETURNS ON HART [CIDsl]. *)
         iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpc Hextc Hextm". rgall.
         assert (Hr0b0 : ret_pc (C4 !!! Regidx Rra)
@@ -822,12 +839,13 @@ Section ProofVirtioDiskRwB.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_refl. }
         (* ==================== acquire(&disk.vdisk_lock) ==================== *)
-        iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) C eb lks
+        iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) C eb
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
                   (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) C (K - 12)%nat eb
-                  vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
+                  vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
                   with "Hcg Hown Htext Hpc [] Hpanic").
+        all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
         iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR Hown Hpay". rgall.
         assert (Hr0bc : ret_pc (D3 !!! Regidx Rra)
@@ -909,6 +927,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                  ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi07e Hi082 Hx0 Hbun Hbh").
         iIntros (M2) "%Hcs2 Hcg Hown Hpc Hx0 Hbun".
         (* +0x086  c.li a5,1 *)
@@ -984,6 +1003,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                  ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi07e Hi082 Hx0 Hbun Hbh").
         iIntros (M2) "%Hcs2 Hcg Hown Hpc Hx0 Hbun".
         (* +0x086  c.li a5,1 *)
@@ -1036,6 +1056,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
+                  ltac:(lkbelow)
                   with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi08c Hi090 Hx1 Hbun Hbm").
         iIntros (M3) "%Hcs3 Hcg Hown Hpc Hx1 Hbun".
         iApply ("Hsleep" $! M3 with

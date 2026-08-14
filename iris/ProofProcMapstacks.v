@@ -454,6 +454,9 @@ Section ProofPMS.
     (gk + sum_list_with (fun j => pt_missing tk (kstack_vpn j) 1) (seq i (64 - i))
        <= kstacks_missing t)%nat ->
     (forall j, (j < i)%nat -> node_kdata (pas j)) ->
+    (* the loop's own kalloc call (+0x52) touches "kmem" (13); nothing else
+       in its cone touches a lock (kvmmap's own Spec exposes no premise). *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x52)) -∗
@@ -491,7 +494,7 @@ Section ProofPMS.
     induction rem as [| rem' IH]; intros CID i Mk tk gk pas sp0 spr ret_tgt
       Hlvl HK Hirem Hrem Hnbig Hroot Hres
       Hsp Hs1 Hs8 Hs2m Hs3 Hs5 Hs6 Hs7 Hs4 Hx25 Hx26 Hx27
-      Hbase Hrep Hnodes Hbud Hpasb; [lia|].
+      Hbase Hrep Hnodes Hbud Hpasb Hbelow; [lia|].
     iIntros "Hcg Hcnt #Htext Hpc Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree Henv Hpages Hcont".
     assert (Hilt : (i < 64)%nat) by lia.
     (* the current stack vpn + address facts *)
@@ -535,7 +538,9 @@ Section ProofPMS.
               ltac:(lia)
               ltac:(reflexivity)
               Hlvl
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu").
+    all: try lkbelow.
     iIntros (CIDl2 Hsl2 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret56 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_mapstacks + 0x56)).
     { rewrite HJ1. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -803,6 +808,7 @@ Section ProofPMS.
               ltac:(rewrite HWka1; unfold VA; apply va_i_range; exact Hilt)
               ltac:(rewrite HWka2; exact Hpab) Hrep ltac:(rewrite HWka1; exact Hnone)
               with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
+    all: try lkbelow.
     { iPureIntro. rewrite HWka1. exact Hkbud. }
     { rewrite avail_sub_Some. iExact "Henv". }
     iIntros (CIDl16 Hsl16 mr1 t' g') "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs1 %Hbase' %Hrep' %Hpres %Hg'miss".
@@ -1010,6 +1016,7 @@ Section ProofPMS.
               ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr1_27)
               (eq_trans Hbase' Hbase) Hrepnew ltac:(lia) Hbudnew
               ltac:(intros j Hj; unfold pas'; destruct (Nat.ltb_spec j i) as [Hlt|Hge]; [apply Hpasb; exact Hlt | exact Hppnb])
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree [Henv] Hpages Hcont").
     { iExact "Henv". }
   Qed.
@@ -1024,7 +1031,7 @@ Section ProofPMS.
     : wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_proc_mapstacks_sconf_body].
-    intros ret_tgt Hlvl HK Hroot Hrep Hres Hnb.
+    intros ret_tgt Hlvl HK Hroot Hrep Hres Hnb Hbelow.
     destruct Hnb as (nb & Hon & Hnbig). subst on.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)))).
@@ -1366,6 +1373,7 @@ Section ProofPMS.
               eq_refl Hrep (eq_sym (Nat.add_0_r (pt_nodes t)))
               ltac:(rewrite Nat.add_0_l; rewrite Nat.sub_0_r; unfold kstacks_missing; apply Nat.le_refl)
               ltac:(intros j Hj; exfalso; lia)
+              Hbelow
               with "Hcg Hcnt Htext Hpc Hc72 Hc64 Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hptree [Henv] [] [Hcont]").
     { rewrite Nat.add_0_r. iExact "Henv". }
     { done. }

@@ -843,10 +843,19 @@ Section BoBodies.
     assert (HA1nz : eq_vec (A1 !!! Regidx (mword_of_int 10 : mword 5)) (zero_reg : mword 64) = false)
       by (rewrite HA1a0; exact bo_log_nz).
     (* -------------------- sleep_prepare(&log) -------------------- *)
+    (* still HOLDING "log" here -- lift [Hbelow] to "proc" and push it across
+       the "log" singleton this hart is holding right now
+       ([locks_below_union_singleton]), matching the OUTER set [Hown] carries
+       at this point. *)
+    assert (HbelowA1 : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [vm_compute; lia |].
+      apply (locks_below_mono lks (lock_rank "log")); [exact Hbelow | vm_compute; lia]. }
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl A1
               (trap_res eb + (K - 4))%nat 1%nat eb C false
-              _ Hj Hjl HA1nz bo_noff2 ltac:(pose proof (bo_K22 K HK); lia)
+              ({[lock_rank "log"]} ∪ lks) Hj Hjl HA1nz bo_noff2 ltac:(pose proof (bo_K22 K HK); lia)
+              HbelowA1
               with "Hcg Hown Htext Hpc Hpinv Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfp) "%HApcs Hcg Hown Hpc".
     assert (HAp3 : ret_pc (A1 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x2a))
       by (rewrite HA1ra; apply bv_eq; vm_compute; reflexivity).
@@ -930,9 +939,16 @@ Section BoBodies.
     iDestruct (cpu_own_transport CIDAr CIDAj 0 eb pj C eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID CIDAj eb pj ltac:(wp_next_chain) with "Htcx") as "Htcx".
     iDestruct (cpu_claim_ext_transport CID CIDAj eb pj ltac:(wp_next_chain) with "Hclmx") as "Hclmx".
-    iApply (Sleep.wp_sleep_sconf γs j γl A4 (K - 4)%nat eb C Hj Hjl
+    (* the interior release two instructions ago already dropped "log" -- the
+       bare [lks] is what [Hown] carries here, and sleep's own acquire wants
+       it bounded below "proc". *)
+    assert (HbelowA4 : locks_below lks (lock_rank "proc")).
+    { apply (locks_below_mono lks (lock_rank "log")); [exact Hbelow | vm_compute; lia]. }
+    iApply (Sleep.wp_sleep_sconf γs j γl A4 (K - 4)%nat eb C lks Hj Hjl
               ltac:(pose proof (bo_K22 K HK); lia)
+              HbelowA4
               with "Hcg Hown Htext Hpc Hpinv Hpanic Htcx Hclmx").
+    all: try lkbelow.
     iIntros (CIDAs HAss mfs) "%HAscs Hcg Hown Hpc Htcx Hclmx".
     assert (HAp6 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x34))
       by (rewrite HA4ra; apply bv_eq; vm_compute; reflexivity).
@@ -981,6 +997,7 @@ Section BoBodies.
               (log_res γ bn γfs cov logstart) A6 0%nat eb pj C (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
     iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres Hown Hpay".
     assert (HAp8 : ret_pc (A6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x3a))
@@ -1094,10 +1111,17 @@ Section BoBodies.
     assert (HB1nz : eq_vec (B1 !!! Regidx (mword_of_int 10 : mword 5)) (zero_reg : mword 64) = false)
       by (rewrite HB1a0; exact bo_log_nz).
     (* -------------------- sleep_prepare(&log) -------------------- *)
+    (* still HOLDING "log" here -- same OUTER-set lift as [bo_armA_body]'s
+       note. *)
+    assert (HbelowB1 : locks_below ({[lock_rank "log"]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [vm_compute; lia |].
+      apply (locks_below_mono lks (lock_rank "log")); [exact Hbelow | vm_compute; lia]. }
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl B1
               (trap_res eb + (K - 4))%nat 1%nat eb C false
-              Hj Hjl HB1nz bo_noff2 ltac:(pose proof (bo_K22 K HK); lia)
+              ({[lock_rank "log"]} ∪ lks) Hj Hjl HB1nz bo_noff2 ltac:(pose proof (bo_K22 K HK); lia)
+              HbelowB1
               with "Hcg Hown Htext Hpc Hpinv Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfp) "%HBpcs Hcg Hown Hpc".
     assert (HBp3 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x5a))
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
@@ -1179,9 +1203,14 @@ Section BoBodies.
     iDestruct (cpu_own_transport CIDBr CIDBj 0 eb pj C eb ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID CIDBj eb pj ltac:(wp_next_chain) with "Htcx") as "Htcx".
     iDestruct (cpu_claim_ext_transport CID CIDBj eb pj ltac:(wp_next_chain) with "Hclmx") as "Hclmx".
-    iApply (Sleep.wp_sleep_sconf γs j γl B4 (K - 4)%nat eb C Hj Hjl
+    (* the bare [lks], as in [bo_armA_body]'s note. *)
+    assert (HbelowB4 : locks_below lks (lock_rank "proc")).
+    { apply (locks_below_mono lks (lock_rank "log")); [exact Hbelow | vm_compute; lia]. }
+    iApply (Sleep.wp_sleep_sconf γs j γl B4 (K - 4)%nat eb C lks Hj Hjl
               ltac:(pose proof (bo_K22 K HK); lia)
+              HbelowB4
               with "Hcg Hown Htext Hpc Hpinv Hpanic Htcx Hclmx").
+    all: try lkbelow.
     iIntros (CIDBs HBss mfs) "%HBscs Hcg Hown Hpc Htcx Hclmx".
     assert (HBp6 : ret_pc (B4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x64))
       by (rewrite HB4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1230,6 +1259,7 @@ Section BoBodies.
               (log_res γ bn γfs cov logstart) B6 0%nat eb pj C (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HB6a0). iExact "Hislock". }
     iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres Hown Hpay".
     assert (HBp8 : ret_pc (B6 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x6a))
@@ -1946,6 +1976,7 @@ Section ProofBeginOp.
               0%nat eb pj C (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
     iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".
     (* JOIN AT THE INDEX: the acquire's push_off freed the pair at

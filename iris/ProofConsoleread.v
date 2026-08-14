@@ -947,11 +947,14 @@ Section ProofConsoleread.
       (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) :
     (- 2 ^ 31 <= n < 2 ^ 31)%Z ->
     (consoleread_stack <= av)%nat ->
+    (* the +0x76 arm still holds cons.lock across either_copyout, whose cone
+       reaches "kmem"; the bound is stated where the siblings state it. *)
+    locks_below lks (lock_rank "cons") ->
     kernel_text -∗ is_conslock γc -∗ kalloc_env γa None -∗
     cr_head_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks -∗
     cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks.
   Proof.
-    intros Hn31 Hav. iIntros "#Ht #Hlk #Henv HEAD".
+    intros Hn31 Hav Hbelow. iIntros "#Ht #Hlk #Henv HEAD".
     rewrite /cr_have_prop.
     iIntros (CIDv Hsv M nc cur P' rr ww ee bs)
       "%Hregs %Ha5 %Hnb %Hlen %Hext EX Hcg Hpc Hcnt Hpay Hlocked Hrc Hwc Hec Hdat Hpriv Hsl7 Hq10 Hq11 Hq12".
@@ -1395,10 +1398,11 @@ Section ProofConsoleread.
     iApply (EitherCopyout.wp_either_copyout_sconf γa γf G5
               (trap_res true + (av - 12))%nat 1%nat true (proc_addr jp) C pid
               (upd_upt V P') true 1%nat (fun _ => trunc8 (H8 !!! Regidx Ra4))
-              (fun _ => chb0) false lks
+              (fun _ => chb0) false ({[lock_rank "cons"]} ∪ lks)
               Hstk ltac:(rewrite HG5a0; vm_compute; reflexivity) HG5a3
               ltac:(vm_compute; reflexivity) cr_lvl1
               with "Hcg Hcnt Ht Hpc Henv [Hch] [Hpriv]").
+    all: try lkbelow.
     { iEval (rewrite HG5a2). cbn [seq]. rewrite big_sepL_singleton pa_add_0.
       iExact "Hch". }
     { iExact "Hpriv". }
@@ -1788,7 +1792,7 @@ Section ProofConsoleread.
       by (rewrite /W1; apply callee_saved_insert_r;
           [vm_compute; reflexivity | apply callee_saved_refl]).
     iApply (Myproc.wp_myproc_sconf W1 (trap_res true + (av - 12))%nat 1%nat true
-              (proc_addr jp) C false cr_lvl1
+              (proc_addr jp) C false _ cr_lvl1
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
               with "Hcg Hcnt Ht Hpc").
@@ -1820,10 +1824,12 @@ Section ProofConsoleread.
       rewrite /W2. apply callee_saved_insert_r;
         [vm_compute; reflexivity | apply callee_saved_refl]. }
     iApply (Killed.wp_killed_sconf γs jp γlp W2 (trap_res true + (av - 12))%nat 1%nat true
-              (proc_addr jp) C false lks HW2a0 Hjp Hjl cr_lvl1
+              (proc_addr jp) C false ({[lock_rank "cons"]} ∪ lks) HW2a0 Hjp Hjl cr_lvl1
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
+              ltac:(lkbelow)
               with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mkl kl) "[%Hcskl %Hkla0] Hcg Hcnt Hpc". rgall.
     iEval (rewrite HW2ra) in "Hpc".
     assert (Hp50 : ret_pc (add_vec_int (mword_of_int (CR + 0x4c) : mword 64) 4)
@@ -1983,11 +1989,13 @@ Section ProofConsoleread.
     { rewrite /S2 /S1. apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs jp γlp S2
-              (trap_res true + (av - 12))%nat 1%nat true C false lks Hjp Hjl
+              (trap_res true + (av - 12))%nat 1%nat true C false ({[lock_rank "cons"]} ∪ lks) Hjp Hjl
               ltac:(rewrite HS2a0; exact a_cons_r_nz) cr_lvl1
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
+              ltac:(lkbelow)
               with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+    all: try lkbelow.
     iApply wp_next_off_intro. iIntros (msp) "%Hcssp Hcg Hcnt Hpc". rgall.
     iEval (rewrite HS2ra) in "Hpc".
     assert (Hp58 : ret_pc (add_vec_int (mword_of_int (CR + 0x54) : mword 64) 4)
@@ -2070,7 +2078,9 @@ Section ProofConsoleread.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Sleep.wp_sleep_sconf γs jp γlp S5 (av - 12)%nat true C lks Hjp Hjl
               ltac:(unfold consoleread_stack in Hav; lia)
+              ltac:(lkbelow)
               with "Hcg Hcnt Ht Hpc Hpinv Hpanic [] []").
+    all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
     iIntros (CIDs1 Hss1 msl) "%Hcssl Hcg Hcnt Hpc _ _". rgall.
@@ -2119,6 +2129,7 @@ Section ProofConsoleread.
               ltac:(unfold consoleread_stack in Hav; lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HS7a0). iExact "Hlk". }
     iIntros (CIDq2 Hsq2 ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
     iEval (rewrite HS7ra) in "Hpc".
@@ -2267,7 +2278,7 @@ Section ProofConsoleread.
     iAssert (□ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks)%I
       with "[]" as "#HAVE".
     { iModIntro.
-      iApply (cr_mk_have γa γc γf jp sp0 m0 av C pid V n fl lks Hn31 Hav with "Ht Hlk Henv").
+      iApply (cr_mk_have γa γc γf jp sp0 m0 av C pid V n fl lks Hn31 Hav Hbelow with "Ht Hlk Henv").
       iApply (IHfl with "Ht Hlk Henv Hpinv Hpanic"). }
     iPoseProof (cr_mk_wait γa γc γf γs jp γlp sp0 m0 av C pid V n fl lks Hjp Hjl Hn31 Hav Hbelow
                   with "Ht Hlk Henv Hpinv Hpanic HAVE") as "WAIT".
@@ -2745,6 +2756,7 @@ Section ProofConsoleread.
               (av - 12)%nat true lks cr_lvl0 ltac:(unfold consoleread_stack in Hav; lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc [] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
     iEval (rewrite HP8ra) in "Hpc".

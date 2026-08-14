@@ -239,7 +239,7 @@ Section ProofUvmfree.
     : wp_uvmfree_sconf_body γa mm uroot um K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmfree_sconf_body].
-    intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom.
+    intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
@@ -490,6 +490,7 @@ Section ProofUvmfree.
       (* ---- freewalk() at lvl = 2 ---- *)
       iApply (Freewalk.wp_freewalk_sconf γa J1 t 2%nat (K - 4)%nat eb p C ilvl b lks
                 HKfw Hilvl HJ1a0 Hfree with "Hcg Hcpu Htext Hpc Ht Henv").
+      all: try lkbelow.
       iIntros (CIDk3 Hsk3 mr) "Hcg Hcpu Hpc %Hcs".
       assert (Hret14 : ret_pc (J1 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmfree + 0x14)).
       { rewrite HJ1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -865,6 +866,7 @@ Section ProofUvmfree.
     iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa B7 uroot um n (K - 4)%nat eb p C ilvl b lks
               HKuu Hilvl HB7a0 Halign HB7a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CID15 Hs15 mr) "Hcg Hcpu Hpc %Hcs Hpt".
     iEval (rewrite HB7a1) in "Hpt".
     (* everything the table still mapped was inside the run it just cleared *)

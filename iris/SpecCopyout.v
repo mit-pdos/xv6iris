@@ -138,6 +138,9 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* vmfault's kalloc keeps its transient noff increment in int range;
      [lvl] is otherwise generic (usertrap calls at 0, the pipe loops at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* copyout -> walkaddr -> walk; [walk] states its bound at "kmem" whether or
+     not the alloc arm is taken *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
   cpu_own lvl eb p C b lks -∗
   kernel_text -∗

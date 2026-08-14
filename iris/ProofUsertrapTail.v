@@ -119,13 +119,18 @@ Section ProofUsertrapTail.
       (C : iProp Σ) (b : bool) (lks : gset nat) :
     ut_wf N ->
     (K_kexit <= nx)%nat ->
+    (* kexit's own cone bottoms out at "ftable" (1) -- the fileclose loop --
+       and every deeper lock it reaches (itable/log/wait_lock/proc) follows
+       by [locks_below_mono] inside its own contract, so this is the ONE
+       premise the tail owes it. *)
+    locks_below lks (lock_rank "ftable") ->
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
     ut_hold Rsys N V C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hnx. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
+    intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct "Hcaps" as "(#Hpi & #Hpa & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
@@ -137,10 +142,11 @@ Section ProofUsertrapTail.
               (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
               (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
-              None (un_fn N) m nx b C b (_ un_pid N) V
-              eq_refl Hj Hjl Hnx Hlg
+              None (un_fn N) m nx b C b _ (un_pid N) V
+              eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcpu Hcsrs Hclm Htext Hpc Hpi Hpa Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
+    all: try lkbelow.
   Qed.
 
 
@@ -654,7 +660,7 @@ Section UtRet.
       by (rewrite /M1 upd_eq; pcw).
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
-    iDestruct (cpu_own_transport CID CID1 0%nat b (un_pj N) C b lks
+    iDestruct (cpu_own_transport CID CID1 0%nat b (un_pj N) C b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -723,6 +729,11 @@ Section UtA6.
     m !!! Regidx csp_rs1 = pa_stk ksp 4 ->
     m !!! Regidx Rs1 = un_pj N ->
     ut_cs m0 m ->
+    (* the block's whole cone bottoms out at "ftable" (1), via the killed
+       branch's [ut_kexit]; killed itself (rank "proc" = 11) follows by
+       [locks_below_mono].  The not-killed branch (ut_ret / prepare_return)
+       touches no lock at all. *)
+    locks_below lks (lock_rank "ftable") ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -733,7 +744,7 @@ Section UtA6.
       (fun CID' => usertrap_post (CID := CID') (ut_res (CID := CID') Rsys) pt ksp m0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -790,12 +801,15 @@ Section UtA6.
       by (rewrite /M2 upd_eq; pcw).
     assert (HcsM2 : ut_cs m0 M2)
       by (rewrite /M2; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM1]).
-    iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b lks
+    iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (KI.wp_killed_sconf (CID := CID2) (un_s N) (un_j N) (un_l N)
               M2 nx 0%nat b (un_pj N) C b
               HM2a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
+              ltac:(exact (locks_below_mono lks (lock_rank "ftable")
+                             (lock_rank "proc") Hbelow ltac:(vm_compute; lia)))
               with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+    all: try lkbelow.
     iIntros (CID3 Hk3 mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hretac : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0xac))
       by (rewrite HM2ra; pcw).
@@ -883,7 +897,7 @@ Section UtA6.
                        (sign_extend' 64 (mword_of_int 2095486 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
-      iDestruct (cpu_own_transport CID3 CID7 0%nat b (un_pj N) C b lks
+      iDestruct (cpu_own_transport CID3 CID7 0%nat b (un_pj N) C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID3 CID7 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -892,7 +906,8 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx C b lks Hwf' ltac:(unfold K_kexit; lia) with "Htext Hpc Hcg [-]").
+                nx C b lks Hwf' ltac:(unfold K_kexit; lia) Hbelow
+                with "Htext Hpc Hcg [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -907,7 +922,7 @@ Section UtA6.
       assert (Hpae : add_vec_int (mword_of_int (UT + 0xac) : mword 64) 2
                      = mword_of_int (UT + 0xae)) by pcw.
       iEval (rewrite Hpae) in "Hpc".
-      iDestruct (cpu_own_transport CID3 CID4 0%nat b (un_pj N) C b lks
+      iDestruct (cpu_own_transport CID3 CID4 0%nat b (un_pj N) C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID3 CID4 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -1010,7 +1025,7 @@ Section UtFa.
                        (sign_extend' 64 (mword_of_int 8112 : mword 13))
                      = mword_of_int (UT + 0xae)) by pcw.
       iEval (rewrite Hpae) in "Hpc".
-      iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b lks
+      iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID CID2 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -1060,7 +1075,7 @@ Section UtFa.
       assert (HcsM2 : ut_cs m0 M2)
         by (rewrite /M2; apply ut_cs_insert;
             [vm_compute; reflexivity | exact HcsM1]).
-      iDestruct (cpu_own_transport CID CID3 0%nat b (un_pj N) C b lks
+      iDestruct (cpu_own_transport CID CID3 0%nat b (un_pj N) C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID CID3 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -1094,7 +1109,7 @@ Section UtFa.
                        ltac:(vm_compute; reflexivity)); exact HM2s1).
       assert (Hcsmf : ut_cs m0 mf)
         by exact (ut_cs_trans m0 M2 mf HcsM2 (ut_cs_of_callee_saved _ _ Hcsy)).
-      iDestruct (cpu_own_transport CID4 CID5 0%nat b (un_pj N) C b lks
+      iDestruct (cpu_own_transport CID4 CID5 0%nat b (un_pj N) C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID4 CID5 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
