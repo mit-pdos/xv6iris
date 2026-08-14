@@ -1121,7 +1121,7 @@ Section IallocClaim.
     (* ia_claim reaches log_write ("log", 3), brelse ("bcache", 4) and its
        tail iget ("itable", 2); "itable" is the lowest of the three, so one
        premise at its rank covers the whole cone via [locks_below_mono]. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗
@@ -1900,7 +1900,7 @@ Section IallocScan.
     (* ia_scan reaches bread/brelse ("bcache", 4, every turn) and ia_claim
        ("itable", 2, the claim arm); "itable" is the lower, so one premise
        at its rank covers the whole cone via [locks_below_mono]. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks (lock_rank "bcache") ->
     kernel_text -∗ kernel_data -∗
     panic_wp_any -∗
     printk_env γpr γu γd -∗

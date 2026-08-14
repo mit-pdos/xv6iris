@@ -591,7 +591,7 @@ Section ProofSysPipe.
       = mword_of_int KernelSyms.fileclose ->
     (* sp_close2's own two fileclose calls want "ftable" (1); nothing else in
        its body touches a lock. *)
-    locks_below lks (lock_rank "ftable") ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr Mt nav b p -∗
     cpu_own 0%nat eb p C b lks -∗
     (* THE COMPLEMENT, THREADED THROUGH BOTH CLOSES.  fileclose takes it at

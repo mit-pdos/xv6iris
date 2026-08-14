@@ -382,7 +382,7 @@ Section KexitLoop.
        unchanged (n = 0 throughout the loop -- no lock is held between
        iterations), and fileclose's own contract now needs [lks] below
        "ftable"'s rank (the lowest fileclose's callees ever touch). *)
-    locks_below lks (lock_rank "ftable") ->
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗
     is_ftable γft γf -∗
     panic_wp_any -∗
@@ -1417,7 +1417,7 @@ Section KexitRest.
        TOUCHES: "itable" (2), via [iput(p->cwd)] directly.  [end_op] (rank
        "log", 3) and the tail [kx_park] (rank "wait_lock", 10) both follow
        by [locks_below_mono]. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M av b pj -∗
     cpu_own 0 eb pj C b lks -∗
     (* THREADED, not framed: begin_op / iput / end_op all take the complement
@@ -1622,7 +1622,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID5 CID6 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    (* "log" (3) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    (* "log" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_log : locks_below lks (lock_rank "log"))
       by lkbelow.
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
@@ -1671,7 +1671,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID7 CID8 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    (* "wait_lock" (10) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    (* "wait_lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_wl : locks_below lks (lock_rank "wait_lock"))
       by lkbelow.
     iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av eb C b lks pid
@@ -2030,7 +2030,7 @@ Section ProofKexit.
         cbn [fcn_dqb fcn_dqs fcn_bmapstart fcn_inodestart fcn_fs fcn_cov
              fcn_logstart fcn_size].
         iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
-        (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
+        (* "itable" outranks "ftable": weaken [Hfresh]'s bound. *)
         assert (Hfresh_it : locks_below lks (lock_rank "itable"))
           by lkbelow.
         iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl γu γd γk pd pav pu bn γ γfs
@@ -2323,7 +2323,7 @@ Section KexitLoop.
        unchanged (n = 0 throughout the loop -- no lock is held between
        iterations), and fileclose's own contract now needs [lks] below
        "ftable"'s rank (the lowest fileclose's callees ever touch). *)
-    locks_below lks (lock_rank "ftable") ->
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗
     is_ftable γft γf -∗
     panic_wp_any -∗
@@ -3358,7 +3358,7 @@ Section KexitRest.
        TOUCHES: "itable" (2), via [iput(p->cwd)] directly.  [end_op] (rank
        "log", 3) and the tail [kx_park] (rank "wait_lock", 10) both follow
        by [locks_below_mono]. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr M av b pj -∗
     cpu_own 0 eb pj C b lks -∗
     (* THREADED, not framed: begin_op / iput / end_op all take the complement
@@ -3563,7 +3563,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID5 CID6 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    (* "log" (3) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    (* "log" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_log : locks_below lks (lock_rank "log"))
       by lkbelow.
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
@@ -3612,7 +3612,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID7 CID8 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    (* "wait_lock" (10) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    (* "wait_lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_wl : locks_below lks (lock_rank "wait_lock"))
       by lkbelow.
     iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av eb C b lks pid
@@ -3971,7 +3971,7 @@ Section ProofKexit.
         cbn [fcn_dqb fcn_dqs fcn_bmapstart fcn_inodestart fcn_fs fcn_cov
              fcn_logstart fcn_size].
         iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
-        (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
+        (* "itable" outranks "ftable": weaken [Hfresh]'s bound. *)
         assert (Hfresh_it : locks_below lks (lock_rank "itable"))
           by lkbelow.
         iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl γu γd γk pd pav pu bn γ γfs

@@ -123,7 +123,7 @@ Section ProofUsertrapTail.
        and every deeper lock it reaches (itable/log/wait_lock/proc) follows
        by [locks_below_mono] inside its own contract, so this is the ONE
        premise the tail owes it. *)
-    locks_below lks (lock_rank "ftable") ->
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -733,7 +733,7 @@ Section UtA6.
        branch's [ut_kexit]; killed itself (rank "proc" = 11) follows by
        [locks_below_mono].  The not-killed branch (ut_ret / prepare_return)
        touches no lock at all. *)
-    locks_below lks (lock_rank "ftable") ->
+    locks_below lks (lock_rank "proc") ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗

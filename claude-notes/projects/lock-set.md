@@ -68,11 +68,18 @@ call the function is *about* -- and the fd scan underneath them quietly calls
 `filedup`.  Whenever a bound looks obvious because one prominent callee states
 it, check the quiet ones.
 
+`tools/rank-audit.py` checks this, and checks it at BOTH levels -- Spec bodies
+against the contracts they call, and each local `Lemma` in a Proof file
+against the contracts called inside its own span.  It reads the table out of
+`LockRank.v`, so it stays honest across a reordering.  Run it after any new
+premise and after any change to `lock_ranks`; it exits nonzero with the
+offending premise and the rank it should carry.
+
 When the ranking itself changes, recompute each contract's floor by FIXPOINT
 over the call graph rather than by eye: a contract's new bound is the minimum
 over its callees' new bounds, and lowering one lowers its callers.  Moving
-`ftable`/`itable` above `proc` moved nineteen contracts down to `"log"` that
-way, most of them nowhere near a file table.
+`ftable`/`itable` above `proc` moved nineteen contracts and twelve local
+lemmas down to `"log"` that way, most of them nowhere near a file table.
 
 ### The two LEAVES sit above `proc`, and why the graph is acyclic
 

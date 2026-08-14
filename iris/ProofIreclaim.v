@@ -953,7 +953,7 @@ Section IreclaimOrphan.
     (* irc_orphan's cone: printk ("pr", 14), iget/iput ("itable", 2),
        begin_op/end_op ("log", 3), ilock ("bcache", 4), iunlock
        ("sleep lock", 6) -- "itable" is the lowest. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗ kernel_data -∗
@@ -2146,7 +2146,7 @@ Section IreclaimScan.
     γs !! j = Some γl ->
     (* irc_scan reaches irc_step (no lock), irc_orphan ("itable", 2) and
        irc_release ("bcache", 4) every turn; "itable" is the lowest. *)
-    locks_below lks (lock_rank "itable") ->
+    locks_below lks (lock_rank "bcache") ->
     kernel_text -∗ kernel_data -∗
     panic_wp_any -∗
     printk_env γpr γu γd -∗

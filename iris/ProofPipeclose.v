@@ -737,7 +737,7 @@ Section ProofPipeclose.
                    ([Hsetback'] above), so [Hown] here carries plain [lks]
                    again; kfree's "kmem" (13) outranks "pipe" (7), so [Hno]
                    weakens straight across with no [_union_singleton] step. *)
-                ltac:lkbelow
+                ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail Hpanic").
       all: try lkbelow.
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
@@ -1605,7 +1605,7 @@ Section ProofPipeclose.
                    ([Hsetback'] above), so [Hown] here carries plain [lks]
                    again; kfree's "kmem" (13) outranks "pipe" (7), so [Hno]
                    weakens straight across with no [_union_singleton] step. *)
-                ltac:lkbelow
+                ltac:(lkbelow)
                 with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail Hpanic").
       all: try lkbelow.
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].

@@ -269,7 +269,7 @@ Section ProofIunlockputMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    (* "sleep lock" (6) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    (* "sleep lock" outranks "itable": weaken [Hfresh]'s bound. *)
     assert (Hfresh_sl : locks_below lks (lock_rank "sleep lock"))
       by lkbelow.
     iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
