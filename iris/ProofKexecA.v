@@ -910,6 +910,28 @@ Section KexecABody.
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
+        (* THE EXIT, HANDED BACK -- see [kxc_phaseA]'s copy below. *)
+        wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
+          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+            (entry spv szv' : mword 64),
+              ⌜callee_saved m mf⌝ -∗
+              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              sie_cap_gpr mf K b (proc_addr jp) -∗
+              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              pc_is (ret_pc ra0) -∗
+              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+              ⌜used' ⊆ used⌝ -∗
+              bitmap_res gfs bmapstart cov logstart size used' -∗
+              kalloc_env ga None -∗
+              proc_priv gf (proc_addr jp) pidv V' -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 na,
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+              bslots bn 3 -∗
+              iref_slots 2 -∗
+              WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1411,10 +1433,14 @@ Section KexecABody.
           iSplitL "Hindres"; [iExact "Hindres" | iExact "Hblocks"]. }
         iDestruct (T.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
         iSpecialize ("Hcont90" $! CID15 with "[%]"); [wp_next_chain |].
+        (* [b] is gone by here -- [kxc_sie_b_agree] pinned it and the proof
+           [subst]ed it, so the retarget names the literal. *)
+        iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
+                     ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("Hcont90" $! Q12 k (q/2)%Qp (q/2)%Qp inum dnl bml gilk gislk gy
                   n1 used1 with "[%] [%] Hpc Hcg Hcnt Hslkk Hslkd Hslpid Hdep
                   Hidev Hiinum Hivalid Hload Hity Hkeep Hlog Hirs Hbm Hins Hbits
-                  Hbs Hka Hpriv Hpath Hargv Hargs").
+                  Hbs Hka Hpriv Hpath Hargv Hargs [-Hcont] Hcont").
         * split_and!; [exact HQ12sp | exact HQ12s0 | exact HQ12s1 | exact HQ12s2
                       | exact HQ12s4 | exact Hk | exact Hib' | exact HQ12thr].
         * split; [exact Hiu | exact Hused1].
@@ -1751,6 +1777,32 @@ Section KexecAMain.
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
         kxc_frameA6 sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) -∗
+        (* THE EXIT, HANDED BACK.  Phase A's two [-1] tails own one copy of
+           the caller's exit and a [wp_next] continuation is LINEAR, so
+           without this phase B would have none.  durable-notes' "CHAINING
+           TWO HALVES" -- the shape [kxc_a1] already uses internally, now on
+           phase A's own interface, because [ProofKexec.v] composes across it. *)
+        wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
+          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+            (entry spv szv' : mword 64),
+              ⌜callee_saved m mf⌝ -∗
+              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              sie_cap_gpr mf K b (proc_addr jp) -∗
+              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              pc_is (ret_pc ra0) -∗
+              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+              ⌜used' ⊆ used⌝ -∗
+              bitmap_res gfs bmapstart cov logstart size used' -∗
+              kalloc_env ga None -∗
+              proc_priv gf (proc_addr jp) pidv V' -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 na,
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+              bslots bn 3 -∗
+              iref_slots 2 -∗
+              WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

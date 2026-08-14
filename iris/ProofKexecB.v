@@ -319,6 +319,30 @@ Section KexecBBody.
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                    w67 ef P -∗
+        (* THE EXIT, HANDED BACK: a [wp_next] continuation is LINEAR, and the
+           +0x31c tail above already owns one copy, so the successor cannot
+           be left without one.  durable-notes' "CHAINING TWO HALVES". *)
+        wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
+          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+            (entry spv szv' : mword 64),
+              ⌜callee_saved m mf⌝ -∗
+              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              sie_cap_gpr mf K b (proc_addr jp) -∗
+              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              pc_is (ret_pc ra0) -∗
+              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+              ⌜used' ⊆ used⌝ -∗
+              bitmap_res gfs bmapstart cov logstart size used' -∗
+              kalloc_env ga None -∗
+              proc_priv gf (proc_addr jp) pidv V' -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 na,
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+              bslots bn 3 -∗
+              iref_slots 2 -∗
+              WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
     (* ---- OUTPUT 2: the phdr loop's body entry, at [i = 0], [sz = 0] ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
@@ -333,6 +357,30 @@ Section KexecBBody.
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
                    (mword_of_int 4095 : mword 64)
                    ef P 0%nat (mword_of_int 0 : mword 64) -∗
+        (* THE EXIT, HANDED BACK: a [wp_next] continuation is LINEAR, and the
+           +0x31c tail above already owns one copy, so the successor cannot
+           be left without one.  durable-notes' "CHAINING TWO HALVES". *)
+        wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDy : CpuId) =>
+          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+            (entry spv szv' : mword 64),
+              ⌜callee_saved m mf⌝ -∗
+              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              sie_cap_gpr mf K b (proc_addr jp) -∗
+              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              pc_is (ret_pc ra0) -∗
+              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+              ⌜used' ⊆ used⌝ -∗
+              bitmap_res gfs bmapstart cov logstart size used' -∗
+              kalloc_env ga None -∗
+              proc_priv gf (proc_addr jp) pidv V' -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 na,
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+              bslots bn 3 -∗
+              iref_slots 2 -∗
+              WP (Loop : expr riscv_lang)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -797,7 +845,9 @@ Section KexecBBody.
         iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
-        iApply ("Hcont1a2" $! G4 ef P v67).
+        iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
+                     ltac:(wp_next_chain) with "Hcont") as "Hcont".
+        iApply ("Hcont1a2" $! G4 ef P v67 with "[-Hcont] Hcont").
         rewrite /kxc_at_1a2.
         iSplitR.
         { iPureIntro. split_and!;
@@ -1059,7 +1109,9 @@ Section KexecBBody.
         iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) C true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
-        iApply ("Hcont12c" $! G11 ef P).
+        iDestruct (wp_next_retarget CID0 CID24 true (proc_addr jp) _
+                     ltac:(wp_next_chain) with "Hcont") as "Hcont".
+        iApply ("Hcont12c" $! G11 ef P with "[-Hcont] Hcont").
         rewrite /kxc_at_12c.
         (* [kxc_at_12c] has NO threading conjunct -- see its header: by +0x12c
            no callee-saved register still holds kexec's entry value, so the
