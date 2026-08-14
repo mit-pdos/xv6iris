@@ -6184,7 +6184,7 @@ Section ProofCreateMain.
          (fun CIDc : CpuId =>
             cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
                          nib ninodes size dev used plen pfun pv ty major minor
-                         V u Sb ns pidv dqb dqs dqbs dqn m K eb C b j
+                         V u Sb ns pidv dqb dqs dqbs dqn m K eb C b lks j
                          ret_tgt CIDc) -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -6253,7 +6253,7 @@ Section ProofCreateMain.
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iIntros "#Htext #Hpanic #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
              #Hprocs #Hdevi #Hgeom #Hdlk".
-    iDestruct (cr_tail_half j m sp0 ret_tgt K b HKsum Hal10 Hal9 Hspm Hrt
+    iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
     iIntros (CIDf Hsf).
     iIntros (Mx kslot q g gil gisl cinum dp bmp datap dc bmc datc
@@ -6270,6 +6270,12 @@ Section ProofCreateMain.
              Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hb : b = true) by (rewrite -Hbm; exact Heb). clear Hbm.
+    (* THE HELD SET IS EMPTY, AND SAID SO ONCE -- the level-0 pose the
+       sibling [cr_fail_half] makes, for the same reason: create's contract
+       carries no order premise because it needs none, and [lkbelow] closes
+       each callee's bound from this EQUATION.  Keep the equation rather
+       than substituting; [lks] is spelled by name in the bodies below. *)
+    iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
     pose proof HXregs as HXr.
     destruct HXr as (X2 & X8 & X9 & X18 & X19 & X20 & X21 & X22 & Xthr).
     destruct (Hiregb cinum Hcinb) as [Hcblk Hcblog].
