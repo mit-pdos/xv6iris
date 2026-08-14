@@ -12,9 +12,9 @@
           [exit]/[internal_error]/[assert_exp] functions actually satisfy
           ([gquiet] refutes a [GenericFail]; [gwalk]/[amo_tail] do not, since
           a [GenericFail] continuation is [False → _]);
-      §3  the ESCAPE INDEX that stage C2 asked C3 for: [gwalkx], the WEAK
-          (abandonment-permitting) reading of the window, with the two bind
-          lemmas it splits into;
+      §3  (was the ESCAPE INDEX [gwalkx] — DELETED in stage C8: with the
+          window gone from [WeakShape.gwalk] the weak and closed readings
+          coincide, and every [gwalkx] lemma is a [gwalk] one);
       §4  [gw_solve] / [gq_solve], the tactics the generated shards run;
       §5  the stage-C3 findings (O4)/(O5) at their sites: (O4) is FIXED in
           C4 and its two refutations are replaced by the positive leaves;
@@ -36,8 +36,8 @@
          read with no conditional write) and fixed it at the LTS.  C4 took
          the symmetric fix ([WeakSailLTS] delta (e'')): the window-closed
          [MemWrite] arms accept ANY RAM write and a standalone conditional
-         write steps as a plain [LStore].  See [gwalkx_write_ram_con] here
-         and [WeakShape.gwalk_write_ram_con].
+         write steps as a plain [LStore].  See
+         [WeakShape.gwalk_write_ram_con].
 
     (O5) THREE OPAQUE MONADIC AXIOMS.  [rv64d] declares
          [load_reservation], [cancel_reservation] and [plat_term_write] as
@@ -73,30 +73,30 @@ Set Default Proof Using "Type".
     SHAPE mode on its own, because a function whose cone contains an
     [exit]/[internal_error] is shaped but not live and not quiet. *)
 
-Lemma gwalk_and_boolM {E} w (l r : Defs.monad E bool) :
-  gwalk w l → gwalk None r → gwalk w (Defs.and_boolM l r).
+Lemma gwalk_and_boolM {E} (l r : Defs.monad E bool) :
+  gwalk l → gwalk r → gwalk (Defs.and_boolM l r).
 Proof.
   intros Hl Hr. rewrite /Defs.and_boolM.
   apply gwalk_bind; [done|]. by intros [|].
 Qed.
 
-Lemma gwalk_or_boolM {E} w (l r : Defs.monad E bool) :
-  gwalk w l → gwalk None r → gwalk w (Defs.or_boolM l r).
+Lemma gwalk_or_boolM {E} (l r : Defs.monad E bool) :
+  gwalk l → gwalk r → gwalk (Defs.or_boolM l r).
 Proof.
   intros Hl Hr. rewrite /Defs.or_boolM.
   apply gwalk_bind; [done|]. by intros [|].
 Qed.
 
 Lemma gwalk_genlistM {E A} (f : nat → Defs.monad E A) (n : nat) :
-  (∀ i, gwalk None (f i)) → gwalk None (Defs.genlistM f n).
+  (∀ i, gwalk (f i)) → gwalk (Defs.genlistM f n).
 Proof.
-  intros Hf. rewrite /Defs.genlistM. apply gwalk_foreachM; [|done].
+  intros Hf. rewrite /Defs.genlistM. apply gwalk_foreachM.
   intros i xs. apply gwalk_bind; [apply Hf|intros x; apply gwalk_ret].
 Qed.
 
 Lemma gwalk_autocast_m {E m n} {T : Z → Type} `{H : Inhabited (T n)}
     (x : Defs.monad E (T m)) :
-  gwalk None x → gwalk None (Defs.autocast_m (n := n) x).
+  gwalk x → gwalk (Defs.autocast_m (n := n) x).
 Proof.
   intros Hx. rewrite /Defs.autocast_m.
   apply gwalk_bind; [done|intros v; apply gwalk_ret].
@@ -104,14 +104,14 @@ Qed.
 
 Lemma gwalk_foreach_ZM_up {E Vars} from to step (vars : Vars)
     (body : Z → Vars → Defs.monad E Vars) :
-  (∀ z v, gwalk None (body z v)) →
-  gwalk None (Defs.foreach_ZM_up from to step vars body).
+  (∀ z v, gwalk (body z v)) →
+  gwalk (Defs.foreach_ZM_up from to step vars body).
 Proof. intros Hb. by apply gwalk_foreach_ZM_up'. Qed.
 
 Lemma gwalk_foreach_ZM_down {E Vars} from to step (vars : Vars)
     (body : Z → Vars → Defs.monad E Vars) :
-  (∀ z v, gwalk None (body z v)) →
-  gwalk None (Defs.foreach_ZM_down from to step vars body).
+  (∀ z v, gwalk (body z v)) →
+  gwalk (Defs.foreach_ZM_down from to step vars body).
 Proof. intros Hb. by apply gwalk_foreach_ZM_down'. Qed.
 
 (* ====================================================================== *)
@@ -161,14 +161,7 @@ Proof.
   destruct ty; simpl; try done; intros H r; by apply IH.
 Qed.
 
-Lemma gsilent_gwalk {E A} (m : Defs.monad E A) : gsilent m → gwalk None m.
-Proof.
-  induction m as [x|T oc k IH]; [done|].
-  destruct oc; simpl; try done; try (intros H r; by apply IH).
-  destruct ty; simpl; try done; intros H r; by apply IH.
-Qed.
-
-Lemma gsilent_amo_tail pa n (m : M unit) : gsilent m → amo_tail pa n m.
+Lemma gsilent_gwalk {E A} (m : Defs.monad E A) : gsilent m → gwalk m.
 Proof.
   induction m as [x|T oc k IH]; [done|].
   destruct oc; simpl; try done; try (intros H r; by apply IH).
@@ -284,218 +277,12 @@ Proof.
   intros idx. destruct (List.nth_error xs (Z.to_nat idx)); [done|apply gsilent_fail].
 Qed.
 
-(** The window-crossing bind, in the [gsilent] mode: a silent prefix carries
-    an OPEN window into its continuation.  This is [WeakShape.gwalk_bind_quiet]
-    with the failure nodes allowed. *)
-Lemma gwalk_bind_silent {E A B} w (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gsilent m → (∀ x, gwalk w (k x)) → gwalk w (Defs.bind m k).
-Proof.
-  induction m as [x|T oc k0 IH]; intros Hm Hk; [by apply Hk|].
-  rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
-    try (intros r; by apply IH); try done.
-  destruct ty; simpl in Hm |- *; intros r; by apply IH.
-Qed.
-
-(* ====================================================================== *)
-(** ** 3. THE ESCAPE INDEX (stage C2's C3 item)
-
-    [WeakShape.gwalk (Some _)] is the CLOSED reading of an open window: the
-    conditional write MUST arrive before the monad returns.  C2 weakened
-    [WeakSailLTS.amo_tail]'s [Interface.Ret] arm to [True] — a window may be
-    ABANDONED — but the kit could not follow, because weakening
-    [gwalk (Some _) (Ret _)] refutes [gwalk_bind]: an abandoned window
-    ESCAPES a bind into the continuation.
-
-    [gwalkx] is the weak reading, added HERE rather than by editing [gwalk],
-    so that every closed-reading lemma of [WeakShape] stays literally
-    unchanged and transfers by [gwalk_gwalkx].  The bind splits in two:
-
-      - [gwalkx_bind]        — [m] escape-FREE (the [gwalk] hypothesis), the
-                               continuation arbitrary.  This is the case for
-                               the ~330 functions that issue no exclusive
-                               read.
-      - [gwalkx_bind_silent] — [m] MAY escape, and then the continuation must
-                               be crossable under an arbitrary window, i.e.
-                               [gsilent].  This is the case at
-                               [execute_LOADRES] and the abandoning arms of
-                               [execute_AMO] / [update_and_write_pte].
-
-    [gwalkx None] still implies [sail_shaped] and [gwalkx (Some _)] still
-    implies [amo_tail], so the escape index costs the consumers nothing. *)
-
-Section WalkX.
-Context {E A : Type}.
-Local Notation mon := (Defs.monad E A).
-
-Fixpoint gwalkx (w : win) (m : mon) {struct m} : Prop :=
-  match m with
-  | Interface.Ret _ => True
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T → mon) → Prop with
-       | Interface.MemRead n req => λ k,
-           match w with
-           | Some _ => False
-           | None =>
-               if dev_addr (Interface.ReadReq.pa req)
-               then ∀ v : bv (8 * n), gwalkx None (k (inl (v, None)))
-               else
-                 ak_coh (classify (Interface.ReadReq.access_kind req)) = false ∧
-                 (if ak_latest (classify (Interface.ReadReq.access_kind req))
-                  then ∀ v : bv (8 * n),
-                         gwalkx (Some (Interface.ReadReq.pa req, n))
-                                (k (inl (v, None)))
-                  else ∀ v : bv (8 * n), gwalkx None (k (inl (v, None))))
-           end
-       | Interface.MemWrite n' req' => λ k,
-           match w with
-           | Some (pa, n) =>
-               dev_addr (Interface.WriteReq.pa req') = false ∧
-               Interface.WriteReq.pa req' = pa ∧ n' = n ∧ n' ≠ 0%N ∧
-               ak_latest (classify (Interface.WriteReq.access_kind req')) = true ∧
-               gwalkx None (k (inl None))
-           | None =>
-               (* any RAM write of nonzero width — [WeakShape.gwalk]'s C4
-                  arm, mirrored ([WeakSailLTS] delta (e'')) *)
-               (if dev_addr (Interface.WriteReq.pa req') then True
-                else n' ≠ 0%N) ∧
-               gwalkx None (k (inl None))
-           end
-       | Interface.Barrier _ => λ k,
-           match w with
-           | Some _ => False
-           | None => ∀ r, gwalkx None (k r)
-           end
-       | Interface.ExtraOutcome _ => λ _, True   (* (e'''), as in [gwalk] *)
-       | _ => λ k, ∀ r, gwalkx w (k r)
-       end) k
-  end.
-
-End WalkX.
-
-Arguments gwalkx {E A} w m.
-
-Lemma gwalk_gwalkx {E A} w (m : Defs.monad E A) : gwalk w m → gwalkx w m.
-Proof.
-  revert w. induction m as [x|T oc k IH]; intros w Hm; [done|].
-  destruct oc; simpl in Hm |- *.
-  all: try (intros r; by apply IH).
-  - destruct w as [[pa0 n0]|]; [done|].
-    destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros v. by apply IH. }
-    destruct Hm as [Hc Hm]. split; [done|].
-    destruct (ak_latest _); intros v; by apply IH.
-  - destruct w as [[pa0 n0]|].
-    + destruct Hm as (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. by apply IH.
-    + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
-  - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - (* ExtraOutcome: (e''') — [True] in both modes here *) done.
-Qed.
-
-Lemma gsilent_gwalkx {E A} w (m : Defs.monad E A) : gsilent m → gwalkx w m.
-Proof.
-  revert w. induction m as [x|T oc k IH]; intros w Hm; [done|].
-  destruct oc; simpl in Hm |- *; try done; try (intros r; by apply IH).
-  destruct ty; simpl in Hm |- *; intros r; by apply IH.
-Qed.
-
-(** The two halves of [sail_shaped]/[amo_tail], from the WEAK reading. *)
-Lemma gwalkx_unit (m : M unit) :
-  (gwalkx None m → sail_shaped m) ∧
-  (∀ pa n, gwalkx (Some (pa, n)) m → amo_tail pa n m).
-Proof.
-  induction m as [x|T oc k IH]; [by split|].
-  destruct oc; simpl.
-  all: try (split; [intros H r; by apply IH, H
-                   |intros pa1 n1 H r; by apply IH, H]).
-  - split; [|by intros pa1 n1].
-    destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros H v; by apply IH, H. }
-    intros [Hc H]. split; [done|].
-    destruct (ak_latest _); intros v; by apply IH, H.
-  - split.
-    + destruct (dev_addr (Interface.WriteReq.pa t)).
-      * intros [_ H]. split; [done|by apply IH, H].
-      * intros [Hn H]. split; [done|by apply IH, H].
-    + intros pa1 n1 (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. by apply IH, H6.
-  - split; [intros H r; by apply IH, H|by intros pa1 n1].
-  - (* ExtraOutcome: (e''') — [True] here, and [amo_tail]'s arm is [True] too *)
-    by split.
-Qed.
-
-Lemma gwalkx_shaped (m : M unit) : gwalkx None m → sail_shaped m.
-Proof. apply gwalkx_unit. Qed.
-
-Lemma gwalkx_amo_tail pa n (m : M unit) :
-  gwalkx (Some (pa, n)) m → amo_tail pa n m.
-Proof. apply gwalkx_unit. Qed.
-
-(** THE ESCAPE-FREE BIND: [m] closes every window it opens (the [gwalk]
-    hypothesis), so the continuation is entered with NO window. *)
-Lemma gwalkx_bind {E A B} w (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gwalk w m → (∀ x, gwalkx None (k x)) → gwalkx w (Defs.bind m k).
-Proof.
-  revert w. induction m as [x|T oc k0 IH]; intros w Hm Hk.
-  { destruct w; [done|apply Hk]. }
-  rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *.
-  all: try (intros r; by apply IH).
-  - destruct w as [[pa0 n0]|]; [done|].
-    destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros v. by apply IH. }
-    destruct Hm as [Hc Hm]. split; [done|].
-    destruct (ak_latest _); intros v; by apply IH.
-  - destruct w as [[pa0 n0]|].
-    + destruct Hm as (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. by apply IH.
-    + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
-  - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - (* ExtraOutcome: (e''') *) done.
-Qed.
-
-(** THE ESCAPING BIND: [m] may leave a window open at its [Interface.Ret], so
-    the continuation is entered under an ARBITRARY window and must be
-    crossable under one — that is [gsilent].  This is the lemma the
-    abandoning exclusive sites compose through. *)
-Lemma gwalkx_bind_silent {E A B} w (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gwalkx w m → (∀ x, gsilent (k x)) → gwalkx w (Defs.bind m k).
-Proof.
-  revert w. induction m as [x|T oc k0 IH]; intros w Hm Hk.
-  { apply gsilent_gwalkx. apply Hk. }
-  rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *.
-  all: try (intros r; by apply IH).
-  - destruct w as [[pa0 n0]|]; [done|].
-    destruct (dev_addr (Interface.ReadReq.pa t)).
-    { intros v. by apply IH. }
-    destruct Hm as [Hc Hm]. split; [done|].
-    destruct (ak_latest _); intros v; by apply IH.
-  - destruct w as [[pa0 n0]|].
-    + destruct Hm as (H1 & H2 & H3 & H4 & H5 & H6).
-      split_and!; try done. by apply IH.
-    + destruct Hm as [H1 H2]. split; [done|]. by apply IH.
-  - destruct w as [[pa0 n0]|]; [done|]. intros r. by apply IH.
-  - (* ExtraOutcome: (e''') *) done.
-Qed.
-
-(** The abandoning exclusive READ, in the weak reading: the continuation may
-    end without a conditional write, provided it is silent from there on.
-    This is the shape of [rv64d.execute_LOADRES]. *)
-Lemma gwalkx_read_ram_abandon {B} rk addr width meta (k : _ → M B) :
-  rk = Read_RISCV_reserved ∨ rk = Read_RISCV_reserved_acquire →
-  dev_addr addr = false →
-  (∀ r, gsilent (k r)) →
-  gwalkx None (Defs.bind (read_ram rk (Physaddr addr) width meta) k).
-Proof.
-  intros Hrk Hd Hk. destruct Hrk as [->| ->];
-    cbv [read_ram]; cbn [Defs.bind Defs.bind0 Defs.returnm returnM
-                         Interface.iMon_bind];
-    cbv [Defs.sail_mem_read];
-    cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind];
-    (simpl; rewrite Hd; split; [done|]);
-    intros v;
-    cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind];
-    by apply gsilent_gwalkx.
-Qed.
+(** The [gsilent]-prefix bind.  (Since stage C8 this is just
+    [WeakShape.gwalk_bind] after [gsilent_gwalk]; it is kept because the
+    sweep tactics dispatch on the PREFIX's mode.) *)
+Lemma gwalk_bind_silent {E A B} (m : Defs.monad E A) (k : A → Defs.monad E B) :
+  gsilent m → (∀ x, gwalk (k x)) → gwalk (Defs.bind m k).
+Proof. intros Hm Hk. apply gwalk_bind; [by apply gsilent_gwalk|exact Hk]. Qed.
 
 (* ====================================================================== *)
 (** ** 4. The sweep tactics
@@ -511,102 +298,102 @@ Qed.
     can close a leaf with ONE hint-database lookup instead of the
     [apply gwalk_quiet; solve [shape_leaf]] chain, which is the difference
     between a 1-second and a 100-second per-function proof at this scale. *)
-Lemma gwalk_read_reg {E} (r : Arch.reg) : gwalk (E := E) None (Defs.read_reg r).
+Lemma gwalk_read_reg {E} (r : Arch.reg) : gwalk (E := E) (Defs.read_reg r).
 Proof. by apply gwalk_quiet, gquiet_read_reg. Qed.
 Lemma gwalk_write_reg {E} (r : Arch.reg) v :
-  gwalk (E := E) None (Defs.write_reg r v).
+  gwalk (E := E) (Defs.write_reg r v).
 Proof. by apply gwalk_quiet, gquiet_write_reg. Qed.
 Lemma gwalk_read_reg_ref {E a}
     (rf : @Values.register_ref Arch.reg Arch.reg_type a) :
-  gwalk (E := E) None (Defs.read_reg_ref rf).
+  gwalk (E := E) (Defs.read_reg_ref rf).
 Proof. by apply gwalk_quiet, gquiet_read_reg_ref. Qed.
 Lemma gwalk_reg_deref {E a}
     (rf : @Values.register_ref Arch.reg Arch.reg_type a) :
-  gwalk (E := E) None (Defs.reg_deref rf).
+  gwalk (E := E) (Defs.reg_deref rf).
 Proof. by apply gwalk_quiet, gquiet_reg_deref. Qed.
 Lemma gwalk_write_reg_ref {E a}
     (rf : @Values.register_ref Arch.reg Arch.reg_type a) v :
-  gwalk (E := E) None (Defs.write_reg_ref rf v).
+  gwalk (E := E) (Defs.write_reg_ref rf v).
 Proof. by apply gwalk_quiet, gquiet_write_reg_ref. Qed.
 Lemma gwalk_sys_reg_read {E a} id
     (rf : @Values.register_ref Arch.reg Arch.reg_type a) :
-  gwalk (E := E) None (Defs.sail_sys_reg_read id rf).
+  gwalk (E := E) (Defs.sail_sys_reg_read id rf).
 Proof. by apply gwalk_quiet, gquiet_sys_reg_read. Qed.
 Lemma gwalk_sys_reg_write {E a} id
     (rf : @Values.register_ref Arch.reg Arch.reg_type a) v :
-  gwalk (E := E) None (Defs.sail_sys_reg_write id rf v).
+  gwalk (E := E) (Defs.sail_sys_reg_write id rf v).
 Proof. by apply gwalk_quiet, gquiet_sys_reg_write. Qed.
 Lemma gwalk_instr_announce {E sz} (op : Values.mword sz) :
-  gwalk (E := E) None (Defs.instr_announce op).
+  gwalk (E := E) (Defs.instr_announce op).
 Proof. by apply gwalk_quiet, gquiet_instr_announce. Qed.
 Lemma gwalk_branch_announce {E} sz (a : Values.mword sz) :
-  gwalk (E := E) None (Defs.branch_announce sz a).
+  gwalk (E := E) (Defs.branch_announce sz a).
 Proof. by apply gwalk_quiet, gquiet_branch_announce. Qed.
 Lemma gwalk_sail_take_exception {E} f :
-  gwalk (E := E) None (Defs.sail_take_exception f).
+  gwalk (E := E) (Defs.sail_take_exception f).
 Proof. by apply gwalk_quiet, gquiet_sail_take_exception. Qed.
 Lemma gwalk_sail_return_exception {E} pa :
-  gwalk (E := E) None (Defs.sail_return_exception pa).
+  gwalk (E := E) (Defs.sail_return_exception pa).
 Proof. by apply gwalk_quiet, gquiet_sail_return_exception. Qed.
-Lemma gwalk_sail_cache_op {E} o : gwalk (E := E) None (Defs.sail_cache_op o).
+Lemma gwalk_sail_cache_op {E} o : gwalk (E := E) (Defs.sail_cache_op o).
 Proof. by apply gwalk_quiet, gquiet_sail_cache_op. Qed.
-Lemma gwalk_sail_tlbi {E} o : gwalk (E := E) None (Defs.sail_tlbi o).
+Lemma gwalk_sail_tlbi {E} o : gwalk (E := E) (Defs.sail_tlbi o).
 Proof. by apply gwalk_quiet, gquiet_sail_tlbi. Qed.
 Lemma gwalk_translation_start {E} ts :
-  gwalk (E := E) None (Defs.sail_translation_start ts).
+  gwalk (E := E) (Defs.sail_translation_start ts).
 Proof. by apply gwalk_quiet, gquiet_translation_start. Qed.
 Lemma gwalk_translation_end {E} te :
-  gwalk (E := E) None (Defs.sail_translation_end te).
+  gwalk (E := E) (Defs.sail_translation_end te).
 Proof. by apply gwalk_quiet, gquiet_translation_end. Qed.
-Lemma gwalk_cycle_count {E} u : gwalk (E := E) None (Defs.cycle_count u).
+Lemma gwalk_cycle_count {E} u : gwalk (E := E) (Defs.cycle_count u).
 Proof. by apply gwalk_quiet, gquiet_cycle_count. Qed.
 Lemma gwalk_get_cycle_count {E} u :
-  gwalk (E := E) None (Defs.get_cycle_count u).
+  gwalk (E := E) (Defs.get_cycle_count u).
 Proof. by apply gwalk_quiet, gquiet_get_cycle_count. Qed.
-Lemma gwalk_print_effect {E} s : gwalk (E := E) None (Defs.print_effect s).
+Lemma gwalk_print_effect {E} s : gwalk (E := E) (Defs.print_effect s).
 Proof. by apply gwalk_quiet, gquiet_print_effect. Qed.
-Lemma gwalk_choose_bool {E} d : gwalk (E := E) None (Defs.choose_bool d).
+Lemma gwalk_choose_bool {E} d : gwalk (E := E) (Defs.choose_bool d).
 Proof. by apply gwalk_quiet, gquiet_choose_bool. Qed.
-Lemma gwalk_choose_int {E} d : gwalk (E := E) None (Defs.choose_int d).
+Lemma gwalk_choose_int {E} d : gwalk (E := E) (Defs.choose_int d).
 Proof. by apply gwalk_quiet, gquiet_choose_int. Qed.
-Lemma gwalk_choose_nat {E} d : gwalk (E := E) None (Defs.choose_nat d).
+Lemma gwalk_choose_nat {E} d : gwalk (E := E) (Defs.choose_nat d).
 Proof. by apply gwalk_quiet, gquiet_choose_nat. Qed.
-Lemma gwalk_choose_string {E} d : gwalk (E := E) None (Defs.choose_string d).
+Lemma gwalk_choose_string {E} d : gwalk (E := E) (Defs.choose_string d).
 Proof. by apply gwalk_quiet, gquiet_choose_string. Qed.
 Lemma gwalk_choose_range {E} d lo hi :
-  gwalk (E := E) None (Defs.choose_range d lo hi).
+  gwalk (E := E) (Defs.choose_range d lo hi).
 Proof. by apply gwalk_quiet, gquiet_choose_range. Qed.
 Lemma gwalk_choose_bitvector {E} d n :
-  gwalk (E := E) None (Defs.choose_bitvector d n).
+  gwalk (E := E) (Defs.choose_bitvector d n).
 Proof. by apply gwalk_quiet, gquiet_choose_bitvector. Qed.
-Lemma gwalk_undefined_unit {E} u : gwalk (E := E) None (Defs.undefined_unit u).
+Lemma gwalk_undefined_unit {E} u : gwalk (E := E) (Defs.undefined_unit u).
 Proof. by apply gwalk_quiet, gquiet_undefined_unit. Qed.
-Lemma gwalk_undefined_bool {E} u : gwalk (E := E) None (Defs.undefined_bool u).
+Lemma gwalk_undefined_bool {E} u : gwalk (E := E) (Defs.undefined_bool u).
 Proof. by apply gwalk_quiet, gquiet_undefined_bool. Qed.
-Lemma gwalk_undefined_int {E} u : gwalk (E := E) None (Defs.undefined_int u).
+Lemma gwalk_undefined_int {E} u : gwalk (E := E) (Defs.undefined_int u).
 Proof. by apply gwalk_quiet, gquiet_undefined_int. Qed.
-Lemma gwalk_undefined_nat {E} u : gwalk (E := E) None (Defs.undefined_nat u).
+Lemma gwalk_undefined_nat {E} u : gwalk (E := E) (Defs.undefined_nat u).
 Proof. by apply gwalk_quiet, gquiet_undefined_nat. Qed.
 Lemma gwalk_undefined_string {E} u :
-  gwalk (E := E) None (Defs.undefined_string u).
+  gwalk (E := E) (Defs.undefined_string u).
 Proof. by apply gwalk_quiet, gquiet_undefined_string. Qed.
 Lemma gwalk_undefined_range {E} i j :
-  gwalk (E := E) None (Defs.undefined_range i j).
+  gwalk (E := E) (Defs.undefined_range i j).
 Proof. by apply gwalk_quiet, gquiet_undefined_range. Qed.
 Lemma gwalk_undefined_bitvector {E} n :
-  gwalk (E := E) None (Defs.undefined_bitvector n).
+  gwalk (E := E) (Defs.undefined_bitvector n).
 Proof. by apply gwalk_quiet, gquiet_undefined_bitvector. Qed.
 Lemma gwalk_undefined_vector {E T} n `{Inhabited T} (a : T) :
-  gwalk (E := E) None (Defs.undefined_vector n a).
+  gwalk (E := E) (Defs.undefined_vector n a).
 Proof. by apply gwalk_quiet, gquiet_undefined_vector. Qed.
 Lemma gwalk_sail_barrier {E} (b : Arch.barrier) :
-  gwalk (E := E) None (Defs.sail_barrier b).
+  gwalk (E := E) (Defs.sail_barrier b).
 Proof. apply gok_sail_barrier. Qed.
 
 Create HintDb gshape discriminated.
 
 (** A `discriminated` DB PRUNES BY HEAD CONSTANT ONLY IF THE CONSTANTS ARE
-    OPAQUE TO IT.  Every hint here concludes [gwalk None (<model function> ?a
+    OPAQUE TO IT.  Every hint here concludes [gwalk (<model function> ?a
     …)], and the generated model's definitions are TRANSPARENT, so without
     this line [eauto] delta-unfolds them while matching and compares BODIES:
     at a goal about one CSR [legalize_*] it walks into every sibling
@@ -672,28 +459,28 @@ Ltac gsl_solve :=
 
 Ltac gw_step :=
   match goal with
-  | |- gwalk _ (Defs.bind _ _) => apply gwalk_bind
-  | |- gwalk _ (Defs.bind0 _ _) => apply gwalk_bind0
-  | |- gwalk None (Defs.try_catch _ _) => apply gwalk_try_catch
-  | |- gwalk None (Defs.liftR _) => apply gwalk_liftR
-  | |- gwalk None (Defs.catch_early_return _) => apply gwalk_catch_early_return
-  | |- gwalk None (Defs.try_catchR _ _) => apply gwalk_try_catchR
-  | |- gwalk _ (Defs.and_boolM _ _) => apply gwalk_and_boolM
-  | |- gwalk _ (Defs.or_boolM _ _) => apply gwalk_or_boolM
-  | |- gwalk None (Defs.foreachM _ _ _) => apply gwalk_foreachM
-  | |- gwalk None (Defs.foreach_ZM_up _ _ _ _ _) => apply gwalk_foreach_ZM_up'
-  | |- gwalk None (Defs.foreach_ZM_down _ _ _ _ _) => apply gwalk_foreach_ZM_down'
-  | |- gwalk None (Defs.genlistM _ _) => apply gwalk_genlistM
-  | |- gwalk None (Defs.autocast_m _) => apply gwalk_autocast_m
-  | |- gwalk None (Defs.untilMT _ _ _ _) => apply gwalk_untilMT
-  | |- gwalk None (Defs.whileMT _ _ _ _) => apply gwalk_whileMT
-  | |- gwalk _ (if ?b then _ else _) => destruct b
-  | |- gwalk _ (match ?x with _ => _ end) => destruct x
+  | |- gwalk (Defs.bind _ _) => apply gwalk_bind
+  | |- gwalk (Defs.bind0 _ _) => apply gwalk_bind0
+  | |- gwalk (Defs.try_catch _ _) => apply gwalk_try_catch
+  | |- gwalk (Defs.liftR _) => apply gwalk_liftR
+  | |- gwalk (Defs.catch_early_return _) => apply gwalk_catch_early_return
+  | |- gwalk (Defs.try_catchR _ _) => apply gwalk_try_catchR
+  | |- gwalk (Defs.and_boolM _ _) => apply gwalk_and_boolM
+  | |- gwalk (Defs.or_boolM _ _) => apply gwalk_or_boolM
+  | |- gwalk (Defs.foreachM _ _ _) => apply gwalk_foreachM
+  | |- gwalk (Defs.foreach_ZM_up _ _ _ _ _) => apply gwalk_foreach_ZM_up'
+  | |- gwalk (Defs.foreach_ZM_down _ _ _ _ _) => apply gwalk_foreach_ZM_down'
+  | |- gwalk (Defs.genlistM _ _) => apply gwalk_genlistM
+  | |- gwalk (Defs.autocast_m _) => apply gwalk_autocast_m
+  | |- gwalk (Defs.untilMT _ _ _ _) => apply gwalk_untilMT
+  | |- gwalk (Defs.whileMT _ _ _ _) => apply gwalk_whileMT
+  | |- gwalk (if ?b then _ else _) => destruct b
+  | |- gwalk (match ?x with _ => _ end) => destruct x
   (* a function with SEVERAL pattern binders elaborates to a match APPLIED to
      the remaining arguments -- the generated proof destructs those arguments
      up front, but the applied form still shows up inside a body. *)
-  | |- gwalk _ (match ?x with _ => _ end _) => destruct x
-  | |- gwalk _ (match ?x with _ => _ end _ _) => destruct x
+  | |- gwalk (match ?x with _ => _ end _) => destruct x
+  | |- gwalk (match ?x with _ => _ end _ _) => destruct x
   end.
 
 (** A LEAF TACTIC IS RUN AT EVERY *NODE*, NOT ONLY AT LEAVES — so any
@@ -707,9 +494,9 @@ Ltac gw_step :=
     subterm.  Two ways that is superlinear:
 
       - [apply gwalk_quiet] / [apply gsilent_gwalk] succeed on ANY
-        [gwalk None ?m] goal and then hand the subterm to [eauto];
+        [gwalk ?m] goal and then hand the subterm to [eauto];
       - worse, THE HINT-DATABASE LOOKUP ITSELF.  Every hint's conclusion is
-        [gwalk None (<some model function> ?a …)] and the model's functions
+        [gwalk (<some model function> ?a …)] and the model's functions
         are TRANSPARENT, so unification delta-unfolds them and compares
         bodies.  Sibling functions in the same band share a long prefix
         ([legalize_mie] and [legalize_mideleg] are both four
@@ -731,25 +518,25 @@ Ltac gw_step :=
     through [Arch.reg_type] — the C1 finding, still true. *)
 Ltac gw_atomic :=
   lazymatch goal with
-  | |- gwalk _ (Defs.bind _ _) => fail
-  | |- gwalk _ (Defs.bind0 _ _) => fail
-  | |- gwalk _ (Defs.try_catch _ _) => fail
-  | |- gwalk _ (Defs.liftR _) => fail
-  | |- gwalk _ (Defs.catch_early_return _) => fail
-  | |- gwalk _ (Defs.try_catchR _ _) => fail
-  | |- gwalk _ (Defs.and_boolM _ _) => fail
-  | |- gwalk _ (Defs.or_boolM _ _) => fail
-  | |- gwalk _ (Defs.foreachM _ _ _) => fail
-  | |- gwalk _ (Defs.foreach_ZM_up _ _ _ _ _) => fail
-  | |- gwalk _ (Defs.foreach_ZM_down _ _ _ _ _) => fail
-  | |- gwalk _ (Defs.genlistM _ _) => fail
-  | |- gwalk _ (Defs.autocast_m _) => fail
-  | |- gwalk _ (Defs.untilMT _ _ _ _) => fail
-  | |- gwalk _ (Defs.whileMT _ _ _ _) => fail
-  | |- gwalk _ (if _ then _ else _) => fail
-  | |- gwalk _ (match _ with _ => _ end) => fail
-  | |- gwalk _ (match _ with _ => _ end _) => fail
-  | |- gwalk _ (match _ with _ => _ end _ _) => fail
+  | |- gwalk (Defs.bind _ _) => fail
+  | |- gwalk (Defs.bind0 _ _) => fail
+  | |- gwalk (Defs.try_catch _ _) => fail
+  | |- gwalk (Defs.liftR _) => fail
+  | |- gwalk (Defs.catch_early_return _) => fail
+  | |- gwalk (Defs.try_catchR _ _) => fail
+  | |- gwalk (Defs.and_boolM _ _) => fail
+  | |- gwalk (Defs.or_boolM _ _) => fail
+  | |- gwalk (Defs.foreachM _ _ _) => fail
+  | |- gwalk (Defs.foreach_ZM_up _ _ _ _ _) => fail
+  | |- gwalk (Defs.foreach_ZM_down _ _ _ _ _) => fail
+  | |- gwalk (Defs.genlistM _ _) => fail
+  | |- gwalk (Defs.autocast_m _) => fail
+  | |- gwalk (Defs.untilMT _ _ _ _) => fail
+  | |- gwalk (Defs.whileMT _ _ _ _) => fail
+  | |- gwalk (if _ then _ else _) => fail
+  | |- gwalk (match _ with _ => _ end) => fail
+  | |- gwalk (match _ with _ => _ end _) => fail
+  | |- gwalk (match _ with _ => _ end _ _) => fail
   | _ => idtac
   end.
 
@@ -780,9 +567,10 @@ Ltac gw_solve :=
     ------------------------------------------------------------------------
     (O4) A STANDALONE STORE-CONDITIONAL — FIXED IN STAGE C4 BY WIDENING THE
          SPECIFICATION; the two refutations that stood here are FALSE now and
-         are replaced by the positive leaves [gwalk_write_ram_con]
-         ([WeakShape] §6b) and [gwalkx_write_ram_con] below.  The history,
-         because the SHAPE of the finding recurs:
+         are replaced by the positive leaf [gwalk_write_ram_con]
+         ([WeakShape] §6b).  The history, because the SHAPE of the finding
+         recurs — and it recurred once more, as (O10), which is what removed
+         the window index from this kit altogether (stage C8):
 
     The path, from the sources:
 
@@ -827,31 +615,6 @@ Ltac gw_solve :=
     valid, and [sail_shaped] quantifies over every register value and every
     fetched word). *)
 
-(** THE POSITIVE LEAF, in the WEAK reading ([WeakShape.gwalk_write_ram_con]
-    is the closed-reading twin).  A conditional RAM write with the window
-    CLOSED is walkable exactly like a plain one; the [0 < width] side
-    condition is the zero-width-write conjunct, the same one
-    [gwalk_write_ram_plain] carries. *)
-Lemma gwalkx_write_ram_con {B} wk addr width data meta (k : _ → M B) :
-  wk = Write_RISCV_conditional ∨ wk = Write_RISCV_conditional_release →
-  (0 < width)%Z →
-  (∀ r, gwalkx None (k r)) →
-  gwalkx None (Defs.bind (write_ram wk (Physaddr addr) width data meta) k).
-Proof.
-  intros Hwk Hw Hk.
-  have Hn : Z.to_N width ≠ 0%N by apply to_N_nonzero.
-  destruct Hwk as [->| ->];
-    cbv [write_ram]; cbn [Defs.bind Defs.bind0 Defs.returnm returnM
-                          Interface.iMon_bind];
-    cbv [Defs.sail_mem_write];
-    cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind];
-    (simpl; split; [by destruct (dev_addr addr)|]);
-    cbn [Defs.bind Defs.bind0 Defs.returnm returnM Interface.iMon_bind];
-    apply Hk.
-Qed.
-
-(** …and the SAME node under an OPEN window must be the window's CLOSING
-    write ([WeakShape.gwalk_write_ram_close]): same address, same width.
-    That asymmetry is the whole content of the exclusive-window discipline —
-    an AMO (read-modify-write in ONE instruction) fuses, a lone [sc] does
-    not, and since C4 both are steppable. *)
+(** The positive leaf itself is [WeakShape.gwalk_write_ram_con]; since
+    stage C8 (finding (O10)) there is only one reading of the walk, so the
+    weak twin that stood here is gone with the window index. *)

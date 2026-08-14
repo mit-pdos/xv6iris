@@ -202,8 +202,7 @@ Proof.
       destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                     |pr pw sr sw]; try done.
       * destruct lat; [done|].
-        destruct H as [(_ & _ & _ & _ & w & _ & ->)
-                      |(_ & _ & _ & _ & w & _ & y & rs1 & _ & ->)]; done.
+        by destruct H as (_ & _ & _ & w & _ & ->).
       * by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite *)
     destruct (dev_addr _); [by intros [_ ->]|]. by intros (_ & _ & ->).
@@ -376,10 +375,11 @@ Definition dev_ok_blk (next : bool → M unit) (i : agent)
 
     [WeakSailLTS] delta (e) gives an [ak_latest] read TWO arms: the FUSED one
     (one [LRmw] label spanning read, silent window and conditional write) and
-    the BARE one (one [LLoad], the window abandoned).  Only the fused one has
-    an image in [wrun]: the interpreter's exclusive read is not a plain load,
-    and its [wbyte_ok] at [ak_latest] is strictly stronger than the [read_ok]
-    a [PFLoad] carries.  Delta (e'') adds the MIRROR arm on the write side: a
+    the BARE one (one ordinary [LLoad], since stage C8 a single step — an
+    exclusive read that is not part of a fused rmw simply loads).  Only the
+    fused one has an image in [wrun]: the interpreter's exclusive read is not
+    a plain load, and its [wbyte_ok] at [ak_latest] is strictly stronger than
+    the [read_ok] a [PFLoad] carries.  Delta (e'') adds the MIRROR arm on the write side: a
     STANDALONE conditional write (a lone [sc]) steps as a plain [LStore],
     which [wrun] does take — its write arm never inspects [ak_latest] — but
     stamps with [WCexcl] ([WeakInterp.wm_class_of]) where the pf step carries
@@ -716,11 +716,13 @@ End peel.
 (* ====================================================================== *)
 (** ** 7. The core: a completed run of a residual monad IS a [wrun]
 
-    [sail_unbracket] is the exact inverse of [WeakSailLTS.sail_bracket];
-    [amo_unbracket] of [WeakSailLTS.amo_bracket].  The mutual induction is
-    the same one, for the same reason: the fused arm's write half is reached
-    from the read's continuation through the silent window, so the statement
-    carried along that window is a second one. *)
+    [sail_unbracket] is the exact inverse of [WeakSailLTS.sail_bracket].  The
+    induction is MUTUAL — [amo_unbracket] is the second statement — because
+    the FUSED rmw arm's write half is reached from the read's continuation
+    through a silent window, so the statement carried along that window is a
+    second one.  (The ⇒ side no longer needs its twin: since stage C8 it
+    takes the one-step bare arm at every exclusive read.  The ⇐ side still
+    does, because the pf run it consumes may contain a fused [LRmw].) *)
 
 Section unbracket.
   Context (next : bool → M unit) (i : agent).
@@ -741,20 +743,30 @@ Section unbracket.
                (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                          (wm_ws s') prom]> ags).
 
-  Definition amo_unbracket (pa : Arch.pa) (n : N) (m : M unit) : Prop :=
+  (** …and the second, for the FUSED rmw arm: [m] is the read's
+      continuation, which the LTS's own arm says reaches a conditional write
+      ([silent_run] to a [wr_node]) — and SINCE STAGE C8 that is the ONLY
+      place the amo structure comes from.  Through C7 the hypothesis was
+      [amo_tail pa n m], i.e. the shape predicate's claim that the window
+      closes at the read's own address and width; (O10) deleted that claim,
+      and nothing was lost here, because the LTS arm ALREADY pins the write's
+      base ([base = pa_z (ReadReq.pa req)]) and its length.  So the window's
+      address agreement is supplied by the RUN, and this statement is indexed
+      by the base the fused label carries. *)
+  Definition amo_unbracket (base : Z) (m : M unit) : Prop :=
     ∀ (s : wmstate) (m1 m2 : M unit) (rs1 : regstate) (rl : bool)
       (data : list (bv 8)) (iq : istream) (prom : gset nat)
       (ags : list (wpagent psail)) (c' : wpcfg psail),
-      amo_tail pa n m →
+      sail_shaped m →
       dev_ok_blk next i c' →
       fused_blk next i c' →
       silent_run (m, wm_regs s) (m1, rs1) →
-      wr_node m1 rl (pa_z pa) data m2 →
+      wr_node m1 rl base data m2 →
       ags !! i = Some (WPAgent (PSail (Some m2) rs1 (wm_dev s) None iq)
-                         (store_post_run (wm_ws s) rl (pa_z pa) (length data)
+                         (store_post_run (wm_ws s) rl base (length data)
                             (S (length (wm_log s)))) prom) →
       rtc (pf_in_block next i)
-        (WPCfg (wimg s) (wm_log s ++ [WMsg (pa_z pa) data (Some i) WCexcl]) ags)
+        (WPCfg (wimg s) (wm_log s ++ [WMsg base data (Some i) WCexcl]) ags)
         c' →
       at_boundary i c' →
       ∃ (x : unit) (s' : wmstate),
@@ -791,13 +803,13 @@ Section unbracket.
       rewrite /silent1 /= in Hs1; simplify_eq/=;
       let xx := fresh "xx" in let ss := fresh "ss" in
       let Hrun := fresh "Hrun" in let Heq := fresh "Heq" in
-      destruct (proj2 (IH ihv) _ _ s2 _ _ _ _ _ _ _ _ _
+      destruct (proj2 (IH ihv) _ s2 _ _ _ _ _ _ _ _ _
                   (Hsh ihv) Hdev Hfus Hsil' Hwr Hlk Hrtc Hbd)
         as (xx & ss & Hrun & Heq);
       exists xx, ss; split; [exact Hrun|exact Heq] ].
 
   Lemma sail_unbracket_all (m : M unit) :
-    sail_unbracket m ∧ ∀ pa n, amo_unbracket pa n m.
+    sail_unbracket m ∧ ∀ base, amo_unbracket base m.
   Proof.
     induction m as [y|T oc k IH].
     { split.
@@ -814,7 +826,7 @@ Section unbracket.
         { eexists. split; [by eapply lk_ins, Hlk|reflexivity]. }
         rewrite (block_done next i _ c' Hbd1 Hrtc1).
         by exists y, s.
-      - intros pa n s m1 m2 rs1 rl data iq prom ags c' _ _ _ Hsil Hwr _ _ _.
+      - intros base s m1 m2 rs1 rl data iq prom ags c' _ _ _ Hsil Hwr _ _ _.
         (* the window may be ABANDONED — but then it never reached a
            [wr_node], and [silent_run] out of [Interface.Ret] is stuck *)
         apply rtc_inv in Hsil.
@@ -856,11 +868,12 @@ Section unbracket.
             as (p1 & -> & Hrtc1).
           rewrite /wrun Hd Hdr.
           destruct (proj1 (IH (inl (w, None))) (wset_dev s d') _ _ _ _
-                      (Hsh _) Hdev Hfus ltac:(eapply lk_ins, Hlk) Hrtc1 Hbd)
+                      (proj2 Hsh _) Hdev Hfus
+                      ltac:(eapply lk_ins, Hlk) Hrtc1 Hbd)
             as (xx & ss & Hrun & Heq).
           rewrite list_insert_insert in Heq.
           exists xx, ss. split; [exact Hrun|exact Heq].
-        * (* RAM read: a plain load, or the fused RMW *)
+        * (* RAM read: a plain load (any access kind), or the fused RMW *)
           destruct Hsh as (Hcoh & Hsh).
           destruct (block_peel next i (WPCfg (wimg s) (wm_log s) ags) c' _
                       Hlk ltac:(done) Hrtc Hbd) as (c1 & Hsolo & Hrtc1).
@@ -875,16 +888,21 @@ Section unbracket.
             |(pr & pw & sr & sw & st' & Hst & _)]]]];
             rewrite /sail_step_ni /sail_mstep /= Hd in Hst;
             try (by destruct Hst as (_ & [])).
-          { (* a load label: the PLAIN arm, or the BARE exclusive one —
-               which [fused_blk] is exactly what excludes *)
+          { (* a load label.  ONE arm since stage C8 — a bare exclusive read
+               takes the same one — so what [fused_blk] excludes is not a
+               second disjunct but the ACCESS KIND: an [ak_latest] read that
+               steps as a plain load appends nothing, which [pf_solo_f]
+               forbids. *)
             destruct Hst as (_ & Hst). destruct lat; [done|].
-            destruct Hst as [(Hlat & -> & -> & Hlents & w & Hw & ->)
-                            |(Hlat & -> & -> & Hlents & w & Hw & y & rs1 & Hsil & ->)];
-              [|exfalso;
-                exact (proj1 (proj2 (Hfus _ _ Hsolo Hrtc1))
-                         (ex_intro _ _ (conj Hlk (conj eq_refl (conj Hd Hlat))))
-                         eq_refl)].
-            rewrite Hlat in Hsh.
+            destruct Hst as (-> & -> & Hlents & w & Hw & ->).
+            have Hlat : ak_latest (classify (Interface.ReadReq.access_kind req))
+                        = false.
+            { destruct (ak_latest (classify (Interface.ReadReq.access_kind req)))
+                eqn:Hl; [|done].
+              exfalso.
+              exact (proj1 (proj2 (Hfus _ _ Hsolo Hrtc1))
+                       (ex_intro _ _ (conj Hlk (conj eq_refl (conj Hd Hl))))
+                       eq_refl). }
             destruct (proj1 (IH (inl (w, None)))
                         (wset_ws s (load_post_run (wm_ws s)
                            (ak_sync (classify (Interface.ReadReq.access_kind req)))
@@ -902,8 +920,8 @@ Section unbracket.
             destruct Hst as (_ & Hst).
             destruct Hst as (Hlat & -> & -> & Hlents & Hlend & w & m1 & m2 & rs1
                              & Hw & Hsil & Hwr & ->).
-            rewrite Hlat in Hsh.
-            destruct (proj2 (IH (inl (w, None))) (Interface.ReadReq.pa req) nn
+            destruct (proj2 (IH (inl (w, None)))
+                        (pa_z (Interface.ReadReq.pa req))
                         (wset_ws s (load_post_run (wm_ws s)
                            (ak_sync (classify (Interface.ReadReq.access_kind req)))
                            (pa_z (Interface.ReadReq.pa req)) tvs.*1))
@@ -1056,7 +1074,7 @@ Section unbracket.
           [done|intros ? ? HH; exact HH|exact Hrtc|exact Hbd].
       + (* Message *) ubr_sil (PSail (Some (k tt)) (wm_regs s) (wm_dev s) None iq) tt s IH Hsh Hdev Hfus Hlk Hrtc Hbd.
     - (* ================= amo_unbracket ================= *)
-      intros pa n s m1 m2 rs1 rl data iq prom ags c'
+      intros base s m1 m2 rs1 rl data iq prom ags c'
              Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
       destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
                      |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hsh.
@@ -1065,19 +1083,25 @@ Section unbracket.
                  IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
       + (* RegWrite *)
         uamo_sil tt (wset_reg s rg rv) IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
-      + (* MemRead: forbidden inside an AMO window *) destruct Hsh.
+      + (* MemRead: no [silent1] arm, so the window's run stops here *)
+        (* no [silent1] arm here, and no [wr_node] either: the window's
+           run cannot pass through a memory node or a barrier *)
+        apply rtc_inv in Hsil;
+        destruct Hsil as [Hrf|(cmid & Hs1 & _)];
+          [ simplify_eq/=; rewrite /wr_node /= in Hwr; destruct Hwr
+          | by rewrite /silent1 /= in Hs1 ].
       + (* MemWrite: THE write half — the silent window ends here *)
         apply rtc_inv in Hsil.
         destruct Hsil as [Hrf|(cmid & Hs1 & _)];
           [|by rewrite /silent1 /= in Hs1].
         injection Hrf as Hm1 Hrs1. subst m1 rs1.
-        destruct Hsh as (Hd & Hpa & Hn & Hn0 & Hlat & Hsh).
+        destruct Hsh as (_ & Hsh).
         have Hm2 := Hwr. rewrite /wr_node /= in Hm2.
         destruct Hm2 as (_ & _ & _ & _ & _ & _ & ->).
         destruct (proj1 (IH (inl None))
                     (WMState (wm_regs s) (wm_img s)
-                       (wm_log s ++ [WMsg (pa_z pa) data (Some i) WCexcl])
-                       (store_post_run (wm_ws s) rl (pa_z pa) (length data)
+                       (wm_log s ++ [WMsg base data (Some i) WCexcl])
+                       (store_post_run (wm_ws s) rl base (length data)
                           (S (length (wm_log s)))) (wm_dev s))
                     _ _ _ _ Hsh Hdev Hfus Hlk Hrtc Hbd)
           as (xx & ss & Hrun & Heq).
@@ -1085,7 +1109,13 @@ Section unbracket.
         eapply (wr_node_wrun (Some i) _ rl _ data _ s); [exact Hwr|exact Hrun].
       + (* InstrAnnounce *) uamo_sil tt s IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
       + (* BranchAnnounce *) uamo_sil tt s IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
-      + (* Barrier: forbidden inside an AMO window *) destruct Hsh.
+      + (* Barrier: likewise *)
+        (* no [silent1] arm here, and no [wr_node] either: the window's
+           run cannot pass through a memory node or a barrier *)
+        apply rtc_inv in Hsil;
+        destruct Hsil as [Hrf|(cmid & Hs1 & _)];
+          [ simplify_eq/=; rewrite /wr_node /= in Hwr; destruct Hwr
+          | by rewrite /silent1 /= in Hs1 ].
       + (* CacheOp *) uamo_sil tt s IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
       + (* TlbOp *) uamo_sil tt s IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
       + (* TakeException *) uamo_sil tt s IH Hsh Hdev Hfus Hsil Hwr Hlk Hrtc Hbd.
@@ -1110,7 +1140,7 @@ Section unbracket.
           [by (simplify_eq/=; rewrite /wr_node /= in Hwr; destruct Hwr)|].
         destruct cmid as [mm rr].
         rewrite /silent1 /= in Hs1. destruct Hs1 as (ch & Hch). simplify_eq/=.
-        destruct (proj2 (IH ch) pa n s _ _ _ _ _ _ _ _ _
+        destruct (proj2 (IH ch) base s _ _ _ _ _ _ _ _ _
                     (Hsh ch) Hdev Hfus Hsil' Hwr Hlk Hrtc Hbd)
           as (xx & ss & Hrun & Heq).
         exists xx, ss. split; [by exists ch|exact Heq].

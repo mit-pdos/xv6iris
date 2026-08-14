@@ -77,7 +77,13 @@ ADMIT = re.compile(r"^\s*(Admitted|Abort)\s*\.|(?<![A-Za-z_])admit\s*\.", re.MUL
 # unterminated `Proof` can only swallow up to the next terminator; that is
 # the failure mode to prefer, since the alternative is scanning tactic text.
 PROOF = re.compile(
-    r"(?<![\w'])(?:Proof|Next\s+Obligation)(?![\w'])"
+    # NOT [Set Default Proof Using "Type".] -- that is a command, not a proof
+    # opener, and treating it as one blanks the whole file up to the first
+    # [Qed], which HIDES every deletion in between (a false NEGATIVE, the
+    # dangerous direction).  Found stage C8, when a restructuring moved the
+    # first [Qed] 100 lines down and the tool started reporting a lemma that
+    # is still there.
+    r"(?<![\w'])(?<!Default )(?:Proof|Next\s+Obligation)(?![\w'])"
     r".*?(?<![\w'])(?:Qed|Defined|Admitted|Abort|Save)(?![\w'])\s*\.",
     re.DOTALL,
 )

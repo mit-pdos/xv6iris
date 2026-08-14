@@ -1886,8 +1886,7 @@ Proof.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data
                   |pr pw sr sw]; try done.
     + destruct lat; [done|].
-      destruct H as [(_ & _ & _ & _ & w & _ & ->)
-                    |(_ & _ & _ & _ & w & _ & y & rs1 & _ & ->)]; done.
+      by destruct H as (_ & _ & _ & w & _ & ->).
     + by destruct H as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1 & _ & _ & _ & ->).
   - (* MemWrite, RAM *)
     by intros (_ & _ & ->).

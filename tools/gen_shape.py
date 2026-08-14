@@ -5,13 +5,13 @@ Stage C3 of [claude-notes/projects/weak-memory-premises.md].  Emits, from
 model-xv6iris/rv64d.v alone, one lemma per monadic definition reachable from
 [try_step]:
 
-    Lemma gw_<f> : forall a0 .. an, gwalk None (@<f> a0 .. an).
+    Lemma gw_<f> : forall a0 .. an, gwalk (@<f> a0 .. an).
     Proof. intros; cbv [<f>]; gw_solve. Qed.
     #[export] Hint Resolve gw_<f> : gshape.
 
 in DEPENDENCY (topological) order, sharded across iris/WeakShapeGen*.v.  THE
 HINT DATABASE IS THE DEPENDENCY MECHANISM: [gw_solve] closes a leaf
-[gwalk None (g x y)] out of `gshape`, so emitting in topological order is all the
+[gwalk (g x y)] out of `gshape`, so emitting in topological order is all the
 ordering that is needed, and each shard Requires the previous one.
 
   Regenerate with:   make gen-shape          (from the repo root)
@@ -29,7 +29,8 @@ WHAT IS *NOT* GENERATED, and why (the "override list"):
   * everything in their up-cone (the 53 monadic functions from
     [checked_mem_read]/[checked_mem_write] up to [try_step]) -- those carry
     the semantic side conditions (0 < split_width, the misaligned loop's
-    termination, the exclusive window) and, since stage C3's finding (O4),
+    termination; the exclusive window left the shape predicate in stage C8,
+    finding (O10)) and, since stage C3's finding (O4),
     are where [sail_shaped] is FALSE;
   * the three OPAQUE MONADIC AXIOMS [load_reservation], [cancel_reservation],
     [plat_term_write] and their up-cone -- nothing about an axiom's shape is
@@ -62,7 +63,7 @@ IMPURE_LEAVES = [
     'plat_term_write',
 ]
 # Textual markers that would make a definition unshaped; propagated up the
-# call graph like the leaves.  There are NONE: [gwalk None] -- the sweep's
+# call graph like the leaves.  There are NONE: [gwalk] -- the sweep's
 # predicate -- constrains only the two MEMORY nodes.  A Barrier, a [throw]
 # (an ExtraOutcome with an empty continuation), an [exit]/[internal_error] and
 # every [Choose] are all walkable, which is why the generated fragment is as
@@ -104,7 +105,7 @@ STATEEN_GROUP = [
 OVERRIDE_PROOFS = {
     '_rec_hartSupports': (['_rec_hartSupports'], """
 (* FUEL RECURSION: [fix] on the [Acc] argument, not [cbv]. *)
-Lemma gw__rec_hartSupports : forall a0 a1 a2, gwalk None (@_rec_hartSupports a0 a1 a2).
+Lemma gw__rec_hartSupports : forall a0 a1 a2, gwalk (@_rec_hartSupports a0 a1 a2).
 Proof.
   fix IH 3. intros a0 a1 a2. destruct a2 as [a2].
   cbv [_rec_hartSupports]. gw_solve.
@@ -118,34 +119,34 @@ Qed.
    [gw_solve]'s [eauto] needs (it cannot project a conjunction). *)
 Lemma gw__rec_stateen_group :
   forall l acc,
-    (forall p b s, gwalk None (_rec_check_stateen_bit p b s l acc)) /\\
-    (forall e, gwalk None (_rec_currentlyEnabled e l acc)) /\\
-    (forall i, gwalk None (_rec_get_hstateen i l acc)) /\\
-    (forall i, gwalk None (_rec_get_sstateen i l acc)) /\\
-    (forall p, gwalk None (_rec_get_xLPE p l acc)) /\\
-    (forall u, gwalk None (_rec_is_hstateen_accessible u l acc)) /\\
-    (forall u, gwalk None (_rec_is_sstateen_accessible u l acc)) /\\
-    (forall u, gwalk None (_rec_is_zfinx_enabled_by_stateen u l acc)) /\\
-    (forall u, gwalk None (_rec_virtual_memory_supported u l acc)).
+    (forall p b s, gwalk (_rec_check_stateen_bit p b s l acc)) /\\
+    (forall e, gwalk (_rec_currentlyEnabled e l acc)) /\\
+    (forall i, gwalk (_rec_get_hstateen i l acc)) /\\
+    (forall i, gwalk (_rec_get_sstateen i l acc)) /\\
+    (forall p, gwalk (_rec_get_xLPE p l acc)) /\\
+    (forall u, gwalk (_rec_is_hstateen_accessible u l acc)) /\\
+    (forall u, gwalk (_rec_is_sstateen_accessible u l acc)) /\\
+    (forall u, gwalk (_rec_is_zfinx_enabled_by_stateen u l acc)) /\\
+    (forall u, gwalk (_rec_virtual_memory_supported u l acc)).
 Proof.
   fix IH 2. intros l acc. destruct acc as [acc].
-  assert (K1 : forall y H p b s, gwalk None (_rec_check_stateen_bit p b s y (acc y H)))
+  assert (K1 : forall y H p b s, gwalk (_rec_check_stateen_bit p b s y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K2 : forall y H e, gwalk None (_rec_currentlyEnabled e y (acc y H)))
+  assert (K2 : forall y H e, gwalk (_rec_currentlyEnabled e y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K3 : forall y H i, gwalk None (_rec_get_hstateen i y (acc y H)))
+  assert (K3 : forall y H i, gwalk (_rec_get_hstateen i y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K4 : forall y H i, gwalk None (_rec_get_sstateen i y (acc y H)))
+  assert (K4 : forall y H i, gwalk (_rec_get_sstateen i y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K5 : forall y H p, gwalk None (_rec_get_xLPE p y (acc y H)))
+  assert (K5 : forall y H p, gwalk (_rec_get_xLPE p y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K6 : forall y H u, gwalk None (_rec_is_hstateen_accessible u y (acc y H)))
+  assert (K6 : forall y H u, gwalk (_rec_is_hstateen_accessible u y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K7 : forall y H u, gwalk None (_rec_is_sstateen_accessible u y (acc y H)))
+  assert (K7 : forall y H u, gwalk (_rec_is_sstateen_accessible u y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K8 : forall y H u, gwalk None (_rec_is_zfinx_enabled_by_stateen u y (acc y H)))
+  assert (K8 : forall y H u, gwalk (_rec_is_zfinx_enabled_by_stateen u y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
-  assert (K9 : forall y H u, gwalk None (_rec_virtual_memory_supported u y (acc y H)))
+  assert (K9 : forall y H u, gwalk (_rec_virtual_memory_supported u y (acc y H)))
     by (intros y H; apply (IH y (acc y H))).
   clear IH.
   repeat apply conj.
@@ -161,31 +162,31 @@ Proof.
 Qed.
 
 Lemma gw__rec_check_stateen_bit : forall p b s l acc,
-  gwalk None (_rec_check_stateen_bit p b s l acc).
+  gwalk (_rec_check_stateen_bit p b s l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_currentlyEnabled : forall e l acc,
-  gwalk None (_rec_currentlyEnabled e l acc).
+  gwalk (_rec_currentlyEnabled e l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_get_hstateen : forall i l acc,
-  gwalk None (_rec_get_hstateen i l acc).
+  gwalk (_rec_get_hstateen i l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_get_sstateen : forall i l acc,
-  gwalk None (_rec_get_sstateen i l acc).
+  gwalk (_rec_get_sstateen i l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_get_xLPE : forall p l acc,
-  gwalk None (_rec_get_xLPE p l acc).
+  gwalk (_rec_get_xLPE p l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_is_hstateen_accessible : forall u l acc,
-  gwalk None (_rec_is_hstateen_accessible u l acc).
+  gwalk (_rec_is_hstateen_accessible u l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_is_sstateen_accessible : forall u l acc,
-  gwalk None (_rec_is_sstateen_accessible u l acc).
+  gwalk (_rec_is_sstateen_accessible u l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_is_zfinx_enabled_by_stateen : forall u l acc,
-  gwalk None (_rec_is_zfinx_enabled_by_stateen u l acc).
+  gwalk (_rec_is_zfinx_enabled_by_stateen u l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 Lemma gw__rec_virtual_memory_supported : forall u l acc,
-  gwalk None (_rec_virtual_memory_supported u l acc).
+  gwalk (_rec_virtual_memory_supported u l acc).
 Proof. intros; apply gw__rec_stateen_group. Qed.
 #[export] Hint Resolve
   gw__rec_check_stateen_bit gw__rec_currentlyEnabled gw__rec_get_hstateen
@@ -198,9 +199,9 @@ Proof. intros; apply gw__rec_stateen_group. Qed.
 HEADER = """(* %(file)s -- AUTO-GENERATED by tools/gen_shape.py.  DO NOT EDIT BY HAND.
 
    Stage C3's per-function shape sweep over [Riscv.rv64d]: one
-   [gwalk None (<f> args)] lemma per monadic definition reachable from
+   [gwalk (<f> args)] lemma per monadic definition reachable from
    [try_step] whose cone touches neither of the two memory leaves nor one of
-   the model's three opaque monadic axioms.  [gwalk None] is
+   the model's three opaque monadic axioms.  [gwalk] is
    [WeakSailLTS.sail_shaped] generalised to an arbitrary monad type
    ([WeakShape.gwalk_shaped]).
 
@@ -215,17 +216,17 @@ Set Default Proof Using "Type".
 EXEC_HEADER = """(* %(file)s -- AUTO-GENERATED by tools/gen_shape.py --mode exec.
    DO NOT EDIT BY HAND.
 
-   Stage C7's VALUE sweep: the same cone in [WeakShapeWin]'s [gwx] mode
-   ([gwpx] at the postcondition [exres_ok] = "[exres_wf] and no window
-   open"), for every [ExecutionResult]-returning definition [try_step]
+   The VALUE sweep: the same cone in [WeakShapeWin]'s [gwx] mode ([gwp] at
+   the return postcondition [exres_wf] = "a redirection carries a well-formed
+   instruction"), for every [ExecutionResult]-returning definition [try_step]
    reaches outside the memory cone, PLUS the [exres_wf] fact for every PURE
    [ExecutionResult] producer (the compressed expansions, whose [ExecuteAs]
    payloads carry literal widths).
 
    THIS IS A SECOND MODE OVER THE SAME MODEL, which is finding (O7): a
-   generated tower proves ONE predicate, and [gwalk None] implies nothing
+   generated tower proves ONE predicate, and [gwalk] implies nothing
    about a returned value.  It is cheap here only because the mode's bind
-   rule takes [gwalk None] for the PREFIX -- so the 294-lemma `gshape` tower
+   rule takes [gwalk] for the PREFIX -- so the 294-lemma `gshape` tower
    is reused verbatim and only the clause bodies are walked.
 
    Emitted in topological order; the `gwexec`/`gwpost` hint databases are the
@@ -459,9 +460,9 @@ def emit(names, model, outdir, shard_sizes, dry_run=False):
             arity = len(gs)
             args = ' '.join('a%d' % i for i in range(arity))
             if arity:
-                stmt = 'forall %s, gwalk None (@%s %s)' % (args, n, args)
+                stmt = 'forall %s, gwalk (@%s %s)' % (args, n, args)
             else:
-                stmt = 'gwalk None %s' % n
+                stmt = 'gwalk %s' % n
             # A PATTERN binder ('(...)) elaborates to a match, and with more
             # than one of them the body is a match APPLIED to the remaining
             # arguments -- which no [gwalk _ (match _ with _ end)] tactic rule
@@ -607,7 +608,7 @@ def main():
                     help='emit only the first N of the topological order '
                          '(0 = the whole sweep)')
     ap.add_argument('--mode', default='shape', choices=['shape', 'exec'],
-                    help="'shape' = the [gwalk None] tower (WeakShapeGen*.v); "
+                    help="'shape' = the [gwalk] tower (WeakShapeGen*.v); "
                          "'exec' = the [gwx] value sweep (WeakShapeExecGen*.v)")
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--report', action='store_true')

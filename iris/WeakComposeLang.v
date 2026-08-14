@@ -255,6 +255,27 @@
         conditional write unchanged, because [wrun] stamps the message
         [WCexcl] where the pf step carries [lbl_class].)
 
+        (O10), THE THIRD AND LAST OF THE FAMILY — AND IT DELETED THE WINDOW
+        (stage C7 finding, stage C8 fix).  C2's bracket assumed the abandoned
+        tail is SILENT.  [rv64d.update_and_write_pte] abandons its exclusive
+        PTE reservation DEEP INSIDE [translate], on the arm where the re-read
+        entry needs no A/D update, so the abandoned tail is the whole rest of
+        the instruction — memory accesses included — and every memory
+        instruction and the fetch translate.  Premise 1 was false again.
+        A "the tail is quiet from here" bracket is only as good as the CALL
+        DEPTH at which the window is abandoned.  THE FIX is the same
+        narrowing the two arms above took: [sail_shaped]'s [MemRead] arm
+        DROPS the window entirely (an exclusive read is shaped exactly like a
+        plain one), [amo_tail] is DELETED, and [sail_mstep]'s bare arm
+        becomes ONE STEP — the plain [LLoad] arm simply stopped requiring
+        [ak_latest = false].  Nothing new is owed: [pf_solo_f]/[fused_blk]
+        are UNCHANGED (a step from an exclusive read must still APPEND), the
+        fused rmw arm stays and takes its structure from the RUN
+        ([silent_run] to a [wr_node]) rather than from the predicate, and
+        [tail_complete] simply reports [fu := false] at an exclusive read.
+        Per-image discharge grows one clause: xv6 runs with
+        [menvcfg.ADUE = 0].
+
     (D) THE AGENT QUANTIFIER — FOUND HERE, FIXED IN LAYER 1, GONE FROM THE
         PREMISE LIST (2026-08-12).  It was a premise of this file for exactly
         one revision, under the name [xv6_violation_harts], and it was FALSE
@@ -303,56 +324,44 @@
     §D  THE PREMISE LIST OF [xv6_weak_robust_adequate] — the composition's
     assumptions inventory (against [WeakCompose] §6's):
 
-      1. [∀ b, sail_shaped (riscv_step b)] AND
-         [∀ b, sail_live (riscv_step b)] — seam (6)'s two group-3 model
-         facts.  [sail_live] is NEW at this level (stage D): it used to
-         arrive inside [Hres], which is now derived rather than assumed.
-         STAGE C3 (2026-08-13) ESTABLISHED THAT NEITHER IS DELETABLE AS
-         STATED: the first was FALSE at a standalone store-conditional
-         ((O4) — the mirror of C1's (O2), FIXED in C4 by widening the
-         [MemWrite] arms), and both are blocked by three OPAQUE MONADIC
-         AXIOMS of [rv64d] ((O5), [WeakShapeTop.rv64d_axiom_shapes]).
-         STAGE C5 COMPLETED THE MECHANIZED SWEEP — all 294 generatable
-         monadic definitions, [WeakShapeGen01..15.v] — and PEELED THE FIRST
-         PREMISE TO TWELVE NAMED FUNCTIONS:
-         [WeakShapeTop.riscv_step_shaped_residue] derives
-         [∀ b, sail_shaped (riscv_step b)] from [gwalk None] of [fetch] and
-         the eleven memory [execute_*] clauses, so a C6 that closes those
-         discharges this premise here with one [apply].  One of the twelve is
-         FALSE AS STATED — finding (O6): the AST's width fields are plain [Z]
-         (Sail's [1;2;4;8] precondition is a comment), so
-         [execute_STORE imm rs2 rs1 0] issues a zero-width [MemWrite]; the
-         replacement is a DECODER POSTCONDITION over [encdec_backwards],
-         which is what [WeakShapeOverrides2.gpost] exists to state.  The
-         SECOND premise ([sail_live]) cannot be peeled the same way: the
-         tower has only the [gwalk] mode (finding (O7)).
-         STAGE C6 CLOSED (O6) — [WeakShapeAst.ast_wf] and
-         [WeakShapeDec.gpureP_ext_decode], the decoder postcondition,
-         state-generic — and found (O9), a fourth over-quantified arm (a
-         raised Sail exception, [WeakSailLTS] delta (e''')).
-         STAGE C7 CONSUMED the decoder postcondition at [run_hart_active]
-         ([WeakShapeWin]'s [gwpx] mode + the 116-lemma value sweep +
-         [WeakShapeExec]), so the residue is restated WELL-FORMED as
-         [WeakShapeTop.riscv_step_shaped_residue_wf]: [fetch] plus the eleven
-         memory clauses UNDER their [0 < width] premise.
-         **BOTH PREMISES HERE ARE CURRENTLY FALSE, AND THAT MAKES THE
-         CAPSTONES VACUOUS.**  The FIRST is refuted by stage C7's finding
-         (O10) ([WeakShapeWin] §1, leaves machine-checked): every memory
-         instruction translates, [translate → update_and_write_pte] issues an
-         exclusive PTE read whose window is ABANDONED on the "re-read needs
-         no update" arm, and the instruction's own data access then falls
-         inside that open window, which [amo_tail] refuses.  The SECOND is
-         refuted by (O9)'s witness ([glive] forbids a raised exception
-         outright, and [zicfiss_xSSE] raises one at
-         [VirtualSupervisor]) — its honest form is
-         STATE-CONDITIONED, [sail_live] under a register-state precondition
+      1. [rv64d_axiom_shapes] AND [∀ b, sail_live (riscv_step b)] — what is
+         left of seam (6)'s two group-3 model facts.
+
+         THE SHAPE HALF IS NO LONGER A PREMISE (stage C8).
+         [WeakShapeTop.riscv_step_shaped_ax] PROVES
+         [∀ b, sail_shaped (riscv_step b)] from [rv64d_axiom_shapes] alone —
+         a three-line [Record] of [gquiet] facts about the three OPAQUE
+         MONADIC AXIOMS [rv64d] declares ([load_reservation],
+         [cancel_reservation], [plat_term_write]; finding (O5), and the only
+         irreducible one of the family, since nothing about an opaque
+         constant's shape is provable OR refutable).  Everything else is
+         machine-checked: the 294-lemma generated tower
+         ([tools/gen_shape.py], [WeakShapeGen01..15]), the 116-lemma value
+         sweep ([WeakShapeExecGen01..03]), the decoder postcondition
+         ([WeakShapeAst.ast_wf], [WeakShapeDec.gpureP_ext_decode]), the
+         memory cone ([WeakShapeMem]) and the peel
+         ([WeakShapePeel], [WeakShapeExec]).  Getting there took FIVE
+         findings, four of which were REFUTATIONS OF THIS PREMISE AS STATED —
+         (O2) the abandoned exclusive window, (O4) the standalone
+         store-conditional, (O6) the decoder's zero width, (O9) the raised
+         Sail exception, (O10) the page walker's abandoned reservation — each
+         fixed by NARROWING the specification to what the machine enforces,
+         never by adding an index; §B(F) has the whole arc, and the
+         worklist [claude-notes/projects/weak-memory-premises.md] has the
+         findings verbatim.
+
+         THE LIVENESS HALF STAYS A PREMISE, AND VERBATIM — it cannot be
+         stated any other way.  (O9)'s witness refutes it as written:
+         [glive] forbids a raised Sail exception outright and
+         [rv64d.zicfiss_xSSE] raises one at [VirtualSupervisor], which every
+         shape predicate's [RegRead] arm quantifies over.  Its honest form is
+         STATE-CONDITIONED — [sail_live] under a register-state precondition
          (xv6 runs with the H extension off, so [cur_privilege] is never
-         [VirtualSupervisor]/[VirtualUser]), which is why it cannot be stated
-         as [∀ b] at all and why C7 leaves it VERBATIM.  Neither premise is
-         swapped for a theorem until (O10)'s specification fix lands: swapping
-         a false premise for a false record hides the vacuity instead of
-         recording it.  The ordered plan and both fixes are in
-         [claude-notes/projects/weak-memory-premises.md].
+         [VirtualSupervisor]/[VirtualUser]) — i.e. it is not a [∀ b] fact at
+         all, and settling that precondition comes BEFORE any [gok] tower.
+         It is left as it is rather than swapped for a record, because
+         swapping a false premise for a false record hides the vacuity
+         instead of recording it.
       2. THE FRESH ERA: [gen_id = 0], [wgpow g0 = true], [wggen g0 = 0],
          [wglog g0 = []], [∀ c, wgws g0 c = ws_init], [wa_dws u0 = ws_init]
          — literally [weak_system_adequacy_phi]'s, plus the disk agent's own
@@ -400,7 +409,9 @@
          capstones; the funext-free discipline is why the refinement's
          output is [xcfg_eqv]-related rather than equal, §A(3).)
 
-    WHAT IS GONE relative to the previous revision: [Hcls] (a free
+    WHAT IS GONE relative to the previous revision:
+    [∀ b, sail_shaped (riscv_step b)] (a THEOREM now, §D 1 — replaced by the
+    strictly smaller [rv64d_axiom_shapes]), [Hcls] (a free
     hypothesis now, §D 5') and [Hirqb] (RETIRED — it was a COVERAGE GAP,
     not an assumption about the program: hardware asserts SEIP
     mid-instruction, and demanding that every delivery land at an
@@ -441,6 +452,8 @@ From xv6iris Require Import WeakRobust WeakRobustTrace WeakRobustGraph
 From xv6iris Require Import WeakRetag.
 From xv6iris Require Import WeakInterp WeakInterpProj WeakSailLTS WeakSailLTS2.
 From xv6iris Require Import WeakSailComplete WeakSailCone.
+(* the SHAPE half of seam (6), as a theorem over the axiom record (§D 1) *)
+From xv6iris Require Import WeakShapeMem WeakShapeTop.
 Require Import RiscvLang WeakLang.
 From xv6iris Require Import WeakCompose.
 From iris.algebra Require Import dfrac.
@@ -1931,7 +1944,7 @@ Qed.
     [pf_violation_free_hart] replaced by the cone route's premises. *)
 Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (c : wpcfg pxv6) :
-  (∀ b, sail_shaped (riscv_step b)) →
+  rv64d_axiom_shapes →
   (∀ b, sail_live (riscv_step b)) →
   wthread_live g0 gen →
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
@@ -1951,7 +1964,8 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
+  intros Hax Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
+  have Hsh := riscv_step_shaped_ax Hax.
   (** THE RETAG PRECOMPOSITION (premise-ledger stage A1).  [wm_ak] is an
       INERT tag, so retagging the behavior's own traced factorization at
       each message's fulfil pre-record ([WeakRetag.canon_f]) gives a
@@ -2019,7 +2033,7 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
     (Hlog : wglog g0 = [])
     (Hws : forall cc : CPU, wgws g0 cc = ws_init)
     (Hdws : wa_dws u0 = ws_init) :
-  (∀ b, sail_shaped (riscv_step b)) →
+  rv64d_axiom_shapes →
   (∀ b, sail_live (riscv_step b)) →
   (forall (HR : riscvGS Σ) (HW : weakGS Σ),
      ⊢@{iPropI Σ} ([∗ set] cc ∈ (fin_to_set CPU : gset CPU),
@@ -2048,8 +2062,8 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hsh Hslv Hwp Himgt Hprem Hbeh.
-  eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hsh Hslv);
+  intros Hax Hslv Hwp Himgt Hprem Hbeh.
+  eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hax Hslv);
     [|exact Hlog|exact Hws|exact Hdws|exact Himgt| |exact Hprem|exact Hbeh].
   - split; [exact Hpow|]. by rewrite Hgen0 Hgid.
   - intros t2 g2 Hr.

@@ -716,34 +716,33 @@ Qed.
         the LTS-level statement outright — the arm is spelled stuck).
       - NO ZERO-WIDTH RAM WRITE: an [n = 0] append would grow the log with an
         empty message no label can mirror.
-      - AMO PAIRING: every exclusive [MemRead] OPENS A WINDOW — its
-        continuation crosses, through register/trace/choice code only, either
-        to a conditional [MemWrite] to the same address and width (the window
-        CLOSES) or to the end of the instruction (it is ABANDONED).  The first
-        is what lets [sail_step] BRACKET an AMO into one fused [LRmw] label
-        (D-M6-5), which is the fix point [WeakInterpProj]'s header (4)
-        explicitly deferred to W5; the second is stage C2's (O2) fix.  A
-        conditional write OUTSIDE any window — a standalone [sc] — is
-        admitted since stage C4 and steps as a plain [LStore] ((O4) below).
+      - (AMO PAIRING — GONE since stage C8, see (O10).  Through C7 the
+        premise also demanded that every exclusive [MemRead] OPEN A WINDOW
+        that closes at a conditional [MemWrite] to the same address and
+        width.  [sail_step] still BRACKETS an AMO into one fused [LRmw] label
+        (D-M6-5, the fix point [WeakInterpProj]'s header (4) deferred to W5),
+        but that arm's evidence is now the RUN's own [silent_run]/[wr_node],
+        not a claim the shape premise makes; a bare exclusive read and a
+        standalone conditional write each step as one ordinary label.)
     WHY DECLARED: discharging them means a syntactic analysis of the rv64d
     decoder's ~thousands of generated branches.
 
-    STATUS AFTER STAGE C5 (2026-08-13) — THE SEAM IS NOT CLOSED, BUT ITS
-    RESIDUE IS NOW A LIST OF TWELVE NAMED FUNCTIONS.  The syntactic analysis
-    exists and is mechanized: [WeakShape.v] (the compositional kit),
-    [WeakShapeOverrides.v] (the [gwalk]-mode combinators, [gsilent], the
-    escape index), [WeakShapeOverrides2.v] ([gpost], the value side) and the
+    STATUS AFTER STAGE C8 (2026-08-14) — THE SHAPE HALF OF THIS SEAM IS
+    CLOSED; what follows is the history of the five findings it took.  The
+    syntactic analysis exists and is mechanized: [WeakShape.v] (the
+    compositional kit), [WeakShapeOverrides.v] (the [gwalk]-mode combinators
+    and [gsilent]), [WeakShapeOverrides2.v] ([gpost], the value side) and the
     COMPLETE generated sweep [WeakShapeGen01..15.v] ([tools/gen_shape.py],
-    [make gen-shape]) machine-check [gwalk None] — i.e. [sail_shaped] — for
+    [make gen-shape]) machine-check [gwalk] — i.e. [sail_shaped] — for
     all 294 generatable monadic definitions reachable from [rv64d.try_step]
     (5 min 20 s of [coqc] for the whole tower, since stage C5's (O8) fixed
     the sweep's leaf tactic).
     On top of it [WeakShapePeel.v] peels [try_step], [run_hart_active] and
     [execute], so [WeakShapeTop.riscv_step_shaped_residue] reduces the whole
-    premise to [fetch] plus the eleven memory [execute_*] clauses.  What
-    stops the seam from closing is not the volume of branches but THREE FACTS
-    ABOUT THE MODEL — the first answered by a stage-C4 specification change,
-    the second an irreducible assumption, the third the stage-C5 finding:
+    premise to [fetch] plus the eleven memory [execute_*] clauses, and stage
+    C8's [WeakShapeMem.v] discharges those.  What kept the seam open for five
+    stages was never the volume of branches but FACTS ABOUT THE MODEL — four
+    of them answered by specification changes, one an irreducible assumption:
 
       (O4) [∀ b, sail_shaped (riscv_step b)] was FALSE, and STAGE C4 FIXED
            THE SPECIFICATION.  A STANDALONE STORE-CONDITIONAL
@@ -773,7 +772,7 @@ Qed.
            [execute_STORE imm rs2 rs1 0] is a well-typed [instruction] on
            which the model issues a zero-width [MemWrite]
            ([WeakShapeOverrides2.gwalk_write_ram_zero_False]) — i.e.
-           [∀ ast, gwalk None (execute ast)], the only form the compositional
+           [∀ ast, gwalk (execute ast)], the only form the compositional
            route can use, is FALSE.  [sail_shaped (riscv_step tick)] itself is
            not refuted (the decoder only builds widths in [[1;2;4;8]]); what
            is refuted is the route, and closing it means a [gpost] sweep over
@@ -788,22 +787,33 @@ Qed.
            walked the whole rest of the instruction at every value of the
            thrown-at type.  FIXED in the specification ([WeakSailLTS] delta
            (e''')): the arm is [True].
-      (O10) (stage C7) [∀ b, sail_shaped (riscv_step b)] IS FALSE AGAIN, and
-           this time AMO PAIRING is what is wrong.  [rv64d.update_and_write_pte]
-           — on the path of EVERY memory instruction, since every one of them
-           translates — issues an EXCLUSIVE PTE read for the A/D update and
-           then, on the arm where the RE-READ entry needs no update, returns
-           SUCCESSFULLY with no conditional write; the instruction goes on to
-           its own data access, which is a [MemRead] inside the open window
-           and [amo_tail] refuses it.  The abandonment C2 legalised assumed
-           the abandoned tail is SILENT ([sail_mstep] BRACKETS it to a
-           [Interface.Ret]); here it is the rest of the instruction.  Leaves
-           machine-checked in [WeakShapeWin] §1, where the fix is also
-           specified: drop the window from [sail_shaped]'s [MemRead] arm
-           entirely (an exclusive read is shaped like a plain one), make
-           [sail_mstep]'s bare exclusive-read arm ONE STEP as C4's standalone
-           conditional write already is, and let the ⇐ cost fall where (O2)'s
-           and (O4)'s did — [fused_blk].
+      (O10) (stage C7) [∀ b, sail_shaped (riscv_step b)] WAS FALSE AGAIN,
+           and this time AMO PAIRING was what was wrong.
+           [rv64d.update_and_write_pte] — on the path of EVERY memory
+           instruction, since every one of them translates — issues an
+           EXCLUSIVE PTE read for the A/D update and then, on the arm where
+           the RE-READ entry needs no update, returns SUCCESSFULLY with no
+           conditional write; the instruction goes on to its own data access,
+           which was a [MemRead] inside the open window and [amo_tail]
+           refused it.  The abandonment C2 legalised had assumed the
+           abandoned tail is SILENT ([sail_mstep] BRACKETED it to an
+           [Interface.Ret]); here it is the rest of the instruction.  A "the
+           tail is quiet from here" bracket is only as good as the CALL DEPTH
+           at which the window is abandoned.
+           FIXED IN STAGE C8, by the narrowing the other two deltas already
+           took: [sail_shaped]'s [MemRead] arm DROPS the window (an exclusive
+           read is shaped exactly like a plain one), [amo_tail] is DELETED,
+           and [sail_mstep]'s bare exclusive-read arm is ONE STEP — the plain
+           [LLoad] arm simply stopped requiring [ak_latest = false], exactly
+           as (O4) stopped requiring it on the write side.  The ⇐ cost fell
+           where (O2)'s and (O4)'s did, into [fused_blk], with NO new premise;
+           the fused rmw arm stays (it is how an rmw appends one message) and
+           takes its amo-structure evidence from the RUN, not from a claim
+           the shape predicate makes.  AND IT COLLAPSED THE KIT: the window
+           index left [gwalk], [gwalkx] disappeared, and the memory cone lost
+           its hardest obligation — the read/write address-and-width
+           agreement, which had needed [pmaCheck]'s [CannotSplit]
+           postcondition and an [untilMT] unfolding at [N = 1].
 
     UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4, the generated tower
     LANDED complete in C5, (O6)'s DECODER POSTCONDITION LANDED in C6

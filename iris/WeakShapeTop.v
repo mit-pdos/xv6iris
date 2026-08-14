@@ -1,137 +1,112 @@
-(** * WeakShapeTop.v — the top of the shape tower, and what is still owed
+(** * WeakShapeTop.v — THE TOP OF THE SHAPE TOWER
 
-    The plan for this file was
-        [Theorem riscv_step_shaped : ∀ b, sail_shaped (riscv_step b)]
-        [Theorem riscv_step_live   : ∀ b, sail_live   (riscv_step b)]
-    at the top of the generated tower ([WeakShapeGen01..15.v]), closing
-    [WeakCompose] §6's seam (6) and deleting both premises from
-    [WeakComposeLang.xv6_weak_robust_lifted]/[_adequate].  Stage C3 found
-    both FALSE/blocked for two reasons; stage C4 fixed the first by changing
-    the specification (§1) and the second is irreducible (§2).  What this
-    file therefore holds is: the history of (O4) as the shape of a recurring
-    finding (§1), the RECORD OF ASSUMPTIONS about the model's own monadic
-    axioms (§2 — a [Record], not [Axiom]s, so that nothing here enters
-    [Print Assumptions]), the sweep's coverage (§3), and §4, the
-    [riscv_step] wrapper reduced to the tower's remaining obligations —
-    which is exactly the list stage C5 owes.
+        [Theorem riscv_step_shaped_ax :
+           rv64d_axiom_shapes → ∀ b, sail_shaped (riscv_step b)]
+
+    That is stage C8's deliverable and the whole point of the tower: the
+    SHAPE half of [WeakCompose] §6's seam (6) is no longer a premise of
+    [WeakComposeLang]'s capstones but a theorem, over the one assumption the
+    model genuinely does not state about itself (§1).  The LIVENESS half
+    stays a premise, and §3 says why it cannot be stated as [∀ b] at all.
 
     ------------------------------------------------------------------------
-    §1  (O4) — WAS THE REFUTATION; FIXED IN STAGE C4 BY A SPECIFICATION
-        CHANGE, so this section is now history plus the shape of the fix.
+    §1  WHAT IS ASSUMED, AND IT IS ONE RECORD OF THREE LINES.
 
-    [rv64d.execute_STORECON] (an [sc.w]/[sc.d]) issues
-
-        vmem_write … (con := true)
-          → mem_write_value … (con := true)
-          → mem_write_value_priv_meta … (con := true)
-          → checked_mem_write … (con := true)
-          → write_kind_of_flags aq rl true = Write_RISCV_conditional[_release]
-          → write_ram Write_RISCV_conditional (Physaddr paddr) split_width …
-
-    i.e. a [MemWrite] whose access kind is [AV_exclusive] — [ak_latest =
-    true] — and NO exclusive [MemRead] occurs anywhere in that instruction:
-    the lr/sc reservation lives in the model's PURE axioms
-    ([load_reservation]/[match_reservation]/[valid_reservation]), not in a
-    memory event, and the matching [lr] is a different [riscv_step].  Through
-    stage C3 [sail_shaped]'s window-closed [MemWrite] arm demanded
-    [ak_latest (classify …) = false] off device addresses, so the fact was
-    false at every [sc] to normal memory.
-
-    STAGE C4 TOOK THE MIRROR OF C2's (O2) FIX ([WeakSailLTS] delta (e'')):
-    the window-closed [MemWrite] arms of [sail_shaped], [sail_mstep] and the
-    kit's [gwalk]/[gwalkx] accept ANY RAM write of nonzero width, so a
-    standalone conditional write is shaped and steps as a plain
-    [WeakPromise.LStore] — one step, no bracket, since there is no open
-    window to abandon.  The two refutations that stood in
-    [WeakShapeOverrides] §5 are false now and are replaced by the positive
-    leaves [WeakShape.gwalk_write_ram_con] /
-    [WeakShapeOverrides.gwalkx_write_ram_con].  The ⇐ cost went into the
-    predicate that already pays for (O2): [WeakSailLTS2.pf_solo_f] also
-    forbids stepping from a conditional-write node, so [fused_blk] reads
-    "every exclusive access of the block is part of a fused rmw" — no new
-    premise anywhere.
+    [WeakShapeMem.rv64d_axiom_shapes] — [gquiet] of [load_reservation],
+    [cancel_reservation] and [plat_term_write], the three [Axiom]s of MONAD
+    TYPE that [rv64d] declares and that are reachable from [try_step]
+    ([vmem_read_addr], [execute_STORECON], [htif_store]).  Nothing about an
+    opaque constant's shape is provable OR refutable, so this is irreducible
+    at the Coq level; the alternative is to give the three definitions in
+    [model-xv6iris/riscv_extras.v], which moves the same assumption into the
+    model.  It is a [Record], NOT a set of [Axiom]s, precisely so that the
+    capstones' [Print Assumptions] stays at the five rv64d axioms it already
+    reports.  (Finding (O5), stage C3.)
 
     ------------------------------------------------------------------------
-    §2  (O5) — three of [rv64d]'s [Axiom]s are MONADIC.
+    §2  WHAT IS PROVED, AND WHERE — THE WHOLE ASSEMBLY IN ONE LIST.
 
-    [load_reservation], [cancel_reservation] and [plat_term_write] are
-    declared [Axiom … : M unit] and all three are reachable from [try_step]
-    ([vmem_read_addr], [execute_STORECON], [htif_store] respectively).  An
-    opaque constant of monad type has no shape: nothing about it is provable
-    OR refutable.  So even with §1 fixed, the two [∀ b] facts cannot be
-    closed from the model as generated.
-
-    [rv64d_axiom_shapes] below is the honest statement of what must be
-    assumed instead.  It is a [Record], NOT a set of [Axiom]s, precisely so
-    that the capstones' [Print Assumptions] stays at the five rv64d axioms
-    it already reports; the intended end state is that
-    [xv6_weak_robust_lifted]/[_adequate] take this record IN PLACE OF the two
-    [∀ b] premises, which is a strictly smaller and locally checkable
-    obligation (three one-line facts about three extern functions, versus a
-    property of the whole decoder).  The alternative is to give the three
-    axioms definitions in [model-xv6iris/riscv_extras.v], which moves the
-    same assumption into the model.
-
-    ------------------------------------------------------------------------
-    §3  WHAT *IS* ASSEMBLED — SINCE STAGE C5, THE WHOLE GENERATED TOWER.
-    [tools/gen_shape.py] emits [gwalk None] — [WeakSailLTS.sail_shaped]
-    generalised to an arbitrary monad type, by [WeakShape.gwalk_shaped] — for
-    all 294 generatable monadic definitions [rv64d.try_step] reaches
-    ([WeakShapeGen01..15.v], machine-checked here); the 51-function residue is
-    exactly the up-cone of the two memory leaves and of the three axioms
-    above, plus [_rec_pt_walk] and [check_leaf_pte].  The shards form a
-    [Require] chain (the hint database is the dependency mechanism), so they
-    cannot be built in parallel; a 48-lemma shard costs 7–30 minutes of
-    [coqc] on this tree, the cost rising up the topological order, and the
-    extension-enum dispatches ([currentlyEnabled] and its callers) dominate.
-
-    THE TOWER HAS EXACTLY ONE MODE, and that is the C5 scheduling lesson
-    (finding (O7)): every shard proves [gwalk None], which does NOT imply
-    [gsilent]/[WeakShapeOverrides2.gpost] (it permits memory events) and says
-    nothing about [glive].  Neither the postcondition sweep §4 (b) needs nor
-    the liveness half can reuse it — each would have to regenerate the whole
-    serial chain in its own mode.  A GENERATED SWEEP MUST EMIT EVERY MODE IT
-    WILL EVER NEED IN ONE PASS.
+      [WeakShape] / [WeakShapeOverrides] / [WeakShapeOverrides2]
+          the compositional kit: [gwalk] (= [sail_shaped] generalised to any
+          monad type, [gwalk_shaped]), [gquiet], [gsilent], [gpost], the
+          combinator lemmas and the sweep tactics.
+      [WeakShapeGen01..15]   the GENERATED tower: [gwalk] for all 294 monadic
+          definitions [try_step] reaches whose cone touches neither memory
+          leaf nor an opaque axiom ([tools/gen_shape.py], [make gen-shape];
+          ~5 min of [coqc], a serial [Require] chain).
+      [WeakShapeAst] / [WeakShapeDec]   the DECODER POSTCONDITION: [ast_wf]
+          ("every width field the decoder builds is positive") for
+          [ext_decode] and [ext_decode_compressed], state-generic.
+      [WeakShapeWin]   [gwp], the value mode, and [gwx] = [gwp] at [exres_wf].
+      [WeakShapeExecGen01..03]   the GENERATED value sweep (116 lemmas).
+      [WeakShapeMem]   THE MEMORY CONE: the 51-function residue, from
+          [read_ram]/[write_ram] up to [fetch], plus the axiom record itself.
+      [WeakShapeExec]  [execute] and [run_hart_active], where the decoder
+          postcondition crosses into [execute]'s obligation and the
+          [ExecuteAs] redirection is discharged.
+      [WeakShapePeel]  [try_step] and [tick_clock].
 
     ------------------------------------------------------------------------
-    §4  THE WRAPPER, AND EXACTLY WHAT IS LEFT — NOW A LIST OF TWELVE.
+    §3  WHY THE LIVENESS HALF IS NOT HERE.
 
-    [RiscvLang.riscv_step tick = try_step 0 false >>= λ _, if tick then
-    tick_clock tt else returnm tt].  [tick_clock] is discharged outright
-    ([WeakShapePeel.gw_tick_clock]), and with the tower complete the three
-    functions between [try_step] and the memory cone ([try_step],
-    [run_hart_active], [execute]) are ordinary [cbv] + [gw_solve] modulo their
-    residue callees ([WeakShapePeel]).  So [riscv_step_shaped_residue] below
-    reduces the whole [∀ b] premise of [WeakComposeLang]'s capstones to TWELVE
-    one-line facts: [fetch] and the eleven memory [execute_*] clauses.
+    [∀ b, sail_live (riscv_step b)] is REFUTABLE as stated — finding (O9):
+    [glive] forbids a raised Sail exception outright, and
+    [rv64d.zicfiss_xSSE] raises one at [VirtualSupervisor], a value the
+    [RegRead] arm quantifies over.  Its honest form is STATE-CONDITIONED
+    ([sail_live] under a register-state precondition: xv6 runs with the H
+    extension off, so [cur_privilege] is never [VirtualSupervisor]), which is
+    exactly why it cannot be a [∀ b] fact, and settling that precondition
+    comes BEFORE generating a [gok] tower — the mode question is finding
+    (O7): a generated sweep must emit every mode it will ever need in one
+    pass, and [gwalk] implies neither [gpost] nor [glive].  Behind it sit the
+    ~100 [exit]/[internal_error]/[assert_exp] reachability sites of (O3).
+    [riscv_step_ok_cone] below is the reduction that a liveness half would
+    plug into, kept for that purpose.
 
-    WHY THOSE TWELVE ARE NOT DISCHARGED, in the order a C6 must attack them:
+    ------------------------------------------------------------------------
+    §4  THE FIVE FINDINGS IT TOOK, in one paragraph each, because the SHAPE
+    of them recurs and four of the five were REFUTATIONS OF THE PREMISE THIS
+    FILE NOW PROVES.  All five are written up at their sites and in
+    [claude-notes/projects/weak-memory-premises.md].
 
-      (a) ONE OF THEM IS FALSE AS STATED — finding (O6).  Sail's
-          [(0 <? width) && (width <=? 4096)] precondition is a COMMENT and
-          [word_width] is [Z], so [execute_STORE imm rs2 rs1 0] is a
-          well-typed instance and the model issues a ZERO-WIDTH [MemWrite] on
-          it, which no shape predicate admits
-          ([WeakShapeOverrides2.gwalk_write_ram_zero_False]).  The [∀ ast]
-          form is unavoidable — [run_hart_active] applies [execute] to
-          [ext_decode]'s output and to the [ExecuteAs] redirection VALUE, and
-          neither is syntax — so what closes it is a DECODER POSTCONDITION,
-          [gpost] of [encdec_backwards] with "every width field is in
-          [[1;2;4;8]]".  [sail_shaped (riscv_step b)] itself is not refuted;
-          the compositional ROUTE is.
-      (b) THE MEMORY CONE then needs the same [gpost] machinery twice more:
-          [0 < split_width] (DISCHARGED in [WeakShapeOverrides2] §2, given
-          [0 < width] — which is (a)), and the EXCLUSIVE WINDOW, which needs
-          [gpost] of [pmaCheck] ([LoadReserved]/[StoreConditional]/[Atomic]
-          answer [CannotSplit], so [split_misaligned] returns [N = 1] and the
-          window is opened at most once — otherwise the loop's second
-          [read_ram] falls into [gwalk (Some _)]'s [MemRead] arm, which is
-          [False]).  The fuel recursion [_rec_pt_walk] is DISCHARGED
-          ([WeakShapeOverrides2] §3).
-      (c) THE THREE AXIOMS of §2, via [gw_load_reservation] /
-          [gw_cancel_reservation] / [gw_plat_term_write] — the record is
-          consumed inside (b)'s proofs, at [vmem_read_addr],
-          [execute_STORECON] and [htif_store], not at §4's statement. *)
+      (O2)  an exclusive read with NO conditional write (a bare [lr], a
+            failing [sc], a faulting AMO).  C2 legalised it by BRACKETING the
+            abandoned window in [sail_mstep].
+      (O4)  the mirror: a conditional write with NO exclusive read (a
+            standalone [sc]; the lr/sc reservation lives in the model's pure
+            axioms, so the matching [lr] is a different [riscv_step]).  C4
+            dropped the [ak_latest = false] conjunct from the window-closed
+            [MemWrite] arms — the write became an ordinary [LStore].
+      (O6)  the decoder's ZERO WIDTH: Sail's [0 < width ≤ 4096] precondition
+            is emitted as a COMMENT and [word_width] is [Z], so
+            [execute_STORE imm rs2 rs1 0] is a well-typed instruction on
+            which the model issues a zero-width [MemWrite].  C6 answered it
+            with the decoder postcondition ([WeakShapeAst]/[WeakShapeDec]),
+            C7 CONSUMED it at [run_hart_active] ([WeakShapeExec]).
+      (O9)  a RAISED SAIL EXCEPTION is a dead end, not a continuation:
+            [ExtraOutcome] is indexed by the monad's own return type, so the
+            old [∀ r, …] arm walked the rest of the instruction at every
+            value of the thrown-at type.  Arm := [True].
+      (O10) THE ONE THAT DELETED THE WINDOW.  [update_and_write_pte] — on the
+            path of every memory instruction and of the fetch, since every
+            one of them translates — abandons an exclusive PTE reservation
+            DEEP INSIDE [translate], so C2's "the abandoned tail is silent"
+            bracket did not apply and the instruction's own data access fell
+            inside an open window.  C8 took the same narrowing (O4) had
+            taken, on the read side: [sail_shaped]'s [MemRead] arm dropped
+            the window, [amo_tail] was deleted, and the bare arm became the
+            ORDINARY load arm.  THE KIT COLLAPSED WITH IT — the window index
+            left [gwalk], [gwalkx] disappeared, and the memory cone lost its
+            hardest obligation (the read/write address-and-width agreement,
+            which had needed [pmaCheck]'s [CannotSplit] postcondition and an
+            [untilMT] unfolding at [N = 1]).  Which is why [WeakShapeMem] is
+            a 700-line file and not a stage of its own.
+
+    THE GENERAL RULE THE FIVE SHARE: an arm of a shape predicate that
+    demands more than the machine enforces is a silent, unbounded
+    strengthening, and the repair is always to NARROW THE ARM — never to add
+    an index, and never to have the predicate describe a multi-step protocol
+    the run's own evidence already pins down. *)
 
 From stdpp Require Import gmap finite list relations.
 From Stdlib.ssr Require Import ssreflect.
@@ -144,86 +119,24 @@ From xv6iris Require Import WeakShapeGen01 WeakShapeGen02 WeakShapeGen03
   WeakShapeGen09 WeakShapeGen10 WeakShapeGen11 WeakShapeGen12 WeakShapeGen13
   WeakShapeGen14 WeakShapeGen15.
 From xv6iris Require Import WeakShapeAst WeakShapeWin WeakShapeDec.
-From xv6iris Require Import WeakShapeExec.
+From xv6iris Require Import WeakShapeMem WeakShapeExec.
 From xv6iris Require Import WeakShapePeel.
 Require Import Riscv.rv64d.
 
 Set Default Proof Using "Type".
 
-(** The three shape facts the model does not state about its own monadic
-    axioms.  [gquiet] (not merely [gwalk None]) is the right strength: these
-    are extern hooks that touch no memory and raise nothing, so they must
-    also be crossable by an open exclusive window — [cancel_reservation] is
-    called by [execute_STORECON] AFTER its conditional write, i.e. inside the
-    instruction's tail. *)
-Record rv64d_axiom_shapes : Prop := {
-  ax_load_reservation :
-    ∀ (a : Values.mword (if 64 =? 32 then 34 else 64)%Z) (n : Z),
-      gquiet (load_reservation a n);
-  ax_cancel_reservation : ∀ u, gquiet (cancel_reservation u);
-  ax_plat_term_write : ∀ (b : Values.mword 8), gquiet (plat_term_write b);
-}.
-
-(** …and what they buy at the leaves, in the sweep's own vocabulary. *)
-Lemma gw_load_reservation (H : rv64d_axiom_shapes) a n :
-  gwalk None (load_reservation a n).
-Proof. by apply gwalk_quiet, (ax_load_reservation H). Qed.
-
-Lemma gw_cancel_reservation (H : rv64d_axiom_shapes) u :
-  gwalk None (cancel_reservation u).
-Proof. by apply gwalk_quiet, (ax_cancel_reservation H). Qed.
-
-Lemma gw_plat_term_write (H : rv64d_axiom_shapes) b :
-  gwalk None (plat_term_write b).
-Proof. by apply gwalk_quiet, (ax_plat_term_write H). Qed.
-
-(** The window-crossing form, which is what [execute_STORECON]'s tail needs
-    (it calls [cancel_reservation] AFTER the conditional write). *)
-Lemma gsilent_cancel_reservation (H : rv64d_axiom_shapes) u :
-  gsilent (cancel_reservation u).
-Proof. by apply gquiet_gsilent, (ax_cancel_reservation H). Qed.
-
-Lemma gsilent_load_reservation (H : rv64d_axiom_shapes) a n :
-  gsilent (load_reservation a n).
-Proof. by apply gquiet_gsilent, (ax_load_reservation H). Qed.
-
-Lemma gsilent_plat_term_write (H : rv64d_axiom_shapes) b :
-  gsilent (plat_term_write b).
-Proof. by apply gquiet_gsilent, (ax_plat_term_write H). Qed.
-
-(** TWO OF THE RESIDUE'S FIFTY-ONE, CLOSED HERE, because they are exactly
-    the functions whose only obstacle was [plat_term_write]: the HTIF store
-    path.  [htif_store] is the axiom's single call site and [mmio_write] is
-    its only caller, so the record above is the whole of what they needed —
-    every other leaf is in the generated tower. *)
-Lemma gw_htif_store (H : rv64d_axiom_shapes) :
-  ∀ a0 a1 a2, gwalk None (@htif_store a0 a1 a2).
-Proof.
-  pose proof (gw_plat_term_write H) as Hterm.
-  intros; destruct a0; cbv [htif_store]; gw_solve.
-Qed.
-
-Lemma gw_mmio_write (H : rv64d_axiom_shapes) :
-  ∀ a0 a1 a2, gwalk None (@mmio_write a0 a1 a2).
-Proof.
-  pose proof (gw_htif_store H) as Hh.
-  intros; cbv [mmio_write]; gw_solve.
-Qed.
-
 (* ====================================================================== *)
-(** ** 4. The [riscv_step] wrapper, over the tower's remaining obligations
+(** ** 5. The [riscv_step] wrapper
 
-    [WeakSailLTS.sail_shaped] is [gwalk None] at [M unit]
-    ([WeakShape.gwalk_shaped]), so the whole [∀ b] premise of
-    [WeakComposeLang]'s capstones is the shape of [try_step] plus the shape
-    of [tick_clock] — the two functions §4's header names as C5's frontier.
-    Nothing else about the decoder is involved: the wrapper contributes only
-    a [bind] and a [bool] test. *)
+    [RiscvLang.riscv_step tick = try_step 0 false >>= λ _, if tick then
+    tick_clock tt else returnm tt], and [WeakSailLTS.sail_shaped] is [gwalk]
+    at [M unit] ([WeakShape.gwalk_shaped]), so the wrapper contributes only a
+    [bind] and a [bool] test. *)
 
 Require Import RiscvLang.
 
 Theorem riscv_step_shaped_cone :
-  (∀ (n : Z) (b : bool), gwalk None (try_step n b)) →
+  (∀ (n : Z) (b : bool), gwalk (try_step n b)) →
   ∀ b : bool, sail_shaped (riscv_step b).
 Proof.
   intros Htry b. apply gwalk_shaped.
@@ -231,41 +144,19 @@ Proof.
   intros _. destruct b; [apply gw_tick_clock|by apply gwalk_quiet, gquiet_returnm].
 Qed.
 
-(** …AND THE SAME PREMISE PEELED TO THE RESIDUE.  This is the honest
-    statement of what stage C5 leaves owed: not "a property of the decoder"
-    but twelve named model functions, each of which is one line.  Eleven of
-    them are the memory [execute_*] clauses and one is [fetch]; §4's header
-    (a) says which of the eleven is FALSE as stated and what replaces it. *)
-Theorem riscv_step_shaped_residue
-    (Hfetch : ∀ a0, gwalk None (@fetch a0))
-    (Hexecute_LOAD : ∀ a0 a1 a2 a3 a4, gwalk None (@execute_LOAD a0 a1 a2 a3 a4))
-    (Hexecute_STORE : ∀ a0 a1 a2 a3, gwalk None (@execute_STORE a0 a1 a2 a3))
-    (Hexecute_LOADRES : ∀ a0 a1 a2 a3 a4, gwalk None (@execute_LOADRES a0 a1 a2 a3 a4))
-    (Hexecute_STORECON : ∀ a0 a1 a2 a3 a4 a5,
-        gwalk None (@execute_STORECON a0 a1 a2 a3 a4 a5))
-    (Hexecute_AMO : ∀ a0 a1 a2 a3 a4 a5 a6,
-        gwalk None (@execute_AMO a0 a1 a2 a3 a4 a5 a6))
-    (Hexecute_SSAMOSWAP : ∀ a0 a1 a2 a3 a4 a5,
-        gwalk None (@execute_SSAMOSWAP a0 a1 a2 a3 a4 a5))
-    (Hexecute_SSPUSH : ∀ a0, gwalk None (@execute_SSPUSH a0))
-    (Hexecute_SSPOPCHK : ∀ a0, gwalk None (@execute_SSPOPCHK a0))
-    (Hexecute_ZICBOM : ∀ a0 a1, gwalk None (@execute_ZICBOM a0 a1))
-    (Hexecute_ZICBOP : ∀ a0 a1 a2, gwalk None (@execute_ZICBOP a0 a1 a2))
-    (Hexecute_ZICBOZ : ∀ a0, gwalk None (@execute_ZICBOZ a0)) :
+(** THE THEOREM.  Everything between [riscv_step] and the two memory leaves
+    is machine-checked; the record is what is left. *)
+Theorem riscv_step_shaped_ax (H : rv64d_axiom_shapes) :
   ∀ b : bool, sail_shaped (riscv_step b).
 Proof.
-  apply riscv_step_shaped_cone, gw_try_step, gw_run_hart_active; [done|].
-  by apply gw_execute.
+  apply riscv_step_shaped_cone, gw_try_step, (gw_run_hart_active_ax H).
 Qed.
 
-(** The same reduction in the [gok] mode, for the liveness half: [glive] has
-    no [Ret]-mode subtlety, so the two halves reduce in lockstep at the
-    wrapper.  BELOW the wrapper they do NOT: the generated tower is
-    [gwalk None]-only (§3), so this premise cannot be peeled to the residue
-    the way [riscv_step_shaped_residue] is — a liveness half needs its own
-    294-lemma [gok] tower FIRST, and only then the ~100 reachability sites of
-    (O3).  That ordering is finding (O7), and it is why the [gok] statement
-    still names both frontier functions. *)
+(** The reduction the LIVENESS half would plug into (§3): [glive] has no
+    [Ret]-mode subtlety, so the two halves reduce in lockstep AT THE WRAPPER.
+    Below it they do not — the generated tower is [gwalk]-only (finding
+    (O7)) — which is why this statement still names both frontier
+    functions. *)
 Theorem riscv_step_ok_cone :
   (∀ (n : Z) (b : bool), gok (try_step n b)) →
   gok (tick_clock tt) →
@@ -275,79 +166,3 @@ Proof.
   rewrite /riscv_step. apply gok_bind; [apply Htry|].
   intros _. destruct b; [exact Htick|apply gok_returnm].
 Qed.
-
-(* ====================================================================== *)
-(** ** 5. STAGE C7: the residue RESTATED, and finding (O10)
-
-    §4's [riscv_step_shaped_residue] is the stage-C5 reduction, and TWO of
-    the three reasons its twelve hypotheses could not be true have been
-    removed since:
-
-      (O6) — a zero-width memory clause.  FIXED by [WeakShapeAst.ast_wf]:
-             the eleven [execute_*] hypotheses below carry [0 < width], and
-             [WeakShapeDec.gpureP_ext_decode] supplies it at
-             [run_hart_active]'s bind, which is what C6 owed C7 and what
-             [WeakShapeExec] §2 does.
-      (O2) — a bare [lr] abandons its window, so the CLOSED reading
-             [gwalk None (execute_LOADRES …)] is false.  [WeakShapeExec]
-             gives both readings; the weak one
-             ([WeakShapeExec.gwx_run_hart_active]) is the honest form and
-             ends in [gwalkx], which still implies [sail_shaped].  The
-             theorem below takes the CLOSED one because
-             [WeakShapePeel.gw_try_step] does — bridging [gwalkx] to [gwalk]
-             at [try_step]'s bind is exactly the escape problem, and it
-             disappears under (O10)'s fix.
-
-    (O10) IS THE THIRD, AND IT IS NOT FIXED.  [WeakShapeWin] §1 has the path
-    and the machine-checked leaves: [translate → update_and_write_pte]
-    issues an EXCLUSIVE PTE read and, on the arm where the re-read entry
-    needs no update, returns SUCCESSFULLY without a conditional write; the
-    clause then performs its own data access inside the open window, which
-    [amo_tail] forbids.  Every one of the twelve translates, so ALL TWELVE
-    hypotheses below are false as a group, and so is the capstones'
-    [∀ b, sail_shaped (riscv_step b)] premise.  C7 therefore does NOT swap
-    that premise for a theorem: there is no theorem to swap in, and swapping
-    one false premise for another would hide the vacuity rather than record
-    it.  The fix is specified in [WeakShapeWin] §1 (i)–(iii); it is a
-    stage-C2/C4-scale specification change and it also COLLAPSES the kit
-    (the window index leaves [gwalk], [gwalkx] becomes [gwalk], and the
-    memory cone loses its hardest obligation). *)
-
-Theorem riscv_step_shaped_residue_wf
-    (Hfetch : ∀ a0, gwalk None (@fetch a0))
-    (HL : ∀ a0 a1 a2 a3 width,
-        (0 < width)%Z → gwx (@execute_LOAD a0 a1 a2 a3 width))
-    (HS : ∀ a0 a1 a2 width, (0 < width)%Z → gwx (@execute_STORE a0 a1 a2 width))
-    (HLR : ∀ a0 a1 a2 width a4,
-        (0 < width)%Z → gwx (@execute_LOADRES a0 a1 a2 width a4))
-    (HSC : ∀ a0 a1 a2 a3 width a5,
-        (0 < width)%Z → gwx (@execute_STORECON a0 a1 a2 a3 width a5))
-    (HA : ∀ a0 a1 a2 a3 a4 width a6,
-        (0 < width)%Z → gwx (@execute_AMO a0 a1 a2 a3 a4 width a6))
-    (HSA : ∀ a0 a1 a2 a3 width a5,
-        (0 < width)%Z → gwx (@execute_SSAMOSWAP a0 a1 a2 a3 width a5))
-    (HP : ∀ a0, gwx (@execute_SSPUSH a0))
-    (HK : ∀ a0, gwx (@execute_SSPOPCHK a0))
-    (HM : ∀ a0 a1, gwx (@execute_ZICBOM a0 a1))
-    (HO : ∀ a0 a1 a2, gwx (@execute_ZICBOP a0 a1 a2))
-    (HZ : ∀ a0, gwx (@execute_ZICBOZ a0)) :
-  ∀ b : bool, sail_shaped (riscv_step b).
-Proof.
-  apply riscv_step_shaped_cone, gw_try_step.
-  apply (gw_run_hart_active_wf Hfetch).
-  by apply gx_execute_closed.
-Qed.
-
-(** …and the same reduction in the ABANDONMENT-permitting reading, which is
-    the one the eleven clauses can actually satisfy once (O10) is fixed:
-    [execute] is allowed to leave a window open, and [run_hart_active] still
-    walks.  It stops at [run_hart_active] rather than [try_step] because
-    [try_step] binds [run_hart_active]'s result and a window escaping THAT
-    bind would need the whole trap/exception cone in [gsilent] — a third
-    generated mode, which (O10)'s fix makes unnecessary. *)
-Theorem run_hart_active_shaped_wf
-    (Hfetch : ∀ a0, gwalk None (@fetch a0))
-    (Hex : ∀ ast, ast_wf ast →
-        gwpx (λ _ : exception, True) exres_wf_win None (execute ast)) :
-  ∀ n, gwalkx None (run_hart_active n).
-Proof. by apply (gwx_run_hart_active Hfetch). Qed.

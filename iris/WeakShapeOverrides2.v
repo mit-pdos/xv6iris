@@ -1,7 +1,7 @@
 (** * WeakShapeOverrides2.v — the VALUE side of the shape sweep (stage C5)
 
     [WeakShapeOverrides.v] gives the sweep its SHAPE vocabulary: predicates
-    over the monad's event structure ([gwalk]/[gwalkx]/[gsilent]) and the
+    over the monad's event structure ([gwalk]/[gsilent]) and the
     tactics the generated shards run.  Every one of those predicates is blind
     to VALUES — and stage C5 found that the 47-function memory residue cannot
     be closed without them.  This file adds the missing piece and records the
@@ -25,7 +25,7 @@
         [tools/gen_shape.py]'s [OVERRIDE_PROOFS] uses for [_rec_hartSupports]
         and the nine-way [stateen] block.
     §4  (O6), the stage-C5 FINDING, at its leaf: a ZERO-WIDTH memory write is
-        not [gwalk]-able, so [∀ ast, gwalk None (rv64d.execute ast)] — the
+        not [gwalk]-able, so [∀ ast, gwalk (rv64d.execute ast)] — the
         shape of the whole instruction set, which is how [run_hart_active]
         uses [execute] — is FALSE, and seam (6) needs a DECODER postcondition
         (every width the decoder puts in an [instruction] is in [1;2;4;8]),
@@ -223,19 +223,9 @@ Proof.
 Qed.
 
 (** THE CONSUMERS: a value fact crossing into a SHAPE obligation. *)
-Lemma gwalk_bind_post {E A B} w (P : A → Prop)
+Lemma gwalk_bind_post {E A B} (P : A → Prop)
     (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gpost0 P m → (∀ x, P x → gwalk w (k x)) → gwalk w (Defs.bind m k).
-Proof.
-  revert m. fix IH 1. intros [x|T oc k0] Hm Hk; [by apply Hk|].
-  rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
-    try (intros r; by apply IH); try done.
-  destruct ty; simpl in Hm |- *; intros r; by apply IH.
-Qed.
-
-Lemma gwalkx_bind_post {E A B} w (P : A → Prop)
-    (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gpost0 P m → (∀ x, P x → gwalkx w (k x)) → gwalkx w (Defs.bind m k).
+  gpost0 P m → (∀ x, P x → gwalk (k x)) → gwalk (Defs.bind m k).
 Proof.
   revert m. fix IH 1. intros [x|T oc k0] Hm Hk; [by apply Hk|].
   rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
@@ -367,8 +357,8 @@ Local Ltac mred :=
 
 Lemma gwalk_write_ram_any {B} wk addr width data meta (k : _ → M B) :
   (0 < width)%Z →
-  (∀ r, gwalk None (k r)) →
-  gwalk None (Defs.bind (write_ram wk (Physaddr addr) width data meta) k).
+  (∀ r, gwalk (k r)) →
+  gwalk (Defs.bind (write_ram wk (Physaddr addr) width data meta) k).
 Proof.
   intros Hw Hk.
   have Hn : Z.to_N width ≠ 0%N by apply to_N_nonzero.
@@ -379,7 +369,7 @@ Proof.
 Qed.
 
 Lemma gwalk_write_ram_solo wk addr width data meta :
-  (0 < width)%Z → gwalk None (write_ram wk (Physaddr addr) width data meta).
+  (0 < width)%Z → gwalk (write_ram wk (Physaddr addr) width data meta).
 Proof.
   intros Hw.
   have Hn : Z.to_N width ≠ 0%N by apply to_N_nonzero.
@@ -419,24 +409,22 @@ Qed.
 Section PtWalk.
 
 Hypothesis Hread_pte :
-  ∀ pa sz, gwalk None (read_pte pa sz).
+  ∀ pa sz, gwalk (read_pte pa sz).
 Hypothesis Hpte_is_invalid :
-  ∀ fl ext, gwalk None (pte_is_invalid fl ext).
+  ∀ fl ext, gwalk (pte_is_invalid fl ext).
 Hypothesis Hcheck_leaf_pte :
   ∀ sv vpn access priv mxr ds pte pte_addr level ext,
-    gwalk None (check_leaf_pte sv vpn access priv mxr ds pte pte_addr level ext).
+    gwalk (check_leaf_pte sv vpn access priv mxr ds pte pte_addr level ext).
 
 Lemma gw__rec_pt_walk :
   ∀ sv vpn access priv mxr ds base level global ext rl acc,
-    gwalk None
-      (_rec_pt_walk sv vpn access priv mxr ds base level global ext rl acc).
+    gwalk (_rec_pt_walk sv vpn access priv mxr ds base level global ext rl acc).
 Proof using Hread_pte Hpte_is_invalid Hcheck_leaf_pte.
   fix IH 12. intros sv vpn access priv mxr ds base level global ext rl acc.
   destruct acc as [acc].
   assert (K : ∀ y H sv' vpn' access' priv' mxr' ds' base' level' global' ext',
-                gwalk None
-                  (_rec_pt_walk sv' vpn' access' priv' mxr' ds' base' level'
-                                global' ext' y (acc y H)))
+                gwalk (_rec_pt_walk sv' vpn' access' priv' mxr' ds' base' level'
+                                    global' ext' y (acc y H)))
     by (intros; apply IH).
   clear IH.
   cbv [_rec_pt_walk]. gw_solve.
@@ -444,7 +432,7 @@ Qed.
 
 Lemma gw_pt_walk :
   ∀ a0 a1 a2 a3 a4 a5 a6 level a8 a9,
-    gwalk None (pt_walk a0 a1 a2 a3 a4 a5 a6 level a8 a9).
+    gwalk (pt_walk a0 a1 a2 a3 a4 a5 a6 level a8 a9).
 Proof using Hread_pte Hpte_is_invalid Hcheck_leaf_pte.
   intros. cbv [pt_walk]. apply gw__rec_pt_walk.
 Qed.
@@ -453,7 +441,7 @@ End PtWalk.
 
 (* ====================================================================== *)
 (** ** 4. (O6) — THE STAGE-C5 FINDING: the memory cone's width obligation
-    does NOT stop at the memory cone, and [∀ ast, gwalk None (execute ast)]
+    does NOT stop at the memory cone, and [∀ ast, gwalk (execute ast)]
     is FALSE
 
     §2 discharges [0 < split_width] FROM [0 < width].  The question C5 then
@@ -468,7 +456,7 @@ End PtWalk.
     [try_step] needs, and on it the model issues a ZERO-WIDTH [MemWrite]:
     [split_misaligned] returns [(1, width)] on its unsplit path, so
     [split_width = 0], and [WeakSailLTS.sail_shaped]'s write arm (like
-    [gwalk]'s, [gwalkx]'s and [sail_mstep]'s [LStore] arm) demands a nonzero
+    [gwalk]'s and [sail_mstep]'s [LStore] arm) demands a nonzero
     width.  The leaf fact is [gwalk_write_ram_zero_False] below.
 
     WHY THE ∀ IS UNAVOIDABLE ON THE COMPOSITIONAL ROUTE, and why this is a
@@ -490,8 +478,8 @@ End PtWalk.
     THAT IS A SECOND GENERATOR-SCALE ITEM, and the honest scope note for C6:
     [encdec_backwards] is ~4000 lines of right-nested [bind]/[match] with
     ~250 arms, and the postcondition sweep needs [gpost] lemmas — NOT the
-    [gwalk None] ones the shards prove — for the whole prefix cone it
-    walks.  [gwalk None] does not imply [gpost]/[gsilent] (it permits memory
+    [gwalk] ones the shards prove — for the whole prefix cone it
+    walks.  [gwalk] does not imply [gpost]/[gsilent] (it permits memory
     events), so those lemmas cannot be recovered from the tower that exists;
     they have to be EMITTED IN THE SAME PASS.  The scheduling lesson, which
     is the expensive half of this finding: A GENERATED SWEEP MUST EMIT EVERY
@@ -510,7 +498,7 @@ End PtWalk.
 
 Lemma gwalk_write_ram_zero_False {B} addr data meta (k : _ → M B) :
   dev_addr addr = false →
-  gwalk None (Defs.bind (write_ram Write_plain (Physaddr addr) 0 data meta) k) →
+  gwalk (Defs.bind (write_ram Write_plain (Physaddr addr) 0 data meta) k) →
   False.
 Proof.
   intros Hd. cbv [write_ram].

@@ -2,14 +2,14 @@
     DECODER POSTCONDITION [∀ w, gpureP ast_wf (ext_decode w)].
 
     [WeakShapeAst] §3 says what the postcondition is FOR (it is the only
-    thing that makes [∀ ast, gwalk None (execute ast)] — stage C5's (O6) —
+    thing that makes [∀ ast, gwalk (execute ast)] — stage C5's (O6) —
     a statable obligation) and §4 gives the mode.  This file supplies the
     two things §3 leaves open:
 
       §1  the THIRTY-FIVE monadic definitions [rv64d.encdec_backwards] and
           [rv64d.encdec_compressed_backwards] reach, each in [gpure].  This
           is the second mode finding (O7) asked for, restricted to the one
-          cone that needs it: the generated tower proves [gwalk None], which
+          cone that needs it: the generated tower proves [gwalk], which
           permits memory events and therefore implies neither [gpost] nor
           [gpureP].  The cone is small enough (35 of the model's 345 monadic
           definitions) that it is written out here rather than generated —

@@ -12,10 +12,10 @@
     The peel is what turns "the two [∀ b] premises" into a NAMED, MINIMAL
     frontier:
 
-      [gwalk None (tick_clock tt)]        — DISCHARGED here, outright.
-      [gwalk None (try_step n b)]         — reduced to [run_hart_active],
-      [gwalk None (run_hart_active n)]    — reduced to [fetch] + [execute],
-      [∀ ast, gwalk None (execute ast)]   — reduced to the ELEVEN memory
+      [gwalk (tick_clock tt)]        — DISCHARGED here, outright.
+      [gwalk (try_step n b)]         — reduced to [run_hart_active],
+      [gwalk (run_hart_active n)]    — reduced to [fetch] + [execute],
+      [∀ ast, gwalk (execute ast)]   — reduced to the ELEVEN memory
                                             execute clauses.
 
     and those eleven, plus [fetch], are precisely the residue.  Stage C5's
@@ -25,7 +25,7 @@
     syntax), the AST's width fields are plain [Z] (Sail's
     [member_Z_list width [1;2;4;8]] is a COMMENT), and a zero width makes the
     model issue a zero-width [MemWrite], which no shape predicate admits.  So
-    [Hexecute_STORE] below — [∀ a0 a1 a2 a3, gwalk None (execute_STORE …)] —
+    [Hexecute_STORE] below — [∀ a0 a1 a2 a3, gwalk (execute_STORE …)] —
     is FALSE as stated, and what C6 owes is the decoder postcondition that
     replaces it.  The peel is stated with the hypothesis anyway, because that
     is what makes the obligation a one-line, checkable statement instead of a
@@ -55,11 +55,11 @@ Set Default Proof Using "Type".
 (* ====================================================================== *)
 (** ** 1. The clock tick — outright, no residue below it *)
 
-Lemma gw_should_inc_mcycle : ∀ a0, gwalk None (@should_inc_mcycle a0).
+Lemma gw_should_inc_mcycle : ∀ a0, gwalk (@should_inc_mcycle a0).
 Proof. intros; cbv [should_inc_mcycle]; gw_solve. Qed.
 #[export] Hint Resolve gw_should_inc_mcycle : gshape.
 
-Lemma gw_tick_clock : ∀ a0, gwalk None (@tick_clock a0).
+Lemma gw_tick_clock : ∀ a0, gwalk (@tick_clock a0).
 Proof. intros; destruct a0; cbv [tick_clock]; gw_solve. Qed.
 #[export] Hint Resolve gw_tick_clock : gshape.
 
@@ -67,33 +67,33 @@ Proof. intros; destruct a0; cbv [tick_clock]; gw_solve. Qed.
 (** ** 2. [execute], modulo its eleven memory clauses *)
 
 Lemma gw_execute
-    (Hexecute_LOAD : ∀ a0 a1 a2 a3 a4, gwalk None (@execute_LOAD a0 a1 a2 a3 a4))
-    (Hexecute_STORE : ∀ a0 a1 a2 a3, gwalk None (@execute_STORE a0 a1 a2 a3))
-    (Hexecute_LOADRES : ∀ a0 a1 a2 a3 a4, gwalk None (@execute_LOADRES a0 a1 a2 a3 a4))
+    (Hexecute_LOAD : ∀ a0 a1 a2 a3 a4, gwalk (@execute_LOAD a0 a1 a2 a3 a4))
+    (Hexecute_STORE : ∀ a0 a1 a2 a3, gwalk (@execute_STORE a0 a1 a2 a3))
+    (Hexecute_LOADRES : ∀ a0 a1 a2 a3 a4, gwalk (@execute_LOADRES a0 a1 a2 a3 a4))
     (Hexecute_STORECON : ∀ a0 a1 a2 a3 a4 a5,
-        gwalk None (@execute_STORECON a0 a1 a2 a3 a4 a5))
+        gwalk (@execute_STORECON a0 a1 a2 a3 a4 a5))
     (Hexecute_AMO : ∀ a0 a1 a2 a3 a4 a5 a6,
-        gwalk None (@execute_AMO a0 a1 a2 a3 a4 a5 a6))
+        gwalk (@execute_AMO a0 a1 a2 a3 a4 a5 a6))
     (Hexecute_SSAMOSWAP : ∀ a0 a1 a2 a3 a4 a5,
-        gwalk None (@execute_SSAMOSWAP a0 a1 a2 a3 a4 a5))
-    (Hexecute_SSPUSH : ∀ a0, gwalk None (@execute_SSPUSH a0))
-    (Hexecute_SSPOPCHK : ∀ a0, gwalk None (@execute_SSPOPCHK a0))
-    (Hexecute_ZICBOM : ∀ a0 a1, gwalk None (@execute_ZICBOM a0 a1))
-    (Hexecute_ZICBOP : ∀ a0 a1 a2, gwalk None (@execute_ZICBOP a0 a1 a2))
-    (Hexecute_ZICBOZ : ∀ a0, gwalk None (@execute_ZICBOZ a0)) :
-  ∀ ast, gwalk None (execute ast).
+        gwalk (@execute_SSAMOSWAP a0 a1 a2 a3 a4 a5))
+    (Hexecute_SSPUSH : ∀ a0, gwalk (@execute_SSPUSH a0))
+    (Hexecute_SSPOPCHK : ∀ a0, gwalk (@execute_SSPOPCHK a0))
+    (Hexecute_ZICBOM : ∀ a0 a1, gwalk (@execute_ZICBOM a0 a1))
+    (Hexecute_ZICBOP : ∀ a0 a1 a2, gwalk (@execute_ZICBOP a0 a1 a2))
+    (Hexecute_ZICBOZ : ∀ a0, gwalk (@execute_ZICBOZ a0)) :
+  ∀ ast, gwalk (execute ast).
 Proof. intros ast; cbv [execute]; gw_solve. Qed.
 
 (* ====================================================================== *)
 (** ** 3. [run_hart_active] and [try_step] *)
 
 Lemma gw_run_hart_active
-    (Hfetch : ∀ a0, gwalk None (@fetch a0))
-    (Hexecute : ∀ ast, gwalk None (execute ast)) :
-  ∀ a0, gwalk None (@run_hart_active a0).
+    (Hfetch : ∀ a0, gwalk (@fetch a0))
+    (Hexecute : ∀ ast, gwalk (execute ast)) :
+  ∀ a0, gwalk (@run_hart_active a0).
 Proof. intros; cbv [run_hart_active]; gw_solve. Qed.
 
 Lemma gw_try_step
-    (Hrun : ∀ a0, gwalk None (@run_hart_active a0)) :
-  ∀ a0 a1, gwalk None (@try_step a0 a1).
+    (Hrun : ∀ a0, gwalk (@run_hart_active a0)) :
+  ∀ a0 a1, gwalk (@try_step a0 a1).
 Proof. intros; cbv [try_step]; gw_solve. Qed.

@@ -917,6 +917,7 @@ WeakShapeGen13.v
 WeakShapeGen14.v
 WeakShapeGen15.v
 WeakShapeWin.v
+WeakShapeMem.v
 WeakShapeExecGen01.v
 WeakShapeExecGen02.v
 WeakShapeExecGen03.v

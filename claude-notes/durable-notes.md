@@ -233,13 +233,13 @@ again at the same offset.
 ## A PREDICATE OVER AN EFFECT MONAD: CHECK EVERY OUTCOME'S *ANSWER TYPE*, NOT
 ## JUST WHETHER THE MACHINE HAS AN ARM FOR IT
 
-Six times on this tree a shape/liveness predicate over a Sail-style
-interaction monad has been **refutable because one arm quantified over answers
-the machine never supplies** (the ∀-path oracle; `sail_live`'s memory abort;
-the exclusive-window read; the standalone conditional write; the decoder's
-zero width; and finally the throw). The recurring mistake is not the ∀ itself
-— it is deciding an arm is harmless from the CONSTRUCTOR's name instead of
-from its answer type.
+Seven times on this tree a shape/liveness predicate over a Sail-style
+interaction monad has been **refutable because one arm demanded more than the
+machine can supply** (the ∀-path oracle; `sail_live`'s memory abort; the
+exclusive-window read; the standalone conditional write; the decoder's zero
+width; the throw; and the page walker's abandoned reservation). The recurring
+mistake is not the ∀ itself — it is deciding an arm is harmless from the
+CONSTRUCTOR's name instead of from its answer type.
 
 **The rule.** For every constructor of the outcome type, write down two
 things: (a) does the LTS/stepping relation have an arm for it, and (b) what is
@@ -261,6 +261,29 @@ own comment already said "the agent is stuck there, so the node is vacuous";
 the claim was true of two of the three failure outcomes and false of the
 third. Fix: narrow the arm to what the machine supplies (here: nothing, i.e.
 `True`).
+
+**AND THE SEVENTH INSTANCE IS THE ONE THAT GENERALISES FURTHEST: A "THE TAIL
+IS QUIET FROM HERE" BRACKET IS ONLY AS GOOD AS THE CALL DEPTH AT WHICH THE
+TAIL BEGINS.** When an arm of the predicate opens an obligation that must be
+discharged LATER in the same computation (here: an exclusive read whose window
+must close at a conditional write), the standard repair is to legalise
+abandonment by BRACKETING the abandoned remainder in the machine — "from here
+on the computation is silent, so let one step stand for all of it". That is
+sound exactly when abandonment happens at the TOP of the instruction, and the
+model decides where it happens: this tree's page walker abandons its PTE
+reservation inside `translate`, i.e. inside a callee of every memory
+instruction, so the "silent tail" was the whole rest of the instruction and
+the bracket was worthless. Before writing such a bracket, find the DEEPEST
+call site that can abandon, and ask what follows it there.
+
+The repair that worked, three times running, is the opposite of adding an
+index: **narrow the predicate until the arm says only what the machine
+enforces.** Each time the deferred obligation was deleted (`ak_latest = false`
+on writes; then on reads; then the window itself), the machine's arm became
+the ORDINARY arm — no new disjunct, no new mode — and the cost stayed where it
+already was, in one run-local, target-indexed side condition (`fused_blk`).
+A predicate that has to describe a multi-step protocol is a sign that the
+protocol belongs in the run's own evidence, not in the predicate.
 
 Corollary for the KIT built on top of such a predicate: a kit may be STRICTLY
 STRONGER than the specification where that buys compositionality (this tree
@@ -305,6 +328,20 @@ the WHOLE chain again, 1-3 hours, and cannot reuse the first: `gwalk None`
 (shape) does not imply `gsilent`/`gpost` (they forbid memory events) and says
 nothing about `glive`.  Decide the predicate set before generating, not after
 the first consumer gets stuck.
+
+**A GENERATED TOWER SURVIVES A CHANGE TO THE PREDICATE IT PROVES, AS LONG AS
+THE CHANGE IS A WEAKENING.**  Stage C8 deleted an index from the swept
+predicate (`gwalk (w : win) m` became `gwalk m`) — a change to the very
+statement all 294 generated lemmas make — and the regeneration came back green
+with NO proof-script change and the same wall time: the shards are
+`cbv [f]; <solver>` and the solver's structural rules were re-derived from the
+new definition.  What the edit costs is the LEAF TABLE (the hand-written
+combinator lemmas the solver's hint database and `match goal` patterns name),
+not the sweep.  Corollary: budget a predicate change as "rewrite the kit, then
+one full tower rebuild to confirm", and regenerate BOTH modes in the same pass.
+**And audit the tactic patterns by eye**: an `Ltac`'s `match goal with |- P _ x`
+pattern that is left with a stale arity does NOT fail when its file compiles —
+it fails much later, inside the shards, as a lemma that will not close.
 
 **…UNLESS THE SECOND MODE'S BIND RULE CONSUMES THE FIRST AT THE PREFIX, WHICH
 IS A DESIGN CHOICE AND WORTH MAKING DELIBERATELY.**  Measured on this tree

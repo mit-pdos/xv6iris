@@ -1,6 +1,6 @@
 (** * WeakShapeAst.v — the DECODER POSTCONDITION, and stage C6's finding (O9)
 
-    Stage C5 left [∀ ast, gwalk None (rv64d.execute ast)] REFUTED (finding
+    Stage C5 left [∀ ast, gwalk (rv64d.execute ast)] REFUTED (finding
     (O6)): Sail's [(0 <? width) && (width <=? 4096)] precondition is emitted
     as a COMMENT and [word_width] is [Z], so [STORE (imm, rs2, rs1, 0)] is a
     well-typed [instruction] on which the model issues a zero-width
@@ -21,7 +21,7 @@
           the residue needs: positive widths, nothing else.
       §3  the CONSUMERS — [gpost]-with-a-permissive-exception-postcondition
           ([gpureP]) and the two bind rules that carry a value fact from the
-          decoder into a [gwalk]/[gwalkx] obligation.  [WeakShapeOverrides2]'s
+          decoder into a [gwalk] obligation.  [WeakShapeOverrides2]'s
           [gwalk_bind_post] cannot serve: it takes [gpost0], i.e. it forbids
           the prefix to raise ANY Sail exception, and the decoder does raise
           one (§1's path).
@@ -85,7 +85,7 @@
     (e''') sets [sail_shaped]'s and [amo_tail]'s [ExtraOutcome] arm to
     [True].  [WeakShape.gwalk] follows in the window-CLOSED mode only — the
     window-open [False] is a kit-side strengthening that [gwalk_try_catch]
-    needs (see the arm) — and [WeakShapeOverrides.gwalkx] follows in both.
+    needs (see the arm).
 
     NOTE FOR THE LIVENESS HALF: [glive]'s arm is [if xf then False else True],
     i.e. [sail_live] FORBIDS a raised exception outright, and the path above
@@ -136,13 +136,13 @@ Proof. reflexivity. Qed.
 
 (** The arm as it now stands: nothing is asked.  (Before delta (e''') the
     two goals below were [∀ r, sail_shaped (k r)] and
-    [∀ r, gwalk None (k r)].) *)
+    [∀ r, gwalk (k r)].) *)
 Lemma sail_shaped_throw_bind {A} (e : exception) (k : A → M unit) :
   sail_shaped (Defs.bind (Defs.throw (A := A) e) k).
 Proof. by rewrite throw_bind_node. Qed.
 
 Lemma gwalk_throw_bind {E A B} (e : E) (k : A → Defs.monad E B) :
-  gwalk None (Defs.bind (Defs.throw (A := A) e) k).
+  gwalk (Defs.bind (Defs.throw (A := A) e) k).
 Proof. by rewrite throw_bind_node. Qed.
 
 (* ====================================================================== *)
@@ -212,7 +212,7 @@ Notation gpureP P m := (gpost (λ _, True) P m).
 
 Lemma gwalk_bind_pure {E A B} (P : A → Prop)
     (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gpureP P m → (∀ x, P x → gwalk None (k x)) → gwalk None (Defs.bind m k).
+  gpureP P m → (∀ x, P x → gwalk (k x)) → gwalk (Defs.bind m k).
 Proof.
   revert m. fix IH 1. intros [x|T oc k0] Hm Hk; [by apply Hk|].
   rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
@@ -220,15 +220,6 @@ Proof.
   destruct ty; simpl in Hm |- *; intros r; by apply IH.
 Qed.
 
-Lemma gwalkx_bind_pure {E A B} (P : A → Prop)
-    (m : Defs.monad E A) (k : A → Defs.monad E B) :
-  gpureP P m → (∀ x, P x → gwalkx None (k x)) → gwalkx None (Defs.bind m k).
-Proof.
-  revert m. fix IH 1. intros [x|T oc k0] Hm Hk; [by apply Hk|].
-  rewrite /Defs.bind /=. destruct oc; simpl in Hm |- *;
-    try (intros r; by apply IH); try done.
-  destruct ty; simpl in Hm |- *; intros r; by apply IH.
-Qed.
 
 (** [gpure] is [gsilent] with the throw arm opened up, so every [gsilent]
     fact of the sweep is available at a [gpure] leaf. *)
@@ -280,7 +271,7 @@ Qed.
 (** ** 4. [gpure]: the mode the decoder's own cone is proved in
 
     THE TOWER HAS ONE MODE AND IT IS THE WRONG ONE HERE (finding (O7)).
-    [WeakShapeGen01..15] prove [gwalk None], which permits memory events and
+    [WeakShapeGen01..15] prove [gwalk], which permits memory events and
     therefore does NOT imply [gpost]/[gpureP]; §3's bind rules need the
     decoder's 35 monadic callees in the value-carrying mode.  [gpure] is that
     mode at the trivial postcondition — "no memory event, no barrier, no
