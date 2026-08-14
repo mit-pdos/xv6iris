@@ -64,7 +64,13 @@ reason for the swap is that a caller needs MANY not-in facts and only ONE
 bound: `iput` states its bound at `"log"` (1) and that one premise covers
 `log`, `bcache` (2) and the sleeplock spinlock (4) all at once.
 
-**A contract must state its bound at the MINIMUM rank over its whole cone.**
+**A contract must state its bound at the MINIMUM rank over its whole cone** --
+where "cone" means every rank it ACQUIRES *and every rank it RELEASES*.  The
+release half is easy to forget: cancelling a balanced pair needs
+`locks_below lks r` at the released rank, because that is how you know `r` was
+not already in the set (`locks_add_del_below`).  `ProofVirtioDiskRwF`'s p6
+seam was stated at `"proc"` (9), the rank its free_desc/wakeup cone reaches,
+and could not cancel its `disk.vdisk_lock` release at 7.
 `locks_below lks r` gets STRONGER as `r` drops, and `locks_below_mono` only
 RAISES a bound, so a contract stating `"time"` (6) cannot deliver the `"cons"`
 (3) one of its callees wants.  `SpecDevintr` and `SpecKerneltrap` were both
