@@ -7929,3 +7929,61 @@ LEFT to right, so the premise is written `add_vec (di_nlink dn : mword 16)
 adding a conjunct to a three-way `Prop` breaks every `proj2` of it silently
 at the OTHER projection's site — `ireg_link_ok_short` exists so the next
 clause does not.
+
+
+### The gate fact REACHES `cr_mkdir_body` — increment 2a of the twelfth
+### stop's ruling.  The diamond's join carries an IMPLICATION, not a bound,
+### and that is the only form either arm can prove
+
+**WHAT MOVED, and it is three statements and nothing else.**
+
+* `cr_found_half`'s +0x3e join conjunct (the `∧`'s first half) gains
+  `⌜ty = T_DIR -> di_nlink dnl <> (mword_of_int 32767 : mword 16)⌝`.
+* `cr_alloc_body` gains the same implication, relayed.
+* `cr_mkdir_body` gains the bound itself, `⌜di_nlink dn <> 32767⌝`,
+  because that branch runs at `ty = T_DIR` and the implication collapses.
+
+**THE IMPLICATION IS FORCED, AND THIS IS THE DESIGN CONTENT.**  +0x3e is
+reached two ways and NEITHER arm proves an unconditional bound: the `c.bnez`
+at +0x36 taken gives `di_nlink dp <> 32767` and says nothing about `ty`, and
+the `c.beqz` at +0x3c falling through gives `ty <> T_DIR` and says nothing
+about the count.  What the JOIN knows is their disjunction, and its usable
+form is the implication — which is exactly what the mkdir sub-branch needs,
+and nothing more.  Each arm discharges it in one line (`intros _; exact
+Hnlm` / `intros Hc; exfalso; exact (Htdirg Hc)`) and `cr_alloc_half` spends
+it at `Hnlmax Htdir`.
+
+**NO CONTRACT PREMISE ANYWHERE.**  `wp_create_sconf_body` does not move, and
+the eleventh stop's "no name for dp" objection never arises: the fact is
+walk-level from the branch to the flush, which is what the kernel fix bought
+and what §20.18's re-ruling asked for.
+
+**GATE.**  Green first try.  `make -f CoqMakefile -j30 -k` MAKEEXIT=0, 1093
+`.vo`, `make -n` 0 `COQC` lines, `lemma_diff` CLEAN, no `Admitted`/`admit`;
+`Print Assumptions` unchanged at the eight real modules.  `SpecCreate.v`,
+`CreateBudget.v`, `LinkCreate*` byte-untouched; coverage unmoved at 177/190.
+
+**WHAT IS LEFT OF INCREMENT 2 IS THE WALK AND THE SEAL, and nothing about
+either is now a design question.**  In order:
+
+1. `cr_mkdir_half` proving `cr_mkdir_body`, +0xf8..+0x144: `dirlink(ip,".")`
+   at +0x106 (ticket-free, `dir_link_at_dirlink_self`), `dirlink(ip,"..")`
+   at +0x11a (the child's re-park DEFERRED — `dir_links_live` out,
+   `dir_links_of_ilink` back, and the return leg takes no hypothesis so it
+   crosses the `++` by construction), `dirlink(dp,name)` at +0x12c (spends
+   the undeposited `ilink cinum`), the `++` at +0x134..+0x13a, the second
+   mint at +0x140 (`wp_iupdate_link` at `cru := true`, now taking the `sh`'s
+   own value and `cr_mkdir_body`'s new premise), and `c.j +0xe0` into
+   ARM C-OK.  The three `bltz` exits at +0x10a / +0x11e / +0x130 go to the
+   T_DIR sibling.  Budget: `CreateBudget.cr_fail_mkdir_closes` /
+   `_closes_ind`.  The one call template to copy is `cr_alloc_half`'s
+   +0xd8 `dirlink`, which carries every premise these three want.
+2. the T_DIR sibling of `cr_fail_body` + its half: the child's `"."` is
+   SELF and therefore `emp`, its `".."` takes the GREY disjunct, the home
+   condition is the `sh zero,74(s3)` at +0x146, and `igrey` is minted free
+   from `ireg_inv` (`InodeRegion.v:2021`) — C1's free mint finding its
+   first consumer.
+3. the seal: `wp_create_sconf` = `cr_found_half` fed `cr_alloc_half` (one
+   `iApply`, D₀-a's finding), `CreateProof : CREATE`, `LinkCreate.v` over
+   the seven callee Links plus `LinkCreateFreshTy`, the `_CoqProject` row,
+   and the coverage flip **177 -> 178** with `sysfile.c` **8 -> 9**.

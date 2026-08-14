@@ -1451,6 +1451,17 @@ Section ProofCreateMain.
        ⌜bv_unsigned dind < 16 * Z.of_nat nib⌝ -∗
        ⌜di_type dn = SpecDirlookup.T_DIR⌝ -∗
        ⌜di_nlink dn <> (mword_of_int 0 : mword 16)⌝ -∗
+       (* THE NLINK_MAX GATE'S FALL-THROUGH, in the only form the DIAMOND
+          can deliver it.  +0x3e is reached two ways: the [c.bnez] at +0x36
+          TAKEN (the count is not at the maximum) and the [c.beqz] at +0x3c
+          FALLING THROUGH (the type is not T_DIR).  Neither arm alone gives
+          an unconditional bound, and their join is exactly this
+          implication -- which is all the mkdir sub-branch needs, since it
+          runs at [ty = T_DIR].  It is a WALK-LEVEL fact: no contract
+          premise anywhere, and none of the "no name for dp" trouble the
+          eleventh stop ruled fatal. *)
+       ⌜ty = SpecDirlookup.T_DIR ->
+          di_nlink dn <> (mword_of_int 32767 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dn bm data⌝ -∗
        ⌜dir_ok nib dn data⌝ -∗
        ⌜exists es e, nameiparent_of (bview plen pfun) es e
@@ -1575,6 +1586,13 @@ Section ProofCreateMain.
        ⌜bv_unsigned dind < 16 * Z.of_nat nib⌝ -∗
        ⌜di_type dn = SpecDirlookup.T_DIR⌝ -∗
        ⌜di_nlink dn <> (mword_of_int 0 : mword 16)⌝ -∗
+       (* ...AND THE GATE'S FALL-THROUGH, DISCHARGED: this branch runs at
+          [ty = T_DIR], so [cr_alloc_body]'s implication collapses to the
+          bound itself.  It is what [SpecIupdate.wp_iupdate_link] takes at
+          +0x140 beside the [sh]'s own value, and without it the flush --
+          hence the whole arm, since the [ilink dind] it mints is the only
+          ticket for the [".."] written at +0x11a -- is unprovable. *)
+       ⌜di_nlink dn <> (mword_of_int 32767 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dn bm data⌝ -∗
        ⌜dir_ok nib dn data⌝ -∗
        ⌜exists es e, nameiparent_of (bview plen pfun) es e
@@ -2589,6 +2607,14 @@ Section ProofCreateMain.
                     ∀ Mj : regfile,
                     ⌜cr_regs m sp0 ipv (m !!! Regidx Rs2 : mword 64)
                        ty major minor Mj⌝ -∗
+                    (* THE GATE'S FALL-THROUGH FACT, carried by the JOIN
+                       and not by either arm: the [c.bnez] arm proves it
+                       from the count, the [c.beqz] arm from the type, and
+                       what +0x3e knows is their disjunction written as an
+                       implication.  The allocate half relays it and only
+                       the T_DIR sub-branch spends it. *)
+                    ⌜ty = SpecDirlookup.T_DIR ->
+                       di_nlink dnl <> (mword_of_int 32767 : mword 16)⌝ -∗
                     sie_cap_gpr (CID := CIDj) Mj (K - 10)%nat b (proc_addr j) -∗
                     pc_is (CID := CIDj) (mword_of_int (CK + 0x3e)) -∗
                     WP (Loop : expr riscv_lang)))
@@ -2602,7 +2628,7 @@ Section ProofCreateMain.
           with "[-Hcg Hpc]" as "Hgate".
         { iSplit.
           - (* ===== THE JOIN AT +0x3e: dirlookup and everything after === *)
-            iIntros (CIDj) "%Hqj". iIntros (Mj) "%HMjregs Hcg Hpc".
+            iIntros (CIDj) "%Hqj". iIntros (Mj) "%HMjregs %Hnlmax Hcg Hpc".
             pose proof HMjregs as HMjR.
             destruct HMjR as (W2 & W8 & W9 & W18 & W20 & W21 & W22 & Wthr).
         (* the locked directory's payload, in the pieces dirlookup takes *)
@@ -3458,6 +3484,7 @@ Section ProofCreateMain.
           iApply ("Ha" $! A1 u5 kd qd gd gild gisld dind dnl bml datl nfp nf0
                     n1 Sb1 used1 w
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                          [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                           Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -3468,6 +3495,7 @@ Section ProofCreateMain.
           { exact Hdib'. }
           { exact Htydir. }
           { exact Hnl0. }
+          { exact Hnlmax. }
           { exact Hiok. }
           { rewrite Hnib. exact Hdok. }
           { exact Hnpname. }
@@ -3758,8 +3786,9 @@ Section ProofCreateMain.
              iEval (rewrite Hp03e) in "Hpc".
              iDestruct "Hgate" as "[Hj _]".
              iSpecialize ("Hj" $! CID25 with "[%]"); [wp_next_chain |].
-             iApply ("Hj" $! N4 with "[%] Hcg Hpc").
+             iApply ("Hj" $! N4 with "[%] [%] Hcg Hpc").
              { exact HN4regs. }
+             { intros Hc. exfalso. exact (Htdirg Hc). }
         * (* ---- the count is below NLINK_MAX: jump the type test ----- *)
           iApply (wp_cbnez_taken_s_sconf (mword_of_int (CK + 0x36))
                     (mword_of_int 4 : mword 8) (Cregidx (mword_of_int 7)) Ra5
@@ -3772,8 +3801,9 @@ Section ProofCreateMain.
           iEval (rewrite Htg03e) in "Hpc".
           iDestruct "Hgate" as "[Hj _]".
           iSpecialize ("Hj" $! CID23 with "[%]"); [wp_next_chain |].
-          iApply ("Hj" $! N3 with "[%] Hcg Hpc").
+          iApply ("Hj" $! N3 with "[%] [%] Hcg Hpc").
           { exact HN3regs. }
+          { intros _. exact Hnlm. }
     - (* ============================================================== *)
       (*  ARM N: nameiparent returned 0                                  *)
       (* ============================================================== *)
@@ -3988,8 +4018,8 @@ Section ProofCreateMain.
                  with "Htext") as "#Htail".
     iIntros (CIDa Hsa).
     iIntros (Ma w5 kd qd gd γil γisl dind dn bm data nf nsl n1 Sb1 used1 w).
-    iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hnpname %Hnone
-             %Hsb1 %Hwmem %Hnp1 %Husd1".
+    iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok %Hnpname
+             %Hnone %Hsb1 %Hwmem %Hnp1 %Husd1".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
              Hmeta Hmap Hblocks #Hshotl Hkeep
@@ -4271,7 +4301,7 @@ Section ProofCreateMain.
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
                           ∪ {[IBLOCK cinum inodestart]}) used1
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                        [%] [%] [%] [%] [%] [%] [%] [%]
+                        [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                         Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -4285,6 +4315,7 @@ Section ProofCreateMain.
         { exact Hdib. }
         { exact Htydir. }
         { exact Hnl0. }
+        { exact (Hnlmax Htdir). }
         { exact Hiok. }
         { exact Hdok. }
         { exact Hnpname. }
