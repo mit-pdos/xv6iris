@@ -26,7 +26,14 @@ generated `CodeKexec.v` — not just transcribed from an earlier read), and its
 second shared tail — the `-1` path at `+0x1d6 .. +0x1f2` that six of the
 phase's branches funnel into — is **proven**
 (`ProofKexecTail.KexecTailProofC.kxc_bad_1d6`; see the phase-C section
-below).
+below). **`kxc_c_setup` (`+0x1ae .. +0x218`: myproc, PGROUNDUP, the first
+`uvmalloc` call and its failure/success split, `uvmclear` on the guard page,
+the stackbase/argv[0] setup, and the final branch into the loop) is now also
+PROVEN and committed** — `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup`,
+`Qed` in 5.3s. See the entry right below for the whole story (a `vm_compute`
+hang that looked like a Qed-scale problem, then a real design gap in which
+page table the loop invariant closes over) — read it before touching phase
+C's remainder, the argv loop.
 
 **THE "17 GB Qed" DIAGNOSIS BELOW WAS WRONG — CORRECTED HERE, READ THIS
 FIRST.** A later session ran `coqc -time -async-proofs off` (durable-notes'
@@ -73,12 +80,21 @@ named, but `um_below`/`um_covered` on THIS table (one page's PTE
 overwritten from `P'`'s) need proving — almost certainly a short "insert
 preserves coverage" lemma next to `um_covered_pground`/`kxc_grow_inv`
 (`UmCovered.v`/`ProcPtOwn.v` are where its siblings live), not yet written.
-**This is the next concrete step**: name `Pfinal := uptd_set P' (svpn_of
-(Z1 !!! Regidx (mword_of_int 11))) (pte_clear_u (uvm_pte (Z.lor 4 18)
-rleaf))`, pass `Pfinal` (not `P'`) as `Hout`'s third argument in both
-branches, and prove `um_below sz1 Pfinal.(ud_um)` / `um_covered sz1
-Pfinal.(ud_um)` from `Hbelow'`/`Hcov'` (which are about `P'`) plus whatever
-"clearing one page doesn't uncover a size bound below it" fact is missing.
+**FIXED.** Named `Pfinal := uptd_set P' (svpn_of (Z1 !!! Regidx
+(mword_of_int 11))) (pte_clear_u (uvm_pte (Z.lor 4 18) rleaf))`, passed
+`Pfinal` (not `P'`) as `Hout`'s third argument in both branches. The missing
+"insert preserves coverage" pair is two three-line lemmas,
+`kxc_um_below_insert`/`kxc_um_covered_insert` (top of `ProofKexecC.v`, next
+to `um_covered_pground`): `um_below` only cares about the KEY (any value
+already below the bound stays below it whatever it's overwritten with — the
+guard page's own vpn is below `sz1` because `Hbelow'` already says so, via
+the very leaf `Hleafeq` found before the clear) and `um_covered` transfers
+unconditionally through an insert (inserting only grows the domain, never
+shrinks it). `ud_root`/`ud_tfp` carry over via the one-line
+`unfold uptd_set; reflexivity` predicted above. **`kxc_c_setup` now compiles
+end to end**, `Qed` in 5.3s — confirming the earlier "17 GB" symptom really
+was the one `vm_compute` call, not a structural Qed-scale problem needing a
+lemma split.
 
 Along the way (found only because the file finally compiled far enough to
 reach them): a missing `w67` argument to `kxc_frameC` (dropped a slot,
@@ -97,12 +113,10 @@ None of these are performance issues; they are exactly the kind of thing
 `optimization.md`'s Rule Zero is for — the compiler reports them instantly
 and cheaply once nothing upstream is hanging.
 
-**Still open in phase C:** the `Pfinal`/coverage-survives-`uptd_set` fix
-just above (next concrete step), then the argv loop (`+0x21a .. +0x272`,
-whose invariant is designed below but not yet proven), and the closing
-`copyout` call joining into phase D at `+0x2a6`. Then phase D, then
-`ProofKexec.v` + `LinkKexec.v`. `ProofKexecC.v` as it stands is
-uncommitted — does not yet compile past the `Pfinal` gap.
+**Still open in phase C:** the argv loop (`+0x21a .. +0x272`, whose
+invariant is designed below but not yet proven), and the closing `copyout`
+call joining into phase D at `+0x2a6`. Then phase D, then `ProofKexec.v` +
+`LinkKexec.v`.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
@@ -207,7 +221,8 @@ both reach the epilogue through tails A already proved — so put the next share
 tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
 | phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
-| phase C — the rest (`+0x1ae..+0x1d6` setup, the argv loop, the closing copyout) | **NEXT** |
+| phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **proven, uncommitted** |
+| phase C — the argv loop (`+0x21a .. +0x272`) and the closing copyout | **NEXT** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
