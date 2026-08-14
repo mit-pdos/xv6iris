@@ -253,7 +253,7 @@ Section UserActiveClass.
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmsten & Hssten)".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & %Hpmaall & _ & _ & %Help_ne & _ & %Hmisa_eq & _)".
+      "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & %Help_ne & _ & %Hmisa_eq & _)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Hhtif_s.
     iDestruct (reg_valid_dq with "Hreg Hpma") as %Lpma.

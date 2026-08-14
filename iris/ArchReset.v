@@ -203,6 +203,10 @@ Definition reset_vector : mword 64 := SailStdpp.Values.mword_of_int 0x80000000.
 (*    enable it finds already set while [legalize_mideleg] forces the matching  *)
 (*    delegation bit to 0 -- so at a nonzero entry [mie] the boot chain's       *)
 (*    bridge is not provable at all.                                          *)
+(*  - senvcfg = 0: like mseccfg/menvcfg, [reset_sys] never writes it, and the   *)
+(*    kernel never writes it either (it is S-mode-writable but xv6 has no       *)
+(*    line that touches it), so [hw_config]'s persistent senvcfg cell needs      *)
+(*    it pinned from the board just as those two are.                          *)
 (*                                                                         *)
 (* NOT HERE, on purpose -- every one of these is DERIVED by [init_model] over *)
 (* arbitrary garbage ([BootReset.exec_init_model]): PC, nextPC,               *)
@@ -220,11 +224,11 @@ Definition board_wired (hid : mword 64) : M unit :=
   set_pc_reset_address reset_vector >>
   write_reg mhartid hid.
 
-(* THE BOARD'S POWER-ON REGISTER VALUES: the eight the privileged spec's [reset]
+(* THE BOARD'S POWER-ON REGISTER VALUES: the nine the privileged spec's [reset]
    does not establish over garbage.  [pma] is a PARAMETER rather than the literal
    table because the table lives in the language file ([RiscvLang.pma_boot], with
    the account of its three regions), which is ABOVE this one: the board's
-   obligation is spelled here and the value it is instantiated at there.  Split from the wiring because these eight
+   obligation is spelled here and the value it is instantiated at there.  Split from the wiring because these nine
    are exactly the ones [ColdBoot.board_regs_after_sim] holds to the model's own
    initializers -- running this after [sail_model_init] changes nothing, which is
    the machine-checked statement that these constants are not a transcription. *)
@@ -237,7 +241,10 @@ Definition board_regs (pma : list PMA_Region) : M unit :=
   write_reg htif_tohost_base None >>
   (* nothing enabled, nothing delegated *)
   write_reg mie (SailStdpp.Values.mword_of_int 0) >>
-  write_reg mideleg (SailStdpp.Values.mword_of_int 0).
+  write_reg mideleg (SailStdpp.Values.mword_of_int 0) >>
+  (* senvcfg: like mseccfg/menvcfg, [reset_sys] never touches it, so its
+     power-on value is a board obligation too -- see the bullet below. *)
+  write_reg senvcfg (SailStdpp.Values.mword_of_int 0).
 
 Definition board_init (hid : mword 64) (pma : list PMA_Region) : M unit :=
   board_wired hid >> board_regs pma.

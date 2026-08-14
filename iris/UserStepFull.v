@@ -225,7 +225,7 @@ Section UserStepFull.
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hnpc & Hgpr)".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
+      "(#Hmisa & _ & _ & _ & #Help & #Hsenv & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
     (* read all the values the dispatch decision / branches need *)
     iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
     iDestruct (reg_valid_dq with "Hreg Hseip") as %Lseip.

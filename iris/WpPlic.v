@@ -175,7 +175,7 @@ Proof.
   iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (pma_all_io Hpma_all a8 4
              (pma_access_io _ _ plic_base (plic_base + plic_size) (proj1 Hrange) (proj2 Hrange)
@@ -399,7 +399,7 @@ Proof.
   iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iPoseProof "Hhw" as "#Hhwc".
   iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+    "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
       %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
   destruct (pma_all_io Hpma_all a8 4
              (pma_access_io _ _ plic_base (plic_base + plic_size) (proj1 Hrange) (proj2 Hrange)

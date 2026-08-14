@@ -195,7 +195,7 @@ Section WpSmodePtCtl.
                  with "Hhw Hinvz Hhsz Hprivz Hmsz Hsiez Hmiez Hmdlz Hmenvz") as "Hsm".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iApply (wp_instr_s_regime R γ pc false (JAL (imm, Regidx rd))
 
@@ -323,7 +323,7 @@ Section WpSmodePtCtl.
              [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iApply (wp_instr_s_config_regime R pc true (JALR (zeros' 12, Regidx ra, zreg))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -484,7 +484,7 @@ Section WpSmodePtCtl.
        [Hpc Hnpc] Hfile Hinstr Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     pose proof (mword1_not_lp elp0 Help_np) as Help0.
     assert (Hxlpe : forall sz : mstate,

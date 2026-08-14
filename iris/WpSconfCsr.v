@@ -637,7 +637,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
@@ -878,7 +878,7 @@ Section WpSconfCsr.
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
@@ -1167,7 +1167,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
@@ -1377,7 +1377,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
@@ -1557,7 +1557,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
@@ -1670,7 +1670,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC & %HmisaU & %HmisaM &
         %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms") as %Lms.
@@ -1818,7 +1818,7 @@ Section WpSconfCsr.
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & _)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hstv")  as %Lstv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
@@ -1951,7 +1951,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & %HmisaU & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & %HmisaU & _)".
     (* the live SIE bit is the arm index *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct (sie_arm_half_agree false p ms with "Hhalf Harm") as %Hsie_ms.
@@ -2135,7 +2135,7 @@ Section WpSconfCsr.
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & _)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hsepc") as %Lsepc.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
@@ -2265,7 +2265,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hsie & Hsret & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
@@ -2475,7 +2475,7 @@ Section WpSconfCsr.
     iDestruct "Hmsx" as (ms0) "(Hms & Hsie & Hsret & %Hmsf)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.

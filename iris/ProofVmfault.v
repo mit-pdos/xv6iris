@@ -1382,7 +1382,7 @@ Section ProofVmfault.
         (* ---- grow the user map by the new page ---- *)
         iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
         iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
-          "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
+          "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
         assert (Hvpnb : (bv_unsigned (svpn_of va0) < 67108864)%Z)
           by exact (svpn_of_lt_maxva va0 Hva0b).
         iDestruct (proc_pt_grow P (svpn_of va0) r t'

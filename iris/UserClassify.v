@@ -155,7 +155,7 @@ Section UserClassify.
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_x.
     (* facts the trap tower needs at s_x (all reads are non-consuming) *)
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & #Help & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
+      "(#Hmisa & _ & _ & _ & #Help & #Hsenv & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv_x.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms_x.
     iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc_x.

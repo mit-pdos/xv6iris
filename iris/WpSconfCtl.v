@@ -330,7 +330,7 @@ Section WpSconfCtl.
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -402,7 +402,7 @@ Section WpSconfCtl.
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -537,7 +537,7 @@ Section WpSconfCtl.
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
@@ -653,7 +653,7 @@ Section WpSconfCtl.
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+      "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.

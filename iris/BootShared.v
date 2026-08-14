@@ -81,7 +81,7 @@ Proof. intros (_ & _ & Hmem & _) x Hx. exact (Hmem x Hx). Qed.
 
 (* [boot_facts]' register clause is a run of the boot program over ARBITRARY
    power-on garbage (the board's explicit writes + the spec's validated reset); [BootReset.reset_regs_of_run] is the bridge to the
-   fifteen-way fact set every consumer above asks for by name.  This is that
+   sixteen-way fact set every consumer above asks for by name.  This is that
    bridge's only caller, which is why the whole chain above is unchanged. *)
 Lemma boot_regs_of_facts (g : gstate) :
   boot_facts g -> forall c : CPU, reset_regs c (g.(gregs) c).

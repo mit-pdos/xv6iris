@@ -147,7 +147,7 @@ Section WpSmodeIntr.
     subst menvcfg0.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     (* the translation slot: SIE = '1' forces the KPT arm *)
     iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn) "(Hstk & Hbit1 & Htlbinv & Harm)".

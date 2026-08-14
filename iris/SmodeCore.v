@@ -1000,12 +1000,12 @@ Section SmodeCoreIris.
      by which a proof that holds the config -- directly, or through [sconf] /
      [sie_cap_gpr] (IntrDefs.v lifts this lemma to both) -- reaches the ↦ₚ⇄↦ₘ
      tier bridges outside a leaf.  Use it instead of destructing [hw_config]'s
-     seventeen conjuncts by position. *)
+     eighteen conjuncts by position. *)
   Lemma hw_config_kmap_claims : hw_config -∗ kmap_static_claims.
   Proof.
     iIntros "H".
     iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
-      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hk)".
+      "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hk)".
     iExact "Hk".
   Qed.
 

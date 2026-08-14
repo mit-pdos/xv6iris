@@ -64,7 +64,7 @@ Section WpStoreGpr.
     iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (pma_all_ram Hpma_all ea 8
                (pma_access_ram _ _ _ Hram_ea Hram_ea7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch & _ & _ & Hwrite & _).
@@ -209,7 +209,7 @@ Section MmodeStoreTor.
     iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (pma_all_ram Hpma_all ea 8
                (pma_access_ram _ _ _ Hram_ea Hram_ea7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch & _ & _ & Hwrite & _).

@@ -736,10 +736,17 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
      which is what makes [ColdBoot.reset_regs_cold_boot] able to close these
      two conjuncts along with the rest. *)
   /\ register_lookup mie rs = boot_w64 0
-  /\ register_lookup mideleg rs = boot_w64 0.
+  /\ register_lookup mideleg rs = boot_w64 0
+  (* senvcfg = 0: like mseccfg/menvcfg, [reset_sys] never writes it and the
+     kernel never writes it either, so it is a board obligation
+     ([ArchReset.board_regs]'s ninth write) -- see that file's bullet.  This
+     is what lets [hw_config] (RiscvFetchExec.v) hold it as a sixth frozen,
+     persistently-shareable cell alongside misa/mseccfg/pma_regions/
+     htif_tohost_base/elp. *)
+  /\ register_lookup senvcfg rs = boot_w64 0.
 
 (* NAMED PROJECTIONS of the three clauses consumers ask for one at a time
-   (pmpcfg, mie, mideleg).  [reset_regs] is a fifteen-way
+   (pmpcfg, mie, mideleg).  [reset_regs] is a sixteen-way
    conjunction and positional destructuring of it in a consumer is exactly the
    brittleness that adding a conjunct exposes, so anything that wants ONE fact
    asks by name. *)
@@ -753,7 +760,11 @@ Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact
 
 Lemma reset_regs_mideleg (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup mideleg rs = boot_w64 0.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
+
+Lemma reset_regs_senvcfg (c : CPU) (rs : regstate) :
+  reset_regs c rs -> register_lookup senvcfg rs = boot_w64 0.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client
@@ -782,7 +793,7 @@ Definition boot_facts (g' : gstate) : Prop :=
      unreset register outside the theorem.  Read [ArchReset.board_init]'s comment
      for the write list; it IS the platform assumption list.
      [rs0] is arbitrary garbage, which is the point: [BootReset.reset_regs_of_run]
-     derives [reset_regs] -- the fifteen-way fact set every consumer still asks
+     derives [reset_regs] -- the sixteen-way fact set every consumer still asks
      for by name -- from this clause for EVERY [rs0], and
      [PowerBoot.boot_shape_boot_gstate] satisfies it with one convenient
      instance ([init_regstate], where ColdBoot computes the whole run with the

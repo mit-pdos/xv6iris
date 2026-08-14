@@ -685,7 +685,7 @@ Section MemArmGlue.
     iDestruct (ucfg_senvcfg C (set_reg sigma_f nextPC (add_vec_int va n))
                  with "Hreg Hcfg") as %Hsenv.
     iPoseProof "Hhw" as (misa0 msec0 pmar0 elp0)
-      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
+      "(#Hmisac & _ & #Hpmac & #Hhtifc & _ & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & _ & _ & %Hmisaeq & _)".
     iDestruct (reg_valid_dq with "Hreg Hhtifc") as %Hhtif.
     iDestruct (reg_valid_dq with "Hreg Hpmac") as %Hpmav.
     assert (Lmisaf : register_lookup misa sigma_f.(sregs) = MISA_C).
