@@ -42,6 +42,12 @@ Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import PanicStub.
 Require Import DinodeEnc.
+Require Import DirView.
+Require Import InodeInv.
+Require Import InodeLock.
+Require Import DirLinks.
+Require Import InodeRegion.
+Require Import IregLinkNz.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -470,6 +476,61 @@ Proof.
     exact (Z.mod_small (bv_unsigned h - 1)%Z 65536%Z ltac:(lia)). }
   rewrite Hstep. lia.
 Qed.
+
+(* ---- (c) THE RECORD EITHER FLUSH WRITES.  Both the [++] and the [--]
+   move ONE halfword, so the new record is the old one with [di_nlink]
+   replaced -- and every pure clause a re-park owes ([InodeLock.inode_ok],
+   [DirView.dir_ok]) reads only the type, the size and the addrs, so all
+   three ride the change by [reflexivity].  The RESOURCE clause
+   ([DirLinks.dir_links]) does not, and its move is
+   [IregLinkNz.dir_links_nlink_drop]: at a nonzero count the grey colour is
+   refuted, and an [ilink] ticket says nothing about the home record. *)
+Definition sl_setnl (dn : dinode) (nl : mword 16) : dinode :=
+  MkDinode (di_type dn) (di_major dn) (di_minor dn) nl (di_size dn)
+           (di_addrs dn).
+
+Lemma sl_setnl_type (dn : dinode) (nl : mword 16) :
+  di_type (sl_setnl dn nl) = di_type dn.
+Proof. reflexivity. Qed.
+
+Lemma sl_setnl_nlink (dn : dinode) (nl : mword 16) :
+  di_nlink (sl_setnl dn nl) = nl.
+Proof. reflexivity. Qed.
+
+Lemma sl_setnl_size (dn : dinode) (nl : mword 16) :
+  di_size (sl_setnl dn nl) = di_size dn.
+Proof. reflexivity. Qed.
+
+Lemma sl_setnl_addrs (dn : dinode) (nl : mword 16) :
+  di_addrs (sl_setnl dn nl) = di_addrs dn.
+Proof. reflexivity. Qed.
+
+Lemma sl_setnl_inode_ok (cov : gset Z) (ls : Z) (dn : dinode) (bm : blkmap)
+    (data : nat -> list (bv 8)) (nl : mword 16) :
+  inode_ok cov ls dn bm data -> inode_ok cov ls (sl_setnl dn nl) bm data.
+Proof. unfold inode_ok, sl_setnl. cbn. exact (fun H => H). Qed.
+
+Lemma sl_setnl_dir_ok (nib : nat) (dn : dinode) (data : nat -> list (bv 8))
+    (nl : mword 16) :
+  dir_ok nib dn data -> dir_ok nib (sl_setnl dn nl) data.
+Proof. unfold dir_ok, sl_setnl. cbn. exact (fun H => H). Qed.
+
+Lemma sl_setnl_type_stable (dn : dinode) (nl : mword 16) :
+  di_type_stable (sl_setnl dn nl) dn.
+Proof. right. exact (sl_setnl_type dn nl). Qed.
+
+(* the halfword the [sh] at +0xf2 commits, named so the walk's store and
+   [wp_iupdate_unlink]'s Z premise can be spelled at one term *)
+Definition sl_ndec (h : mword 16) : mword 16 :=
+  trunc16 (sign_extend' 64 (subrange_vec_dec
+     (add_vec (zero_extend' 64 h : mword 64)
+        (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))
+         : mword 64)) 31 0)).
+
+Lemma sl_ndec_decr (h : mword 16) :
+  bv_unsigned h <> 0%Z ->
+  bv_unsigned h = (bv_unsigned (sl_ndec h) + 1)%Z.
+Proof. unfold sl_ndec. exact (sl_nlink_decr h). Qed.
 
 (* ===================================================================== *)
 (*  THE FRAME CARVE: 38 slots = FOUR saved words + THREE byte buffers     *)

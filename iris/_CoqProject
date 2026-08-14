@@ -925,6 +925,7 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 InodeRegion.v
+IregLinkNz.v
 IcacheEscrow.v
 IcacheBoot.v
 CodeIget.v
