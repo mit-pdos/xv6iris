@@ -150,7 +150,7 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
 Global Typeclasses Opaque uservec_post.
 
 Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (C : ucfg) (pt : uptd) (kroot : mword 44)
+    (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
     (sscr0 : mword 64)
     (vksat vksp vktr vkhart : bv 64)
     (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
@@ -179,7 +179,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
      [wp_userret_pt] takes) *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* the machine, exactly as the trap delivers it *)
-  user_trap_frame C pt -∗
+  user_trap_frame C pt Rut -∗
   (* the kernel-side resources parked while user code ran *)
   sscratch ↦ᵣ sscr0 -∗
   kpt_inv kroot -∗
@@ -227,13 +227,14 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
 Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (kroot : mword 44) (sscr0 : mword 64)
+      (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (kroot : mword 44) (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)
       (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
        w272 w280 w112 : bv 64)
       (dqk : dfrac),
-      wp_uservec_pt_body C pt kroot sscr0 vksat vksp vktr vkhart
+      wp_uservec_pt_body C pt Rut kroot sscr0 vksat vksp vktr vkhart
         w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
         w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
         w272 w280 w112 dqk.

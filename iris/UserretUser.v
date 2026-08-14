@@ -58,7 +58,8 @@ Section UserretUser.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_userret_user (C : ucfg) (pt : uptd) (kroot : mword 44)
+  Lemma wp_userret_user (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (kroot : mword 44)
       (m : regfile) (usatp : mword 64)
       (mstatus0 sepc0 : mword 64)
       (sc_v stval_v : mword 64)
@@ -144,8 +145,10 @@ Section UserretUser.
     mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) -∗
     sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) -∗
     udata_own (ud_data pt) -∗
+    (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
+    Rut pt -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
-    stvec_handler_wp C pt -∗
+    stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
@@ -156,7 +159,7 @@ Section UserretUser.
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
-             Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata Hhandler".
+             Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata Hrut Hhandler".
     iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -176,7 +179,7 @@ Section UserretUser.
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112".
-    iDestruct (userret_to_user_inv C pt mstatus0 sepc0 sc_v stval_v
+    iDestruct (userret_to_user_inv C pt Rut mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
                  (uc_stvec C) (uc_medeleg C) (uc_mip C)
                  (ud_root pt) (ud_tfp pt) (ud_um pt)
@@ -190,9 +193,9 @@ Section UserretUser.
                  eq_refl eq_refl eq_refl eq_refl
                  Hcov Hacc
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
-                       Hfile Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata")
+                       Hfile Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata Hrut")
       as "Hinv".
-    iApply (U.wp_user_exec_closed C pt with "Hhw Hmi Hwi Hinv Hhandler").
+    iApply (U.wp_user_exec_closed C pt Rut with "Hhw Hmi Hwi Hinv Hhandler").
   Qed.
 
 End UserretUser.

@@ -45,14 +45,15 @@ Section UservecAllPt.
     iPureIntro. exact Hwf.
   Qed.
 
-  Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (kroot : mword 44)
+  Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
+      (kroot : mword 44)
       (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)
       (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
        w272 w280 w112 : bv 64)
       (dqk : dfrac) :
-    wp_uservec_pt_body C pt kroot sscr0 vksat vksp vktr vkhart
+    wp_uservec_pt_body C pt Rut kroot sscr0 vksat vksp vktr vkhart
       w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
         w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
         w272 w280 w112 dqk.
@@ -71,10 +72,10 @@ Section UservecAllPt.
              Htf112
              Hcont".
     (* ============ open the trapped machine ============ *)
-    iDestruct (user_trap_frame_open C pt with "Hframe") as (ms_v sc_v stval_v sepc_v g)
+    iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hfile &
         Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmie & Hmdl & Hmedl & Hmip &
-        Hmenv & Hsenv & Hmse & Hsse)".
+        Hmenv & Hsenv & Hmse & Hsse & Hrut)".
     pose proof Hok as Hok2.
     destruct Hok2 as (HSXL & HMPRV & HMXR & HSPP & HSIE & HTVM & HTSR).
     pose proof (uc_mm C) as Hmm.

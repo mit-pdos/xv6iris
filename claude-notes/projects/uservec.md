@@ -412,3 +412,108 @@ supposition, worth recording so nobody re-derives them:**
 the dovetail sketched above): the trapframe page physical → VA conversion,
 `user_cfg C` ⟷ `sconf`'s config cells (checked free), and then building the
 functor itself. The kpt conversion no longer blocks any of it.
+
+## ARCHITECTURAL CORRECTION (superseding the paragraph above): no separate
+## dovetail file — uservec/usertrap/userret compose like any other caller/
+## callee pair (landed: `uservec-rut-threading` branch)
+
+User direction, overriding the "`UservecUsertrap.v` dovetail" plan sketched
+above: **do not build a functor/glue module on top of uservec and usertrap.**
+Treat the call the same as any other function-calls-function edge in this
+project — the CALLER's spec/proof depends on the CALLEE's spec module and
+invokes the callee's WP directly; the `Link*.v` file supplies the concrete
+callee proof as a functor argument. Concretely:
+
+- `ProofUservec.v` becomes `Module UservecProof (UT : USERTRAP) (UR :
+  USERRET) (US : USER) : USERVEC` — a functor, not a flat proof. Its tail
+  (currently a call into the sealed `SpecUservec.uservec_post` continuation,
+  see below) instead does the trapframe phys→VA conversion + `user_cfg ⟷
+  sconf` wiring, then calls `UT.wp_usertrap` directly, then chains into
+  `UR`/`US` (almost certainly via `UserretUser(UR)(US).wp_userret_user`,
+  already exactly this shape one level down). `userret` is simply "the
+  return address uservec supplies for the call to usertrap" — there is no
+  independent entity to dovetail; uservec's own spec depends on BOTH
+  `USERTRAP` and `USERRET` and chains them at the call site, exactly the
+  pattern `UserretUser.v` already established for userret→user.
+- `SpecUservec.v` correspondingly loses `uservec_post` and
+  `wp_uservec_pt_body`'s trailing continuation parameter: it concludes
+  directly in `WP (Loop : expr riscv_lang)`, with a new premise pinning the
+  jalr target to `KernelSyms.usertrap`'s real address.
+- The whole-execution Löb (discharging `stvec_handler_wp`, i.e. what used to
+  be pencilled in as a `UservecUsertrap.v`-level theorem) becomes an OUTER
+  `iLöb` inside `UservecProof.wp_uservec_pt` itself, self-referencing across
+  trap rounds — there is no other file left to put it in.
+
+**The `usertrap_res` exclusive-residue threading problem, and its
+resolution (landed).** `usertrap_res` genuinely cannot be released for the
+duration of user-mode execution: `UsertrapRes.v`'s `ut_own` (proc_priv,
+bio/fd/iref slots, `Rsys`/syscall_env — the non-`ut_caps` remainder) is
+exclusive kernel-side state that usertrap hands to the loop on entry and
+must get back unchanged on the next trap, so it has to ride inside
+`SpecUser.v`'s loop invariant across arbitrarily many user instructions.
+User's chosen shape (over "separate threaded parameter" and other
+alternatives): **an extra conjunct of `user_inv`/`user_trap_frame`
+themselves**, not a value threaded alongside them. Concretely:
+
+- `UserExec.v` gains `Context (Rut : uptd -> iProp Σ)` (right after `C`/
+  `pt`) and one more conjunct `Rut pt` on both `user_inv` and
+  `user_trap_frame`. `Rut` is deliberately ONE argument (not `uptd -> mword
+  64 -> iProp Σ` matching `usertrap_res`'s own `(pt, ksp)` key) — the
+  intended instantiation is `fun p => ∃ ksp, UT.usertrap_res p ksp`,
+  hiding `ksp` existentially inside `Rut` itself, so nothing in the
+  `User*.v` tower ever needs to know `ksp` exists. `user_step_obligation_
+  active` (the ACTIVE-hart residue) additionally needed a NEW `Rut pt -∗`
+  premise it didn't have before (nothing carried it from `user_inv`'s
+  destructure into its continuation `Hk` otherwise). `user_trap_frame_
+  intro` gained a matching `Rut pt -∗` premise.
+- **No constructor Parameter was needed on `SpecUsertrap.USERTRAP_RES`** —
+  this was the open question the session started with, and it resolved to
+  "moot": `Rut` is never independently CONSTRUCTED, only WRAPPED. Each round
+  of the outer Löb, `UservecProof`'s tail calls `UT.wp_usertrap`, receives
+  `R pt' ksp'` (= `UT.usertrap_res pt' ksp'`) straight from usertrap's own
+  postcondition, and builds that round's `Rut pt' := ∃ ksp, UT.usertrap_res
+  pt' ksp` via `iExists ksp'; iFrame` on the spot — a fresh closure supplied
+  as an ordinary value argument to `UR.wp_userret_pt`/`UserretUser`/
+  `US.wp_user_exec_closed` each time, never baked into a fixed Module. The
+  per-hart indexing (`usertrap_res` is a hart-indexed family — see
+  `SpecUsertrap.v`'s note above `wp_usertrap_body`) needs no extra plumbing
+  either: every Section in the `User*.v` tower already carries `Context
+  `{CID : CpuId}``, so `Rut`'s type at any USE site is already pinned to
+  that ambient hart.
+- **Blast radius, exhaustively swept** (confirmed via a dedicated Explore
+  agent before editing): `user_inv` has exactly 6 raw construction sites in
+  exactly 3 lemmas (`UserKernelBridge.userret_to_user_inv`,
+  `UserStep.user_step_obligation_holds` ×2 WAITING arms,
+  `UserClassify.active_step_branch` ×3 RETIRE/RETIRE/ENTER-WAIT arms);
+  `user_trap_frame` has exactly 1 (`UserExec.user_trap_frame_intro`, already
+  a chokepoint, reused by `UserClassify.deliver_user_trap` and
+  `UserStepFull.interrupt_branch`). Every per-instruction-family leaf lemma
+  across `UserMemClassify*.v`/`UserTotalU.v`/`UserClassifyAsm.v`/
+  `UserFetchPt.v`/`UserCsr.v`/`UserBits.v`/`UserTranslate.v`/`UserPtTree.v`
+  etc. proves only the fully abstract `active_step_obligation` (mentions
+  `mstate_interp`/`gpr_file`/`nextPC`/`user_pt_inv`/`user_cfg`, never
+  `user_inv`) — confirmed zero hits, zero of those files touched. Files
+  actually edited (11 total, all compiling and validated by a from-scratch
+  GCP `make proofs`, `MAKEEXIT=0`, 33 files rebuilt): `UserExec.v`,
+  `UserClassify.v`, `UserStep.v`, `UserStepFull.v`, `UserActiveClass.v`,
+  `UserKernelBridge.v`, `SpecUser.v`, `ProofUser.v`, `UserretUser.v`,
+  `SpecUservec.v`, `ProofUservec.v`. `UmodeCap.v`/`WpUmodeStep.v` (the
+  separate "verified tier" with its own concrete-frame twin `uv_trap_frame`)
+  were confirmed out of scope — comment-only mentions, different Section,
+  not an instance of `user_trap_frame`.
+- `SpecUservec.v`/`ProofUservec.v` got only the MINIMAL fix in this pass
+  (add `Rut` param, thread into `user_trap_frame_open`/`wp_uservec_pt_body`;
+  `Hrut` sits unused for the rest of `ProofUservec.v`'s ~1400-line proof —
+  fine, Iris's `iProp` is affine, an unconsumed spatial hypothesis is not an
+  error) — NOT yet the functor-over-USERTRAP/USERRET/USER restructuring
+  above, which is the next session's work. `uservec_post`/`Hcont`'s call
+  site (`ProofUservec.v` around the exit-switch tail, right after `Hcont`
+  is `iEval (rewrite /uservec_post)`d and specialized) is exactly where the
+  new tail (trapframe phys→VA + `user_cfg⟷sconf` + `UT.wp_usertrap` +
+  chain into `UR`/`US` + outer Löb) needs to be spliced in, replacing the
+  `iApply ("Hcont" with ...)` at the very end.
+- GOTCHA hit and worth recording: the GCP build command from earlier in this
+  project (`make -k proofs` run from `iris/`) fails with "No rule to make
+  target 'proofs'" — `proofs` is a ROOT-Makefile target (`Makefile:222`,
+  `proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile`), not an
+  `iris/CoqMakefile` one; run it from the repo root, not `iris/`.

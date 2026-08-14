@@ -17,6 +17,7 @@ Section UserClassify.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
+  Context (Rut : uptd -> iProp Σ).
 
   (* The full execute-result outcome space at U-mode: retire, delegated
      user-trap, illegal, or enter-wait (WRS).  This REPLACES the 2-way
@@ -68,14 +69,14 @@ Section UserClassify.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
-    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
-    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang)) -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗ Rut pt -∗
+    ▷ (user_trap_frame C pt Rut -∗ WP (Loop : expr riscv_lang)) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗ WP (Loop : expr riscv_lang)).
   Proof.
     intros Hmsok Lelp_x Help_ne Hstep.
-    iIntros "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont".
+    iIntros "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hcont".
     iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
     iMod (utrap_ghost s_x c info pcx ms_v sc_v stval_v sepc_v va va' elp0
             (uc_stvec C) Lelp_x Help_ne
@@ -86,9 +87,9 @@ Section UserClassify.
     iNext. iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
     iApply ("Hcont" with "[-]").
-    iApply (user_trap_frame_intro C pt _ _ _ _ _ (utrap_ms_ok elp0 ms_v Hmsok)
+    iApply (user_trap_frame_intro C pt Rut _ _ _ _ _ (utrap_ms_ok elp0 ms_v Hmsok)
              with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt
-                   [Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest]").
+                   [Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest] Hrut").
     iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
   Qed.
 
@@ -124,16 +125,16 @@ Section UserClassify.
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
-    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
+    gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗ Rut pt -∗
     (∀ b : bool, active_step_obligation Ei (set_reg σ (R_bool minstret_increment) b) va g) -∗
-    ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang)) ∧
-       (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang))) -∗
+    ▷ ((user_inv C pt Rut -∗ WP (Loop : expr riscv_lang)) ∧
+       (user_trap_frame C pt Rut -∗ WP (Loop : expr riscv_lang))) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗ WP (Loop : expr riscv_lang)).
   Proof.
     iIntros (Hmsok Lpriv Lms Lpc Hdisp)
-      "#Hhw [Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hob Hcont".
+      "#Hhw [Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hob Hcont".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs0.
     destruct (exec_should_inc_minstret_Some
                 (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
@@ -190,7 +191,7 @@ Section UserClassify.
           iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
           iApply ("Hcont" with "[-]").
           iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g'.
-          iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
+          iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut".
           iPureIntro. split; [exact Hmsok | intros u _; reflexivity].
         * iModIntro. iExists s_tick.
           iSplitR. { iPureIntro. exact Hstep. }
@@ -198,7 +199,7 @@ Section UserClassify.
           iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
           iApply ("Hcont" with "[-]").
           iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g'.
-          iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
+          iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut".
           iPureIntro. split; [exact Hmsok | intros u _; reflexivity].
       + (* EXECUTE-TRAP *)
         assert (Hdel_x : bit_to_bool (access_vec_dec (register_lookup medeleg s_x.(sregs))
@@ -235,7 +236,7 @@ Section UserClassify.
         iApply (deliver_user_trap Ei σ s_x (rv64d_types.Exception e)
                   (xtval_exception_value e xv) pcx ms_v sc_v stval_v sepc_v va va' elp0 mst b g'
                   Hmsok Lelp_x Help_ne Hstep
-                  with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont").
+                  with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hcont").
         iFrame "Hreg Hmd".
       + (* ILLEGAL *)
         assert (Hdel_x : bit_to_bool (access_vec_dec (register_lookup medeleg s_x.(sregs))
@@ -267,7 +268,7 @@ Section UserClassify.
         iApply (deliver_user_trap Ei σ s_x (rv64d_types.Exception (E_Illegal_Instr tt))
                   (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib)) va ms_v sc_v stval_v sepc_v va va' elp0 mst b g'
                   Hmsok Lelp_x Help_ne Hstep
-                  with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont").
+                  with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hcont").
         iFrame "Hreg Hmd".
       + (* ENTER-WAIT *)
         assert (Hnop : wait_is_nop wr = false)
@@ -283,7 +284,7 @@ Section UserClassify.
         iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
         iApply ("Hcont" with "[-]").
         iExists (HART_WAITING (wr, ib)), ms_v, sc_v, stval_v, sepc_v, va, va', g'.
-        iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg".
+        iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut".
         iPureIntro.
         split; [exact Hwr | split; [exact Hmsok | intros u Hu; discriminate Hu]].
     - (* Step_Fetch_Failure (Virtaddr xv, e) *)
@@ -315,7 +316,7 @@ Section UserClassify.
       iApply (deliver_user_trap Ei σ s_x (rv64d_types.Exception e)
                 (xtval_exception_value e xv) va ms_v sc_v stval_v sepc_v va va' elp0 mst b g'
                 Hmsok Lelp_x Help_ne Hstep
-                with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont").
+                with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hcont").
       iFrame "Hreg Hmd".
   Qed.
 
