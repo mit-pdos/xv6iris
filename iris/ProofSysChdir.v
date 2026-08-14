@@ -421,7 +421,14 @@ Section ProofSysChdirEpilogue.
     (pa_stk sp0 3) ↦₈ w3 -∗
     (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
     ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ bf jj) -∗
-    wp_next true pj (fun (CIDx : CpuId) =>
+    (* THE INDEX IS [b], NOT [true], and it has to be: the epilogue is five
+       PLAIN instructions, so every crossing it makes is a [b]-link and the
+       [b]-form chain is what it can hand back.  Stated at [true] the caller
+       gets only "pj = zero_reg -> ...", which pins nothing at [b = false]
+       and leaves every [cpu_own_transport] after the block unprovable.  A
+       caller whose own continuation is at [true] weakens into this for
+       free ([or_intror], which is what [wp_next_chain] tries). *)
+    wp_next b pj (fun (CIDx : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (M !!! Regidx Ra0 : mword 64)⌝ -∗
@@ -587,3 +594,195 @@ Section ProofSysChdirEpilogue.
   Qed.
 
 End ProofSysChdirEpilogue.
+
+(* ===================================================================== *)
+(*  +0x68 .. +0x6e : THE SHARED "-1" TAIL.                                *)
+(*                                                                        *)
+(*  end_op, [c.li a0,-1], and the [c.j] back into the epilogue.  BOTH     *)
+(*  failure arms of the C-level [||] reach it: ARM A ([bltz] at +0x22)     *)
+(*  branches straight here, ARM B ([c.beqz] at +0x32) restores s1 at       *)
+(*  +0x66 and falls in.  Everything an arm still owns rides in its own     *)
+(*  continuation premise, so the only file-system resources here are       *)
+(*  end_op's own.                                                         *)
+(* ===================================================================== *)
+(* ===================================================================== *)
+(*  THE FUNCTOR.  Everything from here down applies a callee's contract,   *)
+(*  so it lives inside the module the seal instantiates.                   *)
+(* ===================================================================== *)
+Module SysChdirProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Argstr : ARGSTR)
+                     (Namei : NAMEI) (Ilock : ILOCK) (Iunlock : IUNLOCK)
+                     (Iput : IPUT) (Iunlockput : IUNLOCKPUT) (EndOp : END_OP).
+
+Section ProofSysChdirM1Tail.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ,
+            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
+
+  Notation Rra := (mword_of_int 1 : mword 5).
+  Notation Rs0 := (mword_of_int 8 : mword 5).
+  Notation Rs1 := (mword_of_int 9 : mword 5).
+  Notation Rs2 := (mword_of_int 18 : mword 5).
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+
+  Lemma sc_m1_tail `{GEN : GenId} `{CID0 : CpuId}
+      (gs : list gname) (jx : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names) (g : log_names) (gfs : fs_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (u : nat) (pidv : mword 32) (dq : dfrac)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool) (lks : gset string) (w3 : mword 64) (bf : nat -> bv 8) :
+    (K_end_op <= K - 20)%nat -> (20 <= K)%nat -> ((K - 20) + 20 = K)%nat ->
+    log_geom_ok cov logstart ->
+    (jx < NPROC)%nat -> gs !! jx = Some gl ->
+    lks = ∅ ->
+    sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
+    sc_sp sp0 M -> sc_thr m M ->
+    (M !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64) ->
+    (forall i, (i < 16)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (20 - i)%nat)) 8 = true) ->
+    sie_cap_gpr M (K - 20) b (proc_addr jx) -∗
+    cpu_own 0 eb (proc_addr jx) C b lks -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr jx) -∗
+    kernel_text -∗ pc_is (mword_of_int (SC + 0x68)) -∗
+    panic_wp_any -∗
+    bio_ctx bn (fs_view gfs gd dev cov) -∗
+    log_ctx g bn gfs cov logstart dev -∗
+    fs_crash_seam cov logstart -∗
+    gen_cert -∗
+    p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+    procs_inv gs -∗
+    dev_inv gu gd -∗
+    disk_geom gd pd pav pu -∗
+    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    log_op g u -∗
+    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈ w3 -∗
+    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 20) jj ↦ₘ bf jj) -∗
+    wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
+      ∀ mf : regfile,
+        ⌜callee_saved m mf⌝ -∗
+        ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
+        sie_cap_gpr mf K b (proc_addr jx) -∗
+        cpu_own 0 eb (proc_addr jx) C b lks -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr jx) -∗
+        pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
+        p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HKeo HK20 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 Hal.
+    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen
+              Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
+    iPoseProof (schdi_68 with "Htext") as "Hi68".
+    iPoseProof (schdi_6c with "Htext") as "Hi6c".
+    iPoseProof (schdi_6e with "Htext") as "Hi6e".
+    (* ===== +0x68 jal ra,end_op ===== *)
+    iApply (wp_jal_s_sconf (CID := CID0) (mword_of_int (SC + 0x68)) Rra
+              (mword_of_int 2091416 : mword 21) M (K - 20)%nat b
+              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi68").
+    iIntros (CID1 Hq1) "Hcg Hpc".
+    set (M1 := <[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (SC + 0x68) : mword 64) 4)]> M).
+    assert (Hjeo : add_vec (mword_of_int (SC + 0x68) : mword 64)
+                     (sign_extend' 64 (mword_of_int 2091416 : mword 21))
+                   = mword_of_int KernelSyms.end_op) by pcw.
+    iEval (rewrite Hjeo) in "Hpc".
+    assert (HM1ra : (M1 !!! Regidx Rra : mword 64)
+                    = add_vec_int (mword_of_int (SC + 0x68) : mword 64) 4)
+      by (rewrite /M1; apply upd_eq).
+    assert (HM1sp : sc_sp sp0 M1)
+      by (rewrite /sc_sp /M1 upd_ne; [exact HMsp | nz]).
+    assert (HM1s1 : (M1 !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64))
+      by (rewrite /M1 upd_ne; [exact HMs1 | nz]).
+    assert (HM1thr : sc_thr m M1).
+    { intros c Hc N2 N8 N9 N18. rewrite /M1 upd_ne; [| regne].
+      exact (HMthr c Hc N2 N8 N9 N18). }
+    iDestruct (cpu_own_transport CID0 CID1 0 eb (proc_addr jx) C b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (trap_csrs_ext_transport CID0 CID1 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
+              g gfs cov logstart dev u pidv dq M1 (K - 20)%nat eb C b lks
+              HKeo Hgeom Hj Hgl ltac:(lkbelow)
+              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    Hpid Hprocs Hdev Hgeo Hdlk Hop").
+    iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    assert (Hpc6c : ret_pc (M1 !!! Regidx Rra : mword 64)
+                    = mword_of_int (SC + 0x6c)) by (rewrite HM1ra; pcw).
+    iEval (rewrite Hpc6c) in "Hpc".
+    assert (Heosp : sc_sp sp0 meo).
+    { rewrite /sc_sp (callee_saved_lookup Hcseo csp_rs1 ltac:(vm_compute; reflexivity)).
+      exact HM1sp. }
+    assert (Heos1 : (meo !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64)).
+    { rewrite (callee_saved_lookup Hcseo Rs1 ltac:(vm_compute; reflexivity)).
+      exact HM1s1. }
+    assert (Heothr : sc_thr m meo).
+    { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcseo c Hc).
+      exact (HM1thr c Hc N2 N8 N9 N18). }
+    (* ===== +0x6c c.li a0,-1 ===== *)
+    iApply (wp_cli_s_sconf (CID := CID2) (mword_of_int (SC + 0x6c)) Ra0
+              (mword_of_int 63 : mword 6) (mword_of_int (-1) : mword 64)
+              meo (K - 20)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
+              with "Hcg Hpc Hi6c").
+    iIntros (CID3 Hq3) "Hcg Hpc".
+    set (P1 := <[Regidx Ra0 := regval_into_reg (mword_of_int (-1) : mword 64)]> meo).
+    assert (HP1a0 : (P1 !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64))
+      by (rewrite /P1; apply upd_eq).
+    assert (HP1sp : sc_sp sp0 P1)
+      by (rewrite /sc_sp /P1 upd_ne; [exact Heosp | nz]).
+    assert (HP1s1 : (P1 !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64))
+      by (rewrite /P1 upd_ne; [exact Heos1 | nz]).
+    assert (HP1thr : sc_thr m P1).
+    { intros c Hc N2 N8 N9 N18. rewrite /P1 upd_ne; [| regne].
+      exact (Heothr c Hc N2 N8 N9 N18). }
+    assert (Hpp6e : add_vec_int (mword_of_int (SC + 0x6c) : mword 64) 2
+                    = mword_of_int (SC + 0x6e)) by pcw.
+    iEval (rewrite Hpp6e) in "Hpc".
+    (* ===== +0x6e c.j +0x5c ===== *)
+    iApply (wp_cj_s_sconf (CID := CID3) (mword_of_int (SC + 0x6e))
+              (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0")))
+              P1 (K - 20)%nat b ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi6e").
+    iIntros (CID4 Hq4). iNext. iIntros "Hcg Hpc".
+    assert (Htg5c : add_vec (mword_of_int (SC + 0x6e) : mword 64)
+                      (sign_extend' 64
+                         (sign_extend' 21 (concat_vec (mword_of_int 2039 : mword 11) ('b"0"))))
+                    = mword_of_int (SC + 0x5c)) by pcw.
+    iEval (rewrite Htg5c) in "Hpc".
+    iDestruct (cpu_own_transport CID2 CID4 0 eb (proc_addr jx) C b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (trap_csrs_ext_transport CID2 CID4 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID2 CID4 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID4)
+                 ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iApply (sc_epilogue (CID0 := CID4) m P1 sp0 K b (proc_addr jx) w3 bf
+              HK20 Kpop Hsp0 HP1sp HP1thr HP1s1 Hal
+              with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hbuf [Hown Htce Hcce Hpid Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iDestruct (cpu_own_transport CID4 CIDy 0 eb (proc_addr jx) C b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (trap_csrs_ext_transport CID4 CIDy eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID4 CIDy eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid").
+    { exact Hcsf. }
+    { rewrite Ha0f. exact HP1a0. }
+  Qed.
+
+End ProofSysChdirM1Tail.
+
+End SysChdirProof.
