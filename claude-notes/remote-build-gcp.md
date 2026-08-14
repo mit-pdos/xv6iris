@@ -130,6 +130,25 @@ That creates the firewall rule, the 1 TB data disk, the Spot instance, the
 idle-shutdown timer, and the shared opam switch. Every step checks before it
 creates, so re-running is safe and cheap.
 
+### Who can ssh in
+
+`$SSH_KEY.pub` plus every key in `$EXTRA_AUTHORIZED_KEYS` (default
+`~/.ssh/authorized_keys`) is authorized for `$SSH_USER`, so anyone who can
+already reach this machine can also ssh straight to the VM and watch a build
+the agent started. Re-running `provision-gcp.sh` is how a key change reaches
+an EXISTING instance: `ssh-keys` metadata is written only at create time, and
+`ensure_ssh_keys` re-writes it wholesale on every run. That makes removals work
+too — a key dropped locally is revoked on the VM by the same step, and the
+guest agent rewrites the VM's `authorized_keys` within seconds, with nothing to
+restart.
+
+Entries carrying **options** (`command="…" ssh-ed25519 …`, `restrict,…`) are
+dropped rather than forwarded. The guest agent copies each metadata line into
+`authorized_keys` verbatim, so an options prefix would carry a forced command
+onto the VM under a key that reads as ordinary — and, the likelier mistake, a
+`from="…"` restriction naming your local network would silently not apply
+there. What is authorized on the VM is therefore always a bare key.
+
 `provision-gcp.sh` does **not** create the project switch — that is specific to
 this development. After provisioning:
 
