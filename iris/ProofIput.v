@@ -1809,12 +1809,23 @@ Section ProofIput.
     { intros c Hcs N2 N8 N9 N18. rewrite /G4 upd_ne; [| regne].
       exact (HG3thr c Hcs N2 N8 N9 N18). }
     (* THE ORDER STEP THIS FILE EXISTS TO JUSTIFY.  iput holds itable.lock (2)
-       across acquiresleep, whose spinlock is "sleep lock" (6) -- acquiring
-       UPWARD, so no inversion.  [Hfresh] is iput's own entry bound at
-       "itable"; [lkbelow] weakens it to 6 ([locks_below_mono]) and pushes it
-       across the held "itable" singleton ([locks_below_union_singleton]) to
-       reach the bound the nested acquiresleep states at the FULL entry set,
-       which is what [Hcnt] here actually holds. *)
+       across acquiresleep, whose spinlock is "sleep lock".
+
+       THIS IS THE ONE EDGE THE ORDER DOES NOT LICENSE, and it fails here on
+       purpose.  Since kfork holds np->lock across idup, "itable" (14) sits
+       ABOVE "proc" (9); and since acquiresleep's blocking path runs
+       sleep_prepare while holding the sleeplock spinlock, "sleep lock" (4)
+       sits BELOW "proc".  There is no room left to place "itable" between
+       them, so [locks_below ({[itable]} ∪ lks) (lock_rank "sleep lock")] --
+       which needs 14 < 4 -- is FALSE, and [lkbelow] correctly refuses it.
+
+       xv6 is still right: fs.c:339 says "ip->ref == 1 means no other process
+       can have ip locked, so this acquiresleep() won't block (or deadlock)".
+       Discharging it needs the icache REF-1 exclusivity theorem
+       (design/fs-icache.md) and a NON-BLOCKING acquiresleep variant whose
+       contract never reaches sleep_prepare, so it raises no order obligation
+       at all.  See claude-notes/projects/lock-set.md, "THE ONE UNLICENSED
+       EDGE".  Owed; this file stays red until it lands. *)
     assert (Hslbelow : locks_below ({[lock_rank "itable"]} ∪ lks)
                                    (lock_rank "sleep lock")) by lkbelow.
     iApply (ASL.wp_acquiresleep_nested_sconf (dq := dq) gs j gil gisl "inode"%string

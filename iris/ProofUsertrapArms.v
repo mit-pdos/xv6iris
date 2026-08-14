@@ -969,7 +969,7 @@ Section UtD0.
       assert (HV'tfp : ud_tfp (pv_upt V') = ud_tfp pt).
       { rewrite /V' /Pd. exact Htfpe. }
       iDestruct ("Hownback" $! V' with "Hpv Hsy") as "Hown".
-      iApply (T.ut_a6 Rsys N V' pt ksp m0 mr av nx C false
+      iApply (T.ut_a6 Rsys N V' pt ksp m0 mr av nx C false lks
                 Hwf' Hav Hnx HV'tfp Hksp Hm0sp Hmrsp Hmrs1 Hcsmr
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
       iApply (ua_hold_on Rsys N V' C with "Hcpu Hcsrs Hclm [-]").
