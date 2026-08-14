@@ -432,6 +432,35 @@ Section CreateSpec.
        ic_loaded γfs γi cov logstart k inum dn bm ∗
        ity_shot g (di_type dn) ∗
        inode_ref_short k (qi + s)%Qp qi dev inum)%I.
+
+  (* Assembled structurally, not by [iFrame]: at the syscall altitude this
+     is built at (hundreds of accumulated hypotheses), even a NAMED
+     [iFrame "H1 .. H10"] over these ten conjuncts measured 26-28 s per call
+     site in ProofCreate.v -- [iSplitL]/[iExact] is free, the same fix as
+     [IcacheEscrow.ic_mk_loaded] for the same reason (optimization.md,
+     "Framing"). *)
+  Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
+      γil γisl :
+    is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) -∗
+    sleeplocked γisl -∗
+    sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
+    ic_deposit cn k (DepShr s dev inum g) -∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word true -∗
+    ic_loaded γfs γi cov logstart k inum dn bm -∗
+    ity_shot g (di_type dn) -∗
+    inode_ref_short k (qi + s)%Qp qi dev inum -∗
+    create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
+  Proof.
+    iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Href".
+    rewrite /create_locked. iExists γil, γisl.
+    iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hlkd"; [iExact "Hlkd" |].
+    iSplitL "Hpid"; [iExact "Hpid" |]. iSplitL "Hdep"; [iExact "Hdep" |].
+    iSplitL "Hdev"; [iExact "Hdev" |]. iSplitL "Hinum"; [iExact "Hinum" |].
+    iSplitL "Hvalid"; [iExact "Hvalid" |]. iSplitL "Hload"; [iExact "Hload" |].
+    iSplitL "Hshot"; [iExact "Hshot" | iExact "Href"].
+  Qed.
 End CreateSpec.
 
 Definition wp_create_sconf_body

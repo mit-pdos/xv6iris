@@ -2412,17 +2412,17 @@ Section ProofCreateMain.
         iPoseProof (cri_086 with "Htext") as "Hi086".
         iPoseProof (cri_08a with "Htext") as "Hi08a".
         iPoseProof (cri_08c with "Htext") as "Hi08c".
-        iAssert (ic_loaded γfs γi cov logstart kd dind dnl bml)
-          with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk]"
+        (* [ic_loaded]'s tail is [inode_blocks]' 268-element big-op
+           ([IcacheEscrow.ic_mk_loaded]'s comment) -- assembled by the
+           constructor, not by [iFrame], which would re-search the whole
+           function context against that big-op's goal shape. *)
+        iAssert (inode_meta (ientry kd) dnl)
+          with "[Hity Himaj Himin Hinl Hisz]" as "Hmetal".
+        { rewrite /inode_meta /i_type /i_nlink. iFrame. }
+        iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dnl bml datl
+                     Hiok Hdok
+                     with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks")
           as "Hload".
-        { rewrite /ic_loaded. iExists datl.
-          iSplitR; [iPureIntro; exact Hiok |].
-          iSplitR; [iPureIntro; exact Hdok |].
-          iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-          iFrame "Hdiat".
-          iSplitL "Hity Himaj Himin Hinl Hisz".
-          - rewrite /inode_meta /i_type /i_nlink. iFrame.
-          - iFrame. }
         iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
         (* +0x84 c.mv a0,s1 *)
@@ -2839,13 +2839,11 @@ Section ProofCreateMain.
             by (rewrite /F3 upd_ne; [exact HF2a0 | nz]).
           assert (HF3regs : cr_regs m sp0 ipv (ientry kslot) ty major minor F3)
             by (rewrite /F3; apply cr_regs_caller; [exact Hcsra | exact HF2regs]).
-          iAssert (ic_loaded γfs γi cov logstart kd dind dnl bml)
-            with "[Hdiat Hmeta Hmap Hblocks Hdlnk]" as "Hload".
-          { rewrite /ic_loaded. iExists datl.
-            iSplitR; [iPureIntro; exact Hiok |].
-            iSplitR; [iPureIntro; exact Hdok |].
-            iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-            iFrame "Hdiat". rewrite /inode_map. iFrame. }
+          iDestruct "Hmap" as "[Haddrs Hind]".
+          iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dnl bml datl
+                       Hiok Hdok
+                       with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks")
+            as "Hload".
           iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
             [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
           iDestruct (cpu_own_transport CIDdl CID27 0%nat eb (proc_addr j) C b
@@ -3311,17 +3309,13 @@ Section ProofCreateMain.
              assert (Htg098b : add_vec (mword_of_int (CK + 0x6c) : mword 64)
                        (sign_extend' 64 (mword_of_int 44 : mword 13))
                        = mword_of_int (CK + 0x98)) by pcw.
-             iAssert (ic_loaded γfs γi cov logstart kslot cinum dnc bmc)
-               with "[Hcdiat Hcity Hcimaj Hcimin Hcinl Hcisz Hcaddrs Hcind
-                      Hcblocks Hcdlnk]" as "Hcload".
-             { rewrite /ic_loaded. iExists datc.
-               iSplitR; [iPureIntro; exact Hciok |].
-               iSplitR; [iPureIntro; exact Hcdok |].
-               iSplitL "Hcdlnk"; [iExact "Hcdlnk" |].
-               iFrame "Hcdiat".
-               iSplitL "Hcity Hcimaj Hcimin Hcinl Hcisz".
-               - rewrite /inode_meta /i_type. iFrame.
-               - iFrame. }
+             iAssert (inode_meta (ientry kslot) dnc)
+               with "[Hcity Hcimaj Hcimin Hcinl Hcisz]" as "Hcmetal".
+             { rewrite /inode_meta /i_type. iFrame. }
+             iDestruct (ic_mk_loaded γfs γi cov logstart kslot cinum dnc bmc
+                          datc Hciok Hcdok
+                          with "Hcdlnk Hcdiat Hcmetal Hcaddrs Hcind Hcblocks")
+               as "Hcload".
              destruct (zopz0zI_u (mword_of_int 1 : mword 64)
                          (cr_trange (di_type dnc))) eqn:Hrng.
              ++ (* ===== ARM F-BAD (second entry): the type is out of
@@ -3384,10 +3378,11 @@ Section ProofCreateMain.
                   split; [split; [exact Hcpos | exact Hcinb] |].
                   split; [exact Htyf |].
                   exact (cr_trange_in (di_type dnc) Hrng). }
-                rewrite /create_locked. iExists gilc, gislc.
                 iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp".
-                iFrame "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
-                        Hcload Hcshot Hckp".
+                iApply (create_locked_mk cn γfs γi cov logstart
+                          _ _ _ _ _ _ _ _ _ gilc gislc
+                          with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                                Hcivalid Hcload Hcshot Hckp").
           -- (* ===== ARM F-BAD (first entry): type != T_FILE ========== *)
              iApply (wp_bne_taken_s_sconf (mword_of_int (CK + 0x5c))
                        (mword_of_int 60 : mword 13) Ra5 Rs4 F6 (K - 10)%nat b
@@ -3489,17 +3484,17 @@ Section ProofCreateMain.
         iPoseProof (cri_090 with "Htext") as "Hi090".
         iPoseProof (cri_094 with "Htext") as "Hi094".
         iPoseProof (cri_096 with "Htext") as "Hi096".
-        iAssert (ic_loaded γfs γi cov logstart kd dind dnl bml)
-          with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk]"
+        (* Same fix as this file's other [ic_loaded] sites: assembled by
+           the constructor, not by [iFrame], which would re-search the
+           whole function context against the 268-element [inode_blocks]
+           big-op. *)
+        iAssert (inode_meta (ientry kd) dnl)
+          with "[Hity Himaj Himin Hinl Hisz]" as "Hmetal".
+        { rewrite /inode_meta /i_type /i_nlink. iFrame. }
+        iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dnl bml datl
+                     Hiok Hdok
+                     with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks")
           as "Hload".
-        { rewrite /ic_loaded. iExists datl.
-          iSplitR; [iPureIntro; exact Hiok |].
-          iSplitR; [iPureIntro; exact Hdok |].
-          iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-          iFrame "Hdiat".
-          iSplitL "Hity Himaj Himin Hinl Hisz".
-          - rewrite /inode_meta /i_type /i_nlink. iFrame.
-          - iFrame. }
         iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
           [iSplitL "Hbs1"; [iExact "Hbs1" | iExact "Hbs2"] |].
         (* +0x8e c.mv a0,s1 *)
@@ -4515,7 +4510,13 @@ Section ProofCreateMain.
           assert (Hoff32 : (Z.of_nat (16 * dir_slot data
                               (dir_nrec (bv_unsigned (di_size dn))) + tot)
                             < 2 ^ 32)%Z).
-          { rewrite Hmb in Hszcap. change (2 ^ 32)%Z with 4294967296%Z. lia. }
+          { rewrite Hmb in Hszcap. change (2 ^ 32)%Z with 4294967296%Z.
+            (* [lia] is quadratic-ish in how much of the context it has to
+               scan for arithmetic atoms, and this is a syscall-altitude
+               proof -- hundreds of unrelated hyps.  The four facts just
+               built above are the whole chain; drop the rest first
+               (durable-notes.md's "clear - H1 H2; lia" recipe). *)
+            clear -Hnatle HzA HzB Hszcap Hnr1. lia. }
           assert (Hszmax : bv_unsigned (di_size dn')
                     = Z.max (bv_unsigned (di_size dn))
                         (Z.of_nat (16 * dir_slot data
@@ -4570,6 +4571,11 @@ Section ProofCreateMain.
                by exact (dir_ok_dirlink nib dn dn' data data' (cr_low16 cinum)
                            (bname 14 nf) _ _ tot eq_refl eq_refl Htot16
                            Hcl16b Hty' Hszmax Hrng Hdok).
+             (* NOT [ic_mk_loaded]: [Hdiat]/[Hmeta] are stated at [dn0'], one
+                rewrite short of the goal's [dn'], so the assembly stays
+                inline here.  Only the tail -- [inode_addrs]/[ind_res]/
+                [inode_blocks], the 268-element big-op -- is closed by name
+                instead of [iFrame]. *)
              iAssert (ic_loaded γfs γi cov logstart kd dind dn' bm')
                with "[Hdlnk Hdiat Hmeta Hmap Hblocks]" as "Hload".
              { rewrite /ic_loaded. iExists data'.
@@ -4578,7 +4584,9 @@ Section ProofCreateMain.
                iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                rewrite (Hdn0' eq_refl). iFrame "Hdiat Hmeta".
                iEval (rewrite /inode_map) in "Hmap".
-               iDestruct "Hmap" as "[Haddrs Hind]". iFrame. }
+               iDestruct "Hmap" as "[Haddrs Hind]".
+               iSplitL "Haddrs"; [iExact "Haddrs" |].
+               iSplitL "Hind"; [iExact "Hind" | iExact "Hblocks"]. }
              (* ===== +0xe0 c.mv a0,s1 ============================== *)
              iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xe0)) Ra0 Rs1 mdl
                        (K - 10)%nat b ltac:(nz) ltac:(rdok)
@@ -4758,36 +4766,40 @@ Section ProofCreateMain.
                split; [rewrite cr_setf_nlink; vm_compute; reflexivity |].
                intros _. exact (cr_setf_fresh_made dnc ty major minor
                                   Hfresh Htyc). }
-             rewrite /create_locked. iExists gil, gisl.
              iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp".
-             iAssert (ic_loaded γfs γi cov logstart kslot cinum
-                        (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc)
-               with "[Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks]" as "Hcload".
-             { rewrite /ic_loaded. iExists datc.
-               iSplitR; [iPureIntro; exact (cr_setf_inode_ok cov logstart dnc
-                                              bmc datc major minor _ Hciok) |].
-               iSplitR; [iPureIntro;
-                         exact (cr_setf_dir_ok icfg_nib dnc datc major minor _ Hcdok) |].
-               (* the CHILD is not a directory on this arm, so its record
-                  ledger is [emp] at either dinode and the flush's [nlink]
-                  bump -- which would break [dir_link_at]'s grey disjunct on
-                  a real directory -- is invisible here. *)
-               iSplitR.
-               { rewrite /dir_links.
-                 destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
-                             (mword_of_int 1 : mword 16))) = T_DIR_z))
-                   as [Hchdir | Hchdir].
-                 - exfalso. apply Htdirz.
-                   rewrite -(cr_setf_type dnc major minor
-                               (mword_of_int 1 : mword 16)).
-                   exact Hchdir.
-                 - done. }
-               iFrame "Hcdiat Hcmeta".
-               iEval (rewrite /inode_map) in "Hcmap".
-               iDestruct "Hcmap" as "[Hca Hci]". iFrame. }
-             rewrite cr_setf_type.
-             iFrame "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum Hcivalid
-                     Hcload Hcshot Hckp".
+             (* the CHILD is not a directory on this arm, so its record
+                ledger is [emp] at either dinode and the flush's [nlink]
+                bump -- which would break [dir_link_at]'s grey disjunct on
+                a real directory -- is invisible here. *)
+             iAssert (dir_links (bv_unsigned cinum)
+                        (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc)
+               as "Hcdlnk1".
+             { rewrite /dir_links.
+               destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
+                           (mword_of_int 1 : mword 16))) = T_DIR_z))
+                 as [Hchdir | Hchdir].
+               - exfalso. apply Htdirz.
+                 rewrite -(cr_setf_type dnc major minor
+                             (mword_of_int 1 : mword 16)).
+                 exact Hchdir.
+               - done. }
+             iDestruct "Hcmap" as "[Hca Hci]".
+             iDestruct (ic_mk_loaded γfs γi cov logstart kslot cinum
+                          (cr_setf dnc major minor (mword_of_int 1 : mword 16))
+                          bmc datc
+                          (cr_setf_inode_ok cov logstart dnc bmc datc major minor
+                             _ Hciok)
+                          (cr_setf_dir_ok icfg_nib dnc datc major minor _ Hcdok)
+                          with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks")
+               as "Hcload".
+             iAssert (ity_shot g (di_type (cr_setf dnc major minor
+                                             (mword_of_int 1 : mword 16))))
+               as "Hcshot1".
+             { rewrite cr_setf_type. iExact "Hcshot". }
+             iApply (create_locked_mk cn γfs γi cov logstart
+                       _ _ _ _ _ _ _ _ _ gil gisl
+                       with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
+                             Hcivalid Hcload Hcshot1 Hckp").
           -- (* ======================================================== *)
              (*  ARM FAIL's non-directory entry: the append fell short    *)
              (* ======================================================== *)
@@ -4919,12 +4931,11 @@ Section ProofCreateMain.
         by (rewrite /Z2; apply cr_regs3_caller; [exact Hcsra | exact HZ1regs]).
       iEval (rewrite /inode_map) in "Hmap".
       iDestruct "Hmap" as "[Haddrs Hind]".
-      iAssert (ic_loaded γfs γi cov logstart kd dind dn bm)
-        with "[Hdlnk Hdiat Hmeta Haddrs Hind Hblocks]" as "Hload".
-      { rewrite /ic_loaded. iExists data.
-        iSplitR; [iPureIntro; exact Hiok |].
-        iSplitR; [iPureIntro; rewrite -Hnib; exact Hdok |].
-        iFrame. }
+      assert (Hdok2 : dir_ok icfg_nib dn data) by (rewrite -Hnib; exact Hdok).
+      iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dn bm data
+                   Hiok Hdok2
+                   with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks")
+        as "Hload".
       iDestruct (cpu_own_transport CIDo CIDF2 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (log_opS_named with "Hop") as (e0) "Hop".
@@ -5325,28 +5336,26 @@ Section ProofCreateMain.
     (* the child's payload, at the ZEROED record: its own [dir_links] is
        [emp] (it is not a directory -- this is the non-T_DIR arm), and the
        flush handed the region's fragment back retagged. *)
-    iAssert (ic_loaded γfs γi cov logstart kslot cinum
-               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) bmc)
-      with "[Hcdlnk Hcdiat Hcmeta Hcmap Hcblocks]" as "Hcload".
-    { rewrite /ic_loaded. iExists datc.
-      iSplitR; [iPureIntro;
-                exact (cr_setf_inode_ok cov logstart dnc bmc datc major minor
-                         _ Hciok) |].
-      iSplitR; [iPureIntro;
-                exact (cr_setf_dir_ok icfg_nib dnc datc major minor
-                         _ Hcdok') |].
-      iSplitR.
-      { rewrite /dir_links.
-        destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
-                    (mword_of_int 0 : mword 16))) = T_DIR_z)) as [Hchd | Hchd].
-        - exfalso. apply Htdirz.
-          rewrite -(cr_setf_type dnc major minor
-                      (mword_of_int 0 : mword 16)).
-          exact Hchd.
-        - done. }
-      iFrame "Hcdiat Hcmeta".
-      iEval (rewrite /inode_map) in "Hcmap".
-      iDestruct "Hcmap" as "[Hca Hci]". iFrame. }
+    iAssert (dir_links (bv_unsigned cinum)
+               (cr_setf dnc major minor (mword_of_int 0 : mword 16)) datc)
+      as "Hcdlnk1".
+    { rewrite /dir_links.
+      destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
+                  (mword_of_int 0 : mword 16))) = T_DIR_z)) as [Hchd | Hchd].
+      - exfalso. apply Htdirz.
+        rewrite -(cr_setf_type dnc major minor
+                    (mword_of_int 0 : mword 16)).
+        exact Hchd.
+      - done. }
+    iDestruct "Hcmap" as "[Hca Hci]".
+    iDestruct (ic_mk_loaded γfs γi cov logstart kslot cinum
+                 (cr_setf dnc major minor (mword_of_int 0 : mword 16))
+                 bmc datc
+                 (cr_setf_inode_ok cov logstart dnc bmc datc major minor
+                    _ Hciok)
+                 (cr_setf_dir_ok icfg_nib dnc datc major minor _ Hcdok')
+                 with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks")
+      as "Hcload".
     iAssert (ity_shot g (di_type (cr_setf dnc major minor
                                     (mword_of_int 0 : mword 16))))
       as "#Hcshot'". { rewrite cr_setf_type. iExact "Hcshot". }
@@ -5497,15 +5506,11 @@ Section ProofCreateMain.
       exact (dir_ok_dirlink nib dn dn' data data' (cr_low16 cinum)
                (bname 14 nf) _ _ 0%nat eq_refl eq_refl ltac:(lia) Hcl16b
                Hty' Hszmax Hrng Hdok). }
-    iAssert (ic_loaded γfs γi cov logstart kd dind dn' bm')
-      with "[Hdlnk Hdiat Hmeta Hmap Hblocks]" as "Hload".
-    { rewrite /ic_loaded. iExists data'.
-      iSplitR; [iPureIntro; exact Hiok' |].
-      iSplitR; [iPureIntro; exact Hdok' |].
-      iSplitL "Hdlnk"; [iExact "Hdlnk" |].
-      iFrame "Hdiat Hmeta".
-      iEval (rewrite /inode_map) in "Hmap".
-      iDestruct "Hmap" as "[Haddrs Hind]". iFrame. }
+    iDestruct "Hmap" as "[Haddrs Hind]".
+    iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dn' bm' data'
+                 Hiok' Hdok'
+                 with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks")
+      as "Hload".
     iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
     { rewrite Hty'. iExact "Hshotl". }
     iPoseProof (cr_esc_acc cn γfs γi cov logstart kd Hkdlt with "Hesc")

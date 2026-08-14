@@ -990,6 +990,31 @@ Section IcacheEscrow.
     iSplitL "Hr"; [iExact "Hr" | iExact "Hp"].
   Qed.
 
+  (* [ic_loaded]'s own tail is the same 268-element [inode_blocks] big-op
+     ([InodeInv.MAXFILE] = 268) that motivates the arms' constructors above,
+     and it is reached far more often -- every [create]/[iput]/[dirlink] site
+     that re-parks a loaded slot rebuilds it.  Measured at ProofCreate's
+     eight construction sites: 90-172 s per bare-[iFrame] close, free by
+     name here. *)
+  Lemma ic_mk_loaded γfs γi cov logstart k (inum : mword 32)
+      (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
+    inode_ok cov logstart dn bm data ->
+    dir_ok icfg_nib dn data ->
+    dir_links (bv_unsigned inum) dn data -∗
+    dinode_at γi inum dn -∗
+    inode_meta (ientry k) dn -∗
+    inode_addrs (ientry k) (bm_cells bm) -∗
+    ind_res γfs bm -∗
+    inode_blocks γfs bm data -∗
+    ic_loaded γfs γi cov logstart k inum dn bm.
+  Proof.
+    intros Hok Hdok. iIntros "Hl Hd Hm Ha Hr Hb". rewrite /ic_loaded.
+    iExists data. iSplitR; [done |]. iSplitR; [done |].
+    iSplitL "Hl"; [iExact "Hl" |]. iSplitL "Hd"; [iExact "Hd" |].
+    iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
+    iSplitL "Hr"; [iExact "Hr" | iExact "Hb"].
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  4.  THE SWAPS AND THE OPENINGS                                     *)
   (* ------------------------------------------------------------------ *)
