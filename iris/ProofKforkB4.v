@@ -219,7 +219,7 @@ Section KforkB4Proof.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
-      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) :
+      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     (22 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (* the itable this block holds the lock for IS the one [cwd_ref] names,
@@ -235,7 +235,7 @@ Section KforkB4Proof.
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]
        with no null test, so this is the honest reading of the code. *)
     sie_cap_gpr m (rsv + (K - 8))%nat false pme -∗
-    cpu_own lvl eb pme C false -∗
+    cpu_own lvl eb pme C false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
     panic_wp_any -∗
@@ -255,7 +255,7 @@ Section KforkB4Proof.
             mf !!! Regidx r = m !!! Regidx r) /\
          mf !!! Regidx Rs1 = sign_extend' 64 pid_c⌝ -∗
         sie_cap_gpr mf (rsv + (K - 8))%nat false pme -∗
-        cpu_own lvl eb pme C false -∗
+        cpu_own lvl eb pme C false lks -∗
         pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
         proc_priv γf pme pid_p Vp -∗
         (∃ Vc' : pprivate,

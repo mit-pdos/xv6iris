@@ -206,8 +206,14 @@ Section SchedPostSwtch.
     m' !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
     sie_cap_gpr m' (av - 6)%nat false pj -∗
-    (* at the RESUMER's base [eb'] -- swtch stores nothing to struct cpu *)
-    cpu_own 1 eb' pj emp false -∗
+    (* at the RESUMER's base [eb'] -- swtch stores nothing to struct cpu.
+       THE SET IS {proc}, BOTH WAYS: sched is entered holding exactly this
+       proc's lock ([sched]'s own [noff != 1] check is the C-level shadow of
+       it), the lock stays held across the swtch, and the resumer comes back
+       holding it too.  ∅ appears only in the scheduler loop, between its
+       [release(&p->lock)] and the next [acquire] -- which is exactly where
+       [intr_on()] sits. *)
+    cpu_own 1 eb' pj emp false {[lock_rank "proc"]} -∗
     pc_is (mword_of_int (KernelSyms.sched + 0x72)) -∗
     (* the five saved callee-saved words + the frame's bottom slot *)
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -228,7 +234,7 @@ Section SchedPostSwtch.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         proc_held cpu_id j γl RUNNING ch0 -∗
         trap_csrs -∗
-        cpu_own 1 eb pj emp false -∗
+        cpu_own 1 eb pj emp false {[lock_rank "proc"]} -∗
         own_ctx (p_context pj) -∗
         hart_full j cpu_id -∗
         ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
@@ -744,7 +750,7 @@ Section ProofSched.
       rewrite H0. apply kv_addv_zero. }
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl (proc_addr j)
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl (proc_addr j) "proc"
               (proc_lock_res γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked").
@@ -1654,7 +1660,7 @@ Section ProofSched.
       rewrite H0. apply kv_addv_zero. }
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl (proc_addr j)
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl (proc_addr j) "proc"
               (proc_lock_res γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked").

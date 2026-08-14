@@ -155,14 +155,14 @@ Section UtArmsCommon.
      proofmode's [IntoSep] search is keyed on the head of the hypothesis, and
      [trap_csrs_ext false] is not syntactically a [∗]: destructuring it
      directly is a coin flip on whether resolution unfolds the definition. *)
-  Lemma ua_hold_off (N : ut_names) (V : pprivate) (C : iProp Σ) :
+  Lemma ua_hold_off (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset nat) :
     ut_hold Rsys N V C false -∗
-      cpu_own 0%nat false (un_pj N) C false ∗ trap_csrs ∗
+      cpu_own 0%nat false (un_pj N) C false lks ∗ trap_csrs ∗
       cpu_claim (un_pj N) ∗ ut_env Rsys N V.
   Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma ua_hold_on (N : ut_names) (V : pprivate) (C : iProp Σ) :
-    cpu_own 0%nat false (un_pj N) C false -∗ trap_csrs -∗
+  Lemma ua_hold_on (N : ut_names) (V : pprivate) (C : iProp Σ) (lks : gset nat) :
+    cpu_own 0%nat false (un_pj N) C false lks -∗ trap_csrs -∗
     cpu_claim (un_pj N) -∗ ut_env Rsys N V -∗
     ut_hold Rsys N V C false.
   Proof.

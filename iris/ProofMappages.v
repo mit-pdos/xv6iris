@@ -93,7 +93,8 @@ Section ProofMappages.
   Lemma wp_mappages_epilogue_sconf `{CID0 : CpuId} (γa : gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool)
+      (lks : gset nat) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
     let ppn0 := (autocast (T := mword) (subrange_vec_dec (mm !!! Regidx (mword_of_int 13)) 55 12) : mword 44) in
@@ -114,7 +115,7 @@ Section ProofMappages.
     ((k = npages /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
      \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1)
          /\ avail_zero (avail_sub on q))) ->
-    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p C b -∗
+    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x9c)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -131,7 +132,7 @@ Section ProofMappages.
     kalloc_env γa (avail_sub on q) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -411,7 +412,7 @@ Section ProofMappages.
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
       (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
-      (rem : nat) (b : bool) :
+      (rem : nat) (b : bool) (lks : gset nat) :
     forall (k : nat) (Mk : regfile) (tk : ptree) (consumed : nat),
     let va := mm !!! Regidx (mword_of_int 11) in
     let pa := mm !!! Regidx (mword_of_int 13) in
@@ -452,7 +453,7 @@ Section ProofMappages.
     pt_present_mono t tk ->
     pt_nodes tk = (pt_nodes t + consumed)%nat ->
     (consumed + pt_missing tk (vpn_at vpn0 k) (npages - k) <= pt_missing t vpn0 npages)%nat ->
-    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b -∗
+    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x3e)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -469,7 +470,7 @@ Section ProofMappages.
     kalloc_env γa (avail_sub on consumed) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -615,7 +616,7 @@ Section ProofMappages.
                  with "Hcnt") as "Hcnt".
     (* the walk call *)
     iApply (Walk.wp_walk_sconf γa W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p C (avail_sub on consumed) b
-              Hlvl ltac:(lia)
+              _ Hlvl ltac:(lia)
               HW4'a0 HW4'a2
               ltac:(rewrite HW4'a1; rewrite uint_unsigned; rewrite Hvak_u; lia)
               Hrep
@@ -752,7 +753,7 @@ Section ProofMappages.
       iDestruct (cpu_own_transport CIDw CIDn2 lvl eb p C b Hcrossnw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossn0 with "Hcont") as "Hcont".
-      iApply (wp_mappages_epilogue_sconf γa mm F1 t t' m npages k perm K lvl eb p C on (consumed + g)%nat b HK
+      iApply (wp_mappages_epilogue_sconf γa mm F1 t t' m npages k perm K lvl eb p C on (consumed + g)%nat b lks HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrsp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr24)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr25)
@@ -1014,7 +1015,7 @@ Section ProofMappages.
       iDestruct (cpu_own_transport CIDw CIDl3 lvl eb p C b Hcrosslw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossl0 with "Hcont") as "Hcont".
-      iApply (wp_mappages_epilogue_sconf γa mm F1 t tS m npages (S k) perm K lvl eb p C on (consumed + g)%nat b HK
+      iApply (wp_mappages_epilogue_sconf γa mm F1 t tS m npages (S k) perm K lvl eb p C on (consumed + g)%nat b lks HK
                 (eq_trans Hfsp Hmrsp)
                 (eq_trans Hf24 Hmr24)
                 (eq_trans Hf25 Hmr25)
@@ -1155,8 +1156,8 @@ Section ProofMappages.
       (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
-    : wp_mappages_sconf_body γa mm t m npages perm lvl K eb p C on b.
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+    : wp_mappages_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -1569,7 +1570,7 @@ Section ProofMappages.
        of them mention [cpu_own]); the loop is entered at [CID25]. *)
     iDestruct (cpu_own_transport CID CID25 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_mappages_loop_sconf γa mm t m npages perm K lvl eb p C on npages b 0%nat P13 t 0%nat
+    iApply (wp_mappages_loop_sconf γa mm t m npages perm K lvl eb p C on npages b lks 0%nat P13 t 0%nat
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone

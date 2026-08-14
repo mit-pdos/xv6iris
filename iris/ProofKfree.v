@@ -51,8 +51,8 @@ Section ProofKfree.
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
 
-      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_kfree_sconf_body γl γk lk fl m on n eb pcur C K b.
+      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_kfree_sconf_body γl γk lk fl m on n eb pcur C K b lks.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
     intros pcE p ret_tgt HK Hlk Hfl Hnoffpos.
@@ -509,7 +509,7 @@ Section ProofKfree.
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) Kacq
               n eb pcur C (K - 4)%nat b
-              Hnoffpos
+              _ Hnoffpos
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hkmem] Hpanic").
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }

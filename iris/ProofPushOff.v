@@ -230,7 +230,7 @@ Section ProofPushOff.
   (* ------------------------------------------------------------------- *)
   Lemma po_own_split `{GEN : GenId} `{CIDx : CpuId} (k : nat) (ebx : bool)
       (px : mword 64) (Cx : iProp Σ) (bx : bool) :
-    cpu_own k ebx px Cx bx -∗
+    cpu_own k ebx px Cx bx lks -∗
     ⌜ bx = true -> k = 0%nat /\ ebx = true ⌝ ∗
     intr_count_pre bx k ebx ∗
     (if bx then emp else cpu_priv k ebx px) ∗

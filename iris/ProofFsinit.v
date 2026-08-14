@@ -201,12 +201,12 @@ Section FsinitDefs.
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
-        cpu_own 0 true (proc_addr j) C b -∗
+        cpu_own 0 true (proc_addr j) C b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         sb_magic ↦₄ v_magic -∗
@@ -283,13 +283,13 @@ Section FsinitEpilogue.
       (v_magic v_size v_nblocks v_nlog : mword 32)
       (bs_sb : list (bv 8))
       (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (lks : gset nat) :
     (K_fsinit <= K)%nat ->
     used' ⊆ used ->
     fsi_sp m M ->
     fsi_thr4 m M ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 true (proc_addr j) C b -∗
+    cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fsinit + 0x58) : mword 64) -∗
     fsi_frame m -∗
@@ -309,7 +309,7 @@ Section FsinitEpilogue.
     bitmap_res γfs bmapstart cov logstart size used' -∗
     fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
              size used dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
-             m K C b -∗
+             m K C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsub Hsp Hthr.
@@ -500,7 +500,7 @@ Section FsinitEpilogue.
       by (apply Hfin; fsiidx).
     assert (Hcs : callee_saved m P5)
       by (unfold callee_saved; split_and!; assumption).
-    iDestruct (cpu_own_transport CID0 CID6 0 true (proc_addr j) C b
+   iDestruct (cpu_own_transport CID0 CID6 0 true (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /fsi_cont.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
@@ -542,14 +542,14 @@ Section FsinitMain.
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool) :
+      (b : bool) (lks : gset nat) :
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
                            used dev
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb C b.
+                           pidv dq m K eb C b lks.
   Proof.
     cbv beta delta [wp_fsinit_sconf_body].
     intros pcE pj ret_tgt HK Hgeom H1cov H1log Himg Hmagic Hvni Hvis Hvbs Hvls
@@ -579,7 +579,7 @@ Section FsinitMain.
               #Hdlock Hsl Hiref Hcont".
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size used dev v_magic v_size v_nblocks v_nlog bs_sb
-               pidv dq j m K C b)%I with "[Hcont]" as "Hcont";
+               pidv dq j m K C b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /fsi_cont; iExact "Hcont" |].
     iPoseProof (fsi_00 with "Htext") as "Hi00".
     iPoseProof (fsi_02 with "Htext") as "Hi02".
@@ -785,13 +785,13 @@ Section FsinitMain.
       by (rewrite /M5; apply upd_eq).
     iDestruct (iu_slots_split bn ((LOGBLOCKS + 2) + 2)%nat 1%nat with "Hsl")
       as "[Hsl34 Hsl1]".
-    iDestruct (cpu_own_transport CID CID9 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID CID9 0 true (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID9) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
-              M5 (K - 4)%nat true C b
+              M5 (K - 4)%nat true C b lks
               ltac:(unfold K_bread; lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
               HM5a0 HM5a1
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
@@ -1149,7 +1149,7 @@ Section FsinitMain.
     assert (HQ1thr : fsi_thr4 m Q1).
     { intros c Hcs N2' N8 N9 N18.
       rewrite /Q1 upd_ne; [| regne]. exact (HQ0thr c Hcs N2' N8 N9 N18). }
-    iDestruct (cpu_own_transport CID10 CID19 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID10 CID19 0 true (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID9) (CIDb := CID19) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -1367,7 +1367,7 @@ Section FsinitMain.
     assert (HQ9thr : fsi_thr4 m Q9).
     { intros c Hcs N2' N8 N9 N18.
       rewrite /Q9 upd_ne; [| regne]. exact (HQ8thr c Hcs N2' N8 N9 N18). }
-    iDestruct (cpu_own_transport CID20 CID29 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID20 CID29 0 true (proc_addr j) C b lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -1442,14 +1442,14 @@ Section FsinitMain.
     (* [log_ctx] is PERSISTENT, and it has to be: ireclaim consumes it at
        +0x54 and the contract hands it to the caller afterwards. *)
     iDestruct "Hlctx" as (γlog) "#Hlctx".
-    iDestruct (cpu_own_transport CID30 CID32 0 true (proc_addr j) C b
+    iDestruct (cpu_own_transport CID30 CID32 0 true (proc_addr j) C b lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (IR.wp_ireclaim_sconf γs j γl γu γd γk pd pav pu bn
               γlog γfs γi cn gtl γpr cov logstart bmapstart inodestart
               ninodes nib size used dev pidv dq (DfracOwn 1) (DfracOwn 1)
-              (DfracOwn 1) R1 (K - 4)%nat true C b
+              (DfracOwn 1) R1 (K - 4)%nat true C b lks
               ltac:(unfold K_ireclaim; lia) Hgeom Hist0 Hblk Hsize Hbm0
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hpenv Hbio Hlctx Hseam
@@ -1472,7 +1472,7 @@ Section FsinitMain.
       exact (HR1thr c Hcs N2' N8 N9 N18). }
     iApply (fsi_epilogue (CID0 := CID33) j bn γfs cov logstart bmapstart
               inodestart ninodes size used used' dev v_magic v_size v_nblocks
-              v_nlog bs_sb pidv dq m mf K C b HK Hsub Hmfsp Hmfthr
+              v_nlog bs_sb pidv dq m mf K C b lks HK Hsub Hmfsp Hmfthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
                     Hist Hbms Hfsb [Hlctx] Hsl3 Hiref Hbm [Hcont]").
     { iExists γlog. iExact "Hlctx". }

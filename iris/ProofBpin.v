@@ -121,8 +121,8 @@ Section ProofBpin.
   Proof. intros H0 H1. rewrite /incr32. by apply moi32_storeval_succ. Qed.
 
   Lemma wp_bpin_sconf (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_bpin_sconf_body bn V k m n eb p C K b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_bpin_sconf_body bn V k m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_bpin_sconf_body].
     intros pcE ret_tgt HK Hnoffpos Hk Ha0.
@@ -278,7 +278,7 @@ Section ProofBpin.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) mA
               n eb p C (K - 4)%nat b
-              Hnoffpos ltac:(lia)
+              _ Hnoffpos ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

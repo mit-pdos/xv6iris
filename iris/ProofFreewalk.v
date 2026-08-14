@@ -385,15 +385,15 @@ Section ProofFreewalk.
 
   Definition fw_rec (l : nat) : Prop :=
     forall (CID0 : CpuId) (γa : gname) (mm : regfile) (t : ptree)
-           (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_freewalk_sconf_body (CID:=CID0) γa mm t l K eb p C ilvl b.
+           (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat),
+      wp_freewalk_sconf_body (CID:=CID0) γa mm t l K eb p C ilvl b lks.
 
   (* ================================================================== *)
   (*  §3  THE EXIT (+0x48 .. +0x5a): kfree(pagetable), then the epilogue. *)
   (* ================================================================== *)
   Local Lemma fw_epilogue `{CID0 : CpuId} (ilvl : nat) (γa : gname)
       (mm mj : regfile) (K : nat) (sp0 : mword 64) (bpt : mword 44)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :
+      (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     (20 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
@@ -402,7 +402,7 @@ Section ProofFreewalk.
     mj !!! Regidx Rs3 = page_base bpt ->
     fw_thr mm mj ->
     sie_cap_gpr mj (K - 6) b p -∗
-    cpu_own ilvl eb p C b -∗
+    cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) -∗
     kfree_pre (page_base bpt) -∗
@@ -416,7 +416,7 @@ Section ProofFreewalk.
     wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       sie_cap_gpr mf K b p -∗
-      cpu_own ilvl eb p C b -∗
+      cpu_own ilvl eb p C b lks -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -641,7 +641,7 @@ Section ProofFreewalk.
   Local Lemma fw_loop `{CID : CpuId} (lvl : nat) (REC : forall l, (l < lvl)%nat -> fw_rec l)
       (γa : gname)
       (mm : regfile) (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (spr : mword 64) (ilvl : nat) (b : bool) :
+      (spr : mword 64) (ilvl : nat) (b : bool) (lks : gset nat) :
     (6 * S lvl + 14 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
     (forall i : mword 9, fw_ok lvl t i) ->
@@ -653,7 +653,7 @@ Section ProofFreewalk.
     m !!! Regidx Rs3 = page_base (pt_base t) ->
     fw_thr mm m ->
     sie_cap_gpr m (K - 6) b p -∗
-    cpu_own ilvl eb p C b -∗
+    cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.freewalk + 0x2a) : mword 64) -∗
     pt_node_claim (pt_base t) -∗
@@ -666,7 +666,7 @@ Section ProofFreewalk.
         /\ mj !!! Regidx Rs3 = page_base (pt_base t)
         /\ fw_thr mm mj ⌝ -∗
       sie_cap_gpr mj (K - 6) b p -∗
-      cpu_own ilvl eb p C b -∗
+      cpu_own ilvl eb p C b lks -∗
       pc_is (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) -∗
       fw_done (pt_base t) 512 -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -702,7 +702,7 @@ Section ProofFreewalk.
           /\ fw_thr mm mt
           /\ (b = false \/ p = zero_reg -> (CIDx : CPU) = (CID : CPU)) ⌝ -∗
         sie_cap_gpr (CID:=CIDx) mt (K - 6) b p -∗
-        cpu_own (CID:=CIDx) ilvl eb p C b -∗
+        cpu_own (CID:=CIDx) ilvl eb p C b lks -∗
         pc_is (CID:=CIDx) (mword_of_int (KernelSyms.freewalk + 0x24) : mword 64) -∗
         fw_done (pt_base t) (d + 1) -∗
         fw_todo lvl t (d + 1) -∗
@@ -971,6 +971,11 @@ Section ProofFreewalk.
     assert (Hlt : (l < lvl)%nat) by (exact (fw_kid_lt lvl t (mword_of_int d) l c Hkid)).
     assert (HKrec : (6 * S l + 14 <= K - 6)%nat) by lia.
     iEval (rewrite /fw_slot Hkid) in "Hch".
+    (* UNSURE (flagged for review): [REC] is [fw_rec l], wrapping
+       [wp_freewalk_sconf_body] from SpecFreewalk.v, which has not yet
+       gained the held-lock-set argument -- so handing it a [lks]-carrying
+       [cpu_own] here is ahead of that file's own sweep; see the identical
+       note at this lemma's top-level entry point below. *)
     iDestruct (cpu_own_transport CID CIDb9 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (REC l Hlt CIDb9 γa B6 c (K - 6)%nat eb p C ilvl b HKrec Hilvl HB6a0 Hfok
@@ -1243,15 +1248,22 @@ Section ProofFreewalk.
        both callees below take a FRESH inline continuation ([-]). *)
     assert (Hshift12 : b = false \/ p = zero_reg -> (CID12 : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hshift12 with "Hcont") as "Hcont".
-    iDestruct (cpu_own_transport CID0 CID12 ilvl eb p C b ltac:(wp_next_chain)
+    (* UNSURE (flagged for review): [wp_freewalk_sconf_body] (SpecFreewalk.v)
+       has not yet gained the held-lock-set argument, so [Hcnt] here is still
+       typed at the OLD [cpu_own] arity and there is no incoming [lks] to
+       thread.  [fw_loop] / [fw_epilogue] below are this file's own internal
+       lemmas and DO now take [lks] (freewalk itself acquires no lock), so ∅
+       is threaded as the placeholder witness until SpecFreewalk.v's contract
+       is swept and an incoming set is actually available here. *)
+    iDestruct (cpu_own_transport CID0 CID12 ilvl eb p C b ∅ ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (fw_loop (CID:=CID12) lvl REC γa mm t K eb p C spr ilvl b HK Hilvl (fw_ok_of lvl t Hfree)
+    iApply (fw_loop (CID:=CID12) lvl REC γa mm t K eb p C spr ilvl b ∅ HK Hilvl (fw_ok_of lvl t Hfree)
               512%nat 0%Z R6 ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
               HR6sp HR6s1 HR6s2 HR6s3 HR6thr
               with "Hcg Hcnt Htext Hpc Hclaim [] Htodo Henv").
     { rewrite /fw_done. rewrite (seqZ_nil 0 0 ltac:(lia)). done. }
     iIntros (CIDj Hsj mj) "(%Hjsp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hdone".
-    iApply (fw_epilogue (CID0:=CIDj) ilvl γa mm mj K sp0 (pt_base t) eb p C b
+    iApply (fw_epilogue (CID0:=CIDj) ilvl γa mm mj K sp0 (pt_base t) eb p C b ∅
               ltac:(lia) Hilvl Hspm Hjsp Hjs3 Hjthr
               with "Hcg Hcnt Htext Hpc [Hdone] Henv Hk1 Hk2 Hk3 Hk4 Hk5 [Hk6]").
     { iApply (pt_slots_kfree_pre (pt_base t) Hpv with "Hkmapb Hdone"). }
@@ -1274,8 +1286,8 @@ Section ProofFreewalk.
 
   Lemma wp_freewalk_sconf `{CID : CpuId} (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (ilvl : nat) (b : bool)
-    : wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b.
+      (ilvl : nat) (b : bool) (lks : gset nat)
+    : wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b lks.
   Proof. exact (fw_go_aux lvl lvl (Nat.le_refl lvl) CID γa mm t K eb p C ilvl b). Qed.
 
 End ProofFreewalk.

@@ -102,7 +102,7 @@ Section ProofFreerange.
      migrated away from). *)
   Lemma frepi `{CID0 : CpuId}
       (m Me : regfile) (K ncnt : nat) (eb b : bool) (pcur : mword 64) (C : iProp Σ)
-      (γl : gname) (γk : gname * gname) (onf : option nat) :
+      (γl : gname) (γk : gname * gname) (onf : option nat) (lks : gset nat) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
     let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -112,7 +112,7 @@ Section ProofFreerange.
     (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 8 -> c <> mword_of_int 9 -> c <> csp_rs1 -> Me !!! Regidx c = m !!! Regidx c) ->
     kernel_text -∗
     sie_cap_gpr Me (K - 6) b pcur -∗
-    cpu_own ncnt eb pcur C b -∗
+    cpu_own ncnt eb pcur C b lks -∗
     pc_is (mword_of_int (KernelSyms.freerange + 0x3e)) -∗
     (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
     (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
@@ -125,7 +125,7 @@ Section ProofFreerange.
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr mr K b pcur -∗
-      cpu_own ncnt eb pcur C b -∗
+      cpu_own ncnt eb pcur C b lks -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
       kalloc_avail γk onf -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -257,8 +257,8 @@ Section ProofFreerange.
   Lemma wp_freerange_sconf
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool)
-    : wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b.
+      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b lks.
   Proof.
     cbv beta delta [wp_freerange_sconf_body].
     intros pcE pa_start pa_end ret_tgt s1entry
@@ -488,7 +488,7 @@ Section ProofFreerange.
       iDestruct (wp_next_shift Hshift12 with "Hcont") as "Hcont".
       iDestruct (cpu_own_transport CID CID12 ncnt eb pcur C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (frepi (CID0 := CID12) m R8 K ncnt eb b pcur C γl γk (Some 0%nat) ltac:(lia) ltac:(apply ret_pc_aligned) HR8sp HR8cs
+      iApply (frepi (CID0 := CID12) m R8 K ncnt eb b pcur C γl γk (Some 0%nat) lks ltac:(lia) ltac:(apply ret_pc_aligned) HR8sp HR8cs
                 with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Hqcpu Havail Hcont").
       { iExists vs20; iExact "Hslot4". }
       { iExists vs30; iExact "Hslot5". }
@@ -612,7 +612,7 @@ Section ProofFreerange.
           /\ qs <> []
           /\ avail_inc_n on (length qs) = Some (length (p0 :: rest)) ⌝ -∗
         sie_cap_gpr (CID:=CID0) M (K - 6) b pcur -∗
-        cpu_own (CID:=CID0) ncnt eb pcur C b -∗
+        cpu_own (CID:=CID0) ncnt eb pcur C b lks -∗
         pc_is (CID:=CID0) (mword_of_int (KernelSyms.freerange + 0x2a)) -∗
         ([∗ list] p ∈ qs, page_own p) -∗
         kalloc_avail γk on -∗
@@ -624,7 +624,7 @@ Section ProofFreerange.
         (pa_stk sp0 6) ↦₈ (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
         wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
           ∀ mr, sie_cap_gpr mr K b pcur -∗
-          cpu_own ncnt eb pcur C b -∗
+          cpu_own ncnt eb pcur C b lks -∗
           pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
           kalloc_avail γk (Some (length (p0 :: rest))) -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -805,7 +805,7 @@ Section ProofFreerange.
           iDestruct (wp_next_shift Hshiftexit with "Hcont") as "Hcont".
           iDestruct (cpu_own_transport CIDkf CIDb7 ncnt eb pcur C b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
-          iApply (frepi (CID0 := CIDb7) m N3 K ncnt eb b pcur C γl γk (Some (length (p0 :: rest))) ltac:(lia)
+          iApply (frepi (CID0 := CIDb7) m N3 K ncnt eb b pcur C γl γk (Some (length (p0 :: rest))) lks ltac:(lia)
                     ltac:(apply ret_pc_aligned) HN3sp HN3cs
                     with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Hqcpu Havail Hcont").
           { iExists _; iExact "Hc4". }

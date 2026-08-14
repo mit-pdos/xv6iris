@@ -221,7 +221,7 @@ End SpecFdalloc.
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (b : bool) :=
+    (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fdalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* a0 is the file to install *)
@@ -231,7 +231,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (fdalloc_stack <= av)%nat ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the block SPLIT at the fd table: fdalloc needs the core only to reach
      myproc's tier, and the array in whatever loan state the caller left it *)
@@ -241,7 +241,7 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b -∗
+      cpu_own n eb p C b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core p pid V -∗
       fdalloc_post γf p V D k (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -252,6 +252,6 @@ Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool),
-      wp_fdalloc_sconf_body γf k D m av n eb p C pid V b.
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat),
+      wp_fdalloc_sconf_body γf k D m av n eb p C pid V b lks.
 End FDALLOC.

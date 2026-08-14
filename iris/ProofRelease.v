@@ -51,10 +51,10 @@ Section ProofRelease.
         intro H1; injection H1 as H2; vm_compute in H2; congruence ].
 
   Lemma wp_release_gen_sconf
-      (γl : gname) (lka : mword 64) (R Dc Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_gen_sconf_body γl lka R Dc Out m n eb p C av.
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset nat)
+    : wp_release_gen_sconf_body γl lka s R Dc Out m n eb p C av lks.
   Proof.
     cbv beta delta [wp_release_gen_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
@@ -196,7 +196,7 @@ Section ProofRelease.
     assert (HlkaR3 : add_vec (R3 !!! Regidx (mword_of_int 10 : mword 5))
                        (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka)
       by (rewrite Ha0R3; exact Hlka).
-    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl lka R Dc R3 (trap_res outb + (av - 4))%nat p
+    iApply (Holding.wp_holding_lockinv_locked_s_sconf γl lka s R Dc R3 (trap_res outb + (av - 4))%nat p
               HlkaR3 ltac:(lia) Href
               with "Hcg Htext Hpc Hlock Htoken").
     iIntros (mh) "Hcg Hpc %Hmh Htoken".
@@ -234,12 +234,14 @@ Section ProofRelease.
     (* THE SET-REMOVING INSTRUCTION, and the one that CANNOT run without the
        set: while the lock is held the invariant owns only half of [lk->cpu],
        so this store is licensed by redeeming the membership fragment out of
-       the hart's own held-lock set (LockSet.cpu_locks_delete).  The set is
-       opened out of [cpu_own] here and put back with [lka] gone, which is
-       why release's contract never mentions it. *)
-    iDestruct (cpu_own_locks_acc with "Hown") as (Slk) "[Hlks Hownback]".
-    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka R Dc (mword_of_int (KernelSyms.release + 0x12))
-              (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false Slk
+       the hart's own held-lock set (LockSet.cpu_locks_delete).  The set is an
+       INDEX now, so it is NAMED here: [cpu_own_locks_swap] takes the
+       authority out at [lks] and puts back [lks ∖ {[lock_rank s]}], which is
+       exactly release's postcondition.  No premise is needed -- membership is
+       DERIVED from the fragment the lock invariant was holding. *)
+    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks Hownback]".
+    iApply (wp_sd_zero_lkcpu_lockopen_s_sconf (CID:=CID) γl lka s R Dc (mword_of_int (KernelSyms.release + 0x12))
+              (mword_of_int 9 : mword 5) (mword_of_int 16 : mword 12) mh (trap_res outb + (av - 4))%nat false lks
               ltac:(rgne; exact Hacpu) Href
               with "Hcg Hpc Hi12 Hlock Htoken Hlks").
     iApply wp_next_off_intro.
@@ -257,7 +259,7 @@ Section ProofRelease.
     iEval (rewrite Hpc1a) in "Hpc".
     (* ---- 0x1a: sw zero,0(s1) : the lock word clears ---- *)
     iPoseProof (rli_1a with "Htext") as "Hi1a".
-    iApply (wp_sw_zero_lockfin_s_sconf (CID:=CID) γl lka R Dc Out (mword_of_int (KernelSyms.release + 0x1a)) (mword_of_int 9 : mword 5)
+    iApply (wp_sw_zero_lockfin_s_sconf (CID:=CID) γl lka s R Dc Out (mword_of_int (KernelSyms.release + 0x1a)) (mword_of_int 9 : mword 5)
               (mword_of_int 0 : mword 12) mh (trap_res outb + (av - 4))%nat false
               ltac:(rgne; rewrite Hs1mh; exact Hlka) Hrefpre
               with "Hcg Hpc Hi1a Hlock Htoken HR Hfin").
@@ -282,7 +284,7 @@ Section ProofRelease.
     assert (HcspM1 : M1 !!! Regidx csp_rs1 = spr).
     { rewrite /M1 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspR3. }
-    iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p C
+    iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p C _
               ltac:(lia)
               with "Hcg Hown Hpay Htext Hpc").
     iIntros (CIDpo Hspo mf) "Hcg Hown Hpc %Hmf".
@@ -496,12 +498,13 @@ Section OfGen.
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_sconf_body γl lka s R m n eb p C av.
+      (lks : gset nat)
+    : wp_release_sconf_body γl lka s R m n eb p C av lks.
   Proof.
     cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γl lka R False%I emp%I m n eb p C av
+    iApply (G.wp_release_gen_sconf γl lka s R False%I emp%I m n eb p C av lks
               Hlka Hav (lock_refute_False _) (lock_refute_False _)
               with "Hcg Htext Hpc [] Htoken HR [] Hown Hpay").
     { iApply (is_lock_openable with "Hlock"). }
@@ -527,17 +530,18 @@ Section CancelOfGen.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_release_cancel_sconf
-      (γl : gname) (lka : mword 64) (R D Out : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_release_cancel_sconf_body γl lka R D Out m n eb p C av.
+      (lks : gset nat)
+    : wp_release_cancel_sconf_body γl lka s R D Out m n eb p C av lks.
   Proof.
     cbv beta delta [wp_release_cancel_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γl lka R D
+    iApply (G.wp_release_gen_sconf γl lka s R D
               (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
-              m n eb p C av
+              m n eb p C av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
     { iApply (lock_finisher_destroy with "Hbuild"). }

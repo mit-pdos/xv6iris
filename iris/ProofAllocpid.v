@@ -95,8 +95,8 @@ Section ProofAllocpid.
 
 
   Lemma wp_allocpid_sconf (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_allocpid_sconf_body γp m av n eb p C b.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_allocpid_sconf_body γp m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_allocpid_sconf_body].
     intros pcE ret_tgt Hn Hav.
@@ -236,7 +236,7 @@ Section ProofAllocpid.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p C (av - 4)%nat b
-              Hn ltac:(pose proof (apid_K10 av Hav); lia)
+              _ Hn ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite HA4a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq0) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".

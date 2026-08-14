@@ -141,10 +141,10 @@ Definition vdi_post
     (γv : disk_names) (γa : gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
-    (ret_tgt c_cpu : mword 64) : iProp Σ :=
+    (ret_tgt c_cpu : mword 64) (lks : gset nat) : iProp Σ :=
   ( ∀ (mr : regfile) (pd pav pu : mword 64),
     sie_cap_gpr mr K false pp -∗
-    cpu_own 0%nat eb pp C false -∗
+    cpu_own 0%nat eb pp C false lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
@@ -190,7 +190,7 @@ Definition wp_virtio_disk_init_sconf_body
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
     (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-    (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) :=
+    (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_init in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let c_name := lock_name_field disk_lock in
@@ -206,7 +206,7 @@ Definition wp_virtio_disk_init_sconf_body
      caller's config half [c0] identifies with the invariant's *)
   virtio_live c0 = false ->
   sie_cap_gpr m K false pp -∗
-  cpu_own 0%nat eb pp C false -∗
+  cpu_own 0%nat eb pp C false lks -∗
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -224,7 +224,7 @@ Definition wp_virtio_disk_init_sconf_body
   disk_avail ↦₈ pav0 -∗
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
-  vdi_post γv γa m K eb pp C on ret_tgt c_cpu -∗
+  vdi_post γv γa m K eb pp C on ret_tgt c_cpu lks -∗
   WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKINIT.
@@ -234,7 +234,7 @@ Module Type VIRTIODISKINIT.
       (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8),
+      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset nat),
       wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
-                                     pd0 pav0 pu0 free0.
+                                     pd0 pav0 pu0 free0 lks.
 End VIRTIODISKINIT.

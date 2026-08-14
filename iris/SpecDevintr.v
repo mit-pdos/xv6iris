@@ -174,7 +174,7 @@ Definition wp_devintr_sconf_body
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (dq : dfrac) (sc : mword 64) :=
+    (dq : dfrac) (sc : mword 64) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.devintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -183,14 +183,14 @@ Definition wp_devintr_sconf_body
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (devintr_stack <= av)%nat ->
   sie_cap_gpr m av false p -∗
-  cpu_own lvl eb p C false -∗
+  cpu_own lvl eb p C false lks -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
       sie_cap_gpr mf av false p -∗
-      cpu_own lvl eb p C false -∗
+      cpu_own lvl eb p C false lks -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -203,6 +203,6 @@ Module Type DEVINTR.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64),
-      wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc.
+      (dq : dfrac) (sc : mword 64) (lks : gset nat),
+      wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc lks.
 End DEVINTR.

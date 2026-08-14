@@ -116,7 +116,7 @@ Section ProofUvmdealloc.
      [wp_consputc_epi]. *)
   Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
       (mm mj : regfile) (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (oldsz newsz res ret_tgt : mword 64) :
+      (C : iProp Σ) (b : bool) (oldsz newsz res ret_tgt : mword 64) (lks : gset nat) :
     (4 <= K)%nat ->
     (b = false \/ p = zero_reg -> (CID0 : CPU) = (CID : CPU)) ->
     ret_tgt = ret_pc (mm !!! Regidx Rra) ->
@@ -128,7 +128,7 @@ Section ProofUvmdealloc.
     ( ((uint newsz >= uint oldsz)%Z /\ res = oldsz)
       \/ ((uint newsz < uint oldsz)%Z /\ res = newsz) ) ->
     sie_cap_gpr mj (K - 4)%nat b p -∗
-    cpu_own 0%nat eb p C b -∗
+    cpu_own 0%nat eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmdealloc + 0x26) : mword 64) -∗
     (* the three saved cells arrive SPD-relative (the same address shape the
@@ -154,7 +154,7 @@ Section ProofUvmdealloc.
     wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K b p -∗
-      cpu_own 0%nat eb p C b -∗
+      cpu_own 0%nat eb p C b lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       ⌜ ((uint newsz >= uint oldsz)%Z /\ mr !!! Regidx Ra0 = oldsz)
@@ -336,8 +336,8 @@ Section ProofUvmdealloc.
 
   Lemma wp_uvmdealloc_sconf
       (γa : gname) (mm : regfile)
-      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_uvmdealloc_sconf_body γa mm P K eb p C b.
+      (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_uvmdealloc_sconf_body γa mm P K eb p C b lks.
   Proof.
     cbv beta delta [wp_uvmdealloc_sconf_body].
     intros pcE oldsz newsz ret_tgt HK Hroot Hob.
@@ -542,7 +542,7 @@ Section ProofUvmdealloc.
       iEval (rewrite Htgt26) in "Hpc".
       iDestruct (cpu_own_transport CID CID7a 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi mm A2 P K eb p C b oldsz newsz oldsz ret_tgt
+      iApply (wp_uvmdealloc_epi mm A2 P K eb p C b oldsz newsz oldsz ret_tgt lks
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA2sp HA2s1 HA2thr
                 ltac:(left; split; [apply Z.le_ge; exact Hge | reflexivity])
                 with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
@@ -821,7 +821,7 @@ Section ProofUvmdealloc.
       iEval (rewrite Hpc26) in "Hpc".
       iDestruct (cpu_own_transport CID CID16 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi mm A10 P K eb p C b oldsz newsz newsz ret_tgt
+      iApply (wp_uvmdealloc_epi mm A10 P K eb p C b oldsz newsz newsz ret_tgt lks
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA10sp HA10s1 HA10thr
                 ltac:(right; split; [exact Hlt | reflexivity])
                 with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
@@ -1057,7 +1057,7 @@ Section ProofUvmdealloc.
        hart crossing). *)
     iDestruct (cpu_own_transport CID CID23 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmunmap.wp_uvmunmap_sconf γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C 0%nat b
+    iApply (Uvmunmap.wp_uvmunmap_sconf γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C 0%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv").
     iIntros (CID24 Hs24 mr) "Hcg Hcpu Hpc %Hcs Hpt".
@@ -1090,7 +1090,7 @@ Section ProofUvmdealloc.
     iEval (rewrite Htgt26') in "Hpc".
     iDestruct (cpu_own_transport CID24 CID25 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (wp_uvmdealloc_epi mm mr P K eb p C b oldsz newsz newsz ret_tgt
+    iApply (wp_uvmdealloc_epi mm mr P K eb p C b oldsz newsz newsz ret_tgt lks
               ltac:(lia) ltac:(wp_next_chain) eq_refl Hmrsp Hmrs1 Hmrthr
               ltac:(right; split; [exact Hlt | reflexivity])
               with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").

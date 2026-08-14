@@ -92,8 +92,8 @@ Section ProofKilled.
 
 
   Lemma wp_killed_sconf  (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_killed_sconf_body γs j γl m av n eb p C b.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_killed_sconf_body γs j γl m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_killed_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav.
@@ -224,7 +224,7 @@ Section ProofKilled.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b
+              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b lks
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite HB1a0). iExact "Hislock". }
@@ -320,7 +320,7 @@ Section ProofKilled.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat
+              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat lks
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".

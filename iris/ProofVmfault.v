@@ -177,8 +177,8 @@ Section ProofVmfault.
   Lemma wp_vmfault_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool)
-    : wp_vmfault_sconf_body γa mm P szv K lvl eb p C b.
+      (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_vmfault_sconf_body].
     intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl.
@@ -368,7 +368,7 @@ Section ProofVmfault.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs4 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr mj (K - 6)%nat b p -∗
-        cpu_own lvl eb p C b -∗
+        cpu_own lvl eb p C b lks -∗
         pc_is (mword_of_int (KernelSyms.vmfault + 0x10) : mword 64) -∗
         (∃ w3 w4 w5 : mword 64,
            pa_stk sp0 3 ↦₈ w3 ∗ pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗

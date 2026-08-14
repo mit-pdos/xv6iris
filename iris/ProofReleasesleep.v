@@ -73,8 +73,8 @@ Section ProofReleasesleep.
   Lemma wp_releasesleep_sconf 
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Hav.

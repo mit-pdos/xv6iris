@@ -94,7 +94,7 @@ Section ProofAcquire.
      to the pre-port shape -- the one new line per leaf, per the porting
      guide's "consumer side" recipe. *)
   Lemma wp_acquire_lock_loop_sconf `{CID0 : CpuId}
-      (γl : gname) (R Tc Dc : iProp Σ)
+      (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (M0 : regfile) (n : nat) (a5v lk : mword 64) (p : mword 64) :
     let a4one : mword 64 := add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))) in
     M0 !!! Regidx (mword_of_int 14 : mword 5) = a4one ->
@@ -102,7 +102,7 @@ Section ProofAcquire.
     (⊢ Tc -∗ Dc -∗ False) ->
     sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg a5v]> M0) n false p -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.acquire + 0x1a)) -∗
-    lock_openable γl lk R Dc -∗
+    lock_openable γl lk s R Dc -∗
     Tc -∗
     ( Tc -∗
       sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
@@ -156,7 +156,7 @@ Section ProofAcquire.
                      ((<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0)
                         !!! Regidx (mword_of_int 15 : mword 5)))) zero_reg = true)
       by (rewrite upd_eq Hst1; vm_compute; reflexivity).
-    iApply (wp_amoswap_lockopen_s_sconf γl lk R Tc Dc (mword_of_int (KernelSyms.acquire + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
+    iApply (wp_amoswap_lockopen_s_sconf γl lk s R Tc Dc (mword_of_int (KernelSyms.acquire + 0x1c)) (mword_of_int 15) (mword_of_int 15) (mword_of_int 9)
               (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg v1]> M0) n false
               HPAlk HSTZ
               ltac:(vm_compute; discriminate) ltac:(rdok) Href
@@ -210,13 +210,16 @@ Section ProofAcquire.
   Qed.
 
   Lemma wp_acquire_gen_sconf
-      (γl : gname) (R Tc Dc : iProp Σ)
+      (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
-    : wp_acquire_gen_sconf_body γl R Tc Dc m n eb p C av b.
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat)
+    : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_acquire_gen_sconf_body].
-    intros pcE lk0 ret_tgt Hpos Hav Href Hrefpre.
+    (* [Hfresh] is the new premise: this hart holds no lock of [lk]'s rank.
+       [#Hpanic] STAYS -- see SpecAcquire.v on why [Hfresh] does not yet kill
+       the [holding] arm. *)
+    intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc #Hlock HTc #Hpanic Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
@@ -335,7 +338,7 @@ Section ProofAcquire.
       exact HcspA0. }
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (PushOff.wp_push_off_sconf A3 (av - 4)%nat n eb p C b
+    iApply (PushOff.wp_push_off_sconf A3 (av - 4)%nat n eb p C b _
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
@@ -396,7 +399,7 @@ Section ProofAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 R Tc Dc B2 (trap_res b + (av - 4))%nat p
+    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 s R Tc Dc B2 (trap_res b + (av - 4))%nat p
               Hlkb ltac:(lia) Href
               with "Hcg Htext Hpc Hlock HTc").
     iIntros (mh) "HTc Hcg Hpc %Hmh".
@@ -501,7 +504,7 @@ Section ProofAcquire.
     { intros f k. apply functional_extensionality; intro j.
       unfold insert, regfile_insert, rf_upd, regval_into_reg, lookup_total, regfile_lookup_total.
       case_bool_decide as Heq; [subst; reflexivity | reflexivity]. }
-    iApply (wp_acquire_lock_loop_sconf γl R Tc Dc B3 (trap_res b + (av - 4))%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0 p
+    iApply (wp_acquire_lock_loop_sconf γl s R Tc Dc B3 (trap_res b + (av - 4))%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0 p
               HB3a4 HB3s1 Href
               with "[Hcg] Htext Hpc Hlock HTc").
     { rewrite (Hupd_id B3 (Regidx (mword_of_int 15 : mword 5))). iExact "Hcg". }
@@ -544,15 +547,17 @@ Section ProofAcquire.
        ([lock_refute_False] is hart-generic already). *)
     (* THE SET-ADDING INSTRUCTION.  The hart's held-lock set is hidden inside
        [cpu_own] (IntrDefs.cpu_hart), so it is opened HERE, handed to the
-       leaf, and put back with [lk0] in it -- which is why acquire's contract
-       says nothing about it.  No [lk0 ∉ S] obligation appears: the leaf
-       derives it from the cpu field this very instruction is about
-       (LockSet.cpu_locks_fresh). *)
-    iDestruct (cpu_own_locks_acc with "Hown") as (Slk) "[Hlks Hownback]".
-    iApply (wp_csd_lkcpu_lockopen_s_sconf γl lk0 R Dc (mword_of_int (KernelSyms.acquire + 0x28))
+       leaf, and put back with [lock_rank s] in it.  The set is now an INDEX
+       of [cpu_own], so it is NAMED here rather than opened existentially --
+       [cpu_own_locks_swap] takes the authority out at [lks] and puts back the
+       one the leaf returns.  The [lock_rank s ∉ lks] obligation is [Hfresh],
+       the caller's own premise; the predecessor derived it from the cpu field
+       instead (see WpLock.v's owner-field block). *)
+    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks Hownback]".
+    iApply (wp_csd_lkcpu_lockopen_s_sconf γl lk0 s R Dc (mword_of_int (KernelSyms.acquire + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false Slk
-              Hpacpu Ha0C (Hrefpre cpu_id)
+              (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false lks
+              Hpacpu Ha0C Hfresh (Hrefpre cpu_id)
               with "Hcg Hpc Hi28 Hlock Htokp Hlks").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Htok Hlks".
@@ -819,13 +824,14 @@ Section OfGen.
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
-    : wp_acquire_sconf_body γl s R m n eb p C av b.
+      (lks : gset nat)
+    : wp_acquire_sconf_body γl s R m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].
-    intros pcE lk0 ret_tgt Hpos Hav.
+    intros pcE lk0 ret_tgt Hpos Hav Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
-    iApply (G.wp_acquire_gen_sconf γl R emp%I False%I m n eb p C av b
-              Hpos Hav (lock_refute_False _) (fun i => lock_refute_False _)
+    iApply (G.wp_acquire_gen_sconf γl s R emp%I False%I m n eb p C av b lks
+              Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
               with "Hcg Hown Htext Hpc [] [] Hpanic").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }

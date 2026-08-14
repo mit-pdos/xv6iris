@@ -126,7 +126,8 @@ Section ProofPipealloc.
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b.
+      (lks : gset nat)
+    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b lks.
   Proof.
     cbv beta delta [wp_pipealloc_sconf_body].
     intros pcE pf0 pf1 ret_tgt HK Hfl Hnoffpos.
@@ -343,7 +344,7 @@ Section ProofPipealloc.
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr mj (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xb8)) -∗
-        cpu_own n eb p C b -∗
+        cpu_own n eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -534,7 +535,7 @@ Section ProofPipealloc.
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa8)) -∗
-        cpu_own n eb p C b -∗
+        cpu_own n eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -559,7 +560,7 @@ Section ProofPipealloc.
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa4)) -∗
-        cpu_own n eb p C b -∗
+        cpu_own n eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         file_ref γf k0 1 Cf0 -∗

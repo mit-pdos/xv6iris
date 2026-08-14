@@ -231,7 +231,7 @@ Section CrBodies.
 
   (* the function's own exit, as a [wp_next] at the entry hart *)
   Definition cr_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
-      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) : iProp Σ :=
+      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        ∀ (mf : regfile) (r : Z) (P' : uptd),
          ⌜callee_saved m0 mf⌝ -∗
@@ -239,7 +239,7 @@ Section CrBodies.
          ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
          sie_cap_gpr mf av true (proc_addr jp) -∗
-         cpu_own 0%nat eb (proc_addr jp) C true -∗
+         cpu_own 0%nat eb (proc_addr jp) C true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -250,7 +250,7 @@ Section CrBodies.
   (* =================================================================== *)
   Lemma cr_epi `{CID : CpuId} (CID0 : CPU)
       (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) :
+      (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset nat) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
     M !!! Regidx csp_rs1 = pa_stk sp0 12%nat ->
@@ -262,11 +262,11 @@ Section CrBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
     sie_cap_gpr M (av - 12)%nat true pj -∗
-    cpu_own 0%nat eb pj C true -∗
+    cpu_own 0%nat eb pj C true lks -∗
     pc_is (mword_of_int (CR + 0xce)) -∗
     proc_priv_core pj pid V -∗
     cr_saved sp0 m0 -∗ cr_rest sp0 -∗
-    cr_ret (CID0 := CID0) jp m0 av eb C pid V n -∗
+    cr_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMa0 HMcs Hr Hav Heb Hcr.
@@ -580,7 +580,7 @@ Section CrBodies.
   (* =================================================================== *)
   Definition cr_epi_prop `{CID0 : CpuId}
       (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) : iProp Σ :=
+      (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDe : CpuId) =>
        ∀ (M : regfile) (P' : uptd) (r : Z),
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 12%nat ⌝ -∗
@@ -590,7 +590,7 @@ Section CrBodies.
          ⌜ (-1 <= r <= Z.max 0 n)%Z ⌝ -∗
          sie_cap_gpr M (av - 12)%nat true (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0xce)) -∗
-         cpu_own 0%nat true (proc_addr jp) C true -∗
+         cpu_own 0%nat true (proc_addr jp) C true lks -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
          cr_rest sp0 -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -601,10 +601,10 @@ Section CrBodies.
      without this the [uptd_ext] chain would have to be re-threaded at each
      of the five exits instead of once, here. *)
   Lemma cr_ret_shift `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
-      (C : iProp Σ) (pid : mword 32) (V : pprivate) (P' : uptd) (n : Z) :
+      (C : iProp Σ) (pid : mword 32) (V : pprivate) (P' : uptd) (n : Z) (lks : gset nat) :
     uptd_ext (pv_upt V) P' ->
-    cr_ret (CID0 := CID0) jp m0 av true C pid V n -∗
-    cr_ret (CID0 := CID0) jp m0 av true C pid (upd_upt V P') n.
+    cr_ret (CID0 := CID0) jp m0 av true C pid V n lks -∗
+    cr_ret (CID0 := CID0) jp m0 av true C pid (upd_upt V P') n lks.
   Proof.
     intro Hx. iIntros "H" (CIDx Hsx mf r P'') "%Hcs %Hex %Hr %Ha0 Hcg Hcnt Hpc Hpriv".
     iSpecialize ("H" $! CIDx with "[%]"); [exact Hsx|].
@@ -617,21 +617,21 @@ Section CrBodies.
   Qed.
 
   Lemma cr_mk_epi `{CID : CpuId} (jp : nat) (sp0 : mword 64) (m0 : regfile)
-      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) :
+      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     (consoleread_stack <= av)%nat ->
     kernel_text -∗ cr_saved sp0 m0 -∗
-    cr_ret (CID0 := CID) jp m0 av true C pid V n -∗
-    cr_epi_prop (CID0 := CID) jp sp0 m0 av C pid V n.
+    cr_ret (CID0 := CID) jp m0 av true C pid V n lks -∗
+    cr_epi_prop (CID0 := CID) jp sp0 m0 av C pid V n lks.
   Proof.
     intros Hm0sp Hav.
     iIntros "#Ht Hsaved Hcont".
     rewrite /cr_epi_prop.
     iIntros (CIDe Hse M P' r) "%Hsp %Ha0 %Hcs %Hext %Hr Hcg Hpc Hcnt Hpriv Hrest".
-    iApply (cr_epi (CID := CIDe) CIDe jp m0 M av true C sp0 pid (upd_upt V P') n r
+    iApply (cr_epi (CID := CIDe) CIDe jp m0 M av true C sp0 pid (upd_upt V P') n r lks
               Hm0sp Hsp Ha0 Hcs Hr Hav eq_refl ltac:(intros _; reflexivity)
               with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest").
-    iApply (cr_ret_shift (CID0 := CIDe) jp m0 av C pid V P' n Hext).
+    iApply (cr_ret_shift (CID0 := CIDe) jp m0 av C pid V P' n lks Hext).
     iApply (wp_next_retarget CID CIDe true (proc_addr jp) _ ltac:(wp_next_chain)
               with "Hcont").
   Qed.
@@ -670,7 +670,7 @@ Section ProofConsoleread.
   (* =================================================================== *)
   Definition cr_retx_prop `{CID0 : CpuId}
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
-      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) : iProp Σ :=
+      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDx : CpuId) =>
        ∀ (M : regfile) (P' : uptd) (nc : Z),
          ⌜ M !!! Regidx csp_rs1 = pa_stk sp0 12%nat ⌝ -∗
@@ -681,7 +681,7 @@ Section ProofConsoleread.
          ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
          sie_cap_gpr M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0xfc)) -∗
-         cpu_own 1%nat true (proc_addr jp) C false -∗
+         cpu_own 1%nat true (proc_addr jp) C false lks -∗
          arm_pay 0%nat true (proc_addr jp) -∗
          locked γc cpu_id -∗
          cons_res -∗
@@ -690,12 +690,12 @@ Section ProofConsoleread.
          WP (Loop : expr riscv_lang)))%I.
 
   Lemma cr_mk_retx (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile)
-      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) :
+      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) :
     (- 2 ^ 31 <= n < 2 ^ 31)%Z ->
     (consoleread_stack <= av)%nat ->
     kernel_text -∗ is_conslock γc -∗
-    cr_epi_prop (CID0 := CID) jp sp0 m0 av C pid V n -∗
-    cr_retx_prop (CID0 := CID) γc jp sp0 m0 av C pid V n.
+    cr_epi_prop (CID0 := CID) jp sp0 m0 av C pid V n lks -∗
+    cr_retx_prop (CID0 := CID) γc jp sp0 m0 av C pid V n lks.
   Proof.
     intros Hn31 Hav. iIntros "#Ht #Hlk EPI".
     rewrite /cr_retx_prop.
@@ -757,7 +757,7 @@ Section ProofConsoleread.
       rewrite /X3 upd_ne; [| congruence]. rewrite /X2 upd_ne; [| congruence].
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
     iApply (Release.wp_release_sconf γc a_cons "cons"%string cons_res X3
-              0%nat true (proc_addr jp) C (av - 12)%nat HX3lka
+              0%nat true (proc_addr jp) C (av - 12)%nat _ HX3lka
               ltac:(unfold consoleread_stack in Hav; lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcnt". rgall.
@@ -825,9 +825,9 @@ Section ProofConsoleread.
      to whichever successor it jumps to. *)
   Definition cr_exits `{CID0 : CpuId}
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
-      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) : iProp Σ :=
-    (cr_retx_prop (CID0 := CID0) γc jp sp0 m0 av C pid V n
-     ∧ cr_epi_prop (CID0 := CID0) jp sp0 m0 av C pid V n)%I.
+      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset nat) : iProp Σ :=
+    (cr_retx_prop (CID0 := CID0) γc jp sp0 m0 av C pid V n lks
+     ∧ cr_epi_prop (CID0 := CID0) jp sp0 m0 av C pid V n lks)%I.
 
   (* the pins every block in the body shares: the six live callee-saved
      roles plus the three registers nothing here ever writes *)
@@ -851,7 +851,7 @@ Section ProofConsoleread.
   (* =================================================================== *)
   Definition cr_head_prop `{CID0 : CpuId}
       (γa γc γf : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
-      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) : iProp Σ :=
+      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDh : CpuId) =>
        ∀ (M : regfile) (nc : Z) (cur : mword 64) (P' : uptd),
          ⌜ cr_regs M m0 sp0 nc cur n ⌝ -∗
@@ -859,10 +859,10 @@ Section ProofConsoleread.
          ⌜ (0 <= n - nc <= Z.max 0 n)%Z ⌝ -∗
          ⌜ (Z.to_nat nc < fl)%nat ⌝ -∗
          ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-         cr_exits (CID0 := CID0) γc jp sp0 m0 av C pid V n -∗
+         cr_exits (CID0 := CID0) γc jp sp0 m0 av C pid V n lks -∗
          sie_cap_gpr M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0x38)) -∗
-         cpu_own 1%nat true (proc_addr jp) C false -∗
+         cpu_own 1%nat true (proc_addr jp) C false lks -∗
          arm_pay 0%nat true (proc_addr jp) -∗
          locked γc cpu_id -∗
          cons_res -∗
@@ -883,7 +883,7 @@ Section ProofConsoleread.
   (* =================================================================== *)
   Definition cr_have_prop `{CID0 : CpuId}
       (γa γc γf : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
-      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) : iProp Σ :=
+      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDv : CpuId) =>
        ∀ (M : regfile) (nc : Z) (cur : mword 64) (P' : uptd)
          (rr ww ee : mword 32) (bs : list (bv 8)),
@@ -892,10 +892,10 @@ Section ProofConsoleread.
          ⌜ (0 < nc)%Z /\ (0 <= n - nc <= Z.max 0 n)%Z /\ (Z.to_nat nc <= fl)%nat ⌝ -∗
          ⌜ length bs = INPUT_BUF_SIZE ⌝ -∗
          ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-         cr_exits (CID0 := CID0) γc jp sp0 m0 av C pid V n -∗
+         cr_exits (CID0 := CID0) γc jp sp0 m0 av C pid V n lks -∗
          sie_cap_gpr M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0x76)) -∗
-         cpu_own 1%nat true (proc_addr jp) C false -∗
+         cpu_own 1%nat true (proc_addr jp) C false lks -∗
          arm_pay 0%nat true (proc_addr jp) -∗
          locked γc cpu_id -∗
          a_cons_r ↦₄ rr -∗ a_cons_w ↦₄ ww -∗ a_cons_e ↦₄ ee -∗ cons_data bs -∗
@@ -934,12 +934,12 @@ Section ProofConsoleread.
   Proof. intro Hi. rewrite <- (cons_byte_addr i Hi). reflexivity. Qed.
 
   Lemma cr_mk_have (γa γc γf : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile)
-      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) :
+      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) :
     (- 2 ^ 31 <= n < 2 ^ 31)%Z ->
     (consoleread_stack <= av)%nat ->
     kernel_text -∗ is_conslock γc -∗ kalloc_env γa None -∗
-    cr_head_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl -∗
-    cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl.
+    cr_head_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks -∗
+    cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks.
   Proof.
     intros Hn31 Hav. iIntros "#Ht #Hlk #Henv HEAD".
     rewrite /cr_have_prop.
@@ -1385,7 +1385,7 @@ Section ProofConsoleread.
     iApply (EitherCopyout.wp_either_copyout_sconf γa γf G5
               (trap_res true + (av - 12))%nat 1%nat true (proc_addr jp) C pid
               (upd_upt V P') true 1%nat (fun _ => trunc8 (H8 !!! Regidx Ra4))
-              (fun _ => chb0) false
+              (fun _ => chb0) false lks
               Hstk ltac:(rewrite HG5a0; vm_compute; reflexivity) HG5a3
               ltac:(vm_compute; reflexivity) cr_lvl1
               with "Hcg Hcnt Ht Hpc Henv [Hch] [Hpriv]").
@@ -1715,17 +1715,17 @@ Section ProofConsoleread.
   (* =================================================================== *)
   Definition cr_wait_prop `{CID0 : CpuId}
       (γc : gname) (jp : nat) (sp0 : mword 64) (m0 : regfile) (av : nat)
-      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) : iProp Σ :=
+      (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CIDw : CpuId) =>
        ∀ (M : regfile) (nc : Z) (cur : mword 64) (P' : uptd),
          ⌜ cr_regs M m0 sp0 nc cur n ⌝ -∗
          ⌜ M !!! Regidx Rs5 = m0 !!! Regidx Rs5 ⌝ -∗
          ⌜ (0 < nc)%Z /\ (0 <= n - nc <= Z.max 0 n)%Z /\ (Z.to_nat nc <= fl)%nat ⌝ -∗
          ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
-         cr_exits (CID0 := CID0) γc jp sp0 m0 av C pid V n -∗
+         cr_exits (CID0 := CID0) γc jp sp0 m0 av C pid V n lks -∗
          sie_cap_gpr M (trap_res true + (av - 12))%nat false (proc_addr jp) -∗
          pc_is (mword_of_int (CR + 0x48)) -∗
-         cpu_own 1%nat true (proc_addr jp) C false -∗
+         cpu_own 1%nat true (proc_addr jp) C false lks -∗
          arm_pay 0%nat true (proc_addr jp) -∗
          locked γc cpu_id -∗
          cons_res -∗
@@ -1735,15 +1735,15 @@ Section ProofConsoleread.
 
   Lemma cr_mk_wait (γa γc γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
       (sp0 : mword 64) (m0 : regfile)
-      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) :
+      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) :
     (jp < NPROC)%nat ->
     γs !! jp = Some γlp ->
     (- 2 ^ 31 <= n < 2 ^ 31)%Z ->
     (consoleread_stack <= av)%nat ->
     kernel_text -∗ is_conslock γc -∗ kalloc_env γa None -∗
     procs_inv γs -∗ panic_wp_any -∗
-    □ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl -∗
-    cr_wait_prop (CID0 := CID) γc jp sp0 m0 av C pid V n fl.
+    □ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks -∗
+    cr_wait_prop (CID0 := CID) γc jp sp0 m0 av C pid V n fl lks.
   Proof.
     intros Hjp Hjl Hn31 Hav.
     iIntros "#Ht #Hlk #Henv #Hpinv #Hpanic #HAVE".
@@ -1804,7 +1804,7 @@ Section ProofConsoleread.
       rewrite /W2. apply callee_saved_insert_r;
         [vm_compute; reflexivity | apply callee_saved_refl]. }
     iApply (Killed.wp_killed_sconf γs jp γlp W2 (trap_res true + (av - 12))%nat 1%nat true
-              (proc_addr jp) C false HW2a0 Hjp Hjl cr_lvl1
+              (proc_addr jp) C false lks HW2a0 Hjp Hjl cr_lvl1
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
               with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
@@ -1964,7 +1964,7 @@ Section ProofConsoleread.
     { rewrite /S2 /S1. apply callee_saved_insert_r; [vm_compute; reflexivity|].
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs jp γlp S2
-              (trap_res true + (av - 12))%nat 1%nat true C false Hjp Hjl
+              (trap_res true + (av - 12))%nat 1%nat true C false lks Hjp Hjl
               ltac:(rewrite HS2a0; exact a_cons_r_nz) cr_lvl1
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
@@ -2046,7 +2046,7 @@ Section ProofConsoleread.
           [vm_compute; reflexivity | apply callee_saved_refl]).
     iDestruct (cpu_own_transport CIDr0 CIDs0 0%nat true (proc_addr jp) C true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Sleep.wp_sleep_sconf γs jp γlp S5 (av - 12)%nat true C Hjp Hjl
+    iApply (Sleep.wp_sleep_sconf γs jp γlp S5 (av - 12)%nat true C lks Hjp Hjl
               ltac:(unfold consoleread_stack in Hav; lia)
               with "Hcg Hcnt Ht Hpc Hpinv Hpanic [] []").
     { rewrite /trap_csrs_ext. done. }
@@ -2223,14 +2223,14 @@ Section ProofConsoleread.
   (* =================================================================== *)
   Lemma cr_mk_head (γa γc γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
       (sp0 : mword 64) (m0 : regfile)
-      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) :
+      (av : nat) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (fl : nat) (lks : gset nat) :
     (jp < NPROC)%nat ->
     γs !! jp = Some γlp ->
     (- 2 ^ 31 <= n < 2 ^ 31)%Z ->
     (consoleread_stack <= av)%nat ->
     kernel_text -∗ is_conslock γc -∗ kalloc_env γa None -∗
     procs_inv γs -∗ panic_wp_any -∗
-    cr_head_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl.
+    cr_head_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks.
   Proof.
     intros Hjp Hjl Hn31 Hav.
     induction fl as [| fl IHfl].
@@ -2240,12 +2240,12 @@ Section ProofConsoleread.
       exfalso. lia. }
     iIntros "#Ht #Hlk #Henv #Hpinv #Hpanic".
     (* the copy block, then the park, both built from the fuel-[fl] head *)
-    iAssert (□ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl)%I
+    iAssert (□ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av C pid V n fl lks)%I
       with "[]" as "#HAVE".
     { iModIntro.
-      iApply (cr_mk_have γa γc γf jp sp0 m0 av C pid V n fl Hn31 Hav with "Ht Hlk Henv").
+      iApply (cr_mk_have γa γc γf jp sp0 m0 av C pid V n fl lks Hn31 Hav with "Ht Hlk Henv").
       iApply (IHfl with "Ht Hlk Henv Hpinv Hpanic"). }
-    iPoseProof (cr_mk_wait γa γc γf γs jp γlp sp0 m0 av C pid V n fl Hjp Hjl Hn31 Hav
+    iPoseProof (cr_mk_wait γa γc γf γs jp γlp sp0 m0 av C pid V n fl lks Hjp Hjl Hn31 Hav
                   with "Ht Hlk Henv Hpinv Hpanic HAVE") as "WAIT".
     rewrite /cr_head_prop.
     iIntros (CIDh Hsh M nc cur P')
@@ -2417,8 +2417,8 @@ Section ProofConsoleread.
   Lemma wp_consoleread_sconf (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool)
-    : wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b.
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat)
+    : wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b lks.
   Proof.
     cbv beta delta [wp_consoleread_sconf_body].
     intros pcE pj ret_tgt Hj Hjl Hlen Ha0v Ha2v Hnrng Hav Heb. subst eb.
@@ -2569,16 +2569,16 @@ Section ProofConsoleread.
                     = mword_of_int (CR + 0x12)) by pcw.
     iEval (rewrite Hpc12) in "Hpc".
     (* ---- the exits, built the moment the frame is saved ---- *)
-    iAssert (cr_ret (CID0 := CID) j m av true C pid V n) with "[Hcont]" as "Hcont".
+    iAssert (cr_ret (CID0 := CID) j m av true C pid V n lks) with "[Hcont]" as "Hcont".
     { rewrite /cr_ret. iExact "Hcont". }
     iAssert (cr_saved sp0 m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf8 Hf9]" as "Hsaved".
     { rewrite /cr_saved. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf8 Hf9". }
-    iAssert (cr_exits (CID0 := CID) γc j sp0 m av C pid V n)
+    iAssert (cr_exits (CID0 := CID) γc j sp0 m av C pid V n lks)
       with "[Hsaved Hcont]" as "EX".
     { rewrite /cr_exits. iSplit.
-      - iApply (cr_mk_retx γc j sp0 m av C pid V n Hn31 Hav with "Ht Hlk").
-        iApply (cr_mk_epi j sp0 m av C pid V n eq_refl Hav with "Ht Hsaved Hcont").
-      - iApply (cr_mk_epi j sp0 m av C pid V n eq_refl Hav with "Ht Hsaved Hcont"). }
+      - iApply (cr_mk_retx γc j sp0 m av C pid V n lks Hn31 Hav with "Ht Hlk").
+        iApply (cr_mk_epi j sp0 m av C pid V n lks eq_refl Hav with "Ht Hsaved Hcont").
+      - iApply (cr_mk_epi j sp0 m av C pid V n lks eq_refl Hav with "Ht Hsaved Hcont"). }
     (* ---- +0x12 c.addi4spn s0,sp,96 ---- *)
     assert (Hs0v : add_vec (pa_stk sp0 12%nat)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8))) = sp0).
@@ -2814,7 +2814,7 @@ Section ProofConsoleread.
     assert (HA4s5 : A4 !!! Regidx Rs5 = m !!! Regidx Rs5).
     { rewrite (Hchain Rs5 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)).
       apply HthrP; reg_neq. }
-    iPoseProof (cr_mk_head γa γc γf γs j γlp sp0 m av C pid V n (S (Z.to_nat n))
+    iPoseProof (cr_mk_head γa γc γf γs j γlp sp0 m av C pid V n (S (Z.to_nat n)) lks
                   Hj Hjl Hn31 Hav with "Ht Hlk Henv Hpinv Hpanic") as "HEAD".
     iSpecialize ("HEAD" $! CIDaq with "[%]"); [wp_next_chain|].
     iApply ("HEAD" $! A4 n (m !!! Regidx Ra1) (pv_upt V)

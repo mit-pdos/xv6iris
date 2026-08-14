@@ -210,7 +210,7 @@ Section AslProps.
        (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
-      (eb : bool) (C : iProp Σ) : iProp Σ :=
+      (eb : bool) (C : iProp Σ) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
@@ -222,7 +222,7 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own 1 eb (proc_addr j) C false -∗
+      cpu_own 1 eb (proc_addr j) C false lks -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
@@ -233,7 +233,7 @@ Section AslProps.
       (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
-      (eb : bool) (C : iProp Σ) : iProp Σ :=
+      (eb : bool) (C : iProp Σ) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
@@ -244,12 +244,12 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own 1 eb (proc_addr j) C false -∗
+      cpu_own 1 eb (proc_addr j) C false lks -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
-      asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+      asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C lks -∗
       WP (Loop : expr riscv_lang)))%I.
 
   (* ---- THE NESTED PAIR: the same two anchors (control at +0x36 and at
@@ -274,7 +274,7 @@ Section AslProps.
   Definition asl_nexit `{GEN : GenId} `{CID : CpuId}
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (j : nat) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
-      (eb : bool) (C : iProp Σ) (n : nat) : iProp Σ :=
+      (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat) : iProp Σ :=
     (∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
       pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -285,7 +285,7 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own (S (S n)) eb (proc_addr j) C false -∗
+      cpu_own (S (S n)) eb (proc_addr j) C false lks -∗
       arm_pay (S n) eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x36)) -∗
@@ -294,7 +294,7 @@ Section AslProps.
   Definition asl_nloop `{GEN : GenId} `{CID : CpuId}
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (j : nat) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
-      (eb : bool) (C : iProp Σ) (n : nat) : iProp Σ :=
+      (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat) : iProp Σ :=
     (∀ (M : regfile),
       ⌜ asl_regs m M slk spd ⌝ -∗
       pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -304,11 +304,11 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own (S (S n)) eb (proc_addr j) C false -∗
+      cpu_own (S (S n)) eb (proc_addr j) C false lks -∗
       arm_pay (S n) eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
-      asl_nexit γl γsl R m j pidv av dq slk spd sp0 eb C n -∗
+      asl_nexit γl γsl R m j pidv av dq slk spd sp0 eb C n lks -∗
       WP (Loop : expr riscv_lang))%I.
 
 End AslProps.
@@ -337,7 +337,7 @@ Section AslBodies.
   Lemma asl_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
-      (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) :
+      (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     let pj := proc_addr j in
     (26 <= av)%nat ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
@@ -354,7 +354,7 @@ Section AslBodies.
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
@@ -363,7 +363,7 @@ Section AslBodies.
       ∀ (mf : regfile),
         ⌜ callee_saved m mf ⌝ -∗
         sie_cap_gpr mf av eb pj -∗
-        cpu_own 0 eb pj C eb -∗
+        cpu_own 0 eb pj C eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
@@ -685,14 +685,14 @@ Section AslBodies.
       (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
-      (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) :
+      (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     let pj := proc_addr j in
     (26 <= av)%nat ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     asl_regs m M slk spd ->
     kernel_text -∗
-    ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
-    asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C lks -∗
+    asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C lks -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -700,7 +700,7 @@ Section AslBodies.
     locked γl cpu_id -∗
     sl_res γsl slk R -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
@@ -780,7 +780,7 @@ Section AslBodies.
       (γs : list gname) (j : nat)
       (γpl γl γsl : gname) (s : string) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
-      (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) :
+      (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     let pj := proc_addr j in
     (26 <= av)%nat ->
     (j < NPROC)%nat ->
@@ -791,7 +791,7 @@ Section AslBodies.
     is_sleeplock γl γsl slk s R -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C lks -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -799,12 +799,12 @@ Section AslBodies.
     locked γl cpu_id -∗
     (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
-    asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Hj Hjpl Hanch Hasl.
@@ -1010,7 +1010,7 @@ Section AslBodies.
     iEval (rewrite Hpc32) in "Hpc".
     assert (HaslMacq : asl_regs m Macq slk spd)
       by (apply (asl_regs_cs m L7 Macq slk spd Hpins HaslL7)).
-    iApply (asl_post_sleep_body (CID := CIDq) CID0 γs j γl γsl R m Macq pidv av dq slk spd sp0 eb C
+    iApply (asl_post_sleep_body (CID := CIDq) CID0 γs j γl γsl R m Macq pidv av dq slk spd sp0 eb C lks
               Hav ltac:(wp_next_chain) HaslMacq
               with "Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HR Hpid Hown Htc Hclm Hcg Hpc").
   Qed.
@@ -1023,12 +1023,12 @@ Section ProofAcquiresleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_acquiresleep_sconf 
+  Lemma wp_acquiresleep_sconf
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (b : bool)
-    : wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b.
+      (b : bool) (lks : gset nat)
+    : wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b lks.
   Proof.
     cbv beta delta [wp_acquiresleep_sconf_body].
     intros pcE slk pj ret_tgt Hj Hav.
@@ -1243,18 +1243,18 @@ Section ProofAcquiresleep.
       - rewrite (callee_saved_lookup Hpins (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity)). apply Hpro_cs; reg_neq. }
 
     (* ============ the anchored EXIT continuation (+0x36 -> ret) ============ *)
-    iAssert (asl_exit CID γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[Hcont]" as "Hexit".
+    iAssert (asl_exit CID γs j γl γsl R m pidv av dq slk spd sp0 eb C lks) with "[Hcont]" as "Hexit".
     { rewrite /asl_exit.
       iIntros (CIDx Hsx M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hown Htc Hclm Hcg Hpc".
-      iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R m M pidv av dq slk spd sp0 eb C
+      iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R m M pidv av dq slk spd sp0 eb C lks
                 Hav Hsx Hspd Hsp0 HaslE
                 with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hown Htc Hclm Hcg Hpc Hcont"). }
 
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ============ *)
-    iAssert (asl_loop CID γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[]" as "Hloop".
+    iAssert (asl_loop CID γs j γl γsl R m pidv av dq slk spd sp0 eb C lks) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /asl_loop.
       iIntros (CIDy Hsy M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Htc Hclm Hcg Hpc Hexit".
-      iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R m M pidv av dq slk spd sp0 eb C
+      iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R m M pidv av dq slk spd sp0 eb C lks
                 Hav Hj Hjpl Hsy HaslL
                 with "Htext Hslk Hpanic Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Htc Hclm Hcg Hpc Hexit"). }
 
@@ -1345,8 +1345,8 @@ Section ProofAcquiresleep.
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (n : nat)
-    : wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n.
+      (n : nat) (lks : gset nat)
+    : wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n lks.
   Proof.
     cbv beta delta [wp_acquiresleep_nested_body].
     intros pcE slk pj ret_tgt Hj Hav Hb31.
@@ -1581,7 +1581,7 @@ Section ProofAcquiresleep.
     pose proof HaslMe as HaslMeW.
 
     (* ============ the EXIT continuation (+0x36 -> ret) ============ *)
-    iAssert (asl_nexit γl γsl R m j pidv av dq slk spd sp0 eb C n) with "[Hcont]" as "Hnexit".
+    iAssert (asl_nexit γl γsl R m j pidv av dq slk spd sp0 eb C n lks) with "[Hcont]" as "Hnexit".
     { iIntros (M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HR Hw Hpid Hown Hpay Hcg Hpc".
       destruct HaslE as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
       (* the four saved-slot addresses, in the [c.ldsp] leaf's spelling *)
@@ -1880,7 +1880,7 @@ Section ProofAcquiresleep.
        Route B's locked branch.  It no longer ends in sched's panic: sleep
        returns whenever the wakeup that cleared [p->chan] beat us to it, and
        the thread simply goes round again. *)
-    iAssert (asl_nloop γl γsl R m j pidv av dq slk spd sp0 eb C n) with "[]" as "Hnloop".
+    iAssert (asl_nloop γl γsl R m j pidv av dq slk spd sp0 eb C n lks) with "[]" as "Hnloop".
     { iLöb as "IH".
       iIntros (M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Hpay Hcg Hpc Hnexit".
       destruct HaslL as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).

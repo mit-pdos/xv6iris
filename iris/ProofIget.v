@@ -338,8 +338,8 @@ Section ProofIget.
   Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -399,16 +399,16 @@ Section ProofIget.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool)
+      (K : nat) (b : bool) (lks : gset nat)
     : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
-                         m n eb p C K b.
+                         m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
     intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1.
     unfold K_iget in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hcont".
-    iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iPoseProof (igi_00 with "Htext") as "Hi00".
@@ -735,7 +735,7 @@ Section ProofIget.
                 c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
-        cpu_own (CID := CIDt) n eb p C b -∗
+        cpu_own (CID := CIDt) n eb p C b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
@@ -947,7 +947,7 @@ Section ProofIget.
                             /\ M !! e = None) ⌝ -∗
       sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
-      cpu_own (S n) eb p C false -∗
+      cpu_own (S n) eb p C false lks -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
@@ -982,7 +982,7 @@ Section ProofIget.
                               /\ M !! e = None) ⌝ -∗
         sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
-        cpu_own (S n) eb p C false -∗
+        cpu_own (S n) eb p C false lks -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗

@@ -448,8 +448,8 @@ Section ProofArgfd.
   Lemma wp_argfd_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool)
-    : wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b.
+      (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset nat)
+    : wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b lks.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].
     intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzf Hn Hav.
@@ -705,7 +705,7 @@ Section ProofArgfd.
     iDestruct (cpu_own_transport CID CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf M6 (av - 6)%nat n eb p C i
               (ud_tfp (pv_upt V)) (pv_tf V) v (word_hi w5) (DfracOwn (1/4)) b
-              Hi HM6a0 Harg Hn ltac:(lia)
+              _ Hi HM6a0 Harg Hn ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage Hs5hi").
     iIntros (CID11 Hk11 A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5hi".
     iDestruct ("Hpback" with "Htfp Hpage") as "Hpriv".
@@ -843,7 +843,7 @@ Section ProofArgfd.
         by (rewrite /B upd_eq; reflexivity).
       iDestruct (cpu_own_transport CID11 CID15 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Myproc.wp_myproc_sconf B (av - 6)%nat n eb p C b
-                Hn ltac:(lia)
+                _ Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iIntros (CID16 Hk16 ms P) "%Hms Hcg Hcpu Hpc %HcsP".
       destruct HcsP as [HcsP HPa0].

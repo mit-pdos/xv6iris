@@ -438,7 +438,7 @@ Section BootRun.
        to fund a trap. *)
     (∀ mf : regfile,
        sie_cap_gpr mf (kv_frame_slots + K_main)%nat false zero_reg -∗
-       cpu_own 0 false zero_reg cpu_ctx_free false -∗
+       cpu_own 0 false zero_reg cpu_ctx_free false ∅ -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
        (* THE TIMER CAPABILITY, allocated HERE rather than in main: it is

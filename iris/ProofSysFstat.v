@@ -336,8 +336,8 @@ Section ProofSysFstat.
   Lemma wp_sys_fstat_sconf
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names) (pidv : mword 32) (V : pprivate) (v : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b lks.
   Proof.
     cbv beta delta [wp_sys_fstat_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Heb.
@@ -507,7 +507,7 @@ Section ProofSysFstat.
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 4)%nat 0%nat eb pj C 1%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v1 w4 (DfracOwn (1/4)) b
+              (ud_tfp (pv_upt V)) (pv_tf V) v1 w4 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(unfold argaddr_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs4").
@@ -707,7 +707,7 @@ Section ProofSysFstat.
                 ltac:(lia) eq_refl eq_refl eq_refl HA2sp HA2a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
       iIntros (CID17 Hs17 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj C b lks
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
@@ -804,10 +804,10 @@ Section ProofSysFstat.
         as (kk qq Cf) "([%Hfvk %Hkk] & Href & Hcore & Howe)".
       assert (HS3a0' : S3 !!! Regidx Ra0 = fnode kk) by (rewrite HS3a0; exact Hfvk).
       iDestruct (sfs_env_frame fn Cf with "Henv") as "[Hfenv Hfback]".
-      iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj C b lks
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf fn pidv V
-                S3 (av - 4)%nat eb C b
+                S3 (av - 4)%nat eb C b lks
                 ltac:(unfold filestat_stack; lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
       iIntros (CID20 Hs20 mf rv P')
@@ -849,7 +849,7 @@ Section ProofSysFstat.
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
       iIntros (CID21 Hs21 mg) "[%Hcsg %Hmga0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj C b lks
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").

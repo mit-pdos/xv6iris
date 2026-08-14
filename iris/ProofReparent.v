@@ -603,7 +603,7 @@ Section ProofReparentLoop.
       (ps : list (mword 64)) (dqi : dfrac)
       (vra vs0 vs1 vs2 vs3 vs4 : mword 64)
       (vs5 vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     length γs = NPROC ->
     length ps = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
@@ -615,7 +615,7 @@ Section ProofReparentLoop.
       ∀ Mexit : regfile,
         ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
         sie_cap_gpr Mexit av b pme -∗
-        cpu_own lvl eb pme C b -∗
+        cpu_own lvl eb pme C b lks -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
         rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
         (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -624,7 +624,7 @@ Section ProofReparentLoop.
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜rpl_regs M spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       sie_cap_gpr M av b pme -∗
-      cpu_own lvl eb pme C b -∗
+      cpu_own lvl eb pme C b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
       rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -642,14 +642,14 @@ Section ProofReparentLoop.
                      ∀ Mexit : regfile,
                        ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
                        sie_cap_gpr Mexit av b pme -∗
-                       cpu_own lvl eb pme C b -∗
+                       cpu_own lvl eb pme C b lks -∗
                        kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
                        rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                        parents_own (rp_map pv ip ps) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pme -∗
-                   cpu_own lvl eb pme C b -∗
+                   cpu_own lvl eb pme C b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -667,7 +667,7 @@ Section ProofReparentLoop.
                  ∀ Mt : regfile,
                    ⌜ rpl_regs Mt spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                    sie_cap_gpr Mt av b pme -∗
-                   cpu_own lvl eb pme C b -∗
+                   cpu_own lvl eb pme C b lks -∗
                    pc_is (mword_of_int (KernelSyms.reparent + 0x2c)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -1034,8 +1034,8 @@ Section ProofReparent.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
-      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b.
+      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b lks.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
     intros pcE pv rettgt HK Hdom Hlen Hlvl.
@@ -1059,7 +1059,7 @@ Section ProofReparent.
                   (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5))
                   (m !!! Regidx (mword_of_int 25 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5))
                   (m !!! Regidx (mword_of_int 27 : mword 5))
-                  lvl (K - 6)%nat eb C b
+                  lvl (K - 6)%nat eb C b lks
                   Hlen Hpslen Hlvl ltac:(unfold K_reparent in HK; lia)
                   with "Hpinv Hpanic") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").

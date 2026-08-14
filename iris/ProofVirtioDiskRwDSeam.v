@@ -90,12 +90,12 @@ Section ProofVirtioDiskRwDSeam.
   (* (h,m2,t) and the [int idx[3]] local survive for P6's [free_chain];     *)
   (* the two untouched descriptor-slot remainders come back with them.      *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p4_exit (CID0 : CPU) (γk : gname) 
+  Definition vdrw_p4_exit (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
-      (kq : nat * positive) : iProp Σ :=
+      (kq : nat * positive) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (q np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat) pin,
@@ -114,7 +114,7 @@ Section ProofVirtioDiskRwDSeam.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false -∗
+       cpu_own 1 eb (proc_addr j) C false lks -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
@@ -129,11 +129,11 @@ Section ProofVirtioDiskRwDSeam.
        WP (Loop : expr riscv_lang)))%I.
 
   (* [P3.vdrw_p3_exit] plus the triple-disjointness conjunct (see above). *)
-  Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname) 
+  Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
-      (m0 : regfile) : iProp Σ :=
+      (m0 : regfile) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
      ∀ (M : regfile) (np nr : nat) (fl pk : gmap nat dclaim)
        (tr : gmap nat (nat * nat * nat)) (fr : nat -> bool) (h m2 t : nat),
@@ -146,7 +146,7 @@ Section ProofVirtioDiskRwDSeam.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false -∗
+       cpu_own 1 eb (proc_addr j) C false lks -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
@@ -164,7 +164,7 @@ Section ProofVirtioDiskRwDSeam.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (m0 : regfile) (kq : nat * positive) :
+      (m0 : regfile) (kq : nat * positive) (lks : gset nat) :
     (uint bno < 2147483648)%Z ->
     length bs_buf = 1024%nat ->
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
@@ -178,8 +178,8 @@ Section ProofVirtioDiskRwDSeam.
        the sector arithmetic lands on. *)
     perm_pend (dn_perm γd) kq (vdrwd_wr wr (1024 * uint bno)%Z bs_buf) -∗
     vdrw_p4_exit CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
-                 bs_buf bs_disk m0 kq -∗
-    vdrw_p3_exit_x CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0.
+                 bs_buf bs_disk m0 kq lks -∗
+    vdrw_p3_exit_x CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0 lks.
   Proof.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".

@@ -1674,7 +1674,7 @@ Section KernelvecHandler.
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
-              (kv_m2 Me) (46 + av) p emp%I pc0 sc tv
+              (kv_m2 Me) (46 + av) p emp%I pc0 sc tv ∅
               Hgs ltac:(unfold kerneltrap_stack; lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
     { rewrite /cpu_own. iFrame "Hcpu". }

@@ -126,7 +126,7 @@ Definition wp_iunlockput_sconf_body
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -151,7 +151,7 @@ Definition wp_iunlockput_sconf_body
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
@@ -203,7 +203,7 @@ Definition wp_iunlockput_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -249,7 +249,7 @@ Definition wp_iunlockput_gen_body
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -277,7 +277,7 @@ Definition wp_iunlockput_gen_body
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
@@ -336,7 +336,7 @@ Definition wp_iunlockput_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -380,11 +380,11 @@ Module Type IUNLOCKPUT.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb C b.
+                               pidv dq dqb dqs m K eb C b lks.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness and at the birth epoch [LogInv.log_opS_named] opens. *)
@@ -406,9 +406,9 @@ Module Type IUNLOCKPUT.
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb C b.
+                             crz e0 pidv dq dqb dqs m K eb C b lks.
 End IUNLOCKPUT.

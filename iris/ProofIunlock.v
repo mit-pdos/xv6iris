@@ -122,12 +122,12 @@ Section ProofIunlockMain.
       (cn : ic_names) (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) : iProp Σ :=
+      (b : bool) (lks : gset nat) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b p -∗
-        cpu_own 0 eb p C b -∗
+        cpu_own 0 eb p C b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid p ↦₄{dq} pidv -∗
         inode_shr k s dev inum -∗
@@ -143,9 +143,9 @@ Section ProofIunlockMain.
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p C b.
+                            dn' bm' pidv dq m K eb p C b lks.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
     intros pcE ip ret_tgt HK Hk Ha0.
@@ -158,7 +158,7 @@ Section ProofIunlockMain.
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
     iEval (rewrite Hipe) in "Hvalid".
-    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p C b)%I
+    iAssert (iul_cont (CID0 := CID)  cn k s g dev inum pidv dq m K eb p C b lks)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     iPoseProof (iui2_00 with "Htext") as "Hi00".
     iPoseProof (iui2_02 with "Htext") as "Hi02".
@@ -366,7 +366,7 @@ Section ProofIunlockMain.
     assert (HR6thr : iul_thr m R6).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /R6 upd_ne; [| regne]. exact (HR5thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID CID11 0%nat eb p C b
+   iDestruct (cpu_own_transport CID CID11 0%nat eb p C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -504,7 +504,7 @@ Section ProofIunlockMain.
     assert (HR9thr : iul_thr m R9).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /R9 upd_ne; [| regne]. exact (HR8thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID12 CID17 0%nat eb p C b
+    iDestruct (cpu_own_transport CID12 CID17 0%nat eb p C b lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -744,7 +744,7 @@ Section ProofIunlockMain.
     assert (Cs11 : P5 !!! Regidx (mword_of_int 27 : mword 5)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; iuidx).
-    iDestruct (cpu_own_transport CID18 CID24 0%nat eb p C b
+    iDestruct (cpu_own_transport CID18 CID24 0%nat eb p C b lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iul_cont.
     iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].

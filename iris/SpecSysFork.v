@@ -94,14 +94,14 @@ Definition wp_sys_fork_sconf_body
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
     (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (b : bool) (pid : mword 32) (V : pprivate) :=
+    (b : bool) (pid : mword 32) (V : pprivate) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_sys_fork <= av)%nat ->
   (* propagates to kfork's own nesting bound *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   sie_cap_gpr m av b p -∗
-  cpu_own lvl eb p C b -∗
+  cpu_own lvl eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv γs -∗
@@ -116,7 +116,7 @@ Definition wp_sys_fork_sconf_body
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own lvl eb p C b -∗
+      cpu_own lvl eb p C b lks -∗
       pc_is ret_tgt -∗
       (* the caller's block comes back verbatim: kfork only reads it *)
       proc_priv γf p pid V -∗
@@ -137,7 +137,7 @@ Module Type SYSFORK.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (b : bool) (pid : mword 32) (V : pprivate),
+      (b : bool) (pid : mword 32) (V : pprivate) (lks : gset nat),
       wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-                             m lvl av eb p C b pid V.
+                             m lvl av eb p C b pid V lks.
 End SYSFORK.

@@ -90,7 +90,7 @@ Section ProofSysFork.
       (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool) (pid : mword 32) (V : pprivate)
     : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-                             m lvl av eb p C b pid V.
+                             m lvl av eb p C b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl.

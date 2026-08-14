@@ -368,8 +368,8 @@ Section ProofUartPutc.
   (* =================================================================== *)
   Lemma wp_uartputc_sconf (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (p : mword 64)
-    : wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p.
+      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat)
+    : wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
     intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hn.
@@ -510,7 +510,7 @@ Section ProofUartPutc.
     iDestruct (cpu_own_transport CID CIDp9 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p C (K - 4)%nat b
-              Hn Hav with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
+              _ Hn Hav with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
     { iEval (rewrite HG14a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hret14 : ret_pc (G14 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x18))

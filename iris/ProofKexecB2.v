@@ -638,7 +638,7 @@ Section KexecB2Body.
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
       (m Mt : regfile) (K : nat) (C : iProp Σ)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
-      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) :
+      (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset nat) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok cov logstart ->
@@ -670,7 +670,7 @@ Section KexecB2Body.
     um_below szf P.(ud_um) ->
     um_covered szf P.(ud_um) ->
     sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true -∗
+    cpu_own 0 true (proc_addr jp) C true lks -∗
     kernel_text -∗
     panic_wp_any -∗
     pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
@@ -704,7 +704,7 @@ Section KexecB2Body.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) C true -∗
+          cpu_own 0 true (proc_addr jp) C true lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1187,7 +1187,7 @@ Section KexecB2Loops.
       (m : regfile) (K : nat) (C : iProp Σ)
       (sp0 ra0 s00 s10 s20 pv av w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
-      (ip : nat) (va : mword 64) (fz po : Z) :
+      (ip : nat) (va : mword 64) (fz po : Z) (lks : gset nat) :
     (K_kexec <= K)%nat ->
     (kf < NINODE)%nat ->
     log_geom_ok cov logstart ->
@@ -1233,7 +1233,7 @@ Section KexecB2Loops.
     Ml !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) ->
     Ml !!! Regidx Rs11 = (mword_of_int 56 : mword 64) ->
     sie_cap_gpr Ml (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true -∗
+    cpu_own 0 true (proc_addr jp) C true lks -∗
     kernel_text -∗
     panic_wp_any -∗
     pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
@@ -1258,7 +1258,7 @@ Section KexecB2Loops.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) C true -∗
+          cpu_own 0 true (proc_addr jp) C true lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1288,7 +1288,7 @@ Section KexecB2Loops.
           Mx !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) /\
           Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64)⌝ -∗
         sie_cap_gpr Mx (K - 68)%nat true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true -∗
+        cpu_own 0 true (proc_addr jp) C true lks -∗
         pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
         kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
                 used2 kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
@@ -1303,7 +1303,7 @@ Section KexecB2Loops.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true -∗
+              cpu_own 0 true (proc_addr jp) C true lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1660,7 +1660,7 @@ Section KexecB2Loops.
                  (forall r : mword 5, is_cs_idx r = true -> r <> Rs2 ->
                     Md !!! Regidx r = Ml !!! Regidx r)⌝ -∗
                sie_cap_gpr Md (K - 68)%nat true (proc_addr jp) -∗
-               cpu_own (CID := CIDd) 0 true (proc_addr jp) C true -∗
+               cpu_own (CID := CIDd) 0 true (proc_addr jp) C true lks -∗
                pc_is (mword_of_int (KXB + 0xda) : mword 64) -∗
                WP (Loop : expr riscv_lang))%I
       with "[Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv
@@ -2121,7 +2121,7 @@ Section KexecB2Loops.
                   gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                   nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
                   pfun na avf alen aslen afun pidv V dqb dqs dqa m M2 K C
-                  sp0 ra0 s00 s10 s20 pv av w67 ef P w65
+                  sp0 ra0 s00 s10 s20 pv av w67 ef P w65 lks
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                   Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2
                   ltac:(rewrite (HM2get csp_rs1 ltac:(vm_compute; reflexivity)

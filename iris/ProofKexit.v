@@ -371,7 +371,7 @@ Section KexitLoop.
   Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId}
        (γft γf : gname) (fn : fclose_names)
       (j : nat) (pid : mword 32) (sv : mword 64) (cwdv : mword 64)
-      (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     let pj := proc_addr j in
     (j < NPROC)%nat ->
     fcn_j fn = j ->
@@ -399,7 +399,7 @@ Section KexitLoop.
         ⌜ pv_ofile Vx = replicate NOFILE (zero_reg : mword 64) ⌝ -∗
         ⌜ pv_cwd Vx = cwdv ⌝ -∗
         sie_cap_gpr Mx av b pj -∗
-        cpu_own 0 eb pj C b -∗
+        cpu_own 0 eb pj C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (mword_of_int (KX + 0x4c)) -∗
@@ -410,7 +410,7 @@ Section KexitLoop.
     ∀ (fd : nat) (M : regfile) (V : pprivate),
       ⌜(fd < NOFILE)%nat⌝ -∗ ⌜kxl_regs M pj sv fd⌝ -∗ ⌜kx_nulled cwdv fd V⌝ -∗
       sie_cap_gpr M av b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       (* IN and OUT: kexit still needs the pair past the loop, for
          begin_op / iput / end_op, and at [eb = false] fileclose is the only
          thing that can re-index it. *)
@@ -435,7 +435,7 @@ Section KexitLoop.
                        ⌜ pv_ofile Vx = replicate NOFILE (zero_reg : mword 64) ⌝ -∗
                        ⌜ pv_cwd Vx = cwdv ⌝ -∗
                        sie_cap_gpr Mx av b pj -∗
-                       cpu_own 0 eb pj C b -∗
+                       cpu_own 0 eb pj C b lks -∗
                        trap_csrs_ext eb -∗
                        cpu_claim_ext eb pj -∗
                        pc_is (mword_of_int (KX + 0x4c)) -∗
@@ -444,7 +444,7 @@ Section KexitLoop.
                        (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pj -∗
-                   cpu_own 0 eb pj C b -∗
+                   cpu_own 0 eb pj C b lks -∗
                    trap_csrs_ext eb -∗
                    cpu_claim_ext eb pj -∗
                    pc_is (mword_of_int (KX + 0x3e)) -∗
@@ -468,7 +468,7 @@ Section KexitLoop.
                  ∀ (Mt : regfile) (Vt : pprivate),
                    ⌜ kxl_regs Mt pj sv fd ⌝ -∗ ⌜ kx_nulled cwdv (S fd) Vt ⌝ -∗
                    sie_cap_gpr Mt av b pj -∗
-                   cpu_own 0 eb pj C b -∗
+                   cpu_own 0 eb pj C b lks -∗
                    trap_csrs_ext eb -∗
                    cpu_claim_ext eb pj -∗
                    pc_is (mword_of_int (KX + 0x38)) -∗
@@ -796,7 +796,7 @@ Section KexitPark.
   Lemma kx_park `{GEN : GenId} `{CID0 : CpuId}
        (γf γw : gname) (γs : list gname)
       (j : nat) (γl : gname) (ip sv : mword 64) (dqi : dfrac)
-      (M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
       (pid : mword 32) (V : pprivate) :
     let pj := proc_addr j in
     (j < NPROC)%nat ->
@@ -806,7 +806,7 @@ Section KexitPark.
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
     sie_cap_gpr M av b pj -∗
-    cpu_own 0 eb pj C b -∗
+    cpu_own 0 eb pj C b lks -∗
     (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE.  The park is
        what needs it: sched's crossing takes [trap_csrs] and [cpu_claim]
        UNCONDITIONALLY, and the [acquire(&p->lock)] below mints them only at
@@ -1347,7 +1347,7 @@ Section KexitRest.
       (bmapstart inodestart : Z) (nib : nat) (size : Z) (us : gset Z)
       (dqb dqs : dfrac)
       (ip sv : mword 64) (dqi : dfrac)
-      (M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
       (pid : mword 32) (V : pprivate) :
     let pj := proc_addr j in
     (j < NPROC)%nat ->
@@ -1370,7 +1370,7 @@ Section KexitRest.
        ~ (IBLOCK inum inodestart ∈ log_region_set logstart)) ->
     cov_below cov size ->
     sie_cap_gpr M av b pj -∗
-    cpu_own 0 eb pj C b -∗
+    cpu_own 0 eb pj C b lks -∗
     (* THREADED, not framed: begin_op / iput / end_op all take the complement
        and give it back, and all three cross at the literal [true]. *)
     trap_csrs_ext eb -∗
@@ -1459,7 +1459,7 @@ Section KexitRest.
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn γ γfs cov logstart dev
-              pid (DfracOwn (1/4)) Q0 av eb C b
+              pid (DfracOwn (1/4)) Q0 av eb C b lks
               ltac:(unfold K_begin_op; lia) Hj Hgl
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hlog Hpidq Hprocs").
     iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpidq Hop".
@@ -1523,7 +1523,7 @@ Section KexitRest.
     iApply (Iput.wp_iput_sconf (CID := CID4) γs j γl γu γd γk pd pav pu bn γ γfs
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
-              Q2 av eb C b
+              Q2 av eb C b lks
               ltac:(unfold K_iput; lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
@@ -1569,7 +1569,7 @@ Section KexitRest.
     iDestruct (cpu_claim_ext_transport CID5 CID6 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb C b
+              cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb C b lks
               ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
@@ -1612,7 +1612,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID7 CID8 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
-    iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av eb C b pid
+    iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av eb C b lks pid
               (upd_cwd V (zero_reg : mword 64))
               Hj Hgl ltac:(lia)
               ltac:(split; [exact Heo_s3 | split; [exact Heo_s4 | intro r; apply rf_to_gmap_dom]])
@@ -1645,12 +1645,12 @@ Section ProofKexit.
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
       (pid : mword 32) (V : pprivate)
     : wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
                           γi cn γtl bmapstart inodestart nib size dqb dqs us
-                          on fn m av eb C b pid V.
+                          on fn m av eb C b lks pid V.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
     intros pcE pj Hfn Hj Hgl HK Hgeom. subst fn.
@@ -1954,7 +1954,7 @@ Section ProofKexit.
                        cov logstart dev pid (DfracOwn (1/4))
                        γi cn γtl bmapstart inodestart nib size dqb dqs) j pid
                     (m !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwd V)
-                    (av - 6)%nat eb C b Hj eq_refl eq_refl eq_refl
+                    (av - 6)%nat eb C b lks Hj eq_refl eq_refl eq_refl
                     ltac:(unfold fileclose_stack, K_iput; lia)
                     with "Htext Hft Hpanic") as "Hloop".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hframe]").
@@ -1969,7 +1969,7 @@ Section ProofKexit.
         iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart dev γi cn γtl bmapstart inodestart nib size usx
                   dqb dqs ip (m !!! Regidx (mword_of_int 10 : mword 5)) dqi
-                  Mx (av - 6)%nat eb C b pid Vx
+                  Mx (av - 6)%nat eb C b lks pid Vx
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
                   with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hpanic Hwl

@@ -107,7 +107,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   γs !! j = Some γl ->
   (20 <= av)%nat ->
   sie_cap_gpr m av eb pj -∗
-  cpu_own 0 eb pj C eb -∗
+  cpu_own 0 eb pj C eb ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -117,7 +117,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av eb pj -∗
-      cpu_own 0 eb pj C eb -∗
+      cpu_own 0 eb pj C eb ∅ -∗
       pc_is ret_tgt -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗

@@ -63,9 +63,9 @@ Section WpIntrOff.
 
   Lemma wp_intr_off_lvl0_s_sconf
       (pc : mword 64) (b : bool) (p : mword 64)
-      (m : regfile) (n : nat) (C : iProp Σ) :
+      (m : regfile) (n : nat) (C : iProp Σ) (lks : gset nat) :
     sie_cap_gpr m n b p -∗
-    cpu_own 0%nat b p C b -∗
+    cpu_own 0%nat b p C b lks -∗
     trap_csrs_ext b -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
@@ -73,7 +73,7 @@ Section WpIntrOff.
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m (trap_res b + n)%nat false p -∗
-      cpu_own 0%nat false p C false -∗
+      cpu_own 0%nat false p C false lks -∗
       trap_csrs -∗
       (* THE RUNNING CLAIM, on the same two-sided split as [trap_csrs_ext]
          above but in the OTHER direction: at [b = true] the dismantled arm

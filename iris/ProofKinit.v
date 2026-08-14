@@ -47,8 +47,8 @@ Section ProofKinit.
   Lemma wp_kinit_sconf
       (m : regfile)
       (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ)
-      (vlock : bv 32) (vname vcpu : bv 64) (b : bool)
-    : wp_kinit_sconf_body m ps K ncnt eb pcur C vlock vname vcpu b.
+      (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset nat)
+    : wp_kinit_sconf_body m ps K ncnt eb pcur C vlock vname vcpu b lks.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
     intros pcE ret_tgt lk fl c_name c_cpu endaddr phystop s1entry
@@ -322,7 +322,7 @@ Section ProofKinit.
        panic_wp_any with it"); [SpecKinit.wp_kinit_sconf_body] now threads the
        same [panic_wp_any] (that sweep missed this one contract -- fixed
        above), so "Hpanic" hands it straight through with no conversion. *)
-    iApply (Freerange.wp_freerange_sconf γl γk lk fl R12 ps (K - 2) ncnt eb pcur C b
+    iApply (Freerange.wp_freerange_sconf γl γk lk fl R12 ps (K - 2) ncnt eb pcur C b lks
               ltac:(lia) Hncnt
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun)

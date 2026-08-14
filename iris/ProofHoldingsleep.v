@@ -68,8 +68,8 @@ Section ProofHoldingsleep.
 
   Lemma wp_holdingsleep_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool)
-    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset nat)
+    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Hav.

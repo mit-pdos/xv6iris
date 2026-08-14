@@ -111,7 +111,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
     (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
     (n : nat) (eb : bool) (C : iProp Σ) (dqf : dfrac)
-    (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) :=
+    (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.printk in
@@ -131,7 +131,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
      the [noff] headroom the callees want is [n + 2], not [n + 1]. *)
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   sie_cap_gpr m0 K b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   fmt ↦ₛ{ dqf } f -∗
@@ -148,7 +148,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr mf K b p -∗
-    cpu_own n eb p C b -∗
+    cpu_own n eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0
       /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
@@ -164,6 +164,6 @@ Module Type PRINTK.
       (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) {dqf : dfrac}
-      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64),
-      wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p.
+      (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset nat),
+      wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks.
 End PRINTK.

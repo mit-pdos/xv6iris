@@ -42,12 +42,27 @@ Import Defs.
    caller owes a refutation of the dead state [Dc] for each.  acquire disposes
    of nothing, so [Dc] merely rides along.  A static kernel lock instantiates
    at [Dc := False] ([wp_acquire_sconf_body] below). *)
-Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) :=
+Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
+  (* THE FRESHNESS PREMISE: this hart does not already hold a lock of this
+     rank.  It is what mints the held-set fragment.  Trivial at [lks = ∅],
+     which is most call sites.
+
+     IT DOES NOT YET KILL THE [if(holding(lk)) panic] ARM, and [panic_wp_any]
+     therefore STAYS in the contract.  The refutation needs the held-set
+     FRAGMENT ([WpLock.lk_cpu_frag]) in scope where [holding]'s read decides
+     [phi], and [WpSconfLock.wp_ld_lkcpu_lockopen_gen]'s view premise is
+     handed only [lock_auth γl st] and the caller's token -- not the
+     fragment, which is not persistent and would have to be borrowed and
+     returned inside the invariant open.  That leaf change plus a
+     [SpecHolding] variant concluding [a0 = 0] is a separate piece of work.
+     (Deadlock-freedom strengthens this to [locks_below lks (lock_rank s)]
+     in a later phase; it implies this one.) *)
+  lock_rank s ∉ lks ->
   (⊢ Tc -∗ Dc -∗ False) ->
   (* [∀ i : CPU], not pinned at the entry [cpu_id]: acquire's entry can be at
      [b = true] (the enabled arm forces [n = 0]), so "enter at CID with
@@ -59,9 +74,9 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
      [lock_refute_False] is already hart-generic. *)
   (forall i : CPU, ⊢ locked_pre γl i -∗ Dc -∗ False) ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  lock_openable γl lk0 R Dc -∗
+  lock_openable γl lk0 s R Dc -∗
   Tc -∗
   panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -94,19 +109,34 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C false -∗
+    cpu_own (S n) eb p C false ({[lock_rank s]} ∪ lks) -∗
     arm_pay n eb p -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) :=
+Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
+  (* THE FRESHNESS PREMISE: this hart does not already hold a lock of this
+     rank.  It is what mints the held-set fragment.  Trivial at [lks = ∅],
+     which is most call sites.
+
+     IT DOES NOT YET KILL THE [if(holding(lk)) panic] ARM, and [panic_wp_any]
+     therefore STAYS in the contract.  The refutation needs the held-set
+     FRAGMENT ([WpLock.lk_cpu_frag]) in scope where [holding]'s read decides
+     [phi], and [WpSconfLock.wp_ld_lkcpu_lockopen_gen]'s view premise is
+     handed only [lock_auth γl st] and the caller's token -- not the
+     fragment, which is not persistent and would have to be borrowed and
+     returned inside the invariant open.  That leaf change plus a
+     [SpecHolding] variant concluding [a0 = 0] is a separate piece of work.
+     (Deadlock-freedom strengthens this to [locks_below lks (lock_rank s)]
+     in a later phase; it implies this one.) *)
+  lock_rank s ∉ lks ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
   panic_wp_any -∗
@@ -139,19 +169,19 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C false -∗
+    cpu_own (S n) eb p C false ({[lock_rank s]} ∪ lks) -∗
     arm_pay n eb p -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type ACQUIRE_GEN.
   Parameter wp_acquire_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool),
-      wp_acquire_gen_sconf_body γl R Tc Dc m n eb p C av b.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat),
+      wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
 End ACQUIRE_GEN.
 
 Module Type ACQUIRE.
   Parameter wp_acquire_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool),
-      wp_acquire_sconf_body γl s R m n eb p C av b.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat),
+      wp_acquire_sconf_body γl s R m n eb p C av b lks.
 End ACQUIRE.

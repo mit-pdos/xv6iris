@@ -94,8 +94,8 @@ Section ProofClockintr.
   (* [eb = true].  At any [S _] level the match is [false] outright.        *)
   (* ================================================================== *)
   Local Lemma ci_outb_false (M : regfile) (av n : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr M av false p -∗ cpu_own n eb p C false -∗
+      (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr M av false p -∗ cpu_own n eb p C false lks -∗
     ⌜ (match n with O => eb | S _ => false end) = false ⌝.
   Proof.
     iIntros "Hcg Hcnt".
@@ -305,8 +305,8 @@ Section ProofClockintr.
   (* THE WHOLE FUNCTION.                                                 *)
   (* ================================================================== *)
   Lemma wp_clockintr_sconf  (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_clockintr_sconf_body γl γs m n eb p C av.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset nat)
+    : wp_clockintr_sconf_body γl γs m n eb p C av lks.
   Proof.
     cbv beta delta [wp_clockintr_sconf_body].
     intros pcE ret_tgt Hn Hav.
@@ -315,7 +315,7 @@ Section ProofClockintr.
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Htcap Htk Hcont".
     (* release's exit index, fixed once here (it is used only at the very end) *)
-    iDestruct (ci_outb_false m av n eb p C with "Hcg Hcnt") as %Hout.
+    iDestruct (ci_outb_false m av n eb p C lks with "Hcg Hcnt") as %Hout.
     (* ===================== PROLOGUE (16-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))

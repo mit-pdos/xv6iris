@@ -91,7 +91,7 @@ Import Defs.
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -99,7 +99,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   γs !! j = Some γl ->
   (20 <= av)%nat ->
   sie_cap_gpr m av eb pj -∗
-  cpu_own 0 eb pj C eb -∗
+  cpu_own 0 eb pj C eb lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -109,7 +109,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av eb pj -∗
-      cpu_own 0 eb pj C eb -∗
+      cpu_own 0 eb pj C eb lks -∗
       pc_is ret_tgt -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
@@ -165,7 +165,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
    do not prove that, we permit it. *)
 Definition wp_sleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -175,14 +175,14 @@ Definition wp_sleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (* the interior acquire reaches [S (S n)], transiently +1 *)
   (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   sie_cap_gpr m av false pj -∗
-  cpu_own (S n) eb pj C false -∗
+  cpu_own (S n) eb pj C false lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
   (∀ (mf : regfile),
      ⌜callee_saved m mf⌝ -∗
      sie_cap_gpr mf av false pj -∗
-     cpu_own (S n) eb pj C false -∗
+     cpu_own (S n) eb pj C false lks -∗
      pc_is ret_tgt -∗
      WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -191,11 +191,11 @@ Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_sconf_body γs j γl m av eb C.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat),
+      wp_sleep_sconf_body γs j γl m av eb C lks.
   Parameter wp_sleep_nested :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
-      wp_sleep_nested_body γs j γl m av eb C n.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat),
+      wp_sleep_nested_body γs j γl m av eb C n lks.
 End SLEEP.

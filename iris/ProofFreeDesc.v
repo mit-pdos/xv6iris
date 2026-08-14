@@ -512,8 +512,8 @@ Section ProofFreeDesc.
   Lemma wp_free_desc_sconf  (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool)
-    : wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b.
+      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset nat)
+    : wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
     intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl.
@@ -808,7 +808,7 @@ Section ProofFreeDesc.
                  with "Hcnt") as "Hcnt".
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15)  E2 γs
               pme lvl (K - 2)%nat eb C b
-              HKw HE2dom Hlen Hlvl
+              _ HKw HE2dom Hlen Hlvl
               with "Hcg Hcnt Htext Hpc Hpanic Hpi").
     iIntros (CIDw Hdw MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
     destruct HcsW as [HcsW HdomW].

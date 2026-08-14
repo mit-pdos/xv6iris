@@ -44,7 +44,7 @@ Definition wp_free_desc_sconf_body
      (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :=
+    (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.free_desc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_free_desc <= K)%nat ->
@@ -54,7 +54,7 @@ Definition wp_free_desc_sconf_body
   length γs = NPROC ->
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b -∗
+  cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗ procs_inv γs -∗
   (* the descriptor-page pointer cell: free_desc RE-READS [disk.desc] (twice)
@@ -72,7 +72,7 @@ Definition wp_free_desc_sconf_body
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
       sie_cap_gpr mf K b pme -∗
-      cpu_own lvl eb pme C b -∗
+      cpu_own lvl eb pme C b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       d_free_cell i ↦ₘ Z_to_bv 8 1 -∗
       d_desc pd i ↦₈ (zero_reg : mword 64) -∗
@@ -88,6 +88,6 @@ Module Type FREEDESC.
        (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool),
-      wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b.
+      (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset nat),
+      wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
 End FREEDESC.

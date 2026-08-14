@@ -379,8 +379,8 @@ Section ProofFetchstr.
   (* =================================================================== *)
   Lemma wp_fetchstr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool)
-    : wp_fetchstr_sconf_body γa γf m av n eb p C pid V maxn buf_olds b.
+      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset nat)
+    : wp_fetchstr_sconf_body γa γf m av n eb p C pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
     intros pcE buf ret_tgt Hn Hav Hmax Hmax31.
@@ -614,7 +614,7 @@ Section ProofFetchstr.
        may have moved us to a different one, so it must be transported before
        it can be fed to [myproc]'s own [cpu_own] premise. *)
     iDestruct (cpu_own_transport CID CID11 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p C b
+    iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p C b lks
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID12 Hk12 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -794,7 +794,7 @@ Section ProofFetchstr.
        can be supplied from [wp_fetchstr_sconf_body] as it stands. *)
     iDestruct (cpu_own_transport CID12 CID17 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Copyinstr.wp_copyinstr_sconf γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
-              (av - 6)%nat n eb p C b
+              (av - 6)%nat n eb p C b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
     iIntros (CID18 Hk18 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".

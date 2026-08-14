@@ -252,7 +252,7 @@ Section ProofCopyin.
   (*  vmfault's [read] constant out to s10, which the prologue saves.     *)
   (* ================================================================== *)
   Local Lemma ci_epilogue `{CID0 : CpuId}
-      (mm mj : regfile) (K ncnt : nat) (eb b : bool) (res sp0 pcur : mword 64) (C : iProp Σ) :
+      (mm mj : regfile) (K ncnt : nat) (eb b : bool) (res sp0 pcur : mword 64) (C : iProp Σ) (lks : gset nat) :
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 58 : mword 6))) in
     (12 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->
@@ -260,7 +260,7 @@ Section ProofCopyin.
     mj !!! Regidx Ra0 = res ->
     mj !!! Regidx Rs11 = mm !!! Regidx Rs11 ->
     sie_cap_gpr mj (K - 12) b pcur -∗
-    cpu_own ncnt eb pcur C b -∗
+    cpu_own ncnt eb pcur C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyin + 0x7c) : mword 64) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx Rra) -∗
@@ -278,7 +278,7 @@ Section ProofCopyin.
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
       sie_cap_gpr mf K b pcur -∗
-      cpu_own ncnt eb pcur C b -∗
+      cpu_own ncnt eb pcur C b lks -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       ⌜mf !!! Regidx Ra0 = res⌝ -∗
@@ -553,7 +553,7 @@ Section ProofCopyin.
       (spr cur va0 dst : mword 64) (rem done : nat) (P : uptd) (v11 : mword 64)
       (K lvl : nat) (eb : bool) (C : iProp Σ) (len : nat) (fd : nat -> bv 8)
       (EXIT : iProp Σ)
-      (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd) : iProp Σ :=
+      (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd) (lks : gset nat) : iProp Σ :=
     (⌜b = false \/ p = zero_reg -> (CIDb : CPU) = (CID0 : CPU)⌝ -∗
      ⌜uptd_ext_sz szv Pc Pd⌝ -∗
      ⌜mb !!! Regidx Ra0 = pa0⌝ -∗
@@ -569,7 +569,7 @@ Section ProofCopyin.
      ⌜mb !!! Regidx Rs10 = (mword_of_int 1 : mword 64)⌝ -∗
      ⌜mb !!! Regidx Rs11 = v11⌝ -∗
      sie_cap_gpr mb (K - 12) b p -∗
-     cpu_own lvl eb p C b -∗
+     cpu_own lvl eb p C b lks -∗
      pc_is (mword_of_int (KernelSyms.copyin + 0x30) : mword 64) -∗
      page_own pa0 -∗
      (page_own pa0 -∗ proc_pt Pd) -∗
@@ -583,7 +583,7 @@ Section ProofCopyin.
   Local Lemma ci_loop `{CID0 : CpuId} (γa : gname)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dst spr : mword 64) (len : nat) (b : bool)
-      (v11 : mword 64) :
+      (v11 : mword 64) (lks : gset nat) :
     (50 <= K)%nat ->
     (Z.of_nat len < 2 ^ 64)%Z ->
     (uint szv <= 2 ^ 38)%Z ->
@@ -602,7 +602,7 @@ Section ProofCopyin.
     m !!! Regidx Rs10 = (mword_of_int 1 : mword 64) ->
     m !!! Regidx Rs11 = v11 ->
     sie_cap_gpr m (K - 12) b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyin + 0x5a) : mword 64) -∗
     proc_pt Pc -∗
@@ -616,7 +616,7 @@ Section ProofCopyin.
       ⌜res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr mj (K - 12) b p -∗
-      cpu_own lvl eb p C b -∗
+      cpu_own lvl eb p C b lks -∗
       pc_is (mword_of_int (KernelSyms.copyin + 0x7c) : mword 64) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ g j) -∗
@@ -646,7 +646,7 @@ Section ProofCopyin.
       ⌜res = (mword_of_int 0 : mword 64) \/ res = (mword_of_int (-1) : mword 64)⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr mj (K - 12) b p -∗
-      cpu_own lvl eb p C b -∗
+      cpu_own lvl eb p C b lks -∗
       pc_is (mword_of_int (KernelSyms.copyin + 0x7c) : mword 64) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ g j) -∗
@@ -678,7 +678,7 @@ Section ProofCopyin.
     (* ================================================================ *)
     iAssert (∀ (CIDb : CpuId) (mb : regfile) (pa0 : mword 64) (Pd : uptd),
         ci_chunk_body b p CID0 szv Pc spr cur va0 dst rem done P v11 K lvl eb C
-          len fd EXIT CIDb mb pa0 Pd)%I with "[]" as "CHUNK".
+          len fd EXIT CIDb mb pa0 Pd lks)%I with "[]" as "CHUNK".
     { iIntros (CIDb mb pa0 Pd) "%Hanchorb %Hextd %Hba0 %Hbsp %Hbs2 %Hbs3 %Hbs4 %Hbs5 %Hbs6
                             %Hbs7 %Hbs8 %Hbs9 %Hbs10 %Hbs11
                             Hcg Hcnt Hpc Hpg Hback Hdst HEXIT".
@@ -1377,8 +1377,8 @@ Section ProofCopyin.
   Lemma wp_copyin_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p C b.
+      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_copyin_sconf_body γa mm P szv len dst_olds K lvl eb p C b lks.
   Proof.
     cbv beta delta [wp_copyin_sconf_body].
     intros pcE dst ret_tgt HK Hroot Hsza1 Hlenr Hlen64 Hszb Hlvl.
@@ -1735,14 +1735,14 @@ Section ProofCopyin.
     iDestruct (cpu_own_transport CID CIDp21 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (ci_loop (CID0 := CIDp21) γa P szv K lvl eb p C dst spr len b
-              (mm !!! Regidx Rs11)
+              (mm !!! Regidx Rs11) lks
               HK Hlen64 Hszb Hlvl len 0%nat len P R10 dst_olds
               HL1 HL2 HL3 (uptd_ext_sz_refl szv P)
               HR10sp HR10s4 HR10s5 HR10s6 HR10s7 HR10s8 HR10s9 HR10s10 HR10s11
               with "Hcg Hcnt Htext Hpc Hpt Henv Hdst").
     iIntros (CIDl Hsl mj res P' g) "%Hjsp %Hjs11 %Hja0 %Hres %Hjext
                             Hcg Hcnt Hpc Hpt Hdst".
-    iApply (ci_epilogue (CID0 := CIDl) mm mj K lvl eb b res sp0 p C
+    iApply (ci_epilogue (CID0 := CIDl) mm mj K lvl eb b res sp0 p C lks
               ltac:(lia) ltac:(reflexivity)
               Hjsp Hja0 Hjs11
               with "Hcg Hcnt Htext Hpc Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12").

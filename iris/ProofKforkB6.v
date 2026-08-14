@@ -233,7 +233,7 @@ Section KforkPrologue.
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
-      (R : iProp Σ) :
+      (R : iProp Σ) (lks : gset nat) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
     let ra0 : mword 64 := m !!! Regidx Rra in
     let s00 : mword 64 := m !!! Regidx Rs0 in
@@ -242,7 +242,7 @@ Section KforkPrologue.
     (K_kfork <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     sie_cap_gpr m K b pme -∗
-    cpu_own lvl eb pme C b -∗
+    cpu_own lvl eb pme C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
     panic_wp_any -∗
@@ -275,7 +275,7 @@ Section KforkPrologue.
            [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
            lets a proof drop it silently, which is exactly how it went
            missing from this continuation the first time. *)
-        cpu_own lvl eb pme C b -∗
+        cpu_own lvl eb pme C b lks -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
@@ -339,7 +339,7 @@ Section KforkPrologue.
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false -∗
+        cpu_own (S lvl) eb pme C false lks -∗
         kalloc_env γa None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -410,7 +410,7 @@ Section KforkPrologue.
                 either way, hence convertible, and [iApply] bridges them. *)
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false -∗
+        cpu_own (S lvl) eb pme C false lks -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
@@ -683,7 +683,7 @@ Section KforkPrologue.
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
-      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b lks
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
@@ -1282,7 +1282,7 @@ Section KforkPrologue.
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
-      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b lks
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".

@@ -194,8 +194,8 @@ Section ProofFilestat.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b.
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb.
@@ -395,7 +395,7 @@ Section ProofFilestat.
     iDestruct (cpu_own_transport CID CID9 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj C b
-              fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
+              _ fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
     iIntros (CID10 Hs10 ms P0) "%Hms Hcg Hcnt Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
     assert (Hpc14 : ret_pc (R5 !!! Regidx Rra) = mword_of_int (FST + 0x14))
@@ -695,7 +695,7 @@ Section ProofFilestat.
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
                 Q3 (K - 10)%nat eb C b
-                (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                (_ fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                       Hslk Hshr Hsb Hppid Hprocs

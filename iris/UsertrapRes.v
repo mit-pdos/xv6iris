@@ -138,7 +138,7 @@ Section UsertrapRes.
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1))%I.
 
   Definition ut_trap (pj : mword 64) (ksp : mword 64) (av : nat)
-      (C : iProp Σ) : iProp Σ :=
+      (C : iProp Σ) (lks : gset nat) : iProp Σ :=
     (ut_stack ksp av ∗
      (* the translation slot, in its KPT arm: THE KERNEL PAGE TABLE, on the
         SHARED tier ([KptShare.tlb_res_pt] inside), which is the whole point
@@ -148,7 +148,7 @@ Section UsertrapRes.
      strans_bit strans_bit_kpt ∗
      sconf_priv_closer ∗
      ut_ghosts ∗
-     cpu_own 0%nat false pj C false ∗
+     cpu_own 0%nat false pj C false lks ∗
      (* the running claim.  It is what [SpecYield] / [SpecKexit] want as
         [cpu_claim_ext false pj], and the trap is where it comes from. *)
      cpu_claim pj)%I.
@@ -177,7 +177,7 @@ Section UsertrapRes.
      coming out here because usertrap READS them (scause three times, sepc
      once, stval twice) before ever folding them away. *)
   Lemma ut_trap_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
-      (m : regfile) (ms : mword 64) :
+      (m : regfile) (ms : mword 64) (lks : gset nat) :
     sconf_ms_facts ms ->
     eq_vec (_get_Mstatus_SIE ms) ('b"1") = false ->
     eq_vec (_get_Mstatus_SPP ms) ('b"1") = false ->
@@ -188,9 +188,9 @@ Section UsertrapRes.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms -∗
     gpr_file m -∗
-    ut_trap pj ksp av C -∗
+    ut_trap pj ksp av C lks -∗
       sie_cap_gpr m av false pj ∗
-      cpu_own 0%nat false pj C false ∗
+      cpu_own 0%nat false pj C false lks ∗
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       strans_bit strans_bit_kpt ∗
@@ -529,7 +529,7 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   Definition ut_res (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
+    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ) (lks : gset nat),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
           This equation is the whole reason R is keyed on [pt]: it is what
           lets userret install [MAKE_SATP(p->pagetable)] and know it is the
@@ -539,7 +539,7 @@ Section UsertrapRes.
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
-       ut_trap (un_pj N) ksp av C ∗
+       ut_trap (un_pj N) ksp av C lks ∗
        ut_env Rsys N V)%I.
 
   (* ------------------------------------------------------------------- *)
@@ -674,8 +674,8 @@ Section UsertrapRes.
      +0xa6 is reached at [true] from the syscall arm and at [false] from the
      other four. *)
   Definition ut_hold (Rsys : gname -> mword 64 -> iProp Σ)
-      (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) : iProp Σ :=
-    (cpu_own 0%nat b (un_pj N) C b ∗
+      (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
+    (cpu_own 0%nat b (un_pj N) C b lks ∗
      trap_csrs_ext b ∗
      cpu_claim_ext b (un_pj N) ∗
      ut_env Rsys N V)%I.
@@ -709,9 +709,9 @@ Section UsertrapRes.
      [cpu_own 0 false pj C false] IS the two of them beside the caller's own
      frame.  ProofScheduler's [sc_flip_pre] is the same lemma at [C = emp];
      this one is [C]-generic because usertrap's frame is a parameter. *)
-  Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) :
-    cpu_own 0%nat false pj C false -∗
-    intr_count 0 false ∗ cpu_priv 0 true pj ∗ C.
+  Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) (lks : gset nat) :
+    cpu_own 0%nat false pj C false lks -∗
+    intr_count 0 false ∗ cpu_priv 0 true pj lks ∗ C.
   Proof.
     rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
     iIntros "((((_ & Hn & Hi & Hp) & Hl) & Hc) & HC)".
@@ -767,12 +767,12 @@ Lemma ut_hold_transport
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> iProp Σ)
-    (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) :
+    (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset nat) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-  ut_hold (CID := CID0) Rsys N V C b -∗ ut_hold (CID := CID1) Rsys N V C b.
+  ut_hold (CID := CID0) Rsys N V C b lks -∗ ut_hold (CID := CID1) Rsys N V C b lks.
 Proof.
   intros Heq. rewrite /ut_hold. iIntros "(Hcpu & Hcsrs & Hclm & Henv)".
-  iDestruct (cpu_own_transport CID0 CID1 0%nat b (un_pj N) C b Heq
+ iDestruct (cpu_own_transport CID0 CID1 0%nat b (un_pj N) C b  Heq
                with "Hcpu") as "$".
   iDestruct (trap_csrs_ext_transport CID0 CID1 b (un_pj N) Heq
                with "Hcsrs") as "$".

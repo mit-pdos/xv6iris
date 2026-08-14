@@ -94,7 +94,7 @@ Section ProofUvmcreate.
   (*  the "with" clause supplies at each call site. *)
   Local Lemma uvc_htail `{CID0 : CpuId}
       (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (on : option nat) (b : bool)
+      (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
       (Mt : regfile) (rv sp0 : mword 64) (v4 : bv 64) :
     (4 <= K)%nat ->
     Mt !!! Regidx csp_rs1 = add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) ->
@@ -104,7 +104,7 @@ Section ProofUvmcreate.
        Mt !!! Regidx r = mm !!! Regidx r) ->
     mm !!! Regidx csp_rs1 = sp0 ->
     sie_cap_gpr Mt (K - 4)%nat b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.uvmcreate + 0x1a)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -115,7 +115,7 @@ Section ProofUvmcreate.
     wp_next b p (fun (CID : CpuId) =>
       ∀ mr : regfile,
       sie_cap_gpr mr K b p -∗
-      cpu_own lvl eb p C b -∗
+      cpu_own lvl eb p C b lks -∗
       pc_is (ret_pc (mm !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ⌜ callee_saved mm mr ⌝ -∗
       uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4)) (mr !!! Regidx (mword_of_int 10)) -∗
@@ -271,8 +271,8 @@ Section ProofUvmcreate.
 
   Lemma wp_uvmcreate_sconf (γa : gname)
       (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (on : option nat) (b : bool)
-    : wp_uvmcreate_sconf_body γa mm lvl K eb p C on b.
+      (on : option nat) (b : bool) (lks : gset nat)
+    : wp_uvmcreate_sconf_body γa mm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_uvmcreate_sconf_body].
     intros ret_tgt Hlvl HK Hcid.
@@ -409,7 +409,7 @@ Section ProofUvmcreate.
                  with "Hcnt") as "Hcnt".
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               J on lvl eb p C (K - 4)%nat b
-              Hc14
+              _ Hc14
               ltac:(reflexivity)
               Hlvl
               with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
@@ -477,7 +477,7 @@ Section ProofUvmcreate.
          either mentioning [cpu_own] -- transport it across both hops. *)
       iDestruct (cpu_own_transport CID7 CID9 lvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (uvc_htail γa mm lvl K eb p C on b M1 root0 sp0 v4
+      iApply (uvc_htail γa mm lvl K eb p C on b lks M1 root0 sp0 v4
                 Hc4 HM1sp HM1s1 HM1rest ltac:(reflexivity)
                 with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Havail2]").
       { rewrite /uvmcreate_post. iLeft.
@@ -611,7 +611,7 @@ Section ProofUvmcreate.
        hart memset's own [wp_next] resumed on. *)
     iDestruct (cpu_own_transport CID7 CID13 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (uvc_htail γa mm lvl K eb p C on b mfin (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) sp0 v4
+    iApply (uvc_htail γa mm lvl K eb p C on b lks mfin (zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12))) sp0 v4
               Hc4 Hfsp Hfs1 Hfrest ltac:(reflexivity)
               with "Hcg Hcnt Htext Hpc Hc1 Hc2 Hc3 Hc4 [Hptree Henv]").
     { rewrite /uvmcreate_post. iRight. iExists bppn.

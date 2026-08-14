@@ -381,7 +381,7 @@ Section ProofMain.
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ kernel_data -∗ panic_wp -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
-    cpu_own 0 false p0 cpu_ctx_free false -∗
+    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
     lk_raw (mword_of_int KernelSyms.cons) -∗
     (* the transmit spinlock's three raw fields, on their way to uartinit *)
     lk_raw (mword_of_int KernelSyms.tx_lock) -∗
@@ -394,7 +394,7 @@ Section ProofMain.
     ( ∀ (γpr : gname) (m' : regfile),
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
-        cpu_own 0 false p0 cpu_ctx_free false -∗
+        cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
         printk_env γpr γd γv -∗
         console_caps γd -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -718,7 +718,7 @@ Section ProofMain.
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ kernel_data -∗ panic_wp_any -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
-    cpu_own 0 false p0 cpu_ctx_free false -∗
+    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
     lk_raw (mword_of_int KernelSyms.kmem) -∗
     (mword_of_int (KernelSyms.kmem + 24) : mword 64) ↦₈ (mword_of_int 0 : mword 64) -∗
     ([∗ list] p ∈ ps, page_own p) -∗
@@ -738,7 +738,7 @@ Section ProofMain.
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
-        cpu_own 0 false p0 cpu_ctx_free false -∗
+        cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
         procs_inv γs -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
@@ -1072,7 +1072,7 @@ Section ProofMain.
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ kernel_data -∗ panic_wp_any -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
-    cpu_own 0 false p0 cpu_ctx_free false -∗
+    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
     procs_inv γs -∗
     kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
@@ -1095,7 +1095,7 @@ Section ProofMain.
     ( ∀ (γk : gname) (pd pav pu : mword 64) (m' : regfile),
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
-        cpu_own 0 false p0 cpu_ctx_free false -∗
+        cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
         disk_geom γv pd pav pu -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1306,7 +1306,7 @@ Section ProofMain.
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
-    cpu_own 0 false p0 cpu_ctx_free false -∗
+    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
     trap_csrs -∗
     started_inv P -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)

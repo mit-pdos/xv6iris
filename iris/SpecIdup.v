@@ -139,7 +139,7 @@ Definition wp_idup_sconf_body
     (cov : gset Z) (logstart : Z) (nib : nat)
     (k : nat) (s : Qp) (dev inum : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (K : nat) (b : bool) :=
+    (K : nat) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_idup <= K)%nat ->
@@ -149,7 +149,7 @@ Definition wp_idup_sconf_body
   (* a0 = ip, and a [struct inode *] IS its slot: [ientry_inj]. *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ientry k ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -161,7 +161,7 @@ Definition wp_idup_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
-    cpu_own n eb p C b -∗
+    cpu_own n eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
@@ -183,7 +183,7 @@ Module Type IDUP.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool),
+      (K : nat) (b : bool) (lks : gset nat),
       wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
-                         m n eb p C K b.
+                         m n eb p C K b lks.
 End IDUP.

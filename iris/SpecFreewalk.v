@@ -71,7 +71,7 @@ Import Defs.
 Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) (b : bool) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freewalk in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* 6-slot frame per recursion level, [lvl]+1 levels deep, and kfree's 14
@@ -87,7 +87,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (* the table maps nothing: the panic arm is dead *)
   pt_free_ok lvl t ->
   sie_cap_gpr mm K b p -∗
-  cpu_own ilvl eb p C b -∗
+  cpu_own ilvl eb p C b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   ptree_own lvl (DfracOwn 1) t -∗
@@ -95,7 +95,7 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own ilvl eb p C b -∗
+    cpu_own ilvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -106,6 +106,6 @@ Module Type FREEWALK.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b.
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat),
+      wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b lks.
 End FREEWALK.

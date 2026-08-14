@@ -397,7 +397,7 @@ Section BoProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) : iProp Σ :=
+      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ bo_regs m M spd ⌝ -∗
@@ -409,7 +409,7 @@ Section BoProps.
       log_res γ bn γfs cov logstart -∗
       log_op γ MAXOPBLOCKS -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own 1 eb (proc_addr j) C false -∗
+      cpu_own 1 eb (proc_addr j) C false lks -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
@@ -421,7 +421,7 @@ Section BoProps.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) : iProp Σ :=
+      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
       ∀ (M : regfile),
       ⌜ bo_regs m M spd ⌝ -∗
@@ -432,12 +432,12 @@ Section BoProps.
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own 1 eb (proc_addr j) C false -∗
+      cpu_own 1 eb (proc_addr j) C false lks -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (K - 4))%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x3a)) -∗
-      bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+      bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
       WP (Loop : expr riscv_lang)))%I.
 
 End BoProps.
@@ -460,7 +460,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) :
+      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) (lks : gset nat) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
@@ -477,7 +477,7 @@ Section BoBodies.
     log_res γ bn γfs cov logstart -∗
     log_op γ MAXOPBLOCKS -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -486,7 +486,7 @@ Section BoBodies.
       ∀ (mf : regfile),
         ⌜ callee_saved m mf ⌝ -∗
         sie_cap_gpr mf K eb pj -∗
-        cpu_own 0 eb pj C eb -∗
+        cpu_own 0 eb pj C eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
@@ -582,7 +582,7 @@ Section BoBodies.
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) X3 0%nat eb pj C (K - 4)%nat
-              Hrel_lka ltac:(rewrite /K_begin_op in HK; lia)
+              _ Hrel_lka ltac:(rewrite /K_begin_op in HK; lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hrelcs Hown".
     assert (Hpc64 : ret_pc (X3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x80))
@@ -736,7 +736,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) :
+      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) (lks : gset nat) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (j < NPROC)%nat ->
@@ -747,8 +747,8 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -756,7 +756,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -978,7 +978,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) :
+      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) (lks : gset nat) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (j < NPROC)%nat ->
@@ -989,8 +989,8 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -998,7 +998,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -1234,7 +1234,7 @@ Section BoBodies.
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
-      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) :
+      (K : nat) (eb : bool) (C : iProp Σ) (spd sp0 : mword 64) (lks : gset nat) :
     let pj := proc_addr j in
     (K_begin_op <= K)%nat ->
     (j < NPROC)%nat ->
@@ -1245,8 +1245,8 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -1254,7 +1254,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
@@ -1361,7 +1361,7 @@ Section BoBodies.
                        = mword_of_int (KernelSyms.begin_op + 0x24))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt24) in "Hpc".
-      iApply (bo_armA_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb C spd sp0
+      iApply (bo_armA_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb C spd sp0 lks
                 HK Hj Hjl Hanch HboE1
                 with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
@@ -1704,7 +1704,7 @@ Section BoBodies.
         assert (Hp46 : add_vec_int (mword_of_int (KernelSyms.begin_op + 0x50) : mword 64) 4 = mword_of_int (KernelSyms.begin_op + 0x54))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp46) in "Hpc".
-        iApply (bo_armB_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb C spd sp0
+        iApply (bo_armB_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb C spd sp0 lks
                   HK Hj Hjl Hanch HboE8
                   with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
   Qed.
@@ -1725,8 +1725,8 @@ Section ProofBeginOp.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
-    : wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev pidv dq m K eb C b.
+      (b : bool) (lks : gset nat)
+    : wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev pidv dq m K eb C b lks.
   Proof.
     cbv beta delta [wp_begin_op_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl.
@@ -1930,17 +1930,17 @@ Section ProofBeginOp.
     { intros c Hcs N2 N8 N10 N1.
       rewrite (callee_saved_lookup Hcsacq c Hcs). exact (Hpro_cs c N2 N8 N10 N1). }
     (* ============ the anchored EXIT continuation (+0x58 -> ret) ============ *)
-    iAssert (bo_exit CID j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[Hcont]" as "Hexit".
+    iAssert (bo_exit CID j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks) with "[Hcont]" as "Hexit".
     { rewrite /bo_exit.
       iIntros (CIDx Hsx Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc".
-      iApply (bo_exit_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx pidv dq K eb C spd sp0
+      iApply (bo_exit_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx pidv dq K eb C spd sp0 lks
                 HK Hsx Hspd Hsp0 HboE
                 with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hown Htc Hclm Hcg Hpc Hcont"). }
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ======== *)
-    iAssert (bo_loop CID j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[]" as "Hloop".
+    iAssert (bo_loop CID j γ bn γfs cov logstart m pidv dq K eb C spd sp0 lks) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /bo_loop.
       iIntros (CIDy Hsy My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit".
-      iApply (bo_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My pidv dq K eb C spd sp0
+      iApply (bo_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My pidv dq K eb C spd sp0 lks
                 HK Hj Hjl Hsy HboL
                 with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc"). }
     (* ============ +0x18..+0x22: s1 := &log, s2 := 30, jump to the test ==== *)

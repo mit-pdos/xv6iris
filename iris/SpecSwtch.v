@@ -52,7 +52,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
          mword 64 -d> mword 64 -d> iPropO Σ)
     (An Ao : ctx_adm)
     (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-    (av : nat) (eb : bool) (p : mword 64) :=
+    (av : nat) (eb : bool) (p : mword 64) (lks : gset nat) :=
   length old_vs = 14%nat ->
   m0 !!! Regidx (mword_of_int 10 : mword 5) = oldc ->
   m0 !!! Regidx (mword_of_int 11 : mword 5) = newc ->
@@ -78,7 +78,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      to struct cpu, so the same-eb contract is realized one level up by
      sched's own epilogue intena store + ghost retune. *)
   sie_cap_gpr m0 av false p -∗
-  cpu_own 1 eb p emp false -∗
+  cpu_own 1 eb p emp false lks -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
   ▷ valid_context P An newc p -∗
@@ -89,7 +89,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
       ⌜adm Ao h⌝ -∗
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr (CID := h) m av false p -∗
-      cpu_own (CID := h) 1 eb' p emp false -∗
+      cpu_own (CID := h) 1 eb' p emp false lks -∗
       pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ (A' : ctx_adm) (cret : mword 64),
@@ -105,6 +105,6 @@ Module Type SWTCH.
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64),
-      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
+      (av : nat) (eb : bool) (p : mword 64) (lks : gset nat),
+      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p lks.
 End SWTCH.

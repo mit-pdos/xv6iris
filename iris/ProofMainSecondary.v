@@ -438,12 +438,12 @@ Section ProofMainSecondary.
     (38 <= n)%nat ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗ kernel_data -∗ panic_wp -∗
     pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-    cpu_own 0 false p0 cpu_ctx_free false -∗
+    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
     printk_env γpr γd γv -∗
     ( ∀ m' : regfile,
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
-        cpu_own 0 false p0 cpu_ctx_free false -∗
+        cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -574,7 +574,7 @@ Section ProofMainSecondary.
     p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
-    cpu_own 0 false p0 cpu_ctx_free false -∗
+    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ trap_csrs_raw -∗
     kpt_inv root -∗

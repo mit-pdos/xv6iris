@@ -140,8 +140,8 @@ Section SleepJoin.
      to the entry hart (porting guide, "a helper lemma sharing the enclosing
      Section's Context"). *)
   Lemma cpu_own_ctx_take `{GEN : GenId} `{CID0 : CpuId}
-      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) :
-    cpu_own n eb p D false -∗ D ∗ cpu_own n eb p emp false.
+      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) (lks : gset nat) :
+    cpu_own n eb p D false lks -∗ D ∗ cpu_own n eb p emp false lks.
   Proof.
     iIntros "[Hh HD]". iFrame "HD". rewrite cpu_own_off. iFrame "Hh".
   Qed.
@@ -150,7 +150,7 @@ Section SleepJoin.
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m mj : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 spd vgap : mword 64) :
+      (sp0 spd vgap : mword 64) (lks : gset nat) :
     let pj := proc_addr j in
     (20 <= av)%nat ->
     (j < NPROC)%nat ->
@@ -177,7 +177,7 @@ Section SleepJoin.
     pc_is (mword_of_int (KernelSyms.sleep + 0x20)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    cpu_own 1 eb pj C false -∗
+    cpu_own 1 eb pj C false lks -∗
     (* the cells the RUNNING arm of the lock holds -- handed back by swtch on
        the park arm, never given up on the no-park one.  They go into the
        RUNNING lock at the release below, which is where the NEXT park will
@@ -197,7 +197,7 @@ Section SleepJoin.
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av eb pj -∗
-        cpu_own 0 eb pj C eb -∗
+        cpu_own 0 eb pj C eb lks -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -300,7 +300,7 @@ Section SleepJoin.
     iDestruct "Hclm" as "[Hclmp Hclmx]".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
-              Hlka
+              _ Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
     (* release's exit index is [outb = eb]: at [eb = true] it re-enables at
@@ -484,10 +484,10 @@ Section ProofSleepBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_sleep_sconf 
+  Lemma wp_sleep_sconf
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    : wp_sleep_sconf_body γs j γl m av eb C.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (lks : gset nat)
+    : wp_sleep_sconf_body γs j γl m av eb C lks.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav.
@@ -816,7 +816,7 @@ Section ProofSleepBody.
         by (apply Hthr_L0; (first [ vm_compute; reflexivity | vm_compute; discriminate ])).
       assert (HL27 : L0 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
         by (apply Hthr_L0; (first [ vm_compute; reflexivity | vm_compute; discriminate ])).
-      iApply (sleep_join (CID0 := CIDa) γs j γl ch0 m L0 av eb C sp0 spd vgap
+      iApply (sleep_join (CID0 := CIDa) γs j γl ch0 m L0 av eb C sp0 spd vgap lks
                 ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
                 Hsp_L0 Hs1_L0
                 HL18 HL19 HL20 HL21 HL22 HL23 HL24 HL25 HL26 HL27
@@ -901,7 +901,7 @@ Section ProofSleepBody.
          lock owns both halves again. *)
       iMod (pstate_whole_update (proc_addr j) RUNNING SLEEPING with "Hpg") as "Hpg".
       iModIntro.
-      iApply (Sched.wp_sched_sconf γs j γl SLEEPING ch0 C1 (trap_res eb + (av - 4))%nat eb
+      iApply (Sched.wp_sched_sconf γs j γl SLEEPING ch0 C1 (trap_res eb + (av - 4))%nat eb lks
                 Hj Hgl (park_ok_SLEEPING) ltac:(lia)
                 with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc").
       { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
@@ -952,10 +952,10 @@ Section ProofSleepBody.
                       = mword_of_int (KernelSyms.sleep + 0x20)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc20) in "Hpc".
       (* re-inject the opaque context-slot payload into the returned bundle. *)
-      iAssert (cpu_own 1 eb (proc_addr j) C false) with "[Hcpuemp HC]" as "Hcpu".
+      iAssert (cpu_own 1 eb (proc_addr j) C false lks) with "[Hcpuemp HC]" as "Hcpu".
       { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
       (* ONE application of the join half, at the DISPATCHING hart. *)
-      iApply (sleep_join (CID0 := CIDs) γs j γl ch' m msch av eb C sp0 spd vgap
+      iApply (sleep_join (CID0 := CIDs) γs j γl ch' m msch av eb C sp0 spd vgap lks
                 ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
                 Hsp_msch Hs1_msch
                 Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
@@ -985,8 +985,8 @@ Section ProofSleepBody.
   (* ===================================================================== *)
   Lemma wp_sleep_nested
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat)
-    : wp_sleep_nested_body γs j γl m av eb C n.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset nat)
+    : wp_sleep_nested_body γs j γl m av eb C n lks.
   Proof.
     cbv beta delta [wp_sleep_nested_body].
     intros pcE pj ret_tgt Hj Hgl Hav Hn.
@@ -1492,7 +1492,7 @@ Section ProofSleepBody.
       (* ---------------------------------------------------------------- *)
       (* +0x1c: sched() at noff = S (S n) >= 2 -- panic("sched locks").    *)
       (* ---------------------------------------------------------------- *)
-      iApply (Sched.wp_sched_locks γs j γl Q1 (av - 4)%nat eb C n
+      iApply (Sched.wp_sched_locks γs j γl Q1 (av - 4)%nat eb C n lks
                 Hj Hgl ltac:(lia) ltac:(lia)
                 with "Hcg Htext Hpc Hprocs Hlocked Hcpu Hpanic").
   Qed.

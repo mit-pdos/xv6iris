@@ -88,7 +88,7 @@ Definition sys_wait_stack : nat := (4 + K_kwait)%nat.
 
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_wait in
   let pj := proc_addr j in
@@ -101,7 +101,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (* the PARKING premise, inherited from kwait: everything that sleeps has it *)
   eb = true ->
   sie_cap_gpr m av b pj -∗
-  cpu_own 0%nat eb pj C b -∗
+  cpu_own 0%nat eb pj C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -114,7 +114,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b -∗
+      cpu_own 0%nat eb pj C b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -124,7 +124,7 @@ Module Type SYSWAIT.
   Parameter wp_sys_wait_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
       (pid : mword 32) (V : pprivate) (v0 : mword 64),
-      wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b pid V v0.
+      wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b lks pid V v0.
 End SYSWAIT.

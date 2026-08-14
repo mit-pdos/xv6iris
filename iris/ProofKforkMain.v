@@ -229,7 +229,7 @@ Section KforkArms.
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
-      (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) :
+      (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) (lks : gset nat) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -247,7 +247,7 @@ Section KforkArms.
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false -∗
+    cpu_own (S lvl) eb pme C false lks -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
@@ -265,7 +265,7 @@ Section KforkArms.
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
         kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
-          (mr !!! Regidx Ra0) -∗
+          (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -285,7 +285,7 @@ Section KforkArms.
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
                  with "HCpriv Hfd Hir Hctx") as "(Hfprest & Hfppt & Hfptf)".
     iApply (B1.kfk_exit_uvmcopy γs γa γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
-              m Mt K sp0 ra0 s00 s10 s50 pme eb b C lvl
+              m Mt K sp0 ra0 s00 s10 s50 pme eb b C lvl lks
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
                     Hheld Hhart Hislock Hkalloc Hfprest Hfppt Hfptf").
@@ -325,7 +325,7 @@ Section KforkArms.
       (γa γf : gname) (cn : ic_names)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
       (pid_p : mword 32) (Vp : pprivate)
-      (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) :
+      (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset nat) :
     (8 <= K)%nat ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
     m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs5 = s50 ->
@@ -333,7 +333,7 @@ Section KforkArms.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr Mt (K - 8)%nat b pme -∗
-    cpu_own lvl eb pme C b -∗
+    cpu_own lvl eb pme C b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
@@ -348,7 +348,7 @@ Section KforkArms.
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
         kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
-          (mr !!! Regidx Ra0) -∗
+          (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -415,7 +415,7 @@ Section KforkArms.
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64)
       (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
-      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44) :
+      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44) (lks : gset nat) :
     (56 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -441,7 +441,7 @@ Section KforkArms.
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false -∗
+    cpu_own (S lvl) eb pme C false lks -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     kfk_frame_at sp0 ra0 s00 s10 s50
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
@@ -467,7 +467,7 @@ Section KforkArms.
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
         kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
-          (mr !!! Regidx Ra0) -∗
+          (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -664,10 +664,10 @@ Section KforkMain.
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (b : bool) (pid_p : mword 32) (Vp : pprivate)
+      (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset nat)
  :
     wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-      m lvl K eb pme C b pid_p Vp.
+      m lvl K eb pme C b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl.
@@ -686,8 +686,8 @@ Section KforkMain.
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
                     kfork_post γa γf cn lvl eb pme C b pid_p Vp
-                      K mr (mr !!! Regidx Ra0) -∗
-                    WP (Loop : expr riscv_lang))%I))
+                      K mr (mr !!! Regidx Ra0) lks -∗
+                    WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpv Hcont [] [] []").
@@ -702,7 +702,7 @@ Section KforkMain.
       { iDestruct "Hke" as "[$ | (% & _ & $)]". }
       iApply (kfork_arm1 (CID0 := CID1) γa γf cn m K lvl eb b pme C pid_p Vp
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
-                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt
+                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt lks
                 (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMtthr
                 with "Hcg Hcpu Ht Hpc Hframe Hpv Hke [HR]").
@@ -715,7 +715,7 @@ Section KforkMain.
       iApply (kfork_arm2 (CID0 := CID2) γa γf γl2 γs cn m K lvl eb b pme C
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
-                npa j pid_c ch Vc Mt
+                npa j pid_c ch Vc Mt lks
                 (wpk_K_ge52 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
@@ -739,7 +739,7 @@ Section KforkMain.
                 cn γfs cov logstart nib m K lvl eb b pme C
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
-                Mt npa j γl2 pid_c ch Vc' tfsrc tfdst
+                Mt npa j γl2 pid_c ch Vc' tfsrc tfdst lks
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr

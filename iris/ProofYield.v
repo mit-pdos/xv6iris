@@ -120,8 +120,8 @@ Section YieldPostSched.
      to the entry hart (porting guide, "a helper lemma sharing the enclosing
      Section's Context"). *)
   Lemma cpu_own_ctx_take `{GEN : GenId} `{CID0 : CpuId}
-      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) :
-    cpu_own n eb p D false -∗ D ∗ cpu_own n eb p emp false.
+      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) (lks : gset nat) :
+    cpu_own n eb p D false lks -∗ D ∗ cpu_own n eb p emp false lks.
   Proof.
     iIntros "[Hh HD]". iFrame "HD". rewrite cpu_own_off. iFrame "Hh".
   Qed.
@@ -130,7 +130,7 @@ Section YieldPostSched.
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m msch : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (sp0 spd vgap : mword 64) :
+      (sp0 spd vgap : mword 64) (lks : gset nat) :
     let pj := proc_addr j in
     (20 <= av)%nat ->
     (j < NPROC)%nat ->
@@ -157,7 +157,7 @@ Section YieldPostSched.
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    cpu_own 1 eb pj emp false -∗
+    cpu_own 1 eb pj emp false lks -∗
     C -∗
     (* the cells swtch handed back; they go into the RUNNING lock at the
        release below, which is where the NEXT yield will find them. *)
@@ -176,7 +176,7 @@ Section YieldPostSched.
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av eb pj -∗
-        cpu_own 0 eb pj C eb -∗
+        cpu_own 0 eb pj C eb lks -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -216,7 +216,7 @@ Section YieldPostSched.
     iDestruct (pstate_at_elim j (1/2) RUNNING Hj with "Hclm") as "Hclm".
     rewrite hart_split. iDestruct "Htag" as "[Htaga Htagb]".
     (* re-inject the opaque context-slot payload into the returned bundle. *)
-    iAssert (cpu_own 1 eb (proc_addr j) C false) with "[Hcpuemp HC]" as "Hcpu".
+    iAssert (cpu_own 1 eb (proc_addr j) C false lks) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
     (* +0x1c: c.mv a0,s1 : a0 := s1 = proc_addr j -- lock still held, so the
        hart is PINNED and [wp_next_off] collapses the binder. *)
@@ -282,7 +282,7 @@ Section YieldPostSched.
     iDestruct "Hclm" as "[Hclmp Hclmx]".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
-              Hlka
+              _ Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
     (* release's exit index is [outb = eb]: at [eb = true] it re-enables at
@@ -814,7 +814,7 @@ Section ProofYield.
     iEval (rewrite HcspA0 Hs0A0 -Hb2) in "Hr16".
     iEval (rewrite HcspA0 Hs1A0 -Hb3) in "Hr8".
     (* ONE application of the post-resume half, at the resuming hart. *)
-    iApply (yield_post_sched (CID0 := CIDs)  γs j γl ch' m msch av eb C sp0 spd vgap
+    iApply (yield_post_sched (CID0 := CIDs)  γs j γl ch' m msch av eb C sp0 spd vgap ∅
               ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
               Hsp_msch Hs1_msch
               Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27

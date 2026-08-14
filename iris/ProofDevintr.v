@@ -122,7 +122,7 @@ Section ProofDevintr.
   Lemma di_epi
       (m0 M : regfile) (sp0 ra0 s00 retv : mword 64)
       (k lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64) (v3 v4 : mword 64) :
+      (dq : dfrac) (sc : mword 64) (v3 v4 : mword 64) (lks : gset nat) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     m0 !!! Regidx ra_idx = ra0 ->
     m0 !!! Regidx s0_idx = s00 ->
@@ -130,7 +130,7 @@ Section ProofDevintr.
     M !!! Regidx a0_idx = retv ->
     di_thr m0 M ->
     sie_cap_gpr M k false p -∗
-    cpu_own lvl eb p C false -∗
+    cpu_own lvl eb p C false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x22) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
@@ -141,7 +141,7 @@ Section ProofDevintr.
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = retv ⌝ -∗
         sie_cap_gpr mf (k + 4) false p -∗
-        cpu_own lvl eb p C false -∗
+        cpu_own lvl eb p C false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -254,7 +254,7 @@ Section ProofDevintr.
       (γu : uart_names) (γv : disk_names)
       (m0 M : regfile) (sp0 ra0 s00 s10 irq : mword 64)
       (k lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64) (v4 : mword 64) :
+      (dq : dfrac) (sc : mword 64) (v4 : mword 64) (lks : gset nat) :
     (6 <= k)%nat ->
     m0 !!! Regidx csp_rs1 = sp0 ->
     m0 !!! Regidx ra_idx = ra0 ->
@@ -267,7 +267,7 @@ Section ProofDevintr.
         r <> (mword_of_int 9 : mword 5) -> M !!! Regidx r = m0 !!! Regidx r ) ->
     devintr_ret sc = (mword_of_int 1 : mword 64) ->
     sie_cap_gpr M k false p -∗
-    cpu_own lvl eb p C false -∗
+    cpu_own lvl eb p C false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.devintr + 0x62) : mword 64) -∗
     scause ↦ᵣ{dq} sc -∗
@@ -279,7 +279,7 @@ Section ProofDevintr.
     ( ∀ mf : regfile,
         ⌜ callee_saved m0 mf /\ mf !!! Regidx a0_idx = devintr_ret sc ⌝ -∗
         sie_cap_gpr mf (k + 4) false p -∗
-        cpu_own lvl eb p C false -∗
+        cpu_own lvl eb p C false lks -∗
         scause ↦ᵣ{dq} sc -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -387,7 +387,7 @@ Section ProofDevintr.
         rewrite /T1 upd_ne; [| congruence].
         rewrite /T0 upd_ne; [| congruence].
         exact (Hthr r Hr Ncsp N8 N9). }
-    iApply (di_epi m0 T3 sp0 ra0 s00 (devintr_ret sc) k lvl eb p C dq sc s10 v4
+    iApply (di_epi m0 T3 sp0 ra0 s00 (devintr_ret sc) k lvl eb p C dq sc s10 v4 lks
               Hm0sp Hm0ra Hm0s0 HT3sp HT3a0 HT3thr
               with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4 Hcont").
   Qed.
@@ -399,8 +399,8 @@ Section ProofDevintr.
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (dq : dfrac) (sc : mword 64)
-    : wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc.
+      (dq : dfrac) (sc : mword 64) (lks : gset nat)
+    : wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc lks.
   Proof.
     cbv beta delta [wp_devintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav.
@@ -831,7 +831,7 @@ Section ProofDevintr.
             rewrite /B6 upd_ne; [| congruence].
             rewrite /B5 upd_ne; [| congruence].
             rewrite /B4 upd_ne; [| congruence]. exact (HB3thr r Hr Ncsp N8 N9). }
-        iApply (di_epi m B6 sp0 ra0 s00 (devintr_ret sc) (av - 4)%nat lvl eb p C dq sc s10 w4
+        iApply (di_epi m B6 sp0 ra0 s00 (devintr_ret sc) (av - 4)%nat lvl eb p C dq sc s10 w4 lks
                   eq_refl eq_refl eq_refl HB6sp HB6a0 HB6thr
                   with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
@@ -871,7 +871,7 @@ Section ProofDevintr.
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
           by (rewrite /U0 upd_eq; reflexivity).
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p C false
-                  Hlen ltac:(lia) ltac:(unfold devintr_stack, uartintr_stack in *; lia)
+                  _ Hlen ltac:(lia) ltac:(unfold devintr_stack, uartintr_stack in *; lia)
                   with "Hcg Hcnt Htext Hpc Hdev Hpinv Hpanic Hccaps").
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
         destruct HcsU as [HcsU HdomU].
@@ -901,7 +901,7 @@ Section ProofDevintr.
                   r <> (mword_of_int 9 : mword 5) -> MU !!! Regidx r = m !!! Regidx r).
         { intros r Hr Ncsp N8 N9.
           rewrite (callee_saved_lookup HcsB3MU r Hr). exact (HB3thr r Hr Ncsp N8 N9). }
-        iApply (di_plic_tail γu γv m MU sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p C dq sc w4
+        iApply (di_plic_tail γu γv m MU sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p C dq sc w4 lks
                   ltac:(unfold devintr_stack in Hav; lia) eq_refl eq_refl eq_refl eq_refl
                   HMUsp HMUs1 HMUthr Hret1
                   with "Hcg Hcnt Htext Hpc Hsc Hdev Hb1 Hb2 Hb3 Hb4").
@@ -1010,7 +1010,7 @@ Section ProofDevintr.
                   r <> (mword_of_int 9 : mword 5) -> MV !!! Regidx r = m !!! Regidx r).
         { intros r Hr Ncsp N8 N9.
           rewrite (callee_saved_lookup HcsV0MV r Hr). exact (HV0thr r Hr Ncsp N8 N9). }
-        iApply (di_plic_tail γu γv m MV sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p C dq sc w4
+        iApply (di_plic_tail γu γv m MV sp0 ra0 s00 s10 irq (av - 4)%nat lvl eb p C dq sc w4 lks
                   ltac:(unfold devintr_stack in Hav; lia) eq_refl eq_refl eq_refl eq_refl
                   HMVsp HMVs1 HMVthr Hret1
                   with "Hcg Hcnt Htext Hpc Hsc Hdev Hb1 Hb2 Hb3 Hb4").
@@ -1181,7 +1181,7 @@ Section ProofDevintr.
             by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
           rewrite /K1 upd_ne; [| congruence].
           rewrite (callee_saved_lookup HcsT3MC r Hr). exact (HT3thr r Hr Ncsp N8). }
-        iApply (di_epi m K1 sp0 ra0 s00 (devintr_ret sc) (av - 4)%nat lvl eb p C dq sc w3 w4
+        iApply (di_epi m K1 sp0 ra0 s00 (devintr_ret sc) (av - 4)%nat lvl eb p C dq sc w3 w4 lks
                   eq_refl eq_refl eq_refl HK1sp HK1a0 HK1thr
                   with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".
@@ -1201,7 +1201,7 @@ Section ProofDevintr.
         iEval (rewrite Hpc22) in "Hpc".
         assert (HT3a0 : T3 !!! Regidx a0_idx = devintr_ret sc)
           by (rewrite Hret0; rewrite /T3; apply upd_eq).
-        iApply (di_epi m T3 sp0 ra0 s00 (devintr_ret sc) (av - 4)%nat lvl eb p C dq sc w3 w4
+        iApply (di_epi m T3 sp0 ra0 s00 (devintr_ret sc) (av - 4)%nat lvl eb p C dq sc w3 w4 lks
                   eq_refl eq_refl eq_refl HT3sp HT3a0 HT3thr
                   with "Hcg Hcnt Htext Hpc Hsc Hb1 Hb2 Hb3 Hb4").
         iIntros (mf) "%Hf Hcg Hcnt Hsc Hpc".

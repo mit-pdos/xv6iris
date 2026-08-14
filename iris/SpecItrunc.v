@@ -311,7 +311,7 @@ Definition wp_itrunc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -383,7 +383,7 @@ Definition wp_itrunc_sconf_body
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  itrunc itself never
      acquires or releases anything -- it is a pure PASS-THROUGH to its
      sleeping callees (bfree, bread, iupdate), each of whose OWN acquire
@@ -449,7 +449,7 @@ Definition wp_itrunc_sconf_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -520,7 +520,7 @@ Definition wp_itrunc_gen_body
     (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
     (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.itrunc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -552,7 +552,7 @@ Definition wp_itrunc_gen_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -596,7 +596,7 @@ Definition wp_itrunc_gen_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -656,11 +656,11 @@ Module Type ITRUNC.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart bmapstart inodestart nib size dev used
                            ip inum dn dn0 bm data u
-                           pidv dq dqd dqn dqb dqs m K eb C b.
+                           pidv dq dqd dqn dqb dqs m K eb C b lks.
   (* the credited set-form contract; [wp_itrunc_sconf] is this at
      [crb := cru := false], derived at the [log_op] existential's own
      witness. *)
@@ -683,9 +683,9 @@ Module Type ITRUNC.
       (u : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_itrunc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                          cov logstart bmapstart inodestart nib size dev used
                          ip inum dn dn0 bm data u Sb crb cru e0
-                         pidv dq dqd dqn dqb dqs m K eb C b.
+                         pidv dq dqd dqn dqb dqs m K eb C b lks.
 End ITRUNC.

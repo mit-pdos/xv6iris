@@ -576,7 +576,7 @@ Section ProofSysPipe.
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (Cf0 Cf1 : fcontent)
-      (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) :
+      (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset nat) :
     (fileclose_stack <= nav)%nat ->
     Mt !!! Regidx Rs0 = sp0 ->
     (* the pc successors and the two relocated call targets *)
@@ -590,7 +590,7 @@ Section ProofSysPipe.
     add_vec (mword_of_int zd : mword 64) (sign_extend' 64 imm2)
       = mword_of_int KernelSyms.fileclose ->
     sie_cap_gpr Mt nav b p -∗
-    cpu_own 0%nat eb p C b -∗
+    cpu_own 0%nat eb p C b lks -∗
     (* THE COMPLEMENT, THREADED THROUGH BOTH CLOSES.  fileclose takes it at
        the top level of its contract on every arm and gives it back, so this
        block cannot frame it: its two crossings are the literal [true]. *)
@@ -623,7 +623,7 @@ Section ProofSysPipe.
         ⌜ (forall c : mword 5, is_cs_idx c = true -> Mr !!! Regidx c = Mt !!! Regidx c)
           /\ Mr !!! Regidx Ra5 = (mword_of_int (-1) : mword 64) ⌝ -∗
         sie_cap_gpr Mr nav b p -∗
-        cpu_own 0%nat eb p C b -∗
+        cpu_own 0%nat eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int zf : mword 64) -∗
@@ -674,7 +674,7 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (fileclose_env_frame fn on us 0%nat eb p Cf0 with "Hpenv Hfenv")
       as "[Hfcenv0 Hfcback0]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p C nav b
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p C nav b lks
               Hnav sp_noff0 HD2a0
               with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href0 Hfcenv0").
     iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 Hunit0 Hout0".
@@ -724,7 +724,7 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (fileclose_env_frame fn on1 us1 0%nat eb p Cf1 with "Hpenv Hfenv")
       as "[Hfcenv1 Hfcback1]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p C nav b
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p C nav b lks
               Hnav sp_noff0 HF2a0
               with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href1 Hfcenv1").
     iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 Hunit1 Hout1".
@@ -955,8 +955,8 @@ Section ProofSysPipe.
   Lemma wp_sys_pipe_sconf (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b.
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+    : wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_pipe_sconf_body].
     intros pcE ret_tgt Harg Hav.
@@ -1107,7 +1107,7 @@ Section ProofSysPipe.
                 r <> Rs0 -> r <> Rs1 -> mj !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
         sie_cap_gpr mj (av - 8)%nat b p -∗
-        cpu_own 0%nat eb p C b -∗
+        cpu_own 0%nat eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0xda) : mword 64) -∗
@@ -1167,7 +1167,7 @@ Section ProofSysPipe.
       by (rewrite /R3; apply upd_eq).
     iDestruct (cpu_own_transport CID CID24 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R3 (av - 8)%nat 0%nat eb p C b
+    iApply (Myproc.wp_myproc_sconf R3 (av - 8)%nat 0%nat eb p C b lks
               sp_noff0 Hav10 with "Hcg Hcpu Htext Hpc").
     iIntros (CID25 Hcr25 ms P0) "%Hms Hcg Hcpu Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
@@ -1280,7 +1280,7 @@ Section ProofSysPipe.
     iDestruct (cpu_own_transport CID25 CID29 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf P4 (av - 8)%nat 0%nat eb p C 0%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v u5 (DfracOwn (1/4)) b
+              (ud_tfp (pv_upt V)) (pv_tf V) v u5 (DfracOwn (1/4)) b lks
               sp_arg0 HP4a0 Harg sp_noff0
               Havaa with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hb5").
     iIntros (CID30 Hcr30 Q0) "%HcsQ0 Hcg Hcpu Hpc Htfc Htfp Hb5".
@@ -1387,7 +1387,7 @@ Section ProofSysPipe.
     iDestruct (cpu_claim_ext_transport CID CID33 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iApply (Pipealloc.wp_pipealloc_sconf γfl γf γa γk
-              (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p C (av - 8)%nat b
+              (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p C (av - 8)%nat b lks
               Hav24 eq_refl sp_noff0
               with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpanic Hua Hub Hb6 Hb7").
     iIntros (CID34 Hcr34 W0) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 Hpost".
@@ -1604,7 +1604,7 @@ Section ProofSysPipe.
        its own; [Href0] stays here and settles the deficit on the way out. *)
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
     rewrite -(proc_ofiles_owe_empty γf p (pv_ofile V)).
-    iApply (Fdalloc.wp_fdalloc_sconf γf k0 ∅ X1 (av - 8)%nat 0%nat eb p C pid V b
+    iApply (Fdalloc.wp_fdalloc_sconf γf k0 ∅ X1 (av - 8)%nat 0%nat eb p C pid V b lks
               HX1a0 Hk0lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
     iIntros (CID41 Hcr41 Y0) "%HcsY0 Hcg Hcpu Hpc Hcore Hpost1".
@@ -1659,7 +1659,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iApply (sp_close2 (CID0 := CID43)  γfl γf fn on us Y0 (av - 8)%nat eb p C sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2092038 : mword 21) (mword_of_int 2092030 : mword 21) b
+                (mword_of_int 2092038 : mword 21) (mword_of_int 2092030 : mword 21) b lks
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
@@ -1759,7 +1759,7 @@ Section ProofSysPipe.
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
     rewrite -(proc_ofiles_owe_empty γf p (pv_ofile (upd_ofile V fd0 (fnode k0)))).
     iApply (Fdalloc.wp_fdalloc_sconf γf k1 ∅ Z1 (av - 8)%nat 0%nat eb p C pid
-              (upd_ofile V fd0 (fnode k0)) b
+              (upd_ofile V fd0 (fnode k0)) b lks
               HZ1a0 Hk1lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
     iIntros (CID48 Hcr48 U0) "%HcsU0 Hcg Hcpu Hpc Hcore Hpost2".
@@ -1882,7 +1882,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iApply (sp_close2 (CID0 := CID53)  γfl γf fn on us F2 (av - 8)%nat eb p C sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2092038 : mword 21) (mword_of_int 2092030 : mword 21) b
+                (mword_of_int 2092038 : mword 21) (mword_of_int 2092030 : mword 21) b lks
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
@@ -2205,7 +2205,7 @@ Section ProofSysPipe.
               (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
-              (av - 8)%nat 0%nat eb p C b
+              (av - 8)%nat 0%nat eb p C b lks
               Hav52 HA6a0 HA6a1 HA6a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henva Hbufhi").
     iIntros (CID61 Hcr61 B0 Pa) "Hcg Hcpu Hpc Hpt Hbufhi %HcsB0 %Hext1 %Hret1".
@@ -2243,7 +2243,7 @@ Section ProofSysPipe.
                 r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
         sie_cap_gpr Mt (av - 8)%nat b p -∗
-        cpu_own 0%nat eb p C b -∗
+        cpu_own 0%nat eb p C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0x80) : mword 64) -∗
@@ -2380,7 +2380,7 @@ Section ProofSysPipe.
       iDestruct "Hfenv" as (us2) "Hfenv".
       iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 us2 E4 (av - 8)%nat eb p C sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
-                (mword_of_int 2092078 : mword 21) (mword_of_int 2092070 : mword 21) b
+                (mword_of_int 2092078 : mword 21) (mword_of_int 2092070 : mword 21) b lks
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
       iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
@@ -2642,7 +2642,7 @@ Section ProofSysPipe.
     iApply (Copyout.wp_copyout_sconf γa C7 Pa
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
-              (av - 8)%nat 0%nat eb p C b
+              (av - 8)%nat 0%nat eb p C b lks
               Hav52 HC7a0 HC7a1 HC7a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hbuflo").
     iIntros (CID76 Hcr76 D0 Pb) "Hcg Hcpu Hpc Hpt Hbuflo %HcsD0 %Hext2 %Hret2".

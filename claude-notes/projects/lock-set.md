@@ -22,17 +22,94 @@ It is **hidden** — it rides inside `IntrDefs.cpu_hart` under
 `cpu_locks_any := ∃ S, cpu_locks S`, and no contract in the tree mentions it.
 So it currently proves nothing to a caller; it is the substrate.
 
-## Phase 2+3 ARE ONE SWEEP. Do not do them in two passes.
+## WHERE IT STANDS: the substrate is LANDED AND PROVEN, the clients are not
 
-Exposing `S` as an index of `CpuOwn.cpu_own` is a tree-wide interface change —
-`cpu_own` is named in ~312 files / ~2300 sites — and it is atomic. The ORDER
-does not change the sweep's cost, only the index's TYPE. Doing "expose the
-address set" and then "add the rank" is paying that sweep twice for nothing.
-So the index goes in ONCE, in its final shape, and every acquire premise is
-stated in order form from the start.
+`cpu_own` carries the held set as an index, and the acquire/release pair is
+proved against it.  Building clean: `LockRank.v`, `LockSet.v`, `WpLock.v`,
+`WpSconfLock.v`, `CpuOwn.v`, `IntrDefs.v`, `SpecAcquire.v`, `SpecRelease.v`,
+`SpecHolding.v`, `ProofAcquire.v`, `ProofRelease.v`, `ProofHolding.v`.
 
-(See `completed/explicit-cpuid.md` for the last sweep of this shape and its
-scoreboard of contracts that were stated falsely and compiled anyway.)
+What that establishes, machine-checked rather than argued:
+
+- the **whole-cell `lk_cpu_res` collapse** is sound.  `lk_stake`,
+  `lk_cpu_half`, `lk_cpu_rest`, the fixed 1/2 fraction and the two exchange
+  wands are DELETED; the lock invariant owns `lk->cpu` at `DfracOwn 1` in
+  every state and the read leaves are state-blind for free;
+- the **rank-keyed set** works end to end: `lkcpu_take_exchange` mints
+  `lk_in i (lock_rank s)` from the caller's premise, where the predecessor had
+  to derive freshness from the cpu cell;
+- **`CpuOwn.cpu_own_locks_swap`** is the right replacement for the deleted
+  existential accessor `cpu_own_locks_acc`: it takes the authority out at a
+  set the caller NAMES and puts back a DIFFERENT one, which is what an
+  acquisition actually does.
+
+### The premise is NON-MEMBERSHIP for now, not the order
+
+acquire takes `lock_rank s ∉ lks`, not `locks_below lks (lock_rank s)`.  It is
+all either obligation needs (minting the fragment; refuting the holder), and it
+lands first deliberately.  The bridge to the order form is already in place and
+unused: `LockRank.locks_below`, `locks_below_not_elem`,
+`LockSet.cpu_locks_insert_below`, `LockSet.cpu_locks_not_in_below`.  Phase 3 is
+a premise swap at two sites.
+
+**The known complication for the order phase** is `iput`: it calls
+`acquiresleep` while holding `itable.lock`.  That is NOT an order inversion --
+`"sleep lock"` (6) is above `itable` (2), and acquiring upward is what the rule
+permits.  The hazard is that `acquiresleep` may SLEEP, and `sched`'s
+`if (mycpu()->noff != 1) panic("sched locks")` forbids sleeping with another
+spinlock held.  The C is safe for a reason outside the lock layer entirely --
+`ip->ref == 1` means nobody else can have the inode locked, so the wait loop
+never runs -- so proving it needs the icache REF-1 exclusivity theorem
+(`design/fs-icache.md`) to reach a non-blocking `acquiresleep` variant.  Owed
+either way once `sleep`/`sched` get lock-set-aware contracts.
+
+### `panic_wp_any` STAYS in acquire's contract
+
+The claim that exposing the set kills acquire's `if(holding(lk)) panic` arm is
+**false as things stand**, and it was asserted here before the machine saw it.
+The refutation needs the held-set FRAGMENT in scope where `holding`'s read
+decides its `phi`, and `WpSconfLock.wp_ld_lkcpu_lockopen_gen`'s view premise is
+handed only `lock_auth γl st` and the caller's token:
+
+```coq
+    (forall st : lock_state, ⊢ lock_auth γl st -∗ T -∗ ⌜phi (lk_cpu_val st)⌝) ->
+```
+
+`lk_cpu_frag` is not persistent, so exposing it means borrowing and returning
+it inside the invariant open -- a leaf signature change plus a `SpecHolding`
+variant concluding `a0 = 0`.  Separate piece of work; do not plan around it
+being free.
+
+## WHAT IS LEFT: propagating the premise to the ~50 acquire call sites
+
+~100 files still fail, and they are almost all LOCK CLIENTS.  This part is NOT
+mechanical: each lock-holding region must NAME the set it actually holds,
+read off the C.  Two shapes:
+
+- **balanced** (acquire and release in the same function): thread `lks`
+  unchanged.  This is most of them and it is safe.
+- **asymmetric or region-crossing**: the set differs mid-body, and threading
+  `lks` unchanged TYPECHECKS while stating something false.  A green build does
+  not certify these.  Known instances:
+  - `ProofAllocproc` -- allocproc RETURNS holding `p->lock` ("return with
+    p->lock held", proc.c).  `SpecAllocproc` says `lks ∪ {[rank "proc"]}`,
+    `ProofAllocproc` says `lks`; they disagree, which is the good outcome.
+  - `ProofKexit` -- the `wait_lock` -> `p->lock` -> `release(wait_lock)` ->
+    `sched()` region, i.e. the non-LIFO case.
+  - `ProofKwait` -- three nesting levels (`wait_lock` + per-proc lock).
+  - `ProofIput`, `ProofVirtioDiskRw`/`RwB`, `ProofAcquiresleep`, `ProofBread`,
+    `ProofSleep`, `ProofPipewrite`, `ProofPrintk` -- lock held across a region
+    boundary; threaded unchanged pending review.
+  - `SpecKerneltrap` -- threaded a variable where it should be `∅`, to match
+    `IntrDefs`' handler precondition `cpu_hart 0 false p ∅`.
+  - `UsertrapRes.ut_res` -- existentially quantifies `lks`, which is the shape
+    this phase exists to remove.
+
+Done so far, as the pattern for the rest: `ProofSched`'s swtch seam is
+`{[lock_rank "proc"]}` (both directions -- `∅` occurs only in the scheduler
+loop between `release` and the next `acquire`, which is exactly where
+`intr_on()` sits), and `ProofBrelse.brelse_tail` is `{[lock_rank "bcache"]}`
+(`n = 1` says exactly one acquire).
 
 ## The audit: xv6 never holds two spinlocks of the same NAME
 

@@ -131,7 +131,7 @@ Definition wp_iupdate_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -183,7 +183,7 @@ Definition wp_iupdate_sconf_body
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  iupdate itself never
      acquires or releases anything -- it just calls bread, whose OWN acquire
      mints [arm_pay 0 eb _] and whose OWN release spends it again before
@@ -239,7 +239,7 @@ Definition wp_iupdate_sconf_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -293,7 +293,7 @@ Definition wp_iupdate_gen_body
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -345,7 +345,7 @@ Definition wp_iupdate_gen_body
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_iupdate_sconf_body] above -- required so that a caller reaching
      iupdate through the SET form (writei's own loop, deriving its counted
@@ -395,7 +395,7 @@ Definition wp_iupdate_gen_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -449,7 +449,7 @@ Definition wp_iupdate_cred_body
     (u : nat) (Sb : gset Z) (cru : bool)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -511,7 +511,7 @@ Definition wp_iupdate_cred_body
      enabled base.  See SpecSched.v / SpecSleep.v. *)
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -556,7 +556,7 @@ Definition wp_iupdate_cred_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
@@ -624,7 +624,7 @@ Definition wp_iupdate_credgen_body
     (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -657,7 +657,7 @@ Definition wp_iupdate_credgen_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -690,7 +690,7 @@ Definition wp_iupdate_credgen_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -736,10 +736,10 @@ Module Type IUPDATE.
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
-                            pidv dq dqd dqn dqs m K eb C b.
+                            pidv dq dqd dqn dqs m K eb C b lks.
 
   (* the SET-FORM contract; [wp_iupdate_sconf] above is its instance with the
      set forgotten, kept as its own parameter so that every existing caller
@@ -760,10 +760,10 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
-                          pidv dq dqd dqn dqs m K eb C b.
+                          pidv dq dqd dqn dqs m K eb C b lks.
   (* the CREDITED set-form contract (S5a finding 3): the same walk with the
      unit returned when the op has already logged this inode's block.
      [wp_iupdate_gen] is its [cru := false] instance. *)
@@ -783,10 +783,10 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                           pidv dq dqd dqn dqs m K eb C b.
+                           pidv dq dqd dqn dqs m K eb C b lks.
   (* the credited set-form contract at itrunc's altitude: eb-generic, so a
      pure pass-through caller can hand its own complements through, and
      RESOURCE-credited, so a caller holding the group witness rather than
@@ -810,8 +810,8 @@ Module Type IUPDATE.
       (u : nat) (Sb : gset Z) (cru : bool) (e0 : nat) (v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
-                              pidv dq dqd dqn dqs m K eb C b.
+                              pidv dq dqd dqn dqs m K eb C b lks.
 End IUPDATE.

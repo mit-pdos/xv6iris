@@ -196,8 +196,8 @@ Section ProofFreeproc.
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (ilvl : nat)
-    : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl.
+      (ilvl : nat) (lks : gset nat)
+    : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
   Proof.
     cbv beta delta [wp_freeproc_sconf_body].
     intros pcE pa ret_tgt HK Hilvl Ha0.
@@ -363,7 +363,7 @@ Section ProofFreeproc.
           /\ me !!! Regidx Rs1 = pa
           /\ fr_thr mm me ⌝ -∗
         sie_cap_gpr me (K - 4)%nat false pme -∗
-        cpu_own ilvl eb pme C false -∗
+        cpu_own ilvl eb pme C false lks -∗
         pc_is (mword_of_int (FR + 0x22) : mword 64) -∗
         p_pagetable pa ↦₈ pgv -∗
         p_trapframe pa ↦₈ (zero_reg : mword 64) -∗
@@ -624,7 +624,7 @@ Section ProofFreeproc.
           /\ me !!! Regidx Rs1 = pa
           /\ fr_thr mm me ⌝ -∗
         sie_cap_gpr me (K - 4)%nat false pme -∗
-        cpu_own ilvl eb pme C false -∗
+        cpu_own ilvl eb pme C false lks -∗
         pc_is (mword_of_int (FR + 0x14) : mword 64) -∗
         p_trapframe pa ↦₈ tfv -∗
         p_sz pa ↦₈ pv_sz V -∗
@@ -722,7 +722,7 @@ Section ProofFreeproc.
           by (rewrite /B2 upd_eq; reflexivity).
         iDestruct (cpu_own_transport CIDp CIDp5 ilvl eb pme C false ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
-        iApply (PFP.wp_proc_freepagetable_sconf γa B2 P (K - 4)%nat eb pme C ilvl false
+        iApply (PFP.wp_proc_freepagetable_sconf γa B2 P (K - 4)%nat eb pme C ilvl false lks
                   Hcpf Hilvl HB2a0
                   ltac:(rewrite HB2a1; exact Hszr)
                   ltac:(rewrite HB2a1; exact Hbelow)
@@ -846,7 +846,7 @@ Section ProofFreeproc.
                    with "Hcpu") as "Hcpu".
       iApply (KF.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
                 (mword_of_int (KernelSyms.kmem + 24)) T1 None ilvl eb pme C
-                (K - 4)%nat false
+                (K - 4)%nat false lks
                 Hckf eq_refl eq_refl Hilvl
                 with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail Hpanic").
       { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HT1a0; exact Htfval |].

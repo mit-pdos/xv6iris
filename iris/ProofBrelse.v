@@ -259,7 +259,7 @@ Section ProofBrelse.
     is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
-    cpu_own 1%nat eb p C false -∗
+    cpu_own 1%nat eb p C false {[lock_rank "bcache"]} -∗
     arm_pay 0%nat eb p -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
@@ -517,8 +517,8 @@ Section ProofBrelse.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool)
-    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset nat)
+    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b lks.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
     intros pcE ret_tgt HK Hk Ha0.
@@ -766,7 +766,7 @@ Section ProofBrelse.
     iDestruct (cpu_own_transport CID CID10 0%nat b p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b C b
+              "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b C b lks
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
     { iEval (rewrite HmAa0). iExact "Hslk". }
@@ -847,7 +847,7 @@ Section ProofBrelse.
     iDestruct (cpu_own_transport CID11 CID14 0%nat b p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b C b
+              "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b C b lks
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hpanic Hprocs").
     { iEval (rewrite HH2a0). iExact "Hslk". }

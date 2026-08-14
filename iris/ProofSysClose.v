@@ -327,8 +327,8 @@ Section ProofSysClose.
   Lemma wp_sys_close_sconf  (γl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b.
+      (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+    : wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav.

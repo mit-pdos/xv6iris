@@ -64,7 +64,8 @@ Import Defs.
 
 Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
+    (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep_prepare in
   let pj := proc_addr j in
   (* a0 = the channel *)
@@ -79,7 +80,7 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   (* 4 slots for this frame, 10 for myproc's / acquire's / release's *)
   (14 <= av)%nat ->
   sie_cap_gpr m av b pj -∗
-  cpu_own n eb pj C b -∗
+  cpu_own n eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -87,7 +88,7 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own n eb pj C b -∗
+      cpu_own n eb pj C b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -96,6 +97,7 @@ Module Type SLEEP_PREPARE.
   Parameter wp_sleep_prepare_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_sleep_prepare_sconf_body γs j γl m av n eb C b.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (lks : gset nat),
+      wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
 End SLEEP_PREPARE.

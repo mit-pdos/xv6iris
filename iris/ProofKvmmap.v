@@ -45,8 +45,8 @@ Section ProofKvmmap.
       (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
-    : wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b.
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat)
+    : wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -219,7 +219,7 @@ Section ProofKvmmap.
        them.  ONE line, no case split on [b]. ---- *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf γa P6 t m npages perm lvl (K - 2)%nat eb p C on b
+    iApply (Mappages.wp_mappages_sconf γa P6 t m npages perm lvl (K - 2)%nat eb p C on b lks
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)

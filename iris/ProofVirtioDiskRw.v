@@ -119,13 +119,13 @@ Section ProofVirtioDiskRw.
   Lemma wp_vdrw_p1
       (γd : disk_names) (γk : gname) (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
-      (bno : mword 32) :
+      (bno : mword 32) (lks : gset nat) :
     let sp0 : Arch.pa := m !!! Regidx csp_rs1 in
     let bp  : Arch.pa := m !!! Regidx Ra0 in
     let wr  : mword 64 := m !!! Regidx Ra1 in
     (K_virtio_disk_rw <= K)%nat ->
     sie_cap_gpr m K eb pj -∗
-    cpu_own 0 eb pj C eb -∗
+    cpu_own 0 eb pj C eb lks -∗
     (* NOT USED HERE: [wp_vdrw_p1] is pure prologue-plus-acquire, so the
        complement just RIDES ALONG, transported to the acquire-return hart
        exactly like [cpu_own] below, and handed to the continuation
@@ -140,7 +140,16 @@ Section ProofVirtioDiskRw.
       ∀ M : regfile,
         ⌜vdrw_regs M sp0 bp wr (vdrw_sector_raw bno) /\ vdrw_hi M m⌝ -∗
         sie_cap_gpr M (trap_res eb + (K - 12))%nat false pj -∗
-        cpu_own 1 eb pj C false -∗
+        (* UNSURE: wp_vdrw_p1 acquires "virtio_disk" (rank 9, LockRank.v) via
+           Acquire.wp_acquire_sconf and does not release it before this
+           postcondition ("Lands at +0x036 holding the lock", above) -- the
+           held-lock set here plausibly wants to be
+           [{[lock_rank "virtio_disk"]} ∪ lks] rather than [lks] unchanged.
+           Threaded UNCHANGED because SpecAcquire.v (ACQUIRE module, out of
+           this sweep's file list) has not itself gained the [gset nat]
+           argument yet, so its exact shape cannot be confirmed here; flagged
+           for review. *)
+        cpu_own 1 eb pj C false lks -∗
         arm_pay 0 eb pj -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -546,9 +555,14 @@ Section ProofVirtioDiskRw.
       by (rewrite /R11; apply upd_eq).
     iDestruct (cpu_own_transport CID CIDp21 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
+    (* UNSURE: Acquire.wp_acquire_sconf (SpecAcquire.v, ACQUIRE module) is
+       outside this sweep's file list and, as read, still takes the
+       pre-sweep 5-argument [cpu_own]; not passing [lks] here since its
+       future signature/position is unknown from this file alone. Flagged
+       for review alongside the postcondition above. *)
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
               (disk_res γd pd pav pu) R11 0%nat eb pj C (K - 12)%nat eb
-              vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
+              _ vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Hown Htext Hpc [] Hpanic").
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".

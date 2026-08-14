@@ -338,8 +338,8 @@ Section ProofFileread.
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool)
-    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat)
+    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb.
@@ -829,7 +829,7 @@ Section ProofFileread.
                      with "Hcnt") as "Hcnt".
         iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb C pidv V n b
-                  Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
+                  _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
         iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
@@ -1384,7 +1384,7 @@ Section ProofFileread.
                 iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
                           (frn_cons fn)
                           E2 (K - 6)%nat eb C pidv V n b
-                          Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
+                          _ Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
                                 Hprocs Hpanic").
@@ -1744,7 +1744,7 @@ Section ProofFileread.
                        icfg_dev inm
                        pidv (DfracOwn (1/4)) (frn_dqs fn)
                        I2 (K - 6)%nat eb C b
-                       (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
+                       (_ fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk)
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs

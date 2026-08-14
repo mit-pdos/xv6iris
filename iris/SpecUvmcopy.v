@@ -98,7 +98,7 @@ Import Defs.
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) (b : bool) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -120,7 +120,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      it is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
   sie_cap_gpr mm K b p -∗
-  cpu_own ilvl eb p C b -∗
+  cpu_own ilvl eb p C b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt Pold -∗
@@ -129,7 +129,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own ilvl eb p C b -∗
+    cpu_own ilvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     (* the parent's table comes back verbatim *)
@@ -161,6 +161,6 @@ Module Type UVMCOPY.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p C ilvl b.
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat),
+      wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p C ilvl b lks.
 End UVMCOPY.

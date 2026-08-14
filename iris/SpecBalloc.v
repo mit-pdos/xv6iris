@@ -158,7 +158,7 @@ Definition wp_balloc_sconf_body
     (u : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -183,7 +183,7 @@ Definition wp_balloc_sconf_body
   (* the uint argument arrives sign-extended (RV64 ABI) *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  balloc holds no lock of its
      own -- every push_off/pop_off pair that can mint or spend an
      [arm_pay 0 eb _] lives inside bread (and, through it, acquiresleep /
@@ -236,7 +236,7 @@ Definition wp_balloc_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -317,7 +317,7 @@ Definition wp_balloc_gen_body
     (u : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -335,7 +335,7 @@ Definition wp_balloc_gen_body
   γs !! j = Some γl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_balloc_sconf_body] above.  balloc holds no lock of its own, so it
      never inspects these: it carries them from entry to exit and hands
@@ -370,7 +370,7 @@ Definition wp_balloc_gen_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -421,10 +421,10 @@ Module Type BALLOC.
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr u cr Sb
-                         pidv dq dqb dqs m K eb C b.
+                         pidv dq dqb dqs m K eb C b lks.
 
   Parameter wp_balloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -442,8 +442,8 @@ Module Type BALLOC.
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u
-                           pidv dq dqb dqs m K eb C b.
+                           pidv dq dqb dqs m K eb C b lks.
 End BALLOC.

@@ -118,7 +118,7 @@ Section ProofSysExit.
     : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
                              γi cn γtl bmapstart inodestart nib size dqb dqs us
-                             on fn m av eb C b pid V v0.
+                             on fn m av eb C b pid V v0 lks.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
     intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb.

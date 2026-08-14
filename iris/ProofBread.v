@@ -241,10 +241,10 @@ Local Ltac regne := reg_ne_side.
 Section BreadDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
 
-  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId} 
+  Definition bd_cont `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) (lks : gset nat)
       : iProp Σ :=
     (* THE LITERAL [true], matching SpecBread's crossing: bread PARKS (its
        acquiresleep sleeps), so its continuation is about an arbitrary hart
@@ -255,7 +255,7 @@ Section BreadDefs.
         ⌜callee_saved m mf
          /\ mf !!! Regidx Ra0 = bnode k⌝ -∗
         sie_cap_gpr mf K eb pj -∗
-        cpu_own 0 eb pj C eb -∗
+        cpu_own 0 eb pj C eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
@@ -267,14 +267,14 @@ Section BreadDefs.
      hands the continuation on at.  [WpSconfVc.wp_next_shift] proves exactly
      this, but cannot see [wp_next]'s [K] through the named [Definition]
      (durable-notes), so it is re-proved here at the unfolded body. *)
-  Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId} 
+  Lemma bd_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) :
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ) (lks : gset nat) :
     (* the guard is at the LITERAL [true] now, [bd_cont]'s own index *)
     (true = false \/ pj = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    bd_cont (CID0 := CIDa)  j bn V pidv dev bno dq m K eb pj C -∗
-    bd_cont (CID0 := CIDb)  j bn V pidv dev bno dq m K eb pj C.
+    bd_cont (CID0 := CIDa)  j bn V pidv dev bno dq m K eb pj C lks -∗
+    bd_cont (CID0 := CIDb)  j bn V pidv dev bno dq m K eb pj C lks.
   Proof.
     intros Hs. rewrite /bd_cont /wp_next.
     iIntros "H" (CID2 Hs2). iApply "H". iPureIntro.
@@ -318,11 +318,11 @@ Section BreadBlocks.
   (*  THE EPILOGUE (0xb8 .. 0xc6), reached from both arms of the tail.   *)
   (* ================================================================== *)
 
-  Local Lemma bread_epi `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_epi `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs_out bsd : list (bv 8)) (d : bool) :
+      (bs_out bsd : list (bv 8)) (d : bool) (lks : gset nat) :
     (K_bread <= K)%nat ->
     bd_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
@@ -330,12 +330,12 @@ Section BreadBlocks.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bread + 0xb8) : mword 64) -∗
     bd_frame m -∗
-    cpu_own 0 eb (proc_addr j) C eb -∗
+    cpu_own 0 eb (proc_addr j) C eb lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     bio_locked bn V k pidv dev bno bs_out bsd d -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK (HMsp & HMs2 & HMs3 & HMthr) HMs1.
@@ -514,7 +514,7 @@ Section BreadBlocks.
       rewrite /E2 upd_ne; [exact HE1a0 | vm_compute; discriminate]. }
     (* [cpu_own] is the one resource a leaf's [wp_next] does NOT re-deliver;
        the trap-CSR complement is hart-indexed too and travels the same way. *)
-    iDestruct (cpu_own_transport CID0 CIDe8 0%nat eb (proc_addr j) C eb
+    iDestruct (cpu_own_transport CID0 CIDe8 0%nat eb (proc_addr j) C eb 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CIDe8 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
@@ -568,13 +568,13 @@ Section BreadBlocks.
   (*  that reads b->valid, the valid test, and the disk-read arm.         *)
   (* ================================================================== *)
 
-  Local Lemma bread_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_tail `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat) (q : Qp)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
@@ -591,7 +591,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     inv bioN (buf_escrow_body bn V k) -∗
     bd_frame m -∗
-    cpu_own 0 eb (proc_addr j) C eb -∗
+    cpu_own 0 eb (proc_addr j) C eb lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     procs_inv γs -∗
@@ -603,7 +603,7 @@ Section BreadBlocks.
     sl_pid (buf_lock (bnode k)) ↦₄ pidv -∗
     bown bn k -∗
     bref bn k q dev bno -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hregs HMs1.
@@ -645,7 +645,7 @@ Section BreadBlocks.
       iFrame "Hvld Hbdev Hbuf Hpay". }
     iIntros (vld CIDt1 Hst1) "Hcg Hpc H".
     iDestruct "H" as (vb bs) "(%Hpin & Hvld & Hbdev & Hbuf & Hpay)".
-    iDestruct (cpu_own_transport CID0 CIDt1 0%nat eb (proc_addr j) C eb
+    iDestruct (cpu_own_transport CID0 CIDt1 0%nat eb (proc_addr j) C eb 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     set (T1 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 (vld : mword 32))]> M).
     assert (HT1s1 : T1 !!! Regidx Rs1 = bnode k)
@@ -687,16 +687,16 @@ Section BreadBlocks.
       assert (Hppb8 : add_vec_int (mword_of_int (KernelSyms.bread + 0xb6) : mword 64) 2 = mword_of_int (KernelSyms.bread + 0xb8))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hppb8) in "Hpc".
-      iDestruct (cpu_own_transport CIDt1 CIDv2 0%nat eb (proc_addr j) C eb
+      iDestruct (cpu_own_transport CIDt1 CIDv2 0%nat eb (proc_addr j) C eb 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CIDv2 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID0 CIDv2 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDv2)  j bn V pidv dev bno dq
-                   m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                   m K eb (proc_addr j) C lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (bread_epi (CID0 := CIDv2)  j bn V k pidv dev bno dq m T1 K eb C
-                bs bsd d HK HT1regs HT1s1
+                bs bsd d lks HK HT1regs HT1s1
                 with "Hcg Htext Hpc Hframe Hcnt Hextc Hextm Hppid
                       [Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy] Hcont").
       rewrite /bio_locked /bio_held /bpa.
@@ -790,7 +790,7 @@ Section BreadBlocks.
       { intros kk Hkk. rewrite HT4a0. exact (bnode_data_kdata k kk Hk Hkk). }
       assert (HKrw : (K_virtio_disk_rw <= K - 6)%nat)
         by (unfold K_virtio_disk_rw, K_bread in *; lia).
-      iDestruct (cpu_own_transport CIDt1 CIDt5 0%nat eb (proc_addr j) C eb
+      iDestruct (cpu_own_transport CIDt1 CIDt5 0%nat eb (proc_addr j) C eb 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CIDt5 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
@@ -798,7 +798,7 @@ Section BreadBlocks.
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu T4
                 (K - 6)%nat eb C bno (mword_of_int 0 : mword 32) bs bsl eb
-                True%I
+                True%I lks
                 HKrw Hbno Hkdata Hj Hgl
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprocs
                       Hdev Hgeom Hdlock [Hbuf] Hdb []").
@@ -890,18 +890,18 @@ Section BreadBlocks.
           rewrite /T1 upd_ne; [| apply not_eq_sym; apply is_cs_idx_true_neq;
                                  [vm_compute; reflexivity | assumption]].
           exact (HMthr c Hcs N2 N8 N9 N18 N19 N4). }
-      iDestruct (cpu_own_transport CIDrw CIDt8 0%nat eb (proc_addr j) C eb
+      iDestruct (cpu_own_transport CIDrw CIDt8 0%nat eb (proc_addr j) C eb lks
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDrw CIDt8 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDrw CIDt8 eb (proc_addr j)
                    ltac:(wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDt8)  j bn V pidv dev bno dq
-                   m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                   m K eb (proc_addr j) C lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iAssert (bio_pay bn V k dev bno bsl bsl false) with "[Hcl]" as "Hpy".
       { rewrite /bio_pay. cbv iota. iFrame "Hcl". done. }
       iApply (bread_epi (CID0 := CIDt8)  j bn V k pidv dev bno dq m T5 K eb C
-                bsl bsl false HK HT5regs HT5s1
+                bsl bsl false lks HK HT5regs HT5s1
                 with "Hcg Htext Hpc Hframe Hcnt Hextc Hextm Hppid
                       [Hstok Hpid Hvld Hbdev Hbuf Hdb Hpy] Hcont").
       rewrite /bio_locked /bio_held /bpa.
@@ -917,14 +917,14 @@ Section BreadBlocks.
   (*  [false] index, hence at this lemma's own hart.                      *)
   (* ================================================================== *)
 
-  Local Lemma bread_hit `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_hit `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
@@ -943,7 +943,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false -∗
+    cpu_own 1 eb (proc_addr j) C false lks -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -955,7 +955,7 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Hk Hdevs Hbnos Hgd Hcov Hdv Hj Hgl Hregs HMs1.
@@ -1131,7 +1131,7 @@ Section BreadBlocks.
       by (rewrite /H7 upd_ne; [exact HH6a0 | vm_compute; discriminate]).
     assert (HH7ra : H7 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0x5e) : mword 64) 4)
       by (rewrite /H7; apply upd_eq).
-    iDestruct (cpu_own_transport CIDr CIDh2 0%nat eb (proc_addr j) C eb
+    iDestruct (cpu_own_transport CIDr CIDh2 0%nat eb (proc_addr j) C eb lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CIDh2 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
@@ -1141,7 +1141,7 @@ Section BreadBlocks.
        since entry -- bread's own release above never conjured it, only the
        [arm_pay] its acquire minted) is exactly what acquiresleep asks for. *)
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) H7 pidv (K - 6)%nat eb C eb
+              "buffer"%string (bown bn k) H7 pidv (K - 6)%nat eb C eb lks
               Hj ltac:(unfold K_bread in HK; lia)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     { iEval (rewrite HH7a0). iExact "Hslk". }
@@ -1178,16 +1178,16 @@ Section BreadBlocks.
                      = mword_of_int (KernelSyms.bread + 0xb4))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtb4) in "Hpc".
-    iDestruct (cpu_own_transport CIDs CIDh3 0%nat eb (proc_addr j) C eb
+    iDestruct (cpu_own_transport CIDs CIDh3 0%nat eb (proc_addr j) C eb lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CIDs CIDh3 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDs CIDh3 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDh3)  j bn V pidv dev bno dq
-                 m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                 m K eb (proc_addr j) C lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (bread_tail (CID0 := CIDh3)  γs j γl γu γd γk pd pav pu bn V k qref pidv dev bno dq
-              m mf K eb C HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1
+              m mf K eb C lks HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1
               with "Hcg Htext Hpc Hpanic Hesc Hframe Hcnt Hextc Hextm Hprocs Hppid
                     Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hcont").
   Qed.
@@ -1199,14 +1199,14 @@ Section BreadBlocks.
   (*  0x90..0xa8 hold the bcache lock, hence the literal [false] index.    *)
   (* ================================================================== *)
 
-  Local Lemma bread_recyc `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_recyc `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     (k < NBUF)%nat ->
@@ -1229,7 +1229,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false -∗
+    cpu_own 1 eb (proc_addr j) C false lks -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1241,7 +1241,7 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Hk HMk Hgd Hcov Hdv Htie Ha0 Ha1 Hj Hgl Hregs HMs1.
@@ -1495,7 +1495,7 @@ Section BreadBlocks.
       by (rewrite /C6 upd_ne; [exact HC5a0 | vm_compute; discriminate]).
     assert (HC6ra : C6 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bread + 0xb0) : mword 64) 4)
       by (rewrite /C6; apply upd_eq).
-    iDestruct (cpu_own_transport CIDr CIDc2 0%nat eb (proc_addr j) C eb
+    iDestruct (cpu_own_transport CIDr CIDc2 0%nat eb (proc_addr j) C eb lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CIDc2 eb (proc_addr j)
                  ltac:(wp_next_chain) with "Hextc") as "Hextc".
@@ -1504,7 +1504,7 @@ Section BreadBlocks.
     (* acquiresleep is index-generic now: bread's own complement (untouched
        since entry) is exactly what acquiresleep asks for. *)
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) C6 pidv (K - 6)%nat eb C eb
+              "buffer"%string (bown bn k) C6 pidv (K - 6)%nat eb C eb lks
               Hj ltac:(unfold K_bread in HK; lia)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     { iEval (rewrite HC6a0). iExact "Hslk". }
@@ -1529,9 +1529,9 @@ Section BreadBlocks.
       - intros c Hcs N2 N8 N9 N18 N19 N4.
         rewrite (HmfX c Hcs). exact (HMthr c Hcs N2 N8 N9 N18 N19 N4). }
     iDestruct (bd_cont_shift (CIDa := CID0) (CIDb := CIDs)  j bn V pidv dev bno dq
-                 m K eb (proc_addr j) C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                 m K eb (proc_addr j) C lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (bread_tail (CID0 := CIDs)  γs j γl γu γd γk pd pav pu bn V k (1/4)%Qp pidv dev bno dq
-              m mf K eb C HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1
+              m mf K eb C lks HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hmfregs Hmfs1
               with "Hcg Htext Hpc Hpanic Hesc Hframe Hcnt Hextc Hextm Hprocs Hppid
                     Hdev Hgeom Hdlock Hstok Hpid Hbown Href Hcont").
   Qed.
@@ -1552,7 +1552,7 @@ Section BreadBlocks.
   (*  needs re-anchoring.                                                 *)
   (* ================================================================== *)
 
-  Local Lemma bread_bloop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_bloop `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1560,7 +1560,7 @@ Section BreadBlocks.
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) :
+      (n : nat) (lks : gset nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
@@ -1584,7 +1584,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false -∗
+    cpu_own 1 eb (proc_addr j) C false lks -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1596,7 +1596,7 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie.
@@ -1681,7 +1681,7 @@ Section BreadBlocks.
         iSplitR; [iPureIntro; exact Hdevpin|].
         iFrame "Hlru Hpool Hslots". }
       iApply (bread_recyc (CID0 := CID0)  γs j γl γu γd γk pd pav pu bn V kk Mg ord devs bnos
-                pidv dev bno dq m B1 K eb C
+                pidv dev bno dq m B1 K eb C lks
                 HK Hbno Hkk HMkNone Hgd Hcov Hdv Htie Ha0 Ha1 Hj Hgl HB1regs HB1s1
                 with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Hextc Hextm Htok Hscan Hbslot
                       Hprocs Hppid Hdev Hgeom Hdlock Hcont").
@@ -1834,14 +1834,14 @@ Section BreadBlocks.
   (*  real buffer.  Still inside the critical section: index [false].      *)
   (* ================================================================== *)
 
-  Local Lemma bread_miss `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_miss `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ)
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
@@ -1861,7 +1861,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false -∗
+    cpu_own 1 eb (proc_addr j) C false lks -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -1873,7 +1873,7 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie Hordp Hregs.
@@ -2020,7 +2020,7 @@ Section BreadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7a) in "Hpc".
     iApply (bread_bloop (CID0 := CID0)  γs j γl γu γd γk pd pav pu bn V Mg ord devs bnos
-              pidv dev bno dq m K eb C (length ord)
+              pidv dev bno dq m K eb C (length ord) lks
               HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie ord [] Q5
               ltac:(reflexivity) ltac:(rewrite app_nil_r; reflexivity)
               (bd_ord_nonnil ord Hordp) HQ5regs HQ5s1 HQ5a4
@@ -2040,7 +2040,7 @@ Section BreadBlocks.
   (*  IH -- stay at this lemma's own hart.                                 *)
   (* ================================================================== *)
 
-  Local Lemma bread_floop `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma bread_floop `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2048,7 +2048,7 @@ Section BreadBlocks.
       (Mg : gmap nat (Qp * positive)) (ord : list nat) (devs bnos : nat -> mword 32)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (n : nat) :
+      (n : nat) (lks : gset nat) :
     (K_bread <= K)%nat ->
     (uint bno < 2147483648)%Z ->
     m !!! Regidx Ra0 = sign_extend' 64 dev ->
@@ -2076,7 +2076,7 @@ Section BreadBlocks.
     panic_wp_any -∗
     bio_ctx bn V -∗
     bd_frame m -∗
-    cpu_own 1 eb (proc_addr j) C false -∗
+    cpu_own 1 eb (proc_addr j) C false lks -∗
     arm_pay 0 eb (proc_addr j) -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
@@ -2088,7 +2088,7 @@ Section BreadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+    bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Hordp.
@@ -2115,7 +2115,7 @@ Section BreadBlocks.
                sie_cap_gpr Mx (trap_res eb + (K - 6))%nat false (proc_addr j) -∗
                pc_is (mword_of_int (KernelSyms.bread + 0x36) : mword 64) -∗
                bd_frame m -∗
-               cpu_own 1 eb (proc_addr j) C false -∗
+               cpu_own 1 eb (proc_addr j) C false lks -∗
                arm_pay 0 eb (proc_addr j) -∗
                trap_csrs_ext eb -∗
                cpu_claim_ext eb (proc_addr j) -∗
@@ -2123,7 +2123,7 @@ Section BreadBlocks.
                bcache_scan bn V Mg ord devs bnos -∗
                bslot bn -∗
                p_pid (proc_addr j) ↦₄{dq} pidv -∗
-               bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
+               bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C lks -∗
                WP (Loop : expr riscv_lang))%I as "HADV".
     { iIntros (Mx (Hxregs & Hxs1 & Hxa4 & Hxne)).
       iIntros "Hcg Hpc Hframe Hcnt Hpay Hextc Hextm Htok Hscan Hbslot Hppid Hcont".
@@ -2201,7 +2201,7 @@ Section BreadBlocks.
         assert (Htie : forall i, (i < NBUF)%nat -> ¬ (devs i = dev /\ bnos i = bno)).
         { intros i Hi. apply Hdone'. rewrite -Hordk. exact (bd_ord_mem ord Hordp i Hi). }
         iApply (bread_miss (CID0 := CID0)  γs j γl γu γd γk pd pav pu bn V Mg ord devs bnos
-                  pidv dev bno dq m G1 K eb C
+                  pidv dev bno dq m G1 K eb C lks
                   HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie Hordp HG1regs
                   with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Hextc Hextm Htok Hscan Hbslot
                         Hprocs Hppid Hdev Hgeom Hdlock Hcont").
@@ -2350,7 +2350,7 @@ Section BreadBlocks.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp48) in "Hpc".
         iApply (bread_hit (CID0 := CID0)  γs j γl γu γd γk pd pav pu bn V kk Mg ord devs bnos
-                  pidv dev bno dq m F2 K eb C
+                  pidv dev bno dq m F2 K eb C lks
                   HK Hbno Hkk Hdeq Hbeq2 Hgd Hcov Hdv Hj Hgl HF2regs HF2s1
                   with "Hcg Htext Hpc Hpanic Hbio Hframe Hcnt Hpay Hextc Hextm Htok Hscan Hbslot
                         Hprocs Hppid Hdev Hgeom Hdlock Hcont").
@@ -2413,16 +2413,16 @@ Section ProofBread.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_bread_sconf 
+  Lemma wp_bread_sconf
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
-                          pidv dev bno dq m K eb C b.
+                          pidv dev bno dq m K eb C b lks.
   Proof.
     cbv beta delta [wp_bread_sconf_body].
     intros pcE pj ret_tgt HK Hbno Hgd Hcov Hdv Hj Hgl Ha0 Ha1.
@@ -2443,7 +2443,7 @@ Section ProofBread.
        function's OWN release always spends the [arm_pay] it minted, never
        this complement. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst b.
-    iAssert (bd_cont (CID0 := CID)  j bn V pidv dev bno dq m K eb pj C)
+    iAssert (bd_cont (CID0 := CID)  j bn V pidv dev bno dq m K eb pj C lks)
       with "[Hcont]" as "Hcont".
     { rewrite /bd_cont. iExact "Hcont". }
     iDestruct (bio_ctx_lock with "Hbio") as "#Hlock".
@@ -2688,7 +2688,7 @@ Section ProofBread.
     iEval (rewrite Hpc1e) in "Hpc".
     pose proof Hacqpins as Hacqpins_cs.
     iDestruct (bd_cont_shift (CIDa := CID) (CIDb := CIDq)  j bn V pidv dev bno dq
-                 m K eb pj C ltac:(wp_next_chain) with "Hcont") as "Hcont".
+                 m K eb pj C lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     (* the trap-CSR complement is untouched since entry -- bread's own
        release/acquire dance never conjures it, only [arm_pay] -- so its
        first transport goes straight from the entry hart to [CIDq]. *)
@@ -2856,7 +2856,7 @@ Section ProofBread.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt3c) in "Hpc".
     iApply (bread_floop (CID0 := CIDq)  γs j γl γu γd γk pd pav pu bn V Mg ord devs bnos
-              pidv dev bno dq m K eb C (length ord)
+              pidv dev bno dq m K eb C (length ord) lks
               HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Hordp [] ord W5
               ltac:(reflexivity) ltac:(reflexivity)
               (bd_ord_nonnil ord Hordp) (bd_done_nil _) HW5regs HW5s1 HW5a4

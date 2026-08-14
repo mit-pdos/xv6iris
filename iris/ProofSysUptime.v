@@ -116,8 +116,8 @@ Section ProofSysUptime.
 
 
   Lemma wp_sys_uptime_sconf (γl : gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
-    : wp_sys_uptime_sconf_body γl m n eb p C av b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset nat)
+    : wp_sys_uptime_sconf_body γl m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_sys_uptime_sconf_body].
     intros pcE ret_tgt Htp Hn Hav.
@@ -255,7 +255,7 @@ Section ProofSysUptime.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res A4
               n eb p C (av - 4)%nat b
-              ltac:(exact Hn)
+              ltac:(exact _ Hn)
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
     { iEval (rewrite HA4a0). iExact "Hlk". }

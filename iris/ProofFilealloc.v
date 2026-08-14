@@ -99,8 +99,8 @@ Section ProofFilealloc.
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
      two independent presentations of the same SIE state; see
      ProofFiledup.v's identical helper for the full comment. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
@@ -158,7 +158,7 @@ Section ProofFilealloc.
   Definition fa_epi_body
       (γf : gname) (m : regfile) (spr : mword 64) (K : nat) (b : bool)
       (p : mword 64) (C : iProp Σ) (n : nat) (eb : bool) (ret_tgt : mword 64)
-      (CID0 : CpuId) : iProp Σ :=
+      (CID0 : CpuId) (lks : gset nat) : iProp Σ :=
     (∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
           /\ mj !!! Regidx Rs1 = res
@@ -167,12 +167,12 @@ Section ProofFilealloc.
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
         pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
-        cpu_own (CID := CID0) n eb p C b -∗
+        cpu_own (CID := CID0) n eb p C b lks -∗
         filealloc_post γf res -∗
         wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
           ∀ mfin,
           sie_cap_gpr mfin K b p -∗
-          cpu_own n eb p C b -∗
+          cpu_own n eb p C b lks -∗
           pc_is ret_tgt -∗
           ⌜ callee_saved m mfin ⌝ -∗
           filealloc_post γf (mfin !!! Regidx Ra0) -∗
@@ -181,14 +181,14 @@ Section ProofFilealloc.
 
   Lemma wp_filealloc_sconf
       (γl γf : gname) (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_filealloc_sconf_body γl γf m n eb p C K b.
+      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_filealloc_sconf_body γl γf m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_filealloc_sconf_body].
     intros pcE ret_tgt HK HnZ.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hfdslot Hcont".
-    iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (fai_00 with "Htext") as "Hi00".
@@ -429,7 +429,7 @@ Section ProofFilealloc.
        closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
        at each concrete call site, is the one who both knows the full
        chain back to entry and holds the real [Hcont]. *)
-    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p C n eb ret_tgt CID0)%I
+    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p C n eb ret_tgt CID0 lks)%I
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hepi".
     { iIntros (CID0 mj res) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hpc Hcnt Hpost Kont".
       (* +0x52 c.mv a0,s1 *)

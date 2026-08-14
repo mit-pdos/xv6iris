@@ -92,27 +92,31 @@ Proof. solve_decision. Defined.
 Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
 
 (* THE PER-CPU HELD-LOCK SET (LockSet.v, claude-notes/design/kernel-proofs.md):
-   an authority over the set of spinlock ADDRESSES this hart currently holds.
-   The authority rides in [IntrDefs.cpu_hart] -- i.e. with the running kernel
-   thread while interrupts are off, and inside [sie_arm true] while they are
-   on -- and a HELD lock's invariant keeps the matching [gset_disj] fragment,
-   which is what makes "[lk->cpu] is set to hart i" and "lk is in i's held
-   set" one fact rather than two.
+   an authority over the set of RANKS -- lock-order levels, [LockRank.v] -- of
+   the spinlocks this hart currently holds.  The authority rides in
+   [IntrDefs.cpu_hart] -- i.e. with the running kernel thread while interrupts
+   are off, and inside [sie_arm true] while they are on -- and a HELD lock's
+   invariant keeps the matching [gset_disj] fragment, which is what makes
+   "[lk->cpu] is set to hart i" and "a lock of this rank is in i's held set"
+   one fact rather than two.
 
    [gset_disj] rather than a plain [gset]: the fragment must be EXCLUSIVE (so
    release, holding it, can retire the element) and it must be UNFORGEABLE (so
    the tie means something).  What that costs is that minting one needs
-   [lk ∉ S] -- discharged, not assumed, out of the lock's own [lk->cpu] cell;
-   see [LockSet.cpu_locks].
+   [r ∉ S] -- which is exactly what acquire's order premise
+   [LockRank.locks_below S r] supplies, via [locks_below_not_elem].
 
-   The key instances are PINNED to Sail's, for exactly the reason
-   [riscvF_kmapGS] pins them below: every use site elaborates
-   [gset (mword 64)] with the instances Sail's import puts in scope, and an
-   unpinned field here would take stdpp's and fail to unify. *)
-Definition lockSetR : cmra :=
-  authR (gset_disjUR (SailStdpp.Values.mword 64)
-           (EqDecision0 := @SailStdpp.Instances.Decidable_eq_mword 64)
-           (H := @SailStdpp.Instances.Countable_mword 64)).
+   RANKS, NOT ADDRESSES, and the element type is where all the ergonomics
+   live.  An address set would have to carry a rank alongside each element for
+   acquire's premise to be statable at all, and the address half would then
+   never be read -- xv6 never holds two locks of the same family, so the order
+   is total on every pair it can actually hold (LockRank.v).  Keying on [nat]
+   also means the element type takes stdpp's own instances: no [EqDecision] /
+   [Countable] pinning is needed (contrast [riscvF_kmapGS] below), and
+   [set_solver] WORKS -- over [gset (mword n)] it fails with "No matching
+   clauses for match", which is why the durable notes' discharge-by-named-lemma
+   rule exists and why it no longer applies here. *)
+Definition lockSetR : cmra := authR (gset_disjUR nat).
 
 (* The ghost layer is SPLIT IN TWO (claude-notes/design/crash.md): the
    FIXED layer -- [invGS] plus every functor (inG) class -- will survive

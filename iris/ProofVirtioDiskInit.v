@@ -749,7 +749,7 @@ Section ProofVirtioDiskInit.
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
       (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8)
     : wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
-                                     pd0 pav0 pu0 free0.
+                                     pd0 pav0 pu0 free0 lks.
   Proof.
     cbv beta delta [wp_virtio_disk_init_sconf_body].
     intros pcE ret_tgt c_name c_cpu HK Hex Hcid Hlive0.

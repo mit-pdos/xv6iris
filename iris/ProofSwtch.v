@@ -88,8 +88,8 @@ Section ProofSwtch.
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
+      (av : nat) (eb : bool) (p : mword 64) (lks : gset nat) :
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p lks.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -123,7 +123,7 @@ Section ProofSwtch.
     iDestruct (intr_count_pos_off 0 eb with "Hccnt") as "[Hq0cnt Hres]".
     iAssert (intr_off_tok ∗ intr_count 1 eb)%I with "[Hsiearm Hq0cnt Hres]" as "(Hq0 & Hccnt)".
     { iFrame "Hsiearm". rewrite /intr_count. iFrame "Hq0cnt Hres". }
-    iAssert (cpu_own 1 eb p emp false) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
+    iAssert (cpu_own 1 eb p emp false lks) with "[Hcnoff Hcint Hclks Hccnt Hcproc]" as "Hcpuown".
     { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
       iFrame "Hcnoff Hcint Hcproc Hclks Hccnt". iPureIntro; exact Hcpb. }
     iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.

@@ -187,7 +187,7 @@ Section ProofKkill.
   (* ================================================================== *)
   Lemma wp_kkill_loop `{GEN : GenId} `{CID0 : CpuId}
        (γs : list gname) (mb : regfile)
-      (spd pidv pme : mword 64) (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (spd pidv pme : mword 64) (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     length γs = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
@@ -199,13 +199,13 @@ Section ProofKkill.
       ∀ (Mx : regfile) (rv : mword 64),
         ⌜ kk_exit_regs Mx mb spd rv ⌝ -∗
         sie_cap_gpr Mx av b pme -∗
-        cpu_own lvl eb pme C b -∗
+        cpu_own lvl eb pme C b lks -∗
         pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜kkl_regs M mb spd pidv k⌝ -∗
       sie_cap_gpr M av b pme -∗
-      cpu_own lvl eb pme C b -∗
+      cpu_own lvl eb pme C b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -224,11 +224,11 @@ Section ProofKkill.
                      ∀ (Mx : regfile) (rv : mword 64),
                        ⌜ kk_exit_regs Mx mb spd rv ⌝ -∗
                        sie_cap_gpr Mx av b pme -∗
-                       cpu_own lvl eb pme C b -∗
+                       cpu_own lvl eb pme C b lks -∗
                        pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pme -∗
-                   cpu_own lvl eb pme C b -∗
+                   cpu_own lvl eb pme C b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -839,8 +839,8 @@ Section ProofKkillMain.
   Notation Rs3 := (mword_of_int 19 : mword 5).
 
   Lemma wp_kkill_sconf  (γs : list gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_kkill_sconf_body γs m av n eb p C b.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_kkill_sconf_body γs m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_kkill_sconf_body].
     intros pcE ret_tgt Hlen Hn Hav.
@@ -1073,7 +1073,7 @@ Section ProofKkillMain.
                ∀ (Mx : regfile) (rv : mword 64),
                  ⌜ kk_exit_regs Mx m (pa_stk sp0 6) rv ⌝ -∗
                  sie_cap_gpr Mx (av - 6)%nat b p -∗
-                 cpu_own n eb p C b -∗
+                 cpu_own n eb p C b lks -∗
                  pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
                  WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hqexit".
@@ -1254,7 +1254,7 @@ Section ProofKkillMain.
     iDestruct (cpu_own_transport CID CID12 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iPoseProof (wp_kkill_loop (CID0 := CID12)  γs m (pa_stk sp0 6)
-                  (add_vec zero_reg (M2 !!! Regidx Ra0)) p n (av - 6)%nat eb C b
+                  (add_vec zero_reg (M2 !!! Regidx Ra0)) p n (av - 6)%nat eb C b lks
                   Hlen Hn ltac:(lia) with "Hprocs Hpanic Hqexit") as "Hscan".
     iApply ("Hscan" $! 0%nat M7 with "[%] [%] Hcg Hcpu Htext Hpc").
     - unfold NPROC; lia.

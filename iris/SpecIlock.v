@@ -180,7 +180,7 @@ Definition wp_ilock_sconf_body
     (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ilock in
   let ip : mword 64 := ientry k in
   let pj := proc_addr j in
@@ -203,7 +203,7 @@ Definition wp_ilock_sconf_body
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM -- acquiresleep and bread
      both sleep, and a parking thread hands [trap_csrs] / [cpu_claim] across
      the crossing (SpecSched.v).  At [eb = true] ilock's own [acquiresleep]
@@ -253,7 +253,7 @@ Definition wp_ilock_sconf_body
   ∀ (mf : regfile) (dn : dinode) (bm : blkmap),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -310,8 +310,8 @@ Module Type ILOCK.
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g dev inum
-                          pidv dq dqs m K eb C b.
+                          pidv dq dqs m K eb C b lks.
 End ILOCK.

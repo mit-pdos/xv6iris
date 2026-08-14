@@ -326,8 +326,8 @@ Section ProofSysRead.
   Lemma wp_sys_read_sconf
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fread_names) (pidv : mword 32) (V : pprivate) (v v2 : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb C b.
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_sys_read_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb C b lks.
   Proof.
     cbv beta delta [wp_sys_read_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Harg2 Hn0 Hnmax Heb.
@@ -509,7 +509,7 @@ Section ProofSysRead.
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj C 1%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b
+              (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(unfold argaddr_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
@@ -585,7 +585,7 @@ Section ProofSysRead.
     iDestruct (cpu_own_transport CID8 CID11 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf B3 (av - 6)%nat 0%nat eb pj C 2%nat
-              (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_hi w4) (DfracOwn (1/4)) b
+              (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_hi w4) (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp [Hs4hi]").
     { iEval (rewrite HB3a1). iExact "Hs4hi". }
@@ -688,7 +688,7 @@ Section ProofSysRead.
     (* ---- argfd(0, 0, &f).  [pfd] IS NULL and carries no resource --
        [SpecArgfd.ofd_out_null] is exactly this case. ---- *)
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj C 0%nat v
-              pidv V (bv_0 32) w3 b
+              pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
               ltac:(unfold argfd_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
@@ -791,7 +791,7 @@ Section ProofSysRead.
                 ltac:(lia) eq_refl eq_refl eq_refl HA3sp HA3a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
       iIntros (CID21 Hs21 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj C b
+     iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj C b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
@@ -920,7 +920,7 @@ Section ProofSysRead.
         as (kk qq Cf) "([%Hfvk %Hkk] & Href & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (read_env_frame γf fn Cf with "Henv Hdev") as "[Hfenv Hfback]".
-      iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj C b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb C (sys_rw_count v2) b
@@ -970,7 +970,7 @@ Section ProofSysRead.
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
       iIntros (CID26 Hs26 mg) "[%Hcsg %Hmga0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj C b lks
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv Hdev").

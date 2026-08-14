@@ -357,7 +357,7 @@ Definition wp_dirlink_sconf_body
     (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -424,7 +424,7 @@ Definition wp_dirlink_sconf_body
   (* PARKING PREMISE *)
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -477,7 +477,7 @@ Definition wp_dirlink_sconf_body
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
       i_dev ip ↦₄{dqd} dev -∗
@@ -586,7 +586,7 @@ Definition wp_dirlink_gen_body
     (ncount : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
   let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -660,7 +660,7 @@ Definition wp_dirlink_gen_body
   (* PARKING PREMISE *)
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -713,7 +713,7 @@ Definition wp_dirlink_gen_body
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
       i_dev ip ↦₄{dqd} dev -∗
@@ -823,12 +823,12 @@ Module Type DIRLINK.
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                             γa γf γpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
-                            m K eb C b.
+                            m K eb C b lks.
 
   (* the SET-FORM contract; [wp_dirlink_sconf] above is its instance with
      the set forgotten, kept as its own parameter so that every existing
@@ -856,10 +856,10 @@ Module Type DIRLINK.
       (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum
                           ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
-                          m K eb C b.
+                          m K eb C b lks.
 End DIRLINK.

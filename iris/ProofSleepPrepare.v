@@ -77,7 +77,8 @@ Section ProofSleepPrepare.
 
   Lemma wp_sleep_prepare_sconf (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_sleep_prepare_sconf_body γs j γl m av n eb C b.
+      (lks : gset nat)
+    : wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
   Proof.
     cbv beta delta [wp_sleep_prepare_sconf_body].
     intros pcE pj chan ret_tgt Hj Hgl Hchan Hn Hav.

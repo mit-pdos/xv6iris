@@ -145,7 +145,7 @@ Section ProofKforkB5.
       (Mt : regfile) (K lvl : nat) (eb b : bool)
       (pme ks : mword 64) (pid_c : mword 32) (Vc : pprivate)
       (ch : mword 64) (rest : list (mword 64)) (rv : mword 64)
-      (C : iProp Σ) :
+      (C : iProp Σ) (lks : gset nat) :
     (18 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (j < NPROC)%nat ->
@@ -161,7 +161,7 @@ Section ProofKforkB5.
        [trap_res b + (K - 8)] -- so the reserve is conserved across the block;
        the three releases and two acquires inside it each conserve it too. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false -∗
+    cpu_own (S lvl) eb pme C false lks -∗
     IntrDefs.arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
@@ -180,7 +180,7 @@ Section ProofKforkB5.
       ∀ mf : regfile,
         ⌜callee_saved Mt mf⌝ -∗
         sie_cap_gpr mf (K - 8)%nat b pme -∗
-        cpu_own lvl eb pme C b -∗
+        cpu_own lvl eb pme C b lks -∗
         pc_is (mword_of_int (KF + 0xf6) : mword 64) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -248,7 +248,7 @@ Section ProofKforkB5.
     iEval (rewrite Hb) in "Hcg".
     iApply (RL.wp_release_sconf (CID := CID0) γl (proc_addr j) "proc"%string
               (SchedCtx.proc_lock_res γs γl (proc_addr j)) M2 lvl eb pme C (K - 8)%nat
-              Hlka1 (kfkb5_stack_ok K HK)
+              _ Hlka1 (kfkb5_stack_ok K HK)
               with "Hcg Htext Hpc [Hpinv] Htok HRused Hown Hpay").
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
     iIntros (CID1 Hs1 mr1) "Hcg Hpc %Hcs_2_r1 Hown".
@@ -314,7 +314,7 @@ Section ProofKforkB5.
     (* carry [cpu_own] hart-generically across the three plain leaves *)
     iDestruct (cpu_own_transport CID1 CID4 lvl eb pme C b ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (AQ.wp_acquire_sconf (CID := CID4) γw "wait_lock"%string WaitInv.wait_res
-              M5 lvl eb pme C (K - 8)%nat b Hlvl (kfkb5_stack_ok K HK)
+              M5 lvl eb pme C (K - 8)%nat b _ Hlvl (kfkb5_stack_ok K HK)
               with "Hcg Hown Htext Hpc [Hwl] Hpanic").
     { iEval (rewrite HM5a0). iExact "Hwl". }
     iIntros (CID5 Hs5 ms mr5) "%Hms5 Hcg Hpc %Hcs_5_r5 Htokw Hwaitres Hown Hpay".

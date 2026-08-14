@@ -194,8 +194,8 @@ Section ProofPanic.
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
-      (dm : pk_arg_desc)
-    : wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm.
+      (dm : pk_arg_desc) (lks : gset nat)
+    : wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31.
@@ -367,7 +367,7 @@ Section ProofPanic.
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID9) (dqf := DfracDiscarded)
               γpr γl γd γv P5 (K - 4)%nat bs n eb C pn_hdr [] b p
-              (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
+              (_ pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
               ltac:(cbn [length]; lia) Hn31
               with "Hcg Hown Htext Hkdata Hpc Hpan [Hhdr] [] Hlk Hdev Htx Hsub").

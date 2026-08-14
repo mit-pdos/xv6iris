@@ -408,9 +408,9 @@ Section ProofEitherCopyout.
   Lemma wp_either_copyout_sconf (γa : gname) (γf : gname)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-      (src_bytes dst_olds : nat -> bv 8) (b : bool)
+      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset nat)
     : wp_either_copyout_sconf_body γa γf m av lvl eb p C pid V user len
-        src_bytes dst_olds b.
+        src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
     intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl.
@@ -684,7 +684,7 @@ Section ProofEitherCopyout.
        ENTRY hart -- re-anchor it at [CID13] before crossing into myproc. *)
     iDestruct (cpu_own_transport CID CID13 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p C b
-              Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
+              _ Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID14 Hs14 ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
     assert (Hpc1c : ret_pc (R7 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x1c))
@@ -882,7 +882,7 @@ Section ProofEitherCopyout.
       iDestruct (cpu_own_transport CID14 CID20 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Copyout.wp_copyout_sconf γa U5 (pv_upt V) (pv_sz V) len src_bytes
                 (av - 6)%nat lvl eb p C b
-                HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
+                _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
       iIntros (CID21 Hs21 mr P') "Hcg Hcpu Hpc Hpt Hsrc %Hcsr %Hext %Hret".
       assert (Hpc2c : ret_pc (U5 !!! Regidx Rra) = mword_of_int (KernelSyms.either_copyout + 0x2c))

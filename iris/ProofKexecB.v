@@ -243,6 +243,7 @@ Section KexecBBody.
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
       (m M90 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (lks : gset nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
     log_geom_ok cov logstart ->
@@ -280,7 +281,7 @@ Section KexecBBody.
               cov logstart inodestart nib dev -∗
     pc_is (mword_of_int (KXB + 0x90) : mword 64) -∗
     sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
-    cpu_own 0 eb (proc_addr jp) C b -∗
+    cpu_own 0 eb (proc_addr jp) C b lks -∗
     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
     log_op g n2 -∗
@@ -303,7 +304,7 @@ Section KexecBBody.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) C b -∗
+          cpu_own 0 eb (proc_addr jp) C b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -506,7 +507,7 @@ Section KexecBBody.
       by (rewrite /tfp /tfr; apply page_base_of_valid; exact Hpvtf).
     assert (Htfpeq : tfp = ud_tfp (pv_upt V)).
     { apply kxc_page_base_inj. rewrite Hbasetf. reflexivity. }
-    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PPT.wp_proc_pagetable_core ga G2 tfr (DfracOwn (1/4)) 0%nat
               (K - 68)%nat true (proc_addr jp) C None true
@@ -801,7 +802,7 @@ Section KexecBBody.
         iIntros (CID15 Hsq15). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt1a2) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-        iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) C true lks
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
         iApply ("Hcont1a2" $! G4 ef P v67).
@@ -1060,7 +1061,7 @@ Section KexecBBody.
         iIntros (CID24 Hsq24). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt12c) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-        iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) C true lks
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iApply ("Hcont12c" $! G11 ef P).
@@ -1185,7 +1186,7 @@ Section KexecBBody.
       iIntros (CID8 Hsq8). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-      iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) C true lks
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hkeep)".

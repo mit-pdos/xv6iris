@@ -230,8 +230,8 @@ Section ProofProcFreepagetable.
   Lemma wp_proc_freepagetable_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool)
-    : wp_proc_freepagetable_sconf_body γa mm P K eb p C ilvl b.
+      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+    : wp_proc_freepagetable_sconf_body γa mm P K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_proc_freepagetable_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow.
@@ -533,7 +533,7 @@ Section ProofProcFreepagetable.
     iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa B5
               (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) tramp_vpn
               (K - 4)%nat eb p C ilvl b
-              HKuu Hilvl HB5a0
+              _ HKuu Hilvl HB5a0
               ltac:(rewrite HB5a1; exact pf_tramp_align)
               HB5a2 HB5a3
               ltac:(rewrite HB5a1; exact pf_tramp_svpn)
@@ -686,7 +686,7 @@ Section ProofProcFreepagetable.
     iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa C6
               {[tf_vpn := pte_tf P.(ud_tfp)]} P.(ud_root) P.(ud_um) tf_vpn
               (K - 4)%nat eb p C ilvl b
-              HKuu Hilvl HC6a0
+              _ HKuu Hilvl HC6a0
               ltac:(rewrite HC6a1; exact pf_tf_align)
               HC6a2 HC6a3
               ltac:(rewrite HC6a1; exact pf_tf_svpn)
@@ -776,7 +776,7 @@ Section ProofProcFreepagetable.
                  with "Hcpu") as "Hcpu".
     iApply (Uvmfree.wp_uvmfree_sconf γa D2 P.(ud_root) P.(ud_um)
               (K - 4)%nat eb p C ilvl b
-              HKuf Hilvl HD2a0
+              _ HKuf Hilvl HD2a0
               ltac:(rewrite HD2a1; exact Hbnd)
               ltac:(rewrite HD2a1; exact Hdom)
               with "Hcg Hcpu Htext Hpc Hpt Henv").

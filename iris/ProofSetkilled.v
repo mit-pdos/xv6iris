@@ -65,8 +65,8 @@ Section ProofSetkilled.
   Notation sk_a5 := (mword_of_int 15 : mword 5).
 
   Lemma wp_setkilled_sconf  (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_setkilled_sconf_body γs j γl m av n eb p C b.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_setkilled_sconf_body γs j γl m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_setkilled_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav.
@@ -186,7 +186,7 @@ Section ProofSetkilled.
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
               (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b
-              Hn ltac:(lia)
+              _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".

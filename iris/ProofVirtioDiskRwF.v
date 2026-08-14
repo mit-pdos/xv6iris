@@ -519,13 +519,13 @@ Section VdrwfP6.
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
       (M : regfile) (av : nat) (eb : bool) (pme : SailStdpp.Values.mword 64)
-      (C : iProp Σ) :
+      (C : iProp Σ) (lks : gset nat) :
     (K_free_desc <= av)%nat -> (i < 8)%nat -> fr i = false ->
     length γs = NPROC ->
     M !!! Regidx Rs2 = (mword_of_int (Z.of_nat i) : SailStdpp.Values.mword 64) ->
     M !!! Regidx Rs3 = (disk_base : SailStdpp.Values.mword 64) ->
     sie_cap_gpr M av false pme -∗
-    cpu_own 1 eb pme C false -∗
+    cpu_own 1 eb pme C false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) -∗
     panic_wp_any -∗ procs_inv γs -∗
     d_desc_ptr ↦₈□ pd -∗
@@ -538,7 +538,7 @@ Section VdrwfP6.
          /\ Mf !!! Regidx Rs1 = (zero_extend' 64 vf : SailStdpp.Values.mword 64)
          /\ Mf !!! Regidx Rs2 = (zero_extend' 64 vn : SailStdpp.Values.mword 64)⌝ -∗
         sie_cap_gpr Mf av false pme -∗
-        cpu_own 1 eb pme C false -∗
+        cpu_own 1 eb pme C false lks -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) -∗
         free_bundles pd (fr_upd fr i true) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -738,7 +738,7 @@ Section VdrwfP6.
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (Q : iProp Σ) (kq : nat * positive) :
+      (Q : iProp Σ) (kq : nat * positive) (lks : gset nat) :
     (K_virtio_disk_rw <= K)%nat -> length γs = NPROC ->
     length bs_buf = 1024%nat -> length bs_disk = 1024%nat ->
     (bv_unsigned sector * 512)%Z = (1024 * uint bno)%Z ->
@@ -764,7 +764,7 @@ Section VdrwfP6.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb (proc_addr j) -∗
-        cpu_own 0 eb (proc_addr j) C eb -∗
+        cpu_own 0 eb (proc_addr j) C eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
@@ -1177,7 +1177,7 @@ Section VdrwfP6.
                      = mword_of_int (KernelSyms.virtio_disk_rw + 0x20e)) by pcstep.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
-              E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C
+              E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
     iIntros (F1) "%HF1 Hcg Hown Hpc Hfb".
@@ -1222,7 +1222,7 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd m2 (fr_upd fr h true)
               (b_data b : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
-              G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C
+              G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
     iIntros (F2) "%HF2 Hcg Hown Hpc Hfb".
@@ -1268,7 +1268,7 @@ Section VdrwfP6.
     iApply (wp_vdrwf_iter (CID := CIDx)  γs pd t (fr_upd (fr_upd fr h true) m2 true)
               (d_info_status h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
-              G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C
+              G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) C lks
               ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
     iIntros (F3) "%HF3 Hcg Hown Hpc Hfb".
@@ -1819,9 +1819,9 @@ Section ProofVirtioDiskRwF.
       (pd pav pu : SailStdpp.Values.mword 64)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bno dsk0 : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
-      (b : bool) (Q : iProp Σ)
+      (b : bool) (Q : iProp Σ) (lks : gset nat)
     : wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
-                                   m K eb C bno dsk0 bs_buf bs_disk b Q.
+                                   m K eb C bno dsk0 bs_buf bs_disk b Q lks.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
     intros HK Hbnolt Hbufkd Hj Hjl.
@@ -1887,28 +1887,28 @@ Section ProofVirtioDiskRwF.
     (* ---- P2: the descriptor allocator (with its sleep-retry loop) ---- *)
     iApply (P2.wp_vdrw_p2 (CID := CIDa) γk γs j γl γd pd pav pu M K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) m HK Hj Hjl Hglen Hregs Hhi
+              (vdrw_sector_raw bno) m lks HK Hj Hjl Hglen Hregs Hhi
               with "Hcg Hown Htc Hclm Htext Hpc Hpanic Hpinv Hgeom Hlk
                     Htok HR Hscr").
     (* ---- P3: the chain formatting ---- *)
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) dsk0 m with "Htext Hgeom Hbdisk").
+              (vdrw_sector_raw bno) dsk0 m lks with "Htext Hgeom Hbdisk").
     (* ---- P4: the ring write and THE PUBLISH ---- *)
     iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk m kq Hbnolt Hlenbuf Hbufkd
+              bno bs_buf bs_disk m kq lks Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk Hpend").
     (* ---- P5: the device kick and the completion wait ---- *)
     iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bs_buf bs_disk m kq HK Hj Hjl
+              (vdrw_sector_raw bno) bs_buf bs_disk m kq lks HK Hj Hjl
               (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia)))
               with "Htext Hpanic Hpinv Hdinv Hlk").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
     iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
-              (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq
+              (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq lks
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl
               with "Htext Hpanic Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
     iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".

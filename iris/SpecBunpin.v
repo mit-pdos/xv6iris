@@ -43,7 +43,7 @@ Definition wp_bunpin_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
     (q : Qp) (dev bno : mword 32)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bunpin in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* bunpin's own frame is 4 slots; acquire/release want 10 below that. *)
@@ -53,7 +53,7 @@ Definition wp_bunpin_sconf_body
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
   panic_wp_any -∗
@@ -62,7 +62,7 @@ Definition wp_bunpin_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
-    cpu_own n eb p C b -∗
+    cpu_own n eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     bslot bn -∗
@@ -74,6 +74,6 @@ Module Type BUNPIN.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (q : Qp) (dev bno : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_bunpin_sconf_body bn V k q dev bno m n eb p C K b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat),
+      wp_bunpin_sconf_body bn V k q dev bno m n eb p C K b lks.
 End BUNPIN.

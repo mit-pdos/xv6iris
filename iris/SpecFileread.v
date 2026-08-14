@@ -666,7 +666,7 @@ Definition wp_fileread_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) :=
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -689,7 +689,7 @@ Definition wp_fileread_sconf_body
   eb = true ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
-  cpu_own 0%nat eb pj C b -∗
+  cpu_own 0%nat eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
@@ -715,7 +715,7 @@ Definition wp_fileread_sconf_body
       ⌜fileread_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0%nat eb pj C b -∗
+      cpu_own 0%nat eb pj C b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
@@ -735,6 +735,6 @@ Module Type FILEREAD.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool),
-      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset nat),
+      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
 End FILEREAD.

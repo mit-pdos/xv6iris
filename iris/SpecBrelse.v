@@ -61,7 +61,7 @@ Definition wp_brelse_sconf_body
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (bs bsd : list (bv 8)) (d : bool) (b : bool) :=
+    (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.brelse in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_brelse <= K)%nat ->
@@ -69,7 +69,7 @@ Definition wp_brelse_sconf_body
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
   sie_cap_gpr m K b p -∗
-  cpu_own 0 eb p C b -∗
+  cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn V -∗
@@ -86,7 +86,7 @@ Definition wp_brelse_sconf_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b p -∗
-      cpu_own 0 eb p C b -∗
+      cpu_own 0 eb p C b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
       (* the reference's slot unit comes back *)
@@ -103,6 +103,6 @@ Module Type BRELSE.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (d : bool) (b : bool),
-      wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
+      (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset nat),
+      wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b lks.
 End BRELSE.

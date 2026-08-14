@@ -467,7 +467,7 @@ Definition wp_writei_sconf_body
     (V : pprivate) (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.writei in
   let pj := proc_addr j in
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -557,7 +557,7 @@ Definition wp_writei_sconf_body
      path is reachable at either index and the restriction is gone.  See
      claude-notes/completed/eb-generic-sweep.md ("Round 13"). *)
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  writei holds no lock of
      its own -- every push_off/pop_off pair that can mint or spend an
      [arm_pay 0 eb _] lives inside bmap/bread/iupdate (and, through them,
@@ -696,7 +696,7 @@ Definition wp_writei_sconf_body
       ⌜((ncount - wi_cost_bmonly off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -750,7 +750,7 @@ Definition wp_writei_gen_body
     (V : pprivate) (ncount : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.writei in
   let pj := proc_addr j in
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -833,7 +833,7 @@ Definition wp_writei_gen_body
   m !!! Regidx (mword_of_int 14 : mword 5) = (mword_of_int (Z.of_nat n) : mword 64) ->
   (* NO eb-GATED RESTRICTION HERE -- see [wp_writei_sconf_body] above. *)
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  Same pure-pass-through
      shape as [wp_writei_sconf_body] above -- required so that
      [wp_writei_sconf] (which must reach [eb = false]) can continue to be
@@ -973,7 +973,7 @@ Definition wp_writei_gen_body
       ⌜wi16_post bmapstart inum inodestart ncount n' off n tot bm bm' Sb Sb'⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -1020,12 +1020,12 @@ Module Type WRITEI.
       (V : pprivate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                            cov logstart inodestart nib bmapstart size dev used γpr
                            ip inum bm data dn dn0
                            user off n src_bytes V ncount
-                           pidv dq dqd dqn dqs dqb dqbs m K eb C b.
+                           pidv dq dqd dqn dqs dqb dqbs m K eb C b lks.
 
   (* the SET-FORM contract; [wp_writei_sconf] above is its instance with the
      set forgotten, kept as its own parameter so that every existing caller
@@ -1051,10 +1051,10 @@ Module Type WRITEI.
       (V : pprivate) (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_writei_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
                          cov logstart inodestart nib bmapstart size dev used γpr
                          ip inum bm data dn dn0
                          user off n src_bytes V ncount Sb
-                         pidv dq dqd dqn dqs dqb dqbs m K eb C b.
+                         pidv dq dqd dqn dqs dqb dqbs m K eb C b lks.
 End WRITEI.

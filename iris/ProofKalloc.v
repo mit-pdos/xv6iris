@@ -50,8 +50,8 @@ Section ProofKalloc.
   Lemma wp_kalloc_sconf
       (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile)
-      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_kalloc_sconf_body γl γk fl m on n eb p C K b.
+      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_kalloc_sconf_body γl γk fl m on n eb p C K b lks.
   Proof.
     cbv beta delta [wp_kalloc_sconf_body].
     intros pcE ret_tgt HK Hfl Hnoffpos.
@@ -177,7 +177,7 @@ Section ProofKalloc.
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) mA
               n eb p C (K - 4)%nat b
-              Hnoffpos
+              _ Hnoffpos
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     { iEval (rewrite HmAa0). iExact "Hlock". }

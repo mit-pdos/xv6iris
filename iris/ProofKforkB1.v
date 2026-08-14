@@ -113,7 +113,7 @@ Section KforkB1Proof.
       (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
-      (pme : mword 64) (eb b : bool) (C : iProp Σ) (lvl : nat) :
+      (pme : mword 64) (eb b : bool) (C : iProp Σ) (lvl : nat) (lks : gset nat) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (* The EXIT arm, named.  This block is entered with np->lock HELD, so its
@@ -146,7 +146,7 @@ Section KforkB1Proof.
        physical carve [trap_res b + (K - 8)] -> [trap_res b + K] is exactly the
        8-slot epilogue pop, i.e. the reserve is CONSERVED across this block. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false -∗
+    cpu_own (S lvl) eb pme C false lks -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
@@ -170,7 +170,7 @@ Section KforkB1Proof.
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr mf K (match lvl with O => eb | S _ => false end) pme -∗
         pc_is (ret_pc ra0) -∗
-        cpu_own lvl eb pme C (match lvl with O => eb | S _ => false end) -∗
+        cpu_own lvl eb pme C (match lvl with O => eb | S _ => false end) lks -∗
         kalloc_env γa None -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).

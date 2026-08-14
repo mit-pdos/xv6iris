@@ -104,8 +104,8 @@ Section ProofPrepareReturn.
 
   Lemma wp_prepare_return_sconf (γf : gname) (ks : mword 64) (pid : mword 32)
       (V : pprivate) (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-      (epc : mword 64) (b : bool)
-    : wp_prepare_return_sconf_body γf ks pid V m av C p epc b.
+      (epc : mword 64) (b : bool) (lks : gset nat)
+    : wp_prepare_return_sconf_body γf ks pid V m av C p epc b lks.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.

@@ -450,7 +450,7 @@ Definition wp_filestat_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fstat_names)                           (* the inode arm's ghosts  *)
     (pidv : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filestat in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -468,7 +468,7 @@ Definition wp_filestat_sconf_body
   eb = true ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
-  cpu_own 0%nat eb pj C b -∗
+  cpu_own 0%nat eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
   panic_wp_any -∗
@@ -491,7 +491,7 @@ Definition wp_filestat_sconf_body
       ⌜filestat_ret r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0%nat eb pj C b -∗
+      cpu_own 0%nat eb pj C b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
@@ -511,6 +511,6 @@ Module Type FILESTAT.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b.
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
 End FILESTAT.

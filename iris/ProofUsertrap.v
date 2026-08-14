@@ -169,7 +169,7 @@ Section UtEntry.
        ⌜M !!! Regidx Ra0 = un_pj N⌝ -∗ ⌜ut_cs m M⌝ -∗ ⌜pv_upt V' = pv_upt V⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
        sie_cap_gpr M (av - 4)%nat false (un_pj N) -∗
-       cpu_own 0%nat false (un_pj N) C false -∗ cpu_claim (un_pj N) -∗
+       cpu_own 0%nat false (un_pj N) C false ∅ -∗ cpu_claim (un_pj N) -∗
        ut_csrs_raw sepc_v sc_v stval_v -∗ ut_env Rsys N V' -∗
        (* THE FRAME, which this block is what CREATES: the four slots the
           prologue's [c.sdsp]s filled.  Not in the note's printed exit
@@ -642,7 +642,7 @@ Section UtDispatch.
   Local Lemma ud_hold (N : ut_names) (V : pprivate) (C : iProp Σ)
       (ep sc st : mword 64) :
     intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    cpu_own 0%nat false (un_pj N) C false -∗
+    cpu_own 0%nat false (un_pj N) C false ∅ -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ st -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
@@ -686,7 +686,7 @@ Section UtDispatch.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x30)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    cpu_own 0%nat false (un_pj N) C false -∗
+    cpu_own 0%nat false (un_pj N) C false ∅ -∗
     cpu_claim (un_pj N) -∗
     ut_csrs_raw ep sc st -∗
     ut_env SY.syscall_env N V -∗

@@ -321,7 +321,7 @@ Section IlockDefs.
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) : iProp Σ :=
     (* THE LITERAL [true], matching SpecIlock's crossing: ilock PARKS (its
        acquiresleep sleeps), so its continuation is about an arbitrary hart
        whatever SIE was doing.  Spelled [b] this was sound only because the
@@ -330,7 +330,7 @@ Section IlockDefs.
       ∀ (mf : regfile) (dn : dinode) (bm : blkmap),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
-        cpu_own 0 eb (proc_addr j) C b -∗
+        cpu_own 0 eb (proc_addr j) C b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -363,12 +363,12 @@ Section IlockEpilogue.
       (k : nat) (ip : mword 64) (dev inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     (K_ilock <= K)%nat ->
     il_sp m M ->
     il_thr5 m M ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 eb (proc_addr j) C b -∗
+    cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
@@ -386,7 +386,7 @@ Section IlockEpilogue.
     ic_loaded gfs gi cov logstart k inum dn bm -∗
     ity_shot g (di_type dn) -∗
     il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
-            dev inum pidv dq dqs j m K eb C b -∗
+            dev inum pidv dq dqs j m K eb C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr.
@@ -582,7 +582,7 @@ Section IlockEpilogue.
     assert (Cs11 : P4 !!! Regidx (mword_of_int 27 : mword 5)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; iuidx).
-    iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b
+   iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID5 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -646,7 +646,7 @@ Section IlockLoad.
       (dev : mword 32)
       (k : nat) (ip : mword 64) (inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
+      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat) :
     (K_ilock <= K)%nat ->
     il_sp m M ->
     il_thr5 m M ->
@@ -660,7 +660,7 @@ Section IlockLoad.
     (j < NPROC)%nat ->
     gs !! j = Some gl ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 eb (proc_addr j) C b -∗
+    cpu_own 0 eb (proc_addr j) C b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
@@ -690,7 +690,7 @@ Section IlockLoad.
        [bread] returns.  [g] was already one of this lemma's parameters. *)
     ity_pending g -∗
     il_cont (CID0 := CID0)  gfs gi gisl bn cn s g cov logstart inodestart k ip
-            dev inum pidv dq dqs j m K eb C b -∗
+            dev inum pidv dq dqs j m K eb C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl.
@@ -931,7 +931,7 @@ Section IlockLoad.
     assert (HL7thr : il_thr6 m L7).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /L7 upd_ne; [| regne]. exact (HL6thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID8 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID0 CID8 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID0 CID8 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -946,7 +946,7 @@ Section IlockLoad.
     iApply (BR.wp_bread_sconf gs j gl gu gd gk pd pav pu bn
               (fs_view gfs gd dev cov) pidv dev bno dq
               L7 (K - 4)%nat eb C b
-              HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
+              _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
     iIntros (CID9 Hq9 mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1669,7 +1669,7 @@ Section IlockLoad.
     assert (HH1thr : il_thr6 m H1).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /H1 upd_ne; [| regne]. exact (HH0thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID9 CID32 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID9 CID32 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -1682,7 +1682,7 @@ Section IlockLoad.
     iApply (BL.wp_brelse_sconf gs bn (fs_view gfs gd dev cov) kk
               pidv dev bno dq H1 (K - 4)%nat eb (proc_addr j) C
               (diblk_bytes ds) bsd0 d0b b
-              HKbl Hkk HH1a0
+              _ HKbl Hkk HH1a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
     iIntros (CID33 Hq33 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl".
     assert (Hpc94 : ret_pc (H1 !!! Regidx Rra : mword 64)
@@ -1876,7 +1876,7 @@ Section IlockLoad.
     { rewrite /il_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |]. iExists _. iExact "Hf4". }
-    iDestruct (cpu_own_transport CID33 CID39 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID33 CID39 0 eb (proc_addr j) C b lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* Hextc/Hextm were last transported to CID9 (right after bread handed
        them back); neither brelse nor the field copies/memmove between here
@@ -1888,7 +1888,7 @@ Section IlockLoad.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iEval (rewrite -valid_word_true) in "Hvalid".
     iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cn s g cov logstart inodestart
-              k ip dev inum dn bm pidv dq dqs m Z0 K eb C b
+              k ip dev inum dn bm pidv dq dqs m Z0 K eb C b lks
               HK HZ0sp HZ0thr
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                     Hdep Hidev Hinumc Hvalid
@@ -1932,10 +1932,10 @@ Section ProofIlockMain.
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi cn gil gisl
                           cov logstart inodestart nib k s g dev inum
-                          pidv dq dqs m K eb C b.
+                          pidv dq dqs m K eb C b lks.
   Proof.
     cbv beta delta [wp_ilock_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0.
@@ -1948,7 +1948,7 @@ Section ProofIlockMain.
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
     iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cn s g cov logstart inodestart k ip
-               dev inum pidv dq dqs j m K eb C b)%I
+               dev inum pidv dq dqs j m K eb C b lks)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     iPoseProof (ili_00 with "Htext") as "Hi00".
     iPoseProof (ili_02 with "Htext") as "Hi02".
@@ -2176,7 +2176,7 @@ Section ProofIlockMain.
     assert (HR6thr : il_thr5 m R6).
     { intros c Hcs N2 N8 N9.
       rewrite /R6 upd_ne; [| regne]. exact (HR5thr c Hcs N2 N8 N9). }
-    iDestruct (cpu_own_transport CID CID11 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID CID11 0 eb (proc_addr j) C b lks
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID11 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2273,7 +2273,7 @@ Section ProofIlockMain.
                  ity_shot g (di_type dn0))%I
         with "[Hpay]" as "Hpay2"; [iExact "Hpay" |].
       iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
-      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b
+      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b lks
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDa CID13 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2282,7 +2282,7 @@ Section ProofIlockMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
       iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cn s g cov logstart
-                inodestart k ip dev inum dnp bmp pidv dq dqs m Q1 K eb C b
+                inodestart k ip dev inum dnp bmp pidv dq dqs m Q1 K eb C b lks
                 HK HQ1sp HQ1thr
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hframe Hppid Hsb Hsl Hstok Hpid
                       Hdep Hidev Hinumc Hvalid Hlk Hshot Hcont").
@@ -2307,7 +2307,7 @@ Section ProofIlockMain.
         with "[Hpay]" as "(Hraw & Hpool & Hpend)";
         [rewrite /ic_payload /ic_unloaded; iDestruct "Hpay" as "[[$ $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
-      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b
+      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b lks
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDa CID13 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2317,7 +2317,7 @@ Section ProofIlockMain.
                    with "Hcont") as "Hcont".
       iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
                 cn s g cov logstart inodestart nib dev k ip inum
-                pidv dq dqs m Q1 K eb C b
+                pidv dq dqs m Q1 K eb C b lks
                 HK HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb

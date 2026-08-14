@@ -66,7 +66,7 @@ Definition uartputc_stack : nat := 14%nat.
 
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) :=
+    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
   let pcE := mword_of_int KernelSyms.uartputc_sync in
@@ -81,7 +81,7 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr m0 K b p -∗
   (* the interrupt level is left exactly as found: an acquire/release pair *)
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   dev_inv γd γv -∗
@@ -90,7 +90,7 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf,
     sie_cap_gpr mf K b p -∗
-    cpu_own n eb p C b -∗
+    cpu_own n eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     uart_sent_sub γd (bs ++ [sb]) -∗
@@ -101,6 +101,6 @@ Module Type UARTPUTC.
   Parameter wp_uartputc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64),
-      wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p.
+      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset nat),
+      wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
 End UARTPUTC.
