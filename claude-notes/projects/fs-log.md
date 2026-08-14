@@ -123,9 +123,7 @@ equals the last committed one.
      the boot image, so the FS layer above sees the recovered state. The gap
      the D2 finding describes is only in what `P_fs`'s HISTORY can record.
    - `ProofInstallTrans`: the recovering arm becomes live.
-2. **sys_sync.** `CodeSysSync.v` is catalogued (33 instruction facts, 15+3
-   words reused from the shared decode catalogues; two duplicated words
-   recorded but deliberately not promoted). Left:
+2. **sys_sync.** `CodeSysSync.v` is catalogued (38 instruction facts). Left:
    - the two receipt-strengthening additions the design doc's item 5 spells
      out: `LogInv.log_mirror_at` gains a PARTIAL SLOT RECORD (so
      `fs_commit_permit` can name the committed state on the batch's own write
@@ -136,6 +134,16 @@ equals the last committed one.
      materialised `n = ncommit + 1`: s2 holds the ORIGINAL count and the back
      edge is `bge s2,a5` ("loop while old >= current"), i.e. a do-while whose
      exit condition is "the counter strictly advanced".
+   - **The loop body is `acquiresleep`'s body, instruction for instruction**:
+     `sleep_prepare(&log); release(&log.lock); sleep(); acquire(&log.lock)`,
+     the same four-call quartet `ProofAcquiresleep` already discharges. One
+     register serves all four calls because `&log` and `&log.lock` are the
+     same address (`lock` is `struct log`'s first field). So the sleep half of
+     sys_sync is a transcription of a proven proof, and only the `ncommit`
+     reasoning above is new.
+   - s1/s2 are spilled LAZILY — inside the taken branch, not the prologue —
+     so the frame's live set differs between the two arms (`filestat`'s
+     pattern; see the playbook §4e).
    - This takes log.c to 7/7.
 3. **The ∀-era FS boot composition.** `FsBoot.v` is DONE and axiom-free: it
    changes the boot mint's granularity from bytes to blocks and runs the

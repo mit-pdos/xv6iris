@@ -2154,14 +2154,14 @@ Section ProofIlockMain.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 jal ra,acquiresleep ===== *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.ilock + 0x16)) Rra
-              (mword_of_int 3354 : mword 21) R5 (K - 4)%nat b
+              (mword_of_int 3368 : mword 21) R5 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16").
     iIntros (CID11 Hq11) "Hcg Hpc".
     set (R6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.ilock + 0x16) : mword 64) 4)]> R5).
     assert (Htgtasl : add_vec (mword_of_int (KernelSyms.ilock + 0x16) : mword 64)
-                        (sign_extend' 64 (mword_of_int 3354 : mword 21))
+                        (sign_extend' 64 (mword_of_int 3368 : mword 21))
                       = mword_of_int KernelSyms.acquiresleep) by pcw.
     iEval (rewrite Htgtasl) in "Hpc".
     assert (HR6a0 : R6 !!! Regidx Ra0 = i_lock ip)

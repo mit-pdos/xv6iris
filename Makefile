@@ -65,15 +65,23 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
 #
-# THE PIN IS A CLEAN UPSTREAM TIP.  It was briefly a local cherry-pick
-# (ae96fd0 + 9da28f5) while the fix for kernel-defects.md D2 was ahead of the
-# revision this tree was proved against; converging on the branch tip retired
-# that apparatus, and the pin has tracked the tip since (d80e61c5: tx_lock
-# becomes a spinlock, panic path removed; a28e94b: no procdump from the
-# console; 2691300: unreachable() split out of panic()).  Nothing here is a
-# local commit: `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the
-# image, and that is the whole recipe.
-XV6_REV ?= 2691300c196b19a2965682fc6147220be85a50af
+# THE PIN IS A CLEAN TIP OF $(XV6_URL)'s `verified` BRANCH.  It was briefly a
+# local cherry-pick (ae96fd0 + 9da28f5) while the fix for kernel-defects.md D2
+# was ahead of the revision this tree was proved against; converging on the
+# branch tip retired that apparatus, and the pin has tracked the tip since
+# (d80e61c5: tx_lock becomes a spinlock, panic path removed; a28e94b: no
+# procdump from the console; 2691300 -> 1a70c2e: unreachable() split out of
+# panic(), rebased onto upstream 13602eb, which gives sleep() a prototype and
+# so rewrites sys_sync's call to it).  Nothing here is a local commit:
+# `git -C xv6-riscv checkout --detach $(XV6_REV)` reproduces the image, and
+# that is the whole recipe.
+#
+# THAT BRANCH IS REBASED, NOT APPENDED TO, so `git -C xv6-riscv fetch` on a
+# tree pinned at the previous tip reports a FORCED UPDATE and the old pin
+# stays reachable only from your local clone -- expect the diff between two
+# consecutive pins to be an upstream commit that landed UNDER the series, not
+# on top of it.
+XV6_REV ?= 1a70c2e75fb6261cc776285fe09e67c539fd404b
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 
@@ -99,6 +107,7 @@ model: $(MODEL)/CoqMakefile
 # to develop on.  An existing $(XV6_DIR) is left alone (see xv6-rev-check).
 $(XV6_DIR):
 	git clone $(XV6_URL) $@
+	git -C $@ fetch -q origin $(XV6_REV)
 	git -C $@ checkout --detach $(XV6_REV)
 
 # Warn when the checkout is not the revision the tracked dumps came from.

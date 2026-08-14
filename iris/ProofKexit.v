@@ -663,14 +663,14 @@ Section KexitLoop.
         iPoseProof (kxi_4a with "Htext") as "Hi4a".
         (* +0x42 jal ra,fileclose *)
         iApply (wp_jal_s_sconf (CID := CIDm) (mword_of_int (KX + 0x42))
-                  (mword_of_int 1 : mword 5) (mword_of_int 8310 : mword 21) M3e av b
+                  (mword_of_int 1 : mword 5) (mword_of_int 8324 : mword 21) M3e av b
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi42").
         iIntros (CIDn Hsn) "Hcg Hpc".
         set (M42 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
              (add_vec_int (mword_of_int (KX + 0x42) : mword 64) 4)]> M3e).
         assert (Hjfc : add_vec (mword_of_int (KX + 0x42) : mword 64)
-                         (sign_extend' 64 (mword_of_int 8310 : mword 21)) = mword_of_int KernelSyms.fileclose)
+                         (sign_extend' 64 (mword_of_int 8324 : mword 21)) = mword_of_int KernelSyms.fileclose)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjfc) in "Hpc".
         assert (HM42ra : M42 !!! Regidx (mword_of_int 1 : mword 5)

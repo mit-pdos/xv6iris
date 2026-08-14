@@ -352,6 +352,48 @@ Section ProofIget.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
+  (* ---- THE SCAN'S BLOCK CONTINUATIONS, [Hloop]/[Hstep]: RULE ONE FOLD
+     ATTEMPTED AND REVERTED (claude-notes/optimization.md, RULE ONE).
+     [Hloop] (a ~30-line fuel-indexed scan invariant, below at the [+0x44]
+     do-while head) and [Hstep] (a ~27-line step continuation nested inside
+     [Hloop]'s induction step, applied at four sites) are exactly the shape
+     ProofPiperead.v's file header (lines 432-457) already flags as
+     unfoldable: no [wp_next] wrapper, the whole scan running at the PINNED
+     index [false] inside the critical section (this file's header, point
+     (1)).
+
+     Folded as [ig_loop_body]/[ig_step_body] (parameterized by every
+     lemma-binder/proof-local name each body mentions -- [γl cn γfs γi cov
+     logstart nib dev inum n eb p C K b macq spr M ci], plus [TAILC] threaded
+     as an explicit [iProp Σ] parameter rather than folded itself; [fuel]/[j]
+     kept as explicit [ig_loop_body] parameters per RULE 3, the innermost
+     [Mr]/[Ms] as an internal [∀]), MEASURED, folding broke at TWO
+     independent points, exactly the Piperead failure signature:
+
+     1. With [Hstep] folded, its own first leaf
+        [iApply (wp_addi4_s_sconf ... with "Hcg Hpc Hi3c")] (the [+0x3c]
+        cursor step) failed:
+          Error: Tactic failure: iSpecialize: cannot instantiate
+          (sie_cap_gpr Ms (trap_res b + (K - 6)) false ?p -∗ ... -∗ WP Loop)
+          with (sie_cap_gpr Ms (trap_res b + (K - 6)) false p).
+
+     2. With [Hstep] reverted back inline and only [Hloop] folded, the
+        failure moved to [Hloop]'s OWN induction hypothesis application
+        [iApply ("IHf" $! (S j) N1 with ...)] (the recursive call after the
+        [+0x40] miss branch falls through) -- folding the IH (RULE 3's whole
+        point) is itself what the pinned-[false] leaf can no longer see
+        through:
+          Error: Tactic failure: iSpecialize: cannot instantiate
+          (sie_cap_gpr N1 (trap_res b + (K - 6)) false ?p -∗ ... -∗ WP Loop)
+          with (sie_cap_gpr N1 (trap_res b + (K - 6)) false p).
+
+     Making [p] an explicit, already-visible [ig_loop_body]/[ig_step_body]
+     parameter (the recipe's first fallback) did not help -- [p] was already
+     explicit in both; the fold itself is what breaks the leaf's implicit
+     process-pointer unification, matching Piperead's diagnosis verbatim.
+     Per the file's fallback rule, both are left as their original inline
+     [iAssert]s below; this file gets no RULE ONE win. *)
+
   Lemma wp_iget_sconf
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)

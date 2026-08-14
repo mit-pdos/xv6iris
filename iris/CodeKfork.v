@@ -271,9 +271,9 @@ Section CodeKfork.
   Proof. mk_rvc (KernelSyms.kfork + 0x98) (mword_of_int 0xd97d : mword 16)
     (mword_of_int (KernelSyms.kfork + 0x98) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_d97d exec_execute_C_BEQZ. Qed.
 
-  Lemma kfk_09a : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0x9a) : mword 64) false (JAL (mword_of_int 9114 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.kfork + 0x9a) (mword_of_int 0x39a020ef : mword 32)
-    (mword_of_int (KernelSyms.kfork + 0x9a) : mword 64) (JAL (mword_of_int 9114 : mword 21, Regidx (mword_of_int 1))) kd_39a020ef. Qed.
+  Lemma kfk_09a : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0x9a) : mword 64) false (JAL (mword_of_int 9128 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.kfork + 0x9a) (mword_of_int 0x3a8020ef : mword 32)
+    (mword_of_int (KernelSyms.kfork + 0x9a) : mword 64) (JAL (mword_of_int 9128 : mword 21, Regidx (mword_of_int 1))) kd_3a8020ef. Qed.
 
   Lemma kfk_09e : kernel_text -∗ instr (mword_of_int (KernelSyms.kfork + 0x9e) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 18), 8)).
   Proof. mk_base (KernelSyms.kfork + 0x9e) (mword_of_int 0x00a93023 : mword 32)

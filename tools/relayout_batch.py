@@ -20,7 +20,11 @@ function, so the per-file `relayout_map.py apply` has to run ~100 times against
 
 It refuses to run when any source reports a SHAPE change (`reshaped`), because
 then the map is quarantined and a human has to classify the function first --
-see claude-notes/xv6-bump-playbook.md §2.
+see claude-notes/xv6-bump-playbook.md §2.  `--allow-shape=Code<F>.v` records
+that classification: the file stops blocking the run, and the batch prints the
+targets that anchor on its symbols so you can see what the quarantined map
+would reach.  Zero targets is the common case (the reshaped function has no
+proof) and is the only case where the flag is free.
 
     relayout_batch.py            # dry run: what would change, per file
     relayout_batch.py --write    # do it
@@ -112,13 +116,14 @@ def targets_for(anchors, syms):
 def main():
     write = '--write' in sys.argv
     residue = '--residue' in sys.argv
+    allowed = {a.split('=', 1)[1] for a in sys.argv if a.startswith('--allow-shape=')}
     codes = sorted(f for f in os.listdir(R.IRIS)
                    if f.startswith('Code') and f.endswith('.v'))
     anchors, aliases = build_index()
     pairs, blocked = [], []
     for c in codes:
         changes, reshaped = R.build_map(c)
-        if reshaped:
+        if reshaped and c not in allowed:
             blocked.append((c, reshaped))
         if not changes:
             continue
@@ -131,6 +136,11 @@ def main():
         for c, rs in blocked:
             print(f'  {c}: {len(rs)} reshaped offsets')
         return 1
+
+    for c in sorted(allowed):
+        reach = sorted({t for s, t, _, _ in pairs if s == c})
+        print(f'SHAPE CHANGE ACKNOWLEDGED {c}: quarantined map reaches '
+              + (', '.join(reach) if reach else 'no hand-written file'))
 
     if residue:
         seen = set()

@@ -113,6 +113,72 @@ Section ProofFilealloc.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
+  (* ---- THE BLOCK CONTINUATIONS, NAMED (RULE ONE, claude-notes/
+     optimization.md): [wp_filealloc_sconf] states two large [iAssert]s
+     ([Hepi], the shared epilogue, and [Hloop], the fuel-indexed scan) whose
+     bodies are spelled out inline; every proofmode step in the ~600-line
+     proof that follows re-embeds them, so naming the bodies here turns each
+     live hypothesis into a small constant application in the context.
+
+     Only [Hepi] folds.  [fa_epi_body] stays TRANSPARENT ON PURPOSE (never
+     [Typeclasses Opaque]) so the later [iApply ("Hepi" $! ..)] use sites
+     keep unifying through it without any extra [rewrite /..], and the
+     [{ .. }] proof script at its original [iAssert] site is UNCHANGED
+     byte-for-byte -- only the stated type moved out.
+
+     [Hloop] (the scan) does NOT fold, matching ProofPiperead.v's [WXP]/
+     [CLOOP] negative (lines ~432-457 there): the whole scan runs at the
+     PINNED index [false] with no [wp_next] wrapper (file header), and a
+     [Definition fa_loop_body ... (fuel j : nat) : iProp Σ := (∀ M, ...)%I]
+     folded the same way as [fa_epi_body] MEASURED broke the first leaf
+     instruction lemma inside the induction: [iApply (wp_clw_s_sconf ...
+     with "Hcg Hpc Hi26 Hcell")] failed at the very first [iInduction]
+     branch with
+
+       Error: Tactic failure: iSpecialize: cannot instantiate
+       (sie_cap_gpr M (trap_res b + (K - 4)) false ?p -∗ ... -∗
+        wp_next false ?p (λ CID0 : CpuId, ...) -∗ WP Loop)%I
+       with (sie_cap_gpr M (trap_res b + (K - 4)) false p).
+
+     -- the leaf's implicit process pointer [p] no longer unifies once it
+     is reached only through the folded body instead of appearing unfolded
+     in the surrounding statement, exactly [ProofPiperead]'s
+     "cannot instantiate ... false ?p" signature.  Per the file's fallback
+     rule, [Hloop] is left as its original inline [iAssert] below. *)
+
+  (* [fa_epi_body]: the shared epilogue at [+0x52..+0x5c].  [CID0] is an
+     explicit trailing parameter (mirroring ProofDirlookup's [dl_tail_body]
+     / its [CIDt]) rather than folded inside the body, because [Hepi] is a
+     genuinely hart-GENERIC proposition -- entered from TWO different
+     post-release call sites at two different concrete harts, so there is
+     no ambient [CID0] to fix it at (worked example
+     ProofConsputc.wp_consputc_epi; file header for the full reason [Hepi]
+     is stated this way and takes its own [wp_next]-shaped continuation
+     rather than invoking [Hcont] directly). *)
+  Definition fa_epi_body
+      (γf : gname) (m : regfile) (spr : mword 64) (K : nat) (b : bool)
+      (p : mword 64) (C : iProp Σ) (n : nat) (eb : bool) (ret_tgt : mword 64)
+      (CID0 : CpuId) : iProp Σ :=
+    (∀ (mj : regfile) (res : mword 64),
+        ⌜ mj !!! Regidx csp_rs1 = spr
+          /\ mj !!! Regidx Rs1 = res
+          /\ (forall c : mword 5, is_cs_idx c = true ->
+                c <> mword_of_int 9 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
+                mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
+        sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
+        pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
+        cpu_own (CID := CID0) n eb p C b -∗
+        filealloc_post γf res -∗
+        wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
+          ∀ mfin,
+          sie_cap_gpr mfin K b p -∗
+          cpu_own n eb p C b -∗
+          pc_is ret_tgt -∗
+          ⌜ callee_saved m mfin ⌝ -∗
+          filealloc_post γf (mfin !!! Regidx Ra0) -∗
+          WP (Loop : expr riscv_lang)) -∗
+        WP (Loop : expr riscv_lang))%I.
+
   Lemma wp_filealloc_sconf
       (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
@@ -223,13 +289,13 @@ Section ProofFilealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e addi a0,a0,1182  (a0 := &ftable) *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x0e)) Ra0 Ra0 (mword_of_int 0x496 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x0e)) Ra0 Ra0 (mword_of_int 0x488 : mword 12)
               R3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e").
     iIntros (CID7 Hs7) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R4 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1174 : mword 12)))]> R3).
+                  (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1160 : mword 12)))]> R3).
     assert (HR4a0 : R4 !!! Regidx Ra0 = ftable_addr).
     { rewrite /R4 upd_eq /R3 upd_eq. rewrite /ftable_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -237,14 +303,14 @@ Section ProofFilealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== +0x12 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filealloc + 0x12)) Rra (mword_of_int 0x1fcb88 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filealloc + 0x12)) Rra (mword_of_int 0x1fcb7a : mword 21)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi12").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.filealloc + 0x12) : mword 64) 4)]> R4).
     assert (Htgtacq : add_vec (mword_of_int (KernelSyms.filealloc + 0x12) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1fcb88 : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1fcb7a : mword 21))
                       = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtacq) in "Hpc".
@@ -294,13 +360,13 @@ Section ProofFilealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a addi s1,s1,1194 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x1a)) Rs1 Rs1 (mword_of_int 0x4a2 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x1a)) Rs1 Rs1 (mword_of_int 0x494 : mword 12)
               R6 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R7 := <[Regidx Rs1 := regval_into_reg
-                  (add_vec (R6 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1186 : mword 12)))]> R6).
+                  (add_vec (R6 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1172 : mword 12)))]> R6).
     assert (HR7s1 : R7 !!! Regidx Rs1 = fnode 0).
     { rewrite /R7 upd_eq /R6 upd_eq. rewrite /fnode /acur /file_base /file_stride.
       apply bv_eq; vm_compute; reflexivity. }
@@ -319,13 +385,13 @@ Section ProofFilealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
     (* +0x22 addi a4,a4,1090 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x22)) Ra4 Ra4 (mword_of_int 0x43a : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x22)) Ra4 Ra4 (mword_of_int 0x42c : mword 12)
               R8 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R9 := <[Regidx Ra4 := regval_into_reg
-                  (add_vec (R8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1082 : mword 12)))]> R8).
+                  (add_vec (R8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1068 : mword 12)))]> R8).
     assert (HR9a4 : R9 !!! Regidx Ra4 = fnode NFILE).
     { rewrite /R9 upd_eq /R8 upd_eq. rewrite /fnode /acur /file_base /file_stride /NFILE.
       apply bv_eq; vm_compute; reflexivity. }
@@ -353,35 +419,17 @@ Section ProofFilealloc.
     iPoseProof (fai_58 with "Htext") as "Hi58".
     iPoseProof (fai_5a with "Htext") as "Hi5a".
     iPoseProof (fai_5c with "Htext") as "Hi5c".
-    iAssert (∀ (CID0 : CpuId) (mj : regfile) (res : mword 64),
-        ⌜ mj !!! Regidx csp_rs1 = spr
-          /\ mj !!! Regidx Rs1 = res
-          /\ (forall c : mword 5, is_cs_idx c = true ->
-                c <> mword_of_int 9 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
-                mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
-        sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
-        pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
-        cpu_own (CID := CID0) n eb p C b -∗
-        filealloc_post γf res -∗
-        (* [Hepi] does NOT invoke the OUTER [Hcont] itself: [CID0] is a truly
-           arbitrary hart from [Hepi]'s own point of view (it is proved once,
-           generically), so [wp_next_chain] could only ever relate its own
-           six internal steps back to [CID0] -- never all the way back to the
-           function's entry hart, which [Hepi] has no way to know about.  So
-           [Hepi] instead takes its OWN wp_next-shaped continuation as an
-           argument (mirroring ProofConsputc.wp_consputc_epi exactly) and
-           closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
-           at each concrete call site, is the one who both knows the full
-           chain back to entry and holds the real [Hcont]. *)
-        wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
-          ∀ mfin,
-          sie_cap_gpr mfin K b p -∗
-          cpu_own n eb p C b -∗
-          pc_is ret_tgt -∗
-          ⌜ callee_saved m mfin ⌝ -∗
-          filealloc_post γf (mfin !!! Regidx Ra0) -∗
-          WP (Loop : expr riscv_lang)) -∗
-        WP (Loop : expr riscv_lang))%I
+    (* [Hepi] does NOT invoke the OUTER [Hcont] itself: [CID0] is a truly
+       arbitrary hart from [Hepi]'s own point of view (it is proved once,
+       generically), so [wp_next_chain] could only ever relate its own
+       six internal steps back to [CID0] -- never all the way back to the
+       function's entry hart, which [Hepi] has no way to know about.  So
+       [Hepi] instead takes its OWN wp_next-shaped continuation as an
+       argument (mirroring ProofConsputc.wp_consputc_epi exactly) and
+       closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
+       at each concrete call site, is the one who both knows the full
+       chain back to entry and holds the real [Hcont]. *)
+    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p C n eb ret_tgt CID0)%I
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hepi".
     { iIntros (CID0 mj res) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hpc Hcnt Hpost Kont".
       (* +0x52 c.mv a0,s1 *)
@@ -789,13 +837,13 @@ Section ProofFilealloc.
       assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x46) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x4a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4a) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x4a)) Ra0 Ra0 (mword_of_int 0x45a : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x4a)) Ra0 Ra0 (mword_of_int 0x44c : mword 12)
                 F2 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4a").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (F3 := <[Regidx Ra0 := regval_into_reg
-                    (add_vec (F2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1114 : mword 12)))]> F2).
+                    (add_vec (F2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1100 : mword 12)))]> F2).
       assert (HF3a0 : F3 !!! Regidx Ra0 = ftable_addr).
       { rewrite /F3 upd_eq /F2 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -803,14 +851,14 @@ Section ProofFilealloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4e) in "Hpc".
       (* +0x4e jal ra,release *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filealloc + 0x4e)) Rra (mword_of_int 0x1fcbd4 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filealloc + 0x4e)) Rra (mword_of_int 0x1fcbc6 : mword 21)
                 F3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4e").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (F4 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.filealloc + 0x4e) : mword 64) 4)]> F3).
       assert (Htgtrel : add_vec (mword_of_int (KernelSyms.filealloc + 0x4e) : mword 64)
-                          (sign_extend' 64 (mword_of_int 0x1fcbd4 : mword 21))
+                          (sign_extend' 64 (mword_of_int 0x1fcbc6 : mword 21))
                         = mword_of_int KernelSyms.release)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrel) in "Hpc".
@@ -899,13 +947,13 @@ Section ProofFilealloc.
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x36))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x36)) Ra0 Ra0 (mword_of_int 0x46e : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.filealloc + 0x36)) Ra0 Ra0 (mword_of_int 0x460 : mword 12)
                 G1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (G2 := <[Regidx Ra0 := regval_into_reg
-                    (add_vec (G1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1134 : mword 12)))]> G1).
+                    (add_vec (G1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1120 : mword 12)))]> G1).
       assert (HG2a0 : G2 !!! Regidx Ra0 = ftable_addr).
       { rewrite /G2 upd_eq /G1 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -913,14 +961,14 @@ Section ProofFilealloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* +0x3a jal ra,release *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filealloc + 0x3a)) Rra (mword_of_int 0x1fcbe8 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.filealloc + 0x3a)) Rra (mword_of_int 0x1fcbda : mword 21)
                 G2 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3a").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (G3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.filealloc + 0x3a) : mword 64) 4)]> G2).
       assert (Htgtrel : add_vec (mword_of_int (KernelSyms.filealloc + 0x3a) : mword 64)
-                          (sign_extend' 64 (mword_of_int 0x1fcbe8 : mword 21))
+                          (sign_extend' 64 (mword_of_int 0x1fcbda : mword 21))
                         = mword_of_int KernelSyms.release)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrel) in "Hpc".

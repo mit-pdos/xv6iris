@@ -16,7 +16,6 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
@@ -88,9 +87,9 @@ Section CodeBrelse.
   Proof. mk_rvc (KernelSyms.brelse + 0x12) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.brelse + 0x12) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma bri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x14) : mword 64) false (JAL (mword_of_int 4920 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.brelse + 0x14) (mword_of_int 0x338010ef : mword 32)
-    (mword_of_int (KernelSyms.brelse + 0x14) : mword 64) (JAL (mword_of_int 4920 : mword 21, Regidx (mword_of_int 1))) kd_338010ef. Qed.
+  Lemma bri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x14) : mword 64) false (JAL (mword_of_int 4934 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.brelse + 0x14) (mword_of_int 0x346010ef : mword 32)
+    (mword_of_int (KernelSyms.brelse + 0x14) : mword 64) (JAL (mword_of_int 4934 : mword 21, Regidx (mword_of_int 1))) kd_346010ef. Qed.
 
   Lemma bri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x18) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 48 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.brelse + 0x18) (mword_of_int 0xc125 : mword 16)
@@ -100,9 +99,9 @@ Section CodeBrelse.
   Proof. mk_rvc (KernelSyms.brelse + 0x1a) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.brelse + 0x1a) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma bri_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64) false (JAL (mword_of_int 4856 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.brelse + 0x1c) (mword_of_int 0x2f8010ef : mword 32)
-    (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64) (JAL (mword_of_int 4856 : mword 21, Regidx (mword_of_int 1))) kd_2f8010ef. Qed.
+  Lemma bri_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64) false (JAL (mword_of_int 4870 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.brelse + 0x1c) (mword_of_int 0x306010ef : mword 32)
+    (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64) (JAL (mword_of_int 4870 : mword 21, Regidx (mword_of_int 1))) kd_306010ef. Qed.
 
   Lemma bri_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x20) : mword 64) false (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.brelse + 0x20) (mword_of_int 0x00015517 : mword 32)

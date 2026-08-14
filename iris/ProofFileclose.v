@@ -267,12 +267,12 @@ Section ProofFileclose.
     assert (Hpp10 : add_vec_int (mword_of_int (FC + 0x0c) : mword 64) 4
                     = mword_of_int (FC + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x10)) Ra0 Ra0 (mword_of_int 1008 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x10)) Ra0 Ra0 (mword_of_int 994 : mword 12)
               R4 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (R5 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1008 : mword 12)))]> R4).
+                  (add_vec (R4 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 994 : mword 12)))]> R4).
     assert (HR5a0 : R5 !!! Regidx Ra0 = ftable_addr).
     { rewrite /R5 upd_eq /R4 upd_eq. rewrite /ftable_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -280,14 +280,14 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf (mword_of_int (FC + 0x14)) Rra (mword_of_int 2083554 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (FC + 0x14)) Rra (mword_of_int 2083540 : mword 21)
               R5 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14").
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (FC + 0x14) : mword 64) 4)]> R5).
     assert (Htgtacq : add_vec (mword_of_int (FC + 0x14) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2083554 : mword 21))
+                        (sign_extend' 64 (mword_of_int 2083540 : mword 21))
                       = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtacq) in "Hpc".
@@ -499,13 +499,13 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp86) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x86)) Ra0 Ra0
-                (mword_of_int 890 : mword 12) E1 (trap_res b + (K - 8))%nat false
+                (mword_of_int 876 : mword 12) E1 (trap_res b + (K - 8))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi86").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
       set (E2 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (E1 !!! Regidx Ra0)
-                       (sign_extend' 64 (mword_of_int 890 : mword 12)))]> E1).
+                       (sign_extend' 64 (mword_of_int 876 : mword 12)))]> E1).
       assert (HE2a0 : E2 !!! Regidx Ra0 = ftable_addr).
       { rewrite /E2 upd_eq /E1 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -513,14 +513,14 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp8a) in "Hpc".
       iApply (wp_jal_s_sconf (mword_of_int (FC + 0x8a)) Rra
-                (mword_of_int 2083572 : mword 21) E2 (trap_res b + (K - 8))%nat false
+                (mword_of_int 2083558 : mword 21) E2 (trap_res b + (K - 8))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8a").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (E3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FC + 0x8a) : mword 64) 4)]> E2).
       assert (Htgtrel : add_vec (mword_of_int (FC + 0x8a) : mword 64)
-                          (sign_extend' 64 (mword_of_int 2083572 : mword 21))
+                          (sign_extend' 64 (mword_of_int 2083558 : mword 21))
                         = mword_of_int KernelSyms.release)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrel) in "Hpc".
@@ -856,13 +856,13 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4c) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x4c)) Ra0 Ra0
-                (mword_of_int 948 : mword 12) G1 (trap_res b + (K - 8))%nat false
+                (mword_of_int 934 : mword 12) G1 (trap_res b + (K - 8))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4c").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
       set (G2 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (G1 !!! Regidx Ra0)
-                       (sign_extend' 64 (mword_of_int 948 : mword 12)))]> G1).
+                       (sign_extend' 64 (mword_of_int 934 : mword 12)))]> G1).
       assert (HG2a0 : G2 !!! Regidx Ra0 = ftable_addr).
       { rewrite /G2 upd_eq /G1 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -870,14 +870,14 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp50) in "Hpc".
       iApply (wp_jal_s_sconf (mword_of_int (FC + 0x50)) Rra
-                (mword_of_int 2083630 : mword 21) G2 (trap_res b + (K - 8))%nat false
+                (mword_of_int 2083616 : mword 21) G2 (trap_res b + (K - 8))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi50").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (G3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (FC + 0x50) : mword 64) 4)]> G2).
       assert (Htgtrel2 : add_vec (mword_of_int (FC + 0x50) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2083630 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2083616 : mword 21))
                          = mword_of_int KernelSyms.release)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrel2) in "Hpc".
@@ -1341,14 +1341,14 @@ Section ProofFileclose.
           iPoseProof (fci_c0 with "Htext") as "Hic0".
           (* ---- +0xaa jal begin_op ---- *)
           iApply (wp_jal_s_sconf (mword_of_int (FC + 0xaa)) Rra
-                    (mword_of_int 2095786 : mword 21) Q2 (K - 8)%nat b
+                    (mword_of_int 2095772 : mword 21) Q2 (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiaa").
           iIntros (CIDf2 Hsf2) "Hcg Hpc".
           set (B1 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (FC + 0xaa) : mword 64) 4)]> Q2).
           assert (Htgtbo : add_vec (mword_of_int (FC + 0xaa) : mword 64)
-                             (sign_extend' 64 (mword_of_int 2095786 : mword 21))
+                             (sign_extend' 64 (mword_of_int 2095772 : mword 21))
                            = mword_of_int KernelSyms.begin_op)
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgtbo) in "Hpc".
@@ -1398,14 +1398,14 @@ Section ProofFileclose.
           iEval (rewrite Hppb0) in "Hpc".
           (* ---- +0xb0 jal iput ---- *)
           iApply (wp_jal_s_sconf (mword_of_int (FC + 0xb0)) Rra
-                    (mword_of_int 2093572 : mword 21) B2 (K - 8)%nat b
+                    (mword_of_int 2093558 : mword 21) B2 (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib0").
           iIntros (CIDf5 Hsf5) "Hcg Hpc".
           set (B3 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (FC + 0xb0) : mword 64) 4)]> B2).
           assert (Htgtip : add_vec (mword_of_int (FC + 0xb0) : mword 64)
-                             (sign_extend' 64 (mword_of_int 2093572 : mword 21))
+                             (sign_extend' 64 (mword_of_int 2093558 : mword 21))
                            = mword_of_int KernelSyms.iput)
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgtip) in "Hpc".
@@ -1452,14 +1452,14 @@ Section ProofFileclose.
           iEval (rewrite Hpcb4) in "Hpc".
           (* ---- +0xb4 jal end_op ---- *)
           iApply (wp_jal_s_sconf (mword_of_int (FC + 0xb4)) Rra
-                    (mword_of_int 2095916 : mword 21) mi (K - 8)%nat b
+                    (mword_of_int 2095902 : mword 21) mi (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib4").
           iIntros (CIDf7 Hsf7) "Hcg Hpc".
           set (B4 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (FC + 0xb4) : mword 64) 4)]> mi).
           assert (Htgteo : add_vec (mword_of_int (FC + 0xb4) : mword 64)
-                             (sign_extend' 64 (mword_of_int 2095916 : mword 21))
+                             (sign_extend' 64 (mword_of_int 2095902 : mword 21))
                            = mword_of_int KernelSyms.end_op)
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgteo) in "Hpc".

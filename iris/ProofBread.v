@@ -756,14 +756,14 @@ Section BreadBlocks.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hppcc) in "Hpc".
       (* ===== +0xcc jal ra,virtio_disk_rw ===== *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0xcc)) Rra (mword_of_int 11238 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0xcc)) Rra (mword_of_int 11254 : mword 21)
                 T3 (K - 6)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hicc").
       iIntros (CIDt5 Hst5) "Hcg Hpc".
       set (T4 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.bread + 0xcc) : mword 64) 4)]> T3).
       assert (Htgtrw : add_vec (mword_of_int (KernelSyms.bread + 0xcc) : mword 64)
-                         (sign_extend' 64 (mword_of_int 11238 : mword 21))
+                         (sign_extend' 64 (mword_of_int 11254 : mword 21))
                        = mword_of_int KernelSyms.virtio_disk_rw)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrw) in "Hpc".
@@ -1111,14 +1111,14 @@ Section BreadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp5e) in "Hpc".
     (* ---- +0x5e jal ra,acquiresleep ---- *)
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0x5e)) Rra (mword_of_int 4970 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0x5e)) Rra (mword_of_int 4984 : mword 21)
               H6 (K - 6)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5e").
     iIntros (CIDh2 Hsh2) "Hcg Hpc".
     set (H7 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bread + 0x5e) : mword 64) 4)]> H6).
     assert (Htgtasl : add_vec (mword_of_int (KernelSyms.bread + 0x5e) : mword 64)
-                        (sign_extend' 64 (mword_of_int 4970 : mword 21))
+                        (sign_extend' 64 (mword_of_int 4984 : mword 21))
                       = mword_of_int KernelSyms.acquiresleep)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtasl) in "Hpc".
@@ -1475,14 +1475,14 @@ Section BreadBlocks.
     assert (Hppb0 : add_vec_int (mword_of_int (KernelSyms.bread + 0xac) : mword 64) 4 = mword_of_int (KernelSyms.bread + 0xb0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb0) in "Hpc".
-    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0xb0)) Rra (mword_of_int 4888 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0xb0)) Rra (mword_of_int 4902 : mword 21)
               C5 (K - 6)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib0").
     iIntros (CIDc2 Hsc2) "Hcg Hpc".
     set (C6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bread + 0xb0) : mword 64) 4)]> C5).
     assert (Htgtasl : add_vec (mword_of_int (KernelSyms.bread + 0xb0) : mword 64)
-                        (sign_extend' 64 (mword_of_int 4888 : mword 21))
+                        (sign_extend' 64 (mword_of_int 4902 : mword 21))
                       = mword_of_int KernelSyms.acquiresleep)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtasl) in "Hpc".
