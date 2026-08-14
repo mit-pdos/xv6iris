@@ -502,17 +502,17 @@ Section ProofVirtioDiskRw.
     iEval (rewrite Hp02e) in "Hpc".
     iPoseProof (rwi_02e with "Htext") as "Hi02e".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x02e) : mword 64) Ra0 Ra0
-              (mword_of_int 3414 : mword 12) R9 (K - 12)%nat eb
+              (mword_of_int 3382 : mword 12) R9 (K - 12)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi02e").
     iIntros (CIDp20 Hsp20) "Hcg Hpc". rgall.
     iClear "Hi02e".
     set (R10 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (R9 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 3414 : mword 12)))]> R9).
+                     (sign_extend' 64 (mword_of_int 3382 : mword 12)))]> R9).
     change (<[Regidx Ra0 := regval_into_reg
                   (add_vec (R9 !!! Regidx Ra0)
-                     (sign_extend' 64 (mword_of_int 3414 : mword 12)))]> R9) with R10.
+                     (sign_extend' 64 (mword_of_int 3382 : mword 12)))]> R9) with R10.
     assert (HR10a0 : R10 !!! Regidx Ra0 = (d_lock : mword 64)).
     { rewrite /R10 upd_eq /R9 upd_eq.
       unfold d_lock, disk_base, pa_add, add_vec_int.
@@ -523,7 +523,7 @@ Section ProofVirtioDiskRw.
     iPoseProof (rwi_032 with "Htext") as "Hi032".
     (* ---- +0x032  jal acquire ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64) Rra
-              (mword_of_int 2077544 : mword 21) R10 (K - 12)%nat eb
+              (mword_of_int 2077496 : mword 21) R10 (K - 12)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi032").
@@ -534,7 +534,7 @@ Section ProofVirtioDiskRw.
     change (<[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64) 4)]> R10) with R11.
     assert (Hjacq : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2077544 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2077496 : mword 21))
                     = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjacq) in "Hpc".
@@ -983,17 +983,17 @@ Section ProofVirtioDiskRw.
     iEval (rewrite Hp062) in "Hpc".
     iPoseProof (rwi_062 with "Htext") as "Hi062".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x062) : mword 64) Ra4 Ra4
-              (mword_of_int 3066 : mword 12) Q2 av false
+              (mword_of_int 3034 : mword 12) Q2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi062").
               iClear "Hi062".
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (Q3 := <[Regidx Ra4 := regval_into_reg
                   (add_vec (Q2 !!! Regidx Ra4)
-                     (sign_extend' 64 (mword_of_int 3066 : mword 12)))]> Q2).
+                     (sign_extend' 64 (mword_of_int 3034 : mword 12)))]> Q2).
     change (<[Regidx Ra4 := regval_into_reg
                   (add_vec (Q2 !!! Regidx Ra4)
-                     (sign_extend' 64 (mword_of_int 3066 : mword 12)))]> Q2) with Q3.
+                     (sign_extend' 64 (mword_of_int 3034 : mword 12)))]> Q2) with Q3.
     assert (HQ3a4 : Q3 !!! Regidx Ra4
                     = add_vec (disk_base : mword 64) (mword_of_int (Z.of_nat 0))).
     { rewrite /Q3 upd_eq /Q2 upd_eq.

@@ -110,9 +110,9 @@ Section CodeClockintr.
   Proof. mk_base (KernelSyms.clockintr + 0x28) (mword_of_int 0x00016517 : mword 32)
     (mword_of_int (KernelSyms.clockintr + 0x28) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00016517. Qed.
 
-  Lemma cii_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x2c) : mword 64) false (ITYPE (mword_of_int 3302 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.clockintr + 0x2c) (mword_of_int 0xce650513 : mword 32)
-    (mword_of_int (KernelSyms.clockintr + 0x2c) : mword 64) (ITYPE (mword_of_int 3302 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ce650513. Qed.
+  Lemma cii_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x2c) : mword 64) false (ITYPE (mword_of_int 3318 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.clockintr + 0x2c) (mword_of_int 0xcf650513 : mword 32)
+    (mword_of_int (KernelSyms.clockintr + 0x2c) : mword 64) (ITYPE (mword_of_int 3318 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cf650513. Qed.
 
   Lemma cii_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x30) : mword 64) false (JAL (mword_of_int 2090688 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.clockintr + 0x30) (mword_of_int 0xec0fe0ef : mword 32)
@@ -122,9 +122,9 @@ Section CodeClockintr.
   Proof. mk_base (KernelSyms.clockintr + 0x34) (mword_of_int 0x00008717 : mword 32)
     (mword_of_int (KernelSyms.clockintr + 0x34) : mword 64) (UTYPE (mword_of_int 8 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_00008717. Qed.
 
-  Lemma cii_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x38) : mword 64) false (ITYPE (mword_of_int 3498 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.clockintr + 0x38) (mword_of_int 0xdaa70713 : mword 32)
-    (mword_of_int (KernelSyms.clockintr + 0x38) : mword 64) (ITYPE (mword_of_int 3498 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_daa70713. Qed.
+  Lemma cii_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x38) : mword 64) false (ITYPE (mword_of_int 3514 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.clockintr + 0x38) (mword_of_int 0xdba70713 : mword 32)
+    (mword_of_int (KernelSyms.clockintr + 0x38) : mword 64) (ITYPE (mword_of_int 3514 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_dba70713. Qed.
 
   Lemma cii_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x3c) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.clockintr + 0x3c) (mword_of_int 0x431c : mword 16)
@@ -150,9 +150,9 @@ Section CodeClockintr.
   Proof. mk_base (KernelSyms.clockintr + 0x48) (mword_of_int 0x00016517 : mword 32)
     (mword_of_int (KernelSyms.clockintr + 0x48) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00016517. Qed.
 
-  Lemma cii_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x4c) : mword 64) false (ITYPE (mword_of_int 3270 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.clockintr + 0x4c) (mword_of_int 0xcc650513 : mword 32)
-    (mword_of_int (KernelSyms.clockintr + 0x4c) : mword 64) (ITYPE (mword_of_int 3270 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cc650513. Qed.
+  Lemma cii_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x4c) : mword 64) false (ITYPE (mword_of_int 3286 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.clockintr + 0x4c) (mword_of_int 0xcd650513 : mword 32)
+    (mword_of_int (KernelSyms.clockintr + 0x4c) : mword 64) (ITYPE (mword_of_int 3286 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_cd650513. Qed.
 
   Lemma cii_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.clockintr + 0x50) : mword 64) false (JAL (mword_of_int 2090792 : mword 21, Regidx (mword_of_int 1))).
   Proof. mk_base (KernelSyms.clockintr + 0x50) (mword_of_int 0xf28fe0ef : mword 32)

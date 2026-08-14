@@ -2863,12 +2863,12 @@ Section IallocMain.
     iEval (rewrite Hpp0c) in "Hpc".
     (* ===== +0x0c lw a4,2108(a4) : a4 := sb.ninodes ===== *)
     assert (Hnadr : add_vec (rget R3 Ra4)
-                      (sign_extend' 64 (mword_of_int 2094 : mword 12))
+                      (sign_extend' 64 (mword_of_int 2110 : mword 12))
                     = sb_ninodes).
     { rgne. rewrite HR3a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ialloc + 0xc)) Ra4 Ra4
-              (mword_of_int 2094 : mword 12) R3 (K - 8)%nat
+              (mword_of_int 2110 : mword 12) R3 (K - 8)%nat
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c Hsbn").
     iIntros (CID6 Hq6) "Hcg Hpc Hsbn".
@@ -3133,12 +3133,12 @@ Section IallocMain.
     iEval (rewrite Hpp2c) in "Hpc".
     (* ===== +0x2c addi s4,s4,2064 : s4 := &sb ===== *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.ialloc + 0x2c)) Rs4 Rs4
-              (mword_of_int 2050 : mword 12) R9 (K - 8)%nat b
+              (mword_of_int 2066 : mword 12) R9 (K - 8)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c").
     iIntros (CID19 Hq19) "Hcg Hpc".
     set (RA := <[Regidx Rs4 := regval_into_reg
                   (add_vec (rget R9 Rs4)
-                     (sign_extend' 64 (mword_of_int 2050 : mword 12)))]> R9).
+                     (sign_extend' 64 (mword_of_int 2066 : mword 12)))]> R9).
     assert (HRAs4 : RA !!! Regidx Rs4 = (mword_of_int KernelSyms.sb : mword 64)).
     { rewrite /RA upd_eq. rgne. rewrite HR9s4. pcw. }
     assert (HRAs2 : RA !!! Regidx Rs2

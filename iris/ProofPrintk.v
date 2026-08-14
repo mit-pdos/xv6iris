@@ -729,12 +729,12 @@ Section ProofPrintk.
     assert (Hp258 : add_vec_int (mword_of_int (KernelSyms.printk + 0x254) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x258)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp258) in "Hpc".
     (* +0x258 addi a0,a0,-1062 : &pr *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printk + 0x258)) a0_idx a0_idx (mword_of_int 3074 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printk + 0x258)) a0_idx a0_idx (mword_of_int 3090 : mword 12)
               L1 AV false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi258").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (L2 := <[Regidx a0_idx := regval_into_reg (add_vec (L1 !!! Regidx a0_idx) (sign_extend' 64 (mword_of_int 3074 : mword 12)))]> L1).
+    set (L2 := <[Regidx a0_idx := regval_into_reg (add_vec (L1 !!! Regidx a0_idx) (sign_extend' 64 (mword_of_int 3090 : mword 12)))]> L1).
     assert (HL2a0 : L2 !!! Regidx a0_idx = pk_pr_lock).
     { rewrite /L2 upd_eq. unfold regval_into_reg. rewrite /L1 upd_eq.
       unfold regval_into_reg, pk_pr_lock. apply bv_eq; vm_compute; reflexivity. }
@@ -8168,12 +8168,12 @@ Section ProofPrintk.
     set (A1 := <[Regidx a0_idx := regval_into_reg (add_vec (mword_of_int (KernelSyms.printk + 0x1e) : mword 64) (auipc_off (mword_of_int 18 : mword 20)))]> mp).
     assert (Hpa22 : add_vec_int (mword_of_int (KernelSyms.printk + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpa22) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printk + 0x22)) a0_idx a0_idx (mword_of_int 3640 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.printk + 0x22)) a0_idx a0_idx (mword_of_int 3656 : mword 12)
               A1 (K - 24)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22").
     iIntros (CIDa2 Hsta2) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (A2 := <[Regidx a0_idx := regval_into_reg (add_vec (A1 !!! Regidx a0_idx) (sign_extend' 64 (mword_of_int 3640 : mword 12)))]> A1).
+    set (A2 := <[Regidx a0_idx := regval_into_reg (add_vec (A1 !!! Regidx a0_idx) (sign_extend' 64 (mword_of_int 3656 : mword 12)))]> A1).
     assert (HA2a0 : A2 !!! Regidx a0_idx = pk_pr_lock).
     { rewrite /A2 upd_eq. unfold regval_into_reg. rewrite /A1 upd_eq.
       unfold regval_into_reg, pk_pr_lock. apply bv_eq; vm_compute; reflexivity. }

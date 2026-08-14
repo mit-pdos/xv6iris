@@ -88,7 +88,12 @@ DEFN_ADDR_RE = re.compile(
     r'Definition\s+([A-Za-z_][A-Za-z_0-9]*)\s*:\s*Z\s*:=\s*(.+?)\.(?![A-Za-z_0-9])', re.S)
 
 
-NOTATION_RE = re.compile(r'Notation\s+([A-Za-z_][A-Za-z_0-9]*)\s*:=\s*(KernelSyms\.[A-Za-z_][A-Za-z_0-9]*)\s*\.')
+# [(only parsing)] is how most of the tree declares its aliases, and without
+# the modifier group here the whole file goes UNRESOLVABLE -- 31 files,
+# including every create/namex/kfork/kexec proof, were invisible to this tool.
+NOTATION_RE = re.compile(
+    r'Notation\s+([A-Za-z_][A-Za-z_0-9]*)\s*:=\s*(KernelSyms\.[A-Za-z_][A-Za-z_0-9]*)'
+    r'\s*(?:\([^)]*\)\s*)?\.')
 
 
 def strip_comments(text):
@@ -448,13 +453,19 @@ def main():
         for a, b, have, want, kind, base, off in sorted(es, key=lambda e: -e[0]):
             nxt = next((x for x in anchors if x > a), len(raw))
             wd = KIND_WIDTH[kind]
-            blk = raw[a:nxt]
+            # The ANCHOR literal is [a,b) and is replaced outright; the echoes
+            # are rewritten in the block that FOLLOWS it.  Substituting over a
+            # block that still contains the anchor and then splicing by the
+            # anchor's OLD length corrupts the source whenever the new literal
+            # has a different width -- it ate the [: mword 12] ascription of a
+            # 4094 -> 14 site and spliced 998 -> 1014 into "101444444", both of
+            # which are well-formed enough to reach the build as a mystery.
+            blk = raw[b:nxt]
             blk = re.sub(r'mword_of_int(\s+)(?:%d|0x%x)\b((?:\s*:\s*mword\s+%d)?)' % (have, have, wd),
                          lambda m: 'mword_of_int%s%d%s' % (m.group(1), want, m.group(2)), blk)
             head = ('0x%x' % want) if raw[a:b].startswith('0x') else str(want)
-            blk = head + blk[b - a:]
             total += 1
-            raw = raw[:a] + blk + raw[nxt:]
+            raw = raw[:a] + head + blk + raw[nxt:]
         open(p, 'w').write(raw)
     print("rewrote %d site(s) across %d file(s)" % (total, len(per_file)))
     return 0

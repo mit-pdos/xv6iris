@@ -3,7 +3,7 @@
 
    ==== WHAT IS ASSUMED, IN ONE LINE =====================================
 
-   At create's `ilock(ip)` (+0x98), on the inode its own `ialloc` (+0x90)
+   At create's `ilock(ip)` (+0xb0), on the inode its own `ialloc` (+0xa8)
    has just claimed, the record the fill returns is the record the claim
    wrote: [di_type dn = ty].  Nothing else.
 
@@ -44,16 +44,16 @@
    contradictory premises -- and is therefore consistent.  That is the
    whole reason this file states a span rather than a fact.
 
-   THE SPAN IS FOUR INSTRUCTIONS, +0x8c .. +0x98:
+   THE SPAN IS FOUR INSTRUCTIONS, +0xa4 .. +0xb0:
 
-     +0x8c  c.mv  a1,s4          a1 := type
-     +0x8e  lw    a0,0(s1)       a0 := dp->dev            (the parent's cell)
-     +0x90  jal   ialloc         <- [wp_ialloc_gen] is a HYPOTHESIS
-     +0x94  c.mv  s3,a0          s3 := ip
-     +0x96  c.beqz a0 -> +0xd4   [ARM A-FAIL]
-     +0x98  jal   ilock          <- [wp_ilock_sconf] is a HYPOTHESIS
+     +0xa4  c.mv  a1,s4          a1 := type
+     +0xa6  lw    a0,0(s1)       a0 := dp->dev            (the parent's cell)
+     +0xa8  jal   ialloc         <- [wp_ialloc_gen] is a HYPOTHESIS
+     +0xac  c.mv  s3,a0          s3 := ip
+     +0xae  c.beqz a0 -> +0xec   [ARM A-FAIL]
+     +0xb0  jal   ilock          <- [wp_ilock_sconf] is a HYPOTHESIS
 
-   and it delivers control at +0x9c (allocated) or +0xd4 (A-FAIL), which
+   and it delivers control at +0xb4 (allocated) or +0xec (A-FAIL), which
    are the CFG's own two successors.  Four instructions is the price of
    consistency and it is stated here so nobody has to measure it: create
    proves the other 158.
@@ -132,7 +132,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* THE SEAM'S REGISTER CONTRACT.  [callee_saved] is FALSE across the span --
-   the [c.mv s3,a0] at +0x94 is the point of it -- so what the span promises
+   the [c.mv s3,a0] at +0xac is the point of it -- so what the span promises
    is [callee_saved] EVERYWHERE BUT s3, with s3's own value reported per
    arm.  Both callees restore sp and s0, so the exception list is exactly
    the one register the span writes, and the predicate is stated
@@ -181,7 +181,7 @@ Definition create_fresh_ty_body
      makes this statement consistent: at two different [ty] these two
      equations cannot both hold.  See the header. ---- *)
   Ma !!! Regidx (mword_of_int 20 : mword 5) = (sign_extend' 64 ty : mword 64) ->
-  (* s1 = dp, whose [dev] word the [lw] at +0x8e reads *)
+  (* s1 = dp, whose [dev] word the [lw] at +0xa6 reads *)
   Ma !!! Regidx (mword_of_int 9 : mword 5) = ientry kd ->
   (kd < NINODE)%nat ->
   (* PARKING PREMISE *)
@@ -220,7 +220,7 @@ Definition create_fresh_ty_body
   (* ================= THE SPAN ================= *)
   sie_cap_gpr Ma K b pj -∗
   cpu_own 0 eb pj C b -∗
-  kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0x8c) : mword 64) -∗
+  kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
@@ -240,7 +240,7 @@ Definition create_fresh_ty_body
   p_pid pj ↦₄{dq} pidv -∗
   bslots bn 3 -∗
   iref_slot -∗
-  (* THE PARENT'S OWN [dev] CELL: the [lw a0,0(s1)] at +0x8e reads it, and
+  (* THE PARENT'S OWN [dev] CELL: the [lw a0,0(s1)] at +0xa6 reads it, and
      it comes straight back.  It is the only piece of the locked parent the
      span touches. *)
   i_dev (ientry kd) ↦₄{dqp} dev -∗
@@ -259,7 +259,7 @@ Definition create_fresh_ty_body
       i_dev (ientry kd) ↦₄{dqp} dev -∗
       (if alloc
        then
-         (* ---- CONTROL IS AT +0x9c, THE INODE IS LOCKED AND FILLED ---- *)
+         (* ---- CONTROL IS AT +0xb4, THE INODE IS LOCKED AND FILLED ---- *)
          ⌜Mo !!! Regidx (mword_of_int 19 : mword 5) = ientry kslot
           /\ (kslot < NINODE)%nat
           /\ 0 < bv_unsigned inum < ninodes
@@ -270,7 +270,7 @@ Definition create_fresh_ty_body
           (* ...and this is ILOCK's, at the [filled] the line above pins:
              NOT assumed -- see the header. *)
           /\ fresh_shape dn⌝ ∗
-         pc_is (mword_of_int (KernelSyms.create + 0x9c) : mword 64) ∗
+         pc_is (mword_of_int (KernelSyms.create + 0xb4) : mword 64) ∗
          is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
                       (ic_tok cn kslot) ∗
          sleeplocked gisl ∗
@@ -286,10 +286,10 @@ Definition create_fresh_ty_body
             [iupdate(ip)] and every [dirlink] on [ip] credit against *)
          log_opS γ u (Sb ∪ {[IBLOCK inum inodestart]})
        else
-         (* ---- CONTROL IS AT +0xd4, ARM A-FAIL: nothing was claimed ---- *)
+         (* ---- CONTROL IS AT +0xec, ARM A-FAIL: nothing was claimed ---- *)
          ⌜Mo !!! Regidx (mword_of_int 19 : mword 5)
           = (mword_of_int 0 : mword 64)⌝ ∗
-         pc_is (mword_of_int (KernelSyms.create + 0xd4) : mword 64) ∗
+         pc_is (mword_of_int (KernelSyms.create + 0xec) : mword 64) ∗
          iref_slot ∗
          log_opS γ (S u) Sb) -∗
       WP (Loop : expr riscv_lang)) -∗

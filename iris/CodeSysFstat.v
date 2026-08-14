@@ -23,9 +23,11 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
+Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
@@ -65,9 +67,9 @@ Section CodeSysFstat.
   Proof. mk_rvc (KernelSyms.sys_fstat + 0xc) (mword_of_int 0x4505 : mword 16)
     (mword_of_int (KernelSyms.sys_fstat + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4505 exec_execute_C_LI. Qed.
 
-  Lemma sfsi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) false (JAL (mword_of_int 2087532 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_fstat + 0xe) (mword_of_int 0xa6dfd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) (JAL (mword_of_int 2087532 : mword 21, Regidx (mword_of_int 1))) kd_a6dfd0ef. Qed.
+  Lemma sfsi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) false (JAL (mword_of_int 2087508 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_fstat + 0xe) (mword_of_int 0xa55fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_fstat + 0xe) : mword 64) (JAL (mword_of_int 2087508 : mword 21, Regidx (mword_of_int 1))) kd_a55fd0ef. Qed.
 
   Lemma sfsi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x12) : mword 64) false (ITYPE (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 12), ADDI)).
   Proof. mk_base (KernelSyms.sys_fstat + 0x12) (mword_of_int 0xfe840613 : mword 32)
@@ -81,9 +83,9 @@ Section CodeSysFstat.
   Proof. mk_rvc (KernelSyms.sys_fstat + 0x18) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_fstat + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma sfsi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x1a) : mword 64) false (JAL (mword_of_int 2096352 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_fstat + 0x1a) (mword_of_int 0xce1ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_fstat + 0x1a) : mword 64) (JAL (mword_of_int 2096352 : mword 21, Regidx (mword_of_int 1))) kd_ce1ff0ef. Qed.
+  Lemma sfsi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x1a) : mword 64) false (JAL (mword_of_int 2096328 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_fstat + 0x1a) (mword_of_int 0xcc9ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_fstat + 0x1a) : mword 64) (JAL (mword_of_int 2096328 : mword 21, Regidx (mword_of_int 1))) kd_cc9ff0ef. Qed.
 
   Lemma sfsi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x1e) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.sys_fstat + 0x1e) (mword_of_int 0x87aa : mword 16)
@@ -105,9 +107,9 @@ Section CodeSysFstat.
   Proof. mk_base (KernelSyms.sys_fstat + 0x2a) (mword_of_int 0xfe843503 : mword 32)
     (mword_of_int (KernelSyms.sys_fstat + 0x2a) : mword 64) (LOAD (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 8)) kd_fe843503. Qed.
 
-  Lemma sfsi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x2e) : mword 64) false (JAL (mword_of_int 2093992 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_fstat + 0x2e) (mword_of_int 0xba8ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_fstat + 0x2e) : mword 64) (JAL (mword_of_int 2093992 : mword 21, Regidx (mword_of_int 1))) kd_ba8ff0ef. Qed.
+  Lemma sfsi_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x2e) : mword 64) false (JAL (mword_of_int 2093968 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_fstat + 0x2e) (mword_of_int 0xb90ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_fstat + 0x2e) : mword 64) (JAL (mword_of_int 2093968 : mword 21, Regidx (mword_of_int 1))) kd_b90ff0ef. Qed.
 
   Lemma sfsi_32 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_fstat + 0x32) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.sys_fstat + 0x32) (mword_of_int 0x60e2 : mword 16)

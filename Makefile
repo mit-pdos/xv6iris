@@ -69,7 +69,7 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # local cherry-pick (ae96fd0 + 9da28f5) while the fix for kernel-defects.md D2
 # was ahead of the revision this tree was proved against; converging on the
 # branch tip retired that apparatus, and the pin has tracked the tip since
-# (d80e61c5: tx_lock becomes a spinlock, panic path removed; a28e94b: no
+# (…; d80e61c5: tx_lock becomes a spinlock, panic path removed; a28e94b: no
 # procdump from the console; 2691300 -> 1a70c2e: unreachable() split out of
 # panic(), rebased onto upstream 13602eb, which gives sleep() a prototype and
 # so rewrites sys_sync's call to it; 1a70c2e -> 515391a: seventeen more
@@ -83,7 +83,7 @@ SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
 # stays reachable only from your local clone -- expect the diff between two
 # consecutive pins to be an upstream commit that landed UNDER the series, not
 # on top of it.
-XV6_REV ?= 515391a5113990105f669b0ed5ab0c1f287080e4
+XV6_REV ?= 117c0e7e5ffeebf9930c06076372c2741886e137
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

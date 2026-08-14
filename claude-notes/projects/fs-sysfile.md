@@ -7601,3 +7601,102 @@ HEAD (pre-C4: `SpecIupdate.v`, `ProofIupdate.v`, `ProofIalloc.v`,
 `SpecLogWrite.v`, `ProofLogWrite.v`) and has NO `.vo` — building there is a
 false green.  `/shared/xv6iris-c4` is content-identical to HEAD and warm at
 1093 `.vo`; this landing was gated there and left clean.
+
+
+### `XV6_REV` -> `117c0e7` (the NLINK_MAX guard).  create is the only
+### proven function that RESHAPED; `cr_found_half` now walks the guard and
+### proves its exit arm, and every create statement is byte-identical
+
+**THE SHIFT MAP, and it is NOT what `relayout_shift.py` prints** (§2 of the
+bump playbook, "the wrong map can be perfectly self-consistent"):
+
+```
+old +0x00 .. +0x2e   ->  +0            (prologue .. the [dp->nlink == 0] c.beqz)
+old +0x30 .. +0x7e   ->  +0x0e         (14 bytes of guard inserted at +0x30)
+old +0x80 .. +0x14a  ->  +0x18         (10 more: the guard's exit block at +0x8e)
+```
+
+(`SpecCreate.v`'s header CFG and the "332-BYTE CFG" listing above are the
+PRE-BUMP offsets and are left that way — apply the map above to read them,
+and note the function is now 356 bytes.)
+
+so the found half's whole prologue is untouched, ARM G's block is at `+0x84`
+(NOT `+0x8e` — gcc emits the cold blocks in source order and the `+0x2e`
+branch's own immediate says so), and the layout of everything below is the old
+one plus `0x18`.  The six new instructions:
+
+```
+ +0x2e c.beqz a5 -> +0x84         [ARM G, unchanged, immediate 0x48 -> 0x56]
+ +0x30 c.lui a4,0xffff8 / +0x32 c.addi a4,a4,1      a4 := -NLINK_MAX
+ +0x34 c.add a5,a5,a4             a5 := dp->nlink - 32767
+ +0x36 c.bnez a5 -> +0x3e         not at the maximum: skip the type test
+ +0x38 addi a5,s4,-1              a5 := ty - T_DIR
+ +0x3c c.beqz a5 -> +0x8e         [ARM G2, the guard's own exit]
+ +0x8e mv a0,s1 / jal iunlockput / li s2,0 / c.j +0x70   [ARM G2]
+```
+
+**ARM G2 IS PROVEN, NOT PARKED, and that is the cheap answer.**  Its block is
+ARM G's at another address, and ARM G's proof never reads `nlink = 0` below
+the branch — the `iunlockput(dp)` runs uncredited at `crb = cru = crz = false`
+against `cr_budget_found_w`'s first row, and the contract's zero-return arm
+takes `dnl`/`bml` back unchanged.  So the arm is 140 lines of the same walk
+with four offsets and two immediates changed, against ~130 for a parked body
+plus a functor parameter.  `cr_found_half`'s STATEMENT did not move, and its
+`Print Assumptions` is the standing six — no `create_fresh_ty`, no new
+assumption of any kind.
+
+**THE GUARD IS A DIAMOND, and the shape that pays for it is an `∧` of two
+`wp_next`-wrapped continuations.**  The `c.bnez` at `+0x36` and the `c.beqz`
+at `+0x3c`'s fall-through BOTH land at `+0x3e`, so the rest of the found half
+(870 lines, dirlookup onwards) must be available to two arms.  An `iAssert` of
+the join alone cannot work — it consumes the resources ARM G2 also needs —
+and `∧` is the connective that hands the whole context to both, exactly as the
+two arms of a `destruct` do.  Two things make it go:
+
+* **each conjunct must be `wp_next (CID0 := <the entry hart>)`-wrapped.**  At
+  a bare `(CIDj : CpuId)` the tail's first `cpu_own_transport` fails with *"No
+  applicable tactic"*: `wp_next_chain` closes a guard only from hypotheses in
+  context and a free hart has none.  This is D₀-a's finding ("any future
+  'prove body B at an arbitrary hart' lemma in this tier has the same wall"),
+  and it applies to an INLINE `iAssert` just as much as to a lemma.
+* the tail is quantified over the register map with `cr_regs` as its only
+  premise, which cost five lines: two of its lookups reached through the
+  concrete map's definition (`rewrite /Q3 upd_ne`) and now read `s0`/`s1` off
+  the bundle instead.
+
+**THE THREE DECISION LEMMAS ARE ONE CANCELLATION LEMMA.**  Both branches ask
+"is this sum zero", so `cr_add_inv x c d` (`c + d = 2^64` -> `x + c = 0` ->
+`x = d`) plus `nx_sext16_inj` decides both: `cr_nlmax_eq`/`_ne` at 32767 and
+`cr_tym1_eq`/`_ne` at `T_DIR`.  Its proof is `add_vec64_unsigned`, `bv_wrap`
+unfolded, and `Z.mod_divide` + `lia` — and **the range facts must be posed as
+`bv_unsigned_in_range _ x`, never `... 64 x`**: with the width given
+explicitly the hypothesis is about `@bv_unsigned 64 x` while the goal is about
+`@bv_unsigned (Z_idx 64) x`, two atoms `lia` cannot relate, and the failure is
+a bare "Cannot find witness" on an arithmetic goal that is plainly true.
+
+**WHAT THE MKDIR ARM (D₀-b) MAY NOW ASSUME.**  Everything its stop was blocked
+on: the `nlink++` at `+0x134` cannot wrap, because `cr_mkdir_body` is reached
+only through the `c.beqz` at `+0x3c` NOT taken, i.e. at `di_nlink dp <> 32767`
+— a walk-level fact, in the code, needing no premise on any statement and no
+region invariant.  The planned L4 carrier (C5) is retired with it.  What the
+arm still owes is the same as before: the two interior `dirlink`s on the child,
+the parent's `dirlink`, and the flush, at the offsets above.  `cr_fail_body`'s
+`⌜ty <> T_DIR⌝` and the three T_DIR `fail:` entries are untouched by any of
+this and remain the open design choice recorded under D₀-c.
+
+**GATE.**  `make -f CoqMakefile -j30 -k` MAKEEXIT=0 on the EC2 mirror
+(`/shared/xv6iris`, md5-verified against the working tree, 1088 `.v`),
+`make -n` 0 `COQC` lines, no `Admitted`/`admit`, `lemma_diff` clean over every
+hand-written file (its 460 lines are the regenerated decode layer),
+`fix_proof_imms` 0 stale.  `Print Assumptions` at the eight real modules:
+`cr_found_half` / `cr_tail_half` / `cr_fail_half` and namex / namei /
+nameiparent / iput / itrunc = the standing six; `cr_alloc_half` = the six plus
+`create_fresh_ty`.  `SpecCreate.v` and `CreateBudget.v` are byte-untouched.
+`cr_found_half` / `cr_tail_half` / `cr_fail_half`'s STATEMENTS are
+byte-identical and `cr_alloc_half`'s moved by two comment offsets; the five
+bodies (`cr_alloc_body`, `cr_mkdir_body`, `cr_fail_body`, `cr_cont_body`,
+`cr_tail_body`) moved by exactly one `pc_is (CK + 0x..)` each plus comment
+offsets and by NOTHING else — byte-different, offset-equal, checked by
+diffing each definition for a changed line carrying `-∗`, `:=` or `∗` (there
+is none).  The only semantic change in `ProofCreate.v` is the gate and ARM
+G2.

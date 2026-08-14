@@ -109,13 +109,13 @@ Set Printing Depth 40.
    [bcache]'s geometry, then [ByteBuf.bb_align_z] ---- *)
 Lemma wh_align_arith (kk qq : Z) :
   0 <= kk -> kk < 30 -> 0 <= qq -> qq <= 255 ->
-  (2147582472 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
-  /\ 0 <= 2147582472 + 1112 * kk + (88 + 4 * qq)
-  /\ 2147582472 + 1112 * kk + (88 + 4 * qq) < 18446744073709551616.
+  (2147582488 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
+  /\ 0 <= 2147582488 + 1112 * kk + (88 + 4 * qq)
+  /\ 2147582488 + 1112 * kk + (88 + 4 * qq) < 18446744073709551616.
 Proof.
   intros H1 H2 H3 H4. split_and!; [| lia | lia].
-  replace (2147582472 + 1112 * kk + (88 + 4 * qq))
-    with ((536895640 + 278 * kk + qq) * 4) by lia.
+  replace (2147582488 + 1112 * kk + (88 + 4 * qq))
+    with ((536895644 + 278 * kk + qq) * 4) by lia.
   apply Z_mod_mult.
 Qed.
 
@@ -132,8 +132,8 @@ Proof.
   destruct (wh_align_arith (Z.of_nat k) (Z.of_nat q)
               ltac:(lia) ltac:(unfold NBUF in Hk; lia) ltac:(lia) ltac:(lia))
     as (Hm & Hlo & Hhi).
-  replace (0x800181f0 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
-    with (2147582472 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
+  replace (0x80018200 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
+    with (2147582488 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
   apply bb_align_z; assumption.
 Qed.
 
@@ -1489,13 +1489,13 @@ Section ProofWriteHead.
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 addi s2,s2,-1826 *)
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x10)) Rs2 Rs2
-              (mword_of_int 2304 : mword 12) R3 (K - 4)%nat b
+              (mword_of_int 2320 : mword 12) R3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (R4 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (rget R3 Rs2)
-                     (sign_extend' 64 (mword_of_int 2304 : mword 12)))]> R3).
+                     (sign_extend' 64 (mword_of_int 2320 : mword 12)))]> R3).
     assert (HR4s2 : R4 !!! Regidx Rs2 = log_addr).
     { rewrite /R4 upd_eq. rgne. rewrite /R3 upd_eq /log_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1805,13 +1805,13 @@ Section ProofWriteHead.
       iEval (rewrite Hpp30) in "Hpc".
       (* +0x30 addi a4,a4,-1810 : a4 := &log.lh.block[0] *)
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x30)) Ra4 Ra4
-                (mword_of_int 2320 : mword 12) B3 (K - 4)%nat b
+                (mword_of_int 2336 : mword 12) B3 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30").
       iIntros (CID18 Hs18) "Hcg Hpc".
       set (B4 := <[Regidx Ra4 := regval_into_reg
                     (add_vec (rget B3 Ra4)
-                       (sign_extend' 64 (mword_of_int 2320 : mword 12)))]> B3).
+                       (sign_extend' 64 (mword_of_int 2336 : mword 12)))]> B3).
       assert (HB4a4 : B4 !!! Regidx Ra4 = lh_block 0%nat).
       { rewrite /B4 upd_eq. rgne. rewrite /B3 upd_eq.
         rewrite /lh_block /log_pa /log_addr /pa_add /add_vec_int.

@@ -2,60 +2,39 @@
 
 A register of bugs in the kernel *being verified*, as opposed to gaps in the
 proofs: an entry here means **the C code is wrong** and the stuck proof is the
-symptom.  The register holds **one open CANDIDATE** (unchecked `nlink`
-saturation, below); every other defect this effort found has been fixed
-upstream, and a fix's consequences for a contract are recorded with that
-contract, not here.
+symptom.  The register holds **no open entry**: every defect this effort found
+has been fixed upstream, and a fix's consequences for a contract are recorded
+with that contract, not here.
 
-## REFUTED CANDIDATE (2026-08-14) — nlink saturation via mkdir is
-## unreachable: the inode supply exhausts first (user-tested on xv6)
+## FIXED UPSTREAM (`117c0e7`) — an unchecked `nlink++` could wrap a link
+## count to zero, in `create`'s mkdir arm and in `sys_link`
 
-Raised at the create walk's mkdir arm (dp->nlink++ wraps a ushort at
-65535, making the raising-flush contract unsatisfiable).  Refuted by the
-team for the sketched route: a directory's nlink rises only at its own
-creation and per CHILD DIRECTORY (sys_link refuses directories), every
-child consumes an inode, and NINODES is orders of magnitude below 65534 —
-ialloc's A-FAIL fires long before saturation.  Empirically confirmed on
-xv6.  nlink CAN in principle overflow (sys_link on a regular file, a
-different walk), which stays a note for sys_link's own stage.
+`nlink` is a `short` on disk, so at its maximum the `sh` stored 0 and the
+record became indistinguishable from a FREE inode while live directory
+entries still named it -- silent on-disk corruption, no panic, no error
+return.  The proof side found it because the link ledger (InodeRegion (L1)
+`w <= nlink`, (L3) `type = 0 -> nlink = 0`) makes the wrapping store
+*unprovable* rather than merely unsupported: `SpecIupdate.wp_iupdate_link`
+wants `bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1`, which at
+the wrap reads `0 = 65536`.  The ledger refusing a corrupting store is the
+ledger working.
 
-What survives for the proof: the bound must reach the walk as an
-INVARIANT (no hypothesis can thread — the no-name objection), i.e. the
-L4 shape: directory nlink <= 1 + allocated count, maintained at the ++
-by the same-step allocation, consumed at the mkdir arm with the geometry
-premise.  Staged as C5.
+The fix is `NLINK_MAX 32767` in `fs.h` and one test at each of the two
+raising sites, each branching to the `fail:`/`return 0` path that already
+unwinds exactly that state.  **Three things it settles for the proofs**, and
+they are why the whole route was worth taking rather than carrying a gate:
 
-## `mkdir` arm and `sys_link` can WRAP a link count to zero
-
-xv6 raises a link count in exactly two places — `create`'s `dp->nlink++`
-at create+0x11c (`lhu` / `addiw 1` / `sh`, on the T_DIR path) and
-`sys_link`'s `ip->nlink++` — and NEITHER tests for saturation.  `nlink`
-is a `short` on disk, so at 65535 the `sh` stores 0: the record becomes
-indistinguishable from a FREE inode while live directory entries still
-name it, and the next `iput` frees a directory that is still linked.
-There is no `panic`, no error return, and no diagnostic; the corruption
-is silent and on disk.
-
-**The proof-side symptom, which is how it was found.**  The link ledger
-(InodeRegion (L1) `w <= nlink`, (L3) `type = 0 -> nlink = 0`) makes the
-store *unprovable*, not merely unsupported: `SpecIupdate.
-wp_iupdate_link`'s premise `bv_unsigned (di_nlink dn) = bv_unsigned
-(di_nlink dn0) + 1` cannot be met when the halfword wrapped — the
-ledger refuses a genuinely corrupting store, which is the ledger working.
-
-**Attainability.**  65535 links to one directory means 65533
-subdirectories of it, one inode each, so the filesystem must be
-near-maximal; mkfs's default `NINODES = 200` is nowhere near it, and
-create itself carries `16 * nib <= 2^16`.  Unreachable on the shipped
-geometry, reachable in principle — durable-notes' rule applies:
-unreachability makes a defect safe, not correct.
-
-**The fix is one test** (`if (dp->nlink >= 65535) goto fail;` beside the
-existing `fail:` label, which already unwinds exactly this state), or a
-wider on-disk field.  Until it lands, create's mkdir arm cannot be
-walked without a gate; the analysis of what a gate would have to look
-like — and why no premise on any landed statement can supply the bound —
-is in projects/fs-sysfile.md, "D₀-b STOPPED".
+* the bound is now a FACT OF THE CODE, so no premise has to thread it and no
+  region invariant has to carry it -- which is what the "no name for dp"
+  objection made impossible (`projects/fs-sysfile.md`, D₀-b's stop).  The
+  planned L4 carrier (directory `nlink <= 1 + allocated count`) is retired.
+* **the guard is still a real two-way branch**: it refuses at 32767 and does
+  not rule the value out, so create's walk pays a case split (and its taken
+  arm) whether or not any invariant is ever added.
+* attainability was, and stays, a separate question: 32767 links to one
+  directory needs 32765 subdirectories, one inode each, so ialloc's A-FAIL
+  fires first on the shipped geometry.  Unreachable makes a defect safe, not
+  correct -- and `sys_link` on a regular file has no such argument at all.
 
 ## REFUTED CANDIDATE (2026-08-13) — create + concurrent unlink cannot bust
 ## the log: CROSS-TRANSACTION ABSORPTION covers namex's freeing iput

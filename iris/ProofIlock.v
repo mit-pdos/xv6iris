@@ -837,12 +837,12 @@ Section IlockLoad.
     iEval (rewrite Hpp42) in "Hpc".
     (* ===== +0x42 lw a1,1698(a1) : a1 := sb.inodestart ===== *)
     assert (Hsbadr : add_vec (rget L3 Ra1)
-                       (sign_extend' 64 (mword_of_int 1684 : mword 12))
+                       (sign_extend' 64 (mword_of_int 1700 : mword 12))
                      = sb_inodestart).
     { rgne. rewrite HL3a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ilock + 0x42)) Ra1 Ra1
-              (mword_of_int 1684 : mword 12) L3 (K - 4)%nat
+              (mword_of_int 1700 : mword 12) L3 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 Hsb").
     iIntros (CID5 Hq5) "Hcg Hpc Hsb".
