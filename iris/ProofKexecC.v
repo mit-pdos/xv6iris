@@ -1405,6 +1405,8 @@ Section KexecCSetup.
         by (rewrite /W7 upd_ne; [exact HW6a0 | nz]).
       assert (HW7sp : W7 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /W7 upd_ne; [exact HW6sp | nz]).
+      assert (HW7s0 : W7 !!! Regidx Rs0 = sp0)
+        by (rewrite /W7 upd_ne; [exact HW6s0 | nz]).
       assert (HW7s1 : W7 !!! Regidx Rs1 = (mword_of_int 0 : mword 64))
         by (rewrite /W7 upd_ne; [exact HW6s1 | nz]).
       assert (HW7s2 : W7 !!! Regidx Rs2 = sz1)
@@ -1415,8 +1417,6 @@ Section KexecCSetup.
         by (rewrite /W7 upd_ne; [exact HW6s5 | nz]).
       assert (HW7s6 : W7 !!! Regidx Rs6 = page_base P.(ud_root))
         by (rewrite /W7 upd_ne; [exact HW6s6 | nz]).
-      assert (HW7s0 : W7 !!! Regidx Rs0 = sp0)
-        by (rewrite /W7 upd_ne; [exact HW6s0 | nz]).
       assert (HW7s7 : W7 !!! Regidx Rs7 = add_vec sz1 (mword_of_int (-4096) : mword 64))
         by (rewrite /W7 upd_ne; [exact HW6s7 | nz]).
       assert (HW7s10 : W7 !!! Regidx Rs10 = pv_sz V)
@@ -1442,6 +1442,8 @@ Section KexecCSetup.
         by (rewrite /W8 upd_ne; [exact HW7a0 | nz]).
       assert (HW8sp : W8 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /W8 upd_ne; [exact HW7sp | nz]).
+      assert (HW8s0 : W8 !!! Regidx Rs0 = sp0)
+        by (rewrite /W8 upd_ne; [exact HW7s0 | nz]).
       assert (HW8s1 : W8 !!! Regidx Rs1 = (mword_of_int 0 : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s1 | nz]).
       assert (HW8s2 : W8 !!! Regidx Rs2 = sz1)
@@ -1452,8 +1454,6 @@ Section KexecCSetup.
         by (rewrite /W8 upd_ne; [exact HW7s5 | nz]).
       assert (HW8s6 : W8 !!! Regidx Rs6 = page_base P.(ud_root))
         by (rewrite /W8 upd_ne; [exact HW7s6 | nz]).
-      assert (HW8s0 : W8 !!! Regidx Rs0 = sp0)
-        by (rewrite /W8 upd_ne; [exact HW7s0 | nz]).
       assert (HW8s7 : W8 !!! Regidx Rs7 = add_vec sz1 (mword_of_int (-4096) : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s7 | nz]).
       assert (HW8s9 : W8 !!! Regidx Rs9 = pa_stk sp0 46)
@@ -1538,7 +1538,13 @@ Section KexecCSetup.
             | rewrite HrootF Hroot'; exact HW8s6 | rewrite -Hs7eq; exact HW8s7
             | exact HW8s8 | exact HW8s9 | exact HW8s10]. }
         iSplitR.
-        { iPureIntro. split_and!; [lia | lia | rewrite -HW8a0; exact Heq0 | change (kxc_sp (uint sz1) alen 0) with (uint sz1); lia]. }
+        (* the stackbase bound at [c = 0] is [kxc_sp]'s base case: the loop has
+           not moved [sp] yet, so it reads [uint sz1 - 4096 <= uint sz1].
+           [change], not [cbn [kxc_sp]] -- a partial-unfold tactic on a
+           [Fixpoint] match is not reliable here (see this file's [kxc_sp_S]). *)
+        { iPureIntro. split_and!;
+            [ lia | lia | rewrite -HW8a0; exact Heq0
+            | change (kxc_sp (uint sz1) alen 0) with (uint sz1); lia ]. }
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
@@ -1574,7 +1580,9 @@ Section KexecCSetup.
             | rewrite HrootF Hroot'; exact HW8s6 | rewrite -Hs7eq; exact HW8s7
             | exact HW8s8 | exact HW8s9 | exact HW8s10]. }
         iSplitR.
-        { iPureIntro. split_and!; [lia | lia | rewrite -HW8a0; exact Hne0 | change (kxc_sp (uint sz1) alen 0) with (uint sz1); lia]. }
+        { iPureIntro. split_and!;
+            [ lia | lia | rewrite -HW8a0; exact Hne0
+            | change (kxc_sp (uint sz1) alen 0) with (uint sz1); lia ]. }
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
