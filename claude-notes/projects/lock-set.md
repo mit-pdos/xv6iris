@@ -23,34 +23,40 @@ during phase 1 is deleted; contracts name the set.
 
 ## Status
 
-The substrate is landed and proven, the client sweep is essentially done, and
-the ORDER has been revised once (ftable/itable above proc -- see below).
+The substrate is landed and proven, the client sweep is DONE, and the ORDER
+has been revised once (ftable/itable above proc -- see below).
 
-At the last full build, 14 of 1085 files have no `.vo`, and they all trace to
-ONE compile error:
+**All 1085 files build.**  The sweep that started at 72 failures is done.
 
-* `ProofVirtioDiskRwF` -- the phase-chain convention seam, in progress.  The
-  only file that fails.
-* the 13 `Link*` files, blocked behind it and never attempted: `LinkIput`,
-  `LinkIunlockput`, `LinkFileclose`, `LinkDirlink`, `LinkNamex`, `LinkNamei`,
-  `LinkNameiparent`, `LinkKexit`, `LinkSysExit`, `LinkSysClose`,
-  `LinkSysPipe`, `LinkPipealloc`, `LinkVirtioDiskRw`.
+One thing in the tree is ASSUMED rather than proved:
+`iput_acquiresleep_order_ADMITTED` in `ProofIput.v`, the one lock-order edge
+no ranking can license.  It is FALSE, not merely unproven, so everything
+downstream of `iput` is currently vacuous -- see "THE ONE UNLICENSED EDGE"
+below for the full accounting and for what the real discharge is.  Nothing
+else in the development is admitted.
 
-**Every `Link` file needs every functor in the chain**, which is why one red
-proof five layers down blocks twelve unrelated-looking names: `iput` reaches
-`itrunc` -> `bwrite` -> `virtio_disk_rw`, so the FS `Link` files were never
-blocked on `iput` at all -- they were blocked on `ProofVirtioDiskRwF` the
-whole time, and unblocking `iput` moved none of them.  Do not infer the
-blocking edge from the names.
+`Print Assumptions` is the way to check: on `LinkIput.Iput.wp_iput_sconf` it
+names `ProofIput.iput_acquiresleep_order_ADMITTED` alongside the ambient Sail
+model axioms.  Run it from `iris/` with the `_CoqProject` load paths spelled
+out, since `rocq compile` does not read them itself:
 
-`ProofIput` now COMPILES, on an admitted axiom -- see "THE ONE UNLICENSED
-EDGE" below.
+```
+rocq compile -R . xv6iris -R ../model-xv6iris Riscv \
+             -R ../kernel-rocq Kernel -R ../user-rocq User AxCheck.v
+```
 
-**Count what is MISSING, not what errored.**  `make -k` does not delete a
-stale `.vo` when a later compile fails, and it skips the dependents in
-silence -- so the error count said "2" while thirteen more were unverified,
-some against artifacts predating the order change.  `for f in *.v; do [ -f
-"${f%.v}.vo" ] || echo "$f"; done` is the honest check.
+**Every `Link` file needs every functor in the chain**, which matters when
+reading a blocked build: `iput` reaches `itrunc` -> `bwrite` ->
+`virtio_disk_rw`, so while `ProofVirtioDiskRwF` was red it blocked `LinkIput`,
+`LinkNamex`, `LinkSysExit` and nine other FS names that look unrelated to the
+disk driver.  Those were never blocked on `iput`, and making `iput` compile
+moved none of them.  Do not infer the blocking edge from the names.
+
+**A file that fails early hides every later defect in it.**  Both long-red
+files had more wrong with them than the error said: `ProofIput` had two
+further sites left over from the order change, and `ProofVirtioDiskRwF`'s
+error only surfaced at P4 once P3 got past. Expect a second round when a
+long-red proof first goes green.
 
 **Count what is MISSING, not what errored.**  `make -k` does not delete a
 stale `.vo` when a later compile fails, and it skips the dependents in
@@ -215,8 +221,6 @@ hiding behind the earlier hard failure: `wp_iput_gen` states its premise at
 its cone minimum `"log"` (1) (because `itrunc` reaches `log_write`), but the
 itable re-acquire at `+0x82` and the shared tail both want `"itable"` (14).
 One hoisted `mono` step at the top of the lemma covers all three sites.
-**A file that fails early hides every later defect in it** -- expect more when
-a long-red proof first goes green.
 
 ### virtio_disk_rw has TWO conventions for what `lks` means
 
@@ -228,11 +232,42 @@ reads plain `lks`.  P5 releases and re-acquires that lock across the sleep
 protocol, so it treats `lks` as the OUTER set and spells its level-1 `cpu_own`
 `{[lock_rank "virtio_disk"]} ∪ lks`.
 
-`wp_vdrw_p5_seam` (`ProofVirtioDiskRwE.v`) is where they meet, and it has to
-TRANSLATE: it consumes a `vdrw_p5_exit ... lks` and produces a
-`P4.vdrw_p4_exit ... ({[lock_rank "virtio_disk"]} ∪ lks)`.  Passing the same
-`lks` to both sides typechecks at the seam and fails ~500 lines later, inside
-the Löb loop, which is what makes this one expensive to find.
+The split is NOT where the phase numbers suggest.  Grep the level-1 `cpu_own`
+in each seam file and the outlier is obvious:
+
+| file | level-1 `cpu_own` index |
+|---|---|
+| `ProofVirtioDiskRwCSeam` (`vdrw_p3_exit`) | `{[lock_rank "virtio_disk"]} ∪ lks` |
+| `ProofVirtioDiskRwDSeam` (`vdrw_p4_exit`, `vdrw_p3_exit_x`) | **`lks`** |
+| `ProofVirtioDiskRwE` (`vdrw_p5_exit`, `vdrw_p5_loop`) | `{[lock_rank "virtio_disk"]} ∪ lks` |
+
+So `D` alone means the FULL held set by `lks`; everyone else means the OUTER
+one.  `wp_vdrw_p5_seam` already TRANSLATES between them -- it consumes
+`vdrw_p5_exit ... lks` and produces `P4.vdrw_p4_exit ... ({[virtio_disk]} ∪
+lks)` -- so the chain closes by applying the P4 seam, and only the P4 seam, at
+the union:
+
+```
+P3 seam consumes  vdrw_p3_exit    ... lks             = cpu_own ({[vd]} ∪ lks)
+P4 seam produces  vdrw_p3_exit_x  ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)  ✓
+P4 seam consumes  vdrw_p4_exit    ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)
+P5 seam produces  vdrw_p4_exit    ... ({[vd]} ∪ lks)                            ✓
+```
+
+**Passing the union to P3 as well moves the mismatch rather than closing it**
+(that attempt is reverted in `2a598b05`): the P3 seam produces
+`P2.vdrw_p2_exit` at whatever index it is given, and P2's own wp leaves that
+goal at the bare `lks`.  `vdrw_p3_exit` and `vdrw_p3_exit_x` are otherwise
+character-identical transparent `Definition`s, so once the index agrees
+`iApply` unfolds straight through -- which is what the "makes
+`vdrw_p3_exit_x` equal to `P3.vdrw_p3_exit`" comment in
+`ProofVirtioDiskRwD.v` §7 was always aiming at.
+
+**Read the conventions off the definitions before touching the chain.**  A
+wrong index typechecks at the seam and fails ~500 lines later, inside the Löb
+loop, which is what makes this one expensive to find the hard way; the four
+`grep -n 'cpu_own 1 eb' ProofVirtioDiskRw{CSeam,DSeam,E}.v` lines above give
+the same answer in one command.
 
 ### When one function has two modes, the premise goes CONDITIONAL
 
