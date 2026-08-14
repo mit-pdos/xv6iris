@@ -288,10 +288,25 @@ python3 tools/fix_proof_imms.py --old-image /tmp/old            # report
 python3 tools/fix_proof_imms.py --old-image /tmp/old --update   # apply
 ```
 
-**`--old-image` is not optional.** Without it the 260-char window regularly
-grabs the NEXT instruction's literal and "fixes" it to this one's — three
-sites on `117c0e7`, including a `-80` frame offset rewritten to `4`. The guard
-("the literal must BE the pre-bump immediate at this pc") kills all three.
+**`--old-image` IS NOT OPTIONAL, AND `--update` NOW REFUSES TO RUN WITHOUT
+IT.** Unguarded, the site → literal binding is POSITIONAL: the tool takes the
+first width-matching literal in the 260-char window, and where several anchors
+sit inside one window that binding is a PERMUTATION rather than the identity.
+It then writes instruction A's immediate onto B's literal, the next audit
+reports B stale, and fixing B re-breaks A — **a period-2 cycle, and the
+reported count can RISE**. Measured on the kexec merge: 431 in 102 files, one
+`--update`, 668 in 92 files; measured on one file in isolation, the pass-3
+text is byte-identical to the pass-1 text. The guard ("the literal must BE the
+pre-bump immediate at this pc") is what makes the fixed point *no change*
+rather than a cycle, because a neighbour's literal is not this pc's old
+immediate. The same run guarded reported **1** site — a known false positive.
+
+**SO AN UNGUARDED COUNT IS NOT A WORK LIST, AND IT IS NOT EVIDENCE OF
+ANYTHING.** Before believing a large report, check whether the functions it
+names even MOVED: group `KernelSyms.v` by delta first (§2). On the kexec merge
+every proof the report named was in the `+0` group with `+0` callees, so the
+true answer was zero sites and eleven commits written against the old image
+needed no sweep at all — which the build confirmed in one round.
 
 **IT IS STILL NOT SUFFICIENT, because the window can reach a neighbour whose
 CORRECT value is this pc's OLD one.** `ProofKforkB5` states two `auipc`/`addi`
@@ -316,6 +331,14 @@ miss.
 Two defects of its own, both fixed, both worth knowing because their output
 reaches the build looking like something else:
 
+* it rewrote `raw` in place from the far end, so every earlier site's block
+  end was an offset into a string whose tail had already changed length, and
+  the slice cut mid-token (`(mword_of_int 32 : mword 12)` became
+  `(mword_of_int 05 mword 12)` — which then crashed the next GUARDED run
+  outright, because `int('05', 0)` is a `ValueError`, so the file's damage
+  presented as "the tool cannot be run with the guard").  It now splices in one
+  ascending pass into a fresh buffer, and a site's block stops at the next
+  site's literal as well as at the next pc anchor.
 * the substitution used to splice the new literal in by the OLD one's length,
   so a width change corrupted the line — `4094 : mword 12` lost its ascription
   and became `14 12`, and `998 -> 1014` became `101444444`. **After any
