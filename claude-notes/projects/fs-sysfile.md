@@ -8266,6 +8266,54 @@ anywhere in `iris/`; `SpecCreate.v`, `SpecCreateFreshTy.v`,
 byte-untouched.
 
 
+### D₀ POSTSCRIPT — create's and dirlink's posts each gained a
+### consumer-forced clause, and create's is GUARDED because the
+### unguarded form is FALSE
+
+**A BUDGET THEOREM THAT PRICES A CALL AS *CALLABLE* DOES NOT PRICE IT AS
+*SURVIVABLE*, AND THAT IS THE TRAP IN READING `CreateBudget`.**
+`cr_budget_fail_late` closes at `ip_need <= u7 /\ u7 = 3`, and `u7` is the
+count BEFORE the arm's last `iunlockput(dp)`, not after it — the theorem
+models no spend for that call.  So "the arm closes at exactly
+`iput_units`" means the call can RUN, and a consumer that reads it as a
+floor on what create HANDS BACK is off by that call's spend.  On the
+`fail:` arms the spend is one and unavoidable: `ip_spend_w w cru crz` is
+`ip_bm w + (if cru || crz then 0 else 1)`, `crz` is a group credit create
+does not hold, and `cru` wants `IBLOCK dp ∈ Sb`, which NO route into
+`fail:` has — `dl16_post`'s membership trio is guarded on `0 < tot` and
+every such route has `tot = 0`.  Two survive, not three.  Hence
+create's floor is `⌜ok = true -> (iput_units <= u')%nat⌝`; the failure
+arms hand back no inode, so the guard costs no consumer anything.
+
+**THE SUCCESS ARMS PAY FOR THEIR FLOOR WITH BOOLEANS, NOT WITH PREMISES.**
+Both `+0xe2` `iunlockput(dp)` calls were entered at `crb = cru = false`
+and now enter credited — C-OK-FILE at `cru := true` (its append went in
+whole, so `dl16_post`'s trio fires), C-OK-DIR at `crb := cru := true` (the
+`+0x140` flush unioned `IBLOCK dp` in itself, and `bmapstart` has been in
+the set since the first interior `dirlink` allocated the child's block 0).
+At C-OK-DIR the put then spends NOTHING, which is what lets
+`cr_budget_mkdir`'s zero-slack three survive it.  **When a ledger comes up
+one unit short at an exit, look at the call's credit booleans before
+looking at its premises**: the credits are usually already in hand and
+just not claimed.
+
+**THE SAME SHAPE ON THE OTHER SIDE.**  `wp_dirlink_gen`'s post gained
+`⌜found = true -> ((ncount - iput_units)%nat <= n')%nat⌝`, because on
+`found = true` the only clause it stated was the counted `dirlink_units`
+and `dl16_post` is guarded by `found = false`.  create never needed it —
+it REFUTES the found arm, holding `ilock(dp)` across its own `dirlookup`
+miss — but a caller that cannot refute it (sys_link never looks the name
+up first) is left with nine minus seven against an `iput_units` of three.
+`ProofDirlink` discharges the clause from a weakening its walk already
+made.  Note the file geography: the post is spelled FOUR times — twice in
+`SpecDirlink.v` and twice more as `ProofDirlink`'s local continuation
+types `dl_after_body` / `dl_scan_body`, which must move in lockstep — and
+`wp_dirlink_sconf_body` is the COUNTED form, carrying neither `Sb ⊆ Sb'`
+nor `dl16_post`, so it takes no clause and the sconf derivation drops it
+at the relay.
+
+
+
 ## S6-chdir — DONE.  sys_chdir is proven, sealed and linked.
 
 `SpecSysChdir.v` (the contract), `ProofSysChdir.v` (the whole walk, every
