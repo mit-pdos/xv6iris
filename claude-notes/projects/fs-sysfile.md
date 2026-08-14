@@ -6418,27 +6418,48 @@ nameiparent's success (two out, one back), each `iunlockput` returns one,
 and the found arm's `dirlookup` iget takes the second — so `create_slots =
 3` is never approached on this half.
 
-**WHAT THE FOUND HALF STILL OWES, and it is exactly one lemma.**  The
-`bltu` at +0x5e falls through iff `(ip->type - 2) mod 2^16 <= 1`, and ARM
-F-OK's contract clause is `di_type dn = T_FILE \/ di_type dn = T_DEVICE`.
-`ProofCreateParts.cr_trange` names the compared word at the three ALU
-leaves' own output shapes and `cr_trange_file` / `cr_trange_device` compute
-it at the two literals; the missing direction is
+**THE FOUND HALF'S ONE ARITHMETIC OBLIGATION IS DISCHARGED.**  The `bltu`
+at +0x5e falls through iff `(ip->type - 2) mod 2^16 <= 1`, and ARM F-OK's
+contract clause is `di_type dn = T_FILE \/ di_type dn = T_DEVICE`.
+`ProofCreateParts.cr_trange_unsigned` is the bridge and
+`cr_trange_in`/`cr_trange_out` the two readings of it.
 
-```coq
-  Lemma cr_trange_unsigned (t : mword 16) :
-    bv_unsigned (cr_trange t) = (bv_unsigned t - 2) `mod` 65536.
-```
+The lesson worth keeping, because it says how to walk ANY sub-word idiom
+in this tree: **the Sail cast layer is CONVERSION at concrete widths, so
+the wrapper stack collapses with no `change` gymnastics at all.**
+`with_word`, `get_word`, `to_word`, `autocast` and `MachineWord.cast_idx`
+are each the identity, and stdpp's `bv_add_unsigned` / `bv_shiftl_unsigned`
+/ `bv_shiftr_unsigned` / `bv_extract_unsigned` / `bv_sign_extend_unsigned`
+are all `Proof. done. Qed.` — so a statement naming the stdpp-level term
+directly (`ProofCreateParts.cr_trange_bv`) closes by bare `reflexivity`,
+and everything after it is ordinary `Z` arithmetic.  Do not reach for
+`bv_simplify` first: it cannot see past the Sail wrappers and reports
+nothing, which reads as "the goal is hard" when the goal is one
+`reflexivity` away.
 
-from which `zopz0zI_u 1 (cr_trange t) = false -> t = T_FILE \/ t =
-T_DEVICE` is `lia` over `0 <= bv_unsigned t < 65536`.  The four steps are:
-`add_vec` is `+ mod 2^64`; `subrange_vec_dec _ 31 0` is `mod 2^32`;
-`sign_extend' 64` preserves the low 32; `shift_bits_left 48` then
-`shift_bits_right 48` keeps bits 15..0.  Nothing in the tree has a
-slli/srli-pair lemma, so this is new work in the `BootReset.v` §3a idiom
-(`change` to the bv-level term, then stdpp's `bv_extract`/`bv_concat`
-algebra).  **It is the found half's only unproven step and it should land
-in `ProofCreateParts` before the walk starts**, not during it.
+Two traps paid for on the way, both already in durable-notes but not
+previously connected to each other:
+
+* **`unfold bv_swrap` does nothing when the head is `bv_signed`** (the
+  body mentions `bv_swrap`; the head does not), and **`bv_modulus` must be
+  unfolded LAST**, because `bv_half_modulus` reintroduces it.  The working
+  order is `bv_signed, bv_swrap, bv_wrap, bv_half_modulus, bv_modulus`.
+* **A proofmode file cannot use `rewrite lem by tac` OR the comma form.**
+  Both are ssreflect clashes and both report as a bare syntax error at the
+  offending character.  The fix that scales is not to rewrite the tactics
+  in place but to **put every premise-carrying step in an ssreflect-FREE
+  file as a premise-free corollary** — which is what the second half of
+  `BvShift.v` is, and why it exists as lemmas rather than as `by` clauses.
+
+`BvShift.v` is the new home: `bv_wrap_shift_pair` (a `slli k; srli k` pair
+on an `m`-bit register keeps the low `m - k` bits) and `swrap_low` (a
+signed and an unsigned reading agree modulo anything dividing the half
+modulus), both stated width-generically, plus the premise-free corollaries.
+RV64 has no sub-word zero-extension instruction, so gcc spells every one as
+this shift pair — the next walk that meets a `short` or `int` widening
+wants these, and there was nothing in the tree before.  Recorded there:
+`BootReset.v` §3a's three `bv_extract_*` lemmas are the same kind of orphan
+and belong in `BvShift.v` at the next touch of that file.
 
 **FILE ORGANIZATION FOR THE WALK, decided against both models.**
 `ProofCreate.v` = `Module CreateProof (NP : NAMEIPARENT) (IL : ILOCK)

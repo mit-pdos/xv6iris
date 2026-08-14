@@ -64,6 +64,16 @@ Require Import SpecCreate.
 (* [nx_sext16_inj] -- the halfword-decision cluster B' hoisted out of
    ProofNamex precisely so create could name it. *)
 Require Import ProofNamexParts.
+(* the shift-pair and signed-reading facts the +0x5e range test needs *)
+Require Import BvShift.
+(* [uint_unsigned]: [uint] IS [bv_unsigned] at width 64, which is both of
+   the [bltu]'s operands.  Required explicitly because Import is not
+   transitive -- RiscvExtras is already in this file's cone via InodeInv,
+   so the row costs no build time.  (Note for a future sweep: the tree
+   carries SEVEN copies of the width-32 instance under seven names, plus
+   this width-64 one, while UserBits.uint_unsigned_n is already the
+   general form.) *)
+Require Import RiscvExtras.
 From Kernel Require KernelData.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -250,9 +260,12 @@ Section CreateParts.
   Qed.
 
   (* the two instances, at the two rodata addresses the auipc/addi pairs
-     at +0xe4..+0xe8 and +0xf8..+0xfc compute.  Both checked against
-     CodeCreate.v at this revision: create + 0xe4 + 0x3000 - 1608
-     = 0x800075e0 and create + 0xf8 + 0x3000 - 1620 = 0x800075e8. *)
+     at +0xe4..+0xe8 and +0xf8..+0xfc compute.  Both re-checked against
+     CodeCreate.v after the bump: create + 0xe4 + 0x3000 - 1622
+     = 0x800075e0 and create + 0xf8 + 0x3000 - 1634 = 0x800075e8.  THE TWO
+     ADDRESSES DID NOT MOVE -- create itself shifted +14 and the two addi
+     immediates shifted -14 (2488 -> 2474, 2476 -> 2462), which cancels
+     exactly; .rodata stayed put. *)
   Lemma cr_dot_window (a : mword 64) :
     a = mword_of_int cr_dot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ cr_dot_f j).
@@ -360,11 +373,7 @@ Lemma cr_trange_device : cr_trange T_DEVICE = (mword_of_int 1 : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* ...so at either of them the [bltu a4,a5] at +0x5e FALLS THROUGH, which
-   is ARM F-OK.  (The converse -- that falling through IMPLIES the type is
-   one of the two -- is the range test's real content and needs
-   [bv_unsigned (cr_trange t) = (bv_unsigned t - 2) mod 65536]; it is the
-   next increment's first obligation and is written up in
-   claude-notes/projects/fs-sysfile.md under D0.) *)
+   is ARM F-OK. *)
 Lemma cr_trange_file_fall :
   zopz0zI_u (mword_of_int 1 : mword 64) (cr_trange T_FILE) = false.
 Proof. rewrite cr_trange_file. vm_compute. reflexivity. Qed.
@@ -372,6 +381,123 @@ Proof. rewrite cr_trange_file. vm_compute. reflexivity. Qed.
 Lemma cr_trange_device_fall :
   zopz0zI_u (mword_of_int 1 : mword 64) (cr_trange T_DEVICE) = false.
 Proof. rewrite cr_trange_device. vm_compute. reflexivity. Qed.
+
+(* ---- AND THE CONVERSE, WHICH IS THE RANGE TEST'S REAL CONTENT --------
+   ARM F-OK's contract clause is [di_type dn = T_FILE \/ di_type dn =
+   T_DEVICE], and nothing but this direction supplies it: falling through
+   the [bltu] must IMPLY the type is one of the two.  The chain is four
+   steps and every one of them is conversion or a named lemma.
+
+   [cr_inner] is the 32-bit intermediate the [addiw] leaves.  Naming it is
+   what makes [cr_trange_bv] a [reflexivity]: the whole Sail cast layer --
+   [with_word], [get_word], [to_word], [autocast], [MachineWord.cast_idx]
+   -- is the IDENTITY at concrete widths, and stdpp's [bv_*_unsigned]
+   lemmas on this path are all [Proof. done. Qed.], so the wrapper stack
+   collapses by conversion alone with no [change] gymnastics. *)
+Definition cr_inner (t : mword 16) : bv 32 :=
+  bv_extract 0 32 (bv_add (bv_zero_extend 64 t)
+      (bv_sign_extend 64 (bv_sign_extend 12 (mword_of_int 62 : mword 6)))).
+
+Lemma cr_trange_bv (t : mword 16) :
+  bv_unsigned (cr_trange t)
+  = Z.shiftr (bv_wrap 64
+      (Z.shiftl (bv_unsigned (bv_sign_extend 64 (cr_inner t))) 48)) 48.
+Proof. reflexivity. Qed.
+
+(* the [lhu] zero-extends and the [addiw] wraps at 32, so the intermediate
+   is [(type - 2) mod 2^32]; the [-2] arrives as the 64-bit constant
+   [2^64 - 2], which is [sign_extend' 64 (sign_extend' 12 62)]. *)
+Lemma cr_inner_unsigned (t : mword 16) :
+  bv_unsigned (cr_inner t) = (bv_unsigned t - 2) `mod` 4294967296.
+Proof.
+  unfold cr_inner.
+  (* ssreflect [rewrite] takes SPACES, not commas *)
+  rewrite bv_extract_unsigned bv_add_unsigned.
+  (* [lia] cannot see through the [Z.to_N 16] the width elaborates to *)
+  rewrite (bv_zero_extend_unsigned 64 t ltac:(vm_compute; discriminate)).
+  assert (Hc : bv_unsigned (bv_sign_extend 64
+                  (bv_sign_extend 12 (mword_of_int 62 : mword 6)) : bv 64)
+               = 18446744073709551614)
+    by (vm_compute; reflexivity).
+  rewrite Hc.
+  change (Z.of_N 0) with 0.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  change (2 ^ Z.of_N 32) with 4294967296.
+  rewrite mod_2_64_32 sub2_wrap64_32. reflexivity.
+Qed.
+
+(* THE BRIDGE: the [slli 48; srli 48] pair keeps the low sixteen bits
+   ([BvShift.bv_wrap_shift_pair]), and the sign extension in the middle
+   does not disturb them ([BvShift.swrap_low_32_16]). *)
+Lemma cr_trange_unsigned (t : mword 16) :
+  bv_unsigned (cr_trange t) = (bv_unsigned t - 2) `mod` 65536.
+Proof.
+  rewrite cr_trange_bv bv_wrap_shift_pair_16 bv_sign_extend_unsigned.
+  (* [bv_signed] is the HEAD -- unfolding [bv_swrap] alone does nothing --
+     and [bv_modulus] must come LAST, because [bv_half_modulus]
+     reintroduces it. *)
+  unfold bv_signed, bv_swrap, bv_wrap, bv_half_modulus, bv_modulus.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  change (2 ^ Z.of_N 32) with 4294967296.
+  rewrite mod_2_64_16 swrap_low_32_16 cr_inner_unsigned mod_2_32_16.
+  reflexivity.
+Qed.
+
+(* the pure arithmetic, over [Z] with no bitvector in sight so that [lia]
+   works normally (the tree's standing rule for bv-heavy contexts) *)
+Lemma cr_range_Z (T : Z) : 0 <= T < 65536 -> T <> 2 -> T <> 3 ->
+  1 < (T - 2) `mod` 65536.
+Proof.
+  intros Hr H2 H3.
+  destruct (Z.le_gt_cases 2 T) as [Hge|Hlt].
+  - assert (Hs : (T - 2) `mod` 65536 = T - 2).
+    { apply Z.mod_small. lia. }
+    lia.
+  - assert (Heq : (T - 2) `mod` 65536 = T - 2 + 1 * 65536).
+    { assert (Ha : (T - 2 + 1 * 65536) `mod` 65536 = (T - 2) `mod` 65536).
+      { apply Z.mod_add. lia. }
+      assert (Hb : (T - 2 + 1 * 65536) `mod` 65536 = T - 2 + 1 * 65536).
+      { apply Z.mod_small. lia. }
+      lia. }
+    lia.
+Qed.
+
+(* +0x5e TAKEN: the found inode is neither a file nor a device -> ARM F-BAD *)
+Lemma cr_trange_out (t : mword 16) :
+  t <> T_FILE -> t <> T_DEVICE ->
+  zopz0zI_u (mword_of_int 1 : mword 64) (cr_trange t) = true.
+Proof.
+  intros H2 H3. unfold zopz0zI_u.
+  rewrite !uint_unsigned cr_trange_unsigned.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 64) = 1)
+    by (vm_compute; reflexivity).
+  rewrite H1. apply Z.ltb_lt.
+  assert (Hne2 : bv_unsigned t <> 2)
+    by (intro Hc; apply H2, bv_eq; rewrite Hc; reflexivity).
+  assert (Hne3 : bv_unsigned t <> 3)
+    by (intro Hc; apply H3, bv_eq; rewrite Hc; reflexivity).
+  apply cr_range_Z; [| exact Hne2 | exact Hne3].
+  destruct (bv_unsigned_in_range _ t) as [Hlo Hhi].
+  split; [exact Hlo |]. change (bv_modulus (Z.to_N 16)) with 65536 in Hhi.
+  exact Hhi.
+Qed.
+
+(* +0x5e FALL-THROUGH: ARM F-OK, and this is the clause the contract wants *)
+Lemma cr_trange_in (t : mword 16) :
+  zopz0zI_u (mword_of_int 1 : mword 64) (cr_trange t) = false ->
+  t = T_FILE \/ t = T_DEVICE.
+Proof.
+  intro Hf.
+  destruct (Z.eq_dec (bv_unsigned t) 2) as [He|H2].
+  { left. apply bv_eq. rewrite He. reflexivity. }
+  destruct (Z.eq_dec (bv_unsigned t) 3) as [He|H3].
+  { right. apply bv_eq. rewrite He. reflexivity. }
+  assert (Hn2 : t <> T_FILE) by (intros ->; apply H2; reflexivity).
+  assert (Hn3 : t <> T_DEVICE) by (intros ->; apply H3; reflexivity).
+  rewrite (cr_trange_out t Hn2 Hn3) in Hf. discriminate.
+Qed.
 
 (* ===================================================================== *)
 (*  (4) THE CONSTANTS                                                     *)

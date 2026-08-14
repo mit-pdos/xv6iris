@@ -8,6 +8,7 @@
 # the resulting "notation was already used" warning project-wide.
 -arg -w
 -arg -notation-overridden
+BvShift.v
 ArchReset.v
 RiscvModelBytes.v
 VirtioModel.v
