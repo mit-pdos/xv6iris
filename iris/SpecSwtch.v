@@ -85,11 +85,17 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
   P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p -∗
-  ( ∀ (h : CPU) (m : regfile) (eb' : bool),
+  (* [lks'] IS ITS OWN BINDER, not the entry [lks].  The caller's continuation
+     becomes the OLD record's resume wand ([SwtchCtx.valid_context_pre]), which
+     is quantified over the held-lock set the RESUMER will be carrying -- a
+     later resumption is a different critical section from the one that
+     suspended, so nothing ties the two sets together.  The entry [lks] above
+     indexes only the bundle the suspender hands in. *)
+  ( ∀ (h : CPU) (m : regfile) (eb' : bool) (lks' : gset nat),
       ⌜adm Ao h⌝ -∗
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr (CID := h) m av false p -∗
-      cpu_own (CID := h) 1 eb' p emp false lks -∗
+      cpu_own (CID := h) 1 eb' p emp false lks' -∗
       pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ (A' : ctx_adm) (cret : mword 64),

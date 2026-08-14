@@ -67,6 +67,15 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   klk = mword_of_int KernelSyms.kmem ->
   kfl = mword_of_int (KernelSyms.kmem + 24) ->
+  (* THE ORDER PREMISE for the one lock pipeclose takes itself, pi->lock,
+     which [pipealloc]'s [initlock] names "pipe": everything the caller holds
+     ranks strictly below it.  [LockRank.locks_below_not_elem] recovers the
+     non-membership the set algebra below needs.  No execution ever holds two
+     "pipe" locks at once (LockRank.v).  pipeclose is BALANCED: BOTH C exit
+     paths release pi->lock (the freeing one releases and only then kfree's
+     the page), so entry and exit [cpu_own] carry the same [lks].  The kmem
+     lock kfree takes is entirely inside kfree, after the release. *)
+  locks_below lks (lock_rank "pipe") ->
   sie_cap_gpr m av b pme -∗
   cpu_own n eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

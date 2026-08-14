@@ -179,6 +179,10 @@ Definition wp_iget_sconf_body
      +0x4c / +0x52 compare them against the [c.lw] of a cell *)
   m !!! Regidx (mword_of_int 10 : mword 5) = (sign_extend' 64 dev : mword 64) ->
   m !!! Regidx (mword_of_int 11 : mword 5) = (sign_extend' 64 inum : mword 64) ->
+  (* THE FRESHNESS PREMISE: iget acquires and releases [itable.lock]
+     internally (balanced -- [lks] is unchanged across the whole call), so
+     the caller must already hold only locks BELOW "itable"'s rank. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

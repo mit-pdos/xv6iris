@@ -163,6 +163,12 @@ Definition wp_iput_sconf_body
   gs !! j = Some gl ->
   (* a0 = ip *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* THE FRESHNESS PREMISE, AT THE LOWEST RANK IPUT (OR ANY CALLEE) TOUCHES:
+     "itable" (2) directly, then upward -- "sleep lock" (6) via the
+     truncate arm's nested acquiresleep, "log"/"bcache" via itrunc/iupdate.
+     One bound covers all of them ([LockRank.locks_below_mono] /
+     [locks_below_union_singleton] derive each at its own call site). *)
+  locks_below lks (lock_rank "itable") ->
   (* PARKING PREMISE -- UNCONDITIONAL.  iput MAY truncate, and no caller
      can know in advance which arm runs, so the bundle is not conditional.
      (Note (B1): under Route B the truncate arm's acquiresleep is the
@@ -347,6 +353,8 @@ Definition wp_iput_gen_body
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* THE FRESHNESS PREMISE -- see [wp_iput_sconf_body]. *)
+  locks_below lks (lock_rank "itable") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗

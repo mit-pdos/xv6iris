@@ -219,7 +219,10 @@ Section ProofAcquire.
     (* [Hfresh] is the new premise: this hart holds no lock of [lk]'s rank.
        [#Hpanic] STAYS -- see SpecAcquire.v on why [Hfresh] does not yet kill
        the [holding] arm. *)
-    intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
+    intros pcE lk0 ret_tgt Hpos Hav Hbelow Href Hrefpre.
+    (* the ghost step consumes NON-MEMBERSHIP; the contract carries the BOUND,
+       which is what composes across a call graph (SpecAcquire.v). *)
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext Hpc #Hlock HTc #Hpanic Hcont".
     iPoseProof (aqi_00 with "Htext") as "Hi00".
@@ -828,10 +831,10 @@ Section OfGen.
     : wp_acquire_sconf_body γl s R m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_acquire_sconf_body].
-    intros pcE lk0 ret_tgt Hpos Hav Hfresh.
+    intros pcE lk0 ret_tgt Hpos Hav Hbelow.
     iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
     iApply (G.wp_acquire_gen_sconf γl s R emp%I False%I m n eb p C av b lks
-              Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
+              Hpos Hav Hbelow (lock_refute_False _) (fun i => lock_refute_False _)
               with "Hcg Hown Htext Hpc [] [] Hpanic").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }

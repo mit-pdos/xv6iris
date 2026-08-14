@@ -83,6 +83,11 @@ Definition wp_kkill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 6 slots for this frame, 10 for acquire's / release's *)
   (16 <= av)%nat ->
+  (* the scan acquires and releases each "proc" lock in turn: the caller's
+     held set must bound below "proc"'s rank (LockRank.v).  Trivial at
+     [lks = ∅]; [locks_below_not_elem] gives the non-membership the ghost
+     step needs. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

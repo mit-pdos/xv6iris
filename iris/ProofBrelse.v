@@ -245,7 +245,8 @@ Section ProofBrelse.
      so no [nn] binder survives. *)
   Local Lemma brelse_tail `{CID0 : CpuId}  (bn : bio_names)
       (V : bio_view Σ)
-      (m M : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
+      (m M : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (lks : gset nat) :
     (K_brelse <= K)%nat ->
     M !!! Regidx csp_rs1
       = add_vec (m !!! Regidx csp_rs1)
@@ -253,13 +254,19 @@ Section ProofBrelse.
     (forall c : mword 5, is_cs_idx c = true ->
        c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 ->
        M !!! Regidx c = m !!! Regidx c) ->
+    (* THE OUTER order fact: [lks] here is the enclosing [wp_brelse_sconf]'s
+       own held-set, threaded through unchanged -- this helper is entered
+       ALREADY holding "bcache" (its precondition below is
+       [{[lock_rank "bcache"]} ∪ lks], not bare [lks]; see the OUTER/INNER
+       convention in claude-notes/projects/lock-set.md). *)
+    locks_below lks (lock_rank "bcache") ->
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.brelse + 0x60) : mword 64) -∗
     is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
-    cpu_own 1%nat eb p C false {[lock_rank "bcache"]} -∗
+    cpu_own 1%nat eb p C false ({[lock_rank "bcache"]} ∪ lks) -∗
     arm_pay 0%nat eb p -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
@@ -269,12 +276,16 @@ Section ProofBrelse.
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb p -∗
-        cpu_own 0%nat eb p C eb -∗
+        (* [lks], NOT [∅]: the release above only drops "bcache"; whatever
+           this hart already held on entry to brelse is untouched by this
+           tail, so it is handed back to the caller's continuation as-is. *)
+        cpu_own 0%nat eb p C eb lks -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK HMsp HMthr.
+    intros HK HMsp HMthr Hbelow0.
+    pose proof (locks_below_not_elem _ _ Hbelow0) as Hfresh0.
     assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -338,12 +349,15 @@ Section ProofBrelse.
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
     iApply (Rl.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
-              0%nat eb p C (K - 4)%nat
+              0%nat eb p C (K - 4)%nat ({[lock_rank "bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc6c : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x6c)).
     { rewrite HT3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc6c) in "Hpc".
@@ -521,7 +535,14 @@ Section ProofBrelse.
     : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b lks.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
-    intros pcE ret_tgt HK Hk Ha0.
+    intros pcE ret_tgt HK Hk Ha0 Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
+    (* holdingsleep/releasesleep's own order premises are at "sleep lock"
+       (rank 6), strictly above "bcache" (rank 4) -- [locks_below_mono]
+       weakens [Hbelow] up to that rank once, here, for both call sites. *)
+    assert (Hbelow_sl : locks_below lks (lock_rank "sleep lock"))
+      by (eapply locks_below_mono; [exact Hbelow | vm_compute; lia]).
+    pose proof (locks_below_not_elem _ _ Hbelow_sl) as Hfresh_sl.
     assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid Hprocs Hlocked Hcont".
@@ -767,7 +788,7 @@ Section ProofBrelse.
                  with "Hcnt") as "Hcnt".
     iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b C b lks
-              ltac:(lia)
+              ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hpid". }
@@ -848,7 +869,7 @@ Section ProofBrelse.
                  with "Hcnt") as "Hcnt".
     iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b C b lks
-              ltac:(lia)
+              ltac:(lia) Hfresh_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hpanic Hprocs").
     { iEval (rewrite HH2a0). iExact "Hslk". }
     { iEval (rewrite HH2a0). iExact "Hpid". }
@@ -926,8 +947,8 @@ Section ProofBrelse.
     iDestruct (cpu_own_transport CID15 CID18 0%nat b p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Aq.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) U3
-              0%nat b p C (K - 4)%nat b
-              ltac:(vm_compute; reflexivity) ltac:(lia)
+              0%nat b p C (K - 4)%nat b lks
+              ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     { iEval (rewrite HU3a0). iExact "Hlock". }
     (* acquire returns with interrupts OFF ([sie_cap_gpr _ _ false _]), so the
@@ -1357,7 +1378,7 @@ Section ProofBrelse.
         rewrite /E1 upd_ne; [| regne].
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p C HK HE9sp HE9thr
+      iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p C lks HK HE9sp HE9thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
@@ -1488,7 +1509,7 @@ Section ProofBrelse.
       { intros c Hcs N2 N8 N9 N18.
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p C HK HD2sp HD2thr
+      iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p C lks HK HD2sp HD2thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].

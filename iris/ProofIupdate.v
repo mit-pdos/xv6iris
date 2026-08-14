@@ -1140,7 +1140,7 @@ Section ProofIupdateMain.
     assert (HRAthr : iu_thr m RA).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /RA upd_ne; [| regne]. exact (HR9thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID CID14 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID CID14 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID14 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
@@ -1153,7 +1153,7 @@ Section ProofIupdateMain.
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               RA (K - 4)%nat eb C b
-              HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
+              _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     iIntros (CID15 Hq15 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
@@ -1737,7 +1737,7 @@ Section ProofIupdateMain.
     { exact (diblk_wf_insert ds (islot inum) dn Hdswf Hdnwf). }
     iDestruct ("Hheldback" with "Hbuf") as "Hheld".
     (* ---- into the tail ---- *)
-    iDestruct (cpu_own_transport CID15 CID36 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID15 CID36 0 eb (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID15 CID36 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".

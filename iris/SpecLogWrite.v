@@ -120,6 +120,17 @@ Definition wp_log_write_gen_body
   (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op
      has already appended [bno] in this batch. *)
   (cr = true -> uint bno ∈ Sb) ->
+  (* THE FRESHNESS PREMISE, AS A BOUND AT THE LOWEST RANK THIS FUNCTION
+     TOUCHES.  log_write acquires "log"(3) itself and its append arm calls
+     bpin, which acquires "bcache"(4) UNDER "log" -- and [locks_below] carries
+     BOTH in one premise, which is exactly the composition property
+     [SpecAcquire.v]'s header argues for: [locks_below_mono] weakens this to
+     "bcache" and [locks_below_union_singleton] carries it across log_write's
+     own acquire, so bpin's [locks_below ({[rank "log"]} ∪ lks) (rank "bcache")]
+     is a consequence rather than a second premise.  Trivial at [lks = ∅],
+     which every landed caller is at (a caller of log_write holds sleeplocks,
+     not spinlocks). *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -210,6 +221,8 @@ Definition wp_log_write_au_body
   (* the block is a covered HOME block: never the log's own storage *)
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
+  (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -321,6 +334,8 @@ Definition wp_log_write_gene_body
   (* the block is a covered HOME block: never the log's own storage *)
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
+  (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -387,6 +402,8 @@ Definition wp_log_write_sconf_body
      re-establish.) *)
   uint bno ∈ cov ->
   ~ (uint bno ∈ log_region_set logstart) ->
+  (* THE FRESHNESS BOUND -- see [wp_log_write_gen_body] *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

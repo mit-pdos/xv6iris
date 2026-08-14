@@ -98,6 +98,17 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (20 <= av)%nat ->
+  (* THE ORDER PREMISE FOR SLEEP'S OWN ACQUIRE.  The split protocol left
+     sleep holding NO caller lock on entry, but sleep still takes p->lock
+     itself (proc.c: [acquire(&p->lock)] before the state store), so acquire's
+     [locks_below lks (lock_rank s)] has to come from here.  BALANCED in
+     the held set -- the release at +0x22 gives the rank straight back on both
+     arms -- so [lks] is unchanged in the postcondition, and this premise is
+     exactly what makes the insert/delete cancel ([locks_below_not_elem]).
+     Trivial at [lks = ∅] ([locks_below_empty]), which is every real call site
+     (sleep is only ever reached from a thread that has already released its
+     condition lock). *)
+  locks_below lks (lock_rank "proc"%string) ->
   sie_cap_gpr m av eb pj -∗
   cpu_own 0 eb pj C eb lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -174,6 +185,15 @@ Definition wp_sleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (20 <= av)%nat ->
   (* the interior acquire reaches [S (S n)], transiently +1 *)
   (Z.of_nat n + 3 < 2 ^ 31)%Z ->
+  (* AND IT IS STILL SLEEP'S OWN ACQUIRE THAT NEEDS THIS, not the caller's
+     lock: [lks] here is the set the caller already holds (it is at [S n], so
+     [lks] is non-empty), and every rank in it must sit strictly BELOW
+     p->lock's -- which is the real xv6 order (a nested sleeper holds
+     "sleep lock" at 6 or "log" at 3, both under "proc" at 11).  Both arms
+     stay balanced in the set -- the no-park arm releases what it took, the
+     park arm panics inside sched and never returns -- so the postcondition
+     carries the entry [lks] unchanged. *)
+  locks_below lks (lock_rank "proc"%string) ->
   sie_cap_gpr m av false pj -∗
   cpu_own (S n) eb pj C false lks -∗
   kernel_text -∗ pc_is pcE -∗

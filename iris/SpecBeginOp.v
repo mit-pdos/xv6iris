@@ -97,6 +97,13 @@ Definition wp_begin_op_sconf_body
   (K_begin_op <= K)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  (* THE ORDER PREMISE FOR begin_op'S OWN ACQUIRE.  begin_op takes "log"
+     itself (rank 3, LockRank.v) and calls nothing that acquires a
+     lower-ranked lock (sleep/sleep_prepare only ever touch "proc", rank 11,
+     strictly above), so the one bound at "log" covers everything this
+     function needs -- [locks_below_mono] weakens it to "proc" for the
+     interior sleep calls. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
   cpu_own 0 eb pj C b lks -∗

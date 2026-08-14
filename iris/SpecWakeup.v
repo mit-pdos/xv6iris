@@ -49,6 +49,10 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
   length γs = NPROC ->
   (* acquire's push_off keeps the transient noff increment in range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "proc"'s -- wakeup acquires and releases each proc's lock in turn, so
+     this contract is BALANCED and [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗

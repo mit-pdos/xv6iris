@@ -57,6 +57,10 @@ Definition wp_virtio_disk_intr_sconf_body
   (forall r : regidx, r ∈ dom (rf_to_gmap m)) ->
   length γs = NPROC ->
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "virtio_disk"'s -- virtio_disk_intr acquires and releases [disk.vdisk_lock]
+     once, so this contract is BALANCED and [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "virtio_disk") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

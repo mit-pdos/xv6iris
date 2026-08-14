@@ -718,7 +718,7 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p C (K - 6)%nat b
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p C (K - 6)%nat b lks
                   ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href1 []").
         { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
@@ -795,7 +795,7 @@ Section ProofPipealloc.
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p C (K - 6)%nat b
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p C (K - 6)%nat b lks
                 ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href0 []").
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no
@@ -863,7 +863,7 @@ Section ProofPipealloc.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID11 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p C (K - 6)%nat b
+    iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p C (K - 6)%nat b lks
               ltac:(lia) Hnoffpos
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslota").
     iIntros (CID12 Hs12 mB) "Hcg Hcnt Hpc %HcsB Hpost0".
@@ -968,7 +968,7 @@ Section ProofPipealloc.
       by (rewrite /mC; apply upd_eq).
     iDestruct (cpu_own_transport CID12 CID15 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p C (K - 6)%nat b
+    iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p C (K - 6)%nat b lks
               ltac:(lia) Hnoffpos
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslotb").
     iIntros (CID16 Hs16 mD) "Hcg Hcnt Hpc %HcsD Hpost1".
@@ -1127,7 +1127,7 @@ Section ProofPipealloc.
       by (rewrite /mE; apply upd_eq).
     iDestruct (cpu_own_transport CID16 CID20 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p C (K - 6)%nat b
+    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p C (K - 6)%nat b lks
               ltac:(lia) Hfl Hnoffpos
               with "Hcg Hcnt Htext Hpc Hkmem Hav Hpanic").
     iIntros (CID21 Hs21 mF) "Hcg Hcnt Hpc %HcsF Hkp".

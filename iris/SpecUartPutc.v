@@ -79,6 +79,10 @@ Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (uartputc_stack <= K)%nat ->
   (* acquire's transient [noff] increment must not overflow the [int] *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "uart"'s -- uartputc_sync acquires and releases [tx_lock] in the same
+     call, so this contract is BALANCED: [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "uart") ->
   sie_cap_gpr m0 K b p -∗
   (* the interrupt level is left exactly as found: an acquire/release pair *)
   cpu_own n eb p C b lks -∗

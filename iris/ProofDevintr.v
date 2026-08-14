@@ -403,7 +403,7 @@ Section ProofDevintr.
     : wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc lks.
   Proof.
     cbv beta delta [wp_devintr_sconf_body].
-    intros pcE ret_tgt Hlen Hlvl Hav.
+    intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (ra0 := (m !!! Regidx ra_idx : mword 64)).
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
@@ -1138,8 +1138,8 @@ Section ProofDevintr.
         assert (HK0ra : K0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x6e) : mword 64) 4)
           by (rewrite /K0 upd_eq; reflexivity).
-        iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p C (av - 4)%nat
-                  ltac:(lia) ltac:(unfold devintr_stack in Hav; lia)
+        iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p C (av - 4)%nat lks
+                  ltac:(lia) ltac:(unfold devintr_stack in Hav; lia) Hbelow
                   with "Hcg Hcnt Htext Hpc Htcap Htk").
         iIntros (MC) "%HcsC Hcg Hcnt Hpc Htk2".
         assert (Hpc72 : ret_pc (K0 !!! Regidx ra_idx) = mword_of_int (KernelSyms.devintr + 0x72))

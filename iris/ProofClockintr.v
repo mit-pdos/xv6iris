@@ -307,7 +307,8 @@ Section ProofClockintr.
     : wp_clockintr_sconf_body γl γs m n eb p C av lks.
   Proof.
     cbv beta delta [wp_clockintr_sconf_body].
-    intros pcE ret_tgt Hn Hav.
+    intros pcE ret_tgt Hn Hav Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (ra0 := (m !!! Regidx ra_idx : mword 64)).
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
@@ -498,9 +499,10 @@ Section ProofClockintr.
         rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Hmosp. }
       (* ===================== acquire(&tickslock) ===================== *)
       iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res B2
-                n eb p C (av - 2)%nat false
+                n eb p C (av - 2)%nat false lks
                 ltac:(lia)
                 ltac:(lia)
+                Hbelow
                 with "Hcg Hcnt Htext Hpc [Hlkl] Hpanic").
       { iEval (rewrite HB2a0). iExact "Hlkl". }
       iApply wp_next_off_intro.
@@ -714,6 +716,7 @@ Section ProofClockintr.
       iEval (rewrite Hridx) in "Hcg".
       iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res E2
                 n eb p C (av - 2)%nat
+                ({[lock_rank "time"]} ∪ lks)
                 ltac:(rewrite HE2a0; apply addv_sext0)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlkl] [Htok] [HR] Hcnt Hpay").
@@ -722,6 +725,12 @@ Section ProofClockintr.
       { iExact "HR". }
       rewrite Hout. iApply wp_next_off_intro.
       iIntros (MR) "Hcg Hpc %HcsR Hcnt".
+      (* clockintr is BALANCED: the set release hands back collapses to the
+         entry [lks] -- [Hfresh] is what makes the singleton insert/delete
+         cancel. *)
+      assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hcnt".
       assert (Hpc54 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.clockintr + 0x54))
         by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc54) in "Hpc".

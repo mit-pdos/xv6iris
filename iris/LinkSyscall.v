@@ -50,6 +50,6 @@ Module Syscall : SYSCALL.
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate),
+      (pid : mword 32) (V : pprivate) (lks : gset nat),
       wp_syscall_sconf_body syscall_env γf γs j γl m av C pid V lks.
 End Syscall.

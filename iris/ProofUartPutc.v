@@ -371,7 +371,7 @@ Section ProofUartPutc.
     : wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
-    intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hn.
+    intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hn Hfresh.
     assert (HK14 : (14 <= K)%nat) by (unfold uartputc_stack in HK; exact HK).
     assert (HK4 : (4 <= K)%nat) by lia.
     assert (Hav : (10 <= K - 4)%nat) by lia.
@@ -508,8 +508,8 @@ Section ProofUartPutc.
     (* ===== acquire(&tx_lock) ===== *)
     iDestruct (cpu_own_transport CID CIDp9 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p C (K - 4)%nat b
-              _ Hn Hav with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
+    iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p C (K - 4)%nat b lks
+              Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
     { iEval (rewrite HG14a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
     assert (Hret14 : ret_pc (G14 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x18))
@@ -588,11 +588,20 @@ Section ProofUartPutc.
     (* ===== release(&tx_lock) ===== *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p C (K - 4)%nat
+              ({[lock_rank "uart"]} ∪ lks)
               Hlka Hav with "Hcg Ht Hpc Hlk Hlocked [Hown] Hcpu Hpay").
     { iApply (tx_res_intro γd (l ++ [sb]) with "Hown"). }
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
     rewrite Hbeq in Hsrel.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcpu".
+    (* uartputc_sync is BALANCED: what it acquired it released, so the set
+       release hands back collapses to the entry [lks] -- [Hfresh] (via
+       [locks_below_not_elem]) is what makes the singleton insert/delete
+       cancel. *)
+    pose proof (locks_below_not_elem lks (lock_rank "uart") Hfresh) as Hnotin.
+    assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hcpu".
     assert (Hret3c : ret_pc (H3c !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x40))
       by (rewrite HH3cra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hret3c) in "Hpc".

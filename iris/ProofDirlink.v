@@ -1693,8 +1693,8 @@ Section ProofDirlinkMain.
     iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk pd pav pu bn gfs gi cn gtl
               ga gf cov logstart nib dev ip bm data dn fn
               false (mword_of_int 0 : mword 32)
-              pidv dq dqd dqn R7 (K - 10)%nat eb C b
-              ltac:(exact _ HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hinums Hj Hgs
+              pidv dq dqd dqn R7 (K - 10)%nat eb C b _
+              ltac:(exact HKdl) Htype Hlg Hbmwf Hbmcov Hszb Hinums Hj Hgs
               HR7a0
               ltac:(cbn [negb]; rewrite HR7a2 dlk_zero_moi; exact (eq_vec_refl _))
               Heb

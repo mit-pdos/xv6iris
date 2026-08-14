@@ -213,6 +213,9 @@ Section ProofWakeup.
     (* the acquire/release + myproc push_off keep the transient +1 in range *)
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
+    (* acquire's order premise, threaded to every iteration's acquire/release
+       pair -- see [wp_wakeup_sconf] where it originates *)
+    locks_below lks (lock_rank "proc") ->
     procs_inv γs -∗
     (* acquire's "already holding" arm sits above panic() *)
     panic_wp_any -∗
@@ -229,7 +232,7 @@ Section ProofWakeup.
       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros Hlen Hlvl Hav.
+    intros Hlen Hlvl Hav Hfresh.
     iIntros "#Hpinv #Hpanic Hqexit".
     (* BOUNDED loop: ordinary Coq induction on a [fuel] bounding the remaining
        iterations [NPROC - k] -- no Löb needed.  The body is a [wp_next b]
@@ -400,9 +403,10 @@ Section ProofWakeup.
       iDestruct (cpu_own_transport CIDk CIDe lvl eb pme C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf (CID := CIDe) γk "proc"%string (proc_lock_res γs γk (proc_addr k)) M3a
-                lvl eb pme C av b
+                lvl eb pme C av b lks
                 ltac:(lia)
                 ltac:(lia)
+                Hfresh
                 with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -508,12 +512,18 @@ Section ProofWakeup.
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
-                  lvl eb pme C av
+                  lvl eb pme C av ({[lock_rank "proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
         rewrite -Hbmatch.
         iIntros (CIDg Hsg mr) "Hcg Hpc %Hpinsr Hown".
+        (* each iteration is BALANCED: what it acquired it released, so the
+           set release hands back collapses to the loop invariant's [lks]. *)
+        pose proof (locks_below_not_elem lks (lock_rank "proc") Hfresh) as Hnotin.
+        assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+      by (apply locks_add_del; assumption).
+        iEval (rewrite Hsetback) in "Hown".
         (* pc = wakeup+0x30 (release's return target). *)
         assert (Hpc30 : ret_pc (Mr2c !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KernelSyms.wakeup + 0x30)).
@@ -846,7 +856,7 @@ Section ProofWakeup.
     : wp_wakeup_sconf_body m γs pme lvl K eb C b lks.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
-    intros sp0 spF rettgt HK Hdom Hlen Hlvl.
+    intros sp0 spF rettgt HK Hdom Hlen Hlvl Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
     iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
@@ -866,7 +876,7 @@ Section ProofWakeup.
                   (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
                   (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) lvl
                   (K - 8)%nat eb C b lks
-                  Hlen Hlvl ltac:(lia)
+                  Hlen Hlvl ltac:(lia) Hfresh
                   with "Hpinv Hpanic") as "Hloop".
     iSpecialize ("Hloop" with "[Hf0 Hcont]").
     { (* exit continuation = epilogue at wakeup+0x54 *)

@@ -107,6 +107,11 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "time"'s -- sys_pause acquires and releases [tickslock] (possibly many
+     times, around each loop iteration's [sleep]) but is BALANCED overall,
+     so [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "time") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗

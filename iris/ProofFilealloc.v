@@ -104,7 +104,7 @@ Section ProofFilealloc.
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -185,7 +185,8 @@ Section ProofFilealloc.
     : wp_filealloc_sconf_body γl γf m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_filealloc_sconf_body].
-    intros pcE ret_tgt HK HnZ.
+    intros pcE ret_tgt HK HnZ Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hfdslot Hcont".
     iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
@@ -329,8 +330,8 @@ Section ProofFilealloc.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "ftable"%string (ftable_res γf) mA
-              n eb p C (K - 4)%nat b
-              HnZ ltac:(lia)
+              n eb p C (K - 4)%nat b lks
+              HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -890,11 +891,18 @@ Section ProofFilealloc.
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) F4
                 n eb p C (K - 4)%nat
+                ({[lock_rank "ftable"]} ∪ lks)
                 ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+      (* filealloc is BALANCED on this arm: the set release hands back
+         collapses to the entry [lks] -- [Hfresh] makes the singleton
+         insert/delete cancel. *)
+      assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
       rewrite <- Houtb in Hsr.
       pose proof Hrelpins as Hrelpins_cs.
@@ -990,11 +998,16 @@ Section ProofFilealloc.
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) G3
                 n eb p C (K - 4)%nat
+                ({[lock_rank "ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+      (* filealloc is BALANCED on this arm too. *)
+      assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
       rewrite <- Houtb in Hsr.
       pose proof Hrelpins as Hrelpins_cs.

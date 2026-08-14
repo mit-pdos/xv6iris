@@ -112,6 +112,17 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
   length γs = NPROC ->
   (* cons.lock's and wakeup's transient noff increments stay in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "cons"'s -- consoleintr acquires and releases cons.lock in the same
+     call (BALANCED), so this contract is threaded on [lks] unchanged end to
+     end.  "cons" (5) is also the LOWEST rank this call tree touches while
+     the lock is held: [wakeup] (-> "proc", 11) surfaces its own
+     [locks_below] premise, which the proof discharges from this one via
+     [locks_below_mono]/[locks_below_union_singleton].  [consputc]'s public
+     contract (SpecConsputc.v) does not surface an order premise at all --
+     see the proof file's report for why that is not this function's
+     obligation to supply. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗

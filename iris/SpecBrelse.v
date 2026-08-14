@@ -68,6 +68,12 @@ Definition wp_brelse_sconf_body
   (* a0 is the buffer *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* THE ORDER PREMISE: brelse acquires "bcache" (rank 4) directly, and the
+     rest of its call graph (holdingsleep / releasesleep, both against the
+     rank-6 "sleep lock") only needs a HIGHER bound -- [locks_below_mono]
+     gets there from this one, so "bcache" (the lowest rank brelse touches)
+     is the only premise stated here. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

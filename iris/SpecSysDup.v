@@ -121,6 +121,17 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   (* push_off's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (sys_dup_stack <= av)%nat ->
+  (* THE RANK BOUND, FOR THE ONE LOCK BELOW.  sys_dup takes no lock of its
+     own, but filedup acquires "ftable", and the rank discipline needs every
+     rank the caller arrives holding to sit strictly BELOW that one --
+     [LockRank.locks_below], not mere non-membership, because only the bound
+     composes across a call chain ([locks_below_mono] weakens it to any higher
+     rank, [locks_below_not_elem] recovers the non-membership a ghost step
+     wants).  It is passed straight through to filedup, which states it in
+     exactly this shape.  A syscall entry point holds nothing, so at every
+     real instantiation [lks] is ∅ and this is [locks_below_empty]; the body
+     is stated ∀-generically in [lks], so it has to be said. *)
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

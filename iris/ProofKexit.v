@@ -378,6 +378,11 @@ Section KexitLoop.
     fcn_dq fn = DfracOwn (1/4) ->
     fcn_pid fn = pid ->
     (fileclose_stack <= av)%nat ->
+    (* THE FRESHNESS PREMISE: every iteration calls fileclose at [lks]
+       unchanged (n = 0 throughout the loop -- no lock is held between
+       iterations), and fileclose's own contract now needs [lks] below
+       "ftable"'s rank (the lowest fileclose's callees ever touch). *)
+    locks_below lks (lock_rank "ftable") ->
     kernel_text -∗
     is_ftable γft γf -∗
     panic_wp_any -∗
@@ -422,7 +427,7 @@ Section KexitLoop.
       (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hj Hfnj Hfndq Hfnpid Hav.
+    intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.
     iIntros "#Htext #Hft #Hpanic Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -697,8 +702,8 @@ Section KexitLoop.
         iDestruct (fileclose_loop_open fn onk usk 0%nat eb pj Cf
                      with "Hpenv Hfenv [Hpidq]") as "[Hfcenv Hfcback]".
         { rewrite Hfnj Hfndq Hfnpid. iExact "Hpidq". }
-        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj C av b
-                  ltac:(lia) ltac:(lia) HM42a0
+        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj C av b lks
+                  ltac:(lia) ltac:(lia) HM42a0 Hfresh
                   with "Hcg Hown Htce Hcce Htext Hpc Hft Hpanic Href Hfcenv").
         iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
@@ -787,8 +792,8 @@ Section KexitPark.
      sharing an enclosing Section's [Context CID] would silently pin to the
      entry hart. *)
   Lemma kx_cpu_own_ctx_take `{GEN : GenId} `{CID0 : CpuId}
-      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) :
-    cpu_own n eb p D false -∗ D ∗ cpu_own n eb p emp false.
+      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) {lks : gset nat} :
+    cpu_own n eb p D false lks -∗ D ∗ cpu_own n eb p emp false lks.
   Proof.
     iIntros "[Hh HD]". iFrame "HD". rewrite cpu_own_off. iFrame "Hh".
   Qed.
@@ -805,6 +810,11 @@ Section KexitPark.
     kxt_regs M pj sv ->
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
+    (* THE FRESHNESS PREMISE, AT THE LOWEST RANK kx_park ITSELF TOUCHES:
+       "wait_lock" (10), acquired directly; "proc" (11) follows via
+       [locks_below_mono] / [locks_below_union_singleton] at the nested
+       acquire below. *)
+    locks_below lks (lock_rank "wait_lock") ->
     sie_cap_gpr M av b pj -∗
     cpu_own 0 eb pj C b lks -∗
     (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE.  The park is
@@ -829,7 +839,7 @@ Section KexitPark.
     proc_priv_nocwd γf pj pid V -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hj Hgl Hav Hregs Hof Hcwd.
+    intros pj Hj Hgl Hav Hregs Hof Hcwd Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
     iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl Hinit Hsp Hir Hpriv".
     (* [eb = b] at level 0 -- for the complement's transport guard ONLY (it is
@@ -895,7 +905,8 @@ Section KexitPark.
     iDestruct (cpu_own_transport CID0 CIDw 0 eb pj C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf (CID := CIDw) γw "wait_lock"%string wait_res
-              P2 0 eb pj C av b ltac:(lia) ltac:(lia)
+              P2 0 eb pj C av b lks ltac:(lia) ltac:(lia)
+              Hfresh
               with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HP2a0). iExact "Hwl". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD: index [false] throughout. *)
@@ -963,6 +974,7 @@ Section KexitPark.
     assert (HP4s4 : P4 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P4 upd_ne; [exact HP3s4 | vm_compute; discriminate]).
     iApply (Reparent.wp_reparent_sconf (CID := CIDa)  P4 γs pj ip ps dqi 1%nat (trap_res b + av)%nat eb C false
+              ({[lock_rank "wait_lock"]} ∪ lks)
               ltac:(unfold K_reparent; lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
               with "Hcg Hown Htext Hpc Hpanic Hprocs Hinit Hpar").
     iApply wp_next_off_intro.
@@ -1023,10 +1035,21 @@ Section KexitPark.
       by (rewrite /P6 upd_ne; [exact HP5s3 | vm_compute; discriminate]).
     assert (HP6s4 : P6 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P6 upd_ne; [exact HP5s4 | vm_compute; discriminate]).
+    (* "proc" (11) outranks "wait_lock" (10), already held: weaken [Hfresh]'s
+       bound up to 11, then push it across the held "wait_lock" singleton --
+       needed here for wakeup's own acquire/release of every p->lock, and
+       reused below for kexit's own [acquire(&p->lock)]. *)
+    assert (Hwl_lt_proc : (lock_rank "wait_lock" < lock_rank "proc")%nat)
+      by (vm_compute; lia).
+    assert (Hfresh_proc : locks_below ({[lock_rank "wait_lock"]} ∪ lks) (lock_rank "proc")).
+    { apply locks_below_union_singleton; [exact Hwl_lt_proc |].
+      apply (locks_below_mono lks (lock_rank "wait_lock")); [exact Hfresh | lia]. }
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDa)  P6 γs
               pj 1%nat (trap_res b + av)%nat eb C false
+              ({[lock_rank "wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen
               ltac:(lia)
+              Hfresh_proc
               with "Hcg Hown Htext Hpc Hpanic Hprocs").
     iApply wp_next_off_intro.
     iIntros (Mwk) "[%Hcsw %Hdomw] Hcg Hown Htext3 Hpc".
@@ -1083,9 +1106,13 @@ Section KexitPark.
     assert (HP8s4 : P8 !!! Regidx (mword_of_int 20 : mword 5) = sv)
       by (rewrite /P8 upd_ne; [exact HP7s4 | vm_compute; discriminate]).
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
+    (* [Hfresh_proc], derived above for wakeup's own call, is exactly what
+       this nested acquire needs too. *)
     iApply (Acquire.wp_acquire_sconf (CID := CIDa) γl "proc"%string
               (proc_lock_res γs γl pj) P8 1%nat eb pj C (trap_res b + av)%nat false
+              ({[lock_rank "wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(lia)
+              Hfresh_proc
               with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HP8a0). iExact "Hislock". }
     iApply wp_next_off_intro.
@@ -1233,6 +1260,7 @@ Section KexitPark.
                  on entry), so both sides of this call sit at
                  [trap_res b + av]. *)
               wait_res PC 1%nat eb pj C (trap_res b + av)%nat
+              ({[lock_rank "proc"]} ∪ ({[lock_rank "wait_lock"]} ∪ lks))
               ltac:(rewrite HPCa0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc Hwl Hlkw [Hpar] Hown Hpay2").
     { iExists _. iExact "Hpar". }
@@ -1272,6 +1300,7 @@ Section KexitPark.
        window, whose index carries the reserve: [trap_res b + av].  The park is
        index-generic, so it just rides through at that index. *)
     iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD (trap_res b + av)%nat eb
+              (({[lock_rank "proc"]} ∪ ({[lock_rank "wait_lock"]} ∪ lks)) ∖ {[lock_rank "wait_lock"]})
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
                     [Hpriv Hsp Hir] Hpay Hcpuemp Hoc Htag Hvc").
@@ -1369,6 +1398,11 @@ Section KexitRest.
        IBLOCK inum inodestart ∈ cov /\
        ~ (IBLOCK inum inodestart ∈ log_region_set logstart)) ->
     cov_below cov size ->
+    (* THE FRESHNESS PREMISE, AT THE LOWEST RANK kx_rest (OR ANY CALLEE)
+       TOUCHES: "itable" (2), via [iput(p->cwd)] directly.  [end_op] (rank
+       "log", 3) and the tail [kx_park] (rank "wait_lock", 10) both follow
+       by [locks_below_mono]. *)
+    locks_below lks (lock_rank "itable") ->
     sie_cap_gpr M av b pj -∗
     cpu_own 0 eb pj C b lks -∗
     (* THREADED, not framed: begin_op / iput / end_op all take the complement
@@ -1402,7 +1436,7 @@ Section KexitRest.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hgl Hav Hgeom Hregs Hof Hcdev Hcnib
-           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb.
+           Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
     iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
@@ -1528,6 +1562,7 @@ Section KexitRest.
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
+              Hfresh
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hitab Hitinv Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
@@ -1568,9 +1603,13 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID5 CID6 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* "log" (3) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    assert (Hfresh_log : locks_below lks (lock_rank "log"))
+      by (apply (locks_below_mono lks (lock_rank "itable")); [exact Hfresh | vm_compute; lia]).
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb C b lks
               ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
+              Hfresh_log
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1612,12 +1651,16 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID7 CID8 eb pj
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* "wait_lock" (10) outranks "itable" (2): weaken [Hfresh]'s bound. *)
+    assert (Hfresh_wl : locks_below lks (lock_rank "wait_lock"))
+      by (apply (locks_below_mono lks (lock_rank "itable")); [exact Hfresh | vm_compute; lia]).
     iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av eb C b lks pid
               (upd_cwd V (zero_reg : mword 64))
               Hj Hgl ltac:(lia)
               ltac:(split; [exact Heo_s3 | split; [exact Heo_s4 | intro r; apply rf_to_gmap_dom]])
               ltac:(cbn [upd_cwd pv_ofile]; exact Hof)
               ltac:(cbn [upd_cwd pv_cwd]; reflexivity)
+              Hfresh_wl
               with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hpanic Hwl Hinit Hsp Hir Hpriv").
   Qed.
 
@@ -1653,7 +1696,7 @@ Section ProofKexit.
                           on fn m av eb C b lks pid V.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
-    intros pcE pj Hfn Hj Hgl HK Hgeom. subst fn.
+    intros pcE pj Hfn Hj Hgl HK Hgeom Hfresh. subst fn.
     unfold K_kexit in HK.
     iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl #Hft".
     iIntros "#Hkmem Hav0".
@@ -1697,7 +1740,7 @@ Section ProofKexit.
       by (rewrite /A0 upd_ne; [exact Hs4 | vm_compute; discriminate]).
     iDestruct (cpu_own_transport CIDp CID1 0 eb pj C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Myproc.wp_myproc_sconf (CID := CID1) A0 (av - 6)%nat 0 eb pj C b
+    iApply (Myproc.wp_myproc_sconf (CID := CID1) A0 (av - 6)%nat 0 eb pj C b lks
               ltac:(lia) ltac:(lia)
               with "Hcg Hown Htext Hpc").
     iIntros (CID2 Hs2 ms mp) "%Hmsf Hcg Hown Hpc %Hmp".
@@ -1956,6 +1999,7 @@ Section ProofKexit.
                     (m !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwd V)
                     (av - 6)%nat eb C b lks Hj eq_refl eq_refl eq_refl
                     ltac:(unfold fileclose_stack, K_iput; lia)
+                    Hfresh
                     with "Htext Hft Hpanic") as "Hloop".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hframe]").
       { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
@@ -1966,12 +2010,16 @@ Section ProofKexit.
         cbn [fcn_dqb fcn_dqs fcn_bmapstart fcn_inodestart fcn_fs fcn_cov
              fcn_logstart fcn_size].
         iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
+        (* "itable" (2) outranks "ftable" (1): weaken [Hfresh]'s bound. *)
+        assert (Hfresh_it : locks_below lks (lock_rank "itable"))
+          by (apply (locks_below_mono lks (lock_rank "ftable")); [exact Hfresh | vm_compute; lia]).
         iApply (kx_rest (CID0 := CIDx)  γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart dev γi cn γtl bmapstart inodestart nib size usx
                   dqb dqs ip (m !!! Regidx (mword_of_int 10 : mword 5)) dqi
                   Mx (av - 6)%nat eb C b lks pid Vx
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
+                  Hfresh_it
                   with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hpanic Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hslks Hsbb Hsbi Hbmres

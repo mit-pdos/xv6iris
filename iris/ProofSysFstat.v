@@ -601,7 +601,7 @@ Section ProofSysFstat.
     (* ---- argfd(0, 0, &f).  [pfd] IS NULL and carries no resource --
        [SpecArgfd.ofd_out_null] is exactly this case. ---- *)
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 4)%nat 0%nat eb pj C 0%nat v
-              pidv V (bv_0 32) w3 b
+              pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
               ltac:(unfold argfd_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
@@ -698,7 +698,7 @@ Section ProofSysFstat.
                 ltac:(lia) eq_refl eq_refl eq_refl HA2sp HA2a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
       iIntros (CID17 Hs17 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj C b lks
+      iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
@@ -795,7 +795,7 @@ Section ProofSysFstat.
         as (kk qq Cf) "([%Hfvk %Hkk] & Href & Hcore & Howe)".
       assert (HS3a0' : S3 !!! Regidx Ra0 = fnode kk) by (rewrite HS3a0; exact Hfvk).
       iDestruct (sfs_env_frame fn Cf with "Henv") as "[Hfenv Hfback]".
-      iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj C b lks
+      iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S3 (av - 4)%nat eb C b lks
@@ -840,7 +840,7 @@ Section ProofSysFstat.
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
       iIntros (CID21 Hs21 mg) "[%Hcsg %Hmga0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj C b lks
+      iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").

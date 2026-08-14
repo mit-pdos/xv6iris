@@ -121,6 +121,32 @@ Lemma locks_below_difference (S : gset nat) (X : gset nat) (r : nat) :
   locks_below S r -> locks_below (S ∖ X) r.
 Proof. intros Hb q Hq. apply Hb. set_solver. Qed.
 
+(* THE RELEASE CANCELLATION, PROVED ONCE AT AN ABSTRACT RANK.
+
+   A balanced acquire/release pair leaves the held set where it started, and
+   every such site needs [({[r]} ∪ lks) ∖ {[r]} = lks].  Do NOT prove that
+   inline with [set_solver] at a CONCRETE lock: the goal then contains
+   [lock_rank "name"] four times over, each an unfolding of [rank_lookup]'s
+   15-way [String.eqb] chain, and [set_solver]'s membership case analysis
+   normalises every one of them.  Measured: minutes per site.  Proved here at
+   an opaque [r] it is instant, and the call sites become [apply
+   locks_add_del] with no set reasoning at all. *)
+Lemma locks_add_del (r : nat) (lks : gset nat) :
+  r ∉ lks -> ({[r]} ∪ lks) ∖ {[r]} = lks.
+Proof. intros Hnin. set_solver. Qed.
+
+(* the two degenerate shapes the scheduler's literal singleton needs, for the
+   same reason: keep [lock_rank] out of [set_solver]'s way. *)
+Lemma locks_self_del (r : nat) : ({[r]} : gset nat) ∖ {[r]} = ∅.
+Proof. set_solver. Qed.
+Lemma locks_union_empty (r : nat) : ({[r]} : gset nat) ∪ ∅ = {[r]}.
+Proof. set_solver. Qed.
+
+(* the same at the premise a caller actually holds *)
+Lemma locks_add_del_below (r : nat) (lks : gset nat) :
+  locks_below lks r -> ({[r]} ∪ lks) ∖ {[r]} = lks.
+Proof. intros Hb. apply locks_add_del, locks_below_not_elem, Hb. Qed.
+
 (* the set a hart holds is a CHAIN: acquire's premise makes every new element
    strictly greater than everything present, so [locks_below] of the singleton
    below is all a nested caller ever states. *)

@@ -289,7 +289,9 @@ Section ProofSwtch.
        construction -- and the spec's [adm An cpu_id] premise is
        exactly its admissibility obligation.  The hand-off names the OLD
        record's own index [Ao]. *)
-    iApply ("Hnewwand" $! cpu_id (vregs_den rho swtch_regs1) eb
+    (* [valid_context_pre]'s resume wand is [∀ h m eb' lks]; instantiate its
+       held-lock binder at the set our own bundle carries. *)
+    iApply ("Hnewwand" $! cpu_id (vregs_den rho swtch_regs1) eb lks
               with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }

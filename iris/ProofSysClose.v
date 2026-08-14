@@ -542,7 +542,7 @@ Section ProofSysClose.
     (* ---- argfd(0, &fd, &f) ---- *)
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p C 0%nat v
-              pid V (word_hi w3) w4 b
+              pid V (word_hi w3) w4 b lks
               ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
               ltac:(unfold argfd_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [Hs3hi] Hs4").
@@ -676,7 +676,7 @@ Section ProofSysClose.
                      = add_vec_int (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) 4)
         by (rewrite /B upd_eq; reflexivity).
       iDestruct (cpu_own_transport CID9 CID12 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Myproc.wp_myproc_sconf B (av - 4)%nat n eb p C b
+      iApply (Myproc.wp_myproc_sconf B (av - 4)%nat n eb p C b lks
                 Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iIntros (CID13 Hs13 ms P) "%Hms Hcg Hcpu Hpc %HcsP".
@@ -849,7 +849,7 @@ Section ProofSysClose.
          keep the other ([fileclose_env_split]). *)
       iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p C (av - 4)%nat b
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p C (av - 4)%nat b lks
                 ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href Hfcenv").
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".

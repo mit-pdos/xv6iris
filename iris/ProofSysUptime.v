@@ -120,7 +120,7 @@ Section ProofSysUptime.
     : wp_sys_uptime_sconf_body γl m n eb p C av b lks.
   Proof.
     cbv beta delta [wp_sys_uptime_sconf_body].
-    intros pcE ret_tgt Htp Hn Hav.
+    intros pcE ret_tgt Htp Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
@@ -254,9 +254,10 @@ Section ProofSysUptime.
     (* ===================== acquire(&tickslock) ===================== *)
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res A4
-              n eb p C (av - 4)%nat b
-              ltac:(exact _ Hn)
+              n eb p C (av - 4)%nat b lks
+              ltac:(exact Hn)
               ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
     { iEval (rewrite HA4a0). iExact "Hlk". }
     iIntros (CID9 Hs9 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -378,6 +379,7 @@ Section ProofSysUptime.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res B5
               n eb p C (av - 4)%nat
+              ({[lock_rank "time"]} ∪ lks)
               ltac:(rewrite HB5a0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
@@ -389,6 +391,12 @@ Section ProofSysUptime.
        S _ => false end]; [Hbeq] identifies it with [b], derived up front. *)
     rewrite Hbeq in Hs10.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcnt".
+    (* sys_uptime is BALANCED: what it acquired it released, so the set
+       release hands back collapses to the entry [lks]. *)
+    pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
+    assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc2c : ret_pc (B5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x2c))
       by (rewrite HB5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".

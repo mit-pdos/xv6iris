@@ -328,7 +328,7 @@ Section SpProps.
         sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+        cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x80)) -∗
         sp_tail CID0 j m av eb C sp0 pj lks -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -350,7 +350,7 @@ Section SpProps.
         (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+        cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x9c)) -∗
         sp_tail CID0 j m av eb C sp0 pj lks -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -371,7 +371,7 @@ Section SpProps.
         pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-        cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+        cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
         sp_exit0 CID0 γt j m av eb C sp0 pj lks -∗
         sp_exitk CID0 γt j m av eb C sp0 pj tk lks -∗
@@ -587,6 +587,8 @@ Section SpBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m N sp0 -> sp_saved m N ->
+    (* acquire's freshness premise -- see [sp_acq_body] where it originates *)
+    locks_below lks (lock_rank "time") ->
     kernel_text -∗
     is_tickslock γt -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -594,12 +596,12 @@ Section SpBodies.
     sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x80)) -∗
     sp_tail CID0 j m av eb C sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav Heb Hanch Hbn Hsn. subst eb.
+    intros Hav Heb Hanch Hbn Hsn Hfresh. subst eb.
     iIntros "#Htext #Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     iPoseProof (spi_80 with "Htext") as "Hi70".
@@ -657,9 +659,16 @@ Section SpBodies.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
     (* release(&tickslock) *)
     iApply (Release.wp_release_sconf γt a_tickslock "time"%string ticks_res X2
-              0%nat true pj C (av - 8)%nat ltac:(rewrite HX2a0; apply sp_add_vec_0) ltac:(lia)
+              0%nat true pj C (av - 8)%nat ({[lock_rank "time"]} ∪ lks)
+              ltac:(rewrite HX2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
     iIntros (CIDr Hsr mrl) "Hcg Hpc %HcsX2 Hown".
+    (* sp_exit0 is BALANCED at the tail: release strips exactly the rank it
+       just took, so [Htail]'s [lks] is the entry set unchanged. *)
+    pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
+    assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hown".
     assert (Hx7c : ret_pc (X2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x8c))
       by (rewrite HX2ra; pcstep).
     iEval (rewrite Hx7c) in "Hpc".
@@ -697,6 +706,8 @@ Section SpBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m N sp0 -> sp_lregs N tk ->
+    (* acquire's freshness premise -- see [sp_acq_body] where it originates *)
+    locks_below lks (lock_rank "time") ->
     kernel_text -∗
     is_tickslock γt -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -708,12 +719,12 @@ Section SpBodies.
     (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x9c)) -∗
     sp_tail CID0 j m av eb C sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav Heb Hanch Hbn Hln. subst eb.
+    intros Hav Heb Hanch Hbn Hln Hfresh. subst eb.
     iIntros "#Htext #Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     pose proof Hbn as Hbn'. destruct Hbn as (HNsp & HNs0 & HNhi).
@@ -774,9 +785,16 @@ Section SpBodies.
     { rewrite /K2 upd_ne; [| reg_neq]. rewrite /K1 upd_eq. rewrite /K0 upd_eq.
       rewrite /a_tickslock. apply bv_eq; vm_compute; reflexivity. }
     iApply (Release.wp_release_sconf γt a_tickslock "time"%string ticks_res K2
-              0%nat true pj C (av - 8)%nat ltac:(rewrite HK2a0; apply sp_add_vec_0) ltac:(lia)
+              0%nat true pj C (av - 8)%nat ({[lock_rank "time"]} ∪ lks)
+              ltac:(rewrite HK2a0; apply sp_add_vec_0) ltac:(lia)
               with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
     iIntros (CIDr Hsr mrk) "Hcg Hpc %HcsK2 Hown".
+    (* sp_exitk is BALANCED at the tail: release strips exactly the rank it
+       just took, so [Htail]'s [lks] is the entry set unchanged. *)
+    pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
+    assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hown".
     assert (Hk98 : ret_pc (K2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0xa8))
       by (rewrite HK2ra; pcstep).
     iEval (rewrite Hk98) in "Hpc".
@@ -915,7 +933,7 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x6a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1112,6 +1130,9 @@ Section SpBodies.
     pj = proc_addr j ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m M sp0 -> sp_lregs M tk ->
+    (* acquire's freshness premise, for the loop's re-acquire after sleep()
+       -- see [sp_acq_body] where it originates *)
+    locks_below lks (lock_rank "time") ->
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
@@ -1129,13 +1150,13 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (trap_res true + (av - 8))%nat false pj -∗
-    cpu_own 1 eb pj C false lks -∗ arm_pay 0 eb pj -∗
+    cpu_own 1 eb pj C false ({[lock_rank "time"]} ∪ lks) -∗ arm_pay 0 eb pj -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     (* [sleep]'s contract names the parking proc as [proc_addr j] literally, so
        the caller's [pj] has to be spelled that way before the crossing. *)
-    intros Hav Heb Hj Hjl Hpjv Hanch Hbn Hln. subst pj.
+    intros Hav Heb Hj Hjl Hpjv Hanch Hbn Hln Hfresh. subst pj.
     iIntros "#Htext #Hlkt #Hpinv #Hpanic IH Hex0 Hexk Htl
               Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
@@ -1342,10 +1363,15 @@ Section SpBodies.
       { rewrite /L5 upd_ne; [| reg_neq]. rewrite /L4 upd_eq. rewrite Hp9. apply add_vec_zero_l. }
       (* ==================== release(&tickslock) ==================== *)
       iApply (Release.wp_release_sconf γt a_tickslock "time"%string ticks_res L5
-                0%nat eb (proc_addr j) C (av - 8)%nat
+                0%nat eb (proc_addr j) C (av - 8)%nat ({[lock_rank "time"]} ∪ lks)
                 ltac:(rewrite HL5a0; apply sp_add_vec_0) ltac:(lia)
                 with "Hcg Htext Hpc Hlk2 Htok HR Hown Hpay").
       iIntros (CIDr Hsr mfr) "Hcg Hpc %Hrcs Hown".
+      (* the release/re-acquire window: nothing is held across sleep() *)
+      pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
+      assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
+      by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hown".
       assert (Hl60 : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x60))
         by (rewrite HL5ra; pcstep).
       iEval (rewrite Hl60) in "Hpc".
@@ -1428,7 +1454,7 @@ Section SpBodies.
       iDestruct (cpu_own_transport CIDs CIDn 0 eb (proc_addr j) C eb ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res L8 0%nat eb (proc_addr j) C
-                (av - 8)%nat eb Hn0 ltac:(lia) with "Hcg Hown Htext Hpc [] Hpanic").
+                (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc [] Hpanic").
       { iEval (rewrite HL8a0). iExact "Hlk2". }
       iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR Hown Hpay".
       assert (Hl6a : ret_pc (L8 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x6a))
@@ -1457,6 +1483,8 @@ Section SpBodies.
     pj = proc_addr j ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp_base m M sp0 -> sp_saved m M ->
+    (* acquire's freshness premise: this hart does not already hold "time" *)
+    locks_below lks (lock_rank "time") ->
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
@@ -1471,7 +1499,7 @@ Section SpBodies.
     sp_tail CID0 j m av eb C sp0 pj lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hav Heb Hj Hjl Hpjv Hanch Hb Hsv.
+    intros Hav Heb Hj Hjl Hpjv Hanch Hb Hsv Hfresh.
     iIntros "#Htext #Hlkt #Hpinv #Hpanic Hs1 Hs2 Hfree Hnc Hjoin7
               Hcg Hown Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
@@ -1532,8 +1560,8 @@ Section SpBodies.
     (* ===================== acquire(&tickslock) ===================== *)
     iDestruct (cpu_own_transport CID CIDq3 0 eb pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res Q2 0%nat eb pj C (av - 8)%nat true
-              Hn0 ltac:(lia) with "Hcg Hown Htext Hpc [] Hpanic").
+    iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res Q2 0%nat eb pj C (av - 8)%nat true lks
+              Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
     iIntros (CIDa Hsa msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR Hown Hpay".
     assert (Hq26 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x26))
@@ -1583,7 +1611,7 @@ Section SpBodies.
       iEval (rewrite Htg70) in "Hpc".
       iDestruct ("Hjoin7" with "Hnc") as "Hx7".
       iApply (sp_exit0_body (CID := CIDa) CID0 γt j m Qe av eb C sp0 pj lks
-                Hav Heb ltac:(wp_next_chain) HbQe HsQe
+                Hav Heb ltac:(wp_next_chain) HbQe HsQe Hfresh
                 with "Htext Hlkt Hs1 Hs2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpc Htail").
     - (* n <> 0: spill s1/s2/s3 and enter the wait loop *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.sys_pause + 0x2a)) (mword_of_int 43 : mword 8)
@@ -1756,7 +1784,7 @@ Section SpBodies.
         iIntros (CIDx Hsx N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpc Htl".
         destruct Hg as (Hbn & Hln).
         iApply (sp_exitk_body (CID := CIDx) CID0 γt j m N av eb C sp0 pj (sign_extend' 64 (t0 : mword 32)) lks
-                  Hav Heb Hsx Hbn Hln
+                  Hav Heb Hsx Hbn Hln Hfresh
                   with "Htext Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpc Htl"). }
 
       (* ==================== the WAIT LOOP (iLöb) ==================== *)
@@ -1767,7 +1795,7 @@ Section SpBodies.
         destruct Hg as (Hbn & Hln).
         iApply (sp_loop_body (CID := CIDy) CID0 γs γt γl j m N av eb C sp0 pj
                   (sign_extend' 64 (t0 : mword 32)) nv lks
-                  Hav Heb Hj Hjl Hpjv Hsy Hbn Hln
+                  Hav Heb Hj Hjl Hpjv Hsy Hbn Hln Hfresh
                   with "Htext Hlkt Hpinv Hpanic IH Hex0 Hexk Htl
                         Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc"). }
 
@@ -1777,7 +1805,7 @@ Section SpBodies.
         iIntros (CIDz Hsz N) "%Hg Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpc Htl".
         destruct Hg as (Hbn & Hsn).
         iApply (sp_exit0_body (CID := CIDz) CID0 γt j m N av eb C sp0 pj lks
-                  Hav Heb Hsz Hbn Hsn
+                  Hav Heb Hsz Hbn Hsn Hfresh
                   with "Htext Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpc Htl"). }
 
       (* enter the loop *)
@@ -1802,7 +1830,7 @@ Section ProofSysPause.
     : wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_pause_sconf_body].
-    intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb.
+    intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb Hfresh.
     subst i.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext #Hdata Hpc Htf Hpage #Hlkt #Hpinv #Hpanic Hcont".
@@ -2026,7 +2054,7 @@ Section ProofSysPause.
       iIntros (CIDq Hsq M nv) "%Hf Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpc Htl".
       destruct Hf as (Hbb & Hss).
       iApply (sp_acq_body (CID := CIDq) CID γs γt γl j m M nv av eb C sp0 pj lks
-                Hav Heb Hj Hjl Hpjv Hsq Hbb Hss
+                Hav Heb Hj Hjl Hpjv Hsq Hbb Hss Hfresh
                 with "Htext Hlkt Hpinv Hpanic Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpc Htl"). }
 
     (* ====================== the [n < 0] dispatch ====================== *)

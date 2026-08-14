@@ -52,6 +52,7 @@ Definition wp_bunpin_sconf_body
   (* a0 is the buffer being unpinned *)
   (k < NBUF)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

@@ -79,6 +79,9 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for myproc's / acquire's / release's *)
   (14 <= av)%nat ->
+  (* the caller's held set must bound below "proc"'s rank (LockRank.v);
+     [locks_below_not_elem] gives the non-membership the ghost step needs. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b pj -∗
   cpu_own n eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗

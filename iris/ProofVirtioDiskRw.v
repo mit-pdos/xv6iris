@@ -124,6 +124,10 @@ Section ProofVirtioDiskRw.
     let bp  : Arch.pa := m !!! Regidx Ra0 in
     let wr  : mword 64 := m !!! Regidx Ra1 in
     (K_virtio_disk_rw <= K)%nat ->
+    (* acquire's order premise: every lock this hart already holds ranks
+       below "virtio_disk"'s -- see the postcondition below for why this
+       phase's OWN [lks] is not enough, it must also reach P6's release. *)
+    locks_below lks (lock_rank "virtio_disk") ->
     sie_cap_gpr m K eb pj -∗
     cpu_own 0 eb pj C eb lks -∗
     (* NOT USED HERE: [wp_vdrw_p1] is pure prologue-plus-acquire, so the
@@ -140,16 +144,17 @@ Section ProofVirtioDiskRw.
       ∀ M : regfile,
         ⌜vdrw_regs M sp0 bp wr (vdrw_sector_raw bno) /\ vdrw_hi M m⌝ -∗
         sie_cap_gpr M (trap_res eb + (K - 12))%nat false pj -∗
-        (* UNSURE: wp_vdrw_p1 acquires "virtio_disk" (rank 9, LockRank.v) via
-           Acquire.wp_acquire_sconf and does not release it before this
-           postcondition ("Lands at +0x036 holding the lock", above) -- the
-           held-lock set here plausibly wants to be
-           [{[lock_rank "virtio_disk"]} ∪ lks] rather than [lks] unchanged.
-           Threaded UNCHANGED because SpecAcquire.v (ACQUIRE module, out of
-           this sweep's file list) has not itself gained the [gset nat]
-           argument yet, so its exact shape cannot be confirmed here; flagged
-           for review. *)
-        cpu_own 1 eb pj C false lks -∗
+        (* RESOLVED (was UNSURE): wp_vdrw_p1 acquires "virtio_disk" (rank 9,
+           LockRank.v) via Acquire.wp_acquire_sconf and does not release it
+           before this postcondition ("Lands at +0x036 holding the lock",
+           above) -- SpecAcquire.v now confirms the held-lock set here is
+           [{[lock_rank "virtio_disk"]} ∪ lks], NOT [lks] unchanged.  This is
+           a LOCK-RETURNING phase, not a balanced one.  NOTE FOR THE NEXT
+           READER: P2..P6 (ProofVirtioDiskRwB/C/D/E/F.v, none in this sweep's
+           file list) continue this phase chain and almost certainly still
+           thread the OLD bare [lks] through their own "holding the lock"
+           cpu_own occurrences -- they need the matching fix, unverified here. *)
+        cpu_own 1 eb pj C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
         arm_pay 0 eb pj -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -162,7 +167,7 @@ Section ProofVirtioDiskRw.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 bp wr HK.
+    intros sp0 bp wr HK Hfresh.
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hlk Hbno Hcont".
     (* ---- the instruction facts ---- *)
     (* ---- +0x000  c.addi16sp sp,-96 : push the 12-slot frame ---- *)
@@ -555,14 +560,9 @@ Section ProofVirtioDiskRw.
       by (rewrite /R11; apply upd_eq).
     iDestruct (cpu_own_transport CID CIDp21 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    (* UNSURE: Acquire.wp_acquire_sconf (SpecAcquire.v, ACQUIRE module) is
-       outside this sweep's file list and, as read, still takes the
-       pre-sweep 5-argument [cpu_own]; not passing [lks] here since its
-       future signature/position is unknown from this file alone. Flagged
-       for review alongside the postcondition above. *)
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
-              (disk_res γd pd pav pu) R11 0%nat eb pj C (K - 12)%nat eb
-              _ vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
+              (disk_res γd pd pav pu) R11 0%nat eb pj C (K - 12)%nat eb lks
+              vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hfresh
               with "Hcg Hown Htext Hpc [] Hpanic").
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".

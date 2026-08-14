@@ -401,6 +401,10 @@ Section ProofFreewalk.
     mj !!! Regidx csp_rs1 = spr ->
     mj !!! Regidx Rs3 = page_base bpt ->
     fw_thr mm mj ->
+    (* THE FRESHNESS PREMISE: this epilogue acquires and releases
+       [kmem.lock] internally (balanced -- [lks] is unchanged), so the
+       caller must already hold only locks BELOW "kmem"'s rank. *)
+    locks_below lks (lock_rank "kmem") ->
     sie_cap_gpr mj (K - 6) b p -∗
     cpu_own ilvl eb p C b lks -∗
     kernel_text -∗
@@ -422,7 +426,7 @@ Section ProofFreewalk.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros spr HK Hilvl Hmmsp Hjsp Hjs3 Hjthr.
+    intros spr HK Hilvl Hmmsp Hjsp Hjs3 Hjthr Hfresh.
     iIntros "Hcg Hcnt #Htext Hpc Hpre #Henv Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hcont".
     iDestruct "Hk6" as (u6) "Hk6".
     iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
@@ -483,8 +487,9 @@ Section ProofFreewalk.
     iDestruct (cpu_own_transport CID0 CIDe2 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
-              (mword_of_int (KernelSyms.kmem + 24)) E1 None ilvl eb p C (K - 6)%nat b
+              (mword_of_int (KernelSyms.kmem + 24)) E1 None ilvl eb p C (K - 6)%nat b lks
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl
+              Hfresh
               with "Hcg Hcnt Htext Hpc Hlock [Hpre] Havail Hpanic").
     { rewrite HE1a0. iExact "Hpre". }
     iIntros (CIDkf Hskf mk) "Hcg Hcnt Hpc %Hkcs _".
@@ -978,7 +983,7 @@ Section ProofFreewalk.
        note at this lemma's top-level entry point below. *)
     iDestruct (cpu_own_transport CID CIDb9 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (REC l Hlt CIDb9 γa B6 c (K - 6)%nat eb p C ilvl b HKrec Hilvl HB6a0 Hfok
+    iApply (REC l Hlt CIDb9 γa B6 c (K - 6)%nat eb p C ilvl b _ HKrec Hilvl HB6a0 Hfok
               with "Hcg Hcnt Htext Hpc Hch Henv").
     iIntros (CIDrec Hsrec mr) "Hcg Hcnt Hpc %Hrcs".
     iEval (rewrite Hret42) in "Hpc".
@@ -1255,7 +1260,7 @@ Section ProofFreewalk.
        lemmas and DO now take [lks] (freewalk itself acquires no lock), so ∅
        is threaded as the placeholder witness until SpecFreewalk.v's contract
        is swept and an incoming set is actually available here. *)
-    iDestruct (cpu_own_transport CID0 CID12 ilvl eb p C b ∅ ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID12 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (fw_loop (CID:=CID12) lvl REC γa mm t K eb p C spr ilvl b ∅ HK Hilvl (fw_ok_of lvl t Hfree)
               512%nat 0%Z R6 ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
@@ -1265,6 +1270,7 @@ Section ProofFreewalk.
     iIntros (CIDj Hsj mj) "(%Hjsp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hdone".
     iApply (fw_epilogue (CID0:=CIDj) ilvl γa mm mj K sp0 (pt_base t) eb p C b ∅
               ltac:(lia) Hilvl Hspm Hjsp Hjs3 Hjthr
+              (locks_below_empty (lock_rank "kmem"))
               with "Hcg Hcnt Htext Hpc [Hdone] Henv Hk1 Hk2 Hk3 Hk4 Hk5 [Hk6]").
     { iApply (pt_slots_kfree_pre (pt_base t) Hpv with "Hkmapb Hdone"). }
     { iExists u6. iExact "Hk6". }

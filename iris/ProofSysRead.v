@@ -916,7 +916,7 @@ Section ProofSysRead.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Fileread.wp_fileread_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb C (sys_rw_count v2) b
-                ltac:(unfold fileread_stack, K_readi; lia) Hkk Hj Hgs Hlens
+                _ ltac:(unfold fileread_stack, K_readi; lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 Hn0 Hnmax Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
       iIntros (CID25 Hs25 mf rv P')
@@ -962,7 +962,7 @@ Section ProofSysRead.
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
       iIntros (CID26 Hs26 mg) "[%Hcsg %Hmga0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj C b lks
+      iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv Hdev").

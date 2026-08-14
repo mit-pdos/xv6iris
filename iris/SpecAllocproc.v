@@ -224,6 +224,13 @@ Definition wp_allocproc_sconf_body
      push_off sees [S lvl] and needs one more slot of headroom than usual *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (exists nb, on = Some nb /\ (K_allocproc < nb)%nat) ->
+  (* allocproc's own acquire needs every lock this hart already holds to
+     rank below "proc" (11) -- the ONLY lock allocproc itself acquires.
+     The nested calls it makes while p->lock is held (allocpid's "nextpid"
+     (12), kalloc's "kmem" (13)) both rank ABOVE "proc", so
+     [locks_below_mono] plus [locks_below_union_singleton] derive their
+     order premises from this single bound; see ProofAllocproc.v. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
@@ -254,6 +261,9 @@ Definition wp_allocproc_core_body
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (48 <= K)%nat ->
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  (* same order premise as the counted contract above -- "proc" is the
+     lowest (only) rank this function itself acquires. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

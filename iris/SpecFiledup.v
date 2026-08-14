@@ -83,6 +83,7 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* a0 is the file being duplicated *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

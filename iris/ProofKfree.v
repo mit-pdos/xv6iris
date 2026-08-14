@@ -55,7 +55,7 @@ Section ProofKfree.
     : wp_kfree_sconf_body γl γk lk fl m on n eb pcur C K b lks.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
-    intros pcE p ret_tgt HK Hlk Hfl Hnoffpos.
+    intros pcE p ret_tgt HK Hlk Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbmatch. symmetry in Hbmatch.
@@ -508,9 +508,10 @@ Section ProofKfree.
     iDestruct (cpu_own_transport CID CID25 n eb pcur C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) Kacq
-              n eb pcur C (K - 4)%nat b
-              _ Hnoffpos
+              n eb pcur C (K - 4)%nat b lks
+              Hnoffpos
               ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [Hkmem] Hpanic").
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -628,7 +629,7 @@ Section ProofKfree.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
     iApply (Release.wp_release_sconf γl lk "kmem"%string (kmem_res γk fl) Rrel
-              n eb pcur C (K - 4)%nat
+              n eb pcur C (K - 4)%nat ({[lock_rank "kmem"]} ∪ lks)
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hkmem] Htok HRres Hcnt Hpay").
@@ -638,6 +639,9 @@ Section ProofKfree.
        it hands back is at [wp_next b], matching kfree's own top-level index. *)
     rewrite -Hbmatch.
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hrelpins Hcnt".
+    pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+    iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
+           [| apply locks_add_del; assumption]) in "Hcnt".
     assert (Hpc54 : ret_pc (Rrel !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kfree + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".

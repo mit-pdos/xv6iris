@@ -31,6 +31,10 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (14 <= K)%nat ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* THE FRESHNESS PREMISE: kalloc acquires and releases [kmem.lock]
+     internally (balanced -- [lks] is unchanged across the whole call), so
+     the caller must already hold only locks BELOW "kmem"'s rank. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

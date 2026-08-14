@@ -116,7 +116,7 @@ Section ProofBunpin.
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -158,7 +158,8 @@ Section ProofBunpin.
     : wp_bunpin_sconf_body bn V k q dev bno m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_bunpin_sconf_body].
-    intros pcE ret_tgt HK HnZ Hk Ha0.
+    intros pcE ret_tgt HK HnZ Hk Ha0 Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hctx #Hpanic Href Hcont".
     iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
@@ -318,8 +319,8 @@ Section ProofBunpin.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) mA
-              n eb p C (K - 4)%nat b
-              HnZ ltac:(lia)
+              n eb p C (K - 4)%nat b lks
+              HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -551,11 +552,17 @@ Section ProofBunpin.
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
               n eb p C (K - 4)%nat
+              ({[lock_rank "bcache"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    (* bunpin is BALANCED: the set release hands back collapses to the entry
+       [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
+    assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.

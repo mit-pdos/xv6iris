@@ -1200,7 +1200,7 @@ Section ProofProcPagetable.
         iDestruct (cpu_own_transport CIDb9 CIDc3 lvl eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (UF.wp_uvmfree_sconf γa W6 b0 ∅ (K - 4)%nat eb p C lvl b
-                  Hc36 Hlvl HW6a0
+                  _ Hc36 Hlvl HW6a0
                   ltac:(rewrite HW6a1; unfold uvm_maxsz;
                         rewrite uint_unsigned; apply (proj1 (Z.leb_le _ _)); vm_compute; reflexivity)
                   ltac:(rewrite dom_empty_L; apply empty_subseteq)

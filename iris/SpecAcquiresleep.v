@@ -55,6 +55,12 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
                    in
   (j < NPROC)%nat ->
   (26 <= av)%nat ->
+  (* acquiresleep's own acquire(&slk->lk) needs every lock this hart
+     already holds to rank below "sleep lock".  The RAW spinlock is
+     released again before this function returns (the sleeplock's
+     higher-level "locked" state is a separate ghost token, [sleeplocked],
+     untouched by [lks]), so [lks] itself is unchanged end to end. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av b pj -∗
   cpu_own 0 eb pj C b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
@@ -155,6 +161,14 @@ Definition wp_acquiresleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   (* the interior acquire pushes to [S (S n)] and sleep's own acquire to
      [S (S (S n))], transiently +1 *)
   (Z.of_nat n + 4 < 2 ^ 31)%Z ->
+  (* same order fact as the non-nested route, for the same "sleep lock"
+     acquire; [lks] here is whatever the caller (e.g. iput, holding
+     "itable") already has, and "sleep lock" (6) outranks "itable" (2), so
+     [locks_below lks (lock_rank "itable")] (iput's own premise) is not
+     enough by itself -- the caller must give the bound AT "sleep lock",
+     i.e. [locks_below lks (lock_rank "sleep lock")], which subsumes it via
+     [locks_below_mono]. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av false pj -∗
   (* NESTED: a spinlock IS held on entry, and is still held on exit *)
   cpu_own (S n) eb pj C false lks -∗

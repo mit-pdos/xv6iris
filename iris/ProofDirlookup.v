@@ -1928,7 +1928,7 @@ Section ProofDirlookupMain.
                       < 16 * Z.of_nat nib).
             { rewrite (dlk_zext32_unsigned (dir_inum data i)).
               exact (Hinums i Hilt Hlive). }
-            iDestruct (cpu_own_transport CIDrd CIDB17 0%nat eb pj C b lks
+            iDestruct (cpu_own_transport CIDrd CIDB17 0%nat eb pj C b 
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
@@ -1973,7 +1973,7 @@ Section ProofDirlookupMain.
                             Hde").
             { exact (dlk_tregs_of_regs m sp0 ip nb pf (16 * i) mig Higregs). }
             iIntros (CIDf Hsf mf) "%Hcsf %Ha0f Hcg Hpc".
-            iDestruct (cpu_own_transport CIDig CIDf 0%nat eb pj C b lks
+            iDestruct (cpu_own_transport CIDig CIDf 0%nat eb pj C b 
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
             iApply ("Hqc" $! mf true i kslot q with
@@ -2002,7 +2002,7 @@ Section ProofDirlookupMain.
             { iEval (rewrite (dlk_de_view data i (pa_stk sp0 12)
                                 (dlk_align_8_2 _ Hal12))).
               iSplitL "Hdehi"; [iExact "Hdehi" | iExact "Hdenm"]. }
-            iDestruct (cpu_own_transport CIDrd CIDB13 0%nat eb pj C b lks
+            iDestruct (cpu_own_transport CIDrd CIDB13 0%nat eb pj C b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             iSpecialize ("Hlatch" $! CIDB13 with "[%]"); [wp_next_chain |].
             iApply ("Hlatch" $! mnc (fun jj => file_byte data (16 * i + jj)%nat)
@@ -2022,7 +2022,7 @@ Section ProofDirlookupMain.
                 with "Hcg Hpc Hi36").
       iNext. iIntros (CID24 Hq24) "Hcg Hpc".
       iEval (rewrite Htgt5c) in "Hpc".
-      iDestruct (cpu_own_transport CID CID24 0%nat eb pj C b lks
+      iDestruct (cpu_own_transport CID CID24 0%nat eb pj C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hloop" $! (S nrec) CID24 with "[%]"); [wp_next_chain |].
       iApply ("Hloop" $! 0%nat R13 dolds0 u10 with

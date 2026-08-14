@@ -95,9 +95,9 @@ Section ProofSysWait.
 
   Lemma wp_sys_wait_sconf
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset nat)
       (pid : mword 32) (V : pprivate) (v0 : mword 64)
-    : wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b pid V_  v0.
+    : wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b lks pid V v0.
   Proof.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
@@ -241,7 +241,7 @@ Section ProofSysWait.
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf A4 (av - 4)%nat 0%nat eb pj C 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 w3 (DfracOwn (1/4)) b
-              sw_arg0 HA4a0 Hv0 sw_ilvl0 (sw_Kaa av Hav)
+              _ sw_arg0 HA4a0 Hv0 sw_ilvl0 (sw_Kaa av Hav)
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
     iEval (rewrite HA4a1) in "Hb3".
@@ -288,7 +288,7 @@ Section ProofSysWait.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kwait(p) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb C b pid V
+    iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb C b pid V lks
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk Henv Hpriv").
     iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpriv".

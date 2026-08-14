@@ -625,6 +625,7 @@ Definition wp_fileclose_sconf_body
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* a0 is the file being closed *)
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where

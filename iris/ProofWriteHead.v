@@ -1259,7 +1259,7 @@ Section WriteHeadBlocks.
                       = mword_of_int (KernelSyms.write_head + 0x46))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp46) in "Hpc".
-      iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CID5 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
@@ -1295,7 +1295,7 @@ Section WriteHeadBlocks.
       iEval (rewrite Htgt3a) in "Hpc".
       assert (Hi' : (S i < n)%nat) by (clear -Hi Hmore; lia).
       assert (Hf' : (n - S i <= fuel)%nat) by (clear -Hi Hfuel Hmore; lia).
-      iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CID0 CID5 0 eb (proc_addr j) C b 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CID5 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".

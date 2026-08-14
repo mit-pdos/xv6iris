@@ -179,6 +179,13 @@ Definition wp_kexit_sconf_body
      PREMISE ANY MORE: [ProcInv.cwd_ref] has no null arm, so
      [proc_priv_cwd_nonzero] projects it straight out of the block this
      contract already takes. *)
+  (* THE FRESHNESS PREMISE, AT THE LOWEST RANK kexit (OR ANY CALLEE)
+     TOUCHES: "ftable" (1), via the fileclose loop's [SpecFileclose.v]
+     premise; "itable" (2, [iput(p->cwd)] directly), "log" (3, [end_op]),
+     "wait_lock" (10) and "proc" (11, nested while holding "wait_lock") are
+     all higher and follow by [LockRank.locks_below_mono] /
+     [locks_below_union_singleton] at each call site. *)
+  locks_below lks (lock_rank "ftable") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗

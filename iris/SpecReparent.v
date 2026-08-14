@@ -77,6 +77,15 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
   length γs = NPROC ->
   (* wakeup's myproc/acquire push_off keeps the transient noff increment in range *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* WAKEUP'S ORDER PREMISE, INHERITED.  reparent acquires nothing itself, but
+     it calls wakeup() once per reparented child and wakeup acquires each
+     pp->lock, so the bound is exactly [SpecWakeup]'s and reparent is a pure
+     conduit for it.  Satisfiable at reparent's only call site: kexit enters
+     holding wait_lock (rank 10) and "proc" is rank 11, so the caller's set is
+     [{[lock_rank "wait_lock"]}] and 10 < 11.  reparent is BALANCED -- it takes
+     no lock of its own and wakeup's own contract is balanced -- so [lks] is
+     unchanged end to end and this premise is not re-established anywhere. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

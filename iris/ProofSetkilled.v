@@ -69,7 +69,7 @@ Section ProofSetkilled.
     : wp_setkilled_sconf_body γs j γl m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_setkilled_sconf_body].
-    intros pcE ret_tgt Ha0 Hj Hgl Hn Hav.
+    intros pcE ret_tgt Ha0 Hj Hgl Hn Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
@@ -185,8 +185,8 @@ Section ProofSetkilled.
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b
-              _ Hn ltac:(lia)
+              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b lks
+              Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
@@ -276,9 +276,19 @@ Section ProofSetkilled.
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C3 n eb p C (av - 4)%nat
+              ({[lock_rank "proc"%string]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    (* BALANCED: acquire handed the set out as [{[rank "proc"]} ∪ lks] and
+       release takes that same rank back out.  [Hno] is the ORDER premise;
+       [locks_below_not_elem] turns it into the non-membership the set
+       algebra actually needs, and then the round trip is the identity --
+       which is what the postcondition's [cpu_own n eb p C b lks] wants. *)
+    pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
+    assert (Heqlks : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Heqlks) in "Hcpu".
     rewrite Hbeq in Hsrel.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcpu".
     assert (Hp1a : ret_pc (C3 !!! Regidx sk_ra) = mword_of_int (KernelSyms.setkilled + 0x1a))

@@ -52,6 +52,10 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
+  (* THE FRESHNESS PREMISE: freerange's loop acquires and releases
+     [kmem.lock] once per page (balanced -- [lks] is unchanged), so the
+     caller must already hold only locks BELOW "kmem"'s rank. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m K b pcur -∗
   cpu_own ncnt eb pcur C b lks -∗
   kernel_text -∗ pc_is pcE -∗

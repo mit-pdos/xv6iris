@@ -111,7 +111,7 @@ Section ProofIdup.
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -130,7 +130,7 @@ Section ProofIdup.
                          m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
-    intros pcE ret_tgt HK HnZ Hk Ha0.
+    intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
     unfold K_idup in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hpanic Hislot Href Hcont".
@@ -289,8 +289,9 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p C (K - 4)%nat b
+              n eb p C (K - 4)%nat b lks
               HnZ ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -528,13 +529,19 @@ Section ProofIdup.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) D5
-              n eb p C (K - 4)%nat
+              n eb p C (K - 4)%nat ({[lock_rank "itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
+    (* release handed back the FULL entry set minus the rank it just gave up;
+       [Hfresh]'s bound gives the non-membership that collapses it back to
+       the untouched [lks]. *)
+    pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+    iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+           [| apply locks_add_del; assumption]) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.
     assert (Hpc2a : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.idup + 0x2a)).

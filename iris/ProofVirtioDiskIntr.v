@@ -372,6 +372,9 @@ Section VtPrologue.
       (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     (22 <= av)%nat ->
+    (* acquire's order premise -- see [wp_virtio_disk_intr_sconf] where it
+       originates *)
+    locks_below lks (lock_rank "virtio_disk") ->
     sie_cap_gpr m av b pme -∗
     cpu_own n eb pme C b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
@@ -389,7 +392,7 @@ Section VtPrologue.
         sie_cap_gpr MA (trap_res b + (av - 4))%nat false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x1e) : mword 64) -∗
         locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-        cpu_own (S n) eb pme C false lks -∗ arm_pay n eb pme -∗
+        cpu_own (S n) eb pme C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
         (* the frame: ra/s0/s1's entry values and the unused fourth slot *)
         pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
         pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
@@ -398,7 +401,7 @@ Section VtPrologue.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hav.
+    intros Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hlk Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
@@ -572,7 +575,7 @@ Section VtPrologue.
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s1. }
     iDestruct (cpu_own_transport CID CID10 n eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string (disk_res γd pd pav pu) A6
-              n eb pme C (av - 4)%nat b ltac:(exact _ Hn) ltac:(lia)
+              n eb pme C (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
     { iEval (rewrite HA6a0). iExact "Hlk". }
     iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -648,11 +651,14 @@ Section VtEpilogue.
     (* release's own exit index; the caller derives it from its entry
        resources ([CpuOwn.cpu_own] / [sie_arm] ghost agreement). *)
     (match n with O => eb | S _ => false end) = b ->
+    (* matches [wp_vt_prologue]'s order premise: needed to fold release's
+       output set back down to [lks] *)
+    locks_below lks (lock_rank "virtio_disk") ->
     sie_cap_gpr MB (trap_res b + (av - 4))%nat false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-    cpu_own (S n) eb pme C false lks -∗ arm_pay n eb pme -∗
+    cpu_own (S n) eb pme C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗
@@ -666,7 +672,7 @@ Section VtEpilogue.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hsp0 HMBcsp HMBthr Hav Hbeq.
+    intros Hsp0 HMBcsp HMBthr Hav Hbeq Hfresh.
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg #Htext Hpc #Hlk Htok HR Hcnt Hpay Hr24 Hr16 Hr8 Hgap Hcont".
     iDestruct "Hgap" as (vgap) "Hgap".
@@ -743,7 +749,7 @@ Section VtEpilogue.
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
-              n eb pme C (av - 4)%nat
+              n eb pme C (av - 4)%nat ({[lock_rank "virtio_disk"]} ∪ lks)
               ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
     { iExact "Hlk". }
@@ -752,6 +758,12 @@ Section VtEpilogue.
     iIntros (CID1 Hs1 MR) "Hcg Hpc %HcsR Hcnt".
     rewrite Hbeq in Hs1.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcnt".
+    (* virtio_disk_intr is BALANCED: what it acquired it released, so the set
+       release hands back collapses to the entry [lks]. *)
+    pose proof (locks_below_not_elem lks (lock_rank "virtio_disk") Hfresh) as Hnotin.
+    assert (Hsetback : ({[lock_rank "virtio_disk"]} ∪ lks) ∖ {[lock_rank "virtio_disk"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc96 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x96))
       by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc96) in "Hpc".
@@ -2640,7 +2652,7 @@ Section VtLoopDefs.
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
        sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
-       cpu_own (S lvl) eb pme C false lks -∗
+       cpu_own (S lvl) eb pme C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
        disk_res γd pd pav pu -∗
        WP (Loop : expr riscv_lang))%I.
 
@@ -2651,7 +2663,7 @@ Section VtLoopDefs.
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
        sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
-       cpu_own (S lvl) eb pme C false lks -∗
+       cpu_own (S lvl) eb pme C false ({[lock_rank "virtio_disk"]} ∪ lks) -∗
        vt_loop_state γd pd pav pu -∗
        vt_exit γd pd pav pu m av lvl eb pme C sp0 lks -∗
        WP (Loop : expr riscv_lang))%I.
@@ -2787,7 +2799,7 @@ Section VtLoopProof.
     assert (HwK : (18 <= trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat) by lia.
     assert (Hwlvl : (Z.of_nat (S lvl) + 1 < 2 ^ 31)%Z) by lia.
     iApply (Wakeup.wp_wakeup_sconf W γs pme (S lvl)
-              (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb C false HwK HWdom Hlen Hwlvl
+              (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb C false _ HwK HWdom Hlen Hwlvl
               with "Hcg Hown Htext Hpc Hpanic Hpi").
     iApply wp_next_off_intro.
     iIntros (MW) "[%HcsW %HdomW] Hcg Hown #Htext2 Hpc".
@@ -2993,14 +3005,14 @@ Section ProofVirtioDiskIntr.
     : wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme C b lks.
   Proof.
     cbv beta delta [wp_virtio_disk_intr_sconf_body].
-    intros pcE ret_tgt HK Hdom Hlen Hlvl.
+    intros pcE ret_tgt HK Hdom Hlen Hlvl Hfresh.
     assert (HKav : (22 <= K)%nat) by (unfold K_virtio_disk_intr in HK; exact HK).
     pose proof (vt_lvl_weaken lvl Hlvl) as Hlvl1.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpi #Hdinv #Hgeom #Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq.
     (* ===================== PROLOGUE + acquire ===================== *)
     iApply (Pro.wp_vt_prologue γk γd pd pav pu m K lvl eb pme C b lks
-              Hlvl1 HKav
+              Hlvl1 HKav Hfresh
               with "Hcg Hown Htext Hpc Hpanic Hlk").
     iIntros (CIDa Hsa MA sp0) "%Hpro Hcg Hpc Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap".
     destruct Hpro as (Hsp0 & HMAcsp & HMAs1 & HMAthr).
@@ -3016,7 +3028,7 @@ Section ProofVirtioDiskIntr.
          index with [outb]; [Hbeq] folds it back to [b] for the epilogue. *)
       iEval (rewrite Hbeq) in "Hcg".
       iApply (Epi.wp_vt_epilogue (CID:=CIDa) γk γd pd pav pu m MB K lvl eb pme C sp0 b lks
-                Hsp0 HBcsp HBthr HKav Hbeq
+                Hsp0 HBcsp HBthr HKav Hbeq Hfresh
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap").
       iIntros (CIDz Hsz MF HcsF) "Hcg Hown Hpc".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain|].

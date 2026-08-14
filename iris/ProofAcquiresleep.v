@@ -222,7 +222,12 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own 1 eb (proc_addr j) C false lks -∗
+      (* HELD: the sleeplock's inner "sleep lock"-rank spinlock is taken
+         while inside this stretch (it is released by the [+0x44 jal
+         release] this covers) -- [lks] itself is the OUTER set, matching
+         what this stretch's own continuation ([Hcont], threaded straight
+         through from the caller) hands back once that release fires. *)
+      cpu_own 1 eb (proc_addr j) C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
@@ -244,7 +249,9 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      cpu_own 1 eb (proc_addr j) C false lks -∗
+      (* same convention as [asl_exit]: [lks] is the OUTER set, this loop
+         iteration is entered still HOLDING "sleep lock". *)
+      cpu_own 1 eb (proc_addr j) C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
       trap_csrs -∗
       cpu_claim (proc_addr j) -∗
       sie_cap_gpr M (trap_res eb + (av - 4))%nat false (proc_addr j) -∗
@@ -344,6 +351,10 @@ Section AslBodies.
     add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd ->
     sp0 = m !!! Regidx csp_rs1 ->
     asl_regs m M slk spd ->
+    (* [lks] is the OUTER set (see [asl_exit]'s header note); this is what
+       lets the [Hcont]-shaped continuation below be handed the CALLER's own
+       [Hcont] unmodified. *)
+    locks_below lks (lock_rank "sleep lock") ->
     kernel_text -∗
     is_sleeplock γl γsl slk s R -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -354,7 +365,7 @@ Section AslBodies.
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false lks -∗
+    cpu_own 1 eb pj C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
@@ -374,7 +385,8 @@ Section AslBodies.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hav Hanch Hspd Hsp0 Hasl.
+    intros pj Hav Hanch Hspd Hsp0 Hasl Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HR Hw Hpid Hown Htc Hclm Hcg Hpc Hcont".
     (* the four saved-slot addresses, in the [c.ldsp] leaf's spelling *)
@@ -524,10 +536,16 @@ Section AslBodies.
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) E5
               0%nat eb pj C (av - 4)%nat
+              ({[lock_rank "sleep lock"]} ∪ lks)
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
     { iApply (is_sleeplock_lock with "Hslk"). }
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hrelcs Hown".
+    (* asl_exit_body's own [lks] is OUTER: the set release hands back
+       collapses to it, matching [Hcont]'s expectation unmodified. *)
+    assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hown".
     assert (Hpc48 : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x48)) by (rewrite HE5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc48) in "Hpc".
@@ -700,7 +718,10 @@ Section AslBodies.
     locked γl cpu_id -∗
     sl_res γsl slk R -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false lks -∗
+    (* OUTER convention, matching [asl_loop]/[asl_exit]: still holding
+       "sleep lock" here (the reload+branch at +0x32..+0x34 happens before
+       either arm touches the lock). *)
+    cpu_own 1 eb pj C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
@@ -787,6 +808,9 @@ Section AslBodies.
     γs !! j = Some γpl ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     asl_regs m M slk spd ->
+    (* OUTER convention, matching [asl_loop]/[asl_exit]/[asl_post_sleep_body];
+       needed for the interior release .. re-acquire round trip below. *)
+    locks_below lks (lock_rank "sleep lock") ->
     kernel_text -∗
     is_sleeplock γl γsl slk s R -∗
     panic_wp_any -∗
@@ -799,7 +823,7 @@ Section AslBodies.
     locked γl cpu_id -∗
     (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    cpu_own 1 eb pj C false lks -∗
+    cpu_own 1 eb pj C false ({[lock_rank "sleep lock"]} ∪ lks) -∗
     trap_csrs -∗
     cpu_claim pj -∗
     sie_cap_gpr M (trap_res eb + (av - 4))%nat false pj -∗
@@ -807,7 +831,8 @@ Section AslBodies.
     asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hav Hj Hjpl Hanch Hasl.
+    intros pj Hav Hj Hjpl Hanch Hasl Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     iIntros "#Htext #Hslk #Hpanic #Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Htc Hclm Hcg Hpc Hexit".
     assert (HaslM : asl_regs m M slk spd) by exact Hasl.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -910,10 +935,17 @@ Section AslBodies.
     iDestruct (arm_pay_ext_split eb _ with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L4
               0%nat eb pj C (av - 4)%nat
+              ({[lock_rank "sleep lock"]} ∪ lks)
               Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
     { iApply (is_sleeplock_lock with "Hslk"). }
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hrelcs Hown".
+    (* back to the OUTER set across the sleep_prepare/release/sleep/acquire
+       round trip -- [Hfresh] is what makes the singleton insert/delete
+       cancel. *)
+    assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hown".
     assert (Hpc28 : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x28)) by (rewrite HL4ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
@@ -994,9 +1026,10 @@ Section AslBodies.
                  with "Hown") as "Hown".
     (* ===== acquire(&slk->lk) again: back to level 1, index [false] ===== *)
     iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) L7
-              0%nat eb pj C (av - 4)%nat eb
+              0%nat eb pj C (av - 4)%nat eb lks
               ltac:(lia)
               ltac:(lia)
+              Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HL7a0). iApply (is_sleeplock_lock with "Hslk"). }
     iIntros (CIDq Hsq ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -1031,7 +1064,7 @@ Section ProofAcquiresleep.
     : wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b lks.
   Proof.
     cbv beta delta [wp_acquiresleep_sconf_body].
-    intros pcE slk pj ret_tgt Hj Hav.
+    intros pcE slk pj ret_tgt Hj Hav Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk #Hpanic Hpid #Hpinv Hcont".
@@ -1206,9 +1239,10 @@ Section ProofAcquiresleep.
     iDestruct (cpu_own_transport CID CID10 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) Maq
-              0%nat eb pj C (av - 4)%nat eb
+              0%nat eb pj C (av - 4)%nat eb lks
               ltac:(lia)
               ltac:(lia)
+              Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_lock with "Hslk"). }
     iIntros (CID11 Hs11 ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -1247,7 +1281,7 @@ Section ProofAcquiresleep.
     { rewrite /asl_exit.
       iIntros (CIDx Hsx M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hown Htc Hclm Hcg Hpc".
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R m M pidv av dq slk spd sp0 eb C lks
-                Hav Hsx Hspd Hsp0 HaslE
+                Hav Hsx Hspd Hsp0 HaslE Hbelow
                 with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hown Htc Hclm Hcg Hpc Hcont"). }
 
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ============ *)
@@ -1255,7 +1289,7 @@ Section ProofAcquiresleep.
     { iLöb as "IH". rewrite /asl_loop.
       iIntros (CIDy Hsy M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Htc Hclm Hcg Hpc Hexit".
       iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R m M pidv av dq slk spd sp0 eb C lks
-                Hav Hj Hjpl Hsy HaslL
+                Hav Hj Hjpl Hsy HaslL Hbelow
                 with "Htext Hslk Hpanic Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Htc Hclm Hcg Hpc Hexit"). }
 
     (* ============ entry dispatch at +0x18 (lw then c.beqz) ============ *)
@@ -1349,7 +1383,8 @@ Section ProofAcquiresleep.
     : wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n lks.
   Proof.
     cbv beta delta [wp_acquiresleep_nested_body].
-    intros pcE slk pj ret_tgt Hj Hav Hb31.
+    intros pcE slk pj ret_tgt Hj Hav Hb31 Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hown #Htext Hpc #Hslk #Hpanic Hpid #Hpinv Hcont".
@@ -1527,9 +1562,10 @@ Section ProofAcquiresleep.
       rewrite /R2 upd_ne; [| congruence]. rewrite /R1 upd_ne; [reflexivity | congruence]. }
     (* ===== acquire(&slk->lk): cpu_own 0 -> 1, returns locked + sl_res + pay ===== *)
     iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) Maq
-              (S n) eb pj C (av - 4)%nat false
+              (S n) eb pj C (av - 4)%nat false lks
               ltac:(lia)
               ltac:(lia)
+              Hbelow
               with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_lock with "Hslk"). }
     iApply wp_next_off_intro.
@@ -1727,11 +1763,17 @@ Section ProofAcquiresleep.
       { rewrite HE5a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
       iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) E5
                 (S n) eb pj C (av - 4)%nat
+                ({[lock_rank "sleep lock"]} ∪ lks)
                 Hrel_lka ltac:(lia)
                 with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
       { iApply (is_sleeplock_lock with "Hslk"). }
       iApply wp_next_off_intro.
       iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
+      (* FREE branch, straight out of entry acquire: back to the OUTER [lks]
+         Hcont expects. *)
+      assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
+      by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hown".
       assert (Hpc48 : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.acquiresleep + 0x48)) by (rewrite HE5ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc48) in "Hpc".
@@ -1983,11 +2025,17 @@ Section ProofAcquiresleep.
          moves and the [arm_pay] needs no conversion. *)
       iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L4
                 (S n) eb pj C (av - 4)%nat
+                ({[lock_rank "sleep lock"]} ∪ lks)
                 Hrel_lka ltac:(lia)
                 with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
       { iApply (is_sleeplock_lock with "Hslk"). }
       iApply wp_next_off_intro.
       iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
+      (* back to the OUTER [lks] across the sleep_prepare/release/sleep/
+         acquire round trip. *)
+      assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
+      by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hown".
       assert (Hpc28 : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.acquiresleep + 0x28)) by (rewrite HL4ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc28) in "Hpc".
@@ -2056,9 +2104,10 @@ Section ProofAcquiresleep.
         apply callee_saved_refl. }
       assert (HaslL7 : asl_regs m L7 slk spd) by (apply (asl_regs_cs m mfs L7 slk spd HcsL7 HaslMfs)).
       iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) L7
-                (S n) eb pj C (av - 4)%nat false
+                (S n) eb pj C (av - 4)%nat false lks
                 ltac:(lia)
                 ltac:(lia)
+                Hbelow
                 with "Hcg Hown Htext Hpc [] Hpanic").
       { iEval (rewrite HL7a0). iApply (is_sleeplock_lock with "Hslk"). }
       iApply wp_next_off_intro.

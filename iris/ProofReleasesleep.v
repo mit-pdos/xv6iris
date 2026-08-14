@@ -77,7 +77,7 @@ Section ProofReleasesleep.
     : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
-    intros pcE slk ret_tgt Hav.
+    intros pcE slk ret_tgt Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
@@ -235,9 +235,10 @@ Section ProofReleasesleep.
     iDestruct (cpu_own_transport CID CID10 0%nat b pme C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) Kacq
-              0%nat b pme C (av - 4)%nat b
+              0%nat b pme C (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
+              Hno
               with "Hcg Hown Htext Hpc [] Hpanic").
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
     iIntros (CIDacq Hsacq ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hown Hpay".
@@ -304,7 +305,10 @@ Section ProofReleasesleep.
     assert (HCwkra : Cwk !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.releasesleep + 0x22) : mword 64) 4)
       by (rewrite /Cwk; apply upd_eq).
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
+    (* wakeup runs INSIDE the sleeplock's inner critical section, so the set
+       it threads (unchanged -- wakeup is balanced) is the acquired one. *)
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs pme 1%nat (trap_res b + (av - 4))%nat b C false
+              ({[lock_rank "sleep lock"%string]} ∪ lks)
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
@@ -365,6 +369,7 @@ Section ProofReleasesleep.
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
               0%nat b pme C (av - 4)%nat
+              ({[lock_rank "sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [] HtokL HRsl Hown Hpay").
@@ -373,6 +378,14 @@ Section ProofReleasesleep.
        -- the term [Hbmatch] equates with [b] -- so the hart it hands back is
        at [wp_next b], matching releasesleep's own top-level index. *)
     iIntros (CIDrel Hsrel Mrel) "Hcg Hpc %Hrelcs Hown".
+    (* BALANCED: the rank acquire put in comes back out.  [Hno] is the ORDER
+       premise; [locks_below_not_elem] turns it into the non-membership the
+       set algebra needs, and then the round trip is the identity -- which is
+       what the postcondition's [cpu_own 0 b pme C b lks] wants. *)
+    pose proof (locks_below_not_elem lks (lock_rank "sleep lock"%string) Hno) as Hnotin.
+    assert (Hsetback : ({[lock_rank "sleep lock"%string]} ∪ lks) ∖ {[lock_rank "sleep lock"%string]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hown".
     assert (Hpc2c : ret_pc (Krel !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.releasesleep + 0x2c)).
     { rewrite HKrelra. apply bv_eq; vm_compute; reflexivity. }

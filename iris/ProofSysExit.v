@@ -114,7 +114,7 @@ Section ProofSysExit.
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (pid : mword 32) (V : pprivate) (v0 : mword 64)
+      (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset nat)
     : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
                              γi cn γtl bmapstart inodestart nib size dqb dqs us
@@ -262,7 +262,7 @@ Section ProofSysExit.
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf A4 (av - 4)%nat 0%nat eb pj C 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (word_hi w3) (DfracOwn (1/4)) b
-              sex_arg0 HA4a0 Hv0 sex_ilvl0 (sex_Kai av Hav)
+              _ sex_arg0 HA4a0 Hv0 sex_ilvl0 (sex_Kai av Hav)
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
     iEval (rewrite HA4a1) in "Hb3hi".
@@ -308,7 +308,7 @@ Section ProofSysExit.
     iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev ip dqi γkl γka
               γi cn γtl bmapstart inodestart nib size dqb dqs us
-              on fn B2 (av - 4)%nat eb C b pid V
+              on fn B2 (av - 4)%nat eb C b lks pid V
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo
               with "Hcg Hcpu [] [] Htext Hpc Hprocs Hpanic Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs

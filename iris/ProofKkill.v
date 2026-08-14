@@ -191,6 +191,10 @@ Section ProofKkill.
     length γs = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
+    (* the scan enters each slot fresh: the caller's held set must bound
+       below "proc"'s rank (LockRank.v); [locks_below_not_elem] gives the
+       per-slot non-membership the ghost step needs. *)
+    locks_below lks (lock_rank "proc") ->
     procs_inv γs -∗
     panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [kkill+0x52],
@@ -209,7 +213,7 @@ Section ProofKkill.
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
       WP (Loop : expr riscv_lang).
   Proof.
-    intros Hlen Hlvl Hav.
+    intros Hlen Hlvl Hav Hno.
     iIntros "#Hpinv #Hpanic Hqexit".
     (* BOUNDED loop: ordinary Coq induction on a [fuel] bounding the
        remaining iterations [NPROC - k].  The exit continuation is a
@@ -281,8 +285,8 @@ Section ProofKkill.
       iDestruct (cpu_own_transport CIDk CIDb lvl eb pme C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf (CID := CIDb) γk "proc"%string
-                (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme C av b
-                ltac:(lia) ltac:(lia)
+                (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme C av b lks
+                ltac:(lia) ltac:(lia) Hno
                 with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
       { iEval (rewrite HM22a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -418,10 +422,19 @@ Section ProofKkill.
           iEval (rewrite Hbmatch) in "Hcg".
           iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
                     (proc_lock_res γs γk (proc_addr k)) Mr4c lvl eb pme C av
+                    ({[lock_rank "proc"]} ∪ lks)
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
           rewrite -Hbmatch.
           iIntros (CIDg Hsg mr) "Hcg Hpc %Hpinsr Hown".
+          (* acquire handed back [{[rank "proc"]} ∪ lks]; release hands back
+             that set minus the same singleton, and [Hno] (via
+             [locks_below_not_elem]) says the round trip is a no-op: this
+             hart never held a "proc" lock to begin with. *)
+          pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin1.
+          assert (Heqlks1 : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+      by (apply locks_add_del; assumption).
+          iEval (rewrite Heqlks1) in "Hown".
           assert (Hpc50 : ret_pc (Mr4c !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x50))
             by (rewrite HMr4c_ra; apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpc50) in "Hpc".
@@ -697,10 +710,16 @@ Section ProofKkill.
         iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
                   (proc_lock_res γs γk (proc_addr k)) M2e lvl eb pme C av
+                  ({[lock_rank "proc"]} ∪ lks)
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
         rewrite -Hbmatch.
         iIntros (CIDg Hsg mr) "Hcg Hpc %Hpinsr Hown".
+        (* see the +0x4c release above: [Hno] kills the difference. *)
+        pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin2.
+        assert (Heqlks2 : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
+      by (apply locks_add_del; assumption).
+        iEval (rewrite Heqlks2) in "Hown".
         assert (Hpc32 : ret_pc (M2e !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x32))
           by (rewrite HM2e_ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc32) in "Hpc".
@@ -843,7 +862,7 @@ Section ProofKkillMain.
     : wp_kkill_sconf_body γs m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_kkill_sconf_body].
-    intros pcE ret_tgt Hlen Hn Hav.
+    intros pcE ret_tgt Hlen Hn Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
@@ -1255,7 +1274,7 @@ Section ProofKkillMain.
                  with "Hcpu") as "Hcpu".
     iPoseProof (wp_kkill_loop (CID0 := CID12)  γs m (pa_stk sp0 6)
                   (add_vec zero_reg (M2 !!! Regidx Ra0)) p n (av - 6)%nat eb C b lks
-                  Hlen Hn ltac:(lia) with "Hprocs Hpanic Hqexit") as "Hscan".
+                  Hlen Hn ltac:(lia) Hno with "Hprocs Hpanic Hqexit") as "Hscan".
     iApply ("Hscan" $! 0%nat M7 with "[%] [%] Hcg Hcpu Htext Hpc").
     - unfold NPROC; lia.
     - unfold kkl_regs.

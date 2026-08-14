@@ -1876,7 +1876,7 @@ Section IlockLoad.
     { rewrite /il_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |]. iExists _. iExact "Hf4". }
-    iDestruct (cpu_own_transport CID33 CID39 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID33 CID39 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* Hextc/Hextm were last transported to CID9 (right after bread handed
        them back); neither brelse nor the field copies/memmove between here
@@ -2176,7 +2176,7 @@ Section ProofIlockMain.
     assert (HR6thr : il_thr5 m R6).
     { intros c Hcs N2 N8 N9.
       rewrite /R6 upd_ne; [| regne]. exact (HR5thr c Hcs N2 N8 N9). }
-    iDestruct (cpu_own_transport CID CID11 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CID CID11 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID11 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2273,7 +2273,7 @@ Section ProofIlockMain.
                  ity_shot g (di_type dn0))%I
         with "[Hpay]" as "Hpay2"; [iExact "Hpay" |].
       iDestruct "Hpay2" as (dnp bmp) "[Hlk #Hshot]".
-      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDa CID13 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
@@ -2307,7 +2307,7 @@ Section ProofIlockMain.
         with "[Hpay]" as "(Hraw & Hpool & Hpend)";
         [rewrite /ic_payload /ic_unloaded; iDestruct "Hpay" as "[[$ $] $]" |].
       iEval (rewrite -Hipe) in "Hraw".
-      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b lks
+      iDestruct (cpu_own_transport CIDa CID13 0 eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDa CID13 eb (proc_addr j)
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".

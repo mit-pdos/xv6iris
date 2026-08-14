@@ -1347,7 +1347,7 @@ Section ReadiLoop.
       by lkp.
     assert (HB3s9 : B3 !!! Regidx Rs9 = (mword_of_int 1024 : mword 64)) by lkp.
     assert (HB3s8 : B3 !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)) by lkp.
-    iDestruct (cpu_own_transport CIDa4 CIDa8 0 eb (proc_addr j) C b lks
+    iDestruct (cpu_own_transport CIDa4 CIDa8 0 eb (proc_addr j) C b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CIDa4 CIDa8 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".

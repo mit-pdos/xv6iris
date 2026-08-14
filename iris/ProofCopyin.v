@@ -1248,7 +1248,7 @@ Section ProofCopyin.
     assert (HV5a2' : tp_pin V5 !!! Regidx Ra2 = va0)
       by (rewrite (tp_pin_ne (CIDx := CIDv4) V5 Ra2 ltac:(ridx_neq)); exact HV5a2).
     iApply (Vmfault.wp_vmfault_sconf γa (tp_pin V5) Pc szv (K - 12) lvl eb p C b
-              ltac:(lia) HV5tp HV5a0' HV5a1' Hszb Hlvl
+              _ ltac:(lia) HV5tp HV5a0' HV5a1' Hszb Hlvl
               with "Hcg Hcnt Htext Hpc Hpt Henv").
     iIntros (CIDvf Hsvf mv) "Hcg Hcnt Hpc %Hvcs Hvpost".
     iEval (rewrite HV5a2' Hidem) in "Hvpost".

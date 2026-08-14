@@ -113,6 +113,17 @@ Definition wp_end_op_sconf_body
   log_geom_ok cov logstart ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
+  (* the order premise: end_op's own two critical sections both acquire
+     "log" (rank 3) directly, balanced end to end, so [lks] -- the caller's
+     held set -- is the SAME value at both acquire call sites.  wakeup's own
+     "proc" (rank 11) order premise is a consequence at the point it is
+     called (with "log" held): [locks_below_mono] lifts this bound to 11,
+     [locks_below_union_singleton] pushes it across the held "log" singleton.
+     commit's interior bread/bwrite/brelse run with "log" ALREADY RELEASED
+     (the C releases before calling commit()) and their Spec files (SpecBread
+     etc.) surface no order premise of their own for their callers to
+     satisfy, so nothing about them is stated here. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗
   trap_csrs_ext eb -∗

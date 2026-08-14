@@ -148,7 +148,7 @@ Section ProofIunlockMain.
                             dn' bm' pidv dq m K eb p C b lks.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
-    intros pcE ip ret_tgt HK Hk Ha0.
+    intros pcE ip ret_tgt HK Hk Ha0 Hfresh.
     pose proof HK as HK'. unfold K_iunlock in HK'.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
@@ -371,8 +371,9 @@ Section ProofIunlockMain.
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (HS.wp_holdingsleep_sconf (dq := dq) gil gisl "inode"%string
-              (ic_tok cn k) R6 p pidv (K - 4)%nat eb C b
+              (ic_tok cn k) R6 p pidv (K - 4)%nat eb C b lks
               ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
     { iEval (rewrite HR6a0). iExact "Hslk". }
     { iEval (rewrite HR6a0). iExact "Hpid". }
@@ -504,7 +505,7 @@ Section ProofIunlockMain.
     assert (HR9thr : iul_thr m R9).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /R9 upd_ne; [| regne]. exact (HR8thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID12 CID17 0%nat eb p C b lks
+    iDestruct (cpu_own_transport CID12 CID17 0%nat eb p C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -529,7 +530,7 @@ Section ProofIunlockMain.
     iAssert (inode_shr k s dev inum) with "[Href]" as "Href".
     { rewrite inode_shr_gen_intro. iExists g. iExact "Href". }
     iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
-              (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b
+              (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b lks
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hpanic Hprocs").
     { iEval (rewrite HR9a0). iExact "Hslk". }
@@ -744,7 +745,7 @@ Section ProofIunlockMain.
     assert (Cs11 : P5 !!! Regidx (mword_of_int 27 : mword 5)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; iuidx).
-    iDestruct (cpu_own_transport CID18 CID24 0%nat eb p C b lks
+    iDestruct (cpu_own_transport CID18 CID24 0%nat eb p C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iul_cont.
     iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].

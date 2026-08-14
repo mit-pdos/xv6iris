@@ -33,6 +33,10 @@ Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* THE FRESHNESS PREMISE: kfree acquires and releases [kmem.lock]
+     internally (balanced -- [lks] is unchanged across the whole call), so
+     the caller must already hold only locks BELOW "kmem"'s rank. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m K b pcur -∗
   cpu_own n eb pcur C b lks -∗
   kernel_text -∗ pc_is pcE -∗

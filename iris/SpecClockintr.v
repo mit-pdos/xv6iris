@@ -115,6 +115,7 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      wakeup's per-proc acquire) stay in int range *)
   (Z.of_nat n + 2 < 2 ^ 31)%Z ->
   (20 <= av)%nat ->
+  locks_below lks (lock_rank "time") ->
   sie_cap_gpr m av false p -∗
   cpu_own n eb p C false lks -∗
   kernel_text -∗ pc_is pcE -∗

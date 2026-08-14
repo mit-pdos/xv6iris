@@ -123,6 +123,10 @@ Definition wp_iunlock_sconf_body
   (* the entry is slot [k]: a0 = ip, and the null test dies here *)
   (k < NINODE)%nat ->
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (* THE FRESHNESS PREMISE: iunlock's own [holdingsleep] acquires and
+     releases the sleeplock's inner "sleep lock" spinlock internally, so
+     the caller must already hold only locks BELOW its rank. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m K b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

@@ -51,6 +51,15 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (22 <= av)%nat ->
+  (* THE ORDER PREMISE for the INNER spinlock of the sleeplock, which
+     [initlock]s at the name "sleep lock" (the sleeplock itself is not a
+     spinlock and has no rank): everything the caller holds ranks strictly
+     below it.  [LockRank.locks_below_not_elem] recovers the non-membership
+     the set algebra below needs.  No execution ever holds two "sleep lock"s
+     at once (LockRank.v).  releasesleep is BALANCED -- entry and exit
+     [cpu_own] carry the same [lks] -- because the C's single return path
+     releases lk->lk; the wakeup() in between is itself balanced. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av b pme -∗
   cpu_own 0 eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗

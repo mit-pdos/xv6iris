@@ -91,6 +91,11 @@ Definition wp_bread_sconf_body
      64-bit compares against the sign-extending [lw]s are then exact *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
+  (* bread directly acquires "bcache" (rank 4, via the inlined bget) and its
+     own acquiresleep call needs "sleep lock" (rank 6, LockRank.v); the bound
+     is stated at the LOWER rank -- [locks_below_mono] (4 <= 6) lifts it to
+     cover the acquiresleep call too, so one premise suffices for both. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
   cpu_own 0 eb pj C b lks -∗

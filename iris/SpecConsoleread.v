@@ -128,6 +128,14 @@ Definition wp_consoleread_sconf_body
   (consoleread_stack <= av)%nat ->
   (* PARKING PREMISE (hart-generic scheduler protocol).  See SpecSched.v. *)
   eb = true ->
+  (* consoleread's own acquire(&cons.lock) needs every lock this hart
+     already holds to rank below "cons".  The lock is released again
+     before every exit (the killed early-return, the ^D/copy/'\n' breaks,
+     and the [n <= 0] loop exit all release before returning), so [lks]
+     itself is unchanged end to end -- none of consoleread's other callees
+     (myproc, killed, sleep_prepare, sleep, either_copyout) surface a lock
+     of their own through this contract. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗

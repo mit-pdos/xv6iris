@@ -49,6 +49,10 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
   (* acquire's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (14 <= av)%nat ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "time"'s -- sys_uptime acquires and releases [tickslock] in the same
+     call, so this contract is BALANCED and [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "time") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

@@ -52,6 +52,19 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
      rank.  It is what mints the held-set fragment.  Trivial at [lks = ∅],
      which is most call sites.
 
+     A BOUND, NOT A NON-MEMBERSHIP, AND THE REASON IS COMPOSITION.  [∉] does
+     not compose: a function that transitively acquires k locks needs k
+     separate premises, and every caller inherits all of them, so the premise
+     set grows with the transitive closure of the call graph.  [iput] alone
+     would carry three ("itable" directly, "sleep lock" via acquiresleep,
+     "log" via iupdate -> log_write).  The bound carries ONE, at the LOWEST
+     rank the function touches, and the rest are consequences:
+     [locks_below_mono] weakens it to every higher rank and
+     [locks_below_not_elem] turns each into the non-membership the ghost step
+     actually consumes.  Nesting composes too --
+     [locks_below_union_singleton] takes [locks_below lks r] across an
+     acquire at [r] to [locks_below ({[r]} ∪ lks) r'] for any [r < r'].
+
      IT DOES NOT YET KILL THE [if(holding(lk)) panic] ARM, and [panic_wp_any]
      therefore STAYS in the contract.  The refutation needs the held-set
      FRAGMENT ([WpLock.lk_cpu_frag]) in scope where [holding]'s read decides
@@ -60,9 +73,9 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
      fragment, which is not persistent and would have to be borrowed and
      returned inside the invariant open.  That leaf change plus a
      [SpecHolding] variant concluding [a0 = 0] is a separate piece of work.
-     (Deadlock-freedom strengthens this to [locks_below lks (lock_rank s)]
-     in a later phase; it implies this one.) *)
-  lock_rank s ∉ lks ->
+     It is strictly stronger than the [lock_rank s ∉ lks] the ghost step
+     needs, and that is the point -- see the composition note above. *)
+  locks_below lks (lock_rank s) ->
   (⊢ Tc -∗ Dc -∗ False) ->
   (* [∀ i : CPU], not pinned at the entry [cpu_id]: acquire's entry can be at
      [b = true] (the enabled arm forces [n = 0]), so "enter at CID with
@@ -124,6 +137,19 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
      rank.  It is what mints the held-set fragment.  Trivial at [lks = ∅],
      which is most call sites.
 
+     A BOUND, NOT A NON-MEMBERSHIP, AND THE REASON IS COMPOSITION.  [∉] does
+     not compose: a function that transitively acquires k locks needs k
+     separate premises, and every caller inherits all of them, so the premise
+     set grows with the transitive closure of the call graph.  [iput] alone
+     would carry three ("itable" directly, "sleep lock" via acquiresleep,
+     "log" via iupdate -> log_write).  The bound carries ONE, at the LOWEST
+     rank the function touches, and the rest are consequences:
+     [locks_below_mono] weakens it to every higher rank and
+     [locks_below_not_elem] turns each into the non-membership the ghost step
+     actually consumes.  Nesting composes too --
+     [locks_below_union_singleton] takes [locks_below lks r] across an
+     acquire at [r] to [locks_below ({[r]} ∪ lks) r'] for any [r < r'].
+
      IT DOES NOT YET KILL THE [if(holding(lk)) panic] ARM, and [panic_wp_any]
      therefore STAYS in the contract.  The refutation needs the held-set
      FRAGMENT ([WpLock.lk_cpu_frag]) in scope where [holding]'s read decides
@@ -132,9 +158,9 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
      fragment, which is not persistent and would have to be borrowed and
      returned inside the invariant open.  That leaf change plus a
      [SpecHolding] variant concluding [a0 = 0] is a separate piece of work.
-     (Deadlock-freedom strengthens this to [locks_below lks (lock_rank s)]
-     in a later phase; it implies this one.) *)
-  lock_rank s ∉ lks ->
+     It is strictly stronger than the [lock_rank s ∉ lks] the ghost step
+     needs, and that is the point -- see the composition note above. *)
+  locks_below lks (lock_rank s) ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

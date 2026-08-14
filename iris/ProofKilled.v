@@ -96,7 +96,7 @@ Section ProofKilled.
     : wp_killed_sconf_body γs j γl m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_killed_sconf_body].
-    intros pcE ret_tgt Ha0 Hj Hgl Hn Hav.
+    intros pcE ret_tgt Ha0 Hj Hgl Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
@@ -226,6 +226,7 @@ Section ProofKilled.
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
               (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b lks
               Hn ltac:(lia)
+              Hfresh
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
@@ -320,10 +321,13 @@ Section ProofKilled.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat lks
+              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat ({[lock_rank "proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+    iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
+           [| apply locks_add_del; assumption]) in "Hcpu".
     (* release's exit index is [outb := match n with O => eb | S _ => false
        end]; [Hbeq] (derived up front) folds it back to [b] so the whole
        epilogue -- and the closing [wp_next_chain] -- sees a uniform [b]. *)

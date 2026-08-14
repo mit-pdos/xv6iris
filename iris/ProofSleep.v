@@ -154,6 +154,13 @@ Section SleepJoin.
     let pj := proc_addr j in
     (20 <= av)%nat ->
     (j < NPROC)%nat ->
+    (* [lks] IS THE SET SLEEP WAS ENTERED WITH, not the one it is holding
+       here: the join is reached WITH p->lock still taken, so the ambient
+       [cpu_own] below carries [{[lock_rank "proc"]} ∪ lks] and the release at
+       +0x22 hands [lks] back.  The ORDER premise is what makes that
+       cancellation exact (via [locks_below_not_elem]), and it is the same one
+       sleep's own acquire needed. *)
+    locks_below lks (lock_rank "proc"%string) ->
     add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd ->
     sp0 = m !!! Regidx csp_rs1 ->
     (* NOTE: the old [⌜mj !!! x4 = cid_word⌝] premise is GONE -- [tp_pin]
@@ -177,7 +184,7 @@ Section SleepJoin.
     pc_is (mword_of_int (KernelSyms.sleep + 0x20)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    cpu_own 1 eb pj C false lks -∗
+    cpu_own 1 eb pj C false ({[lock_rank "proc"%string]} ∪ lks) -∗
     (* the cells the RUNNING arm of the lock holds -- handed back by swtch on
        the park arm, never given up on the no-park one.  They go into the
        RUNNING lock at the release below, which is where the NEXT park will
@@ -204,7 +211,7 @@ Section SleepJoin.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hav Hj Hspd Hsp0 Hsp_mj Hs1_mj
+    intros pj Hav Hj Hno Hspd Hsp0 Hsp_mj Hs1_mj
            Hmj18 Hmj19 Hmj20 Hmj21 Hmj22 Hmj23 Hmj24 Hmj25 Hmj26 Hmj27.
     iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpu Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(4-k)]. *)
@@ -300,7 +307,7 @@ Section SleepJoin.
     iDestruct "Hclm" as "[Hclmp Hclmx]".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
-              _ Hlka
+              ({[lock_rank "proc"%string]} ∪ lks) Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
     (* release's exit index is [outb = eb]: at [eb = true] it re-enables at
@@ -308,6 +315,14 @@ Section SleepJoin.
        below is hart-GENERIC; at [eb = false] it does not, and the chain
        pins every step to this hart.  Either way the leaves run at [eb]. *)
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hcs_rel Hcpu".
+    (* SLEEP IS BALANCED IN THE HELD SET: what its acquire took, this release
+       gives back, so the singleton insert and delete cancel -- which is
+       exactly what [Hno] buys, once its ORDER bound is cashed for the
+       non-membership the cancellation actually needs. *)
+    pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
+    assert (Hsetback : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
+      by (apply locks_add_del; assumption).
+    iEval (rewrite Hsetback) in "Hcpu".
     assert (Hpc26 : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x26)) by (rewrite HD1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc26) in "Hpc".
@@ -490,7 +505,7 @@ Section ProofSleepBody.
     : wp_sleep_sconf_body γs j γl m av eb C lks.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
-    intros pcE pj ret_tgt Hj Hgl Hav.
+    intros pcE pj ret_tgt Hj Hgl Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hext Hclmx Hcont".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
@@ -593,7 +608,7 @@ Section ProofSleepBody.
       by (rewrite /A2 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID CID6 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0 eb pj C eb
+    iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0 eb pj C eb lks
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
@@ -639,13 +654,16 @@ Section ProofSleepBody.
     iDestruct (cpu_own_transport CID7 CID9 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 0 eb pj C (av - 4)%nat eb
+              (proc_lock_res γs γl (proc_addr j)) B1 0 eb pj C (av - 4)%nat eb lks
               ltac:(lia)
               ltac:(lia)
+              Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
-       [false] and every leaf collapses with [wp_next_off]. *)
+       [false] and every leaf collapses with [wp_next_off] -- and the held SET
+       is [{[lock_rank "proc"]} ∪ lks] for exactly the same stretch, which is
+       what sched and the join half below are instantiated at. *)
     iIntros (CIDa Hsa ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu [Hpay Hclmp]".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
@@ -817,7 +835,7 @@ Section ProofSleepBody.
       assert (HL27 : L0 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
         by (apply Hthr_L0; (first [ vm_compute; reflexivity | vm_compute; discriminate ])).
       iApply (sleep_join (CID0 := CIDa) γs j γl ch0 m L0 av eb C sp0 spd vgap lks
-                ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
+                ltac:(lia) Hj Hno ltac:(reflexivity) ltac:(reflexivity)
                 Hsp_L0 Hs1_L0
                 HL18 HL19 HL20 HL21 HL22 HL23 HL24 HL25 HL26 HL27
                 with "Htext Hislock Hcg Hpc [Hlocked Hstate Hpg Hchan Hpub] Htc Hcpu Hown Htag Hvc
@@ -901,7 +919,12 @@ Section ProofSleepBody.
          lock owns both halves again. *)
       iMod (pstate_whole_update (proc_addr j) RUNNING SLEEPING with "Hpg") as "Hpg".
       iModIntro.
-      iApply (Sched.wp_sched_sconf γs j γl SLEEPING ch0 C1 (trap_res eb + (av - 4))%nat eb lks
+      (* sched IS SET-GENERIC AND SET-BALANCED (SpecSched.v): it is entered and
+         left at [cpu_own 1 eb pj emp false lks] for the SAME [lks], however
+         many scheduler rounds pass in between -- so the park carries p->lock's
+         own rank across the crossing, and the set here is the held one. *)
+      iApply (Sched.wp_sched_sconf γs j γl SLEEPING ch0 C1 (trap_res eb + (av - 4))%nat eb
+                ({[lock_rank "proc"%string]} ∪ lks)
                 Hj Hgl (park_ok_SLEEPING) ltac:(lia)
                 with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc").
       { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
@@ -952,11 +975,12 @@ Section ProofSleepBody.
                       = mword_of_int (KernelSyms.sleep + 0x20)) by (rewrite HC1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc20) in "Hpc".
       (* re-inject the opaque context-slot payload into the returned bundle. *)
-      iAssert (cpu_own 1 eb (proc_addr j) C false lks) with "[Hcpuemp HC]" as "Hcpu".
+      iAssert (cpu_own 1 eb (proc_addr j) C false ({[lock_rank "proc"%string]} ∪ lks))
+        with "[Hcpuemp HC]" as "Hcpu".
       { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
       (* ONE application of the join half, at the DISPATCHING hart. *)
       iApply (sleep_join (CID0 := CIDs) γs j γl ch' m msch av eb C sp0 spd vgap lks
-                ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
+                ltac:(lia) Hj Hno ltac:(reflexivity) ltac:(reflexivity)
                 Hsp_msch Hs1_msch
                 Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
                 with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpu Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap
@@ -989,7 +1013,7 @@ Section ProofSleepBody.
     : wp_sleep_nested_body γs j γl m av eb C n lks.
   Proof.
     cbv beta delta [wp_sleep_nested_body].
-    intros pcE pj ret_tgt Hj Hgl Hav Hn.
+    intros pcE pj ret_tgt Hj Hgl Hav Hn Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcont".
     (* ------------------------------------------------------------------ *)
@@ -1091,7 +1115,7 @@ Section ProofSleepBody.
     iEval (rewrite Hpcmp) in "Hpc".
     assert (HN2ra : N2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sleep + 0x0a) : mword 64) 4)
       by (rewrite /N2 upd_eq; reflexivity).
-    iApply (Myproc.wp_myproc_sconf N2 (av - 4)%nat (S n) eb pj C false
+    iApply (Myproc.wp_myproc_sconf N2 (av - 4)%nat (S n) eb pj C false lks
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
@@ -1138,9 +1162,10 @@ Section ProofSleepBody.
       by (rewrite /N4 upd_eq; reflexivity).
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) N4 (S n) eb pj C (av - 4)%nat false
+              (proc_lock_res γs γl (proc_addr j)) N4 (S n) eb pj C (av - 4)%nat false lks
               ltac:(lia)
               ltac:(lia)
+              Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     { iEval (rewrite Ha0_N4). iExact "Hislock". }
     iApply wp_next_off_intro.
@@ -1274,11 +1299,17 @@ Section ProofSleepBody.
       { rewrite /proc_lock_res. iExists st0, ch0. iFrame "Hstate Hpg Hchan Hpub Hslot". }
       iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
                 (proc_lock_res γs γl (proc_addr j)) N7 (S n) eb pj C (av - 4)%nat
-                Hlka
+                ({[lock_rank "proc"%string]} ∪ lks) Hlka
                 ltac:(lia)
                 with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
       iApply wp_next_off_intro.
       iIntros (mrel) "Hcg Hpc %Hcs_rel Hcpu".
+      (* the no-park arm is BALANCED too: it took p->lock and gave it back, so
+         the caller gets its own [lks] out at the same level [S n]. *)
+      pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
+      assert (Hsetback : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
+        by (apply locks_add_del; assumption).
+      iEval (rewrite Hsetback) in "Hcpu".
       assert (Hpc26 : ret_pc (N7 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sleep + 0x26)) by (rewrite HN7ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc26) in "Hpc".
@@ -1492,7 +1523,8 @@ Section ProofSleepBody.
       (* ---------------------------------------------------------------- *)
       (* +0x1c: sched() at noff = S (S n) >= 2 -- panic("sched locks").    *)
       (* ---------------------------------------------------------------- *)
-      iApply (Sched.wp_sched_locks γs j γl Q1 (av - 4)%nat eb C n lks
+      iApply (Sched.wp_sched_locks γs j γl Q1 (av - 4)%nat eb C n
+                ({[lock_rank "proc"%string]} ∪ lks)
                 Hj Hgl ltac:(lia) ltac:(lia)
                 with "Hcg Htext Hpc Hprocs Hlocked Hcpu Hpanic").
   Qed.

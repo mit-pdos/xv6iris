@@ -1420,7 +1420,7 @@ Section ProofWalk.
            caddiw/bne) landed on [CIDb6] -- re-anchor both once. *)
         assert (Hchainb1 : b = false \/ p = zero_reg -> (CIDb6 : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hchainb1 with "Hcont") as "Hcont".
-        iDestruct (cpu_own_transport CID CIDb6 lvl eb p C b lks Hchainb1 with "Hcnt") as "Hcnt".
+        iDestruct (cpu_own_transport CID CIDb6 lvl eb p C b Hchainb1 with "Hcnt") as "Hcnt".
         iApply (wp_walk_tail_sconf γa mm M9 t tf (pt_base c) K lvl eb p C on g b lks HK Hva
                   HspM9 HM9s3 HM9s1 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hsame Hoff Hpres ltac:(lia) Hmiss
                   ltac:(exists p2, p1, (pt_ents c (vpn_idx 0 vpn)); split;
@@ -1437,7 +1437,7 @@ Section ProofWalk.
         iEval (rewrite Hbk26) in "Hpc".
         assert (Hchainb2 : b = false \/ p = zero_reg -> (CIDb6' : CPU) = (CID : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hchainb2 with "Hcont") as "Hcont".
-        iDestruct (cpu_own_transport CID CIDb6' lvl eb p C b lks Hchainb2 with "Hcnt") as "Hcnt".
+        iDestruct (cpu_own_transport CID CIDb6' lvl eb p C b Hchainb2 with "Hcnt") as "Hcnt".
         iApply (IH CIDb6' g M9 c w ltac:(lia) HspM9 HM9s3 HM9s4 HM9s5 HM9s1 HM9s6 HM9x23 HM9x24 HM9x25 HM9x26 HM9x27 Hnv
                   ltac:(rewrite <- (grafts_lvl_descend 1 cur c vpn Hkids); exact Hgrafts)
                   with "Hcg Hcnt Htext Hpc Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00 Hownc Hrestore' Henv Hcont").
@@ -1500,7 +1500,7 @@ Section ProofWalk.
       (* [Hcont]/[Hcnt] entered this iteration at [CID]; cbeqz.taken landed
          on [CIDc0] -- re-anchor once before feeding [wp_walk_alloc_sconf]. *)
       assert (Hchainc0 : b = false \/ p = zero_reg -> (CIDc0 : CPU) = (CID : CPU)) by wp_next_chain.
-      iDestruct (cpu_own_transport CID CIDc0 lvl eb p C b lks Hchainc0 with "Hcnt") as "Hcnt".
+      iDestruct (cpu_own_transport CID CIDc0 lvl eb p C b Hchainc0 with "Hcnt") as "Hcnt".
       iApply (wp_walk_alloc_sconf γa mm M6 cur
                 (fun bg => pt_graft cur (vpn_idx (S L') vpn) bg) (S L') L'
                 (u_pte_addr (pt_base cur) (vpn_idx (S L') vpn)) pte K lvl eb p C _ on g b lks Hlvl HK
@@ -1608,7 +1608,7 @@ Section ProofWalk.
           assert (Hchainc1 : b = false \/ p = zero_reg -> (CIDc2 : CPU) = (CID : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hchainc1 with "Hcont") as "Hcont".
           assert (Hchainc1' : b = false \/ p = zero_reg -> (CIDc2 : CPU) = (CIDok : CPU)) by wp_next_chain.
-          iDestruct (cpu_own_transport CIDok CIDc2 lvl eb p C b lks Hchainc1' with "Hcnt") as "Hcnt".
+          iDestruct (cpu_own_transport CIDok CIDc2 lvl eb p C b Hchainc1' with "Hcnt") as "Hcnt".
           iApply (wp_walk_tail_sconf γa mm Rb t tf (pt_base (pt_empty_node bn)) K lvl eb p C on (S g) b lks HK Hva
                     HspRb HRbs3 HRbs1 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27 Hsame Hoff Hpres ltac:(lia) Hmiss
                     ltac:(exists p2, p1, (pt_ents (pt_empty_node bn) (vpn_idx 0 vpn)); split;
@@ -1626,7 +1626,7 @@ Section ProofWalk.
           assert (Hchainc2 : b = false \/ p = zero_reg -> (CIDc2' : CPU) = (CID : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hchainc2 with "Hcont") as "Hcont".
           assert (Hchainc2' : b = false \/ p = zero_reg -> (CIDc2' : CPU) = (CIDok : CPU)) by wp_next_chain.
-          iDestruct (cpu_own_transport CIDok CIDc2' lvl eb p C b lks Hchainc2' with "Hcnt") as "Hcnt".
+          iDestruct (cpu_own_transport CIDok CIDc2' lvl eb p C b Hchainc2' with "Hcnt") as "Hcnt".
           iApply (IH CIDc2' (S g) Rb (pt_empty_node bn) w ltac:(lia) HspRb HRbs3 HRbs4 HRbs5 HRbs1 HRbs6 HRbx23 HRbx24 HRbx25 HRbx26 HRbx27
                     (or_intror (ptree_blocks0_lvl_empty _ bn vpn))
                     ltac:(rewrite (grafts_lvl_empty 1 bn vpn);
@@ -1985,7 +1985,7 @@ Section ProofWalk.
        of the [m !! vpn] case split below. *)
     assert (Hchainw : b = false \/ p = zero_reg -> (CIDw18 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hchainw with "Hcont") as "Hcont".
-    iDestruct (cpu_own_transport CID CIDw18 lvl eb p C b lks Hchainw with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CIDw18 lvl eb p C b Hchainw with "Hcnt") as "Hcnt".
     destruct (m !! vpn) as [wv|] eqn:Hmv.
     - destruct (proj1 Hrep vpn wv Hmv) as (p2 & p1 & Hmaps).
       iApply (wp_walk_loop_sconf γa mm W9 t t 2 wv K lvl eb p C on 0%nat b lks Hlvl HK Hva' ltac:(lia)

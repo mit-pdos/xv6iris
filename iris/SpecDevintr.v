@@ -180,6 +180,11 @@ Definition wp_devintr_sconf_body
      stay in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (devintr_stack <= av)%nat ->
+  (* devintr's clock branch dispatches to clockintr, which acquires "time"
+     (rank 8, LockRank.v) directly -- devintr itself acquires nothing, so
+     this is the only order premise its contract needs. Trivial at every
+     real call site: devintr always runs at trap entry, [lks = ∅]. *)
+  locks_below lks (lock_rank "time") ->
   sie_cap_gpr m av false p -∗
   cpu_own lvl eb p C false lks -∗
   kernel_text -∗ pc_is pcE -∗

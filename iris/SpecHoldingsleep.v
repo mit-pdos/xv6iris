@@ -47,6 +47,11 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
   (16 <= av)%nat ->
+  (* THE FRESHNESS PREMISE: holdingsleep acquires and releases the
+     sleeplock's inner "sleep lock" spinlock internally (balanced -- [lks]
+     is unchanged across the whole call), so the caller must already hold
+     only locks BELOW "sleep lock"'s rank. *)
+  locks_below lks (lock_rank "sleep lock") ->
   sie_cap_gpr m av b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

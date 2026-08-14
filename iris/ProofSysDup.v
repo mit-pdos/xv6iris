@@ -341,7 +341,7 @@ Section ProofSysDup.
     : wp_sys_dup_sconf_body γl γf m av n eb p C v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].
-    intros pcE ret_tgt Harg Hn Hav.
+    intros pcE ret_tgt Harg Hn Hav Hftno.
     unfold sys_dup_stack in Hav.
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
@@ -554,7 +554,7 @@ Section ProofSysDup.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p C 0%nat v pid V
-              (word_lo w5) w5 b
+              (word_lo w5) w5 b lks
               ltac:(unfold NARG; lia) HM6a0' Harg Hs5nz Hn
               ltac:(unfold argfd_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs5").
@@ -744,7 +744,7 @@ Section ProofSysDup.
       as (k q Cf) "([%Hfvk %Hklt] & Href & Hcore & Hof)".
     iDestruct (cpu_own_transport CID9 CID16 n eb p C b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p C pid V b
+    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p C pid V b lks
               ltac:(rewrite HB4a0 Hfvk; reflexivity) Hklt Hn
               ltac:(unfold fdalloc_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
@@ -992,8 +992,8 @@ Section ProofSysDup.
     iDestruct (cpu_own_transport CID17 CID22 n eb p C b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     (* THE UNIT fdalloc RELEASED IS WHAT PAYS FOR THE HIGHER COUNT *)
-    iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p C (av - 6)%nat b
-              ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity)
+    iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p C (av - 6)%nat b lks
+              ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
               with "Hcg Hcpu Htext Hpc Hftab Hpanic Hunit Href").
     iIntros (CID23 Hk23 G3) "Hcg Hcpu Hpc [%HcsG3 %HG3a0] Href0 Href1".
     assert (Hpc36 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x36))

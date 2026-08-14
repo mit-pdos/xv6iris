@@ -67,6 +67,16 @@ Definition wp_setkilled_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for acquire's / release's *)
   (14 <= av)%nat ->
+  (* THE ORDER PREMISE for the one lock this function takes: everything the
+     caller already holds ranks strictly BELOW "proc".  It composes across a
+     call chain in a way the bare non-membership does not
+     ([LockRank.locks_below_mono]), and [locks_below_not_elem] recovers the
+     [lock_rank "proc" ∉ lks] the ghost step and the set algebra below need.
+     No execution ever holds two "proc" locks at once (LockRank.v), so a
+     caller inside some OTHER proc's critical section is not a problem here.
+     setkilled is BALANCED -- both the entry and the exit [cpu_own] carry the
+     same [lks] -- because the C releases p->lock on its only return path. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

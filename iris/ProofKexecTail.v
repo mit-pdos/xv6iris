@@ -522,7 +522,7 @@ Section KexecA.
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -1089,7 +1089,7 @@ Section KexecAExit.
               HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hthr
               with "Hcg Htext Hpc Hframe").
     iIntros (CIDe Hse mf) "%Hcs %Hpres Hcg Hpc".
-    iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj C b lks Hse
+    iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj C b Hse
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe with "[%]"); [exact Hse |].
     iApply ("Hcont" $! mf used' V (mword_of_int 0 : mword 64)

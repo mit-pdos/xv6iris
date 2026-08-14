@@ -66,6 +66,10 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for acquire's / release's *)
   (14 <= av)%nat ->
+  (* THE FRESHNESS PREMISE: killed acquires and releases [p->lock]
+     internally (balanced -- [lks] is unchanged across the whole call), so
+     the caller must already hold only locks BELOW "proc"'s rank. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗

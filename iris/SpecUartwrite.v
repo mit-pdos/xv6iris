@@ -111,6 +111,10 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
+  (* acquire's order premise: every lock this hart already holds ranks below
+     "uart"'s -- uartwrite acquires and releases [tx_lock] once per byte, but
+     is BALANCED overall, so [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "uart") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
   cpu_own 0%nat eb pj C b lks -∗

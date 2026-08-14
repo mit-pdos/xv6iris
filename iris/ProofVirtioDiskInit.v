@@ -747,7 +747,7 @@ Section ProofVirtioDiskInit.
   Lemma wp_virtio_disk_init_sconf (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
-      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8)
+      (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset nat)
     : wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
                                      pd0 pav0 pu0 free0 lks.
   Proof.
@@ -1579,7 +1579,7 @@ Section ProofVirtioDiskInit.
     assert (HB39s2 : B39 !!! Regidx (mword_of_int 18 : mword 5) = mword_of_int 11)
       by (peel; exact HB30s2).
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-              B39 (Some nb) 0%nat eb pp C (K - 4)%nat false Hc14
+              B39 (Some nb) 0%nat eb pp C (K - 4)%nat false _ Hc14
               ltac:(reflexivity) ltac:(vm_compute; reflexivity)
               with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
     iApply wp_next_off_intro.

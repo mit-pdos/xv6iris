@@ -683,7 +683,7 @@ Section KforkPrologue.
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
-      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b lks
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
@@ -1282,7 +1282,7 @@ Section KforkPrologue.
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
-      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b lks
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
