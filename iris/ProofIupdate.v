@@ -141,11 +141,13 @@ Section IupdateDefs.
   (* the ghost step itself, at the sixteen-dinode list the walk learned at
      its own bread: exactly [SpecLogWrite.wp_log_write_au]'s premise, with
      the payout abstracted. *)
-  Definition iu_region_au (γfs : fs_names) (inodestart : Z) (inum : mword 32)
-      (dn : dinode) (ds : list dinode) (Pout : iProp Σ) : iProp Σ :=
-    (|={⊤, ⊤ ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
-       fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+  Definition iu_region_au (γ : log_names) (γfs : fs_names) (inodestart : Z)
+      (inum : mword 32) (dn : dinode) (ds : list dinode) (e0 : nat)
+      (Pout : iProp Σ) : iProp Σ :=
+    (|={⊤, ⊤ ∖ ↑iregN}=> ∃ (bsl' : list (bv 8)) (v : nat),
+       fsblock γfs (IBLOCK inum inodestart) bsl' ∗ log_epoch_lb γ v ∗
        (⌜bsl' = diblk_bytes ds⌝ -∗
+        logged_at γ e0 (IBLOCK inum inodestart) -∗ ⌜(v <= e0)%nat⌝ -∗
         fsblock γfs (IBLOCK inum inodestart)
                 (diblk_bytes (<[islot inum := dn]> ds))
         ={⊤ ∖ ↑iregN, ⊤}=∗ Pout))%I.
@@ -154,11 +156,12 @@ Section IupdateDefs.
      proof-internal (the walk learns it at [InodeRegion.ireg_read], out of
      the region's own coupling), so the premise quantifies over it and takes
      the caller's [dinode_at] on the way in. *)
-  Definition iu_region_step (γfs : fs_names) (γi : gname) (inodestart : Z)
-      (inum : mword 32) (dn dn0 : dinode) (Pout : iProp Σ) : iProp Σ :=
+  Definition iu_region_step (γ : log_names) (γfs : fs_names) (γi : gname)
+      (inodestart : Z) (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
+      (Pout : iProp Σ) : iProp Σ :=
     (∀ ds : list dinode,
        ⌜diblk_wf ds⌝ -∗ dinode_at γi inum dn0 -∗
-       iu_region_au γfs inodestart inum dn ds Pout)%I.
+       iu_region_au γ γfs inodestart inum dn ds e0 Pout)%I.
 
   (* the record being flushed is a legal dinode -- one line, needed by both
      builders below and by nothing else *)
@@ -173,17 +176,22 @@ Section IupdateDefs.
      a type-0 flush is iput's free path and ABSORBS the fragment, paying out
      the marker; every other flush keeps the fragment out and the marker in.
      [InodeRegion.ireg_out] is exactly that two-case payout (§16.4). *)
-  Lemma iu_step_out (γfs : fs_names) (γi : gname) (inodestart : Z) (nib : nat)
-      (inum : mword 32) (dn dn0 : dinode) :
+  Lemma iu_step_out (γ : log_names) (γfs : fs_names) (γi : gname)
+      (inodestart : Z) (nib : nat)
+      (inum : mword 32) (dn dn0 : dinode) (e0 : nat) :
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     di_type_stable dn dn0 ->
     di_nlink_stable dn dn0 ->
     ireg_inv γi γfs inodestart nib -∗
-    iu_region_step γfs γi inodestart inum dn dn0 (ireg_out γi inum dn).
+    iu_region_step γ γfs γi inodestart inum dn dn0 e0 (ireg_out γi inum dn).
   Proof.
     intros Hnib Hdnwf Hstab Hnlk. iIntros "#Hireg" (ds) "%Hdswf Hdn".
-    rewrite /iu_region_au /ireg_out. case_decide as Hty.
+    (* the ordinary flush owes no receipt ([InodeRegion.ireg_ep_mono]
+       carries it for free), so its anchor is the unit: one adapter line
+       and both region lemmas below are unchanged. *)
+    rewrite /iu_region_au. iApply lw_au_lb0.
+    rewrite /ireg_out. case_decide as Hty.
     - iApply (ireg_free_au ⊤ γi γfs inodestart nib inum dn0 dn ds
                 ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty Hnlk
                 with "Hireg Hdn").
@@ -199,22 +207,81 @@ Section IupdateDefs.
      the payout it hands back.  The type premise is forced: (L3) makes a
      type-0 record's [nlink] zero, and the increment below makes the
      flushed one's at least one. *)
-  Lemma iu_step_link (γfs : fs_names) (γi : gname) (inodestart : Z) (nib : nat)
-      (inum : mword 32) (dn dn0 : dinode) :
+  Lemma iu_step_link (γ : log_names) (γfs : fs_names) (γi : gname)
+      (inodestart : Z) (nib : nat)
+      (inum : mword 32) (dn dn0 : dinode) (e0 : nat) :
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     bv_unsigned (di_type dn) <> 0 ->
     di_type_stable dn dn0 ->
     bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1 ->
     ireg_inv γi γfs inodestart nib -∗
-    iu_region_step γfs γi inodestart inum dn dn0
+    iu_region_step γ γfs γi inodestart inum dn dn0 e0
       (dinode_at γi inum dn ∗ ilink (bv_unsigned inum)).
   Proof.
     intros Hnib Hdnwf Hnz Hstab Hnl. iIntros "#Hireg" (ds) "%Hdswf Hdn".
-    rewrite /iu_region_au.
+    (* nlink RISES here, so the receipt is vacuous at the written record
+       and the anchor is the unit -- the same one adapter line the ordinary
+       step takes. *)
+    rewrite /iu_region_au. iApply lw_au_lb0.
     iApply (ireg_write_link ⊤ γi γfs inodestart nib inum dn0 dn ds
               ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hnl
               with "Hireg Hdn").
+  Qed.
+
+  (* THE UNLINK STEP (design fs-icache.md §20.18, stage C4; fs-log.md
+     §G.17).  [InodeRegion.ireg_write_unlink] is the one region writer that
+     LOWERS nlink, hence the only one that can park a fresh zero, hence the
+     only one that owes [InodeRegion.izrcpt] at the record it writes.  Its
+     fupd is already the atomic update's new shape -- it surrenders the
+     inum's observation counter [v] with its epoch bound and takes the
+     receipt back -- so this step is a pure translation of the two wand
+     inputs into that receipt, along one of TWO routes:
+
+     - THE WITNESS ROUTE (the zero case, [ip->nlink = 0]): [logged_at γ e0
+       (IBLOCK inum inodestart)] with [⌜v <= e0⌝] IS [izrcpt]'s right
+       disjunct, once the two ambient ties identify the region's own log
+       and first inode block with the threaded ones.  Nothing else can
+       produce it: outside log_write's ghost step the two lower bounds are
+       incomparable (§G.14).
+     - THE VACUOUS ROUTE ([⌜nlink dn <> 0⌝], the parent-decrement case):
+       [izrcpt]'s antecedent is false at the written record, so the receipt
+       is free -- and then the anchor is the unit, at the caller's OWN [γ],
+       which is why this arm needs neither tie. *)
+  Lemma iu_step_unlink (γ : log_names) (γfs : fs_names) (γi : gname)
+      (inodestart : Z) (nib : nat)
+      (inum : mword 32) (dn dn0 : dinode) (e0 : nat) :
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    dinode_wf dn ->
+    bv_unsigned (di_type dn) <> 0 ->
+    di_type_stable dn dn0 ->
+    bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
+    ireg_inv γi γfs inodestart nib -∗
+    ilink (bv_unsigned inum) -∗
+    (⌜γ = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝
+     ∨ ⌜bv_unsigned (di_nlink dn) <> 0⌝) -∗
+    iu_region_step γ γfs γi inodestart inum dn dn0 e0
+      (dinode_at γi inum dn).
+  Proof.
+    intros Hnib Hdnwf Hnz Hstab Hnl. iIntros "#Hireg Hfrag Hrc" (ds) "%Hdswf Hdn".
+    rewrite /iu_region_au.
+    iMod (ireg_write_unlink ⊤ γi γfs inodestart nib inum dn0 dn ds
+            ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hnl
+            with "Hireg Hdn Hfrag") as (bsl' v) "(Hfsb & #Hvlb & Hcl)".
+    iDestruct "Hrc" as "[[%Hlg %Hist] | %Hnzd]".
+    - (* THE WITNESS ROUTE *)
+      subst γ inodestart.
+      iModIntro. iExists bsl', v. iFrame "Hfsb Hvlb".
+      iIntros "%Hbs #Hwit %Hle Hfsb".
+      iApply ("Hcl" with "[//] [] Hfsb").
+      rewrite /izrcpt iblk_of_IBLOCK. iIntros (_).
+      iRight. iExists e0. iFrame "Hwit". iPureIntro. exact Hle.
+    - (* THE VACUOUS ROUTE *)
+      iMod (log_epoch_lb_0 γ) as "#Hlb0".
+      iModIntro. iExists bsl', 0%nat. iFrame "Hfsb Hlb0".
+      iIntros "%Hbs _ _ Hfsb".
+      iApply ("Hcl" with "[//] [] Hfsb").
+      rewrite /izrcpt. iIntros (H0). exfalso. exact (Hnzd H0).
   Qed.
 
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
@@ -369,7 +436,7 @@ Section IupdateTail.
        contracts this file seals.  The list [ds] is already fixed here (the
        walk learned it at its own bread), so the premise is the AU itself
        rather than [iu_region_step]'s quantified form. *)
-    iu_region_au γfs inodestart inum dn ds Pout -∗
+    iu_region_au γ γfs inodestart inum dn ds e0 Pout -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
     iu_cont (CID0 := CID0) γfs bn γ inodestart ip inum dn bm
@@ -832,7 +899,7 @@ Section ProofIupdateMain.
          walk needs it first for its own [InodeRegion.ireg_read] -- that is
          where the sixteen-dinode list this step is stated over comes from,
          and why the premise quantifies over it. *)
-      iu_region_step γfs γi inodestart inum dn dn0 Pout -∗
+      iu_region_step γ γfs γi inodestart inum dn dn0 e0 Pout -∗
       p_pid pj ↦₄{dq} pidv -∗
       procs_inv γs -∗
       dev_inv γu γd -∗
@@ -1882,7 +1949,7 @@ Qed.
     (* THE ORDINARY GHOST STEP (§20.18 C2): the two-arm region move this
        contract always made, now supplied to the core rather than wired
        into it. *)
-    iPoseProof (iu_step_out γfs γi inodestart nib inum dn dn0 Hnib
+    iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -1931,7 +1998,7 @@ Qed.
     iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd Hop Hcont".
-    iPoseProof (iu_step_out γfs γi inodestart nib inum dn dn0 Hnib
+    iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -1987,7 +2054,7 @@ Qed.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
-    iPoseProof (iu_step_out γfs γi inodestart nib inum dn dn0 Hnib
+    iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -2046,7 +2113,7 @@ Qed.
     iDestruct (log_opS_named with "Hop") as (e0) "Hop".
     iPoseProof (log_credit_own γ false Sb0 e0 (IBLOCK inum inodestart)
                   ltac:(discriminate)) as "#Hcrd".
-    iPoseProof (iu_step_out γfs γi inodestart nib inum dn dn0 Hnib
+    iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hstab Hnlk
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -2107,7 +2174,7 @@ Qed.
     iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
       as "#Hcrd".
     (* THE ONE SUBSTITUTION *)
-    iPoseProof (iu_step_link γfs γi inodestart nib inum dn dn0 Hnib
+    iPoseProof (iu_step_link γ γfs γi inodestart nib inum dn dn0 e0 Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
@@ -2130,6 +2197,70 @@ Qed.
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
                      Hsb Hdnout Hlink Hsl Hop").
+    exact Hcs.
+  Qed.
+
+  (* THE LINK-SPENDING SEAL (design fs-icache.md §20.18, stage C4).  The
+     link-minting seal's plumbing with ONE substitution again --
+     [iu_step_unlink] fills the region's ghost step -- plus the [ilink] and
+     the receipt choice threaded into it.  The walk itself is untouched:
+     [InodeRegion.ireg_write_unlink]'s fupd is the atomic update's shape,
+     and that is the whole of what [SpecLogWrite]'s C4 edit bought. *)
+  Lemma wp_iupdate_unlink
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z) (cru : bool)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool)
+    : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                             cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                             pidv dq dqd dqn dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_iupdate_unlink_body].
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hda Hdirlen
+           Hj Hgl Ha0 Heb.
+    subst eb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+              Hsb #Hireg Hdn Hlink Hrc Hppid #Hprocs #Hdevi #Hdgeom
+              #Hdlock Hsl Hop Hcont".
+    (* the trivial DEPOSITOR anchor and the own-set credit, exactly as the
+       link-minting seal builds them: this contract's receipt is the
+       WRITER's, cashed inside the region's own fupd, so the [v] the walk
+       threads is still the unit. *)
+    iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
+    iDestruct (log_opS_named with "Hop") as (e0) "Hop".
+    iPoseProof (log_credit_own γ cru Sb e0 (IBLOCK inum inodestart) Hcru)
+      as "#Hcrd".
+    (* THE ONE SUBSTITUTION *)
+    iPoseProof (iu_step_unlink γ γfs γi inodestart nib inum dn dn0 e0 Hnib
+                  (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hnl
+                  with "Hireg Hlink Hrc") as "Hstep".
+    iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
+              (dinode_at γi inum dn)%I
+              pidv dq dqd dqn dqs m K true C b
+              HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0
+              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
+                    Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
+                    [Hcont]").
+    { rewrite /trap_csrs_ext. done. }
+    { rewrite /cpu_claim_ext. done. }
+    iEval (rewrite /wp_next).
+    iIntros (CIDf) "%Hchain".
+    iIntros (mf) "%Hcs Hcg Hcnt Htc Hclm Hpc Hppid Hidev Hinumc Hmeta Hmap Hsb
+                  Hiout Hsl Hop Hwit".
+    iClear "Htc Hclm".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
+    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc Hppid Hidev Hinumc Hmeta Hmap
+                     Hsb Hiout Hsl Hop").
     exact Hcs.
   Qed.
 

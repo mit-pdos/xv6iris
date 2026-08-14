@@ -2168,7 +2168,17 @@ Section ProofLogWrite.
        content [bsl'] to the [bsl] the handle is indexed at -- the caller
        never has to know it in advance. ---- *)
     iApply fupd_wp.
-    iMod "Hau" as (bsl') "[Hfsb HauClose]".
+    (* THE WRITER'S ANCHOR, CASHED IN THE SAME BREATH (fs-log.md §G.17,
+       blocker 4).  The fupd hands out its own lower bound [v'] -- the one
+       resource the caller could not name outside its own invariant -- and
+       [Hepa], still open here, is what orders it against this batch's
+       epoch.  [Hwit] (minted above, both arms) and this comparison are the
+       two inputs the closing wand takes; together they are exactly
+       [InodeRegion.izrcpt]'s witness disjunct. *)
+    iMod "Hau" as (bsl' v') "(Hfsb & #Hvlb' & HauClose)".
+    (* [e0] is already [Ep] here -- a live entry is born at the current
+       epoch, [subst] above -- so this IS the comparison the wand wants. *)
+    iDestruct (log_epoch_lb_le γ Ep v' with "Hepa Hvlb'") as %Hvle'.
     iMod (fsblock_update γfs L (uint bno) bsl' bs bsl with "HLauth Hfsb HpL")
       as "((%Hbsl1 & %Hllk) & HLauth & Hfsb & HpL)".
     (* [Hbsl1 : bsl = bsl'] -- [fsblock_update]'s output is stated as
@@ -2176,7 +2186,7 @@ Section ProofLogWrite.
        on the LEFT.  Substituting [bsl'] away keeps [Hllk] in its old shape
        ([L !! uint bno = Some bsl]) for everything downstream. *)
     subst bsl'.
-    iMod ("HauClose" with "[//] Hfsb") as "HPhifsb".
+    iMod ("HauClose" with "[//] Hwit [//] Hfsb") as "HPhifsb".
     iModIntro.
     (* ---- THE d-TIE: the handle's dirty half against the batch's ---- *)
     rewrite (big_sepS_delete _ cov (uint bno) Hcovbno).
@@ -2719,8 +2729,11 @@ Section ProofLogWrite.
          iDestruct "HopW" as "(HopS & #Hwit & _)".
          iApply ("Hcont" $! mr with "Hsie Hcnt Hpc [%] HopS Hwit Hfsb Hlk Hslot").
          exact Hcs. }
-    iModIntro. iExists bsl. iFrame "Hfsb".
-    iIntros (_) "Hfsb". iModIntro. iExact "Hfsb".
+    (* the degenerate anchor inline: this form HOLDS the half, so it parks
+       the bound at zero (the [Hlb0] it already minted) and drops both of
+       the closing wand's new inputs *)
+    iModIntro. iExists bsl, 0%nat. iFrame "Hfsb Hlb0".
+    iIntros "_ _ _ Hfsb". iModIntro. iExact "Hfsb".
   Qed.
 
   (* THE HELD-fsblock CONTRACT, derived from the epoch-exposed one by

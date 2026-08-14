@@ -1457,6 +1457,10 @@ Section IallocClaim.
               ltac:(rewrite Hbno; exact Hlog)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
     { iEval (rewrite Hbno).
+      (* ialloc owes no receipt, so the atomic update's own anchor is the
+         unit and both of its closing inputs are dropped: one adapter line
+         (fs-log.md §G.17), and [ireg_claim_au] is unchanged. *)
+      iApply lw_au_lb0.
       iApply (ireg_claim_au ⊤ γi γfs inodestart nib inum (ialloc_fresh ty) ds
                 ltac:(solve_ndisj) Hnib Hdswf Ht0
                 (ialloc_fresh_shape ty Hty) with "Hireg"). }

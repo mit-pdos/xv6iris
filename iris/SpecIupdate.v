@@ -844,6 +844,146 @@ Definition wp_iupdate_link_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  THE LINK-SPENDING CONTRACT (design fs-icache.md §20.18, stage C4)     *)
+(*                                                                        *)
+(*  [ip->nlink = 0; iupdate(ip)] -- create's fail arm, and                *)
+(*  [dp->nlink--; iupdate(dp)] -- sys_unlink's parent decrement.  It is    *)
+(*  the DUAL of [wp_iupdate_link] and it is that body with four edits:     *)
+(*                                                                        *)
+(*    (i) the increment is FLIPPED: [nlink dn0 = nlink dn + 1], i.e. the   *)
+(*        OLD count is the new one plus one.  This is the only            *)
+(*        nlink-LOWERING flush in the kernel, which is exactly why         *)
+(*        [wp_iupdate_gen]'s [di_nlink_stable] may stand unweakened.       *)
+(*   (ii) [ilink (bv_unsigned inum)] moves from the POST to the PREMISE:   *)
+(*        the drop is PAID FOR by consuming one ledger fragment, so (L1)   *)
+(*        falls on both sides in the same ghost step and no fragment ever  *)
+(*        outlives the count that backs it.                               *)
+(*  (iii) the payout is [dinode_at γi inum dn] alone -- the retagged       *)
+(*        fragment, which with a nonzero type is what [ireg_out] is.       *)
+(*   (iv) THE RECEIPT PREMISE, and it is the whole of stage C4.            *)
+(*                                                                        *)
+(*  WHY (iv) EXISTS.  [InodeRegion.izrcpt] is owed at the record this      *)
+(*  flush writes: a record whose [nlink] is ZERO must carry a witness that *)
+(*  its inode block is in the CURRENT batch's header, or a later iput      *)
+(*  cannot claim the absorption its free path needs (fs-log.md §G.17).     *)
+(*  No caller can build one -- the comparison it needs is against the      *)
+(*  [ln_ep] auth, which lives behind the log spinlock -- so the receipt is *)
+(*  built INSIDE log_write's ghost step, out of the two inputs             *)
+(*  [SpecLogWrite.wp_log_write_au]'s closing wand now takes.  What is left *)
+(*  for the caller is only to say WHICH of the two routes it is on, and    *)
+(*  the premise is that choice, in [LogInv.log_credit]'s disjunctive       *)
+(*  style:                                                                *)
+(*                                                                        *)
+(*    - LEFT, the WITNESS route (create's [ip->nlink = 0]): the record     *)
+(*      being written may have [nlink = 0], so the receipt must be real.   *)
+(*      It costs no resource -- the wand's [logged_at]/[<=] inputs are it  *)
+(*      -- only the two AMBIENT TIES, [⌜γ = icfg_log⌝] and                 *)
+(*      [⌜inodestart = icfg_ist⌝], which are what identify the region's    *)
+(*      own log and first inode block with the threaded ones               *)
+(*      ([SpecIput]'s [crz] premise carries the same pair, for the same    *)
+(*      reason: a tie between a threaded name and an ambient record field  *)
+(*      is sayable only as a pure equation, true at boot by [icfg_alloc]). *)
+(*    - RIGHT, the VACUOUS route (sys_unlink's [dp->nlink--], and any      *)
+(*      decrement that lands nonzero): [⌜nlink dn <> 0⌝] makes [izrcpt]'s  *)
+(*      antecedent false, so the receipt is free, the anchor is the unit   *)
+(*      at the caller's own [γ], and NEITHER tie is needed.                *)
+(*                                                                        *)
+(*  A SIXTH PARAMETER, POSITIONAL, for the fifth's reason: no landed       *)
+(*  caller's arity moves and the five landed contracts stay byte-stable.   *)
+(*  [cru]-credited and [eb := true], cut to create's altitude, exactly as  *)
+(*  the fifth is.                                                         *)
+(* ===================================================================== *)
+Definition wp_iupdate_unlink_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+    `{GEN : GenId} `{CID : CpuId}
+
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+    (ip : mword 64) (inum : mword 32)
+    (dn dn0 : dinode) (bm : blkmap)
+    (u : nat) (Sb : gset Z) (cru : bool)
+    (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_iupdate <= K)%nat ->
+  (cru = true -> IBLOCK inum inodestart ∈ Sb) ->
+  log_geom_ok cov logstart ->
+  0 <= inodestart ->
+  IBLOCK inum inodestart ∈ cov ->
+  ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  InodeRegion.di_type_stable dn dn0 ->
+  (* the fifth body's added premise, unchanged: (L3) makes a type-0
+     record's count zero, and the region's closing clause needs the type to
+     stay out of that corner while a fragment is being spent. *)
+  bv_unsigned (di_type dn) <> 0 ->
+  (* THE DECREMENT, the flip of the fifth body's increment: the OLD count
+     is the new one plus one, and the [ilink] premise below is what pays
+     for it. *)
+  bv_unsigned (di_nlink dn0) = bv_unsigned (di_nlink dn) + 1 ->
+  di_addrs dn = bm_cells bm ->
+  length (bm_dir bm) = NDIRECT ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  i_dev ip ↦₄{dqd} dev -∗
+  i_inum ip ↦₄{dqn} inum -∗
+  inode_meta ip dn -∗
+  inode_map γfs ip bm -∗
+  sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
+  (* THE FRAGMENT THE DROP SPENDS (edit (ii)): consumed, not returned. *)
+  ilink (bv_unsigned inum) -∗
+  (* THE RECEIPT PREMISE (edit (iv); see the banner).  Persistent in both
+     arms, so it costs a caller nothing to keep, and pure in both, so the
+     choice is made with one [iLeft]/[iRight]. *)
+  (⌜γ = icfg_log⌝ ∗ ⌜inodestart = icfg_ist⌝
+   ∨ ⌜bv_unsigned (di_nlink dn) <> 0⌝) -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  procs_inv γs -∗
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  bslots bn 2 -∗
+  log_opS γ (S u) Sb -∗
+  wp_next true pj (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      i_inum ip ↦₄{dqn} inum -∗
+      inode_meta ip dn -∗
+      inode_map γfs ip bm -∗
+      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      (* THE FLUSH, AND NOTHING MINTED (edit (iii)): the retagged fragment
+         alone -- the type is nonzero, so this is [ireg_out] here -- and
+         the [ilink] that went in is GONE, spent by the count it paid. *)
+      dinode_at γi inum dn -∗
+      bslots bn 2 -∗
+      log_opS γ (if cru then S u else u) (Sb ∪ {[IBLOCK inum inodestart]}) -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -965,4 +1105,29 @@ Module Type IUPDATE.
       wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
                            pidv dq dqd dqn dqs m K eb C b.
+
+  (* the LINK-SPENDING contract (design §20.18 stage C4): the credited walk
+     at a flush that LOWERS [nlink] by one, spending the [ilink] that drop
+     costs and carrying the zero-record receipt through log_write's own
+     ghost step.  A sixth parameter for the fifth's reason. *)
+  Parameter wp_iupdate_unlink :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
+      `{GEN : GenId} `{CID : CpuId}
+
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
+      (ip : mword 64) (inum : mword 32)
+      (dn dn0 : dinode) (bm : blkmap)
+      (u : nat) (Sb : gset Z) (cru : bool)
+      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                             cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
+                             pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.
