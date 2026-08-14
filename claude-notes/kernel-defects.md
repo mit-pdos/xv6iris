@@ -7,7 +7,24 @@ saturation, below); every other defect this effort found has been fixed
 upstream, and a fix's consequences for a contract are recorded with that
 contract, not here.
 
-## CANDIDATE (2026-08-14) — `nlink` SATURATION IS UNCHECKED, so `create`'s
+## REFUTED CANDIDATE (2026-08-14) — nlink saturation via mkdir is
+## unreachable: the inode supply exhausts first (user-tested on xv6)
+
+Raised at the create walk's mkdir arm (dp->nlink++ wraps a ushort at
+65535, making the raising-flush contract unsatisfiable).  Refuted by the
+team for the sketched route: a directory's nlink rises only at its own
+creation and per CHILD DIRECTORY (sys_link refuses directories), every
+child consumes an inode, and NINODES is orders of magnitude below 65534 —
+ialloc's A-FAIL fires long before saturation.  Empirically confirmed on
+xv6.  nlink CAN in principle overflow (sys_link on a regular file, a
+different walk), which stays a note for sys_link's own stage.
+
+What survives for the proof: the bound must reach the walk as an
+INVARIANT (no hypothesis can thread — the no-name objection), i.e. the
+L4 shape: directory nlink <= 1 + allocated count, maintained at the ++
+by the same-step allocation, consumed at the mkdir arm with the geometry
+premise.  Staged as C5.
+
 ## `mkdir` arm and `sys_link` can WRAP a link count to zero
 
 xv6 raises a link count in exactly two places — `create`'s `dp->nlink++`
