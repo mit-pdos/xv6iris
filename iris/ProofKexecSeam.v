@@ -912,6 +912,7 @@ Section KexecBSeam.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
        M !!! Regidx Ra0 = avf c /\
        M !!! Regidx Rs2 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
@@ -955,6 +956,7 @@ Section KexecBSeam.
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
     (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs0 = sp0 /\
        M !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64) /\
        M !!! Regidx Rs2 = (mword_of_int (kxc_sp (uint sz1) alen c) : mword 64) /\
        M !!! Regidx Rs4 = sz1 /\

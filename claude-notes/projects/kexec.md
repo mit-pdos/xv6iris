@@ -251,17 +251,67 @@ work is `match goal with |- ?G => idtac "GOAL:" G end.` (prints the actual
 goal, which is what actually diagnosed the `bv_modulus`-vs-literal gap) —
 never trust `idtac H` for a hypothesis `H` as evidence of anything.
 
-**Still open in phase C beyond the BLTU:** the taken/overflow arm's
-`+0x358` connector into `kxc_bad_1d6` (needs `kxc_ustack_collapse` first,
-to turn `kxc_frameC`'s split-at-`c` ustack back into `kxc_frame_at`'s
-uniform shape — see the design note two paragraphs up); the rest of the
-fall-through arm (reload argv[c] via s11, second `strlen` call at +0x238,
-the `copyout` call and its own fail exit at +0x24c, the ustack write, the
-next-arg load at +0x264, the three-way final branch at +0x268/+0x26a);
-`kxc_argv_loop` (the fuel-induction wrapper, mirroring
-`ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the closing
-`copyout` call joining into phase D at `+0x2a6`. Then phase D, then
-`ProofKexec.v` + `LinkKexec.v`.
+**Progress past the BLTU, same session, continuing "keep going":** the
+fall-through arm now reaches +0x236 -- reload argv[c] via `s11` (+0x22e
+`ld s11,3584(s0)`, +0x232 `ld s3,0(s11)` out of `Hargv`, extract/use/
+restore, same idiom as `kxc_c_setup`'s argv[0] read) then `mv a0,s3`
+prepping the SECOND `strlen` call's argument. `admit`s right before the
++0x238 `jal` itself. `coqc`-clean (verified fresh, `EXIT: 0`, zero errors)
+as of this checkpoint.
+
+**A SECOND missing invariant conjunct, found the same way as the
+`stackbase<=sp` one:** +0x22e's `ld s11,3584(s0)` needs `s0`'s value, and
+`kxc_at_21a`/`kxc_at_272` didn't track it -- `s0 = sp0` is set once in
+`kxc_c_setup`'s prologue and never touched again for the rest of the
+function (confirmed: none of the loop body's own instructions write s0),
+so it's a genuine "dead invariant" register exactly like the earlier gap.
+**Fixed the same way:** added `M !!! Regidx Rs0 = sp0` as a new conjunct to
+both `kxc_at_21a`/`kxc_at_272` (`ProofKexecSeam.v`), threaded `HW{2..8}s0`
+through every intermediate register-file pose in `kxc_c_setup`'s existing
+chain (**most of this chain, `HW2s0`/`HW3s0`, already existed** -- only
+checking the OUTERMOST fact (`HW8s0`) was missing led to duplicating two
+already-present links first time through; `grep -c` each `HW{i}s0` before
+assuming a whole chain is absent), and added `HT{0..5}s0` through
+`kxc_argv_step`'s own T-chain the same way as every other tracked
+register.
+
+**A costly false trail, worth remembering in full:** +0x236 looked like a
+NON-compressed `add a0,zero,s3` from an early, uncross-checked reading, so
+substantial effort went into writing a new `wp_mv_s_sconf` lemma (the
+non-compressed twin of `WpSconfAlu.wp_cmv_s_sconf`) to fill what looked
+like a real gap in the shared WP library -- necessary in principle (the
+generic `wp_add_s_sconf`'s wval premise genuinely does need `rget m zero =
+zero_reg`, a fact nothing forces structurally, for `rs1 = zero`; the fix
+is routing the zero read through `gpr_rd_val`'s own `if uint r = 0` case
+via `wp_gpr_write_s_sconf_base`, passing `rs2` into BOTH callback slots).
+That lemma is CORRECT and PROVEN (`Qed`), but **turned out to be
+unnecessary**: `kxc_236`'s own `instr` fact says `true` (compressed) --
+`CodeKexec.v` had it right the whole time; the transcription that started
+this detour just misread it. It was deleted rather than left as dead code.
+Two things worth keeping from the detour: (1) **a `Local Lemma` declared
+inside a section that fixes one hart/process as a Context variable (like
+`KexecCLoop`'s `CID0`/`jp`) bakes THAT SAME hart into its own statement
+instead of a fresh per-call-site implicit** -- symptom was `iSpecialize:
+cannot instantiate` with BOTH sides of the failing premise PRINTING
+IDENTICALLY (`CID0` vs the actual current hart several `wp_next`s later,
+invisible without `Set Printing All`); a leaf WP lemma needs its OWN
+freestanding section mirroring the library file's own header
+(`Context `{!riscvGS Σ}. Context `{!sieG Σ}. Context `{GEN}`{CID}`. Context
+{p}.`) to get a properly fresh, unifiable implicit hart. (2) **Before
+writing a new WP lemma for a suspicious instruction shape, re-`grep` its
+own `CodeKexec.v` fact one more time** -- the compressed flag is the
+cheapest possible check and would have skipped the entire detour.
+
+**Still open in phase C beyond +0x236:** the taken/overflow arm's `+0x358`
+connector into `kxc_bad_1d6` (needs `kxc_ustack_collapse` first, to turn
+`kxc_frameC`'s split-at-`c` ustack back into `kxc_frame_at`'s uniform
+shape — see the design note above); the rest of the fall-through arm (the
+`jal` to `strlen` at +0x238 itself, the `copyout` call and its own fail
+exit at +0x24c, the ustack write, the next-arg load at +0x264, the
+three-way final branch at +0x268/+0x26a); `kxc_argv_loop` (the
+fuel-induction wrapper, mirroring `ProofKexecB3.kxc_phdr`'s shape around
+`kxc_ph_step`), and the closing `copyout` call joining into phase D at
+`+0x2a6`. Then phase D, then `ProofKexec.v` + `LinkKexec.v`.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
