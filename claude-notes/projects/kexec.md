@@ -302,16 +302,81 @@ writing a new WP lemma for a suspicious instruction shape, re-`grep` its
 own `CodeKexec.v` fact one more time** -- the compressed flag is the
 cheapest possible check and would have skipped the entire detour.
 
-**Still open in phase C beyond +0x236:** the taken/overflow arm's `+0x358`
-connector into `kxc_bad_1d6` (needs `kxc_ustack_collapse` first, to turn
-`kxc_frameC`'s split-at-`c` ustack back into `kxc_frame_at`'s uniform
-shape — see the design note above); the rest of the fall-through arm (the
-`jal` to `strlen` at +0x238 itself, the `copyout` call and its own fail
-exit at +0x24c, the ustack write, the next-arg load at +0x264, the
-three-way final branch at +0x268/+0x26a); `kxc_argv_loop` (the
-fuel-induction wrapper, mirroring `ProofKexecB3.kxc_phdr`'s shape around
-`kxc_ph_step`), and the closing `copyout` call joining into phase D at
-`+0x2a6`. Then phase D, then `ProofKexec.v` + `LinkKexec.v`.
+**Progress past +0x236, same session, still "keep going":** the fall-through
+arm now reaches all the way through the SECOND `strlen` call (+0x238, for
+copyout's own `len`), the four `c.mv` argument preps (+0x240..+0x246), and
+the `copyout` call itself (+0x248) including its own branch at +0x24c —
+both arms of THAT branch are now written too (success falls through,
+`admit`; failure funnels to +0x35c, `admit`, same missing-connector shape
+as the BLTU overflow exit's +0x358). `coqc`-clean, and — per this
+session's mid-stream steer to build on the GCP VM instead of local
+`coqc` — verified via a full clean GCP build (exit 0, zero errors, only
+the harmless notation warnings). **Three `admit`s now**, not one: the
++0x358 stub, the +0x35c stub (both need the SAME connector work), and the
+copyout-success continuation (ustack write onward).
+
+**`sz1`'s MAXVA bound for copyout's own premise came free, unlike the two
+register-tracking gaps — no new invariant conjunct needed.** copyout
+requires `(uint sz1 <= 2^38)%Z`, and `SpecUvmalloc`'s postcondition does
+NOT give this (confirmed by an Explore agent: the postcondition has no
+upper bound at all when the precondition was discharged via the
+`um_covered` disjunct, which is kexec's own case — `uvmalloc`'s untrusted
+ELF-derived `newsz` has no a-priori bound). The fix: derive it from the
+loop invariant's OWN `um_covered sz1 P.(ud_um)` conjunct directly, via
+`UmCovered.proc_pt_covered_maxsz : proc_pt_wf P -> um_covered szv P.(ud_um)
+-> bv_unsigned szv <= uvm_maxsz` (already used once before, in
+`kxc_bad_1d6`'s own proof, for exactly this purpose) — `proc_pt_wf_get`
+off `Hpt` plus this one lemma closes it, `uvm_maxsz = 2^38 - 8192` weakened
+to `2^38` by `lia` once both sides are literal.
+
+**A real, structural gap in the buffer/string distinction, worth
+remembering for any future strlen-then-copyout pair:** `Hargc` (extracted
+from `Hargs` for `strlen`) covers `seq 0 (aslen c)` — the WHOLE allocated
+buffer — but `copyout` only wants `seq 0 (S (alen c))` — the string plus
+its NUL. These are different ranges (`alen c < aslen c`), and passing the
+wrong one is a genuine type mismatch, not a cosmetic one. Fixed by
+`seq_app` + `big_sepL_app` to split `Hargc` into a prefix (handed to
+copyout) and a suffix (set aside), then `iCombine` + the same lemmas in
+reverse to re-fold it back to `Hargc`'s original shape once copyout's own
+contract (**"the source buffer comes back unchanged"**, `SpecCopyout.v`'s
+own header) hands the prefix back.
+
+**A THIRD instance of the "chain the register file through every
+intervening `pose`, or callee_saved_lookup will silently miss it" gap**
+(same species as the `Rs0`/stackbase gaps, but this time entirely LOCAL to
+`ProofKexecC.v`, no `ProofKexecSeam.v` change needed): the five `T8..T12`
+poses between the ADDIW and the `copyout` call each only carried the
+register facts the IMMEDIATELY NEXT step needed, not the full set —
+`Rs0`/`Rs1`/`Rs2`/`Rs4`/`Rs6`/`Rs7`/`Rs8`/`Rs9`/`Rs10`/`Rs11` all had gaps
+at one `T{i}` or another, surfacing one at a time as `"HT{i}s{j} was not
+found"` once `T13` (post-`copyout`) needed to reconstruct them via
+`callee_saved_lookup`. **The mechanical lesson: when adding a new `pose`
+in the middle of an already-long register-file chain, carry EVERY fact
+the CURRENT state has, not just the ones the very next line needs** — an
+omitted fact costs nothing until some LATER step needs it, at which point
+the fix is a batch of near-identical `assert`s scattered across several
+already-written `pose`s rather than one line in the state that dropped it.
+**Also**: `callee_saved_lookup` only bridges ONE call boundary at a time
+(`Hcs2 : callee_saved Z2 T13` relates `T13` to `Z2`, NOT to `T6` or any
+earlier state) — chaining `rewrite (callee_saved_lookup Hcs2 ...)` then
+`rewrite (callee_saved_lookup Hcs1 ...)` back-to-back to try to reach
+THROUGH two DIFFERENT calls in one step doesn't type-check (the second
+rewrite's target doesn't match); bridge each call boundary to its OWN
+immediately-preceding `pose`d state (here, `Z2` to `T12` via plain
+`upd_ne`, since `Z2` only touched `Rra`), not further back.
+
+**Still open in phase C:** BOTH the `+0x358` and `+0x35c` connectors into
+`kxc_bad_1d6` (needs `kxc_ustack_collapse` first, to turn `kxc_frameC`'s
+split-at-`c` ustack back into `kxc_frame_at`'s uniform shape — see the
+design note above; the SAME connector code should serve both stubs, since
+both just do `mv s3,s4` before falling into the shared tail); the rest of
+the copyout-success arm (the ustack write at +0x250..+0x260, the loop
+counter increment at +0x25a, the argv-pointer bump and spill at
++0x25c..+0x260, the next-arg load at +0x264, the three-way final branch
+at +0x268/+0x26a/+0x26e); `kxc_argv_loop` (the fuel-induction wrapper,
+mirroring `ProofKexecB3.kxc_phdr`'s shape around `kxc_ph_step`), and the
+closing `copyout` call joining into phase D at `+0x2a6`. Then phase D,
+then `ProofKexec.v` + `LinkKexec.v`.
 
 <details>
 <summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
