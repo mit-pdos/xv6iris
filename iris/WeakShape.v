@@ -2,11 +2,19 @@
 
     Stage C of [claude-notes/projects/weak-memory-premises.md] has to discharge
 
-        ∀ b, sail_shaped (riscv_step b)   and   ∀ b, sail_live (riscv_step b)
+        ∀ b, sail_shaped (riscv_step b)   and   the LIVENESS half
 
-    ([WeakSailLTS.sail_shaped] / [WeakSailComplete.sail_live]).  This file is
-    the KIT that a sweep over the generated model would run on, plus a
+    ([WeakSailLTS.sail_shaped] / [WeakSailComplete.sail_live_st]).  This file
+    is the KIT that a sweep over the generated model would run on, plus a
     measured calibration.  It adds no axioms.
+
+    THE LIVENESS HALF IS NOT A [∀ b] FACT (stage C9, finding (O9)): its
+    honest form is [sail_live_st rs (riscv_step b)] under [priv_ok rs], and
+    the STATE-THREADING kit that proves it lives in [WeakShapeLive.v].  What
+    this file's [glive] contributes there is the REGISTER-FREE half — a
+    fragment proved [glive true] is live at every register state
+    ([glive_sail_live_st]), which is what lets a register-insensitive prefix
+    be reused verbatim under the state-threading bind rule.
 
     ------------------------------------------------------------------------
     (1) THE ONE ABSTRACTION: [gwalk].
@@ -33,8 +41,11 @@
     through [M A] and [try_catch]/[liftR] through [monadR R E].
 
     [glive] is likewise indexed by a bool [xf] = "an uncaught [ExtraOutcome]
-    (i.e. a Sail exception) is fatal".  [glive true] is [sail_live]
-    ([glive_live]); [glive false] is what a [try_catch] argument needs.
+    (i.e. a Sail exception) is fatal".  [glive true] is the REGISTER-FREE
+    reading of liveness ([glive_sail_live_st]); [glive false] is what a
+    [try_catch] argument needs.  The STATE-CONDITIONED reading the machine
+    actually asks for is [WeakSailComplete.sail_live_st] and its kit is
+    [WeakShapeLive.gliveP].
 
     ------------------------------------------------------------------------
     (2) WHAT THE KIT COVERS (151 lemmas).  All of SailStdpp's [Defs]
@@ -177,7 +188,9 @@ Fixpoint gwalk (m : mon) {struct m} : Prop :=
   end.
 
 (** [xf]: an [ExtraOutcome] (a raised Sail exception) is FATAL.  [true] is
-    [sail_live]; [false] is the hypothesis a [try_catch] argument satisfies. *)
+    the REGISTER-FREE reading of liveness (live at EVERY register state,
+    [glive_sail_live_st]); [false] is the hypothesis a [try_catch] argument
+    satisfies. *)
 Fixpoint glive (xf : bool) (m : mon) {struct m} : Prop :=
   match m with
   | Interface.Ret _ => True
@@ -246,19 +259,37 @@ Proof.
   - (* ExtraOutcome: (e''') — a dead end *) done.
 Qed.
 
-Lemma glive_live (m : M unit) : glive true m ↔ sail_live m.
+(** [glive] IS THE REGISTER-FREE READING, AND IT SURVIVES STAGE C9 AS THE
+    REUSABLE HALF.  Its [RegRead]/[RegWrite] arms are the default [∀ r, …],
+    i.e. it says the monad is live AT EVERY register state — which is FALSE
+    of the instruction monad (finding (O9)) but TRUE of the register-free
+    and register-insensitive fragments, and it implies the state-conditioned
+    reading at every state.  So a prefix proved [glive] once serves
+    [WeakShapeLive]'s state-threading kit at every [rs]
+    ([WeakShapeLive.glive_glive_st]); what it can no longer be is the
+    STATEMENT of the liveness half.  See [WeakSailComplete] §2 (f). *)
+Lemma glive_sail_live_st (rs : regstate) (m : M unit) :
+  glive true m → sail_live_st rs m.
 Proof.
-  induction m as [x|T oc k IH]; [done|].
-  destruct oc; simpl; try (split; intros H r; by apply IH, H); try done.
-  - destruct ty; simpl; (split; [done|done]) ||
-      (split; intros H r; by apply IH, H).
+  revert rs. induction m as [x|T oc k IH]; intros rs; [done|].
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl; try done;
+    try (intros H r; by apply IH).
+  - (* RegRead: the ∀ arm answers both branches of the concrete one *)
+    destruct (register_beq rg (sig_seip : register)); intros H;
+      [intros v|]; by apply IH.
+  - (* RegWrite *) intros H. by apply IH.
+  - (* MemWrite *) intros H. by apply IH.
+  - (* Choose *) destruct ty; simpl; try done; intros H r; by apply IH.
 Qed.
 
-(** The definitive form: [gok] on the instruction monad is exactly the two
-    stage-C premises. *)
-Lemma gok_stageC (m : M unit) : gok m → sail_shaped m ∧ sail_live m.
+(** The definitive form: [gok] on the instruction monad gives the shape
+    premise outright and the liveness premise at EVERY register state (which
+    is more than the machine needs — see the note above). *)
+Lemma gok_stageC (rs : regstate) (m : M unit) :
+  gok m → sail_shaped m ∧ sail_live_st rs m.
 Proof.
-  intros [H1 H2]. split; [by apply gwalk_shaped|by apply glive_live].
+  intros [H1 H2]. split; [by apply gwalk_shaped|by apply glive_sail_live_st].
 Qed.
 
 (* ---------------------------------------------------------------------- *)

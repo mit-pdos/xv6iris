@@ -87,15 +87,16 @@
     window-open [False] is a kit-side strengthening that [gwalk_try_catch]
     needs (see the arm).
 
-    NOTE FOR THE LIVENESS HALF: [glive]'s arm is [if xf then False else True],
-    i.e. [sail_live] FORBIDS a raised exception outright, and the path above
-    is reachable in the same ∀-quantified sense.  So
-    [∀ b, sail_live (riscv_step b)] is refuted by the SAME witness, and what
-    it needs is not a shape fix but the per-image reachability narrowing of
-    (O3): xv6 runs with the H extension off, so [cur_privilege] is never
-    [VirtualSupervisor]/[VirtualUser].  That is a register-state side
-    condition, and it is the reason the liveness half cannot be stated as
-    [∀ b] at all. *)
+    THE LIVENESS HALF WAS REFUTED BY THE SAME WITNESS, AND STAGE C9 RESTATED
+    IT: liveness FORBIDS a raised exception outright, and the path above is
+    reachable in the ∀-quantified sense, so [∀ b, sail_live (riscv_step b)]
+    was FALSE.  What it needed was not a shape fix but the register-state
+    side condition of (O3) — xv6 runs with the H extension off, so
+    [cur_privilege] is never [VirtualSupervisor]/[VirtualUser] — and that is
+    why the liveness half cannot be a [∀ b] fact at all.  It is now
+    [WeakSailComplete.sail_live_st] under [priv_ok]; the predicate answers
+    [RegRead] from the register file exactly as [sail_mstep] does, which
+    kills this witness outright.  Kit and reduction: [WeakShapeLive.v]. *)
 
 From stdpp Require Import gmap finite list relations.
 From stdpp Require Import bitvector.definitions.

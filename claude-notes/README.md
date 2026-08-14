@@ -143,10 +143,17 @@ are working on that effort — the relevant `projects/` file.
 ### `projects/` — ongoing worklists & plans (one per effort)
 
 - **[`weak-memory-premises.md`](projects/weak-memory-premises.md)** — shrinking
-  the lifted capstone's premise ledger: the Hcls retag elimination (the
-  machine is class-oblivious), the Hres→Horc derivation, the Hirqb→Hseip
-  coverage fix (mid-block SEIP deliveries commuted forward under a
-  seip-free residual), and the group-3 shape-typing sweep.
+  the lifted capstone's premise ledger.  **The in-scope ledger is CLOSED
+  (C9, 2026-08-14) — the file should move to `completed/`.**  Both halves of
+  seam (6) are theorems now: `riscv_step_shaped_ax` over
+  `rv64d_axiom_shapes`, and `riscv_step_live_ax` over `rv64d_live_residue`
+  plus the per-record `Hpriv`.  Read it for the recurring finding it is a
+  catalogue of — SIX refutations of the two group-3 premises, every one an
+  arm of a monad predicate demanding more than the machine supplies, every
+  one repaired by NARROWING the arm — for the state-threading liveness
+  predicate and the record-own-registers residual invariant (C9), and for
+  the Hcls retag elimination, the Hres→Horc derivation and the Hirqb→Hseip
+  coverage fix.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
@@ -332,8 +339,10 @@ are working on that effort — the relevant `projects/` file.
   it for the two findings — `pf_violation_free_hart`/block-cover are
   REFUTABLE at event granularity (the dangling walker-CAS-under-`w_relp`
   counterexample), and same-agent fulfil timestamps are not
-  program-order monotone — the final premise ledger
-  (`xv6_cone_premises`, `cone_liftable`, `sail_live`, `img_total`) with
+  program-order monotone — the premise ledger AS OF THE LIFT
+  (`xv6_cone_premises`, `cone_liftable`, `sail_live`, `img_total`; the two
+  model-fact premises have since become theorems — see
+  `projects/weak-memory-premises.md`) with
   its discharge stories, and the reusable recipes (the `Acc`-on-a-free-
   monad kit, contracted-acyclicity-for-free, splice-by-transplant).
 - **[`weak-memory-m6.md`](completed/weak-memory-m6.md)** — the M6

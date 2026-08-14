@@ -324,8 +324,9 @@
     §D  THE PREMISE LIST OF [xv6_weak_robust_adequate] — the composition's
     assumptions inventory (against [WeakCompose] §6's):
 
-      1. [rv64d_axiom_shapes] AND [∀ b, sail_live (riscv_step b)] — what is
-         left of seam (6)'s two group-3 model facts.
+      1. [rv64d_axiom_shapes] AND [rv64d_live_residue] — what is left of
+         seam (6)'s two group-3 model facts.  BOTH ARE NOW RECORDS, NOT
+         [∀ b] PREMISES (stages C8 and C9).
 
          THE SHAPE HALF IS NO LONGER A PREMISE (stage C8).
          [WeakShapeTop.riscv_step_shaped_ax] PROVES
@@ -350,18 +351,39 @@
          worklist [claude-notes/projects/weak-memory-premises.md] has the
          findings verbatim.
 
-         THE LIVENESS HALF STAYS A PREMISE, AND VERBATIM — it cannot be
-         stated any other way.  (O9)'s witness refutes it as written:
-         [glive] forbids a raised Sail exception outright and
-         [rv64d.zicfiss_xSSE] raises one at [VirtualSupervisor], which every
-         shape predicate's [RegRead] arm quantifies over.  Its honest form is
-         STATE-CONDITIONED — [sail_live] under a register-state precondition
-         (xv6 runs with the H extension off, so [cur_privilege] is never
-         [VirtualSupervisor]/[VirtualUser]) — i.e. it is not a [∀ b] fact at
-         all, and settling that precondition comes BEFORE any [gok] tower.
-         It is left as it is rather than swapped for a record, because
-         swapping a false premise for a false record hides the vacuity
-         instead of recording it.
+         THE LIVENESS HALF IS NO LONGER A PREMISE EITHER (stage C9), AND
+         THE PREMISE IT REPLACES WAS FALSE.  (O9)'s witness refutes
+         [∀ b, sail_live (riscv_step b)] as written — liveness forbids a
+         raised Sail exception and [rv64d.zicfiss_xSSE] raises one at
+         [VirtualSupervisor], a value the OLD [RegRead] arm quantified over
+         — so a capstone carrying it was VACUOUS.  C9 took the same
+         narrowing the five shape findings took: [sail_mstep] answers a
+         [RegRead] concretely, so the predicate does too.
+         [WeakSailComplete.sail_live_st rs m] answers every [RegRead] from
+         [rs] and THREADS every [RegWrite]; the sole exception is
+         [sig_seip], still ∀-quantified because [irq_deliver] writes the pin
+         behind the residual's back (note (g) there).  Then
+         [WeakShapeLive.riscv_step_live_ax] PROVES
+         [∀ rs b, priv_ok rs → sail_live_st rs (riscv_step b)] from the
+         record [rv64d_live_residue].
+
+         READ THE TWO RECORDS DIFFERENTLY.  [rv64d_axiom_shapes] is
+         IRREDUCIBLE.  [rv64d_live_residue] is the (O3) LIVENESS SWEEP,
+         UN-RUN — two fields ([try_step], [tick_clock]) standing for a
+         campaign whose size is now measured ([make live-sites]): 123 of the
+         345 reachable monadic definitions carry a failure node directly,
+         302 carry one in their cone, 431 sites in all, each needing a
+         REACHABILITY argument rather than a shape lemma.  It is a [Record]
+         and not an [Axiom] precisely so that this shows up as a named
+         hypothesis a caller must supply.
+
+         THE SWAP IS NOT A WEAKENING, AND SAYING SO IS THE POINT.  The
+         deleted [∀ b] premise is unsatisfiable, so it formally implies
+         anything, including this record; but [Hpriv] (5 below) is a NEW
+         per-trace obligation that the old premise did not imply, and a
+         supplier who had "discharged" the old one had in fact discharged
+         nothing.  What the swap buys is that the capstones are no longer
+         vacuous.
       2. THE FRESH ERA: [gen_id = 0], [wgpow g0 = true], [wggen g0 = 0],
          [wglog g0 = []], [∀ c, wgws g0 c = ws_init], [wa_dws u0 = ws_init]
          — literally [weak_system_adequacy_phi]'s, plus the disk agent's own
@@ -373,11 +395,21 @@
          reader-tail completion.
       5. The per-traced-bundle static package: [main_premises n_disk TS]
          (= [WeakCompose] §6 (3), with [bad] now bounding the READER's agent
-         index too) AND [xv6_cone_premises TS], which is now exactly TWO
-         conjuncts — [Hcq] (a cross-edge source's post-state is quiet) and
+         index too) AND [xv6_cone_premises TS], which is now exactly THREE
+         conjuncts — [Hcq] (a cross-edge source's post-state is quiet),
          [Hseip] (a delivery either lands at an instruction boundary or the
-         residual it interrupts never touches [sig_seip]) — stated exactly
-         as [WeakSailCone] §11-§12's section context.  The package is
+         residual it interrupts never touches [sig_seip]) and, since stage
+         C9, [Hpriv] (every hart record's [cur_privilege] is one of
+         [Machine]/[Supervisor]/[User]) — stated exactly as [WeakSailCone]
+         §11-§13's section context.  [Hpriv] is the per-trace input of
+         premise 1's liveness half: a boundary record is where a fresh
+         instruction is loaded, and [riscv_step_live_ax] gives its liveness
+         only at a [priv_ok] register file.  Per-image discharge: xv6 never
+         enables the hypervisor extension.  RECORDED UPGRADE PATH (not
+         attempted): the model-level reachability invariant "[priv_ok] is
+         preserved by [riscv_step]", which would delete the premise — it is
+         the same whole-instruction-set sweep [rv64d_live_residue] is.
+         The package is
          demanded ONLY of bundles satisfying [WeakRetag.cls_canonical
          lbl_class] (see 5' below), so the supplier's obligation is strictly
          smaller than it looks.
@@ -452,8 +484,9 @@ From xv6iris Require Import WeakRobust WeakRobustTrace WeakRobustGraph
 From xv6iris Require Import WeakRetag.
 From xv6iris Require Import WeakInterp WeakInterpProj WeakSailLTS WeakSailLTS2.
 From xv6iris Require Import WeakSailComplete WeakSailCone.
-(* the SHAPE half of seam (6), as a theorem over the axiom record (§D 1) *)
-From xv6iris Require Import WeakShapeMem WeakShapeTop.
+(* seam (6): the SHAPE half as a theorem over the axiom record, the
+   LIVENESS half as a theorem over the residue record + [Hpriv] (§D 1) *)
+From xv6iris Require Import WeakShapeMem WeakShapeTop WeakShapeLive.
 Require Import RiscvLang WeakLang.
 From xv6iris Require Import WeakCompose.
 From iris.algebra Require Import dfrac.
@@ -1772,7 +1805,26 @@ Definition xv6_cone_premises (TS : ptraces pxv6) : Prop :=
      pt_trs TS !! i = Some T →
      at_ags T !! k = Some ag → at_ags T !! S k = Some ag' →
      pa_st ag = PHart q → pa_st ag' = PHart q' →
-     irq_deliver q l q' → ¬ pbnd (PHart q) → seip_free_psail q).
+     irq_deliver q l q' → ¬ pbnd (PHart q) → seip_free_psail q) ∧
+  (** [Hpriv] (stage C9): every hart record's [cur_privilege] is one of the
+      three privileges an H-less machine has.  It is the per-trace input of
+      the LIVENESS half of seam (6) — [WeakShapeLive.riscv_step_live_ax]
+      supplies liveness of a fresh instruction only at a [priv_ok] register
+      file, and a boundary record is where that instruction is loaded.
+
+      PER-IMAGE DISCHARGE: xv6 never enables the hypervisor extension
+      (misa.H is clear at reset and no kernel store sets it), so
+      [VirtualUser]/[VirtualSupervisor] are unreachable.  This is the same
+      family as [Hcq]/[Hseip] — a per-image, checker-style fact — and its
+      RECORDED UPGRADE PATH is the model-level reachability invariant
+      ("[priv_ok] is preserved by [riscv_step] from a [priv_ok] reset
+      state"), which would delete the premise outright.  Not attempted:
+      it is a statement about the whole instruction set, i.e. the same
+      sweep as [rv64d_live_residue] itself, and it is recorded rather than
+      forced into this stage. *)
+  (∀ i T k ag q,
+     pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
+     pa_st ag = PHart q → priv_ok (sp_regs q)).
 
 (** THE BUNDLE FACTS [robust_main]'s own proof derives from a behavior — and
     which the cone consumes.  Packaged so that the "no bad edge" premise of
@@ -1819,7 +1871,7 @@ Qed.
 Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (TS : ptraces pxv6) :
   (∀ b, sail_shaped (riscv_step b)) →
-  (∀ b, sail_live (riscv_step b)) →
+  (∀ rs b, priv_ok rs → sail_live_st rs (riscv_step b)) →
   wthread_live g0 gen →
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
   img_total (img_z (wgimg g0)) →
@@ -1834,13 +1886,14 @@ Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
 Proof.
   intros Hsh Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hbwf
     (Hwf & Hwsi & Hco & Hwfl & Himg & Hnag & Hdata & Hps0 & Hfo & Hee & Hsplit)
-    (Hcq & Hseip) Hcls Hcl e1 e2 Hbad.
+    (Hcq & Hseip & Hpriv) Hcls Hcl e1 e2 Hbad.
   (** [Hres] IS DERIVED (WeakSailCone §13): the residual invariant follows
       from the two group-3 facts and the trace well-formedness already in
       hand.  Since stage D there is no device residue to re-establish, so
       the old [horc_prem] input is gone with it. *)
   have Hres : hres_prem TS
-    := hres_derived TS (xv6_ps0 g0 u0) Hwf Hps0 (xv6_ps0_bnd g0 u0) Hsh Hslv.
+    := hres_derived TS (xv6_ps0 g0 u0) Hwf Hps0 (xv6_ps0_bnd g0 u0) Hsh Hslv
+         Hpriv.
   destruct (Hbwf e1 e2 Hbad) as (f1 & f2 & Hbad' & Hmin).
   destruct (cone_segments2 TS (img_z (wgimg g0)) (xv6_ps0 g0 u0)
               Hwf Hwsi Hco Hwfl Himg Hnag Hdata Hps0 Hfo Hee n_disk Hsplit
@@ -1945,7 +1998,7 @@ Qed.
 Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
     (c : wpcfg pxv6) :
   rv64d_axiom_shapes →
-  (∀ b, sail_live (riscv_step b)) →
+  rv64d_live_residue →
   wthread_live g0 gen →
   wglog g0 = [] → (∀ cc : CPU, wgws g0 cc = ws_init) → wa_dws u0 = ws_init →
   img_total (img_z (wgimg g0)) →
@@ -1964,8 +2017,9 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hax Hslv Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
+  intros Hax Hlvr Hlive Hlog0 Hws0 Hdws0 Himgt Hphi Hprem Hbeh.
   have Hsh := riscv_step_shaped_ax Hax.
+  have Hslv := riscv_step_live_ax Hlvr.
   (** THE RETAG PRECOMPOSITION (premise-ledger stage A1).  [wm_ak] is an
       INERT tag, so retagging the behavior's own traced factorization at
       each message's fulfil pre-record ([WeakRetag.canon_f]) gives a
@@ -2034,7 +2088,7 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
     (Hws : forall cc : CPU, wgws g0 cc = ws_init)
     (Hdws : wa_dws u0 = ws_init) :
   rv64d_axiom_shapes →
-  (∀ b, sail_live (riscv_step b)) →
+  rv64d_live_residue →
   (forall (HR : riscvGS Σ) (HW : weakGS Σ),
      ⊢@{iPropI Σ} ([∗ set] cc ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D cc,
@@ -2062,8 +2116,8 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
           (wp_init (img_z (wgimg g0)) (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hax Hslv Hwp Himgt Hprem Hbeh.
-  eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hax Hslv);
+  intros Hax Hlvr Hwp Himgt Hprem Hbeh.
+  eapply (xv6_weak_robust_lifted gen_id g0 u0 c Hax Hlvr);
     [|exact Hlog|exact Hws|exact Hdws|exact Himgt| |exact Hprem|exact Hbeh].
   - split; [exact Hpow|]. by rewrite Hgen0 Hgid.
   - intros t2 g2 Hr.

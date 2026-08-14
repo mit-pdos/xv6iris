@@ -159,7 +159,7 @@
     THE PREMISE LEDGER of §11-§12, beyond the mirrored [WeakRobustCone] context:
     [Hps_bnd] (initial states are boundaries), [Hcq] (the post-state of a
     cross-edge source is quiet), [Hres] (every trace record's residual is
-    [sail_shaped] and [sail_live]), [Himgt]
+    [sail_shaped] and [sail_live_st]), [Himgt]
     ([img_total]).  Layer-1's two side conditions are NOT premises —
     [WeakCompose.xv6_lat_free] and [xv6_ts_oblivious] discharge them.
 
@@ -784,7 +784,7 @@ Section xcomplete.
   Theorem xtail_complete (i : agent) (c : wpcfg pxv6) ag q (m : M unit) :
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → pa_st ag = PHart q → sp_m q = Some m →
-    sail_shaped m → sail_live m →
+    sail_shaped m → sail_live_st (sp_regs q) m →
     ∃ c' ag' q',
       rtc (pf_xsolo next i) c c' ∧
       pc_ags c' !! i = Some ag' ∧ pa_st ag' = PHart q' ∧
@@ -798,7 +798,7 @@ Section xcomplete.
     destruct (tail_complete next i (prj_cfg q c) (prj_ag q ag) m Him
                 (prj_cfg_bnd q c Hbnd) Hlks
                 ltac:(by rewrite /prj_ag /= Hst)
-                Hsh Hlv)
+                Hsh ltac:(by rewrite /prj_ag /= Hst))
       as (cs' & ags' & ms & fu & Hrun & _ & Hlk2 & (agb & Hagb & Hmb) & Hf2 & _).
     destruct (pf_solo_run_lift next i c (prj_cfg q c) cs' Hrun Hl)
       as (c' & Hxrun & (Himg' & Hlog' & agx & ags & Hax & Has & Hpst & Hpws & Hppr)
@@ -927,7 +927,7 @@ Section cone.
              pa_st ag = PHart q →
              match sp_m q with
              | None => True
-             | Some m => sail_shaped m ∧ sail_live m
+             | Some m => sail_shaped m ∧ sail_live_st (sp_regs q) m
              end).
   (** (B4-4) the image is total *)
   Context (Himgt : img_total img).
@@ -2477,7 +2477,7 @@ Section package.
              pa_st ag = PHart q →
              match sp_m q with
              | None => True
-             | Some m => sail_shaped m ∧ sail_live m
+             | Some m => sail_shaped m ∧ sail_live_st (sp_regs q) m
              end).
   Context (Himgt : img_total img).
 
@@ -3461,23 +3461,42 @@ End package.
 
     §11–§12 take [Hres] — EVERY record of EVERY trace whose state is a
     hart with an in-flight residual has that residual [sail_shaped] and
-    [sail_live] — as an opaque premise.  It is not one: it is a trace
-    INVARIANT whose only inputs are the two group-3 model facts.
+    [sail_live_st] AT THE RECORD'S OWN REGISTERS — as an opaque premise.
+    It is not one: it is a trace INVARIANT whose only inputs are the model
+    facts about [next] and the per-record privilege premise.
+
+    THE INVARIANT'S SHAPE (stage C9, and the thing to keep): the liveness
+    conjunct is measured at [sp_regs q], the SAME record the residual lives
+    in.  That is what makes it inductive — every [sail_mstep] arm moves the
+    registers exactly as [sail_live_st] threads them, so a mid-instruction
+    privilege write (trap entry sets [cur_privilege] INSIDE the monad) needs
+    no side condition at all: the post-record's residual is measured at the
+    state the write produced.  A record-INDEPENDENT reading (["live at every
+    state"]) would be the refuted [∀ b, sail_live] again, and a reading
+    pinned to the BLOCK's entry state would not survive the first
+    [RegWrite].
 
     THE THREE ARMS OF A [PHart] STEP.  [pstep_xv6]'s hart arm is
     [WeakSailLTS.sail_step], and each of its arms does one of three
     things to the reading:
 
-      - the PARKED FENCE arm and [WeakSailLTS.irq_deliver] rebuild the
-        record with [sp_m] LITERALLY unchanged (a fence fires and clears
-        [sp_fence]; a delivery writes [sig_seip] and pops [sp_irq]) — so
-        both properties are preserved outright ([res_ok_frame]);
+      - the PARKED FENCE arm rebuilds the record with [sp_m] AND [sp_regs]
+        literally unchanged ([res_ok_frame]); [WeakSailLTS.irq_deliver]
+        keeps [sp_m] but writes [sig_seip] behind the residual's back, and
+        [WeakSailComplete.sail_live_st_seip] is exactly the closure that
+        covers it (§2 note (g) there: the pin is the one register the
+        predicate still answers with [∀ v], and it is quantified BECAUSE of
+        this arm);
       - an IN-BLOCK step ([sp_m ≠ None], no parked fence) is exactly a
         [WeakSailLTS2.sail_step_ni], where [WeakSailComplete]'s two
         preservation lemmas apply verbatim;
       - the BOUNDARY arm ([sp_m = None]) is the only one that ESTABLISHES
-        a residual, and it establishes [next tick] — about which the
-        group-3 facts say everything.
+        a residual, and it establishes [next tick] at the boundary record's
+        OWN registers — which is what the per-boundary liveness fact
+        ([WeakShapeLive.riscv_step_live_ax]) says, under [priv_ok] of those
+        registers.  Hence the new [Hpriv] input: the privilege condition has
+        to hold AT EVERY BOUNDARY RECORD, and asking it at every hart record
+        is the same premise stated without a case split.
 
     SINCE STAGE D THERE IS NO RESIDUE AT ALL.  The old derivation kept a
     third conjunct (oracle consistency of the record's device stream) and
@@ -3502,7 +3521,7 @@ End package.
 Definition res_ok (q : psail) : Prop :=
   match sp_m q with
   | None => True
-  | Some m => sail_shaped m ∧ sail_live m
+  | Some m => sail_shaped m ∧ sail_live_st (sp_regs q) m
   end.
 
 Lemma res_ok_split q : res_ok q ↔ shaped_res q ∧ live_res q.
@@ -3517,7 +3536,7 @@ Definition hres_prem (TS : ptraces pxv6) : Prop :=
     pa_st ag = PHart q →
     match sp_m q with
     | None => True
-    | Some m => sail_shaped m ∧ sail_live m
+    | Some m => sail_shaped m ∧ sail_live_st (sp_regs q) m
     end.
 
 (* ---------------------------------------------------------------- *)
@@ -3535,28 +3554,38 @@ Lemma pstep_xv6_hart_post (next : bool → M unit) q l p' :
   pstep_xv6 next (PHart q) l p' → ∃ q', p' = PHart q' ∧ sail_step next q l q'.
 Proof. destruct p' as [q'|d pend]; [by exists q'|done]. Qed.
 
-(** An arm that rebuilds the record with the same residual preserves the
-    reading — the parked fence and the interrupt delivery. *)
+(** An arm that rebuilds the record with the same residual AND the same
+    registers preserves the reading — the parked fence. *)
 Lemma res_ok_frame q q' :
-  sp_m q' = sp_m q → res_ok q → res_ok q'.
-Proof. intros Hm Hr. rewrite /res_ok Hm. exact Hr. Qed.
+  sp_m q' = sp_m q → sp_regs q' = sp_regs q → res_ok q → res_ok q'.
+Proof. intros Hm Hrg Hr. rewrite /res_ok Hm Hrg. exact Hr. Qed.
+
+(** …and the DELIVERY arm, which keeps the residual but writes the pin.
+    [sail_live_st] is invariant under a [sig_seip] write by construction
+    ([WeakSailComplete] §2 note (g)), so nothing else is needed. *)
+Lemma res_ok_irq q l q' : irq_deliver q l q' → res_ok q → res_ok q'.
+Proof.
+  intros (_ & v & iq & _ & ->) Hr. rewrite /res_ok /= in Hr |- *.
+  destruct (sp_m q) as [m|]; [|done].
+  destruct Hr as (Hs & Hl). split; [exact Hs|by apply sail_live_st_seip].
+Qed.
 
 (** THE STEP LEMMA.  Both properties are preserved-or-established by every
-    [sail_step], given the two group-3 facts about the generator.  NO
-    DEVICE SIDE CONDITION (stage D). *)
+    [sail_step], given the model facts about the generator and [priv_ok] at
+    the record.  NO DEVICE SIDE CONDITION (stage D). *)
 Lemma res_ok_step (next : bool → M unit)
-    (Hnsh : ∀ b, sail_shaped (next b)) (Hnlv : ∀ b, sail_live (next b))
+    (Hnsh : ∀ b, sail_shaped (next b))
+    (Hnlv : ∀ rs b, priv_ok rs → sail_live_st rs (next b))
     q l q' :
-  res_ok q → sail_step next q l q' → res_ok q'.
+  priv_ok (sp_regs q) → res_ok q → sail_step next q l q' → res_ok q'.
 Proof.
-  intros Hr Hstep. rewrite /sail_step in Hstep.
+  intros Hpv Hr Hstep. rewrite /sail_step in Hstep.
   destruct (sp_fence q) as [[[[pr pw] sr] sw]|] eqn:Hf.
-  { (* the parked second fence: [sp_m] survives *)
-    destruct Hstep as [_ ->]. exact (res_ok_frame q _ eq_refl Hr). }
+  { (* the parked second fence: [sp_m] and [sp_regs] both survive *)
+    destruct Hstep as [_ ->]. exact (res_ok_frame q _ eq_refl eq_refl Hr). }
   destruct Hstep as [Hirq|Hstep].
-  { (* an interrupt delivery: ditto *)
-    destruct Hirq as (_ & v & iq & _ & ->).
-    exact (res_ok_frame q _ eq_refl Hr). }
+  { (* an interrupt delivery: the pin frame *)
+    exact (res_ok_irq q l q' Hirq Hr). }
   destruct (sp_m q) as [m|] eqn:Hm.
   - (* IN-BLOCK: [WeakSailComplete]'s two preservation lemmas *)
     have Hni : sail_step_ni next q l q'
@@ -3566,9 +3595,9 @@ Proof.
     split_and!.
     + exact (sail_shaped_res_step next q l q' Hne Hs Hni).
     + exact (sail_live_res_step next q l q' Hne Hl Hni).
-  - (* BOUNDARY: the fresh instruction, from group 3 *)
+  - (* BOUNDARY: the fresh instruction, at THIS record's registers *)
     destruct Hstep as (_ & tick & ->). rewrite /res_ok /=.
-    split_and!; [apply Hnsh|apply Hnlv].
+    split_and!; [apply Hnsh|by apply Hnlv].
 Qed.
 
 (* ---------------------------------------------------------------- *)
@@ -3581,7 +3610,13 @@ Section hres.
                     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
   Context (Hps_bnd : ∀ i p, ps !! i = Some p → pbnd p).
   Context (Hnsh : ∀ b, sail_shaped (riscv_step b)).
-  Context (Hnlv : ∀ b, sail_live (riscv_step b)).
+  (** THE STATE-CONDITIONED LIVENESS FACT (stage C9).  Not [∀ b] — see
+      [WeakSailComplete] §2 note (f) and [WeakShapeLive]. *)
+  Context (Hnlv : ∀ rs b, priv_ok rs → sail_live_st rs (riscv_step b)).
+  (** …and its per-record input: [WeakComposeLang]'s [Hpriv]. *)
+  Context (Hpriv : ∀ i T k ag q,
+             pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
+             pa_st ag = PHart q → priv_ok (sp_regs q)).
 
   (** The invariant, by induction on the record index.  Every consecutive
       pair of records is a [pstep_xv6] step ([asteps_wf_step]); the
@@ -3609,11 +3644,13 @@ Section hres.
       destruct (pstep_xv6_hart_pre riscv_step (pa_st ag0) (ae_lb ev) q Hps)
         as (q0 & Hst0 & Hsl).
       apply (res_ok_step riscv_step Hnsh Hnlv q0 (ae_lb ev) q);
-        [by apply (IH ag0 q0)|exact Hsl].
+        [exact (Hpriv i T k ag0 q0 HT Hag0 Hst0)
+        |by apply (IH ag0 q0)|exact Hsl].
   Qed.
 
-  (** THE EXPORT.  [Hres] from the two group-3 facts and the
-      trace/initial-state well-formedness §11 already has in context. *)
+  (** THE EXPORT.  [Hres] from the model facts about [riscv_step], the
+      per-record privilege premise, and the trace/initial-state
+      well-formedness §11 already has in context. *)
   Theorem hres_derived : hres_prem TS.
   Proof.
     intros i T k ag q HT Hag Hq.

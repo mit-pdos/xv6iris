@@ -815,15 +815,55 @@ Qed.
            agreement, which had needed [pmaCheck]'s [CannotSplit]
            postcondition and an [untilMT] unfolding at [N = 1].
 
+    STATUS AFTER STAGE C9 (2026-08-14) — THE SEAM IS FULLY CLOSED, MODULO
+    TWO NAMED RECORDS AND ONE PER-TRACE PREMISE.  Both halves are theorems:
+
+      SHAPE     [WeakShapeTop.riscv_step_shaped_ax :
+                   rv64d_axiom_shapes → ∀ b, sail_shaped (riscv_step b)]
+      LIVENESS  [WeakShapeLive.riscv_step_live_ax :
+                   rv64d_live_residue →
+                   ∀ rs b, priv_ok rs → sail_live_st rs (riscv_step b)]
+
+    and [WeakComposeLang]'s capstones take the two RECORDS in place of the
+    two [∀ b] premises, plus [Hpriv] (every hart record's [cur_privilege] is
+    one of [Machine]/[Supervisor]/[User]) inside [xv6_cone_premises].
+
+    THE LIVENESS HALF IS NOT A [∀ b] FACT, AND THAT IS THE STAGE'S FINDING
+    (O9's other half, settled in C9).  The old premise
+    [∀ b, sail_live (riscv_step b)] is REFUTED — liveness forbids a raised
+    Sail exception, and [rv64d.zicfiss_xSSE] raises one at
+    [VirtualSupervisor], a value the old [RegRead] arm quantified over — so
+    a capstone carrying it was VACUOUS, the same genre as the ∀-path oracle
+    premise and (O10).  The repair is the same narrowing all five earlier
+    findings took: [WeakSailLTS.sail_mstep] answers a [RegRead] CONCRETELY
+    ([k (register_lookup r rs)]), so the predicate does too —
+    [WeakSailComplete.sail_live_st rs m], with [RegWrite] THREADING the
+    state.  The only register still ∀-quantified is [sig_seip], because
+    [irq_deliver] writes it behind the residual's back.  The residual
+    invariant becomes "live at the record's OWN registers"
+    ([WeakSailCone.res_ok]), which is inductive step for step, and the
+    boundary arm is where [Hpriv] enters.
+
+    THE TWO RECORDS ARE NOT THE SAME KIND OF THING.
+    [WeakShapeMem.rv64d_axiom_shapes] is IRREDUCIBLE (three opaque monadic
+    [Axiom]s of the generated model).  [WeakShapeLive.rv64d_live_residue] is
+    a WORK ITEM: the (O3) liveness sweep, un-run.  Its size is now measured
+    ([make live-sites]): of the 345 monadic definitions reachable from
+    [try_step], 123 carry a failure node directly and 302 carry one in their
+    cone — 431 sites in all (187 [assert_exp], 130 [exit], 107
+    [internal_error], 4 [reserved_behavior], 3 [untilMT]) — and each needs a
+    REACHABILITY argument, not a shape lemma.  40 functions are failure-free
+    and could be emitted mechanically today.
+
     UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4, the generated tower
     LANDED complete in C5, (O6)'s DECODER POSTCONDITION LANDED in C6
     ([WeakShapeAst.ast_wf], [WeakShapeDec.gpureP_ext_decode]) and C7 CONSUMED
     it at [run_hart_active] ([WeakShapeWin]'s [gwpx] mode, the 116-lemma
-    value sweep [WeakShapeExecGen01..03], [WeakShapeExec]), so
-    [WeakShapeTop.riscv_step_shaped_residue_wf] states the residue with the
-    [0 < width] premises that make it well-formed.  What remains is (O10)'s
-    specification fix and then the memory cone itself.  Details and the
-    ordered plan: [claude-notes/projects/weak-memory-premises.md].
+    value sweep [WeakShapeExecGen01..03], [WeakShapeExec]); C8 fixed (O10)
+    and closed the memory cone; C9 restated and closed the liveness half.
+    What remains is the (O3) sweep behind [rv64d_live_residue] and the
+    model-level reachability invariant that would delete [Hpriv].  Details
+    and the ordered plan: [claude-notes/projects/weak-memory-premises.md].
 
     ------------------------------------------------------------------------
     WHAT IS *NOT* ON THIS LIST, because it is machine-checked: the Layer-1

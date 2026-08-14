@@ -233,11 +233,12 @@ again at the same offset.
 ## A PREDICATE OVER AN EFFECT MONAD: CHECK EVERY OUTCOME'S *ANSWER TYPE*, NOT
 ## JUST WHETHER THE MACHINE HAS AN ARM FOR IT
 
-Seven times on this tree a shape/liveness predicate over a Sail-style
+Eight times on this tree a shape/liveness predicate over a Sail-style
 interaction monad has been **refutable because one arm demanded more than the
-machine can supply** (the ∀-path oracle; `sail_live`'s memory abort; the
+machine can supply** (the ∀-path oracle; the memory abort; the
 exclusive-window read; the standalone conditional write; the decoder's zero
-width; the throw; and the page walker's abandoned reservation). The recurring
+width; the throw; the page walker's abandoned reservation; and the register
+read). The recurring
 mistake is not the ∀ itself — it is deciding an arm is harmless from the
 CONSTRUCTOR's name instead of from its answer type.
 
@@ -276,7 +277,34 @@ instruction, so the "silent tail" was the whole rest of the instruction and
 the bracket was worthless. Before writing such a bracket, find the DEEPEST
 call site that can abandon, and ask what follows it there.
 
-The repair that worked, three times running, is the opposite of adding an
+**AND THE EIGHTH INSTANCE IS THE REGISTER ARM, WHICH IS WHERE THE RULE STOPS
+BEING ABOUT FAILURE OUTCOMES.** `RegRead`'s answer type is inhabited and the
+stepping relation answers it *from the agent's own state* (`k (register_lookup
+r rs)`), so a `∀ v, P (k v)` arm is the same silent strengthening — it demands
+the property along control-flow paths the machine never takes, and on this
+tree that refuted the liveness half outright (a decoder gate reads
+`cur_privilege` and throws at a value an H-less machine never holds). The
+repair is again to narrow: **thread the state through the predicate** — answer
+`RegRead` concretely from it, and let `RegWrite` move it. Two consequences
+worth knowing before writing such a predicate:
+
+- **The bind rule must become CPS.** At `bind m k` the state `k` starts in is
+  path-dependent, so the only compositional formulation carries a
+  postcondition over the FINAL state (`Ret x ↦ P x rs`) and says "the prefix's
+  postcondition is the continuation's hypothesis". A state-blind predicate can
+  hypothesise `∀ x, P (k x)`; a state-threading one cannot. (This is the same
+  driver a state-pinned boolean traversal has — see the section below — so
+  port that driver, and expect the ∀-quantified predicate to survive as the
+  register-free specialisation, reusable at every prefix that does not branch
+  on a register.)
+- **∀-quantify in exactly the components ANOTHER agent can write.** Whatever
+  the environment can change behind the residual's back (here: one interrupt
+  pin, written by the LTS's own delivery arm without moving the monad) must
+  stay quantified, or the invariant is not preserved by that arm. Everything
+  else is concrete. Getting this wrong is invisible until the frame lemma for
+  that arm fails to typecheck, several files away.
+
+The repair that worked, four times running, is the opposite of adding an
 index: **narrow the predicate until the arm says only what the machine
 enforces.** Each time the deferred obligation was deleted (`ak_latest = false`
 on writes; then on reads; then the window itself), the machine's arm became

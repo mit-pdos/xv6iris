@@ -1,49 +1,176 @@
 # Shrinking the capstone's premise ledger — worklist
 
-## C9 (next): the state-conditioned liveness — the LAST premise in scope
+## C9 (LANDED 2026-08-14): the state-conditioned liveness — THE LAST
+## PREMISE IN SCOPE.  BOTH HALVES OF SEAM (6) ARE NOW THEOREMS.
 
-Design (orchestrator, 2026-08-14).  `sail_live`'s ∀b form is refuted
-(O9's witness quantifies register reads over all values; the throw
-gates read `cur_privilege`).  But its ONLY consumer is completion
-non-stuckness (`tail_complete` + the `hres` threading that feeds it),
-and `sail_mstep` answers register reads from the CONCRETE state
-(`k (register_lookup r rs)`), so the honest predicate is
-**`sail_live_st rs m`** — RegReads answered concretely from `rs`,
-memory values still ∀-chosen (the completion's freedom), failure nodes
-refused.  Plan:
-1. Define `sail_live_st` (+ a `glive_st` kit mode; the second-mode
-   bind-reuse lesson applies — prefix facts from the existing tower
-   where the prefix is register-free; a `goodbP`-style concrete-state
-   driver from DecodeSetU is the right engine for register-branching
-   cones).
-2. Per-boundary fact: `priv_ok rs → sail_live_st rs (riscv_step b)`
-   where `priv_ok rs := cur_privilege ∈ {M,S,U}` (+ whatever else the
-   O3 sites need — the fuel sites are state-independent and already
-   killed; enumerate the rest via the generator's liveness mode +
-   hand lemmas at the ~100 failure sites, reachability-refuted or
-   priv-gated).
-3. New sharp per-trace premise **`Hpriv`** (every record's
-   `cur_privilege ∈ {M,S,U}`) joining Hcq/Hseip — per-image discharge:
-   xv6 never enables H (misa.H clear; the model-level reachability
-   invariant is the recorded upgrade path that would delete Hpriv).
-4. Re-thread `live_res`/`hres_derived`/`tail_complete` on
-   `sail_live_st` at the record's own registers; DELETE the capstone's
-   `∀ b, sail_live (riscv_step b)` premise in favor of
-   `rv64d_axiom_shapes`(-extended if the three axiom stubs need
-   liveness forms too — they already carry gsilent facts) + `Hpriv`
-   inside `xv6_cone_premises`.
-After C9 the effort's in-scope ledger is: `main_premises`,
-`Hcq ∧ Hseip ∧ Hpriv`, `cone_liftable`, `rv64d_axiom_shapes`,
-`img_total`, fresh era, the WP package, the 5 axioms — everything
-else is a discharge campaign by charter.
+`∀ b, sail_live (riscv_step b)` is **deleted from the tree**, predicate
+and all, and replaced by
 
-**Status (2026-08-14): IN FLIGHT (stage C8 landed — (O10)'s specification fix,
-the kit collapse, the memory cone, and THE CAPSTONE SWAP: the shape premise is
-now a THEOREM, `WeakShapeTop.riscv_step_shaped_ax` over the three-fact record
-`rv64d_axiom_shapes`, and `xv6_weak_robust_lifted`/`_adequate` take the record
-in its place.  What is left of this effort is the LIVENESS half — whose honest
-form is state-conditioned, not `∀ b` (finding (O9)) — and the discharge
-campaigns that were never in scope).**  Follow-on to
+    WeakShapeLive.riscv_step_live_ax :
+      rv64d_live_residue → ∀ rs b, priv_ok rs → sail_live_st rs (riscv_step b)
+
+with `Hpriv` (every hart record's `cur_privilege ∈ {M,S,U}`) as the new
+third conjunct of `xv6_cone_premises`.  Both capstones take the two
+RECORDS (`rv64d_axiom_shapes`, `rv64d_live_residue`) and are still at
+exactly the five rv64d axioms.
+
+### The predicate, and the two arms that are NOT concrete
+
+`WeakSailComplete.sail_live_st rs m` (§2, notes (f)/(g)) — `RegRead`
+answered `k (register_lookup r rs)`, `RegWrite` THREADING the state
+(`sail_live_st (register_set r v rs) (k tt)`), memory arms unchanged
+(the C2/O1 narrowed answers), `ExtraOutcome`/`GenericFail`/`Discard`/
+`ChooseReal` refused.  Two arms stay quantified and each is forced:
+
+- **memory** — the completion's freedom; the LTS picks the value.
+- **`sig_seip`** — and this one is the design point.  `irq_deliver` is
+  an arm of the SAME LTS and it writes the pin **without moving the
+  residual**, so a residual whose liveness depended on the pin would
+  lose it at a delivery and `WeakSailCone.res_ok_frame` would be false.
+  Answering that ONE register with `∀ v` makes liveness invariant under
+  any pin write (`sail_live_st_agree` over §9.1's `regs_agree seip_reg`,
+  then `sail_live_st_seip`), which is exactly the closure the LTS asks
+  for.  **THE RULE: a predicate over a per-agent state must be
+  ∀-quantified in exactly the components another agent can write.**
+  Nothing else needs it — the pin is the only register any other agent
+  touches.
+
+### THE INVARIANT SHAPE THAT WORKED (the thing to reuse)
+
+`live_res p := match sp_m p with None => True | Some m =>
+sail_live_st (sp_regs p) m end` — **live at the record's OWN
+registers**, and `res_ok` is that conjoined with `sail_shaped m`.  It is
+inductive step for step because every `sail_mstep` arm moves `sp_regs`
+exactly as `sail_live_st` threads it:
+
+| arm | registers | why it goes through |
+|---|---|---|
+| `RegRead` | unchanged | both branches of the predicate give `k (register_lookup r rs)` (`sail_live_st_regread`) |
+| `RegWrite` | `register_set r v rs` | the predicate's own arm |
+| fused rmw | `rs → rs1` across the whole `silent_run` | `sail_live_st_silent1` is stated over the PAIR (`sail_live_st b.2 b.1`), so the window carries the state with it |
+| parked fence | unchanged | `res_ok_frame` |
+| `irq_deliver` | `register_set sig_seip v` | `res_ok_irq`, from the pin frame above |
+| BOUNDARY | unchanged; residual := `next tick` | `riscv_step_live_ax` at THOSE registers, under `Hpriv` |
+
+**A mid-instruction privilege write costs nothing.**  Trap entry sets
+`cur_privilege` inside the monad; the residual after it is measured at
+the state the write produced, so no side condition is needed and
+`priv_ok` is NOT required to hold mid-instruction — only at boundary
+records, which is what `Hpriv` says.  The two readings that do NOT work
+and are worth naming: a record-INDEPENDENT one ("live at every state")
+is the refuted `∀ b` again, and one pinned to the BLOCK's entry state
+does not survive the first `RegWrite`.
+
+### `priv_ok`, final contents
+
+    priv_ok rs := register_lookup cur_privilege rs ∈ {Machine, Supervisor, User}
+
+and **nothing else** — the sweep was not run (below), so no site forced
+a second conjunct.  Any site the sweep later finds to need more state
+gets ADDED here with its reason, per the design.
+
+### The kit: `WeakShapeLive.v`
+
+`gliveP Q P rs m` — `gpost` with the memory/barrier arms opened up and
+the register state threaded, and with a **postcondition over the FINAL
+STATE** (`Ret x ↦ P x rs`).  That CPS shape is forced: at `bind m k` the
+state `k` starts in is path-dependent (whatever `m`'s `RegWrite`s left),
+so the only compositional rule is `gliveP_bind`, "the prefix's
+postcondition is the continuation's hypothesis" — the same driver shape
+as `DecodeSetU.goodbP`, which is the recorded porting recipe applied in
+the other direction (this IS the state-pinned traversal; `WeakShape.glive`
+is its register-free specialisation).  `glive_st rs m` is the
+information-free instance; `glive_st_sail_live_st` is the bridge, and
+`glive_glive_st : glive true m → glive_st rs m` is the **register-free
+tower reuse** (a prefix that never branches on a register is live at
+every state).  Kit: mono / ret / returnm / bind / bind0 / the failure
+leaves / throw / assert_exp(') / `gliveP_read_reg`(`_ne`) /
+`gliveP_write_reg` / `gliveP_try_catch` / `gliveP_liftR` /
+`gliveP_catch_early_return`.
+
+### THE SWEEP WAS NOT RUN, AND ITS SIZE IS NOW MEASURED
+
+`tools/gen_shape.py --mode live` (`make live-sites`) is the enumerator —
+**a report, not an emitter**, because `glive_st` is FALSE at any function
+with a reachable failure node, so a blind tower would be hundreds of
+unprovable lemmas.  Measured on this model:
+
+    reachable from try_step: 1053 (monadic 345)
+    monadic defs with a DIRECT failure site:  123
+    monadic defs whose CONE carries one:      302
+    monadic defs whose cone is failure-free:   40
+    sites by kind: assert_exp=187  exit=130  internal_error=107
+                   reserved_behavior=4  throw=4  untilMT=3
+
+i.e. **431 sites, not "~100"** — (O3)'s estimate was low by 4×.  The
+per-function table is in the tool's output; the headline entries are
+`encdec_forwards` (71+71), `assembly_forwards` (15+15), `pmaCheck`
+(10 assert + 4 internal_error), `trap_handler` (7), `check_PTE_permission`
+(8), the three `untilMT` loops (`checked_mem_read`/`_write`,
+`mem_write_ea`), and `try_step` itself (3 `assert_exp` + 1
+`internal_error`).  The 40 failure-free functions are printed with their
+skeletons, which is where an emitter would start; `gl_solve` does not
+exist yet and writing it is the sweep's first task (the (O8)/(O11)
+discipline applies verbatim — gate the leaf on an ATOMIC goal,
+`Hint Constants Opaque`, name every callee in a hand script).
+
+So the residue is **hypothesis-ized as a named record**, per the stage's
+own fallback:
+
+    Record rv64d_live_residue := {
+      rlr_try_step : ∀ n b rs, priv_ok rs →
+          gliveP (λ _ _, False) (λ _ rs', priv_ok rs') rs (try_step n b);
+      rlr_tick_clock : ∀ rs, priv_ok rs → glive_st rs (tick_clock tt) }.
+
+`rlr_try_step`'s POSTCONDITION is `priv_ok` again — an instruction may
+change `cur_privilege` and what the model guarantees is that it lands in
+one of the three; carrying it is what lets the `tick_clock` tail be
+discharged at the state `try_step` left, and it is the same statement
+`Hpriv` makes per record, so **a proof of one is most of a proof of the
+other**.  `rv64d_axiom_shapes` was NOT extended with liveness fields:
+with the whole cone hypothesised, the three opaque axioms' liveness sits
+INSIDE `rv64d_live_residue`, and adding unusable fields to the shape
+record would misreport what is assumed.
+
+### THE SWAP IS NOT A WEAKENING — direction verified, and it matters
+
+The deleted `∀ b, sail_live (riscv_step b)` is UNSATISFIABLE, so it
+formally implies anything, including the record.  But `Hpriv` is a NEW
+per-trace obligation the old premise did not imply.  What the swap buys
+is not a smaller ledger, it is a NON-VACUOUS capstone: a supplier who had
+"discharged" the old premise had discharged nothing.  Recorded in
+`WeakComposeLang` §D 1 in as many words.
+
+### Deleted, and why (lemma_diff justification)
+
+`WeakSailComplete.sail_live` (the ∀-form `Fixpoint`), `sail_live_choose`,
+`sail_live_silent1`, `sail_live_silent_run` — superseded by their `_st`
+forms; nothing needs the ∀-form, so per the guiding principle it is gone
+rather than kept beside its replacement.  `WeakShape.glive_live` →
+`glive_sail_live_st` (the ∀-form implication, which is what survives as
+the register-free reuse).  `wr_node_live` and `gok_stageC` and
+`WeakShapeTop.riscv_step_ok_cone` are RESTATED (extra `rs` parameter),
+not deleted.  `WeakShape.glive`/`gok` are KEPT: `glive true` is still
+the cheap route wherever a fragment is register-insensitive.
+
+## END STATE (after C9) — THE EFFORT'S IN-SCOPE LEDGER IS EMPTY
+
+Every premise this effort set out to eliminate or reduce has been.  What
+`WeakComposeLang.xv6_weak_robust_lifted`/`_adequate` now assume:
+
+| premise | status |
+|---|---|
+| `rv64d_axiom_shapes` | IRREDUCIBLE (3 opaque monadic `Axiom`s of the model).  Only alternative: define them in `model-xv6iris/riscv_extras.v`, which moves the same assumption into the model.  Decide deliberately. |
+| `rv64d_live_residue` | A WORK ITEM: the (O3) liveness sweep, un-run, sized above. |
+| `Hcq ∧ Hseip ∧ Hpriv` (`xv6_cone_premises`) | per-image checker facts.  `Hpriv`'s upgrade path = the model-level reachability invariant `priv_ok` is `riscv_step`-preserved (same sweep as the record). |
+| `main_premises`, `cone_liftable`, `img_total`, the fresh era, the WP package, the 5 rv64d axioms | NOT IN SCOPE by charter — discharge campaigns (static checker, Iris discipline exports, 6c pinnedness, M5). |
+
+**This file should move to `completed/`** on the next pass over the
+notes (it was left in `projects/` by the C9 task).
+
+**Status (2026-08-14): C9 LANDED; the in-scope ledger is closed (stage C8 had
+landed (O10)'s specification fix, the kit collapse, the memory cone, and the
+SHAPE capstone swap; C9 restated and closed the LIVENESS half).**  Follow-on to
 [`completed/weak-memory-lift.md`](../completed/weak-memory-lift.md):
 eliminate or reduce the premises of
 `WeakComposeLang.xv6_weak_robust_lifted`/`_adequate` that are provable

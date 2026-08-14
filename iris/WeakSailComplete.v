@@ -39,13 +39,13 @@
     TWO PREMISE DEVIATIONS FROM THE STAGE-B SKETCH, both forced and both
     recorded here rather than hidden in a proof.
 
-    (a) [sail_live] (§2).  [sail_shaped] does NOT exclude the model's three
+    (a) [sail_live_st] (§2).  [sail_shaped] does NOT exclude the model's three
         FAILURE outcomes ([Interface.GenericFail], [Interface.Discard],
         [Interface.ExtraOutcome]): their result types are empty (or
         abstract), so [sail_shaped]'s default arm [∀ r, sail_shaped (k r)]
         is VACUOUSLY true at such a node, while [sail_mstep] has no arm for
         them at all — the agent is stuck and no completion exists.
-        [tail_complete] therefore takes [sail_live], a second shape premise
+        [tail_complete] therefore takes [sail_live_st], a second shape premise
         in exactly the same epistemic slot as [sail_shaped] (a per-
         instruction, decoder-checkable property of the decoded monad,
         declared not proved).  [quiet_tail] excludes the three by hand, so
@@ -65,7 +65,7 @@
         [R] at [Values.ChooseReal], which alone puts Stdlib's
         [ClassicalDedekindReals.sig_forall_dec] into the [Print Assumptions]
         output of [quiet_complete] / [tail_complete] and of everything above
-        them.  So [quiet_tail] and [sail_live] refute the [Values.ChooseReal]
+        them.  So [quiet_tail] and [sail_live_st] refute the [Values.ChooseReal]
         node outright (their [Interface.Choose] arm is [False] there and
         [∀ r, …] at every other choose type), and [choose_val] produces the
         value per constructor with no [R] anywhere.  rv64d never emits
@@ -78,9 +78,10 @@
 
       §1  [mchild], [macc], [mchild_wf], [msub_wf] — the [iMon] subterm kit;
           [silent_run_mchild] (the fused window descends).
-      §2  [quiet_tail], [sail_live], [quiet_tail_choose], [sail_live_choose],
-          [choose_val], [choose_val_q], [psail_quiet], [shaped_res],
-          [live_res].
+      §2  [quiet_tail], [sail_live_st] (state-conditioned — see (f)/(g)),
+          [priv_ok], [quiet_tail_choose], [sail_live_st_choose],
+          [sail_live_st_regread], [choose_val], [choose_val_q],
+          [psail_quiet], [shaped_res], [live_res].
       §3  [pf_solo_q] (a [pf_solo] step with a quiet label), [qframe] /
           [tframe] and their run forms, [pf_solo_run_bnd].
       §4  [pf_qstep], [pf_unpark] (the parked [fence.tso] half),
@@ -196,19 +197,46 @@ Proof. intros H1 H2. eapply tc_rtc_l; [exact H1|]. by apply tc_once. Qed.
     which §4 fires).  Memory accesses and the three failure outcomes are
     excluded.
 
-    [sail_live m]: no path of [m] runs into a failure outcome.  See header
-    deviation (a): [sail_shaped] does NOT imply this, because the failure
-    outcomes' result types are empty and its default arm is then vacuous.
+    [sail_live_st rs m]: no path of [m], RUN FROM THE REGISTER FILE [rs],
+    runs into a failure outcome.  See header deviation (a): [sail_shaped]
+    does NOT imply this, because the failure outcomes' result types are empty
+    and its default arm is then vacuous.
 
-    ITS MEMORY ARMS QUANTIFY OVER THE ANSWERS THE LTS SUPPLIES — [inl (w,
+    ------------------------------------------------------------------------
+    (f) WHY IT IS STATE-CONDITIONED, AND NOT [∀ b, sail_live (riscv_step b)]
+    (stage C9; the state-free [sail_live] this replaces is DELETED).  Finding
+    (O9): [Interface.RegRead]'s answer type is inhabited and the LTS answers
+    it CONCRETELY ([sail_mstep]'s arm is [k (register_lookup r rs)]), so a
+    predicate arm [∀ v, P (k v)] is the same silent, unbounded strengthening
+    the memory arms carried before stage C2 — and it BITES:
+    [rv64d.encdec_backwards] reaches [zicfiss_xSSE priv] with [priv] read
+    from [cur_privilege], and [zicfiss_xSSE VirtualSupervisor] is an
+    [internal_error].  The register-generic statement is therefore FALSE,
+    while the concrete-answer one is exactly what the machine needs.  So
+    every [RegRead] is answered from [rs] and every [RegWrite] THREADS it,
+    which is what makes the residual invariant "live AT THE RECORD'S OWN
+    REGISTERS" ([live_res]) preserved by [sail_mstep] step for step.
+
+    (g) THE ONE REGISTER THAT IS STILL ∀-QUANTIFIED IS [sig_seip], AND IT IS
+    FORCED BY THE LTS, NOT BY CONVENIENCE.  [WeakSailLTS.irq_deliver] writes
+    the external-interrupt pin BEHIND THE RESIDUAL'S BACK — the residual
+    monad does not move, the register file does — so a residual whose
+    liveness depended on the pin's value would lose it at a delivery, and
+    [WeakSailCone.res_ok_frame] (the arm that carries the invariant across a
+    delivery) would be false.  Answering [sig_seip] with [∀ v] makes
+    liveness invariant under any pin write ([sail_live_st_agree] /
+    [sail_live_st_seip], §9.4), which is exactly the closure the LTS asks
+    for.  Nothing else in the file is quantified: the pin is the only
+    register any OTHER agent writes.
+
+    THE MEMORY ARMS QUANTIFY OVER THE ANSWERS THE LTS SUPPLIES — [inl (w,
     None)] and [inl None] — exactly as [WeakSailLTS.sail_shaped]'s do
     ([WeakSailLTS] delta (e')).  The ∀-over-every-answer reading was
     REFUTABLE: it included the abort [inr ab], which [rv64d.read_ram] answers
-    with [exit tt], so [∀ b, sail_live (riscv_step b)] was false at every
-    load (stage C1 finding (O1); the refutation was
-    [WeakShape.read_ram_not_live], deleted when this was fixed).  Nothing
-    downstream weakens: every consumer instantiates the arm at exactly those
-    answers, because they are the only ones [sail_mstep] produces. *)
+    with [exit tt], so it was false at every load (stage C1 finding (O1)).
+    Nothing downstream weakens: every consumer instantiates the arm at
+    exactly those answers, because they are the only ones [sail_mstep]
+    produces. *)
 
 Fixpoint quiet_tail (m : M unit) {struct m} : Prop :=
   match m with
@@ -229,30 +257,56 @@ Fixpoint quiet_tail (m : M unit) {struct m} : Prop :=
        end) k
   end.
 
-Fixpoint sail_live (m : M unit) {struct m} : Prop :=
+Fixpoint sail_live_st (rs : regstate) (m : M unit) {struct m} : Prop :=
   match m with
   | Interface.Ret _ => True
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T return (T → M unit) → Prop with
+       (* (f)/(g): concrete from [rs], except the pin another agent writes *)
+       | Interface.RegRead r _ => λ k,
+           if register_beq r (sig_seip : register)
+           then ∀ v, sail_live_st rs (k v)
+           else sail_live_st rs (k (register_lookup r rs))
+       | Interface.RegWrite r _ v => λ k,
+           sail_live_st (register_set r v rs) (k tt)
        | Interface.MemRead n req => λ k,
-           ∀ w : bv (8 * n), sail_live (k (inl (w, None)))
-       | Interface.MemWrite _ _ => λ k, sail_live (k (inl None))
+           ∀ w : bv (8 * n), sail_live_st rs (k (inl (w, None)))
+       | Interface.MemWrite _ _ => λ k, sail_live_st rs (k (inl None))
        | Interface.ExtraOutcome _ => λ _, False
        | Interface.GenericFail _ => λ _, False
        | Interface.Discard => λ _, False
        | Interface.Choose ty =>
            match ty as t return (Values.choose_type t → M unit) → Prop with
            | Values.ChooseReal => λ _, False
-           | _ => λ k, ∀ r, sail_live (k r)
+           | _ => λ k, ∀ r, sail_live_st rs (k r)
            end
-       | _ => λ k, ∀ r, sail_live (k r)
+       | _ => λ k, ∀ r, sail_live_st rs (k r)
        end) k
   end.
 
-(** The three CHOOSE lemmas.  [quiet_tail] / [sail_live] at a [Choose] node
-    still give the continuation at EVERY value (so the LTS's adversarial
-    choice is covered); and they give a VALUE, produced without touching
-    [R] — which is what a completion needs to step the node. *)
+(** THE PRIVILEGE SIDE CONDITION (stage C9).  The state precondition finding
+    (O9) forces, and the whole of it: [cur_privilege] is one of the three
+    privileges an H-less machine can be in.  It is what the [zicfiss_xSSE] /
+    [_rec_get_xLPE] [internal_error] arms need, and it is stated over the
+    register file rather than over a trace so that the per-boundary liveness
+    fact is a statement about ONE record.
+
+    PER-IMAGE DISCHARGE: xv6 never enables the hypervisor extension
+    (misa.H is clear at reset and nothing writes it), so no [riscv_step] can
+    ever enter [VirtualUser]/[VirtualSupervisor].  Making THAT a theorem is
+    the model-level reachability invariant recorded as the upgrade path in
+    [claude-notes/projects/weak-memory-premises.md]; until it exists,
+    [WeakComposeLang]'s [Hpriv] carries it per trace record, exactly as
+    [Hcq]/[Hseip] carry their own per-image facts. *)
+Definition priv_ok (rs : regstate) : Prop :=
+  register_lookup cur_privilege rs = Machine ∨
+  register_lookup cur_privilege rs = Supervisor ∨
+  register_lookup cur_privilege rs = User.
+
+(** The three CHOOSE lemmas.  [quiet_tail] / [sail_live_st] at a [Choose]
+    node still give the continuation at EVERY value (so the LTS's
+    adversarial choice is covered); and they give a VALUE, produced without
+    touching [R] — which is what a completion needs to step the node. *)
 
 Lemma quiet_tail_choose (ty : Values.ChooseType)
     (k : Values.choose_type ty → M unit) :
@@ -260,18 +314,30 @@ Lemma quiet_tail_choose (ty : Values.ChooseType)
   ∀ r, quiet_tail (k r).
 Proof. destruct ty; simpl; intros H; (exact H || destruct H). Qed.
 
-Lemma sail_live_choose (ty : Values.ChooseType)
+Lemma sail_live_st_choose rs (ty : Values.ChooseType)
     (k : Values.choose_type ty → M unit) :
-  sail_live (Interface.Next (Interface.Choose ty) k) → ∀ r, sail_live (k r).
+  sail_live_st rs (Interface.Next (Interface.Choose ty) k) →
+  ∀ r, sail_live_st rs (k r).
 Proof. destruct ty; simpl; intros H; (exact H || destruct H). Qed.
+
+(** The [RegRead] answer, whichever arm the register takes: the LTS supplies
+    [register_lookup r rs], and both arms give the continuation there. *)
+Lemma sail_live_st_regread rs (r : register) ak
+    (k : type_of_register r → M unit) :
+  sail_live_st rs (Interface.Next (Interface.RegRead r ak) k) →
+  sail_live_st rs (k (register_lookup r rs)).
+Proof.
+  simpl. destruct (register_beq r (sig_seip : register)); [|done].
+  intros H. apply H.
+Qed.
 
 (** A value at every choose type the shape predicates admit.  [choose_prop]
     is NOT enforced by the LTS's [Choose] arm (it is existential in the
     value), so any inhabitant serves; the point is that none of these is an
     [R]. *)
-Lemma choose_val (ty : Values.ChooseType)
+Lemma choose_val rs (ty : Values.ChooseType)
     (k : Values.choose_type ty → M unit) :
-  sail_live (Interface.Next (Interface.Choose ty) k) →
+  sail_live_st rs (Interface.Next (Interface.Choose ty) k) →
   ∃ r : Values.choose_type ty, True.
 Proof.
   destruct ty; simpl; intros H;
@@ -298,8 +364,14 @@ Definition psail_quiet (p : psail) : Prop :=
 Definition shaped_res (p : psail) : Prop :=
   match sp_m p with None => True | Some m => sail_shaped m end.
 
+(** LIVE AT THE RECORD'S OWN REGISTERS — the invariant shape stage C9
+    settled on.  A step CHANGES [sp_regs], and [sail_live_st] threads exactly
+    the writes the step makes, so this reading is preserved step for step
+    ([sail_live_res_step]); a mid-instruction privilege write (trap entry
+    sets [cur_privilege] INSIDE the monad) is covered for free, because the
+    residual after it is measured at the state the write produced. *)
 Definition live_res (p : psail) : Prop :=
-  match sp_m p with None => True | Some m => sail_live m end.
+  match sp_m p with None => True | Some m => sail_live_st (sp_regs p) m end.
 
 
 (* ====================================================================== *)
@@ -770,7 +842,7 @@ End complete.
     The only arm of [sail_step_ni] that does NOT descend to an immediate
     continuation is the fused RMW, which jumps across a whole [silent_run]
     window and a [wr_node].  Four little lemmas carry [sail_shaped] and
-    [sail_live] across it; they are what the two preservation lemmas need.
+    [sail_live_st] across it; they are what the two preservation lemmas need.
 
     SINCE STAGE C8 THE CARRIER IS [sail_shaped] ITSELF (finding (O10)):
     [amo_tail] is gone, so the residual after a fused step is shaped for the
@@ -801,27 +873,34 @@ Proof.
   exact (sail_shaped_silent1 mx rsx y Hsh Hxy).
 Qed.
 
-Lemma sail_live_silent1 (m : M unit) rs (b : M unit * regstate) :
-  sail_live m → silent1 (m, rs) b → sail_live b.1.
+(** THE STATE THREADS THROUGH THE WINDOW.  A silent step may be a [RegRead]
+    (answered from the current file) or a [RegWrite] (which MOVES the file),
+    so the carrier is stated over the pair: liveness at [b.2] of [b.1]. *)
+Lemma sail_live_st_silent1 (m : M unit) rs (b : M unit * regstate) :
+  sail_live_st rs m → silent1 (m, rs) b → sail_live_st b.2 b.1.
 Proof.
   destruct m as [y|T oc k]; [by intros _ []|].
   destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
                  |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl;
     try (by intros _ []);
-    try (by intros Hlv ->; simpl; apply Hlv).
-  (* Choose *)
-  intros Hlv [ch ->]. simpl. by apply (sail_live_choose ty k Hlv).
+    (* RegRead: the LTS answers concretely, and both arms of the predicate
+       give the continuation at exactly that value *)
+    try (by intros Hlv ->; simpl; exact (sail_live_st_regread rs rg akk k Hlv));
+    (* RegWrite threads the write; every other silent arm keeps [rs] *)
+    try (by intros Hlv ->; simpl; apply Hlv);
+    try (by intros Hlv [ch ->]; simpl; apply (sail_live_st_choose rs _ _ Hlv)).
 Qed.
 
-Lemma sail_live_silent_run (m m1 : M unit) rs rs1 :
-  sail_live m → silent_run (m, rs) (m1, rs1) → sail_live m1.
+Lemma sail_live_st_silent_run (m m1 : M unit) rs rs1 :
+  sail_live_st rs m → silent_run (m, rs) (m1, rs1) → sail_live_st rs1 m1.
 Proof.
   intros Hlv Hrun.
-  change m with (m, rs).1 in Hlv. change m1 with (m1, rs1).1.
+  change (sail_live_st (m, rs).2 (m, rs).1) in Hlv.
+  change (sail_live_st (m1, rs1).2 (m1, rs1).1).
   remember (m, rs) as a. remember (m1, rs1) as b. clear Heqa Heqb m rs m1 rs1.
   revert Hlv. induction Hrun as [|x y z Hxy _ IH]; [done|].
   intros Hlv. apply IH. destruct x as [mx rsx].
-  exact (sail_live_silent1 mx rsx y Hlv Hxy).
+  exact (sail_live_st_silent1 mx rsx y Hlv Hxy).
 Qed.
 
 Lemma wr_node_mchild m1 rl base data m2 :
@@ -840,8 +919,8 @@ Proof.
   intros (_ & Hsh) (_ & _ & _ & _ & _ & _ & ->). exact Hsh.
 Qed.
 
-Lemma wr_node_live m1 rl base data m2 :
-  sail_live m1 → wr_node m1 rl base data m2 → sail_live m2.
+Lemma wr_node_live rs m1 rl base data m2 :
+  sail_live_st rs m1 → wr_node m1 rl base data m2 → sail_live_st rs m2.
 Proof.
   destruct m1 as [y|T oc k]; [done|].
   destruct oc; try done. simpl.
@@ -908,6 +987,8 @@ Section residual.
     destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
                    |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hstep, Hlv;
       try (by destruct Hstep);
+      try (by destruct Hstep as [_ ->]; simpl;
+             exact (sail_live_st_regread (sp_regs p) rg akk k Hlv));
       try (by destruct Hstep as [_ ->]; simpl; apply Hlv).
     - (* MemRead *)
       destruct (dev_addr (Interface.ReadReq.pa req)) eqn:Hd.
@@ -917,17 +998,19 @@ Section residual.
                       |pr pw sr sw]; try (by destruct Hstep).
         * destruct lat; [by destruct Hstep|].
           destruct Hstep as (_ & _ & _ & w & _ & ->). simpl. by apply Hlv.
-        * destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
+        * (* the fused rmw: the register file MOVES across the silent
+             window, and the residual is measured at where it lands *)
+          destruct Hstep as (_ & _ & _ & _ & _ & w & m1 & m2 & rs1
                              & _ & Hsil & Hwr & ->).
           simpl. eapply wr_node_live; [|exact Hwr].
-          eapply sail_live_silent_run; [apply (Hlv w)|exact Hsil].
+          eapply sail_live_st_silent_run; [apply (Hlv w)|exact Hsil].
     - (* MemWrite *)
       destruct (dev_addr (Interface.WriteReq.pa req)) eqn:Hd.
       + destruct Hstep as [_ ->]. simpl. exact Hlv.
       + destruct Hstep as (_ & _ & ->). simpl. exact Hlv.
     - (* Choose *)
       destruct Hstep as (_ & ch & ->). simpl.
-      by apply (sail_live_choose ty k Hlv).
+      by apply (sail_live_st_choose _ ty k Hlv).
   Qed.
 
 End residual.
@@ -1094,7 +1177,7 @@ Section tail.
     ∃ (m' : M unit) (rs' : regstate) (d' : dev_state)
       (fo : option (bool * bool * bool * bool)),
       pa_st ag' = PSail (Some m') rs' d' fo iq ∧
-      tc mchild m' m ∧ sail_shaped m' ∧ sail_live m'.
+      tc mchild m' m ∧ sail_shaped m' ∧ sail_live_st rs' m'.
 
   (** The QUIET arms of the tail, factored: one silent (or barrier) step to a
       smaller residual. *)
@@ -1102,7 +1185,7 @@ Section tail.
       fo iq :
     pc_ags c !! i = Some ag → lbl_quiet l →
     sail_step_ni next (pa_st ag) l (PSail (Some m') rs' d' fo iq) →
-    tc mchild m' m → sail_shaped m' → sail_live m' →
+    tc mchild m' m → sail_shaped m' → sail_live_st rs' m' →
     ∃ c' ag' (fu : bool), pf_solo next i c c' ∧
               (fu = true → pf_solo_f next i c c') ∧
               pc_ags c' !! i = Some ag' ∧ tail_post i m iq c' ag'.
@@ -1121,7 +1204,7 @@ Section tail.
   Lemma tail_step (i : agent) c ag (m : M unit) rs (d : dev_state) iq :
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → pa_st ag = PSail (Some m) rs d None iq →
-    sail_shaped m → sail_live m →
+    sail_shaped m → sail_live_st rs m →
     ∃ c' ag' (fu : bool), pf_solo next i c c' ∧
               (fu = true → pf_solo_f next i c c') ∧
               pc_ags c' !! i = Some ag' ∧ tail_post i m iq c' ag'.
@@ -1145,7 +1228,8 @@ Section tail.
       apply (tail_qcase i c ag WeakPromise.LSilent _
                (k (register_lookup rg rs)) rs d None iq Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; by split
-        |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
+        |apply tc_once; by eexists|by apply Hsh
+        |exact (sail_live_st_regread rs rg akk k Hlv)].
     - (* RegWrite *)
       apply (tail_qcase i c ag WeakPromise.LSilent _
                (k tt) (register_set rg rv rs) d None iq Hlk (or_introl eq_refl));
@@ -1302,13 +1386,13 @@ Section tail.
         [rewrite Hst /sail_step_ni /=; by split
         |apply tc_once; by eexists|by apply Hsh|by apply Hlv].
     - (* Choose *)
-      destruct (choose_val ty k Hlv) as (v & _).
+      destruct (choose_val rs ty k Hlv) as (v & _).
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k v) rs d None
                iq Hlk (or_introl eq_refl));
         [rewrite Hst /sail_step_ni /=; split;
            [reflexivity|by exists v]
         |apply tc_once; by eexists|by apply Hsh
-        |by apply (sail_live_choose ty k Hlv)].
+        |by apply (sail_live_st_choose rs ty k Hlv)].
     - (* Message *)
       apply (tail_qcase i c ag WeakPromise.LSilent _ (k tt) rs d None iq
                Hlk (or_introl eq_refl));
@@ -1324,7 +1408,7 @@ Section tail.
   Lemma tail_run : ∀ (m : M unit) (i : agent) c ag rs (d : dev_state) iq,
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → pa_st ag = PSail (Some m) rs d None iq →
-    sail_shaped m → sail_live m →
+    sail_shaped m → sail_live_st rs m →
     ∃ c' ag' (fu : bool), rtc (pf_solo next i) c c' ∧
               (fu = true → rtc (pf_solo_f next i) c c') ∧
               pc_ags c' !! i = Some ag' ∧
@@ -1366,7 +1450,7 @@ Section tail.
   Theorem tail_complete (i : agent) c ag (m : M unit) :
     img_total (pc_img c) → cfg_bnd c →
     pc_ags c !! i = Some ag → sp_m (pa_st ag) = Some m →
-    sail_shaped m → sail_live m →
+    sail_shaped m → sail_live_st (sp_regs (pa_st ag)) m →
     ∃ c' ag' ms (fu : bool),
       rtc (pf_solo next i) c c' ∧
       (fu = true → rtc (pf_solo_f next i) c c') ∧
@@ -2058,6 +2142,48 @@ Lemma seip_free_res_step next p l p' :
   sp_m p ≠ None → seip_free_psail p → sail_step_ni next p l p' →
   seip_free_psail p'.
 Proof. apply regs_free_res_step. Qed.
+
+(** THE PIN FRAME FOR LIVENESS (stage C9; §2 note (g)).  [sail_live_st] is
+    invariant under any change confined to [sig_seip], because its [RegRead]
+    arm answers that ONE register with [∀ v] and every other one from the
+    file.  This is what [WeakSailCone.res_ok_frame] consumes at
+    [irq_deliver], the LTS arm that writes the pin BEHIND the residual's
+    back — and it needs no [seip_free] hypothesis at all, unlike the
+    commutation of §9.5, because it says nothing about the values that flow,
+    only that no path FAILS. *)
+Lemma register_beq_refl (r : register) : register_beq r r = true.
+Proof.
+  destruct r; simpl; autorewrite with register_beq_refls; reflexivity.
+Qed.
+
+Lemma sail_live_st_agree (m : M unit) rs rs' :
+  regs_seip_eq rs rs' → sail_live_st rs m → sail_live_st rs' m.
+Proof.
+  revert rs rs'. induction m as [x|T oc k IH]; intros rs rs' Hag; [done|].
+  destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
+                 |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl;
+    try done;
+    try (intros H r; by apply (IH r rs rs')).
+  - (* RegRead: the pin is ∀-quantified, every other register agrees *)
+    destruct (register_beq rg (sig_seip : register)) eqn:Hb.
+    + intros H v. by apply (IH v rs rs').
+    + rewrite -(Hag rg). { intros H. by apply (IH _ rs rs'). }
+      intros Hs. rewrite /seip_reg in Hs. rewrite Hs in Hb.
+      by rewrite register_beq_refl in Hb.
+  - (* RegWrite: the same agreement survives the write *)
+    intros H. apply (IH tt (register_set rg rv rs) (register_set rg rv rs'));
+      [by apply regs_agree_set|exact H].
+  - (* MemRead *) intros H w. by apply (IH _ rs rs').
+  - (* MemWrite *) intros H. by apply (IH _ rs rs').
+  - (* Choose *) destruct ty; simpl; try done; intros H r; by apply (IH r rs rs').
+Qed.
+
+Lemma sail_live_st_seip (m : M unit) rs (v : type_of_register (sig_seip : register)) :
+  sail_live_st rs m → sail_live_st (register_set sig_seip v rs) m.
+Proof.
+  apply sail_live_st_agree.
+  exact (regs_agree_set_excluded seip_reg rs (sig_seip : register) v eq_refl).
+Qed.
 
 Lemma irq_deliver_intro p v iq :
   sp_irq p = v :: iq →

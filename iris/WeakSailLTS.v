@@ -218,10 +218,21 @@
     (e') THE ANSWERS THE SHAPE PREDICATES QUANTIFY OVER ARE THE ANSWERS THIS
         LTS SUPPLIES.  [sail_mstep]'s memory arms hand the continuation
         [inl (w, None)] (read) and [inl None] (write) and nothing else, so
-        [sail_shaped] (and [WeakSailComplete.sail_live]) quantify
+        [sail_shaped] (and [WeakSailComplete.sail_live_st]) quantify
         over exactly those — NOT over the full answer type, whose abort
         branch [inr ab] the model answers with [exit tt] and which made
         [∀ b, sail_live (riscv_step b)] refutable (stage C1 finding (O1)).
+
+        THE SAME PRINCIPLE GOVERNS THE REGISTER ARMS SINCE STAGE C9, and it
+        is what made the liveness half statable at all.  [RegRead]'s answer
+        is [register_lookup r rs] — ONE value, from the hart's own file — so
+        [WeakSailComplete.sail_live_st] answers it concretely and threads
+        [RegWrite]; a [∀ v] arm there was the same silent strengthening the
+        memory arms carried before C2, and it is what finding (O9) refutes
+        (at [cur_privilege = VirtualSupervisor], which the machine never
+        reaches).  The one register still ∀-quantified is [sig_seip],
+        because [irq_deliver] — an arm of THIS LTS — writes it without
+        moving the residual.
 
     (f) THE BRACKET IS PER-AGENT AND FRAMED.  [wrun_sail_bracket] is stated
         over an arbitrary agent list [ags] with agent [i]'s slot pinned and

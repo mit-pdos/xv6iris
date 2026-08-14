@@ -924,6 +924,7 @@ WeakShapeExecGen03.v
 WeakShapeExec.v
 WeakShapePeel.v
 WeakShapeTop.v
+WeakShapeLive.v
 WeakComposeLang.v
 WeakCompose.v
 WeakLang.v

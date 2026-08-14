@@ -47,21 +47,25 @@
       [WeakShapePeel]  [try_step] and [tick_clock].
 
     ------------------------------------------------------------------------
-    §3  WHY THE LIVENESS HALF IS NOT HERE.
+    §3  WHERE THE LIVENESS HALF IS: [WeakShapeLive.v].
 
-    [∀ b, sail_live (riscv_step b)] is REFUTABLE as stated — finding (O9):
-    [glive] forbids a raised Sail exception outright, and
-    [rv64d.zicfiss_xSSE] raises one at [VirtualSupervisor], a value the
-    [RegRead] arm quantifies over.  Its honest form is STATE-CONDITIONED
-    ([sail_live] under a register-state precondition: xv6 runs with the H
-    extension off, so [cur_privilege] is never [VirtualSupervisor]), which is
-    exactly why it cannot be a [∀ b] fact, and settling that precondition
-    comes BEFORE generating a [gok] tower — the mode question is finding
-    (O7): a generated sweep must emit every mode it will ever need in one
-    pass, and [gwalk] implies neither [gpost] nor [glive].  Behind it sit the
-    ~100 [exit]/[internal_error]/[assert_exp] reachability sites of (O3).
-    [riscv_step_ok_cone] below is the reduction that a liveness half would
-    plug into, kept for that purpose.
+    [∀ b, sail_live (riscv_step b)] was REFUTABLE as stated — finding (O9):
+    liveness forbids a raised Sail exception outright, and
+    [rv64d.zicfiss_xSSE] raises one at [VirtualSupervisor], a value the old
+    [RegRead] arm quantified over.  Stage C9 took the narrowing the other
+    four findings took (NARROW THE ARM TO WHAT THE MACHINE SUPPLIES): the
+    LTS answers a [RegRead] CONCRETELY, so the predicate does too
+    ([WeakSailComplete.sail_live_st]), and the honest fact is
+
+      [WeakShapeLive.riscv_step_live_ax :
+         rv64d_live_residue → ∀ rs b, priv_ok rs → sail_live_st rs (riscv_step b)]
+
+    — per boundary record, under [priv_ok] of THAT record's registers.  What
+    is still un-run there is the (O3) sweep (~100 [exit]/[internal_error]/
+    [assert_exp] reachability sites, and finding (O7): a [gliveP] tower
+    cannot reuse this file's [gwalk] tower at all, because the shape mode
+    implies no liveness).  It is carried as the named record
+    [WeakShapeLive.rv64d_live_residue], NOT as an axiom.
 
     ------------------------------------------------------------------------
     §4  THE FIVE FINDINGS IT TOOK, in one paragraph each, because the SHAPE
@@ -152,17 +156,20 @@ Proof.
   apply riscv_step_shaped_cone, gw_try_step, (gw_run_hart_active_ax H).
 Qed.
 
-(** The reduction the LIVENESS half would plug into (§3): [glive] has no
-    [Ret]-mode subtlety, so the two halves reduce in lockstep AT THE WRAPPER.
-    Below it they do not — the generated tower is [gwalk]-only (finding
-    (O7)) — which is why this statement still names both frontier
-    functions. *)
+(** The REGISTER-FREE reduction of both halves at once, kept because it is
+    the cheap route wherever a fragment happens to be register-insensitive:
+    [gok] is [gwalk] ∧ [glive true], and [glive true] implies the
+    state-conditioned reading at EVERY state ([WeakShape.glive_sail_live_st]).
+    It is NOT the route the liveness half takes — [glive true (try_step n b)]
+    is refuted by (O9)'s witness, exactly as its [∀ b] consequence is — see
+    §3 and [WeakShapeLive]. *)
 Theorem riscv_step_ok_cone :
   (∀ (n : Z) (b : bool), gok (try_step n b)) →
   gok (tick_clock tt) →
-  ∀ b : bool, sail_shaped (riscv_step b) ∧ sail_live (riscv_step b).
+  ∀ (rs : regstate) (b : bool),
+    sail_shaped (riscv_step b) ∧ sail_live_st rs (riscv_step b).
 Proof.
-  intros Htry Htick b. apply gok_stageC.
+  intros Htry Htick rs b. apply gok_stageC.
   rewrite /riscv_step. apply gok_bind; [apply Htry|].
   intros _. destruct b; [exact Htick|apply gok_returnm].
 Qed.

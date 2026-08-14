@@ -590,6 +590,99 @@ def emit_exec(mon, pure, model, outdir, shard_sizes, dry_run=False):
     return written
 
 
+# ---------------------------------------------------------------------------
+# THE LIVENESS MODE (stage C9).  It is an ENUMERATOR, not a tower emitter, and
+# that is deliberate: [glive_st] (WeakShapeLive.gliveP at the trivial
+# postconditions) is FALSE at every function whose cone contains a reachable
+# [exit] / [internal_error] / failing [assert_exp], so a blind sweep would
+# emit hundreds of unprovable lemmas.  What the sweep needs FIRST is the site
+# table -- which functions carry a failure node, of what kind -- because each
+# site is then discharged one of three ways:
+#
+#   (a) REACHABILITY-REFUTED   the branch cannot be taken (the [untilMT] fuel
+#                              recipe: the measure really bounds the loop);
+#   (b) PRIV-GATED             the branch is behind a [cur_privilege] test
+#                              that [priv_ok] rules out (zicfiss_xSSE,
+#                              _rec_get_xLPE -- finding (O9)'s own witness);
+#   (c) A NEW STATE CONDITION  add it to [WeakSailComplete.priv_ok] and
+#                              record why.
+#
+# The CLEAN set this prints -- reachable monadic definitions whose whole cone
+# is failure-free -- is exactly the part a mechanical tower could emit today,
+# and it is what a future [--mode live] EMITTER should start from.  The
+# skeletons are printed so the shape of that emitter is already fixed:
+#
+#     Lemma gl_<f> : forall rs a0..an, glive_st rs (@<f> a0..an).
+#     Proof. intros; cbv [<f>]; gl_solve. Qed.
+#
+# [gl_solve] does not exist yet; writing it is the sweep's first task, and the
+# (O8)/(O11) discipline applies to it verbatim (gate the leaf on an ATOMIC
+# goal, `Hint Constants Opaque`, name every callee in a hand script).
+FAILURE_TOKENS = [
+    ('exit', r'\bexit\b'),
+    ('internal_error', r'\binternal_error\b'),
+    ('fail', r'\bfail\b'),
+    ('assert_exp', r"\bassert_exp'?\b"),
+    ('reserved_behavior', r'\breserved_behavior\b'),
+    ('throw', r'\bthrow\b'),
+    ('untilMT', r'\buntilMT\b'),
+    ('whileMT', r'\bwhileMT\b'),
+]
+
+
+def failure_sites(body):
+    """Kind -> count, over the comment/string-stripped body."""
+    txt = strip_comments_and_strings(body)
+    out = {}
+    for kind, pat in FAILURE_TOKENS:
+        n = len(re.findall(pat, txt))
+        if n:
+            out[kind] = n
+    return out
+
+
+def live_report(model, ccalls, creach, mon, impure, order):
+    sites = {}
+    for n in sorted(creach):
+        if n in model:
+            s = failure_sites(model[n][1])
+            if s:
+                sites[n] = s
+    # transitive: a caller of a site-carrying function inherits the obligation
+    dirty = up_cone(ccalls, creach, list(sites))
+    clean = sorted((mon - dirty) - impure)
+    print('LIVENESS SWEEP -- SITE TABLE (tools/gen_shape.py --mode live)')
+    print('reachable from %s: %d (monadic %d)' % (ROOTFN, len(creach), len(mon)))
+    print('monadic definitions with a DIRECT failure site: %d'
+          % len([n for n in sites if n in mon]))
+    print('monadic definitions whose CONE carries one: %d' % len(dirty & mon))
+    print('monadic definitions whose cone is failure-free: %d' % len(clean))
+    print('')
+    tot = {}
+    for s in sites.values():
+        for k, v in s.items():
+            tot[k] = tot.get(k, 0) + v
+    print('sites by kind (whole reachable cone): %s'
+          % '  '.join('%s=%d' % (k, tot[k]) for k, _ in FAILURE_TOKENS
+                      if k in tot))
+    print('')
+    print('-- per function (monadic, direct sites only) --')
+    for n in sorted(sites):
+        if n in mon:
+            print('  %-46s %s' % (n, ' '.join('%s:%d' % (k, v)
+                                              for k, v in sorted(sites[n].items()))))
+    print('')
+    print('-- SKELETONS for the failure-free set (%d) --' % len(clean))
+    for n in clean:
+        body = model[n][1]
+        ar = len(binder_groups(binder_region(body)))
+        args = ' '.join('a%d' % i for i in range(ar))
+        print('Lemma gl_%s : forall rs%s, glive_st rs (@%s%s).'
+              % (n, (' ' + args) if args else '', n,
+                 (' ' + args) if args else ''))
+        print('Proof. intros; cbv [%s]; gl_solve. Qed.' % n)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--model', default=MODEL)
@@ -607,9 +700,11 @@ def main():
     ap.add_argument('--limit', type=int, default=0,
                     help='emit only the first N of the topological order '
                          '(0 = the whole sweep)')
-    ap.add_argument('--mode', default='shape', choices=['shape', 'exec'],
+    ap.add_argument('--mode', default='shape', choices=['shape', 'exec', 'live'],
                     help="'shape' = the [gwalk] tower (WeakShapeGen*.v); "
-                         "'exec' = the [gwx] value sweep (WeakShapeExecGen*.v)")
+                         "'exec' = the [gwx] value sweep (WeakShapeExecGen*.v); "
+                         "'live' = the LIVENESS ENUMERATOR (report + "
+                         "[glive_st] skeletons on stdout; see live_report)")
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--report', action='store_true')
     args = ap.parse_args()
@@ -658,6 +753,9 @@ def main():
               % ' '.join(sorted(mon - set(full))))
 
     sizes = [int(x) for x in args.shard_sizes.split(',')]
+    if args.mode == 'live':
+        live_report(model, ccalls, creach, mon, impure, order)
+        return
     if args.mode == 'exec':
         # THE VALUE SWEEP.  [execute] itself is hand-proved (it is the file
         # that consumes the eleven memory-clause hypotheses), and the memory

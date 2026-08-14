@@ -76,7 +76,7 @@ USER_DUMPS ?= sync:Sync
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
-        gen-shape check-shape \
+        gen-shape check-shape live-sites \
         gen-sites check-sites \
         clean clean-proofs distclean model-gen
 
@@ -200,10 +200,18 @@ update-decode: gen-code
 # needing a hand proof belongs in iris/WeakShapeOverrides.v or in
 # tools/gen_shape.py's OVERRIDE_PROOFS table (which is emitted in the group's
 # topological position, so the hint database still orders it).
-# TWO MODES, EMITTED IN THE SAME PASS (finding (O7)): --mode shape is the
-# [gwalk None] tower (WeakShapeGen*.v), --mode exec is stage C7's [gwx] value
+# TWO EMITTING MODES, IN THE SAME PASS (finding (O7)): --mode shape is the
+# [gwalk] tower (WeakShapeGen*.v), --mode exec is stage C7's [gwx] value
 # sweep (WeakShapeExecGen*.v).  A generated sweep must emit every mode it will
 # ever need, because the shards form a serial Require chain.
+#
+# --mode live (stage C9) is an ENUMERATOR, not an emitter: it prints the
+# LIVENESS SITE TABLE (which of the reachable monadic definitions carry an
+# [exit]/[internal_error]/[assert_exp]/[untilMT], and of what kind) plus
+# [glive_st] skeletons for the failure-free subset.  It writes NO shard,
+# because [glive_st] is FALSE at a function with a reachable failure site and
+# a blind tower would be hundreds of unprovable lemmas; the site table is what
+# the sweep has to work through first.  So it is not part of check-shape.
 gen-shape:
 	$(PYTHON) tools/gen_shape.py --outdir $(IRIS) --report
 	$(PYTHON) tools/gen_shape.py --outdir $(IRIS) --mode exec \
@@ -211,6 +219,8 @@ gen-shape:
 check-shape: gen-shape
 	git diff --exit-code -- $(IRIS)/WeakShapeGen*.v \
 	    $(IRIS)/WeakShapeExecGen*.v
+live-sites:
+	$(PYTHON) tools/gen_shape.py --mode live
 
 # The memory-ordering SITE enumeration, a sibling of the decode layer: same
 # inputs (the tracked kernel-rocq/ dump), same rule that its outputs are
