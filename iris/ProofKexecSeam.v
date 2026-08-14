@@ -50,6 +50,8 @@ Require Import FsCrash.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
+Require Import VcGen.
+Require Import W32Arith.
 Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
@@ -196,6 +198,72 @@ Qed.
 Lemma kxc_lvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. change (2 ^ 31)%Z with 2147483648%Z. lia. Qed.
 
+(* --------------------------------------------------------------------- *)
+(*  THE INVARIANT STEP ACROSS uvmalloc -- BOTH HALVES, BOTH ARMS.         *)
+(*                                                                        *)
+(*  Every uvmalloc call in kexec (the phdr loop's at +0x17c and phase C's  *)
+(*  at +0x1ce) re-establishes the same pair, and the ORDER is what makes   *)
+(*  it work: coverage first, with no size bound at all                     *)
+(*  ([UmCovered.um_covered_after]), then the bound read OFF the coverage   *)
+(*  ([UmCovered.proc_pt_covered_maxsz]), and only then [um_below_grow] --  *)
+(*  whose [uint newsz <= uvm_maxsz] premise kexec can pay no other way,    *)
+(*  its [newsz] being [ph.vaddr + ph.memsz] out of an untrusted file.      *)
+(*                                                                        *)
+(*  BOTH ARMS OF uvmalloc's SUCCESS DISJUNCTION ARE LIVE HERE.  On         *)
+(*  [newsz < oldsz] the C returns [oldsz] having mapped nothing, and       *)
+(*  [uvma_np] is 0 there, so the map comes back with the same domain and   *)
+(*  both halves transfer verbatim.                                        *)
+(* --------------------------------------------------------------------- *)
+
+(* [uvma_np] is 0 whenever the run would not go forward -- the arm the C
+   returns from immediately, and (at [newsz = oldsz]) the degenerate one the
+   shrink arm is re-read as below. *)
+Lemma kxc_uvma_np_le (oldsz newsz : mword 64) :
+  (bv_unsigned oldsz <= uvm_maxsz)%Z ->
+  (bv_unsigned newsz <= bv_unsigned oldsz)%Z ->
+  uvma_np oldsz newsz = 0%nat.
+Proof.
+  intros Hmax Hle.
+  destruct (pgroundup_maxsz oldsz Hmax) as [[Hge _] _].
+  assert (Hq : ((bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095)
+                / 4096 < 1)%Z) by (apply Z.div_lt_upper_bound; lia).
+  unfold uvma_np.
+  destruct ((bv_unsigned newsz - bv_unsigned (pgroundup oldsz) + 4095)
+            / 4096)%Z eqn:E; [reflexivity | lia | reflexivity].
+Qed.
+
+Lemma kxc_grow_inv (P P' : uptd) (oldsz newsz sz' : mword 64) :
+  proc_pt_wf P -> proc_pt_wf P' ->
+  um_below oldsz P.(ud_um) ->
+  um_covered oldsz P.(ud_um) ->
+  uptd_ext P P' ->
+  dom P'.(ud_um)
+    = dom P.(ud_um) ∪ vpn_run (svpn_of (pgroundup oldsz)) (uvma_np oldsz newsz) ->
+  (((bv_unsigned newsz < bv_unsigned oldsz)%Z /\ sz' = oldsz)
+   \/ ((bv_unsigned oldsz <= bv_unsigned newsz)%Z /\ sz' = newsz)) ->
+  um_below sz' P'.(ud_um) /\ um_covered sz' P'.(ud_um).
+Proof.
+  intros Hwf Hwf' Hbelow Hcov (_ & _ & Hsub) Hdom Harm.
+  pose proof (proc_pt_covered_maxsz P oldsz Hwf Hcov) as Hmax.
+  destruct Harm as [[Hlt ->] | [Hle ->]].
+  - (* NOTHING WAS MAPPED: [uvma_np] is 0 and the domain did not move. *)
+    rewrite (kxc_uvma_np_le oldsz newsz Hmax ltac:(lia)) vpn_run_0
+            union_empty_r_L in Hdom.
+    split.
+    + apply (um_below_grow oldsz oldsz P.(ud_um) P'.(ud_um) Hbelow
+               (Z.le_refl _) Hmax).
+      rewrite Hdom (kxc_uvma_np_le oldsz oldsz Hmax (Z.le_refl _))
+              vpn_run_0 union_empty_r_L. reflexivity.
+    + apply (um_covered_z_subseteq _ P.(ud_um)); [rewrite Hdom; done | exact Hcov].
+  - (* THE RUN LANDED: coverage first (no bound), then the bound off it. *)
+    assert (Hcov' : um_covered newsz P'.(ud_um))
+      by exact (um_covered_after oldsz newsz P.(ud_um) P'.(ud_um)
+                  Hmax Hle Hcov Hdom).
+    split; [| exact Hcov'].
+    apply (um_below_grow oldsz newsz P.(ud_um) P'.(ud_um) Hbelow Hle
+             (proc_pt_covered_maxsz P' newsz Hwf' Hcov') Hdom).
+Qed.
+
 (* ===================================================================== *)
 (*  THE THIRTEEN CALLEE-SAVED INDICES, ENUMERATED.                        *)
 (* ===================================================================== *)
@@ -251,6 +319,67 @@ Definition kxc_off (ef : nat -> bv 8) (i : nat) : mword 64 :=
 Lemma kxc_off_0 (ef : nat -> bv 8) :
   kxc_off ef 0 = sign_extend' 64 (Z_to_bv 32 (eh_phoff ef) : mword 32).
 Proof. unfold kxc_off. rewrite ph_at_0. reflexivity. Qed.
+
+(* [mword_of_int] and [Z_to_bv] are the same function at 32 bits -- convertible
+   but not syntactically equal, which is the one bridge every [kxc_off] site
+   needs (the decode layer produces the second, the ALU laws are stated over
+   the first). *)
+Lemma kxc_moi32_ztobv (z : Z) : (mword_of_int z : mword 32) = (Z_to_bv 32 z : mword 32).
+Proof. reflexivity. Qed.
+
+Lemma kxc_off_alt (ef : nat -> bv 8) (i : nat) :
+  kxc_off ef i = (sign_extend' 64 (mword_of_int (ph_at ef i) : mword 32) : mword 64).
+Proof. unfold kxc_off. by rewrite kxc_moi32_ztobv. Qed.
+
+(* ...and the STEP the back edge's [addiw a3,a5,56] performs.  The immediate
+   form of [W32Arith.w32_addw_arg]: ADDIW truncates the SUM rather than the
+   operands, so the law goes through [VcGen.trunc32_add] instead. *)
+Lemma kxc_addiw56 (a : Z) :
+  (sign_extend' 64 (subrange_vec_dec
+     (add_vec (sign_extend' 64 (mword_of_int a : mword 32) : mword 64)
+              (sign_extend' 64 (mword_of_int 56 : mword 12) : mword 64)) 31 0
+    : mword 32) : mword 64)
+  = (sign_extend' 64 (mword_of_int (a + 56) : mword 32) : mword 64).
+Proof.
+  rewrite <- trunc32_subrange. rewrite trunc32_add trunc32_sext64.
+  assert (H56 : trunc32 (sign_extend' 64 (mword_of_int 56 : mword 12) : mword 64)
+                = (mword_of_int 56 : mword 32))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite H56 w32_addv. reflexivity.
+Qed.
+
+Lemma kxc_off_step (ef : nat -> bv 8) (i : nat) :
+  (sign_extend' 64 (subrange_vec_dec
+     (add_vec (kxc_off ef i)
+              (sign_extend' 64 (mword_of_int 56 : mword 12) : mword 64)) 31 0
+    : mword 32) : mword 64)
+  = kxc_off ef (S i).
+Proof. rewrite !kxc_off_alt kxc_addiw56 ph_at_succ. reflexivity. Qed.
+
+(* [lhu]'s zero extension, as a LITERAL: what turns the [bge s10,a5] at
+   +0x128 into a decidable [Z] test on [eh_phnum].  ([W32Arith.w32_zext8_moi]
+   at sixteen bits.) *)
+Lemma kxc_hw_range (h : mword 16) : (0 <= bv_unsigned h < 65536)%Z.
+Proof. exact (bv_unsigned_in_range 16 h). Qed.
+
+Lemma kxc_zext16_moi (h : mword 16) :
+  (zero_extend' 64 h : mword 64) = (mword_of_int (bv_unsigned h) : mword 64).
+Proof.
+  pose proof (kxc_hw_range h) as Hr0.
+  assert (Hr : (0 <= bv_unsigned h < 2 ^ 64)%Z)
+    by (change (2 ^ 64)%Z with 18446744073709551616%Z; lia).
+  apply bv_eq. rewrite moi64_unsigned. rewrite (bvw64_small _ Hr). reflexivity.
+Qed.
+
+Lemma kxc_phnum_moi (ef : nat -> bv 8) :
+  (zero_extend' 64 (Z_to_bv 16 (le_at ef 56 2) : mword 16) : mword 64)
+  = (mword_of_int (eh_phnum ef) : mword 64).
+Proof.
+  rewrite kxc_zext16_moi. f_equal.
+  rewrite (Z_to_bv_small 16 (le_at ef 56 2)
+             ltac:(exact (eh_phnum_bound ef))).
+  reflexivity.
+Qed.
 
 (* ===================================================================== *)
 (*  THE ELF BUFFER: CARVE AND UNCARVE, and the two field WINDOWS.          *)
@@ -570,6 +699,119 @@ Section KexecBSeam.
               gilf gislf ∗
      log_op g n2 ∗
      iref_slots 1 ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
+     bitmap_res gfs bmapstart cov logstart size used2 ∗
+     bslots bn 3 ∗
+     kalloc_env ga None ∗
+     proc_pt P ∗
+     proc_priv gf (proc_addr jp) pidv V ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 na,
+        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
+
+  (* --------------------------------------------------------------- *)
+  (*  +0x1a4 -- WHERE THE PHDR LOOP AND THE NO-SEGMENTS PATH MEET.     *)
+  (*                                                                   *)
+  (*  Both [kxc_at_1a2] (one [c.li s2,0] away) and the loop's exit at   *)
+  (*  +0x128 land here, with [s2] holding the size the image reached.   *)
+  (*  What follows is [mv a0,s4 ; jal iunlockput ; jal end_op], which   *)
+  (*  is why the open inode and the log budget are still in it.         *)
+  (*                                                                   *)
+  (*  NO THREADING CONJUNCT, for [kxc_at_12c]'s reason: the two paths   *)
+  (*  in disagree about s1/s3/s7..s11 and nothing downstream reads them *)
+  (*  -- phase C/D's tails reload all nine from slots 5..13, which is   *)
+  (*  where [callee_saved m mf] comes from.                             *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_at_1a4
+      (jp : nat)
+      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32) (used used2 : gset Z)
+      (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
+      (dnf : dinode) (bmf : blkmap)
+      (gilf gislf : gname) (n2 : nat)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (M : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (szv : mword 64) : iProp Σ :=
+    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs0 = sp0 /\
+       M !!! Regidx Rs2 = szv /\
+       M !!! Regidx Rs4 = ientry kf /\
+       M !!! Regidx Rs6 = page_base P.(ud_root) ⌝ ∗
+     ⌜ (kf < NINODE)%nat /\
+       bv_unsigned inumf < 16 * Z.of_nat nib /\
+       (iput_units <= n2)%nat /\ used2 ⊆ used /\
+       (forall j, (j < 8)%nat ->
+          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
+     ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
+       um_below szv P.(ud_um) /\
+       um_covered szv P.(ud_um) ⌝ ∗
+     pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
+     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     cpu_own 0 true (proc_addr jp) C true ∗
+     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
+              gilf gislf ∗
+     log_op g n2 ∗
+     iref_slots 1 ∗
+     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
+     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
+     bitmap_res gfs bmapstart cov logstart size used2 ∗
+     bslots bn 3 ∗
+     kalloc_env ga None ∗
+     proc_pt P ∗
+     proc_priv gf (proc_addr jp) pidv V ∗
+     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) ∗
+     ([∗ list] k ∈ seq 0 (S na), pa_add av (8 * k) ↦₈{dqa} avf k) ∗
+     ([∗ list] k ∈ seq 0 na,
+        [∗ list] j ∈ seq 0 (aslen k), pa_add (avf k) j ↦ₘ afun k j) ∗
+     ([∗ list] j ∈ seq 0 64, pa_add (pa_stk sp0 54) j ↦ₘ ef j) ∗
+     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67)%I.
+
+  (* --------------------------------------------------------------- *)
+  (*  +0x1ae -- PHASE C's ENTRY.  The inode is closed and the log      *)
+  (*  transaction is over, so what phase B threaded through the FS is  *)
+  (*  gone: no [kxc_open], no [log_op], both [iref_slots] back.  What  *)
+  (*  is left is the half-built address space, the process, and the    *)
+  (*  frame -- plus the ELF buffer, which travels NAMED all the way to *)
+  (*  phase D (it reads [elf.entry] at +0x2f0).                        *)
+  (* --------------------------------------------------------------- *)
+  Definition kxc_at_1ae
+      (jp : nat)
+      (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (M : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (P : uptd) (szv : mword 64) : iProp Σ :=
+    (⌜ M !!! Regidx csp_rs1 = pa_stk sp0 68 /\
+       M !!! Regidx Rs0 = sp0 /\
+       M !!! Regidx Rs2 = szv /\
+       M !!! Regidx Rs6 = page_base P.(ud_root) ⌝ ∗
+     ⌜ used2 ⊆ used /\
+       (forall j, (j < 8)%nat ->
+          is_aligned_paddr (Physaddr (pa_stk sp0 (54 - j))) 8 = true) ⌝ ∗
+     ⌜ ud_tfp P = ud_tfp (pv_upt V) /\
+       um_below szv P.(ud_um) /\
+       um_covered szv P.(ud_um) ⌝ ∗
+     pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
+     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
+     cpu_own 0 true (proc_addr jp) C true ∗
+     iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
      bitmap_res gfs bmapstart cov logstart size used2 ∗
