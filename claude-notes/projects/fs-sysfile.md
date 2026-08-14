@@ -8400,30 +8400,29 @@ ilock at "bcache", iunlock at "sleep lock", argstr at "kmem") is
 `locks_below ∅ _`, closed by `lkbelow`.  That is the case
 `cpu_own_zero_empty`'s own comment was written for.
 
-### THE STOP: THERE IS NO POST-MERGE MIRROR TO COMPILE AGAINST
+### THE GR-16/17 WIDENING, and the level-0 discharge
 
-The EC2 mirror is at `d79bc603`; HEAD is `542d8ec4` (GR-16), 37 commits
-and the whole lock-set widening ahead of it, and the mirror's working
-tree is 233 files dirty with someone else's partial sync.  Under the
-mirror-only-compiles rule that means **the GR-16 adaptation of
-`SpecSysChdir.v` is committed UNVERIFIED** — it was landed anyway
-because the alternative was a HEAD whose `_CoqProject` names a file that
-cannot compile.  It is mechanical and matches the diff the merge applied
-to `SpecSysClose.v` line for line; it still wants a green build.
-
-`ProofSysChdir.v` is green at the mirror's base and its content is
-merge-invariant (it names no `cpu_own` and no lks-bearing contract, and
-`CodeSysChdir.v` is byte-identical across the merge), but it too wants a
-post-merge re-check.
+`cpu_own` carries the held-lock set (of lock NAMES) as a trailing index.
+sys_chdir takes `(lks : gset string)` and threads it, and — unlike
+`SpecSysClose` — takes **no `locks_below` premise**: its `cpu_own` pins the
+depth at ZERO, so `CpuOwn.cpu_own_zero_empty` derives `lks = ∅` and every
+order goal the nine callees raise (begin_op / iput / iunlockput / end_op
+at "log", ilock at "bcache", iunlock at "sleep lock", argstr at "kmem")
+is `locks_below ∅ _`.  The idiom is one `iDestruct (cpu_own_zero_empty …)
+as "[%Hlkempty Hcnt]"` per body and `lkbelow` at each call — keep the
+EQUATION rather than substituting, because `lks` is spelled by name
+everywhere below.  Machine-checked: the GR-16 gate failed without the
+widening and passed with it.
 
 ### WHAT IS LEFT, in order
 
-1. Re-verify `SpecSysChdir.v` + `ProofSysChdir.v` on a synced mirror.
-2. The walk, in the order the arms fall out: prologue + frame carve
+1. The walk, in the order the arms fall out: prologue + frame carve
    (+0x00..+0x08), myproc, begin_op, argstr, the +0x22 split; then ARM A
-   through the shared `+0x68` tail; then namei and the +0x32 split with
-   ARM B; then ilock, the type test, ARM C; then the success tail.
-   The epilogue is already a lemma and every arm ends by applying it.
+   through `sc_m1_tail`; then namei and the +0x32 split with ARM B (which
+   restores s1 at +0x66 and falls into the same tail); then ilock, the
+   type test, ARM C (+0x70, its own iunlockput/end_op/li/ldsp/j); then
+   the success tail (+0x42..+0x5a).  The epilogue and the "-1" tail are
+   already lemmas and every arm ends by applying one of them.
 3. `LinkSysChdir.v` = `SysChdirProof Myproc BeginOp Argstr Namei Ilock
    Iunlock Iput Iunlockput EndOp`, then `Print Assumptions` — it must be
    the standing six, and sys_chdir must NOT pick up `create_fresh_ty`
@@ -8449,3 +8448,38 @@ post-merge re-check.
 4. **`uptd` is `UserPtTree`'s**, not `ProcPtOwn`'s — `ProcPtOwn` only
    defines `uptd_ext` over it, so requiring `ProcPtOwn` alone leaves the
    record's name unbound.
+
+### S6-c — the shared "-1" tail lands; the epilogue's crossing INDEX was wrong
+
+`ProofSysChdir.sc_m1_tail` is +0x68..+0x6e (end_op, `c.li a0,-1`, the
+`c.j` back into the epilogue), and the file now carries the module functor
+`SysChdirProof (Myproc) (BeginOp) (Argstr) (Namei) (Ilock) (Iunlock)
+(Iput) (Iunlockput) (EndOp)`.  Green at `c9e90ea7`, with `SpecSysChdir.v`.
+
+**A BLOCK LEMMA'S CONTINUATION MUST BE STATED AT THE INDEX ITS OWN
+CROSSINGS PRODUCE, AND FOR AN ALL-PLAIN BLOCK THAT IS `b`, NOT `true`.**
+`sc_epilogue` is five plain instructions, so each of its crossings is a
+`b`-link and the chain it can hand back is the `b`-form one.  Stated at
+`wp_next true` the caller receives only `pj = zero_reg -> CIDy = CID4`,
+which pins nothing at `b = false`, and **every `cpu_own_transport` after
+the block is unprovable**.  The symptom is a bare *"No applicable
+tactic"* from `wp_next_chain` at the transport — it reads like a missing
+chain link and is a wrong index.  The weakening goes the other way for
+free: a caller whose own continuation is at `true` supplies a `b`-form
+premise by `or_intror`, one of the branches `wp_next_chain` already
+tries.  **Rule: a block lemma that contains a PARKING CALL may state its
+continuation at `true`; one that is straight-line must state it at `b`.**
+
+Two smaller ones from the same increment:
+
+5. **A block lemma that applies a callee must be INSIDE the module
+   functor.**  `EndOp.wp_end_op_sconf` is not in scope in a section that
+   precedes `Module SysChdirProof`, and the error names the constant
+   (*"The reference EndOp.wp_end_op_sconf was not found"*), not the
+   scoping.  Only the register/frame blocks can live outside.
+6. `wp_next b p K` unfolds to `∀ CID, ⌜guard⌝ -∗ K CID`, so **proving one
+   starts `iEval (rewrite /wp_next). iIntros (CID) "%Hq".`** — the guard
+   is an Iris pure premise, and introducing it as a plain Coq binder in
+   the same `iIntros (CID Hq)` works only when the goal is already the
+   ∀ (i.e. when a leaf handed it to you), not when you are constructing
+   one to hand to a block lemma.
