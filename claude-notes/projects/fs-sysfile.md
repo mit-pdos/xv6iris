@@ -7094,3 +7094,11 @@ not `neq_vec` — `wp_beq_fall/taken_s_sconf` compare `rget rs1` with
 the parent's re-park by `DirLinks.dir_links_dirlink` with
 `dir_link_at_dirlink` at `tot = 16`, and +0xc8..+0xd2. The two parked
 bodies are already stated at exactly the shape those two branches need.
+
+
+### 3b's dn0-clause ruling, closed (2026-08-14): the PRESERVATION form is
+### ratified — ⌜dn0 = dn -> dn0' = dn'⌝, free at every ic_loaded caller
+### (one dinode_at), matching di_type_stable's own style; the disjunction
+### alternative is declined (it taxes every consumer a case split for a
+### distinction only the -1 route exhibits).  D₀-a's brief already builds
+### on it (eq_refl at the antecedent).
