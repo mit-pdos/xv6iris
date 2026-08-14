@@ -8266,225 +8266,33 @@ anywhere in `iris/`; `SpecCreate.v`, `SpecCreateFreshTy.v`,
 byte-untouched.
 
 
+## S6-chdir — DONE.  sys_chdir is proven, sealed and linked.
 
-## S6-chdir — the contract LANDS and two blocks of the walk are PARKED
-## GREEN; the walk itself is NOT written, and the reason is that the
-## mirror is 37 commits and one lock-set merge behind
+`SpecSysChdir.v` (the contract), `ProofSysChdir.v` (the whole walk, every
+lemma `Qed`), `LinkSysChdir.v` (`SysChdirProof Myproc BeginOp Argstr Namei
+Ilock Iunlock Iput Iunlockput EndOp`), all three in `_CoqProject`.
+`Print Assumptions SysChdir.wp_sys_chdir_sconf` is the standing six plus
+`ProofIput.iput_acquiresleep_order_ADMITTED` (the success arm and the
+not-a-directory arm both free an inode) — and NOT `create_fresh_ty`.
 
-### What landed
+The arm graph, the frame's slot map and the resource plan are in
+`ProofSysChdir.v`'s own header; the two ledgers are in `SpecSysChdir.v`'s.
+Two facts worth knowing outside that file:
 
-| file | state |
-|---|---|
-| `iris/SpecSysChdir.v` | the contract, green at the pre-merge base, then widened for GR-16 (unverified — see the stop below) |
-| `iris/ProofSysChdir.v` | pure side conditions + the frame carve/join pair + the EPILOGUE block, every lemma `Qed`, no `Admitted`, no `Axiom`; NOT in `_CoqProject` (no functor yet) |
-| `iris/LinkSysChdir.v` | does not exist |
+* **sys_chdir is the first consumer of `SpecNamei.wp_namei_gen`, and it
+  had to be.**  The COUNTED `wp_namei_sconf` prices the walk at
+  `(L + 1) * iput_units` both as premise and as spend, so at `L = 3` it
+  demands twelve of begin_op's ten and at `L = 2` it hands back one where
+  the tail's `iput` needs three.  The set form prices the walk at
+  `walk_need L <= 4` regardless of depth and spends at most one.  **The
+  rule generalises: a syscall whose path length is unbounded AND whose
+  tail still has to pay for an inode free cannot use a counted walker.**
+* **sys_chdir is the first caller of `SpecArgstr` anywhere in the tree.**
+  Its contract composes as written — `proc_priv` whole in and out at
+  `upd_upt V P'`, the buffer as a `seq`-indexed byte window — and needs
+  `kernel_data`, which most fs callers do not thread.
 
-`_CoqProject` carries the `SpecSysChdir.v` row and nothing else of the
-three.  **The rule this stage re-learned the hard way: a `_CoqProject`
-row lands ONLY in the same commit as the tracked, green file it names.**
-Adding all three rows up front left HEAD naming two files that did not
-exist and broke a full-tree build that a merge gate was about to run.
-
-### THE DECODE, read off `CodeSysChdir.v` IN FULL — 45 instructions,
-### FOUR arms, ONE epilogue
-
-```
-  +0x00  c.addi16sp sp,-160      TWENTY slots (imm6 = 54)
-  +0x02  c.sdsp ra,152(sp)       slot 1
-  +0x04  c.sdsp s0,144(sp)       slot 2
-  +0x06  c.sdsp s2,128(sp)       slot 4
-  +0x08  c.addi4spn s0,sp,160    s0 = the ENTRY sp  (nzimm = 40)
-  +0x0a  jal myproc              +0x0e  c.mv s2,a0      s2 := p
-  +0x10  jal begin_op
-  +0x14  li a2,128
-  +0x18  addi a1,s0,-160         a1 = pa_stk sp0 20 = &path[0]  (imm = 3936)
-  +0x1c  c.li a0,0               +0x1e  jal argstr
-  +0x22  bltz a0 -> +0x68        ARM A
-  +0x26  c.sdsp s1,136(sp)       slot 3  -- AFTER the branch
-  +0x28  addi a0,s0,-160         +0x2c  jal namei      +0x30  c.mv s1,a0
-  +0x32  c.beqz a0 -> +0x66      ARM B
-  +0x34  jal ilock
-  +0x38  lh a4,68(s1)            ip->type          +0x3c  c.li a5,1
-  +0x3e  bne a4,a5 -> +0x70      ARM C
-  +0x42  c.mv a0,s1              +0x44  jal iunlock
-  +0x48  ld a0,336(s2)           p->cwd            +0x4c  jal iput
-  +0x50  jal end_op
-  +0x54  sd s1,336(s2)           p->cwd = ip
-  +0x58  c.li a0,0               +0x5a  c.ldsp s1,136(sp)
-  +0x5c  EPILOGUE  ldsp ra / ldsp s0 / ldsp s2 / addi16sp sp,160 / c.ret
-  +0x66  c.ldsp s1,136(sp)       (ARM B rejoins ARM A here)
-  +0x68  jal end_op  +0x6c c.li a0,-1  +0x6e c.j +0x5c
-  +0x70  c.mv a0,s1  +0x72 jal iunlockput  +0x76 jal end_op
-         +0x7a c.li a0,-1  +0x7c c.ldsp s1,136(sp)  +0x7e c.j +0x5c
-```
-
-Slot map: `pa_stk sp0 k = sp0 - 8k`, so ra@152 = slot 1, s0@144 = slot 2,
-s1@136 = slot 3, s2@128 = slot 4, and **slots 5..20 (sp+0..sp+127) ARE
-`char path[128]`**.
-
-**THE STRUCTURAL POINT, and it is the only thing about this function that
-is not routine: `s1` IS SAVED LATE.**  The `c.sdsp s1` at +0x26 is AFTER
-the `bltz`, so ARM A neither saves nor restores it — sound because ARM A
-never writes it either, so slot 3 rides through as the caller's junk and
-the register as the caller's value.  The other three arms each do their
-own `c.ldsp s1` (+0x5a, +0x66, +0x7c) before joining, so the EPILOGUE
-never touches s1 and can take "M's s1 is m's s1" as a premise.
-
-### THE CONTRACT'S TWO LEDGERS, and both arithmetic checks
-
-**THE REFERENCE LEDGER CLOSES AT TWO ON EVERY ARM** — `iref_slots 2` in,
-`iref_slots 2` out, on all four:
-
-* namei takes 2 and returns 1 on success (the second is spent against the
-  reference it made) and 2 on failure;
-* the success arm's `iput(p->cwd)` frees the OLD directory's unit;
-* ARM C's `iunlockput(ip)` frees the NEW one's, and `p->cwd` never moved;
-* ARMs A and B never made a reference.
-
-So "a live process's `p->cwd` has one unit parked in the itable" is
-PRESERVED, not merely restored.
-
-**THE LOG LEDGER HAS TO BE THE SET FORM, and this is the stage's one real
-design finding.**  The COUNTED `wp_namei_sconf` prices the walk at
-`(L + 1) * iput_units` both as its premise and as its spend.  begin_op
-mints `MAXOPBLOCKS = 10`.  So:
-
-* at `L = 3` the counted premise demands **twelve of the ten** — the
-  contract is not even applicable;
-* at `L = 2` it applies (9 <= 10) but hands back `n' >= 1`, and the
-  tail's `iput` needs `iput_units = 3`.  **Unprovable.**
-
-`wp_namei_gen` over `log_opS` prices it at `walk_need L <= 4` regardless
-of depth and spends at most `walk_spend w + (if ok then 0 else 1) <= 1`,
-leaving `n' >= 9` for an `iput` that needs 3.  `sc_bud_walk` /
-`sc_bud_iput` in `ProofSysChdir.v` are those two figures, closed.
-**chdir is the first syscall whose path length is unbounded and whose
-tail still has to pay for an inode free**, which is why it is the first
-one that cannot use the counted namei.
-
-Nothing log-shaped crosses the interface: begin_op mints and end_op
-retires, both inside the body.  `log_opS_op` forgets the set for
-iput / iunlockput / end_op, which all take the counted form.
-
-**NO COLOUR-LEDGER RESOURCE** (fs-icache.md §20.18 ruling 1): sys_chdir
-reads a type field and swaps a pointer, and writes no directory record.
-
-### THE RESOURCE PLAN, arm by arm — what the walk consumes
-
-The one accessor the whole function turns on is
-`ProcInv.proc_priv_cwd_pid`, whose own comment already said "sys_chdir
-wants the same pair".  It is NOT usable as a single bracket here, because
-begin_op runs BEFORE argstr and argstr wants the WHOLE block:
-
-1. `proc_priv_pid` lends the ¼ across `begin_op`, and takes it back;
-2. argstr consumes and returns `proc_priv γf pj pid V` at `upd_upt V P'`;
-3. only THEN `proc_priv_split_cwd` + `proc_priv_nocwd_cwd_pid` opens the
-   cell + the ¼ + the reference, and they stay open across namei, ilock,
-   iunlock, iput and end_op;
-4. the block is rebuilt at the `sd s1,336(s2)` with `upd_cwd V1 ipv`.
-
-The cwd reference makes a round trip through the SHARE layer:
-`inode_held_shed` (→ `inode_held_short ipv s` ∗ `inode_shr_held ipv s`),
-`inode_shr_gen_intro` to name the generation ilock demands,
-`ic_escrows_acc` / `IcacheBoot.ic_sleeplocks_acc` for the per-slot escrow
-and sleeplock, then either
-
-* `iunlock` → `inode_shr k s dev inum` → `inode_held_gather` → the new
-  `cwd_ref` (success arm), or
-* `iunlockput`, which wants exactly the retained `inode_ref_short k
-  (qi + s) qi dev inum` the shed handed out (ARM C).
-
-`bslots bn 3` splits 1 + 2 for ilock (which wants one `bslot`) and
-rejoins for iput.  A helper the walk will need and that does not exist
-yet: `upd_cwd V (pv_cwd V) = V` (one `destruct V; reflexivity`), for the
-two arms that put the block back UNCHANGED.
-
-### THE ARM-DECIDING FACTS, and where each comes from
-
-| branch | decided by |
-|---|---|
-| +0x22 `bltz a0` | `SpecFetchstr.fetchstr_ret`'s disjunction: `r = -1` (taken) or `r = k` with `k < 128` (falls).  Needs `sd_sint_moi`-style lemmas — copy `ProofSysDup.sd_sint_moi` / `sd_fd_nonneg` / `sd_m1_neg`. |
-| +0x32 `c.beqz a0` | namei's `ok`: at `false` the post pins `a0 = 0`; at `true` `IcacheRef.inode_held_ne_zero` refutes it. |
-| +0x3e `bne a4,a5` | `ProofNamexParts.nx_tdir_eq` / `nx_tdir_ne` (re-derive locally rather than importing another function's parts file — they are three lines each over `nx_sext16_inj`). |
-
-`fetchstr_ret`'s success arm gives `bb_cstr buf_new k` and `k < 128`
-directly, which is exactly namei's `bb_cstr pfun plen` premise plus
-`Z.of_nat plen < 2^31`; the buffer splits `S k` + `127 - k`
-(`sc_buf_split` / `sc_buf_join`, already landed).
-
-### K BUDGET
-
-`K_sys_chdir = 126` = twenty frame slots over namei's `K_namei = 106`.
-The other eight callees are all below it: iunlockput 64, argstr 60, iput
-60, end_op 58, ilock 44, begin_op 26, iunlock 26, myproc 10.  `sc_kb`
-turns the single premise into all eleven bounds the walk wants.
-
-### THE GR-16 WIDENING, applied — and what sys_chdir does NOT need
-
-`cpu_own` gains the held-lock set as a trailing index.  sys_chdir takes
-`(lks : gset nat)` and threads it, and — unlike `SpecSysClose` — takes
-**no `locks_below` premise**: its `cpu_own` pins the depth at ZERO, so
-`CpuOwn.cpu_own_zero_empty` derives `lks = ∅` and every order goal the
-nine callees raise (begin_op / iput / iunlockput / end_op at "log",
-ilock at "bcache", iunlock at "sleep lock", argstr at "kmem") is
-`locks_below ∅ _`, closed by `lkbelow`.  That is the case
-`cpu_own_zero_empty`'s own comment was written for.
-
-### THE GR-16/17 WIDENING, and the level-0 discharge
-
-`cpu_own` carries the held-lock set (of lock NAMES) as a trailing index.
-sys_chdir takes `(lks : gset string)` and threads it, and — unlike
-`SpecSysClose` — takes **no `locks_below` premise**: its `cpu_own` pins the
-depth at ZERO, so `CpuOwn.cpu_own_zero_empty` derives `lks = ∅` and every
-order goal the nine callees raise (begin_op / iput / iunlockput / end_op
-at "log", ilock at "bcache", iunlock at "sleep lock", argstr at "kmem")
-is `locks_below ∅ _`.  The idiom is one `iDestruct (cpu_own_zero_empty …)
-as "[%Hlkempty Hcnt]"` per body and `lkbelow` at each call — keep the
-EQUATION rather than substituting, because `lks` is spelled by name
-everywhere below.  Machine-checked: the GR-16 gate failed without the
-widening and passed with it.
-
-### WHAT IS LEFT, in order
-
-1. The walk, in the order the arms fall out: prologue + frame carve
-   (+0x00..+0x08), myproc, begin_op, argstr, the +0x22 split; then ARM A
-   through `sc_m1_tail`; then namei and the +0x32 split with ARM B (which
-   restores s1 at +0x66 and falls into the same tail); then ilock, the
-   type test, ARM C (+0x70, its own iunlockput/end_op/li/ldsp/j); then
-   the success tail (+0x42..+0x5a).  The epilogue and the "-1" tail are
-   already lemmas and every arm ends by applying one of them.
-3. `LinkSysChdir.v` = `SysChdirProof Myproc BeginOp Argstr Namei Ilock
-   Iunlock Iput Iunlockput EndOp`, then `Print Assumptions` — it must be
-   the standing six, and sys_chdir must NOT pick up `create_fresh_ty`
-   (it never calls create).
-4. Re-add the `ProofSysChdir.v` / `LinkSysChdir.v` rows to `_CoqProject`,
-   each in the commit that makes its file green.
-
-### Traps recorded
-
-1. **`upd_eq` under a `regval_into_reg` needs `exact`, not `rewrite`.**
-   `rewrite /M4 upd_eq Hwv` leaves `regval_into_reg sp0 = m !!! sp` and
-   reads like a coercion bug; it is not — `exact` closes it up to
-   conversion and `rewrite` does not.  State the bridge as its own
-   `assert` at the shape the goal has (`... = m !!! Regidx csp_rs1`) and
-   close the register fact with a bare `exact`.
-2. **`pc_is` lives in `InstrBytes.v`**, not in `RiscvPtsto`/`SmodeCore`;
-   the missing import surfaces as "The reference pc_is was not found" in
-   a lemma STATEMENT, ~300 lines into the file.
-3. **`ic_sleeplocks` exists four times** (IcacheBoot, SpecFileclose,
-   SpecDirlink, and via SpecNamex).  `SpecNamei`'s statement uses
-   **SpecDirlink's**, so a caller of `wp_namei_gen` must
-   `Require Import SpecDirlink` or the Spec does not even elaborate.
-4. **`uptd` is `UserPtTree`'s**, not `ProcPtOwn`'s — `ProcPtOwn` only
-   defines `uptd_ext` over it, so requiring `ProcPtOwn` alone leaves the
-   record's name unbound.
-
-### S6-c — the shared "-1" tail lands; the epilogue's crossing INDEX was wrong
-
-`ProofSysChdir.sc_m1_tail` is +0x68..+0x6e (end_op, `c.li a0,-1`, the
-`c.j` back into the epilogue), and the file now carries the module functor
-`SysChdirProof (Myproc) (BeginOp) (Argstr) (Namei) (Ilock) (Iunlock)
-(Iput) (Iunlockput) (EndOp)`.  Green at `c9e90ea7`, with `SpecSysChdir.v`.
+### The rules this walk established, and the traps it paid for
 
 **A BLOCK LEMMA'S CONTINUATION MUST BE STATED AT THE INDEX ITS OWN
 CROSSINGS PRODUCE, AND FOR AN ALL-PLAIN BLOCK THAT IS `b`, NOT `true`.**
@@ -8493,14 +8301,36 @@ CROSSINGS PRODUCE, AND FOR AN ALL-PLAIN BLOCK THAT IS `b`, NOT `true`.**
 `wp_next true` the caller receives only `pj = zero_reg -> CIDy = CID4`,
 which pins nothing at `b = false`, and **every `cpu_own_transport` after
 the block is unprovable**.  The symptom is a bare *"No applicable
-tactic"* from `wp_next_chain` at the transport — it reads like a missing
+tactic"* from `wp_next_chain` AT THE TRANSPORT — it reads like a missing
 chain link and is a wrong index.  The weakening goes the other way for
 free: a caller whose own continuation is at `true` supplies a `b`-form
-premise by `or_intror`, one of the branches `wp_next_chain` already
-tries.  **Rule: a block lemma that contains a PARKING CALL may state its
-continuation at `true`; one that is straight-line must state it at `b`.**
+premise by `or_intror`, which `wp_next_chain` already tries.  **A block
+lemma that contains a PARKING CALL may state its continuation at `true`;
+one that is straight-line must state it at `b`.**
 
-Two smaller ones from the same increment:
+**THE `trap_csrs_ext` / `cpu_claim_ext` COMPLEMENT IS DROPPED, NOT
+THREADED, IN ANY BODY WHOSE CONTRACT PINS `eb = true`.**  Five of
+sys_chdir's nine callees (myproc, argstr, namei, iunlock, and every plain
+instruction) do not take the pair, and namei's crossing is the literal
+`true` — so a threaded copy would need a transport across a park, and
+`*_ext_transport`'s guard (`eb = false \/ p = zero_reg -> …`) cannot
+supply one.  At `eb = true` both are `emp`: drop them at the top
+(`iIntros "… _ _ …"`) and re-mint one per callee with a `[]` placeholder
+closed by `rewrite Heb /trap_csrs_ext. done.`, including for the caller's
+own continuation.  This is what `ProofNamex` does and it is the shape to
+copy.
+
+**A `cpu_own_transport` WHOSE FIRST HART IS WRONG REPORTS ITSELF AS A
+`pj` / `proc_addr j` SPELLING DIFFERENCE.**  `iSpecialize: cannot
+instantiate (cpu_own 0 eb pj C b ?lks -∗ …) with (cpu_own 0 eb
+(proc_addr j) C b lks)` — the two spellings are convertible and are NOT
+the problem; the real difference is the invisible `CID` instance,
+i.e. you named the hart of the last INSTRUCTION rather than the hart the
+hypothesis is actually at (the last CALLEE's return).  Count the plain
+steps between the callee's `iIntros` and the transport, and name the
+callee's hart; `wp_next_chain` walks the rest.
+
+Four smaller ones:
 
 5. **A block lemma that applies a callee must be INSIDE the module
    functor.**  `EndOp.wp_end_op_sconf` is not in scope in a section that
@@ -8513,3 +8343,37 @@ Two smaller ones from the same increment:
    the same `iIntros (CID Hq)` works only when the goal is already the
    ∀ (i.e. when a leaf handed it to you), not when you are constructing
    one to hand to a block lemma.
+7. **A `[%]` placeholder in an `iApply`/`iSpecialize` spec pattern opens a
+   COQ goal, not an Iris one.**  `iPureIntro` there fails with
+   *"iStartProof: not a BI assertion"*, naming the pure proposition —
+   which reads like the goal is malformed.  Close it with `exact`.
+8. **An unused `∀` binder in a side-condition lemma cannot be inferred at
+   the use site**, and the error is *"Cannot infer this placeholder of
+   type nat"* followed by the whole local context and no indication of
+   which lemma.  `sc_bud_iput` carried a vestigial `L`; deleting it is
+   the fix, and the general rule is that a pure side-condition lemma
+   should quantify only what its statement mentions.
+
+### Earlier traps, still live
+
+1. **`upd_eq` under a `regval_into_reg` needs `exact`, not `rewrite`.**
+   `rewrite /M4 upd_eq Hwv` leaves `regval_into_reg sp0 = m !!! sp` and
+   reads like a coercion bug; it is not.  State the bridge as its own
+   `assert` at the shape the goal has and close with a bare `exact` (or
+   `etransitivity; [apply upd_eq | …]`, which is what the chdir walk uses
+   for every `set`-defined register file).
+2. **`pc_is` lives in `InstrBytes.v`**, not in `RiscvPtsto`/`SmodeCore`;
+   the missing import surfaces as "The reference pc_is was not found" in
+   a lemma STATEMENT, ~300 lines into the file.
+3. **`ic_sleeplocks` exists four times** (IcacheBoot, SpecFileclose,
+   SpecDirlink, and via SpecNamex).  `SpecNamei`'s statement uses
+   **SpecDirlink's**, so a caller of `wp_namei_gen` must
+   `Require Import SpecDirlink` or the Spec does not even elaborate.  The
+   four bodies are identical, so a locally-stated `big_sepL_lookup`
+   accessor (`sc_slk_acc`) applies to whichever copy is in scope.
+4. **`uptd` is `UserPtTree`'s**, not `ProcPtOwn`'s — `ProcPtOwn` only
+   defines `uptd_ext` over it, so requiring `ProcPtOwn` alone leaves the
+   record's name unbound.  In the same family: `is_sleeplock` needs
+   `SleepLock` and `di_type` needs `DinodeEnc`, neither of which arrives
+   through `InodeInv`/`IcacheInv`; both surface as "The reference … was
+   not found" in a lemma statement far from the import list.
