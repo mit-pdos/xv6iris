@@ -6461,6 +6461,27 @@ wants these, and there was nothing in the tree before.  Recorded there:
 `BootReset.v` §3a's three `bv_extract_*` lemmas are the same kind of orphan
 and belong in `BvShift.v` at the next touch of that file.
 
+**THE WALK'S ARITHMETIC LAYER IS LANDED, so the WP body has none left to
+invent.**  `ProofCreateParts` now carries `cr_push` / `cr_pop` / `cr_fp`,
+the eight slot equations `cr_frm1`..`cr_frm8` (ra 72 -> slot 1, s0 64 -> 2,
+s1 56 -> 3, s2 48 -> 4, **s3 40 -> 5**, s4 32 -> 6, s5 24 -> 7, s6 16 -> 8;
+slots 9/10 are the sixteen-byte `name` local, which the code addresses as
+`s0 - 80` and not as a slot), and `cr_kb`, the K split for all seven
+callees at `K - 10`.
+
+**AND A DUPLICATION THE NEXT SWEEP SHOULD TAKE, sized.**
+`KernelRvcDecode.v` carries the generic `stk_push` / `stk_pop` / `stk_frm`
+AND the 32-, 48- and 64-byte instances — but not the 80-byte ones.  So
+ELEVEN proof files (balloc, dirlink, filestat, installtrans, kwait,
+mappages, procmapstacks, scheduler, uartwrite, uvmalloc, uvmcopy) each
+re-derive a character-identical private copy INSIDE their functor, where no
+sibling can see it, and `ProofCreateParts` is now a twelfth.  The lemmas
+are hypothesis-free, so this is durable-notes' "near-duplicates that cannot
+see each other" rule at twelve-fold: add `stk_push_80` / `stk_pop_80` and
+the eight `stk_frm` instances to `KernelRvcDecode.v` and delete twelve
+copies.  Not taken here because that file's cone is the whole tree and this
+increment had no other reason to pay it.
+
 **FILE ORGANIZATION FOR THE WALK, decided against both models.**
 `ProofCreate.v` = `Module CreateProof (NP : NAMEIPARENT) (IL : ILOCK)
 (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (IA : IALLOC) (IU : IUPDATE) (DLK :

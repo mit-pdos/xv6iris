@@ -74,6 +74,13 @@ Require Import BvShift.
    this width-64 one, while UserBits.uint_unsigned_n is already the
    general form.) *)
 Require Import RiscvExtras.
+(* [stk_push] / [stk_pop] / [stk_frm], and the K constants of every callee *)
+Require Import KernelRvcDecode.
+(* [caddi16sp_imm] / [caddi4spn_imm] *)
+Require Import WpMmodeLeafBase.
+Require Import StackOwn.
+Require Import SpecNameiparent SpecIlock SpecDirlookup SpecIunlockput
+        SpecIupdate SpecDirlink.
 From Kernel Require KernelData.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -497,6 +504,104 @@ Proof.
   assert (Hn2 : t <> T_FILE) by (intros ->; apply H2; reflexivity).
   assert (Hn3 : t <> T_DEVICE) by (intros ->; apply H3; reflexivity).
   rewrite (cr_trange_out t Hn2 Hn3) in Hf. discriminate.
+Qed.
+
+(* ===================================================================== *)
+(*  (3c) THE FRAME, AND THE K SPLIT (D0 step 2's arithmetic layer)        *)
+(*                                                                        *)
+(*  create's frame is 80 bytes / TEN slots, and every one of the walk's    *)
+(*  stack addresses is one of these twelve equations.  They are            *)
+(*  hypothesis-free corollaries of [KernelRvcDecode]'s generic             *)
+(*  [stk_push] / [stk_pop] / [stk_frm], exactly as the same cluster is     *)
+(*  derived inside eleven other proof functors.                           *)
+(*                                                                        *)
+(*  A DUPLICATION WORTH FIXING, SIZED HERE SO SOMEBODY CAN.                *)
+(*  [KernelRvcDecode.v] already carries the 32-, 48- and 64-byte instances *)
+(*  ([stk_push_32] ... [stk_pop_64]) beside the generic lemmas -- but NOT  *)
+(*  the 80-byte ones, so ELEVEN proof files (balloc, dirlink, filestat,    *)
+(*  installtrans, kwait, mappages, procmapstacks, scheduler, uartwrite,    *)
+(*  uvmalloc, uvmcopy) each re-derive an identical private copy INSIDE     *)
+(*  their functor, where nobody else can see it -- and this file is now a  *)
+(*  twelfth.  The lemmas are hypothesis-free and character-identical, so   *)
+(*  this is the "near-duplicates that cannot see each other" rule in       *)
+(*  durable-notes at eleven-fold: add [stk_push_80] / [stk_pop_80] /       *)
+(*  [stk_frm_80_k] to KernelRvcDecode.v and delete twelve copies.  Not     *)
+(*  done here because that file's rebuild cone is the whole tree and this  *)
+(*  increment has no other reason to pay it.                              *)
+(* ===================================================================== *)
+
+Lemma cr_push (X : mword 64) :
+  add_vec X (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6)))
+  = pa_stk X 10.
+Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_pop (X : mword 64) :
+  add_vec (pa_stk X 10) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))
+  = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* [addi s0,sp,80] at +0x10: the frame pointer is the ENTRY sp *)
+Lemma cr_fp (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8)))
+  = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* the eight slot addresses the seven prologue saves and s3's late save use:
+   ra 72 -> slot 1, s0 64 -> 2, s1 56 -> 3, s2 48 -> 4, s3 40 -> 5,
+   s4 32 -> 6, s5 24 -> 7, s6 16 -> 8.  (Slots 9 and 10 are the sixteen-byte
+   [name] local at sp+0, which the walk addresses as [s0 - 80], not as a
+   slot.) *)
+Lemma cr_frm1 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))
+  = pa_stk X 1.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm2 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 8 : mword 6) ('b"000")))
+  = pa_stk X 2.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm3 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000")))
+  = pa_stk X 3.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm4 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))
+  = pa_stk X 4.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm5 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
+  = pa_stk X 5.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm6 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
+  = pa_stk X 6.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm7 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
+  = pa_stk X 7.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_frm8 (X : mword 64) :
+  add_vec (pa_stk X 10) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
+  = pa_stk X 8.
+Proof. apply stk_frm. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* THE K SPLIT.  create's own frame is ten slots and its deepest callee is
+   nameiparent at 98, so every callee runs at [K - 10] and the seven of them
+   fit with the slack the ladder in SpecCreate.v's header records. *)
+Lemma cr_kb (K : nat) : (K_create <= K)%nat ->
+  (10 <= K)%nat /\ (K_nameiparent <= K - 10)%nat /\ (K_ilock <= K - 10)%nat
+  /\ (K_dirlookup <= K - 10)%nat /\ (K_iunlockput <= K - 10)%nat
+  /\ (K_ialloc <= K - 10)%nat /\ (K_iupdate <= K - 10)%nat
+  /\ (K_dirlink <= K - 10)%nat /\ ((K - 10) + 10)%nat = K.
+Proof.
+  unfold K_create, K_nameiparent, K_ilock, K_dirlookup, K_iunlockput,
+         K_ialloc, K_iupdate, K_dirlink. lia.
 Qed.
 
 (* ===================================================================== *)
