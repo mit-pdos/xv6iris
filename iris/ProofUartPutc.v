@@ -601,7 +601,7 @@ Section ProofUartPutc.
        cancel. *)
     pose proof (locks_below_not_elem lks (lock_rank "uart") Hfresh) as Hnotin.
     assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     assert (Hret3c : ret_pc (H3c !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uartputc_sync + 0x40))
       by (rewrite HH3cra; apply bv_eq; vm_compute; reflexivity).

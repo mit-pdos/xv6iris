@@ -523,7 +523,7 @@ Section ProofWakeup.
            set release hands back collapses to the loop invariant's [lks]. *)
         pose proof (locks_below_not_elem lks (lock_rank "proc") Hfresh) as Hnotin.
         assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hown".
         (* pc = wakeup+0x30 (release's return target). *)
         assert (Hpc30 : ret_pc (Mr2c !!! Regidx (mword_of_int 1 : mword 5))

@@ -346,7 +346,7 @@ Section ProofSleepPrepare.
        says "proc" was fresh in [lks], so the round trip is a no-op. *)
     pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin.
     assert (Heqlks : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Heqlks) in "Hcpu".
     rewrite Hbeq in Hsrel.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcpu".

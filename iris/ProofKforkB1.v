@@ -306,7 +306,7 @@ Section KforkB1Proof.
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcpu".
+           [| apply locks_add_del_below; lkbelow]) in "Hcpu".
     assert (Hp88 : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KF + 0x88))
       by (rewrite HT3ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp88) in "Hpc".

@@ -562,7 +562,7 @@ Section ProofBunpin.
     (* bunpin is BALANCED: the set release hands back collapses to the entry
        [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
     assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     rewrite <- Houtb in Hsr.

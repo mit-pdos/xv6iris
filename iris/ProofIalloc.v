@@ -1656,7 +1656,7 @@ Section IallocClaim.
               WA 0%nat true (proc_addr j) C (K - 8)%nat b lks
               ltac:(unfold K_iget; lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
-              Hbelow
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
     all: try lkbelow.
     iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href".
@@ -1900,7 +1900,7 @@ Section IallocScan.
     (* ia_scan reaches bread/brelse ("bcache", 4, every turn) and ia_claim
        ("itable", 2, the claim arm); "itable" is the lower, so one premise
        at its rank covers the whole cone via [locks_below_mono]. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗ kernel_data -∗
     panic_wp_any -∗
     printk_env γpr γu γd -∗

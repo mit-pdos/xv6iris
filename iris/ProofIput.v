@@ -629,7 +629,7 @@ Section IputTail.
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcnt".
+           [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     pose proof Hrelpins as Hrelpins_cs.
     assert (Hpc32 : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x32))
       by (rewrite HD5ra; pcw).
@@ -1324,7 +1324,7 @@ Section ProofIput.
               (itable_res2 cn gfs gi cov logstart nib dev) mA
               0%nat eb pj C (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
-              Hfresh
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hitab". }
@@ -1430,7 +1430,7 @@ Section ProofIput.
                 m E2 K eb C sp0 vg4 lks
                 HK Hk ltac:(wp_next_chain) Hsp0eq HE2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
-                ltac:(discriminate) ltac:(intros _; reflexivity) Hfresh
+                ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
@@ -1986,7 +1986,7 @@ Section ProofIput.
     iIntros (CIDrl Hsrl mr1) "Hcg Hpc %Hpins1 Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcnt".
+           [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     pose proof Hpins1 as Hpins1_cs.
     assert (Hpc60 : ret_pc (H3 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x60))
       by (rewrite HH3ra; pcw).

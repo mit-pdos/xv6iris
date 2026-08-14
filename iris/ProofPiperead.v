@@ -2756,6 +2756,9 @@ Section ProofPiperead.
          noff 0 with interrupts ENABLED, so [trap_csrs_ext true = emp] and
          [cpu_claim_ext true pj = emp] -- sleep's own acquire mints the pair
          out of the enabled SIE arm. *)
+      (* the release above left [lks ∖ {[rank "pipe"]}]; [lks = ∅] at depth 0
+         makes that the bare entry set sleep's contract names. *)
+      iEval (rewrite Hlkempty locks_empty_del -Hlkempty) in "Hown".
       iApply (Sleep.wp_sleep_sconf γs j γlp Sl5 (av - 12)%nat true C lks
                 Hj Hjl ltac:(lia) Hbelow_proc
                 with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").

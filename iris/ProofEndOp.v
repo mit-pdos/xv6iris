@@ -1577,7 +1577,7 @@ Section EndOpBlocks.
     { iExact "Hlock". }
     iIntros (CIDc1 Hsc1 mr) "Hcg Hpc %Hrel Hcnt".
     assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc66 : ret_pc (G2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x66)).
     { rewrite HG2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3655,7 +3655,7 @@ Section EndOpBlocks.
     { iExact "Hlock". }
     iIntros (CIDc1 Hsc1 mr) "Hcg Hpc %Hrel Hcnt".
     assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc92 : ret_pc (G3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x92)).
     { rewrite HG3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -4366,7 +4366,7 @@ Section ProofEndOp.
       { iExact "Hlock". }
       iIntros (CIDr Hsr mr) "Hcg Hpc %Hrel Hcnt".
       assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-        by (apply locks_add_del; assumption).
+        by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       assert (Hpc3c : ret_pc (U5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0x3c)).
       { rewrite HU5ra. apply bv_eq; vm_compute; reflexivity. }

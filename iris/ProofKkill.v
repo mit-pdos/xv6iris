@@ -434,7 +434,7 @@ Section ProofKkill.
              hart never held a "proc" lock to begin with. *)
           pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin1.
           assert (Heqlks1 : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
           iEval (rewrite Heqlks1) in "Hown".
           assert (Hpc50 : ret_pc (Mr4c !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x50))
             by (rewrite HMr4c_ra; apply bv_eq; vm_compute; reflexivity).
@@ -719,7 +719,7 @@ Section ProofKkill.
         (* see the +0x4c release above: [Hno] kills the difference. *)
         pose proof (locks_below_not_elem lks (lock_rank "proc") Hno) as Hnotin2.
         assert (Heqlks2 : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Heqlks2) in "Hown".
         assert (Hpc32 : ret_pc (M2e !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x32))
           by (rewrite HM2e_ra; apply bv_eq; vm_compute; reflexivity).

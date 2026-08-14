@@ -322,7 +322,7 @@ Section ProofFileclose.
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γfl "ftable"%string (ftable_res γf) mA
               n eb p C (K - 8)%nat b lks
-              HnZ ltac:(lia) Hbelow
+              HnZ ltac:(lia) ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
@@ -559,7 +559,7 @@ Section ProofFileclose.
          collapses to the entry [lks] -- [Hfresh] makes the singleton
          insert/delete cancel. *)
       assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
       rewrite <- Houtb in Hsr.
@@ -948,7 +948,7 @@ Section ProofFileclose.
       iIntros (CIDr2 Hsr2 mr2) "Hcg Hpc %Hrel2 Hcnt".
       (* fileclose is BALANCED on this arm too. *)
       assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
       rewrite <- Houtb in Hsr2.

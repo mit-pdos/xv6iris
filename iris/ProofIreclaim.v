@@ -1261,7 +1261,7 @@ Section IreclaimOrphan.
               O6 0%nat true (proc_addr j) C (K - 8)%nat b lks
               ltac:(unfold K_iget; lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
-              Hbelow
+              ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
     all: try lkbelow.
     iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href".
@@ -1957,7 +1957,7 @@ Section IreclaimRelease.
     Ml !!! Regidx Rs5 = (sign_extend' 64 dev : mword 64) ->
     Ml !!! Regidx Rs6 = (mword_of_int irc_msg_addr : mword 64) ->
     (* irc_release's only lock-touching callee is brelse, at "bcache" (4). *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks (lock_rank "log") ->
     sie_cap_gpr Ml (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b lks -∗
     kernel_text -∗
@@ -2146,7 +2146,7 @@ Section IreclaimScan.
     γs !! j = Some γl ->
     (* irc_scan reaches irc_step (no lock), irc_orphan ("itable", 2) and
        irc_release ("bcache", 4) every turn; "itable" is the lowest. *)
-    locks_below lks (lock_rank "bcache") ->
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗ kernel_data -∗
     panic_wp_any -∗
     printk_env γpr γu γd -∗

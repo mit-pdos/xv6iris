@@ -288,7 +288,7 @@ Section ProofSetkilled.
        which is what the postcondition's [cpu_own n eb p C b lks] wants. *)
     pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
     assert (Heqlks : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Heqlks) in "Hcpu".
     rewrite Hbeq in Hsrel.
     iEval (rewrite Hbeq) in "Hcg". iEval (rewrite Hbeq) in "Hcpu".

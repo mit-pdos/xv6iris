@@ -1459,7 +1459,7 @@ Section ProofIget.
             iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
             pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
             iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
-                   [| apply locks_add_del; assumption]) in "Hcnt".
+                   [| apply locks_add_del_below; lkbelow]) in "Hcnt".
             rewrite <- Houtb in Hsr.
             pose proof Hrelpins as Hrelpins_cs.
             assert (Hpc8c : ret_pc (V4 !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x8c)).
@@ -1873,7 +1873,7 @@ Section ProofIget.
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
         pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
         iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
-               [| apply locks_add_del; assumption]) in "Hcnt".
+               [| apply locks_add_del_below; lkbelow]) in "Hcnt".
         rewrite <- Houtb in Hsr.
         pose proof Hrelpins as Hrelpins_cs.
         assert (Hpc66 : ret_pc (L7 !!! Regidx Rra) = mword_of_int (KernelSyms.iget + 0x66)).

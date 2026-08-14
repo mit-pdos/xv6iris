@@ -297,7 +297,7 @@ Section YieldPostSched.
        hands back collapses to the entry [lks]. *)
     pose proof (locks_below_not_elem lks (lock_rank "proc") Hfresh) as Hnotin.
     assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     assert (Hpc22 : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.yield + 0x22)) by (rewrite HD1ra; apply bv_eq; vm_compute; reflexivity).

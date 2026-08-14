@@ -600,7 +600,7 @@ Section BoBodies.
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hrelcs Hown".
     (* back to the OUTER set, matching [Hcont]'s expectation unmodified. *)
     assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hpc64 : ret_pc (X3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x80))
       by (rewrite HX3ra; apply bv_eq; vm_compute; reflexivity).
@@ -910,7 +910,7 @@ Section BoBodies.
     (* between the interior release and the re-acquire this thread holds no
        lock: back to the bare, order-bounded [lks]. *)
     assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (HAp5 : ret_pc (A3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x30))
       by (rewrite HA3ra; apply bv_eq; vm_compute; reflexivity).
@@ -1174,7 +1174,7 @@ Section BoBodies.
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
     iIntros (CIDBr HBsr mfr) "Hcg Hpc %HBrcs Hown".
     assert (Hsetback : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (HBp5 : ret_pc (B3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x60))
       by (rewrite HB3ra; apply bv_eq; vm_compute; reflexivity).

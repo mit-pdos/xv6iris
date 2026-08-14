@@ -630,7 +630,7 @@ Section ProofVirtioDiskRwE.
       iDestruct (cpu_own_transport CIDsl CIDd3 0 eb (proc_addr j) C eb
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
-                (disk_res γd pd pav pu) W7 0%nat eb (proc_addr j) C (K - 12)%nat eb
+                (disk_res γd pd pav pu) W7 0%nat eb (proc_addr j) C (K - 12)%nat eb lks
                 vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia)
                 with "Hcg Hown Htext Hpc [] Hpanic").
       all: try lkbelow.

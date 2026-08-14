@@ -642,7 +642,7 @@ Section ProofKfree.
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hrelpins Hcnt".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcnt".
+           [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     assert (Hpc54 : ret_pc (Rrel !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kfree + 0x54)).
     { rewrite HRrelra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc54) in "Hpc".

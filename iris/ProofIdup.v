@@ -542,7 +542,7 @@ Section ProofIdup.
        the untouched [lks]. *)
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcnt".
+           [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.
     assert (Hpc2a : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.idup + 0x2a)).

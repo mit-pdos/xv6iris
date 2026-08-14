@@ -733,7 +733,7 @@ Section UtA6.
        branch's [ut_kexit]; killed itself (rank "proc" = 11) follows by
        [locks_below_mono].  The not-killed branch (ut_ret / prepare_return)
        touches no lock at all. *)
-    locks_below lks (lock_rank "proc") ->
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
@@ -905,7 +905,7 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx C b lks Hwf' ltac:(unfold K_kexit; lia) Hbelow
+                nx C b lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].

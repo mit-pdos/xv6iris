@@ -468,7 +468,7 @@ Section IupdateTail.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq T3 (K - 4)%nat eb (proc_addr j) C
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
-              _ HKbl Hkk HT3a0
+              lks HKbl Hkk HT3a0
               (* brelse's bound is "bcache"(4); iu_tail's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)

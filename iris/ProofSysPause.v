@@ -667,7 +667,7 @@ Section SpBodies.
        just took, so [Htail]'s [lks] is the entry set unchanged. *)
     pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
     assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hx7c : ret_pc (X2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x8c))
       by (rewrite HX2ra; pcstep).
@@ -793,7 +793,7 @@ Section SpBodies.
        just took, so [Htail]'s [lks] is the entry set unchanged. *)
     pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
     assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hk98 : ret_pc (K2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0xa8))
       by (rewrite HK2ra; pcstep).
@@ -1387,7 +1387,7 @@ Section SpBodies.
       (* the release/re-acquire window: nothing is held across sleep() *)
       pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
       assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hown".
       assert (Hl60 : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x60))
         by (rewrite HL5ra; pcstep).

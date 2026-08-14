@@ -419,7 +419,7 @@ Section ProofAllocpid.
        release hands back collapses to the entry [lks] -- [Hfresh] is what
        makes the singleton insert/delete cancel. *)
     assert (Hsetback : ({[lock_rank "nextpid"]} ∪ lks) ∖ {[lock_rank "nextpid"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     (* ===================== EPILOGUE (generic b again) ===================== *)
     (* the porting guide's release table: [wp_next]'s own index is release's

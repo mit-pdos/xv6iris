@@ -2039,7 +2039,7 @@ Section ProofKexit.
                   Mx (av - 6)%nat eb C b lks pid Vx
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
-                  Hfresh_it
+                  ltac:(lkbelow)
                   with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hpanic Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hslks Hsbb Hsbi Hbmres

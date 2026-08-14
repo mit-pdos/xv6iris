@@ -763,7 +763,7 @@ Section VtEpilogue.
        release hands back collapses to the entry [lks]. *)
     pose proof (locks_below_not_elem lks (lock_rank "virtio_disk") Hfresh) as Hnotin.
     assert (Hsetback : ({[lock_rank "virtio_disk"]} ∪ lks) ∖ {[lock_rank "virtio_disk"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc96 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.virtio_disk_intr + 0x96))
       by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).
@@ -2807,9 +2807,7 @@ Section VtLoopProof.
        held ([Hfresh] widened past it, then the acquire's own singleton added
        back on top) -- "virtio_disk" (9) < "proc" (11) *)
     assert (Hwproc : locks_below ({[lock_rank "virtio_disk"]} ∪ lks) (lock_rank "proc")).
-    { apply locks_below_union_singleton; [vm_compute; lia |].
-      lkbelow.
-      vm_compute; lia. }
+    { lkbelow. }
     iApply (Wakeup.wp_wakeup_sconf W γs pme (S lvl)
               (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb C false _ HwK HWdom Hlen Hwlvl
               Hwproc

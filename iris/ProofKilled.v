@@ -328,7 +328,7 @@ Section ProofKilled.
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcpu".
+           [| apply locks_add_del_below; lkbelow]) in "Hcpu".
     (* release's exit index is [outb := match n with O => eb | S _ => false
        end]; [Hbeq] (derived up front) folds it back to [b] so the whole
        epilogue -- and the closing [wp_next_chain] -- sees a uniform [b]. *)

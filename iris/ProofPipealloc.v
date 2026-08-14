@@ -871,7 +871,7 @@ Section ProofPipealloc.
     iDestruct (cpu_own_transport CID CID11 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p C (K - 6)%nat b lks
-              ltac:(lia) Hnoffpos Hbelow
+              ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslota").
     all: try lkbelow.
     iIntros (CID12 Hs12 mB) "Hcg Hcnt Hpc %HcsB Hpost0".
@@ -977,7 +977,7 @@ Section ProofPipealloc.
     iDestruct (cpu_own_transport CID12 CID15 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p C (K - 6)%nat b lks
-              ltac:(lia) Hnoffpos Hbelow
+              ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslotb").
     all: try lkbelow.
     iIntros (CID16 Hs16 mD) "Hcg Hcnt Hpc %HcsD Hpost1".

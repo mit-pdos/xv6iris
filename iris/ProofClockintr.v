@@ -734,7 +734,7 @@ Section ProofClockintr.
          entry [lks] -- [Hfresh] is what makes the singleton insert/delete
          cancel. *)
       assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcnt".
       assert (Hpc54 : ret_pc (E2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.clockintr + 0x54))
         by (rewrite HE2ra; apply bv_eq; vm_compute; reflexivity).

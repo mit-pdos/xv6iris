@@ -1159,7 +1159,7 @@ Section FsinitMain.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq Q1 (K - 4)%nat true (proc_addr j) C
-              bs_sb bsd0 d0 b _
+              bs_sb bsd0 d0 b lks
               ltac:(unfold K_brelse; lia) Hkk HQ1a0
               (* brelse's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)

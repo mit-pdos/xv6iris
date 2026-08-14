@@ -1385,7 +1385,7 @@ Section ProofFileread.
                 iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
                           (frn_cons fn)
                           E2 (K - 6)%nat eb C pidv V n b
-                          _ Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
+                          lks Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv

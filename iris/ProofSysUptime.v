@@ -396,7 +396,7 @@ Section ProofSysUptime.
        release hands back collapses to the entry [lks]. *)
     pose proof (locks_below_not_elem lks (lock_rank "time") Hfresh) as Hnotin.
     assert (Hsetback : ({[lock_rank "time"]} ∪ lks) ∖ {[lock_rank "time"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc2c : ret_pc (B5 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_uptime + 0x2c))
       by (rewrite HB5ra; apply bv_eq; vm_compute; reflexivity).

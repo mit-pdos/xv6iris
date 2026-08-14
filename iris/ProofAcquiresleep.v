@@ -549,7 +549,7 @@ Section AslBodies.
     (* asl_exit_body's own [lks] is OUTER: the set release hands back
        collapses to it, matching [Hcont]'s expectation unmodified. *)
     assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hpc48 : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x48)) by (rewrite HE5ra; apply bv_eq; vm_compute; reflexivity).
@@ -952,7 +952,7 @@ Section AslBodies.
        round trip -- [Hfresh] is what makes the singleton insert/delete
        cancel. *)
     assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hpc28 : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x28)) by (rewrite HL4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1786,7 +1786,7 @@ Section ProofAcquiresleep.
       (* FREE branch, straight out of entry acquire: back to the OUTER [lks]
          Hcont expects. *)
       assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hown".
       assert (Hpc48 : ret_pc (E5 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.acquiresleep + 0x48)) by (rewrite HE5ra; apply bv_eq; vm_compute; reflexivity).
@@ -2051,7 +2051,7 @@ Section ProofAcquiresleep.
       (* back to the OUTER [lks] across the sleep_prepare/release/sleep/
          acquire round trip. *)
       assert (Hsetback : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hown".
       assert (Hpc28 : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.acquiresleep + 0x28)) by (rewrite HL4ra; apply bv_eq; vm_compute; reflexivity).

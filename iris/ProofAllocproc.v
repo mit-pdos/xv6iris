@@ -1285,7 +1285,7 @@ Section ProofAllocproc.
           rewrite -Hbmatch.
           iIntros (CIDg Hsg mrl) "Hcg Hpc %Hcsrl Hcpu".
           assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
           iEval (rewrite Hsetback) in "Hcpu".
           assert (Hp92 : ret_pc (T4 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x92))
             by (rewrite HT4ra; apply bv_eq; vm_compute; reflexivity).
@@ -1648,7 +1648,7 @@ Section ProofAllocproc.
           rewrite -Hbmatch.
           iIntros (CIDg Hsg mrl) "Hcg Hpc %Hcsrl Hcpu".
           assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
           iEval (rewrite Hsetback) in "Hcpu".
           assert (Hpa2 : ret_pc (U4 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0xa2))
             by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
@@ -2085,7 +2085,7 @@ Section ProofAllocproc.
         rewrite -Hbmatch.
         iIntros (CIDg Hsg mrel) "Hcg Hpc %Hcsrel Hcpu".
         assert (Hsetback : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hcpu".
         assert (Hp2c : ret_pc (R2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x2c))
           by (rewrite HR2ra; apply bv_eq; vm_compute; reflexivity).

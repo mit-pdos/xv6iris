@@ -5424,7 +5424,7 @@ Section ProofNamexMain.
       iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
                 A3 0%nat eb (proc_addr j) C (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
-                Hrino HA3a0 HA3a1 Hbelow
+                Hrino HA3a0 HA3a1 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl1").
       all: try lkbelow.
       iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href".

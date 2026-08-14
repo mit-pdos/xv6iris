@@ -496,7 +496,7 @@ Section ProofHoldingsleep.
        the untouched [lks]. *)
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "sleep lock"]} ∪ lks) ∖ {[lock_rank "sleep lock"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hcnt".
+           [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     assert (Hpc24 : ret_pc (D20 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.holdingsleep + 0x24))
       by (rewrite HD20ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".

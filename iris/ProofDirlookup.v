@@ -1938,7 +1938,7 @@ Section ProofDirlookupMain.
                       ltac:(unfold K_iget; lia)
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
-                      Hbelow
+                      ltac:(lkbelow)
                       with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hislot").
             all: try lkbelow.
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href".

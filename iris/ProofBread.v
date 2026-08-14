@@ -1100,7 +1100,7 @@ Section BreadBlocks.
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc5a : ret_pc (H5 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0x5a)).
     { rewrite HH5ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1474,7 +1474,7 @@ Section BreadBlocks.
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpcac : ret_pc (C4 !!! Regidx Rra) = mword_of_int (KernelSyms.bread + 0xac)).
     { rewrite HC4ra. apply bv_eq; vm_compute; reflexivity. }

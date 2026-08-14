@@ -300,7 +300,7 @@ Section ProofKalloc.
       rename mr0 into mr.
       pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
       iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
-             [| apply locks_add_del; assumption]) in "Hcnt".
+             [| apply locks_add_del_below; lkbelow]) in "Hcnt".
       assert (Hpc58 : ret_pc (E3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x58)).
       { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc58) in "Hpc".
@@ -593,7 +593,7 @@ Section ProofKalloc.
       rename mr0 into mr.
       pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
       iEval (rewrite (_ : ({[lock_rank "kmem"]} ∪ lks) ∖ {[lock_rank "kmem"]} = lks);
-             [| apply locks_add_del; assumption]) in "Hcnt".
+             [| apply locks_add_del_below; lkbelow]) in "Hcnt".
       assert (Hpc36 : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kalloc + 0x36)).
       { rewrite HR12ra. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hpc36) in "Hpc".

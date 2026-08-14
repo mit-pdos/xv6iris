@@ -530,7 +530,7 @@ Section ProofPipeclose.
            non-membership the set algebra needs. *)
         pose proof (locks_below_not_elem lks (lock_rank "pipe"%string) Hno) as Hnotin.
         assert (Hsetback : ({[lock_rank "pipe"%string]} ∪ lks) ∖ {[lock_rank "pipe"%string]} = lks)
-          by (apply locks_add_del; assumption).
+          by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hown".
         iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hown".
         rewrite <- Houtb in Hsrl.
@@ -686,7 +686,7 @@ Section ProofPipeclose.
          Same [locks_below_not_elem] step as at the plain release above. *)
       pose proof (locks_below_not_elem lks (lock_rank "pipe"%string) Hno) as Hnotin'.
       assert (Hsetback' : ({[lock_rank "pipe"%string]} ∪ lks) ∖ {[lock_rank "pipe"%string]} = lks)
-        by (apply locks_add_del; assumption).
+        by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback') in "Hown".
       iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hown".
       rewrite <- Houtb in Hsrc.

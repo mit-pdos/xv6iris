@@ -262,7 +262,7 @@ Section ProofKforkB5.
       by lkbelow.
     pose proof (locks_below_not_elem _ _ Hfresh_proc) as Hfresh_proc_ne.
     iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hown".
+           [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_c8 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (KF + 0xc8)).
     { rewrite HM2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc_c8) in "Hpc".
@@ -431,7 +431,7 @@ Section ProofKforkB5.
     iIntros (CID6 Hs6 mr6) "Hcg Hpc %Hcs_8_r6 Hown".
     pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
     iEval (rewrite (_ : ({[lock_rank "wait_lock"]} ∪ lks) ∖ {[lock_rank "wait_lock"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hown".
+           [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_e4 : ret_pc (M8 !!! Regidx Rra) = mword_of_int (KF + 0xe4)).
     { rewrite HM8ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc_e4) in "Hpc".
@@ -608,7 +608,7 @@ Section ProofKforkB5.
     { iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
     iIntros (CID10 Hs10 mr10) "Hcg Hpc %Hcs_13_r10 Hown".
     iEval (rewrite (_ : ({[lock_rank "proc"]} ∪ lks) ∖ {[lock_rank "proc"]} = lks);
-           [| apply locks_add_del; assumption]) in "Hown".
+           [| apply locks_add_del_below; lkbelow]) in "Hown".
     assert (Hpc_f6 : ret_pc (M13 !!! Regidx Rra) = mword_of_int (KF + 0xf6)).
     { rewrite HM13ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc_f6) in "Hpc".

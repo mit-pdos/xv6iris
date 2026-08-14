@@ -391,7 +391,7 @@ Section ProofReleasesleep.
        what the postcondition's [cpu_own 0 b pme C b lks] wants. *)
     pose proof (locks_below_not_elem lks (lock_rank "sleep lock"%string) Hno) as Hnotin.
     assert (Hsetback : ({[lock_rank "sleep lock"%string]} ∪ lks) ∖ {[lock_rank "sleep lock"%string]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hown".
     assert (Hpc2c : ret_pc (Krel !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.releasesleep + 0x2c)).

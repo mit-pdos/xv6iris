@@ -321,7 +321,7 @@ Section SleepJoin.
        non-membership the cancellation actually needs. *)
     pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
     assert (Hsetback : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcpu".
     assert (Hpc26 : ret_pc (D1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x26)) by (rewrite HD1ra; apply bv_eq; vm_compute; reflexivity).
@@ -1322,7 +1322,7 @@ Section ProofSleepBody.
          the caller gets its own [lks] out at the same level [S n]. *)
       pose proof (locks_below_not_elem lks (lock_rank "proc"%string) Hno) as Hnotin.
       assert (Hsetback : ({[lock_rank "proc"%string]} ∪ lks) ∖ {[lock_rank "proc"%string]} = lks)
-        by (apply locks_add_del; assumption).
+        by (apply locks_add_del_below; lkbelow).
       iEval (rewrite Hsetback) in "Hcpu".
       assert (Hpc26 : ret_pc (N7 !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sleep + 0x26)) by (rewrite HN7ra; apply bv_eq; vm_compute; reflexivity).

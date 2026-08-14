@@ -356,7 +356,7 @@ Section ProofBrelse.
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     assert (Hsetback : ({[lock_rank "bcache"]} ∪ lks) ∖ {[lock_rank "bcache"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     assert (Hpc6c : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KernelSyms.brelse + 0x6c)).
     { rewrite HT3ra. apply bv_eq; vm_compute; reflexivity. }

@@ -623,7 +623,7 @@ Section ProofConsoleintr.
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcnt". rgall.
     assert (Hsetback : ({[lock_rank "cons"]} ∪ lks) ∖ {[lock_rank "cons"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite HX3ra) in "Hpc".
     assert (Hp110 : ret_pc (add_vec_int (mword_of_int (CT + 0x10c) : mword 64) 4)

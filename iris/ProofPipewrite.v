@@ -2346,8 +2346,9 @@ Section ProofPipewrite.
               assert (HwK : (18 <= trap_res true + (av - 14))%nat) by lia.
               assert (HwdomF : forall r : regidx, r ∈ dom (rf_to_gmap F2)) by (intro r; apply rf_to_gmap_dom).
               assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
-              iApply (Wakeup.wp_wakeup_sconf F2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false lks
-                        HwK HwdomF Hlen Hwlvl Hbelowproc
+              iApply (Wakeup.wp_wakeup_sconf F2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true C false
+                        ({[lock_rank "pipe"]} ∪ lks)
+                        HwK HwdomF Hlen Hwlvl ltac:(lkbelow)
                         with "Hcg Hown Htext Hpc Hpanic Hpinv").
               all: try lkbelow.
               iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.

@@ -1025,7 +1025,7 @@ Section UwBodies.
         pose proof (locks_below_not_elem lks (lock_rank "uart")
                       ltac:(lkbelow)) as Hnotin.
         assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback) in "Hcnt".
         iEval (rewrite HK2ra P42) in "Hpc".
         assert (HregsR : uw_loop_regs m0 MR (pa_stk sp0 10) buf n i).
@@ -1184,7 +1184,7 @@ Section UwBodies.
         pose proof (locks_below_not_elem lks (lock_rank "uart")
                       ltac:(lkbelow)) as Hnotin2.
         assert (Hsetback2 : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
         iEval (rewrite Hsetback2) in "Hcnt".
         iEval (rewrite HG4ra P72) in "Hpc".
         assert (HregsR2 : uw_loop_regs m0 MR2 (pa_stk sp0 10) buf n i).

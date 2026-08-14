@@ -575,7 +575,7 @@ Section KforkArms.
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
-                Mx2 (trap_res b) K (S lvl) eb C
+                Mx2 (trap_res b) K (S lvl) eb C ({[lock_rank "proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
       iApply wp_next_off_intro.

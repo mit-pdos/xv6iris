@@ -612,7 +612,7 @@ Section LogWriteBlocks.
     assert (Hnotin : lock_rank "log" ∉ lks)
       by (exact (locks_below_not_elem lks (lock_rank "log") Hno)).
     assert (Heqlks : ({[lock_rank "log"]} ∪ lks) ∖ {[lock_rank "log"]} = lks)
-      by (apply locks_add_del; assumption).
+      by (apply locks_add_del_below; lkbelow).
     iEval (rewrite Heqlks) in "Hcnt".
     assert (Hpcba : ret_pc (E3 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.log_write + 0xba)).
     { rewrite HE3ra. apply bv_eq; vm_compute; reflexivity. }
