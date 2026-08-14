@@ -366,6 +366,29 @@ The same applies to any hand-written substitution: obey
 "only the operand of `mword_of_int`" and "one pass" below, and confirm by
 compiling, never by inspection.
 
+**BEFORE THE COMPILE, RESOLVE — it is seconds and it names the file.** §4a-bis's
+check runs tree-wide and is exactly the right shape for a merge: every
+`add_vec (S + off) (sign_extend' 64 imm) = mword_of_int KernelSyms.f`
+assertion is a self-checking statement of where an immediate points, so
+recomputing all of them against the new `KernelSyms.v` audits the whole tree
+including the text git just replayed into it. Merging the `515391a` bump with
+13 commits of concurrent proof work checked **603** such assertions with zero
+mismatches, which is a much better answer than "it compiled" and arrives
+before the build does.
+
+Two things that check needs to get right, both of which silently under-report:
+
+- **Aliases live in a SIBLING file** (`Notation FR := KernelSyms.fileread` in
+  `ProofFilereadParts.v`, used in `ProofFileread.v`) — the same miss that makes
+  `relayout_map`'s per-file scan report a truthful "0 substitutions". Resolve
+  through the target's own `Require`s.
+- **And a tree-wide alias table is WRONG, measurably.** Collected over the
+  whole tree, `FR` is both `fileread` and `freeproc`, `KX` is both `kexec` and
+  `kexit`, and `Z` is seven different data symbols (`bcache`, `itable`,
+  `ftable`, `proc`, `cpus`, `stack0`, `states_0`). Anything that flattens them
+  audits one function's offsets against another's map — so scope per file, and
+  make the collision itself the error rather than picking a winner.
+
 ### THE RULE THAT SUBSUMES THE OTHERS
 
 Every immediate a proof spells goes through `mword_of_int`. A line carries
