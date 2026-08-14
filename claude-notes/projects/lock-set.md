@@ -26,22 +26,31 @@ during phase 1 is deleted; contracts name the set.
 The substrate is landed and proven, the client sweep is essentially done, and
 the ORDER has been revised once (ftable/itable above proc -- see below).
 
-At the last full build, 15 of 1085 files have no `.vo`.  TWO of those fail to
-compile; the other THIRTEEN are blocked behind them and were never attempted:
+At the last full build, 14 of 1085 files have no `.vo`, and they all trace to
+ONE compile error:
 
-* `ProofIput` -- RED ON PURPOSE, and expected to stay that way until the
-  icache REF-1 work lands.  See "THE ONE UNLICENSED EDGE" below; the failing
-  `assert` in the file carries the same explanation.
-* `ProofVirtioDiskRwF` -- the phase-chain convention seam, in progress.
-* blocked by `ProofIput`: `LinkIput`, `LinkIunlockput`, `LinkFileclose`,
-  `LinkDirlink`, `LinkNamex`, `LinkNamei`, `LinkNameiparent`, `LinkKexit`,
-  `LinkSysExit`, `LinkSysClose`, `LinkSysPipe`, `LinkPipealloc`; blocked by
-  `ProofVirtioDiskRwF`: `LinkVirtioDiskRw`.
+* `ProofVirtioDiskRwF` -- the phase-chain convention seam, in progress.  The
+  only file that fails.
+* the 13 `Link*` files, blocked behind it and never attempted: `LinkIput`,
+  `LinkIunlockput`, `LinkFileclose`, `LinkDirlink`, `LinkNamex`, `LinkNamei`,
+  `LinkNameiparent`, `LinkKexit`, `LinkSysExit`, `LinkSysClose`,
+  `LinkSysPipe`, `LinkPipealloc`, `LinkVirtioDiskRw`.
 
-That blocked set is the real price of the deferred `iput` edge, and it is
-worth keeping in view: leaving that one proof red costs the LINKING of iput,
-iunlockput, fileclose, dirlink, namex, namei, nameiparent, kexit, sys_exit,
-sys_close, sys_pipe and pipealloc.
+**Every `Link` file needs every functor in the chain**, which is why one red
+proof five layers down blocks twelve unrelated-looking names: `iput` reaches
+`itrunc` -> `bwrite` -> `virtio_disk_rw`, so the FS `Link` files were never
+blocked on `iput` at all -- they were blocked on `ProofVirtioDiskRwF` the
+whole time, and unblocking `iput` moved none of them.  Do not infer the
+blocking edge from the names.
+
+`ProofIput` now COMPILES, on an admitted axiom -- see "THE ONE UNLICENSED
+EDGE" below.
+
+**Count what is MISSING, not what errored.**  `make -k` does not delete a
+stale `.vo` when a later compile fails, and it skips the dependents in
+silence -- so the error count said "2" while thirteen more were unverified,
+some against artifacts predating the order change.  `for f in *.v; do [ -f
+"${f%.v}.vo" ] || echo "$f"; done` is the honest check.
 
 **Count what is MISSING, not what errored.**  `make -k` does not delete a
 stale `.vo` when a later compile fails, and it skips the dependents in
@@ -182,6 +191,32 @@ non-blocking `acquiresleep` variant.  Note the ref-1 argument does NOT rescue
 the three-CPU cycle you would draw from the raw edges -- that one is broken
 instead by the fact that the lock `kfork` holds is a NOT-RUNNING process's,
 and `sleep_prepare` only ever acquires the running process's own.
+
+**It is ADMITTED for now**, as `iput_acquiresleep_order_ADMITTED` at the top
+of `ProofIput.v`, so the sweep can proceed.  Four things about how it is set
+up, all deliberate:
+
+* it lives in `ProofIput.v`, NOT in `LockRank.v` or any other header, so the
+  only way to depend on it is to depend on `iput`;
+* its premise is `iput`'s own (`locks_below lks (lock_rank "itable")`), so it
+  cannot be picked up as a general "any set is below any rank" escape hatch;
+* the name is loud and greppable, and `Print Assumptions` on any downstream
+  theorem prints it.  That is the intended tripwire;
+* **the admitted statement is FALSE, not merely unproven.**  `lock_rank` is a
+  closed computation, so `vm_compute` refutes it and `locks_below_not_elem`
+  turns it into `False`.  Every theorem whose proof reaches it is logically
+  vacuous.  There is no consistent alternative: the goal itself is refutable,
+  so any axiom that closes it is too.  The real fix changes the OBLIGATION --
+  a non-blocking `acquiresleep` whose contract never reaches `sleep_prepare`,
+  and so raises no order premise at all -- rather than assuming it.
+
+Admitting it flushed out two leftovers of the order change that had been
+hiding behind the earlier hard failure: `wp_iput_gen` states its premise at
+its cone minimum `"log"` (1) (because `itrunc` reaches `log_write`), but the
+itable re-acquire at `+0x82` and the shared tail both want `"itable"` (14).
+One hoisted `mono` step at the top of the lemma covers all three sites.
+**A file that fails early hides every later defect in it** -- expect more when
+a long-red proof first goes green.
 
 ### virtio_disk_rw has TWO conventions for what `lks` means
 
