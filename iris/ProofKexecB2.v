@@ -1450,10 +1450,10 @@ Section KexecB2Loops.
                                            (zeros' 12 : mword 12))).
     { rewrite HN4a0 Hbase. reflexivity. }
     assert (Htwa : add_vec (mword_of_int (KXB + 0x100) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2082656 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2082642 : mword 21))
                    = mword_of_int KernelSyms.walkaddr) by lpcw.
     iApply (wp_jal_s_sconf (mword_of_int (KXB + 0x100)) Rra
-              (mword_of_int 2082656 : mword 21) N4 (K - 68)%nat true
+              (mword_of_int 2082642 : mword 21) N4 (K - 68)%nat true
               ltac:(lnz) ltac:(rdok)
               ltac:(rewrite Htwa; vm_compute; reflexivity)
               with "Hcg Hpc Hi100").
@@ -1532,23 +1532,23 @@ Section KexecB2Loops.
       assert (Hpp0d2 : add_vec_int (mword_of_int (KXB + 0xce) : mword 64) 4
                        = mword_of_int (KXB + 0xd2)) by lpcw.
       iEval (rewrite Hpp0d2) in "Hpc".
-      (* +0x0d2 addi a0,a0,3496 *)
+      (* +0x0d2 addi a0,a0,3482 *)
       iApply (wp_addi4_s_sconf (mword_of_int (KXB + 0xd2)) Ra0 Ra0
-                (mword_of_int 3496 : mword 12) Np1 (K - 68)%nat true
+                (mword_of_int 3482 : mword 12) Np1 (K - 68)%nat true
                 ltac:(lnz) ltac:(rdok) with "Hcg Hpc Hi0d2").
       iIntros (CIDp2 Hsp2) "Hcg Hpc".
       set (Np2 := <[Regidx Ra0 := regval_into_reg
                      (add_vec (rget Np1 Ra0)
-                        (sign_extend' 64 (mword_of_int 3496 : mword 12)))]> Np1).
+                        (sign_extend' 64 (mword_of_int 3482 : mword 12)))]> Np1).
       assert (Hpp0d6 : add_vec_int (mword_of_int (KXB + 0xd2) : mword 64) 4
                        = mword_of_int (KXB + 0xd6)) by lpcw.
       iEval (rewrite Hpp0d6) in "Hpc".
       (* +0x0d6 jal ra,panic -- and panic() never returns *)
       assert (Htpn : add_vec (mword_of_int (KXB + 0xd6) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2080756 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2080742 : mword 21))
                      = mword_of_int KernelSyms.panic) by lpcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXB + 0xd6)) Rra
-                (mword_of_int 2080756 : mword 21) Np2 (K - 68)%nat true
+                (mword_of_int 2080742 : mword 21) Np2 (K - 68)%nat true
                 ltac:(lnz) ltac:(rdok)
                 ltac:(rewrite Htpn; vm_compute; reflexivity)
                 with "Hcg Hpc Hi0d6").
@@ -1789,10 +1789,10 @@ Section KexecB2Loops.
       iEval (rewrite Hppe6) in "Hpc".
       (* ---- +0x0e6: jal ra,readi ---- *)
       assert (Htrd : add_vec (mword_of_int (KXB + 0xe6) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2092376 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2092362 : mword 21))
                      = mword_of_int KernelSyms.readi) by lpcw.
       iApply (wp_jal_s_sconf (mword_of_int (KXB + 0xe6)) Rra
-                (mword_of_int 2092376 : mword 21) D5 (K - 68)%nat true
+                (mword_of_int 2092362 : mword 21) D5 (K - 68)%nat true
                 ltac:(lnz) ltac:(rdok)
                 ltac:(rewrite Htrd; vm_compute; reflexivity)
                 with "Hcg Hpc Hi0e6").
