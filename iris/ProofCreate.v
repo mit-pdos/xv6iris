@@ -120,6 +120,7 @@ Require Import DinodeEnc.
    that, at the ABI's sign-extended [major] / [minor] arguments. *)
 Require Import DinodeSlot.
 Require Import DirentEnc.
+Require Import BvShift.
 Require Import PathElems.
 Require Import DirView.
 Require Import DirLinks.
@@ -933,6 +934,274 @@ Lemma cr_sub_union_sing (S : gset Z) (x : Z) : S ⊆ S ∪ {[x]}.
 Proof. apply union_subseteq_l. Qed.
 
 (* ===================================================================== *)
+(*  (viii) THE mkdir SUB-BRANCH (+0xf8 .. +0x144), D0-b step 1            *)
+(*                                                                        *)
+(*  Three groups and nothing else: the sixteen-bit [++] at +0x134..+0x13a, *)
+(*  the DIRECTORY-VIEW readings the two interior [dirlink]s need, and the  *)
+(*  arm's ledger, which closes at EXACTLY [iput_units].                    *)
+(* ===================================================================== *)
+
+(* ---- (a) THE [++].  The [lhu] at +0x134 zero-extends, the [c.addiw] at
+   +0x138 wraps at 32 and sign-extends to 64, and the [sh] at +0x13a
+   commits [trunc16] of that -- which IS [add_vec h 1] at sixteen bits.
+   [ProofCreateParts.cr_inner]'s pattern verbatim: name the 32-bit
+   intermediate, and the whole Sail cast layer collapses by conversion.
+   [BvShift.swrap_low_32_16] crosses the sign extension without a case
+   split on the sign. *)
+Definition cr_ninner (h : mword 16) : bv 32 :=
+  bv_extract 0 32 (bv_add (bv_zero_extend 64 h)
+      (bv_sign_extend 64 (bv_sign_extend 12 (mword_of_int 1 : mword 6)))).
+
+Lemma cr_ninner_unsigned (h : mword 16) :
+  bv_unsigned (cr_ninner h) = (bv_unsigned h + 1) `mod` 4294967296.
+Proof.
+  unfold cr_ninner.
+  rewrite bv_extract_unsigned bv_add_unsigned.
+  rewrite (bv_zero_extend_unsigned 64 h ltac:(vm_compute; discriminate)).
+  assert (Hc : bv_unsigned (bv_sign_extend 64
+                  (bv_sign_extend 12 (mword_of_int 1 : mword 6)) : bv 64) = 1)
+    by (vm_compute; reflexivity).
+  rewrite Hc.
+  change (Z.of_N 0) with 0.
+  rewrite Z.shiftr_0_r.
+  unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  change (2 ^ Z.of_N 32) with 4294967296.
+  rewrite mod_2_64_32. reflexivity.
+Qed.
+
+Lemma cr_nbump_bv (h : mword 16) :
+  bv_unsigned (trunc16 (sign_extend' 64 (subrange_vec_dec
+     (add_vec (zero_extend' 64 h : mword 64)
+        (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))
+         : mword 64)) 31 0)))
+  = bv_unsigned (bv_extract 0 16 (bv_sign_extend 64 (cr_ninner h))).
+Proof. reflexivity. Qed.
+
+Lemma cr_nbump_unsigned (h : mword 16) :
+  bv_unsigned (bv_extract 0 16 (bv_sign_extend 64 (cr_ninner h)))
+  = (bv_unsigned h + 1) `mod` 65536.
+Proof.
+  rewrite bv_extract_unsigned bv_sign_extend_unsigned.
+  change (Z.of_N 0) with 0. rewrite Z.shiftr_0_r.
+  unfold bv_signed, bv_swrap, bv_wrap, bv_half_modulus, bv_modulus.
+  change (2 ^ Z.of_N 64) with 18446744073709551616.
+  change (2 ^ Z.of_N 32) with 4294967296.
+  change (2 ^ Z.of_N 16) with 65536.
+  rewrite mod_2_64_16 swrap_low_32_16 cr_ninner_unsigned mod_2_32_16.
+  reflexivity.
+Qed.
+
+Lemma cr_nlink_incr (h : mword 16) :
+  trunc16 (sign_extend' 64 (subrange_vec_dec
+     (add_vec (zero_extend' 64 h : mword 64)
+        (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))
+         : mword 64)) 31 0))
+  = add_vec h (mword_of_int 1 : mword 16).
+Proof.
+  apply bv_eq. rewrite cr_nbump_bv cr_nbump_unsigned.
+  rewrite add_vec_unsigned.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 16) = 1)
+    by (vm_compute; reflexivity).
+  rewrite H1. unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16)) with 65536.
+  reflexivity.
+Qed.
+
+(* ---- (b) THE DIRECTORY-VIEW READINGS.  The child is EMPTY when the arm
+   starts, so the first link's slot is zero and its dirlookup cannot hit;
+   after it, slot zero is LIVE at the child's own inum (which is what makes
+   the second link's free-slot scan settle on slot one) and its canonical
+   name is ["."] (which is what makes the second link's dirlookup MISS,
+   [".."] being a different list). *)
+Lemma cr_nrec_0 : dir_nrec 0 = 0%nat.
+Proof. reflexivity. Qed.
+
+Lemma cr_nrec_16 : dir_nrec 16 = 1%nat.
+Proof. reflexivity. Qed.
+
+Lemma cr_slot_0 (data : nat -> list (bv 8)) : dir_slot data 0 = 0%nat.
+Proof. unfold dir_slot, dir_free_first. rewrite dfirst_0. reflexivity. Qed.
+
+Lemma cr_first_0 (data : nat -> list (bv 8)) (s : list (bv 8)) :
+  dir_first data 0 s = None.
+Proof. apply dir_first_None. intros j Hj. exfalso. lia. Qed.
+
+Lemma cr_slot_1 (data : nat -> list (bv 8)) :
+  dir_inum data 0 <> bv_0 16 -> dir_slot data 1 = 1%nat.
+Proof.
+  intro Hlive. apply dir_slot_char; [lia | | left; reflexivity].
+  intros j Hj. assert (Hj0 : j = 0%nat) by lia. subst j. exact Hlive.
+Qed.
+
+Lemma cr_dot_record (data : nat -> list (bv 8)) (i : bv 16) :
+  (forall j, (j < 16)%nat ->
+     file_byte data (16 * 0 + j)%nat
+     = dirent_bytes (de_of_name i (bname 14 cr_dot_f)) !!! j) ->
+  dir_inum data 0 = i /\ bname 14 (dir_name data 0) = [Z_to_bv 8 0x2e].
+Proof.
+  intro Hb.
+  destruct (dir_record_of_name data 0 i (bname 14 cr_dot_f)
+              (bname_length_le 14 cr_dot_f)
+              (cut_nul_nonul (bview 14 cr_dot_f)) Hb) as [Hi Hn].
+  split; [exact Hi | rewrite Hn; exact cr_dot_name].
+Qed.
+
+Lemma cr_first_miss_dotdot (data : nat -> list (bv 8)) (i : bv 16) :
+  (forall j, (j < 16)%nat ->
+     file_byte data (16 * 0 + j)%nat
+     = dirent_bytes (de_of_name i (bname 14 cr_dot_f)) !!! j) ->
+  dir_first data 1 (bname 14 cr_dotdot_f) = None.
+Proof.
+  intro Hb. apply dir_first_None. intros j Hj.
+  assert (Hj0 : j = 0%nat) by lia. subst j.
+  intros [_ Hn].
+  destruct (cr_dot_record data i Hb) as [_ Hnm].
+  rewrite Hnm cr_dotdot_name in Hn. discriminate.
+Qed.
+
+(* ---- (c) THE FIRST LINK ALWAYS ALLOCATES.  The fresh child's cell zero
+   is zero ([fresh_shape]'s all-zero [addrs] through [inode_ok]'s
+   [di_addrs = bm_cells]) and the sixteen bytes that went in make the
+   file's first block COVERED, so [SpecBmap.bmap_ad] fires.  That is what
+   pins [crb] at [true] for both later links -- an allocating writei
+   reports [bmapstart ∈ Sb'] -- and the whole arm's ledger rests on it. *)
+Lemma cr_fresh_cell0 (bm : blkmap) :
+  bm_cells bm = replicate 13 (bv_0 32) ->
+  length (bm_dir bm) = NDIRECT ->
+  bv_unsigned (blkmap_get bm 0) = 0.
+Proof.
+  intros Hc Hlen.
+  rewrite blkmap_get_dir; [| unfold NDIRECT; lia ].
+  unfold bm_cells in Hc.
+  assert (H0 : (bm_dir bm ++ [bm_ind bm])%list !! 0%nat = Some (bv_0 32))
+    by (rewrite Hc; reflexivity).
+  assert (Hl : (bm_dir bm ++ [bm_ind bm])%list !! 0%nat = bm_dir bm !! 0%nat)
+    by (apply lookup_app_l; unfold NDIRECT in Hlen; lia).
+  rewrite Hl in H0.
+  rewrite (list_lookup_total_correct _ _ _ H0).
+  vm_compute. reflexivity.
+Qed.
+
+Lemma cr_alloced_first (bm bm' : blkmap) :
+  bv_unsigned (blkmap_get bm 0) = 0 ->
+  bv_unsigned (blkmap_get bm' 0) <> 0 ->
+  SpecBmap.bmap_alloced bm bm' 0 = true.
+Proof.
+  intros H0 H1.
+  exact (SpecBmap.bmap_alloced_of_ad bm bm' 0%nat
+           (SpecBmap.bmap_ad_true bm bm' 0%nat H0 H1)).
+Qed.
+
+(* ---- (d) THE ARM'S LEDGER.  Three facts feed it and every one is read
+   off the walk rather than assumed: [al1 = true] (above), the walk's own
+   correlation [crb1 = false -> 9 <= n3] (at [w = true] nameiparent paid
+   the bitmap block and it is in the set, at [w = false] it did not pay and
+   the count is one higher -- which is why [cr_mkdir_body] carries the
+   disjunction), and [dl16_post]'s "an allocating writei reports the bitmap
+   block".  WITHOUT THE CORRELATION THE CHAIN BUSTS BY EXACTLY ONE UNIT at
+   the corner [crb1 = false], [n3 = 8]. *)
+Lemma cr_u_ge10 (u : nat) : (create_units <= u)%nat -> (10 <= u)%nat.
+Proof. unfold create_units, MAXOPBLOCKS. lia. Qed.
+
+Lemma cr_n3_lo (u q2 : nat) (w : bool) :
+  (create_units <= u)%nat ->
+  ((u - (SpecNamex.walk_spend w + 0))%nat <= S (S q2))%nat ->
+  w = false -> (9 <= S q2)%nat.
+Proof.
+  intros Hu Hn Hw. rewrite Hw in Hn.
+  pose proof (cr_u_ge10 u Hu) as H10.
+  unfold SpecNamex.walk_spend in Hn. lia.
+Qed.
+
+Lemma cr_mkdir_dl3_need (n3 n4 n5 : nat)
+    (crb1 crd1 crb2 al2 crb3 ind3 : bool) :
+  (8 <= n3)%nat ->
+  (crb1 = false -> (9 <= n3)%nat) ->
+  ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
+  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n5)%nat ->
+  crb2 = true -> crb3 = true ->
+  (SpecDirlink.dl_need crb3 ind3 <= n5)%nat.
+Proof.
+  intros H3 Hw H4 H5 -> ->.
+  unfold wi16_spend, SpecBmap.bmap_cost, SpecDirlink.dl_need,
+         wi16_need, SpecBmap.bmap_need in *.
+  destruct crb1; [| pose proof (Hw eq_refl) ];
+    destruct crd1, al2, ind3; simpl in *; lia.
+Qed.
+
+Lemma cr_mkdir_ip (n3 n4 n5 n6 : nat)
+    (crb1 crd1 crb2 al2 crb3 crd3 cru3 al3 ind3 : bool) :
+  (8 <= n3)%nat ->
+  (crb1 = false -> (9 <= n3)%nat) ->
+  ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
+  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n5)%nat ->
+  ((n5 - wi16_spend crb3 crd3 cru3 al3 ind3)%nat <= n6)%nat ->
+  crb2 = true -> crb3 = true ->
+  (iput_units <= n6)%nat /\ (1 <= n6)%nat.
+Proof.
+  intros H3 Hw H4 H5 H6 -> ->.
+  unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
+  destruct crb1; [| pose proof (Hw eq_refl) ];
+    destruct crd1, al2, crd3, cru3, al3, ind3; simpl in *; lia.
+Qed.
+
+Lemma cr_mkdir_n5 (n3 n4 n5 : nat) (crb1 crd1 crb2 al2 : bool) :
+  (8 <= n3)%nat ->
+  (crb1 = false -> (9 <= n3)%nat) ->
+  ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
+  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n5)%nat ->
+  crb2 = true -> (6 <= n5)%nat.
+Proof.
+  intros H3 Hw H4 H5 ->.
+  unfold wi16_spend, SpecBmap.bmap_cost in *.
+  destruct crb1; [| pose proof (Hw eq_refl) ];
+    destruct crd1, al2; simpl in *; lia.
+Qed.
+
+(* ...and the three FAIL exits' readings.  The first two entries discharge
+   [cr_fail_mkdir_body]'s LEFT disjunct outright ([8 <= n3] and a spend of
+   at most two, twice); only the third needs
+   [CreateBudget.cr_fail_mkdir_closes] / [_closes_ind], and it has
+   [bmapstart ∈ Sb4] as well. *)
+Lemma cr_mkdir_fail1 (n3 n' : nat) (crb crd al : bool) :
+  (8 <= n3)%nat ->
+  ((n3 - wi16_spend crb crd true al false)%nat <= n')%nat ->
+  (iput_units <= n')%nat /\ (S iput_units <= n')%nat.
+Proof.
+  intros H3 H. unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
+  destruct crb, crd, al; simpl in *; lia.
+Qed.
+
+Lemma cr_mkdir_fail2 (n3 n4 n' : nat) (crb1 crd1 crb2 al2 : bool) :
+  (8 <= n3)%nat ->
+  ((n3 - wi16_spend crb1 crd1 true true false)%nat <= n4)%nat ->
+  ((n4 - wi16_spend crb2 true true al2 false)%nat <= n')%nat ->
+  crb2 = true ->
+  (iput_units <= n')%nat /\ (S iput_units <= n')%nat.
+Proof.
+  intros H3 H4 H5 ->.
+  unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
+  destruct crb1, crd1, al2; simpl in *; lia.
+Qed.
+
+Lemma cr_mkdir_fail3 (n5 n' : nat) (crb3 crd3 cru3 al3 ind3 : bool) :
+  (6 <= n5)%nat -> crb3 = true ->
+  ((n5 - wi16_spend crb3 crd3 cru3 al3 ind3)%nat <= n')%nat ->
+  (iput_units <= n')%nat.
+Proof.
+  intros H5 -> H.
+  unfold wi16_spend, SpecBmap.bmap_cost, iput_units in *.
+  destruct crd3, cru3, al3, ind3; simpl in *; lia.
+Qed.
+
+(* the slot ledger for the mkdir arm: three [dirlink]s, each net zero, so
+   the count never leaves [ns - 2] except while a call holds its unit. *)
+Lemma cr_ns_3 (ns : nat) : (create_slots <= ns)%nat ->
+  (1 + (ns - 3))%nat = (ns - 2)%nat.
+Proof. unfold create_slots. lia. Qed.
+
+(* ===================================================================== *)
 (*  2.  THE PROOF                                                         *)
 (* ===================================================================== *)
 
@@ -1618,6 +1887,17 @@ Section ProofCreateMain.
        ⌜Sb ⊆ Sb3⌝ -∗
        ⌜IBLOCK cinum inodestart ∈ Sb3⌝ -∗
        ⌜(8 <= n3)%nat /\ (n3 <= u)%nat⌝ -∗
+       (* THE WALK'S OWN nameiparent CORRELATION, and the arm cannot close
+          without it.  [8 <= n3] alone busts this chain by EXACTLY one unit
+          at [crb1 = false], [n3 = 8]: the three [dirlink]s plus the
+          parent's [iupdate] leave [iput_units] with ZERO slack
+          ([CreateBudget.cr_budget_mkdir]'s [u6 = 3]).  What closes it is
+          that the two are not independent -- at [w = true] nameiparent
+          PAID for the bitmap block, so it is in the set and the first
+          interior link absorbs; at [w = false] it did not pay and the
+          count is one higher.  Free at [cr_alloc_half], which holds both
+          halves ([w = true -> bmapstart ∈ Sb1] and [create_units <= u]). *)
+       ⌜bmapstart ∈ Sb3 \/ (9 <= n3)%nat⌝ -∗
        ⌜used3 ⊆ used⌝ -∗
        (* the machine *)
        sie_cap_gpr Mx (K - 10)%nat b (proc_addr j) -∗
@@ -4308,7 +4588,7 @@ Section ProofCreateMain.
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
                           ∪ {[IBLOCK cinum inodestart]}) used1
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                        [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                        [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                         Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -4338,6 +4618,13 @@ Section ProofCreateMain.
                    (cr_sub_union_sing _ _)). }
         { exact (cr_in_union_sing _ _). }
         { split; [lia | lia]. }
+        (* THE CORRELATION, discharged where both halves are in hand. *)
+        { destruct w.
+          - left.
+            exact (cr_sub2 _ _ _ (cr_sub_union_sing Sb1 _)
+                     (cr_sub_union_sing _ _) _ (Hwmem eq_refl)).
+          - right.
+            exact (cr_n3_lo u q2 false Hu (proj1 Hnp1) eq_refl). }
         { exact Husd1. }
       + (* ============================================================ *)
         (*  +0xca FALLS THROUGH: the non-directory path                  *)
