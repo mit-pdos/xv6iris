@@ -97,6 +97,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`iput-acquiresleep.md`](projects/iput-acquiresleep.md)** — discharging
+  `iput_acquiresleep_order_ADMITTED`, the tree's one admitted (and FALSE)
+  statement: the staged plan, and the three dead ends not to re-walk.
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-icache.md`](projects/fs-icache.md)** — the inode-cache implementation
@@ -167,7 +170,7 @@ discharge — which is what `sysfile.c` and the boot client inherit).
 
 `lock-set.md` is the third, and the one to read BEFORE adding a lock or
 changing where one sits: it carries the audit of every simultaneous lock pair
-in xv6 and the installed rank table. Unlike the rest of this directory it has
-a live consequence — `ProofIput.iput_acquiresleep_order_ADMITTED` is a FALSE
-axiom the project left behind deliberately, tracked separately, and everything
-downstream of `iput` is vacuous until it is discharged.
+in xv6 and the installed rank table. The one thing it left behind —
+`ProofIput.iput_acquiresleep_order_ADMITTED`, a FALSE axiom that makes
+everything downstream of `iput` vacuous — is a live effort of its own, in
+[`projects/iput-acquiresleep.md`](projects/iput-acquiresleep.md).
