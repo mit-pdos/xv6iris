@@ -7987,3 +7987,68 @@ either is now a design question.**  In order:
    `iApply`, D₀-a's finding), `CreateProof : CREATE`, `LinkCreate.v` over
    the seven callee Links plus `LinkCreateFreshTy`, the `_CoqProject` row,
    and the coverage flip **177 -> 178** with `sysfile.c` **8 -> 9**.
+
+
+### Step 2 LANDED — the T_DIR `fail:` sibling, and C1's free grey mint has
+### its FIRST CONSUMER.  Steps 1 and 3 are untouched and unchanged in shape
+
+**WHAT THE SIBLING IS.**  `cr_fail_mkdir_body` / `cr_fail_mkdir_half`,
++0x146..+0x15e at `ty = T_DIR`, reached from the mkdir arm's three `bltz`es.
+Its statement differs from `cr_fail_body`'s in exactly the two places the
+resources do, and both differences make it SHORTER:
+
+* **the child's `dir_links` is not a premise at all.**  It is BUILT at the
+  zeroed record, out of `InodeRegion.ireg_link_grey`: the `sh zero,74(s3)`
+  at +0x146 is `DirLinks.dir_link_at`'s grey home condition and `igrey` is
+  free, so every live non-self record's ticket is manufactured rather than
+  threaded.  That is what makes ONE body cover all three entries — they
+  differ only in how many records the child has (0, 1 or 2), which the
+  builder quantifies over.
+* **the parent is handed over ALREADY re-parked.**  All three entries sit
+  BEFORE the +0x134 `lhu`, so the parent's count is its entry one and its
+  `dir_links` is at the record the walk itself put back — no post-dirlink
+  index description, no `wi_dinode` chain, none of `cr_fail_body`'s twelve
+  writei-shaped pure premises.
+
+**THE CHILD IS AN ABSTRACT RECORD, WITH THREE FIELD EQUATIONS INSTEAD OF A
+`cr_setf` SHAPE.**  After two interior `dirlink`s the child's record is
+`wi_dinode (cr_setf dnc major minor 1) …`, which is NOT `cr_setf`-shaped —
+so the body takes `dc` with `di_type dc = ty`, `di_major dc = major`,
+`di_minor dc = minor`, `di_nlink dc = 1`.  Those four are exactly what makes
+the `sh` land on `cr_setf dc major minor 0` (the store moves only the
+`i_nlink` cell, and `cr_setf` agrees with `dc` on every other) and what makes
+`wp_iupdate_unlink`'s Z-form decrement `1 = 0 + 1`.
+
+**THE THREE HELPERS**, all additive: `cr_bzext32_16` (`DirView.dir_inum` is a
+`bv 16`, `ireg_link_grey` is at the region's `bv 32`), `cr_grey_links` (the
+induction, one mint per live non-self record, each bounded by `dir_ok`'s own
+`dir_inums_ok` — which is guarded on `dir_live` exactly where the ticket is),
+`cr_grey_dir_links` (the payload-level form).
+
+**GATE.**  `make -f CoqMakefile -j30 -k` MAKEEXIT=0 on the mirror
+(md5-verified for all 1090 `iris/*.v` first), zero `Error`, 1093 `.vo`,
+`make -n` 0 `COQC` lines, staleness 0, no `Admitted`/`admit`, `lemma_diff`
+CLEAN.  `SpecCreate.v` / `CreateBudget.v` / `DirLinks.v` / `InodeRegion.v` /
+`LinkCreate*` byte-untouched, every landed `ProofCreate.v` statement
+byte-identical, `proof_coverage` unmoved at **177/190, sysfile.c 8/16, create
+ASSUMED at 356 B**.
+
+**WHAT IS LEFT is items 1 and 3 of the list above, verbatim** — nothing about
+either moved.  Two figures worth having in hand before item 1 is written, both
+read off the walk's own lower bound `8 <= n3` rather than off
+`cr_budget_mkdir`'s exact chain:
+
+* the FIRST `dirlink`'s spend is `wi16_spend crb crd true al false` and that
+  is `<= 2` at EVERY pair of the two unknown booleans — `cru = true` comes
+  from `cr_mkdir_body`'s `IBLOCK cinum inodestart ∈ Sb3`, `ind = false`
+  because slot 0 of the fresh child is in its block 0, and the two remaining
+  corners are `al = true` (then `bmap_cost crb true false <= 2` and the
+  data-block term is free) and `al = false` (then `bmap_cost = 0` and the
+  data-block term is at most one).  So `n' >= 6` after it, which is
+  `cr_budget_mkdir`'s `u3` exactly.
+* the SIBLING's own ledger premise is `cr_fail_body`'s, unchanged —
+  `iput_units <= n4` plus `S iput_units <= n4 \/ bmapstart ∈ Sb4` — and the
+  first two entries discharge the LEFT disjunct outright from `8 <= n3` and
+  `wi16_spend <= 2` twice.  Only the third entry needs
+  `cr_fail_mkdir_closes` / `_closes_ind`, and it has `bmapstart ∈ Sb4` as
+  well.
