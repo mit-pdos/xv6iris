@@ -129,9 +129,13 @@ ensure_running() {
         # retrying. This is the preemption-recovery path; it must not be clever.
         attempt=$(( attempt + 1 ))
         (( attempt > 3 )) && die "could not start $INSTANCE after 3 attempts.
-Spot capacity in $ZONE may be exhausted. To run on-demand instead:
-  gcloud compute instances update $INSTANCE --zone=$ZONE --provisioning-model=STANDARD
-(verify that flag exists in your gcloud version first: gcloud compute instances update --help)"
+Spot capacity in $ZONE may be exhausted. To run on-demand instead (the
+instance must be TERMINATED, and all three flags are required -- the legacy
+preemptible field and the Spot-only termination action both have to go):
+  gcloud compute instances set-scheduling $INSTANCE --zone=$ZONE \\
+    --no-preemptible --provisioning-model=STANDARD --clear-instance-termination-action
+(it is set-scheduling, NOT 'instances update', which has no such flag.
+See claude-notes/remote-build-gcp.md for the errors each flag answers.)"
         say "instance is $status; starting (attempt $attempt)"
         if ! g compute instances start "$INSTANCE" --zone="$ZONE" 2>"$STATE_DIR/start.err"; then
           warn "start failed: $(tail -n2 "$STATE_DIR/start.err" | tr '\n' ' ')"

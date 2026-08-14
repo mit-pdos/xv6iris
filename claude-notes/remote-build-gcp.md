@@ -153,6 +153,57 @@ Verified: stop → restart takes ~15s with all state intact.
 Rocq builds are incrementally resumable, so a preemption mid-build costs only
 the file in flight — `make` picks up where it left off.
 
+**Switching to on-demand when Spot capacity is thrashing.** Repeated
+preemptions inside one build (each restart re-syncs, restarts the VM and
+resumes, so a build can take several wall-clock multiples of its compile time)
+are the signal. The instance must be **TERMINATED** for the change, and it
+takes THREE flags, not one:
+
+```sh
+run-on-gcp --stop        # wait for TERMINATED; the change is rejected while RUNNING
+gcloud compute instances set-scheduling rocq-builder --zone=us-east4-a \
+  --no-preemptible --provisioning-model=STANDARD --clear-instance-termination-action
+run-on-gcp --start
+```
+
+Each flag exists because of an error the previous one produces, and none of the
+messages names the flag you actually need:
+
+- `--provisioning-model=STANDARD` alone → *"For preemptible, only allowed
+  provisioning_model value is SPOT"*. The instance carries the LEGACY
+  `preemptible: true` field beside the modern `provisioningModel`, and both
+  have to move; hence `--no-preemptible`.
+- adding `--no-preemptible` → *"You cannot specify a termination action for a
+  VM instance that has the standard provisioning model"*. `set-scheduling`
+  re-sends the existing `instanceTerminationAction=STOP` as UNSPECIFIED rather
+  than dropping it, and the API counts that as specifying it; hence
+  `--clear-instance-termination-action`.
+
+**The flag is on `set-scheduling`, not on `instances update`** — the latter has
+no `--provisioning-model` at all in current gcloud. Going back is the same
+command with `--preemptible --provisioning-model=SPOT
+--instance-termination-action=STOP`.
+
+Verify with:
+
+```sh
+gcloud compute instances describe rocq-builder --zone=us-east4-a \
+  --format="value(scheduling.provisioningModel,scheduling.preemptible)"   # STANDARD  False
+```
+
+**The change survives the idle shutdown, and resets when the instance is
+RECREATED.** Provisioning model is a property of the instance resource, not a
+per-boot setting, so the 1-hour idle power-off and every later `--start` keep
+it. But `config.sh` deliberately keeps `PROVISIONING_MODEL=SPOT` as the
+default, so `provision-gcp.sh` — the documented way to change the machine or
+boot image — brings a recreated instance back as Spot with no warning. Re-apply
+`set-scheduling` after any recreate, or pass
+`ROCQ_PROVISIONING_MODEL=STANDARD ROCQ_TERMINATION_ACTION=` for that one run.
+
+On-demand `c3d-standard-90` is ~$4.30/hr against Spot's ~$1.68, so switch back
+once capacity recovers — and note the idle-shutdown timer matters much more at
+that rate.
+
 The VM powers itself off after **1 hour idle**, judged by live SSH sessions and
 running `rocq`/`make`/`opam` processes, so a detached build keeps it alive on
 its own. To pin it up (a long run you do not want interrupted):
