@@ -306,6 +306,16 @@ the WHOLE chain again, 1-3 hours, and cannot reuse the first: `gwalk None`
 nothing about `glive`.  Decide the predicate set before generating, not after
 the first consumer gets stuck.
 
+**…UNLESS THE SECOND MODE'S BIND RULE CONSUMES THE FIRST AT THE PREFIX, WHICH
+IS A DESIGN CHOICE AND WORTH MAKING DELIBERATELY.**  Measured on this tree
+(2026-08-14): the shape tower is 294 lemmas / 5 min 20 s; the value mode over
+the same cone is 116 lemmas / **9 s**, because its bind rule's PREFIX
+obligation is the shape mode's `gwalk None` — resolved by one premise-free
+hint out of the existing tower — so only the ~60 clause BODIES are walked, not
+their cones.  When you add a mode, ask first what the bind rule can demand of
+a prefix; a mode that must re-walk every callee costs the whole chain again,
+a mode that reuses the previous one at the prefix costs the leaves only.
+
 **A "HUNG" GENERATED SHARD IS A TACTIC BUG UNTIL PROVEN OTHERWISE, AND THE
 TWO CAUSES ARE BOTH IN THE LEAF TACTIC.**  A sweep whose solver is
 `repeat first [... | solve [leaf] | step]` runs the LEAF AT EVERY NODE, not
@@ -319,6 +329,13 @@ each ~an order of magnitude, measured on this tree (2026-08-14):
   `lazymatch` that `fail`s on every combinator head (`bind`, `try_catch`,
   `if`, `match`, the loop combinators). At a combinator node the structural
   step is the only correct move anyway, so the gate cannot lose a proof.
+- **AND IT IS NOT ONLY HINT DATABASES: any `apply` of a lemma about a
+  generated function is the same trap.** A dispatch written as
+  `try (by apply H1); try (by apply H2); …` over a ~130-arm `match` did not
+  finish in two minutes for exactly this reason; matching on the goal's HEAD
+  CONSTANT with a `lazymatch` instead made it 3 s. If a tactic that only
+  `apply`s a dozen hypotheses is slow, suspect delta-unfolding before
+  suspecting the goal.
 - **A `discriminated` hint DB does NOT prune unless the constants are opaque
   to it.** Hints concluding `P (<generated function> ?a …)` over a
   TRANSPARENT model make `eauto` delta-unfold and compare bodies; sibling
@@ -369,6 +386,31 @@ loop:
   `|- P (match ?x with _ => _ end)` tactic rule matches. Destruct the pattern
   arguments up front — the generator knows which they are from the binder
   region, so this is derived, not guessed.
+
+## A PREMISE THAT DOES NOT REDUCE MAKES A TACTIC RULE FALL THROUGH SILENTLY
+
+The failure mode has no error message and surfaces several steps away from its
+cause. A rule of the form `apply lemma; [solve [by intros] | …]` carries a
+side condition like `∀ e, Q e`; when `Q` is a postcondition over a SUM type
+(the shape a `catch_early_return` installs — `λ ea, match ea with inl a => P a
+| inr e => Q0 e end`) the goal is a stuck `match` until the sum is destructed,
+so `by intros` fails, so the whole `first [...]` alternative fails, so a LATER
+and WEAKER rule fires instead. On this tree the weaker rule was the plain
+shape route, which walked the decoder happily and DROPPED its postcondition;
+the symptom, four steps later, was a goal needing a hypothesis that "should
+have been in scope". Two habits:
+
+- write such side conditions as a named tactic that also destructs
+  (`intros e; destruct e; first [exact I | reflexivity | done]`), not as
+  `by intros`;
+- when a solver leaves a goal that looks like it lost information, instrument
+  the rule you EXPECTED to fire (`idtac "MATCHED"; …`) before reading the
+  goal — a rule that never matched and a rule whose body failed look identical
+  from the goal alone.
+
+**And unpack a postcondition only once its subject is a CONSTRUCTOR.** A
+cleanup rule that `clear`s a "not yet usable" hypothesis will fire before the
+scrutinee is destructed and throw away the fact the next branch needs.
 
 ## Write the checker for a refactor's SILENT failure mode, before the sweep
 

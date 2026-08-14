@@ -1,6 +1,10 @@
 # Shrinking the capstone's premise ledger — worklist
 
-**Status (2026-08-14): IN FLIGHT (stage C6 landed — the DECODER
+**Status (2026-08-14): IN FLIGHT (stage C7 landed — the `gwpx` mode, the
+116-lemma value sweep and the decoder postcondition CONSUMED at
+`run_hart_active`; and finding (O10) shows the shape premise is FALSE, so the
+capstones are currently vacuous and the next stage must fix the
+SPECIFICATION before touching the memory cone).**  Earlier: (stage C6 landed — the DECODER
 POSTCONDITION is proven and state-generic, and finding (O9) fixed a
 specification bug that had made `∀ b, sail_shaped (riscv_step b)` FALSE; what
 remains is the value-carrying window mode, the memory cone, and liveness).**  Follow-on to
@@ -711,7 +715,163 @@ discharge it).
   `sail_live` under a register-state precondition (the `D-M6-8` checker
   family), and it should be settled BEFORE a `gok` tower is generated.
 
-## What C7 owes
+- **C7 (LANDED 2026-08-14, PARTIAL — the two premises STILL STAY, and now we
+  know the FIRST one is FALSE)** — C6's item 1 is DONE (the decoder
+  postcondition is CONSUMED at `run_hart_active`), the `gwpx` mode and the
+  value sweep exist, and the residue is restated well-formed; but the memory
+  cone was NOT attempted, because C7 found **(O10)**: `∀ b, sail_shaped
+  (riscv_step b)` is REFUTABLE AGAIN, at `update_and_write_pte`, and every one
+  of the twelve residual facts is false as a consequence.  What landed:
+  - **`iris/WeakShapeWin.v` — `gwpx Q P w m`, the VALUE-AND-WINDOW mode.**
+    C6 asked for "`gwalk` with a Ret postcondition"; the consumers forced one
+    more index, and it is the design point: **`P : A → win → Prop` takes the
+    WINDOW THAT IS OPEN AT THE RETURN.**  With it ONE fixpoint is the whole
+    kit — `gwalk w m` is EXACTLY `gwpx (λ _, True) (λ _ w', w' = None) w m`
+    (both directions proven: `gwalk_gwpx`/`gwpx_gwalk`), `gwalkx` is the
+    `λ _ _, True` instance up to the throw arm (`gwpx_gwalkx`), and
+    `run_hart_active` needs NEITHER: what it needs is "if `execute` returns an
+    `ExecuteAs` redirection then the payload is `ast_wf` AND no window is
+    open" (`exres_wf_win`), so the redirection arm may call `execute` again
+    while `execute_LOADRES` still abandons.  A value-only `P` cannot state
+    that and the `gwalkx`/`gsilent` split cannot either (the redirection arm
+    is not silent).  The `ExtraOutcome` arm keeps `gwalk`'s KIT-SIDE
+    strengthening (`False` under an open window) — that is what lets
+    `gwpx_try_catch` hand the handler over at a closed window, which `liftR`
+    and `catch_early_return` both need.
+    ONE BIND RULE (`gwpx_bind`) specialises to every other: `gwpx_bind_closed`
+    (prefix from the `gshape` tower), `gwpx_bind_pure` (prefix from
+    `gpureP`, i.e. the decoder), `gwpx_bind_exres` (prefix whose
+    `ExecutionResult` the continuation matches on), plus the consumers
+    `gwalk_bind_wpx`/`gwalkx_bind_wpx`.  Solver `gwx_solve` under the (O8)
+    discipline (gated atomic leaf, `Hint Constants Opaque` on `gwpost`/
+    `gwexec`).
+  - **`tools/gen_shape.py --mode exec` + `iris/WeakShapeExecGen01..03.v`** —
+    116 lemmas: `gwx` (= `gwpx` at `exres_ok` = "`exres_wf` and no window
+    open") for the 61 `ExecutionResult`-returning monadic definitions outside
+    the memory cone, and `exres_wf` for the 55 PURE `ExecutionResult`
+    producers (the compressed expansions, whose `ExecuteAs` payloads carry
+    literal widths).  `make gen-shape` now emits BOTH modes (finding (O7)),
+    `make check-shape` checks both.
+    **MEASURED: the whole second mode is 9 s of `coqc`** (5.2 + 3.0 + 1.2),
+    against 5 min 20 s for the `gwalk` tower — because `gwpx`'s bind rule
+    takes `gwalk None` for the PREFIX, so the 294-lemma tower is reused
+    verbatim and only the ~60 clause BODIES are walked.  THE GENERAL RULE:
+    a second mode over the same cone is cheap exactly when its bind rule can
+    consume the first mode at the prefix; design the modes so that it can.
+  - **`iris/WeakShapeExec.v`** — `gx_execute`/`gx_execute_closed` (both
+    readings, modulo the eleven memory clauses now stated WITH `0 < width`)
+    and `gwx_run_hart_active`/`gw_run_hart_active_wf`, where the decoder
+    postcondition CROSSES into `execute`'s obligation and the `ExecuteAs`
+    REDIRECTION is discharged.  `WeakShapeTop.riscv_step_shaped_residue_wf`
+    is the restated residue; `WeakShapePeel`'s is left in place as the
+    stage-C5 form.
+  - **THREE TACTIC TRAPS, all of the (O8) family, all costing >30 min each:**
+    (i) `try (by apply H1); try (by apply H2); …` over `execute`'s ~130 arms
+    did not finish in two minutes — the model's `execute_*` are TRANSPARENT so
+    every failing `apply` delta-unfolds two large terms.  Dispatch by HEAD
+    CONSTANT with a `lazymatch`: 3 s.  **The (O8) lesson is not about hint
+    databases, it is about `apply` against a transparent generated model
+    anywhere.**
+    (ii) **`∀ e, Q e` where `Q` is the SUM postcondition a
+    `catch_early_return` installs does NOT reduce until the sum is
+    destructed**, so `by intros` fails and every rule carrying that premise
+    silently FALLS THROUGH to the next alternative.  Here the decoder rule
+    fell through to the generic `gwalk` route, which walks the decoder happily
+    and DROPS its postcondition — the symptom was `gwx (execute ?ast)` with no
+    `ast_wf` in scope, four steps away from the cause.  `qtriv` (destruct the
+    sum, then `exact I`/`reflexivity`) is the fix.
+    (iii) a cleanup rule that `clear`s a postcondition hypothesis "not yet
+    needed" fired BEFORE the value was destructed and threw away the very fact
+    the redirection arm needed.  Unpack a postcondition only once its subject
+    is a CONSTRUCTOR.
+  - the capstones are UNTOUCHED and `Print Assumptions` on both is still
+    EXACTLY the five rv64d axioms; `WeakCompose` §6 (6) and `WeakComposeLang`
+    §D record (O9), (O10) and the liveness half's state-conditioned form.
+
+## FINDING (2026-08-14, C7 — leaves machine-checked, path from the sources):
+## (O10) — `∀ b, sail_shaped (riscv_step b)` IS FALSE AGAIN, AND SO THE
+## CAPSTONES ARE CURRENTLY VACUOUS
+
+- **(O10)** `rv64d.update_and_write_pte` — on the path of EVERY memory
+  instruction and of the FETCH, since every one of them translates — issues
+  an **exclusive** PTE read (`read_pte_exclusive` = `mem_read_priv … (res :=
+  true)`, and `read_kind_of_flags false false true = Read_RISCV_reserved`,
+  which `WeakInterp.classify` maps to `AV_exclusive`), and then, on the arm
+  where the **re-read** entry needs no update (`update_PTE_Bits pte' access =
+  None`, and `pte'` is the ∀-quantified value of that read), returns
+  `Ok (Some pte', ext_ptw)` — a SUCCESSFUL A/D update **with no conditional
+  write**.  `translate_TLB_hit`/`_miss` treat that as success, `translate`
+  returns `Ok`, and the instruction then performs its OWN data access — a
+  `MemRead` inside the still-open window, which `amo_tail`'s arm refuses
+  (`MemRead ↦ False`), or a `MemWrite` at the wrong address.  Machine-checked
+  leaves in `WeakShapeWin` §1: `amo_tail_read_ram_False`,
+  `gwalkx_read_ram_in_window_False`, `gwalk_excl_read_then_read_False` (the
+  composite), `read_kind_of_flags_res`.  The enclosing gate is satisfiable at
+  ordinary register states (`hartSupports Ext_Svadu = true` in this
+  configuration and `menvcfg.ADUE` is a REGISTER).
+- **IT IS THE SAME GENRE AS (O2)/(O4), NOT A NEW ONE — and it is where C2's
+  fix ran out.**  C2 legalised an abandoned window by BRACKETING it in
+  `sail_mstep` (`silent_run … (Interface.Ret y, rs1)`), i.e. by assuming the
+  abandoned tail is SILENT.  Here the abandoned tail is *the rest of the
+  instruction*, memory accesses included, so the bracket does not apply, the
+  LTS is stuck, and the shape predicate is false.  **THE GENERALISABLE RULE:
+  a "the tail is quiet from here" bracket is only as good as the CALL DEPTH
+  at which the window is abandoned — an abandonment deep in a callee
+  (`translate`) has the whole caller after it.**
+- **THE FIX (specified, not implemented; it is a stage-C2/C4-scale change):**
+  (i) `sail_shaped`'s `MemRead` arm DROPS the window entirely — an exclusive
+  read is shaped exactly like a plain one — so `amo_tail` survives only as the
+  hypothesis of `sail_mstep`'s FUSED rmw arm and of `amo_reach`, not as a
+  claim `sail_shaped` makes; (ii) `sail_mstep`'s BARE exclusive-read arm
+  becomes ONE STEP instead of a bracket, exactly as C4's standalone
+  conditional write already is — C2 rejected the one-step form only because
+  "it leaves the hart in window mode where `sail_shaped` is not preserved",
+  and with (i) there is no window mode, so `sail_shaped_res_step` and
+  `tail_complete` go through unchanged; (iii) the ⇐ cost goes where (O2)'s and
+  (O4)'s went, into `pf_solo_f`/`fused_blk`, whose reading stays "every
+  exclusive access of the block is part of a fused rmw" — per-image discharge:
+  xv6 runs with `menvcfg.ADUE = 0`, so the A/D update path is never taken.
+- **AND THE FIX COLLAPSES THE KIT, WHICH IS WHY IT SHOULD COME FIRST.** With
+  (i) the window index leaves `gwalk`, `gwalkx` BECOMES `gwalk`, the
+  "universal exclusive-window obligation" C6 recorded (every memory
+  instruction pays it) EVAPORATES, and the memory cone loses its hardest
+  semantic obligation — the read/write address-and-width agreement across
+  `checked_mem_read`/`checked_mem_write`, which needed `pmaCheck`'s
+  `CannotSplit` postcondition, `split_misaligned`'s `N = 1`, an `untilMT`
+  unfolding at `N = 1`, and `add_vec_int … 0` reasoning.  `gwpx` survives
+  unchanged (its `P`'s window argument becomes constantly `None`).
+- **CONSEQUENCE TO STATE PLAINLY:** with (O10) open, the capstones'
+  `(∀ b, sail_shaped (riscv_step b))` premise is UNSATISFIABLE, so
+  `xv6_weak_robust_lifted`/`_adequate` are currently VACUOUS — the same genre
+  as the ∀-path oracle premise (2026-08-13) and a fourth reason not to swap a
+  premise for a record until the specification is right.  `∀ b, sail_live
+  (riscv_step b)` was already refuted by (O9)'s witness.
+
+## What C8 owes (re-ordered by C7's finding)
+
+1. **(O10)'s SPECIFICATION FIX FIRST** — it is the only item that makes
+   anything below it true, and it makes the rest much smaller (see the
+   finding).  Ripple: `WeakSailLTS` (`sail_shaped`, `sail_mstep`),
+   `WeakSailLTS2` (`pf_solo_f`/`fused_blk` prose), `WeakSailComplete`
+   (`tail_complete`, `amo_reach`), `WeakShape`/`WeakShapeOverrides` (the
+   window index leaves `gwalk`; `gwalkx` becomes redundant),
+   `WeakCompose` §6 (6) + `WeakComposeLang` §D prose.  The 294-lemma tower and
+   the 116-lemma value sweep are `cbv`+solver proofs and should survive it
+   unchanged; budget one regeneration to be safe.
+2. **THE MEMORY CONE** — ~40 hand lemmas from `read_ram`/`write_ram` up to
+   `fetch` + the eleven `execute_*`, which after item 1 need only
+   `0 < split_width` (DONE) and the two `untilMT` scripts C5 prescribed.
+   Layer them: the `pmaCheck` cone is 12 monadic functions, `pmpCheck`'s 6,
+   the mmio cone 12, `check_leaf_pte`'s 8 — all small, all needing `gpure`
+   lemmas the `gwalk` tower does not give (finding (O7) again).
+3. **The three axiom facts** — unchanged (`WeakShapeTop.rv64d_axiom_shapes`),
+   consumed inside 2.
+4. **Liveness** — behind (O9)'s liveness half: settle the register-state
+   precondition FIRST, then the `gok` tower, then the ~100 reachability sites.
+5. Only when 1–3 are done can the capstone premise be swapped; do it with one
+   `apply` of `riscv_step_shaped_residue_wf`'s successor.
+
+## What C7 owed (kept for the record)
 
 1. **CONSUME the decoder postcondition at `run_hart_active`** — the one
    piece C6 stopped short of, and it is a KIT item, not a proof item.

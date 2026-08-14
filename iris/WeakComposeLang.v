@@ -325,8 +325,34 @@
          replacement is a DECODER POSTCONDITION over [encdec_backwards],
          which is what [WeakShapeOverrides2.gpost] exists to state.  The
          SECOND premise ([sail_live]) cannot be peeled the same way: the
-         tower has only the [gwalk] mode (finding (O7)).  The ordered plan is
-         in [claude-notes/projects/weak-memory-premises.md].
+         tower has only the [gwalk] mode (finding (O7)).
+         STAGE C6 CLOSED (O6) — [WeakShapeAst.ast_wf] and
+         [WeakShapeDec.gpureP_ext_decode], the decoder postcondition,
+         state-generic — and found (O9), a fourth over-quantified arm (a
+         raised Sail exception, [WeakSailLTS] delta (e''')).
+         STAGE C7 CONSUMED the decoder postcondition at [run_hart_active]
+         ([WeakShapeWin]'s [gwpx] mode + the 116-lemma value sweep +
+         [WeakShapeExec]), so the residue is restated WELL-FORMED as
+         [WeakShapeTop.riscv_step_shaped_residue_wf]: [fetch] plus the eleven
+         memory clauses UNDER their [0 < width] premise.
+         **BOTH PREMISES HERE ARE CURRENTLY FALSE, AND THAT MAKES THE
+         CAPSTONES VACUOUS.**  The FIRST is refuted by stage C7's finding
+         (O10) ([WeakShapeWin] §1, leaves machine-checked): every memory
+         instruction translates, [translate → update_and_write_pte] issues an
+         exclusive PTE read whose window is ABANDONED on the "re-read needs
+         no update" arm, and the instruction's own data access then falls
+         inside that open window, which [amo_tail] refuses.  The SECOND is
+         refuted by (O9)'s witness ([glive] forbids a raised exception
+         outright, and [zicfiss_xSSE] raises one at
+         [VirtualSupervisor]) — its honest form is
+         STATE-CONDITIONED, [sail_live] under a register-state precondition
+         (xv6 runs with the H extension off, so [cur_privilege] is never
+         [VirtualSupervisor]/[VirtualUser]), which is why it cannot be stated
+         as [∀ b] at all and why C7 leaves it VERBATIM.  Neither premise is
+         swapped for a theorem until (O10)'s specification fix lands: swapping
+         a false premise for a false record hides the vacuity instead of
+         recording it.  The ordered plan and both fixes are in
+         [claude-notes/projects/weak-memory-premises.md].
       2. THE FRESH ERA: [gen_id = 0], [wgpow g0 = true], [wggen g0 = 0],
          [wglog g0 = []], [∀ c, wgws g0 c = ws_init], [wa_dws u0 = ws_init]
          — literally [weak_system_adequacy_phi]'s, plus the disk agent's own

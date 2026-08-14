@@ -200,10 +200,17 @@ update-decode: gen-code
 # needing a hand proof belongs in iris/WeakShapeOverrides.v or in
 # tools/gen_shape.py's OVERRIDE_PROOFS table (which is emitted in the group's
 # topological position, so the hint database still orders it).
+# TWO MODES, EMITTED IN THE SAME PASS (finding (O7)): --mode shape is the
+# [gwalk None] tower (WeakShapeGen*.v), --mode exec is stage C7's [gwx] value
+# sweep (WeakShapeExecGen*.v).  A generated sweep must emit every mode it will
+# ever need, because the shards form a serial Require chain.
 gen-shape:
 	$(PYTHON) tools/gen_shape.py --outdir $(IRIS) --report
+	$(PYTHON) tools/gen_shape.py --outdir $(IRIS) --mode exec \
+	    --shard-sizes 40 --report
 check-shape: gen-shape
-	git diff --exit-code -- $(IRIS)/WeakShapeGen*.v
+	git diff --exit-code -- $(IRIS)/WeakShapeGen*.v \
+	    $(IRIS)/WeakShapeExecGen*.v
 
 # The memory-ordering SITE enumeration, a sibling of the decode layer: same
 # inputs (the tracked kernel-rocq/ dump), same rule that its outputs are

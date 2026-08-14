@@ -782,12 +782,38 @@ Qed.
            access kind, hence [split_misaligned] returns [N = 1] and the
            window is opened at most once per instruction.
 
-    UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4 and the generated tower
-    LANDED complete in C5; what remains is (O6)'s decoder postcondition and
-    the 51-function residue, of which [0 < split_width] and the fuel
-    recursion [_rec_pt_walk] are already discharged in
-    [WeakShapeOverrides2.v].  Details and the ordered plan:
-    [claude-notes/projects/weak-memory-premises.md].
+      (O9) (stage C6) the [Interface.ExtraOutcome] arm of
+           [sail_shaped]/[amo_tail] OVER-QUANTIFIED — a raised Sail exception
+           is a dead end the LTS has no arm for, and the old [∀ r, …] arm
+           walked the whole rest of the instruction at every value of the
+           thrown-at type.  FIXED in the specification ([WeakSailLTS] delta
+           (e''')): the arm is [True].
+      (O10) (stage C7) [∀ b, sail_shaped (riscv_step b)] IS FALSE AGAIN, and
+           this time AMO PAIRING is what is wrong.  [rv64d.update_and_write_pte]
+           — on the path of EVERY memory instruction, since every one of them
+           translates — issues an EXCLUSIVE PTE read for the A/D update and
+           then, on the arm where the RE-READ entry needs no update, returns
+           SUCCESSFULLY with no conditional write; the instruction goes on to
+           its own data access, which is a [MemRead] inside the open window
+           and [amo_tail] refuses it.  The abandonment C2 legalised assumed
+           the abandoned tail is SILENT ([sail_mstep] BRACKETS it to a
+           [Interface.Ret]); here it is the rest of the instruction.  Leaves
+           machine-checked in [WeakShapeWin] §1, where the fix is also
+           specified: drop the window from [sail_shaped]'s [MemRead] arm
+           entirely (an exclusive read is shaped like a plain one), make
+           [sail_mstep]'s bare exclusive-read arm ONE STEP as C4's standalone
+           conditional write already is, and let the ⇐ cost fall where (O2)'s
+           and (O4)'s did — [fused_blk].
+
+    UPGRADE PATH: (O4)'s LTS fix LANDED in stage C4, the generated tower
+    LANDED complete in C5, (O6)'s DECODER POSTCONDITION LANDED in C6
+    ([WeakShapeAst.ast_wf], [WeakShapeDec.gpureP_ext_decode]) and C7 CONSUMED
+    it at [run_hart_active] ([WeakShapeWin]'s [gwpx] mode, the 116-lemma
+    value sweep [WeakShapeExecGen01..03], [WeakShapeExec]), so
+    [WeakShapeTop.riscv_step_shaped_residue_wf] states the residue with the
+    [0 < width] premises that make it well-formed.  What remains is (O10)'s
+    specification fix and then the memory cone itself.  Details and the
+    ordered plan: [claude-notes/projects/weak-memory-premises.md].
 
     ------------------------------------------------------------------------
     WHAT IS *NOT* ON THIS LIST, because it is machine-checked: the Layer-1

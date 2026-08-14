@@ -143,6 +143,8 @@ From xv6iris Require Import WeakShapeGen01 WeakShapeGen02 WeakShapeGen03
   WeakShapeGen04 WeakShapeGen05 WeakShapeGen06 WeakShapeGen07 WeakShapeGen08
   WeakShapeGen09 WeakShapeGen10 WeakShapeGen11 WeakShapeGen12 WeakShapeGen13
   WeakShapeGen14 WeakShapeGen15.
+From xv6iris Require Import WeakShapeAst WeakShapeWin WeakShapeDec.
+From xv6iris Require Import WeakShapeExec.
 From xv6iris Require Import WeakShapePeel.
 Require Import Riscv.rv64d.
 
@@ -273,3 +275,79 @@ Proof.
   rewrite /riscv_step. apply gok_bind; [apply Htry|].
   intros _. destruct b; [exact Htick|apply gok_returnm].
 Qed.
+
+(* ====================================================================== *)
+(** ** 5. STAGE C7: the residue RESTATED, and finding (O10)
+
+    §4's [riscv_step_shaped_residue] is the stage-C5 reduction, and TWO of
+    the three reasons its twelve hypotheses could not be true have been
+    removed since:
+
+      (O6) — a zero-width memory clause.  FIXED by [WeakShapeAst.ast_wf]:
+             the eleven [execute_*] hypotheses below carry [0 < width], and
+             [WeakShapeDec.gpureP_ext_decode] supplies it at
+             [run_hart_active]'s bind, which is what C6 owed C7 and what
+             [WeakShapeExec] §2 does.
+      (O2) — a bare [lr] abandons its window, so the CLOSED reading
+             [gwalk None (execute_LOADRES …)] is false.  [WeakShapeExec]
+             gives both readings; the weak one
+             ([WeakShapeExec.gwx_run_hart_active]) is the honest form and
+             ends in [gwalkx], which still implies [sail_shaped].  The
+             theorem below takes the CLOSED one because
+             [WeakShapePeel.gw_try_step] does — bridging [gwalkx] to [gwalk]
+             at [try_step]'s bind is exactly the escape problem, and it
+             disappears under (O10)'s fix.
+
+    (O10) IS THE THIRD, AND IT IS NOT FIXED.  [WeakShapeWin] §1 has the path
+    and the machine-checked leaves: [translate → update_and_write_pte]
+    issues an EXCLUSIVE PTE read and, on the arm where the re-read entry
+    needs no update, returns SUCCESSFULLY without a conditional write; the
+    clause then performs its own data access inside the open window, which
+    [amo_tail] forbids.  Every one of the twelve translates, so ALL TWELVE
+    hypotheses below are false as a group, and so is the capstones'
+    [∀ b, sail_shaped (riscv_step b)] premise.  C7 therefore does NOT swap
+    that premise for a theorem: there is no theorem to swap in, and swapping
+    one false premise for another would hide the vacuity rather than record
+    it.  The fix is specified in [WeakShapeWin] §1 (i)–(iii); it is a
+    stage-C2/C4-scale specification change and it also COLLAPSES the kit
+    (the window index leaves [gwalk], [gwalkx] becomes [gwalk], and the
+    memory cone loses its hardest obligation). *)
+
+Theorem riscv_step_shaped_residue_wf
+    (Hfetch : ∀ a0, gwalk None (@fetch a0))
+    (HL : ∀ a0 a1 a2 a3 width,
+        (0 < width)%Z → gwx (@execute_LOAD a0 a1 a2 a3 width))
+    (HS : ∀ a0 a1 a2 width, (0 < width)%Z → gwx (@execute_STORE a0 a1 a2 width))
+    (HLR : ∀ a0 a1 a2 width a4,
+        (0 < width)%Z → gwx (@execute_LOADRES a0 a1 a2 width a4))
+    (HSC : ∀ a0 a1 a2 a3 width a5,
+        (0 < width)%Z → gwx (@execute_STORECON a0 a1 a2 a3 width a5))
+    (HA : ∀ a0 a1 a2 a3 a4 width a6,
+        (0 < width)%Z → gwx (@execute_AMO a0 a1 a2 a3 a4 width a6))
+    (HSA : ∀ a0 a1 a2 a3 width a5,
+        (0 < width)%Z → gwx (@execute_SSAMOSWAP a0 a1 a2 a3 width a5))
+    (HP : ∀ a0, gwx (@execute_SSPUSH a0))
+    (HK : ∀ a0, gwx (@execute_SSPOPCHK a0))
+    (HM : ∀ a0 a1, gwx (@execute_ZICBOM a0 a1))
+    (HO : ∀ a0 a1 a2, gwx (@execute_ZICBOP a0 a1 a2))
+    (HZ : ∀ a0, gwx (@execute_ZICBOZ a0)) :
+  ∀ b : bool, sail_shaped (riscv_step b).
+Proof.
+  apply riscv_step_shaped_cone, gw_try_step.
+  apply (gw_run_hart_active_wf Hfetch).
+  by apply gx_execute_closed.
+Qed.
+
+(** …and the same reduction in the ABANDONMENT-permitting reading, which is
+    the one the eleven clauses can actually satisfy once (O10) is fixed:
+    [execute] is allowed to leave a window open, and [run_hart_active] still
+    walks.  It stops at [run_hart_active] rather than [try_step] because
+    [try_step] binds [run_hart_active]'s result and a window escaping THAT
+    bind would need the whole trap/exception cone in [gsilent] — a third
+    generated mode, which (O10)'s fix makes unnecessary. *)
+Theorem run_hart_active_shaped_wf
+    (Hfetch : ∀ a0, gwalk None (@fetch a0))
+    (Hex : ∀ ast, ast_wf ast →
+        gwpx (λ _ : exception, True) exres_wf_win None (execute ast)) :
+  ∀ n, gwalkx None (run_hart_active n).
+Proof. by apply (gwx_run_hart_active Hfetch). Qed.
