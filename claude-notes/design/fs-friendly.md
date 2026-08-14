@@ -92,7 +92,7 @@ under it.
 | stage | what | note |
 |---|---|---|
 | F1 | `fs_rep`: the tree type + abstraction relation over the landed invariants | mostly a reading; the design forcing-function |
-| F2 | path resolution as tree lookup: the namex trio's specs re-derived as an `fs_rep` lemma | first friendly corollary; validates F1 |
+| F2 | path resolution as a logically-atomic triple, linearization point = one `dirlookup` under one lock | CORRECTED per fs-fragments.md §5.4: NOT a re-derivation of namex's post — SpecNamex rules there is no path→inode functional statement |
 | F3 | atomic-triple wrappers per proven syscall at the identified linearization points | one wrapper per landed sconf; create first (its walk documents its own points) |
 | F4 | the path-points-to API + fragment-locality lemmas | the CSL dividend |
 | F5 | a verified user program against F3/F4 (user-rocq substrate exists) | the end-to-end result |
@@ -142,6 +142,12 @@ NOT the ledger renegotiations (wi16/dl16/crz) — those were about log
 accounting, orthogonal to shape.
 
 ## 7. RULED (2026-08-15): create_fresh_ty's retirement path runs through here
+
+UPDATE 2026-08-14: the F1/F1.5 design was VERIFIED against the landed
+tree and RULED — see `fs-fragments.md`, now the design of record for
+the fragment campaign (staging, the (L5) clause, the never-state-(L6)
+constraint, the owed-items register).  This file stays the direction
+sketch; that file is what the campaign executes from.
 
 The user's ruling: the span axiom stays for now, and the tree layer is
 its designated retirement.  The reasoning, recorded so F1/F1.5's designer
