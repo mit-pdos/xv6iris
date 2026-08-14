@@ -24,10 +24,26 @@ raising sites, each branching to the `fail:`/`return 0` path that already
 unwinds exactly that state.  **Three things it settles for the proofs**, and
 they are why the whole route was worth taking rather than carrying a gate:
 
-* the bound is now a FACT OF THE CODE, so no premise has to thread it and no
-  region invariant has to carry it -- which is what the "no name for dp"
-  objection made impossible (`projects/fs-sysfile.md`, D₀-b's stop).  The
-  planned L4 carrier (directory `nlink <= 1 + allocated count`) is retired.
+* the bound is now a FACT OF THE CODE, so no premise has to thread it up to
+  `wp_create_sconf_body` -- which is what the "no name for dp" objection made
+  impossible (`projects/fs-sysfile.md`, D₀-b's stop).  The declined C5
+  carrier (directory `nlink <= 1 + allocated count`, a COUNTING argument) is
+  retired.
+  **AMENDED (2026-08-14, the twelfth stop): "and no region invariant has to
+  carry it" was WRONG, and the walk found it.**  The guard is a SIGNED test
+  -- `short nlink`, `>= NLINK_MAX` compiled to `== 32767` -- while the
+  ledger's premise is UNSIGNED, and the two differ at `bv_unsigned = 65535`,
+  i.e. signed `-1`: it passes both of create's guards (`<> 0` at +0x2e,
+  `<> 32767` at +0x36) and still wraps.  Nothing in the tree bounds
+  `di_nlink` above (`ireg_link_ok` is a LOWER bound; `dinode_wf`,
+  `inode_ok`, `ic_loaded` say nothing; the boot image obligation is (L3)
+  again), so a RANGE invariant (L4) `bv_unsigned (di_nlink d) <= 32767` is
+  still owed.  What the fix genuinely buys is that (L4) is now
+  **preservable** -- §20.18's option 3 was right that it is "option 2 with
+  the proof obligation stated".  Witness and the closing statement:
+  `ProofCreateParts.cr_nlink_guard_leaves_the_wrap` /
+  `cr_nlink_guard_closes_under_L4`; the priced four-file resolution is in
+  `projects/fs-sysfile.md`'s twelfth-stop entry.
 * **the guard is still a real two-way branch**: it refuses at 32767 and does
   not rule the value out, so create's walk pays a case split (and its taken
   arm) whether or not any invariant is ever added.

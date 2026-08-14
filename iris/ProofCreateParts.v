@@ -576,6 +576,88 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(*  (3d) THE MKDIR ARM'S [dp->nlink++], AND WHY THE NLINK_MAX GUARD DOES  *)
+(*       NOT CLOSE IT (the twelfth stop, D0-b)                            *)
+(*                                                                        *)
+(*  The arm's +0x134..+0x13a is [lhu a5,74(s1)] / [c.addiw a5,1] /         *)
+(*  [sh a5,74(s1)] -- a SIXTEEN-BIT increment, whatever the widths in      *)
+(*  between -- and [SpecIupdate.wp_iupdate_link]'s premise is the Z-level  *)
+(*  equation [bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1]. *)
+(*  Those agree exactly when the old halfword is not [65535], which is     *)
+(*  [cr_nlink_step].                                                       *)
+(*                                                                        *)
+(*  WHAT THE WALK HOLDS ABOUT THAT HALFWORD IS TWO DISEQUALITIES, AND      *)
+(*  NEITHER IS THAT ONE.  The [c.beqz] at +0x2e gives [di_nlink dp <> 0];  *)
+(*  the xv6 117c0e7 gate at +0x36 gives [di_nlink dp <> 32767] on the      *)
+(*  ty = T_DIR route.  [cr_nlink_guard_leaves_the_wrap] is the witness     *)
+(*  that the two together do not exclude the wrap: at [65535] -- signed    *)
+(*  [-1] -- both hold and the increment equation is FALSE.  The gate is    *)
+(*  a SIGNED test ([lh] at +0x2a, [>= NLINK_MAX] on a [short] compiled to  *)
+(*  [== 32767]) and the ledger's premise is an UNSIGNED one; the gap       *)
+(*  between them is the range fact that [nlink] is a NONNEGATIVE short.    *)
+(*                                                                        *)
+(*  [cr_nlink_guard_closes_under_L4] is that fact stated as the premise    *)
+(*  it would be: with [bv_unsigned (di_nlink dp) <= 32767] in hand the     *)
+(*  guard closes the increment outright.  Nothing in the tree carries it   *)
+(*  -- [InodeRegion.ireg_link_ok] is (L1) [w <= nlink] (a LOWER bound)     *)
+(*  and (L3), [dinode_wf] / [inode_ok] / [ic_loaded] say nothing about     *)
+(*  [nlink] at all, and [IcacheBoot]'s image obligation is (L3) again.     *)
+(*  So the bound is a REGION invariant that is not there, not a walk       *)
+(*  step that has not been taken, and the mkdir arm stops here.            *)
+(* ===================================================================== *)
+
+(* the 16-bit [++] IS the Z's [+1] exactly off the wrap *)
+Lemma cr_nlink_step (h : mword 16) :
+  bv_unsigned h <> 65535 ->
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) = bv_unsigned h + 1.
+Proof.
+  intro Hne.
+  pose proof (bv_unsigned_in_range _ h) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z in Hr.
+  rewrite add_vec_unsigned.
+  assert (H1 : bv_unsigned (mword_of_int 1 : mword 16) = 1)
+    by (vm_compute; reflexivity).
+  rewrite H1.
+  apply bv_wrap_small. unfold bv_modulus.
+  change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z. lia.
+Qed.
+
+(* THE REFUTATION.  [65535] passes both of create's guards and wraps. *)
+Theorem cr_nlink_guard_leaves_the_wrap :
+  let h : mword 16 := mword_of_int 65535 in
+  h <> (mword_of_int 0 : mword 16)                       (* the +0x2e guard *)
+  /\ h <> (mword_of_int 32767 : mword 16)                (* the +0x36 gate  *)
+  /\ bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <> bv_unsigned h + 1.
+Proof.
+  cbn zeta. split_and!.
+  - intro Hc. apply (f_equal bv_unsigned) in Hc. vm_compute in Hc. discriminate.
+  - intro Hc. apply (f_equal bv_unsigned) in Hc. vm_compute in Hc. discriminate.
+  - vm_compute. discriminate.
+Qed.
+
+(* ...AND WHAT WOULD CLOSE IT: the missing region range invariant, and then
+   the gate is exactly enough -- BOTH WAYS.  The first conjunct is the
+   premise [wp_iupdate_link] wants; the second is the invariant's own
+   PRESERVATION at the one writer that raises the count, and it is where
+   the gate's disequality is spent.  Neither conjunct holds without the
+   other's hypothesis: the range alone would not survive the write, and
+   the gate alone leaves [cr_nlink_guard_leaves_the_wrap]'s corner.  This
+   is (L4) and its proof obligation, stated at the halfword. *)
+Theorem cr_nlink_guard_closes_under_L4 (h : mword 16) :
+  bv_unsigned h <= 32767 ->
+  h <> (mword_of_int 32767 : mword 16) ->
+  bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) = bv_unsigned h + 1
+  /\ bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <= 32767.
+Proof.
+  intros Hle Hne.
+  assert (Hnz : bv_unsigned h <> 32767).
+  { intro Hc. apply Hne. apply bv_eq. rewrite Hc. vm_compute. reflexivity. }
+  assert (Hstep : bv_unsigned (add_vec h (mword_of_int 1 : mword 16))
+                  = bv_unsigned h + 1) by (apply cr_nlink_step; lia).
+  split; [exact Hstep | rewrite Hstep; lia].
+Qed.
+
+(* ===================================================================== *)
 (*  (3) THE CONSTANTS                                                     *)
 (* ===================================================================== *)
 

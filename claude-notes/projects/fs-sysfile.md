@@ -7700,3 +7700,145 @@ offsets and by NOTHING else — byte-different, offset-equal, checked by
 diffing each definition for a changed line carrying `-∗`, `:=` or `∗` (there
 is none).  The only semantic change in `ProofCreate.v` is the gate and ARM
 G2.
+
+
+### The twelfth stop (D₀-b, 2026-08-14) — **the NLINK_MAX guard does not
+### close the mkdir arm's `nlink++`.**  The gate is a SIGNED test and the
+### ledger's premise is an UNSIGNED one; the corner between them is
+### `nlink = 65535`, and nothing in the tree excludes it.  `ProofCreate.v`,
+### `SpecCreate.v`, `CreateBudget.v` and `LinkCreate*` are BYTE-UNTOUCHED
+### and no seal was attempted
+
+**THE ARM'S ARITHMETIC, from `CodeCreate.v` and nowhere else.**  +0x134
+`lhu a5,74(s1)`, +0x138 `c.addiw a5,1`, +0x13a `sh a5,74(s1)` — a SIXTEEN-BIT
+increment whatever the widths in between.  `SpecIupdate.wp_iupdate_link`'s
+premise (SpecIupdate.v:796) is the Z-level equation
+`bv_unsigned (di_nlink dn) = bv_unsigned (di_nlink dn0) + 1`.  The two agree
+exactly off the wrap, and the wrap is at `bv_unsigned = 65535`.
+
+**WHAT THE WALK HOLDS ABOUT THAT HALFWORD IS TWO DISEQUALITIES, AND NEITHER
+IS THAT ONE.**  The `c.beqz` at +0x2e gives `di_nlink dp <> 0`.  The 117c0e7
+gate at +0x36 gives `di_nlink dp <> 32767` on the `ty = T_DIR` route (the
+diamond's join carries `ty = T_DIR -> di_nlink dp <> 32767`; the other route
+into +0x3e is the `c.beqz` at +0x3c falling through, which is the `ty` half).
+At `bv_unsigned (di_nlink dp) = 65535` — signed **−1** — BOTH hold and the
+increment equation reads `0 = 65536`.  The gate implements xv6's
+`>= NLINK_MAX` on a **signed** `short`, compiled to `== 32767` because gcc
+knows the range; the ledger's premise is unsigned.  **The gap between them is
+the range fact that a link count is a NON-NEGATIVE short, and that fact is
+nowhere in the tree.**
+
+Machine-checked, in `ProofCreateParts.v` group (3d) — the only `.v` change
+this stage made, three additive lemmas, no statement moved:
+
+| lemma | says |
+|---|---|
+| `cr_nlink_step` | `bv_unsigned h <> 65535` -> the 16-bit `++` IS the Z's `+1` |
+| `cr_nlink_guard_leaves_the_wrap` | `65535` passes BOTH guards and the equation is FALSE there — the witness |
+| `cr_nlink_guard_closes_under_L4` | with `bv_unsigned h <= 32767` in hand the gate closes it BOTH ways: the `+1` equation AND the bound's own preservation, the second conjunct being where the gate's disequality is spent |
+
+**THE SEARCH FOR AN UPPER BOUND IS EXHAUSTIVE AND THE ANSWER IS NO** (190
+occurrences of `di_nlink` classified).  `InodeRegion.ireg_link_ok`
+(InodeRegion.v:663) is (L1) `w <= nlink` — a LOWER bound — and (L3)
+`type = 0 -> nlink = 0`.  `DinodeEnc.dinode_wf` (:107) is the addrs length and
+does not mention `nlink`; `InodeLock.inode_ok` (:73) has no `nlink` conjunct;
+`IcacheEscrow.ic_loaded` carries none; `SpecIlock`'s post gives `nlink = 0`
+only on the `filled = true` arm.  `IcacheBoot`'s image obligation
+`image_free_nlink` (IcacheBoot.v:474) is (L3) again — an ALLOCATED record's
+count is arbitrary in the boot image, and the header there says outright that
+any 64 bytes decode.  So the bound is a REGION INVARIANT THAT IS NOT THERE,
+not a walk step that was not taken.
+
+**THE RESOLUTION, PRICED — and it is NOT the balance ledger that was
+declined.**  C5's declined carrier was `nlink <= 1 + allocated count`, a
+counting argument.  What is needed is a RANGE invariant, (L4)
+`bv_unsigned (di_nlink d) <= 32767`, and the kernel fix is what makes it
+PRESERVABLE — which is exactly what §20.18's option 3 said it would be
+("option 2 with the proof obligation stated, not an alternative to it").
+The record in `kernel-defects.md` that the L4 carrier is retired is
+**withdrawn**; it is corrected there.  Four files, and the boot half is free:
+
+* `InodeRegion.v` — one conjunct in `ireg_link_ok` (:663).  Re-established by
+  every arm move for free (`fresh_shape` gives 0; `di_nlink_stable` leaves it;
+  the unlink mover at :1809 lowers it) EXCEPT the `+1` mover at :1700, which
+  gains the gate's disequality as a premise and closes by
+  `cr_nlink_guard_closes_under_L4`'s second conjunct.
+* `IcacheBoot.v` — one more image hypothesis beside `image_free_nlink` (:474).
+  **`ireg_alloc` has no callers yet**, so this costs nothing today.
+* `SpecIupdate.v` / `ProofIupdate.v` — `wp_iupdate_link`'s premise changes
+  SHAPE: the caller supplies the MACHINE-level `di_nlink dn = add_vec
+  (di_nlink dn0) 1` plus `di_nlink dn0 <> 32767`, and the body derives the Z
+  equation inside, where the region's (L4) is open.  One landed consumer
+  (create's C-OK-FILE mint at +0xc4, `0 -> 1`), which supplies both trivially.
+* `ProofCreate.v` — thread the diamond's `ty = T_DIR -> di_nlink dp <> 32767`
+  through `cr_alloc_body` into `cr_mkdir_body`, then walk.
+
+**AND THE KERNEL FIX REVIVES THE GATE OPTION, WHICH D₀-b HAD RULED AGAINST
+FOR A REASON THAT NO LONGER APPLIES.**  The objection to a span-pinned
+`SpecCreateNlink` was Increment 2's rule — an axiom must be TRUE of the
+binary, and the pre-fix one was FALSE at the corner the kernel did not
+check.  With 117c0e7 in the image the bound IS true of every reachable
+state: nothing lowers a link count below zero (`sys_unlink`'s own
+`if (ip->nlink < 1) panic` is `CodeSysUnlink.v:203`'s `lh` + `bge x0,a5`,
+and there is no `ProofSysUnlink.v` yet, so nothing has had to produce that
+fact either), and nothing raises one past 32767.  So a gate over
++0x134..+0x140 is now in `create_fresh_ty`'s class — consistent (the span
+pins `dp`'s record to the program point, so the "instantiate it twice"
+test passes), true, and uncarried.  It costs one more `create_*` row in
+`Print Assumptions` and no bottom-of-tree churn, against (L4)'s honest
+retirement of the assumption.  **That trade is the ruling**, and the two
+are not exclusive: the gate seals create now, (L4) deletes the gate later,
+exactly as §20.7's carrier will delete `create_fresh_ty`.
+
+That is a STATEMENT change to a landed contract and to the bottom-of-tree
+region invariant, i.e. outside any sanctioned surface, and it re-opens a
+route the user ruled on.  **It wants the ruling before the edit** — this
+campaign's own record (the found half's PROCESS BREACH) is that "the fix is
+certain" is exactly the state in which the rule is worth most.
+
+**EVERYTHING ELSE THE MKDIR ARM NEEDS IS PRESENT, so the relaunch after the
+ruling is a walk.**  Verified against the landed statements:
+
+* the three `dirlink`s and their offsets: +0x106 `dirlink(ip,".")` /
+  +0x11a `dirlink(ip,"..")` / +0x12c `dirlink(dp,name)`, with the three
+  `bltz`es at +0x10a / +0x11e / +0x130 all targeting +0x146, and the C-OK
+  join at +0x144 `c.j +0xe0`.  `cr_mkdir_body`'s entry `pc_is` is +0xf8 and
+  matches.
+* the `"."` record is TICKET-FREE by `DirLinks.dir_link_at_dirlink_self`
+  (the self-record exemption, DirLinks.v:360), so only the `".."` and the
+  parent's own record want fragments.
+* the deferred re-park round trip (`dir_links_live` / `dir_ilink_at` /
+  `dir_link_at_of_ilink` / `dir_links_of_ilink`) is landed and its return leg
+  takes no hypothesis, so it crosses the `nlink++` by construction.
+* the budget wall is gone: `CreateBudget.cr_fail_mkdir_closes` /
+  `_closes_ind` close both interior entries against the collapsed
+  `dl16_post`.
+* **THE T_DIR `fail:` DISPOSAL IS SUPPLIED, and the choice is settled by
+  what the resources are.**  The child's own records are `"."` (SELF, hence
+  `emp` in `dir_link_at` — no obligation at all) and `".."` (naming the
+  PARENT, and the arm never minted an `ilink` for the parent, because the
+  mint is the `nlink++` that the fail path skips).  So the disposal is the
+  GREY disjunct, and its two halves are both in hand: the home condition
+  `di_nlink child = 0` is what the `sh zero,74(s3)` at +0x146 writes, and
+  `igrey` is minted FROM NOTHING out of the region invariant —
+  `InodeRegion.v:2021`, `ireg_inv ={E}=∗ igrey (bv_unsigned inum)`, whose own
+  comment says it concludes nothing and so needs no clause.  That makes the
+  **T_DIR SIBLING the cheaper of the two treatments**: generalising
+  `cr_fail_body` over `ty` would put a disjunctive child payload through the
+  whole +0x146..+0x15e tail (`cr_fail_body`'s `⌜ty <> T_DIR⌝`,
+  `ProofCreate.v`:1693 at the current decode, is spent at :5173/:5342 on
+  re-parking the zeroed child as `ic_loaded`, whose
+  `dir_links` component is `emp` only because the child is not a directory),
+  whereas a sibling shares that walk verbatim and differs in one `iAssert`.
+  Recorded as the choice; not taken here, because it is reachable only from
+  inside `cr_mkdir_body`.
+
+**GATE (this stage).**  `make -f CoqMakefile -j30 -k` on the mirror, 1093
+`.vo`, `make -n` 0 `COQC` lines, `lemma_diff` CLEAN, no `Admitted`/`admit`.
+`Print Assumptions` unchanged at the eight real modules: `cr_found_half` /
+`cr_tail_half` / `cr_fail_half` = the standing six, `cr_alloc_half` = the six
+plus `create_fresh_ty`.  `ProofCreate.v`, `SpecCreate.v`, `CreateBudget.v`
+byte-untouched; `proof_coverage` unmoved — **177 of 190 proven (93%), 20494
+of 23626 text bytes (87%), `sysfile.c` 8/16, `create` ASSUMED at 356 B**.
+Note for whoever writes the seal's gate: the baseline is 177, not the 176
+the D₀-c-era briefs carry, so the flip is 177 -> 178 and `sysfile.c` 8 -> 9.
