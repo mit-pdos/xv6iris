@@ -526,27 +526,34 @@ that the next phase (or the next loop anywhere) should reuse:
 of kexec is now covered by a proven block; what is left is the
 COMPOSITION (`ProofKexec.v` + `LinkKexec.v`) and then `sys_exec`.
 
-**THE FIRST THING THE COMPOSITION MUST SETTLE IS THE LOCK SET.**
-`SpecKexec`'s `cpu_own 0 eb pj C b lks` leaves `lks` generic and
-`ProofKexecA.kxc_phaseA` / `ProofKexecB.kxc_b1` carry it through, but
-every SEAM in `ProofKexecSeam.v` — `kxc_at_1a2`, `kxc_at_12c`,
-`kxc_at_1a4`, `kxc_at_1ae`, `kxc_at_21a`, `kxc_at_272`, `kxc_at_2a6` —
-hardcodes `cpu_own 0 true … true ∅`, and phases B2/B3/C/D are proven
-against that.  So the chain can only be assembled at `lks = ∅` unless the
-seams gain the parameter.  Two ways out, and the choice is a SPEC
-decision, not a proof one:
-  * add `lks = ∅` to `SpecKexec`'s premises — true (kexec is a syscall
-    entry, no lock is held across it) and free, but it narrows the
-    contract; or
-  * give the seven seam definitions an `lks` parameter — a mechanical
-    sweep over four files and their rebuild, and it keeps the contract as
-    general as its callees'.
-The second is the cleaner shape by this project's own guiding principle;
-the first is what the existing `∅`s already assume.  **Read
-`ProofKexecB.kxc_b1` before deciding** — it takes `b` and `lks` generic
-yet publishes a seam pinned at `true`/`∅`, so one of the two is already
-constrained somewhere that is not its premise list, and whichever it is
-settles this.
+**THE SEAMS' `cpu_own 0 true … true ∅` IS NOT A HARDCODING DECISION — IT
+IS THE ONLY INHABITED INSTANCE.  SETTLED; DO NOT RE-OPEN IT.**  The
+question looks like four free indices (`n`, `eb`, `b`, `lks`) that the
+seams pin by fiat.  It is one:
+
+* **`b = true` is forced by kexec's CALLEES, not by kexec.**
+  `SpecBeginOp`, `SpecNamei`, `SpecIlock`, `SpecReadi`, `SpecIunlockput`
+  and `SpecEndOp` each state their continuation as `wp_next true pj` —
+  callable only with interrupts enabled — and phase A reaches the first
+  at `+0x00c`.  Fifty Spec files in the tree spell it that way; the
+  page-table and string callees phase C/D use (`uvmalloc`, `uvmclear`,
+  `walkaddr`, `strlen`, `copyout`, `safestrcpy`,
+  `proc_freepagetable`, `myproc`, `proc_pagetable`) are all `wp_next b`
+  generic, so it is *only* the FS layer that pins it.  Relaxing it is an
+  FS-contract sweep, not a kexec change.
+* **Once `b = true`, the other three are THEOREMS.**
+  `CpuOwn.cpu_own_on` reads
+  `cpu_own n eb p C true lks ⊣⊢ ⌜n = 0 /\ eb = true /\ lks = ∅⌝ ∗ C`.
+  So writing the seams with `n`, `eb`, `lks` free would state the *same*
+  proposition, just less readably: the pure conjunct pins all three.
+
+`SpecKexec` therefore carries `b = true` as a premise, with the reason at
+the premise.  **The evidence, if it is ever re-checked:** generalising
+`kxc_bad64` over `b` fails at its `iunlockput` call, whose
+`trap_csrs_ext eb` / `cpu_claim_ext eb` premises are `emp` only at
+`eb = true`, and then `wp_next_chain` cannot close `CIDf = CID0` because
+`iunlockput`'s own crossing is stated at the literal `true` and so is
+never specialised.  That is the whole proof of the paragraph above.
 
 **THE NAME SCAN'S INVARIANT IS DELIBERATELY WEAK, and that is the design
 decision worth keeping.** `kexec_ok` asks only for an EXISTENTIAL name of
