@@ -114,3 +114,29 @@ under it.
    faked with the epoch ghost alone for non-crash async semantics
    (fsync as "durable index catches up") — the latter is much cheaper
    and may cover the developer-facing story.
+
+## 6. Do the internals want tree specs too?  (2026-08-15 follow-up)
+
+Partially, and the partiality is the design.  namex IS tree lookup and
+dirlookup/dirlink ARE edge operations — their premise bundles (dir_ok,
+dir_inums_ok, di_type = T_DIR, nlink ≠ 0) are five spellings of "a live
+directory node" and would collapse under a node assertion.  But the
+internal layer's JOB is traversing tree-broken states — the
+allocated-unlinked inode between ialloc and dirlink, the fail arm's
+deliberate orphan, the grey dangling edge — and its specs must be able
+to say those states.  (FSCQ hit the same wall: distinct reps per layer,
+shift lemmas at the boundaries.)  The budget/machine dimensions are
+orthogonal to shape and only the syscall boundary can hide them.
+
+THE SYNTHESIS: a FRAGMENT ALGEBRA as the shared vocabulary — tree
+fragments with holes as first-class assertions (detached node, dangling
+edge, path slice), internal ops stated over fragments, the syscall
+layer's whole-tree triples arising by composing fragments closed.  The
+colour disjunct becomes the fragment-attachment state, formalized once.
+This inserts between F1 and F2 in the staging (call it F1.5) and
+re-scopes F4: path-points-to is the CLOSED-fragment special case.
+
+Honesty check against the hardness data: fragments would have insulated
+the SHAPE premises' churn (dir_links threading, the type bundles) but
+NOT the ledger renegotiations (wi16/dl16/crz) — those were about log
+accounting, orthogonal to shape.
