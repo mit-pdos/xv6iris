@@ -1909,10 +1909,31 @@ Section ProofVirtioDiskRwF.
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) dsk0 m lks with "Htext Hgeom Hbdisk").
-    (* ---- P4: the ring write and THE PUBLISH ---- *)
+    (* ---- P4: the ring write and THE PUBLISH ----
+
+       APPLIED AT THE UNION, and it is the only seam in this chain that is.
+       [ProofVirtioDiskRwDSeam] states BOTH its predicates ([vdrw_p4_exit],
+       [vdrw_p3_exit_x]) with a bare [lks] at the level-1 [cpu_own], where
+       [CSeam]'s [vdrw_p3_exit] and [E]'s [vdrw_p5_exit]/[vdrw_p5_loop] all
+       spell [{[lock_rank "virtio_disk"]} ∪ lks].  D is the outlier, so its
+       [lks] parameter means the FULL held set while everyone else's means the
+       OUTER one, and the translation between the two conventions is already
+       done by [wp_vdrw_p5_seam]'s conclusion.  Feeding D the union here is
+       what makes the two neighbours line up:
+
+         P3 seam consumes  vdrw_p3_exit    ... lks             = cpu_own ({[vd]} ∪ lks)
+         P4 seam produces  vdrw_p3_exit_x  ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)  ✓
+         P4 seam consumes  vdrw_p4_exit    ... ({[vd]} ∪ lks)  = cpu_own ({[vd]} ∪ lks)
+         P5 seam produces  vdrw_p4_exit    ... ({[vd]} ∪ lks)                            ✓
+
+       Do NOT "fix" this by passing the union to P3 as well: P3 seam produces
+       [P2.vdrw_p2_exit] at whatever index it is given, and P2's own wp leaves
+       that goal at the bare [lks].  Moving both moves the mismatch rather
+       than closing it. *)
     iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
-              bno bs_buf bs_disk m kq lks Hbnolt Hlenbuf Hbufkd
+              bno bs_buf bs_disk m kq ({[lock_rank "virtio_disk"]} ∪ lks)
+              Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk Hpend").
     (* ---- P5: the device kick and the completion wait ---- *)
     iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb C
