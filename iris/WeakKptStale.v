@@ -56,6 +56,16 @@ Require Import WeakKpt.
 Local Open Scope Z_scope.
 Import Defs.
 
+(** The POST-[minstret_increment]-WRITE state.  The model's [try_step] writes
+    that flag BEFORE it fetches (see [WkStepPeel]'s header), so every fact a
+    fetch-walking consumer owes about the translation is owed at BOTH of these
+    states, and the funnel's own choice of the flag is invisible to it.  The
+    dispatch (§2) and the absorption theorem (§3) therefore export their
+    families at [set_mi _ bf] for all [bf], not at the bare state.  It is an
+    abbreviation, so the exported statements are literally
+    [set_reg s (R_bool minstret_increment) b]. *)
+Local Notation set_mi s b := (set_reg s (R_bool minstret_increment) b).
+
 (* ====================================================================== *)
 (** ** 1. Slot geometry: two slots holding a POINTER and a LEAF are
     disjoint
@@ -157,10 +167,21 @@ Section WeakKptStaleDispatch.
     register_lookup menvcfg sg.(sregs) = MENVCFG_S ->
     register_lookup htif_tohost_base sg.(sregs) = None ->
     register_lookup cur_privilege sg.(sregs) = p ->
-    exec_eff (translationMode p) sg = Some (Sv39, sg, []) ->
-    exec_eff (effectivePrivilege acc (register_lookup mstatus sg.(sregs)) p) sg
-      = Some (p, sg, []) ->
-    exec_eff (is_shadow_stack_access acc) sg = Some (false, sg, []) ->
+    (* THE THREE FACTS THAT DO NOT TRANSPORT ACROSS A REGISTER WRITE — an
+       [exec_eff] run is not register-framed — are owed at the flag-modified
+       states, for both values of the flag.  Every [register_lookup]-shaped
+       premise above stays at [sg]: those DO transport
+       ([irrelevant_register_set]). *)
+    (forall bf : bool,
+       exec_eff (translationMode p) (set_mi sg bf)
+       = Some (Sv39, set_mi sg bf, [])) ->
+    (forall bf : bool,
+       exec_eff (effectivePrivilege acc (register_lookup mstatus sg.(sregs)) p)
+         (set_mi sg bf)
+       = Some (p, set_mi sg bf, [])) ->
+    (forall bf : bool,
+       exec_eff (is_shadow_stack_access acc) (set_mi sg bf)
+       = Some (false, set_mi sg bf, [])) ->
     register_lookup satp sg.(sregs) = satp0 ->
     autocast (T := mword) (satp_to_ppn (autocast (T := mword) satp0 : mword 64)) = root_ppn ->
     zero_extend' 16 (satp_to_asid (autocast (T := mword) satp0 : mword 64)) = (mword_of_int 0 : mword 16) ->
@@ -179,18 +200,19 @@ Section WeakKptStaleDispatch.
     ( (* READ-ONLY: no family member writes *)
       (forall av dv : mword 1,
          pte_ad_le (pte_set_ad w av dv) p0 ->
+         forall bf : bool,
          exists (sg' : mstate) (es : list weff),
            exec_stale la 8 (pte_set_ad w av dv)
-             (translateAddr (Virtaddr va) acc) sg
+             (translateAddr (Virtaddr va) acc) (set_mi sg bf)
            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es)
            /\ mem sg' = sg.(mem) /\ mdev sg' = sg.(mdev)
-           /\ (sregs sg' = sg.(sregs) \/
+           /\ (sregs sg' = sregs (set_mi sg bf) \/
                (exists ae de : mword 1,
                   sregs sg' = register_set tlb
                     (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                        (Some (u_walk_entry vpn p2 p1 (pte_set_ad w ae de)
                                 (mword_of_int 0))))
-                    sg.(sregs)))
+                    (sregs (set_mi sg bf))))
            /\ (es = [] \/
                es = [WEread wak_plain a2w 8; WEread wak_plain a1w 8;
                      WEread wak_plain la 8] \/
@@ -207,9 +229,10 @@ Section WeakKptStaleDispatch.
          update_PTE_Bits (p0 : mword 64) acc = Some (pte_set_ad p0 a1 d1)
          /\ forall av dv : mword 1,
               pte_ad_le (pte_set_ad w av dv) p0 ->
+              forall bf : bool,
               exists (sg' : mstate) (es : list weff),
                 exec_stale la 8 (pte_set_ad w av dv)
-                  (translateAddr (Virtaddr va) acc) sg
+                  (translateAddr (Virtaddr va) acc) (set_mi sg bf)
                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es)
                 /\ mem sg' = write_bytes sg.(mem) la 8 (pte_set_ad p0 a1 d1)
                 /\ mdev sg' = sg.(mdev)
@@ -218,7 +241,7 @@ Section WeakKptStaleDispatch.
                         (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                            (Some (u_walk_entry vpn p2 p1 (pte_set_ad w ae de)
                                     (mword_of_int 0))))
-                        sg.(sregs))
+                        (sregs (set_mi sg bf)))
                 /\ es = (if wtr
                          then [WEread wak_plain a2w 8; WEread wak_plain a1w 8;
                                WEread wak_plain la 8;
@@ -250,18 +273,95 @@ Section WeakKptStaleDispatch.
     pose proof (pt_slot_racc_disj sg _ _ _ _ Hsm0' Hsm1' Hl0 Hn1) as Hd1.
     (* the two exported disjointness conjuncts, discharged here *)
     split; [exact Hd2|]. split; [exact Hd1|].
-    (* the reads at the REAL state *)
-    destruct (Hpmar a2w (pt_slot_ram_access _ _ _ Hsm2')) as (region2 & Hm2 & Hs2).
-    destruct (Hpmar a1w (pt_slot_ram_access _ _ _ Hsm1')) as (region1 & Hm1 & Hs1).
-    destruct (Hpmar la (pt_slot_ram_access _ _ _ Hsm0')) as (region0 & Hm0r & Hs0).
-    pose proof (wpt_read_pte_slot sg _ p2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif)
-      as Hrd2.
-    pose proof (wpt_read_pte_slot sg _ p1 region1 Hsm1' HA Hord HR Hcov Hm1 Hs1 Hhtif)
-      as Hrd1.
-    pose proof (wpt_read_pte_slot sg _ p0 region0 Hsm0' HA Hord HR Hcov Hm0r Hs0 Hhtif)
-      as Hrd0.
-    pose proof (wpt_read_pte_exclusive_slot sg _ p0 region0 Hsm0' HA Hord HR Hcov
-                  Hm0r Hs0 Hhtif) as Hrdx.
+    (* ---------------------------------------------------------------- *)
+    (* EVERY [sg]-level register fact, TRANSPORTED past the flag write.
+       [register_lookup] is framed by an irrelevant register write, so this
+       is one rewrite apiece; the side condition is closed by [vm_compute].
+       [mem] and [mdev] do not move at all, so the memory-shaped facts
+       ([pt_slot_mem], the slot geometry) hold at the modified state by
+       conversion. *)
+    assert (Hregb : forall (bf : bool) (r : register),
+              register_beq r (R_bool minstret_increment) = false ->
+              register_lookup r (sregs (set_mi sg bf))
+              = register_lookup r sg.(sregs)).
+    { intros bf r Hr. rewrite sregs_set_reg.
+      exact (irrelevant_register_set r (R_bool minstret_increment)
+               sg.(sregs) bf Hr). }
+    assert (Hsmb2 : forall bf : bool, pt_slot_mem (set_mi sg bf) a2w p2)
+      by (intros bf; exact Hsm2').
+    assert (Hsmb1 : forall bf : bool, pt_slot_mem (set_mi sg bf) a1w p1)
+      by (intros bf; exact Hsm1').
+    assert (Hsmb0 : forall bf : bool, pt_slot_mem (set_mi sg bf) la p0)
+      by (intros bf; exact Hsm0').
+    assert (Hmisab : forall bf : bool,
+              register_lookup misa (sregs (set_mi sg bf)) = MISA_C).
+    { intros bf. rewrite (Hregb bf misa ltac:(vm_compute; reflexivity)).
+      exact Hmisa. }
+    assert (Hmenvb : forall bf : bool,
+              register_lookup menvcfg (sregs (set_mi sg bf)) = MENVCFG_S).
+    { intros bf. rewrite (Hregb bf menvcfg ltac:(vm_compute; reflexivity)).
+      exact Hmenv. }
+    assert (Hhtifb : forall bf : bool,
+              register_lookup htif_tohost_base (sregs (set_mi sg bf)) = None).
+    { intros bf.
+      rewrite (Hregb bf htif_tohost_base ltac:(vm_compute; reflexivity)).
+      exact Hhtif. }
+    assert (Hcpb : forall bf : bool,
+              register_lookup cur_privilege (sregs (set_mi sg bf)) = p).
+    { intros bf. rewrite (Hregb bf cur_privilege ltac:(vm_compute; reflexivity)).
+      exact Hcp. }
+    assert (Hsatpb : forall bf : bool,
+              register_lookup satp (sregs (set_mi sg bf)) = satp0).
+    { intros bf. rewrite (Hregb bf satp ltac:(vm_compute; reflexivity)).
+      exact Hsatp. }
+    assert (Htlbvb : forall bf : bool,
+              register_lookup tlb (sregs (set_mi sg bf)) = tlbvec).
+    { intros bf. rewrite (Hregb bf tlb ltac:(vm_compute; reflexivity)).
+      exact Htlbv. }
+    assert (HAb : forall bf : bool, pmpAddrMatchType_encdec_backwards
+              (_get_Pmpcfg_ent_A
+                 (vec_access_dec (register_lookup pmpcfg_n (sregs (set_mi sg bf))) 0)) = TOR).
+    { intros bf. rewrite (Hregb bf pmpcfg_n ltac:(vm_compute; reflexivity)).
+      exact HA. }
+    assert (Hordb : forall bf : bool, zopz0zKzJ_u (zeros' 64)
+              (vec_access_dec (register_lookup pmpaddr_n (sregs (set_mi sg bf))) 0) = false).
+    { intros bf. rewrite (Hregb bf pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact Hord. }
+    assert (HRb : forall bf : bool, eq_vec (_get_Pmpcfg_ent_R
+              (vec_access_dec (register_lookup pmpcfg_n (sregs (set_mi sg bf))) 0)) ('b"1") = true).
+    { intros bf. rewrite (Hregb bf pmpcfg_n ltac:(vm_compute; reflexivity)).
+      exact HR. }
+    assert (HWb : forall bf : bool, eq_vec (_get_Pmpcfg_ent_W
+              (vec_access_dec (register_lookup pmpcfg_n (sregs (set_mi sg bf))) 0)) ('b"1") = true).
+    { intros bf. rewrite (Hregb bf pmpcfg_n ltac:(vm_compute; reflexivity)).
+      exact HW. }
+    assert (Hcovb : forall bf : bool, (ram_base + ram_size
+              <= uint (vec_access_dec (register_lookup pmpaddr_n (sregs (set_mi sg bf))) 0) * 4)%Z).
+    { intros bf. rewrite (Hregb bf pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact Hcov. }
+    assert (Hpmarb : forall bf : bool,
+              pma_allows_pte_read (register_lookup pma_regions (sregs (set_mi sg bf)))).
+    { intros bf. rewrite (Hregb bf pma_regions ltac:(vm_compute; reflexivity)).
+      exact Hpmar. }
+    assert (Hpmawb : forall bf : bool,
+              pma_allows_pte_write (register_lookup pma_regions (sregs (set_mi sg bf)))).
+    { intros bf. rewrite (Hregb bf pma_regions ltac:(vm_compute; reflexivity)).
+      exact Hpmaw. }
+    assert (Heffb : forall bf : bool,
+              exec_eff (effectivePrivilege acc
+                          (register_lookup mstatus (sregs (set_mi sg bf))) p)
+                (set_mi sg bf) = Some (p, set_mi sg bf, [])).
+    { intros bf. rewrite (Hregb bf mstatus ltac:(vm_compute; reflexivity)).
+      exact (Heff bf). }
+    (* the CAS's exclusive read, at the modified states *)
+    assert (Hrdxb : forall bf : bool,
+              exec_eff (read_pte_exclusive (Physaddr la) 8) (set_mi sg bf)
+              = Some (Ok p0, set_mi sg bf, [WEread (AkInfo false true false) la 8])).
+    { intros bf.
+      destruct (Hpmarb bf la (pt_slot_ram_access _ _ _ Hsm0'))
+        as (region0 & Hm0r & Hs0).
+      exact (wpt_read_pte_exclusive_slot (set_mi sg bf) _ p0 region0 (Hsmb0 bf)
+               (HAb bf) (Hordb bf) (HRb bf) (Hcovb bf) Hm0r Hs0 (Hhtifb bf)). }
     (* identity geometry *)
     assert (Hid : zero_extend' 64 (concat_vec
               ((autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (p0 : mword 64))) : mword 44)) : mword 44)
@@ -272,32 +372,38 @@ Section WeakKptStaleDispatch.
     assert (HADUE : eq_vec (_get_MEnvcfg_ADUE MENVCFG_S) ('b"1") = true)
       by (vm_compute; reflexivity).
     (* the CAS's write half, available whenever the fresh word needs bits *)
-    assert (Hwrite : forall q : mword 64,
+    assert (Hwriteb : forall (bf : bool) (q : mword 64),
               update_PTE_Bits (p0 : mword 64) acc = Some q ->
-              exec_eff (write_pte_conditional (Physaddr la) 8 (q : mword 64)) sg
+              exec_eff (write_pte_conditional (Physaddr la) 8 (q : mword 64))
+                (set_mi sg bf)
               = Some (Ok true,
-                      MState sg.(sregs) (write_bytes sg.(mem) la 8 (q : mword 64)) sg.(mdev),
+                      MState (sregs (set_mi sg bf))
+                        (write_bytes sg.(mem) la 8 (q : mword 64)) sg.(mdev),
                       [WEwrite wak_excl la 8 (q : mword 64)])).
-    { intros q _.
+    { intros bf q _.
       pose proof Hsm0' as (Hbytes0 & Hram0 & Hram0' & Hal0).
-      destruct (Hpmaw la
+      destruct (Hpmawb bf la
             (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
                eq_refl eq_refl)) as (regionw & Hmw & Hww).
-      exact (exec_eff_write_pte_conditional_ram la q regionw sg
-               Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif). }
+      exact (exec_eff_write_pte_conditional_ram la q regionw (set_mi sg bf)
+               Hram0 Hram0' Hal0 (HAb bf) (Hordb bf) (HWb bf) (Hcovb bf)
+               Hmw Hww (Hhtifb bf)). }
     (* ---------------------------------------------------------------- *)
     (* THE MISS PATH, once, as a hypothesis keyed on the [lookup_TLB]
-       fact — both the foreign-entry and the empty-slot branch use it. *)
+       fact — both the foreign-entry and the empty-slot branch use it.  The
+       key is [tlbvec]-shaped and hence flag-INDEPENDENT, which is what keeps
+       the ARM CHOICE below outside the [forall bf]. *)
     match goal with |- ?G =>
-      assert (Hmiss : exec_eff (lookup_TLB 39 (mword_of_int 0) vpn) sg
-                      = Some (None, sg, []) -> G)
+      assert (Hmiss : (forall bf : bool,
+                 exec_eff (lookup_TLB 39 (mword_of_int 0) vpn) (set_mi sg bf)
+                 = Some (None, set_mi sg bf, [])) -> G)
     end.
     { intros Hlk.
       (* the per-member run, uniform in the family: [exec_stale] at [pv] *)
-      assert (Hfam : forall av dv : mword 1,
+      assert (Hfam : forall (bf : bool) (av dv : mword 1),
         exists (sg' : mstate) (es : list weff),
           exec_stale la 8 (pte_set_ad w av dv)
-            (translateAddr (Virtaddr va) acc) sg
+            (translateAddr (Virtaddr va) acc) (set_mi sg bf)
           = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es)
           /\ mdev sg' = sg.(mdev)
           /\ (exists ae de : mword 1,
@@ -305,7 +411,7 @@ Section WeakKptStaleDispatch.
                   (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                      (Some (u_walk_entry vpn p2 p1 (pte_set_ad w ae de)
                               (mword_of_int 0))))
-                  sg.(sregs))
+                  (sregs (set_mi sg bf)))
           /\ ( (mem sg' = sg.(mem)
                 /\ ((update_PTE_Bits (pte_set_ad w av dv : mword 64) acc = None
                      /\ es = [WEread wak_plain a2w 8; WEread wak_plain a1w 8;
@@ -319,7 +425,7 @@ Section WeakKptStaleDispatch.
                    /\ es = [WEread wak_plain a2w 8; WEread wak_plain a1w 8;
                             WEread wak_plain la 8; WEread wak_excl la 8;
                             WEwrite wak_excl la 8 (q : mword 64)]) )).
-      { intros av dv.
+      { intros bf av dv.
         assert (Hleafv : pte_is_non_leaf
                   (Mk_PTE_Flags (subrange_vec_dec (pte_set_ad w av dv) 7 0)) = false).
         { apply (proj2 (pte_set_ad_leaf w av dv)).
@@ -335,34 +441,47 @@ Section WeakKptStaleDispatch.
         { rewrite pte_set_ad_ppn. exact Hout. }
         assert (Habs : p0 = pte_set_ad (pte_set_ad w av dv) a0 d0)
           by (symmetry; exact (pte_set_ad_absorb w av dv a0 d0)).
-        (* the three walk reads, at the PATCHED state *)
-        pose proof (pt_slot_mem_mpatch_disj la 8 (pte_set_ad w av dv) sg a2w p2
-                      Hwf0 Hwf2 Hd2 Hsm2') as Hsm2p.
-        pose proof (pt_slot_mem_mpatch_disj la 8 (pte_set_ad w av dv) sg a1w p1
-                      Hwf0 Hwf1 Hd1 Hsm1') as Hsm1p.
-        pose proof (pt_slot_mem_mpatch_win la (pte_set_ad w av dv) sg p0
-                      Hwf0 Hsm0') as Hsm0p.
-        pose proof (wpt_read_pte_slot (mpatch la 8 (pte_set_ad w av dv) sg) _ p2
-                      region2 Hsm2p HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2p.
-        pose proof (wpt_read_pte_slot (mpatch la 8 (pte_set_ad w av dv) sg) _ p1
-                      region1 Hsm1p HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1p.
-        pose proof (wpt_read_pte_slot (mpatch la 8 (pte_set_ad w av dv) sg) _
+        (* the three walk reads, at the PATCHED state — which is the
+           flag-modified state with the window patched, so its registers are
+           the flag-modified ones *)
+        pose proof (pt_slot_mem_mpatch_disj la 8 (pte_set_ad w av dv)
+                      (set_mi sg bf) a2w p2 Hwf0 Hwf2 Hd2 (Hsmb2 bf)) as Hsm2p.
+        pose proof (pt_slot_mem_mpatch_disj la 8 (pte_set_ad w av dv)
+                      (set_mi sg bf) a1w p1 Hwf0 Hwf1 Hd1 (Hsmb1 bf)) as Hsm1p.
+        pose proof (pt_slot_mem_mpatch_win la (pte_set_ad w av dv)
+                      (set_mi sg bf) p0 Hwf0 (Hsmb0 bf)) as Hsm0p.
+        destruct (Hpmarb bf a2w (pt_slot_ram_access _ _ _ Hsm2'))
+          as (region2 & Hm2 & Hs2).
+        destruct (Hpmarb bf a1w (pt_slot_ram_access _ _ _ Hsm1'))
+          as (region1 & Hm1 & Hs1).
+        destruct (Hpmarb bf la (pt_slot_ram_access _ _ _ Hsm0'))
+          as (region0 & Hm0r & Hs0).
+        pose proof (wpt_read_pte_slot (mpatch la 8 (pte_set_ad w av dv) (set_mi sg bf)) _ p2
+                      region2 Hsm2p (HAb bf) (Hordb bf) (HRb bf) (Hcovb bf)
+                      Hm2 Hs2 (Hhtifb bf)) as Hrd2p.
+        pose proof (wpt_read_pte_slot (mpatch la 8 (pte_set_ad w av dv) (set_mi sg bf)) _ p1
+                      region1 Hsm1p (HAb bf) (Hordb bf) (HRb bf) (Hcovb bf)
+                      Hm1 Hs1 (Hhtifb bf)) as Hrd1p.
+        pose proof (wpt_read_pte_slot (mpatch la 8 (pte_set_ad w av dv) (set_mi sg bf)) _
                       (pte_set_ad w av dv)
-                      region0 Hsm0p HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrd0p.
+                      region0 Hsm0p (HAb bf) (Hordb bf) (HRb bf) (Hcovb bf)
+                      Hm0r Hs0 (Hhtifb bf)) as Hrd0p.
         destruct (WeakWalkStale.exec_stale_translateAddr_pt_miss_cases acc p
                     vpn root_ppn p2 p1 (pte_set_ad w av dv) p0 a0 d0
-                    satp0 va pa MENVCFG_S sg
-                    Hwf0 Heff Hss Hcp Htm Hsatp Hppn Hasid Hcanon eq_refl Hlk Hidv
+                    satp0 va pa MENVCFG_S (set_mi sg bf)
+                    Hwf0 (Heffb bf) (Hss bf) (Hcpb bf) (Htm bf) (Hsatpb bf)
+                    Hppn Hasid Hcanon eq_refl (Hlk bf) Hidv
                     Hwv2 Hn2 Hwv1 Hn1 (Hval av dv) Hleafv
                     (fun mxr ds => Hchk av dv mxr ds) Hnapv
                     Habs (Hval a0 d0) Hl0 (fun mxr ds => Hchk a0 d0 mxr ds) Hnap
-                    Hrd2p Hrd1p Hrd0p Hrdx Hwrite Hmisa Hmenv HPBMTE HADUE)
+                    Hrd2p Hrd1p Hrd0p (Hrdxb bf) (Hwriteb bf)
+                    (Hmisab bf) (Hmenvb bf) HPBMTE HADUE)
           as (sg' & es & Heq & Hmdev & Hsregs & Harm).
         exists sg', es. split_and!.
         - exact Heq.
         - exact Hmdev.
         - destruct Hsregs as (ae & de & Hsr). exists ae, de.
-          rewrite Hsr Htlbv pte_set_ad_absorb. reflexivity.
+          rewrite Hsr (Htlbvb bf) pte_set_ad_absorb. reflexivity.
         - destruct Harm as [(Hmem0 & [(Hg & Hes)|(Hg & Hes)]) | (q & Hq' & Hmem0 & Hes)].
           + left. split; [exact Hmem0|]. left. split; [exact Hg|exact Hes].
           + left. split; [exact Hmem0|]. right. split; [exact Hg|exact Hes].
@@ -374,8 +493,8 @@ Section WeakKptStaleDispatch.
         (* the MISS path's write-back shape is the five-event walk, for every
            member alike *)
         right. exists a1, d1, true. split; [rewrite <- Hq; reflexivity|].
-        intros av dv Hle.
-        destruct (Hfam av dv) as (sg' & es & Heq & Hmdev & Hsregs & Harm).
+        intros av dv Hle bf.
+        destruct (Hfam bf av dv) as (sg' & es & Heq & Hmdev & Hsregs & Harm).
         destruct Harm as [(Hmem0 & [(Hg & Hes)|(Hg & Hes)]) | (q & Hq' & Hmem0 & Hes)].
         + exfalso.
           destruct (update_PTE_Bits_fires_mono (pte_set_ad w av dv) p0 acc Hle
@@ -390,8 +509,8 @@ Section WeakKptStaleDispatch.
           * exact Hsregs.
           * exact Hes.
       - (* READ-ONLY *)
-        left. intros av dv Hle.
-        destruct (Hfam av dv) as (sg' & es & Heq & Hmdev & Hsregs & Harm).
+        left. intros av dv Hle bf.
+        destruct (Hfam bf av dv) as (sg' & es & Heq & Hmdev & Hsregs & Harm).
         destruct Harm as [(Hmem0 & [(Hg & Hes)|(Hg & Hes)]) | (q & Hq' & Hmem0 & Hes)];
           [ | | exfalso; congruence ].
         + exists sg', es. split_and!.
@@ -436,21 +555,25 @@ Section WeakKptStaleDispatch.
           destruct (update_PTE_Bits (p0 : mword 64) acc) as [p0'|] eqn:Hupm.
           -- (* O3, hit path: the CAS pair lands *)
              pose proof Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
-             destruct (Hpmaw (pt_addr0 p1 vpn)
-               (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
-                  eq_refl eq_refl)) as (regionw & Hmw & Hww).
-             assert (Hwr : exec_eff (write_pte_conditional (Physaddr la) 8
-                        (p0' : mword 64)) sg
-                      = Some (Ok true, MState sg.(sregs)
+             assert (Hwr : forall bf : bool,
+                      exec_eff (write_pte_conditional (Physaddr la) 8
+                        (p0' : mword 64)) (set_mi sg bf)
+                      = Some (Ok true, MState (sregs (set_mi sg bf))
                                  (write_bytes sg.(mem) (pt_addr0 p1 vpn) 8 p0') sg.(mdev),
-                              [WEwrite (AkInfo false true false) (pt_addr0 p1 vpn) 8 p0']))
-               by exact (exec_eff_write_pte_conditional_ram (pt_addr0 p1 vpn) p0' regionw sg
-                           Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif).
+                              [WEwrite (AkInfo false true false) (pt_addr0 p1 vpn) 8 p0'])).
+             { intros bf.
+               destruct (Hpmawb bf (pt_addr0 p1 vpn)
+                 (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
+                    eq_refl eq_refl)) as (regionw & Hmw & Hww).
+               exact (exec_eff_write_pte_conditional_ram (pt_addr0 p1 vpn) p0' regionw
+                        (set_mi sg bf) Hram0 Hram0' Hal0 (HAb bf) (Hordb bf) (HWb bf)
+                        (Hcovb bf) Hmw Hww (Hhtifb bf)). }
              destruct (update_PTE_Bits_set_ad _ _ _ Hupm) as (a1 & d1 & Hq).
              assert (Hqw : p0' = pte_set_ad w a1 d1)
                by (rewrite Hq; exact (pte_set_ad_absorb w a0 d0 a1 d1)).
-             assert (Hhit : exists (sgh : mstate) (esh : list weff),
-                 exec_eff (translateAddr (Virtaddr va) acc) sg
+             assert (Hhit : forall bf : bool,
+                 exists (sgh : mstate) (esh : list weff),
+                 exec_eff (translateAddr (Virtaddr va) acc) (set_mi sg bf)
                  = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgh, esh)
                  /\ mem sgh = write_bytes sg.(mem) la 8 (pte_set_ad p0 a1 d1)
                  /\ mdev sgh = sg.(mdev)
@@ -459,47 +582,54 @@ Section WeakKptStaleDispatch.
                          (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                             (Some (u_walk_entry vpn p2 p1 (pte_set_ad w ae de)
                                      (mword_of_int 0))))
-                         sg.(sregs))
+                         (sregs (set_mi sg bf)))
                  /\ esh = [WEread (AkInfo false true false) la 8;
                            WEwrite (AkInfo false true false) la 8
                              (pte_set_ad p0 a1 d1 : mword 64)]).
-             { do 2 eexists. split_and!.
+             { intros bf. do 2 eexists. split_and!.
                - apply (exec_eff_translateAddr_pt_front acc p vpn root_ppn
                           (autocast (T := mword) ((autocast (T := mword)
                              (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
-                          satp0 va pa _ sg _
-                          Heff Hss Hcp Htm Hsatp Hppn Hasid
+                          satp0 va pa _ (set_mi sg bf) _
+                          (Heffb bf) (Hss bf) (Hcpb bf) (Htm bf) (Hsatpb bf) Hppn Hasid
                           Hcanon eq_refl).
                  2:{ exact Hidc. }
                  intros mxr do_sum.
                  apply (exec_eff_translate_hit_user vpn root_ppn (mword_of_int 0)
-                          (tlb_hash (__id 39) vpn) _ acc p mxr do_sum _ sg _ _
-                          (exec_eff_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ sg Htlbv Hslot
+                          (tlb_hash (__id 39) vpn) _ acc p mxr do_sum _ (set_mi sg bf) _ _
+                          (exec_eff_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _
+                             (set_mi sg bf) (Htlbvb bf) Hslot
                              (uwe_match_self vpn p2 p1 (pte_set_ad p0 a' d')))).
                  apply (exec_eff_translate_TLB_hit_pt_upd acc p mxr do_sum
                           vpn p2 p1 (pte_set_ad p0 a' d') q0' p0 p0' MENVCFG_S (mword_of_int 0)
                           (tlb_hash (__id 39) vpn) _ _
-                          (MState sg.(sregs) (write_bytes sg.(mem) (pt_addr0 p1 vpn) 8 p0') sg.(mdev)) sg
-                          (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
-                          Hrdx (Hval a0 d0) Hl0 (Hchk a0 d0 mxr do_sum) Hnap Hmisa HPBMTE
-                          Hvarm Hupm Hwr eq_refl).
+                          (MState (sregs (set_mi sg bf))
+                             (write_bytes sg.(mem) (pt_addr0 p1 vpn) 8 p0') sg.(mdev))
+                          (set_mi sg bf)
+                          (Hchkc mxr do_sum) Hupq Hpbc (Hmenvb bf) HADUE
+                          (Hrdxb bf) (Hval a0 d0) Hl0 (Hchk a0 d0 mxr do_sum) Hnap
+                          (Hmisab bf) HPBMTE
+                          Hvarm Hupm (Hwr bf) eq_refl).
                - rewrite mem_set_reg. rewrite <- Hq. reflexivity.
                - by rewrite mdev_set_reg.
-               - exists a1, d1. rewrite sregs_set_reg Htlbv. rewrite <- Hqw. reflexivity.
+               - exists a1, d1. rewrite sregs_set_reg (Htlbvb bf). rewrite <- Hqw. reflexivity.
                - rewrite <- Hq. reflexivity. }
-             destruct Hhit as (sgh & esh & Hrun & Hmm & Hdd & Hss' & Hee).
              (* the HIT path's write-back shape is the adjacent CAS pair *)
              right. exists a1, d1, false. split; [rewrite <- Hq; reflexivity|].
-             intros av dv Hle. exists sgh, esh. split_and!.
-             ++ apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0 sg _ _ _ Hrun).
+             intros av dv Hle bf.
+             destruct (Hhit bf) as (sgh & esh & Hrun & Hmm & Hdd & Hss' & Hee).
+             exists sgh, esh. split_and!.
+             ++ apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0
+                         (set_mi sg bf) _ _ _ Hrun).
                 rewrite Hee. apply trace_off_win_pinned. pinned_trace.
              ++ exact Hmm.
              ++ exact Hdd.
              ++ exact Hss'.
              ++ exact Hee.
           -- (* O2', hit path: refresh only — trace is the CAS read *)
-             assert (Hhit : exists (sgh : mstate) (esh : list weff),
-                 exec_eff (translateAddr (Virtaddr va) acc) sg
+             assert (Hhit : forall bf : bool,
+                 exists (sgh : mstate) (esh : list weff),
+                 exec_eff (translateAddr (Virtaddr va) acc) (set_mi sg bf)
                  = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgh, esh)
                  /\ mem sgh = sg.(mem)
                  /\ mdev sgh = sg.(mdev)
@@ -508,34 +638,38 @@ Section WeakKptStaleDispatch.
                          (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                             (Some (u_walk_entry vpn p2 p1 (pte_set_ad w ae de)
                                      (mword_of_int 0))))
-                         sg.(sregs))
+                         (sregs (set_mi sg bf)))
                  /\ esh = [WEread (AkInfo false true false) la 8]).
-             { do 2 eexists. split_and!.
+             { intros bf. do 2 eexists. split_and!.
                - apply (exec_eff_translateAddr_pt_front acc p vpn root_ppn
                           (autocast (T := mword) ((autocast (T := mword)
                              (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
-                          satp0 va pa _ sg _
-                          Heff Hss Hcp Htm Hsatp Hppn Hasid
+                          satp0 va pa _ (set_mi sg bf) _
+                          (Heffb bf) (Hss bf) (Hcpb bf) (Htm bf) (Hsatpb bf) Hppn Hasid
                           Hcanon eq_refl).
                  2:{ exact Hidc. }
                  intros mxr do_sum.
                  apply (exec_eff_translate_hit_user vpn root_ppn (mword_of_int 0)
-                          (tlb_hash (__id 39) vpn) _ acc p mxr do_sum _ sg _ _
-                          (exec_eff_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ sg Htlbv Hslot
+                          (tlb_hash (__id 39) vpn) _ acc p mxr do_sum _ (set_mi sg bf) _ _
+                          (exec_eff_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _
+                             (set_mi sg bf) (Htlbvb bf) Hslot
                              (uwe_match_self vpn p2 p1 (pte_set_ad p0 a' d')))).
                  apply (exec_eff_translate_TLB_hit_pt_refresh acc p mxr do_sum
                           vpn p2 p1 (pte_set_ad p0 a' d') q0' p0 MENVCFG_S (mword_of_int 0)
-                          (tlb_hash (__id 39) vpn) _ sg
-                          (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
-                          Hrdx (Hval a0 d0) Hl0 (Hchk a0 d0 mxr do_sum) Hnap Hmisa HPBMTE
+                          (tlb_hash (__id 39) vpn) _ (set_mi sg bf)
+                          (Hchkc mxr do_sum) Hupq Hpbc (Hmenvb bf) HADUE
+                          (Hrdxb bf) (Hval a0 d0) Hl0 (Hchk a0 d0 mxr do_sum) Hnap
+                          (Hmisab bf) HPBMTE
                           Hvarm Hupm).
                - by rewrite mem_set_reg.
                - by rewrite mdev_set_reg.
-               - exists a0, d0. rewrite sregs_set_reg Htlbv. reflexivity.
+               - exists a0, d0. rewrite sregs_set_reg (Htlbvb bf). reflexivity.
                - reflexivity. }
-             destruct Hhit as (sgh & esh & Hrun & Hmm & Hdd & Hss' & Hee).
-             left. intros av dv Hle. exists sgh, esh. split_and!.
-             ++ apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0 sg _ _ _ Hrun).
+             left. intros av dv Hle bf.
+             destruct (Hhit bf) as (sgh & esh & Hrun & Hmm & Hdd & Hss' & Hee).
+             exists sgh, esh. split_and!.
+             ++ apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0
+                         (set_mi sg bf) _ _ _ Hrun).
                 rewrite Hee. apply trace_off_win_pinned. pinned_trace.
              ++ exact Hmm.
              ++ exact Hdd.
@@ -545,42 +679,75 @@ Section WeakKptStaleDispatch.
           assert (Hupq' : update_PTE_Bits
                     (autocast (T := mword) (pte_set_ad p0 a' d') : mword 64) acc = None)
             by exact Hupq.
-          assert (Hrun : exec_eff (translateAddr (Virtaddr va) acc) sg
-                         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg, [])).
-          { apply (exec_eff_translateAddr_pt_front acc p vpn root_ppn
+          assert (Hrun : forall bf : bool,
+                    exec_eff (translateAddr (Virtaddr va) acc) (set_mi sg bf)
+                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), set_mi sg bf, [])).
+          { intros bf.
+            apply (exec_eff_translateAddr_pt_front acc p vpn root_ppn
                      (autocast (T := mword) ((autocast (T := mword)
                         (PPN_of_PTE (pte_set_ad p0 a' d' : mword 64))) : mword 44))
-                     satp0 va pa [] sg sg
-                     Heff Hss Hcp Htm Hsatp Hppn Hasid
+                     satp0 va pa [] (set_mi sg bf) (set_mi sg bf)
+                     (Heffb bf) (Hss bf) (Hcpb bf) (Htm bf) (Hsatpb bf) Hppn Hasid
                      Hcanon eq_refl).
             2:{ exact Hidc. }
             intros mxr do_sum.
             apply (exec_eff_translate_hit_user vpn root_ppn (mword_of_int 0)
-                     (tlb_hash (__id 39) vpn) _ acc p mxr do_sum _ sg _ _
-                     (exec_eff_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ sg Htlbv Hslot
+                     (tlb_hash (__id 39) vpn) _ acc p mxr do_sum _ (set_mi sg bf) _ _
+                     (exec_eff_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _
+                        (set_mi sg bf) (Htlbvb bf) Hslot
                         (uwe_match_self vpn p2 p1 (pte_set_ad p0 a' d')))).
             apply (exec_eff_translate_TLB_hit_pt acc p mxr do_sum
                      vpn p2 p1 (pte_set_ad p0 a' d') (mword_of_int 0)
-                     (tlb_hash (__id 39) vpn) sg
+                     (tlb_hash (__id 39) vpn) (set_mi sg bf)
                      (Hchkc mxr do_sum) Hupq' Hpbc). }
-          left. intros av dv Hle. exists sg, ([] : list weff). split_and!.
-          -- apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0 sg _ _ _ Hrun).
+          left. intros av dv Hle bf.
+          exists (set_mi sg bf), ([] : list weff). split_and!.
+          -- apply (exec_stale_of_exec_eff la 8 (pte_set_ad w av dv) _ Hwf0
+                      (set_mi sg bf) _ _ _ (Hrun bf)).
              apply trace_off_win_pinned. pinned_trace.
           -- reflexivity.
           -- reflexivity.
           -- left. reflexivity.
           -- left. reflexivity.
       + (* foreign entry: rejected by the tag, so the walk runs *)
-        apply Hmiss.
-        exact (exec_eff_lookup_TLB_nomatch_s vpn (mword_of_int 0) _ tlbvec sg Htlbv Hslot
+        apply Hmiss. intros bf.
+        exact (exec_eff_lookup_TLB_nomatch_s vpn (mword_of_int 0) _ tlbvec
+                 (set_mi sg bf) (Htlbvb bf) Hslot
                  (uwe_match_other vpn0 vpn q2 q1 (pte_set_ad qp0 a' d')
                     (mword_of_int 0) Hne)).
     - (* empty slot: the walk runs *)
-      apply Hmiss.
-      exact (exec_eff_lookup_TLB_miss vpn (mword_of_int 0) tlbvec sg Htlbv Hslot).
+      apply Hmiss. intros bf.
+      exact (exec_eff_lookup_TLB_miss vpn (mword_of_int 0) tlbvec
+               (set_mi sg bf) (Htlbvb bf) Hslot).
   Qed.
 
 End WeakKptStaleDispatch.
+
+(* ====================================================================== *)
+(** ** 2bis. THE SREGS DESCRIPTION, WEAKENED TO THE USABLE FORM
+
+    §2's family reports the walk's register footprint as a DISJUNCTION —
+    unchanged, or exactly one [register_set tlb] whose value mentions the
+    residue's [tlbvec].  That vector is existentially hidden inside
+    [wtlb_res_pt], so §3 cannot re-export the disjunction as it stands.  It
+    exports instead the weakening the consumers actually use — the SC side's
+    ([SmodeCorePt.pt_regs_preserved], restated here rather than imported to
+    keep this file's [Require] set as it was):
+
+        EVERY REGISTER BUT [tlb] SURVIVES THE TRANSLATION.
+
+    That form mentions no vector at all, and is exactly what a gate that
+    reads [pmpcfg_n] / [pmpaddr_n] / [pma_regions] / [htif_tohost_base] /
+    [cur_privilege] at a post-translation state needs. *)
+
+Lemma wtlb_regs_preserved (rs rs' : regstate) :
+  (rs' = rs \/ exists tv, rs' = register_set tlb tv rs) ->
+  forall r : register, register_beq r tlb = false ->
+    register_lookup r rs' = register_lookup r rs.
+Proof.
+  intros [-> | (tv & ->)] r Hr; [reflexivity |].
+  exact (irrelevant_register_set r tlb rs tv Hr).
+Qed.
 
 (* ====================================================================== *)
 (** ** 3. THE RACY ABSORPTION THEOREM *)
@@ -609,10 +776,15 @@ Section WeakKptStaleAbsorb.
     register_lookup htif_tohost_base (wm_regs σ) = None ->
     register_lookup cur_privilege (wm_regs σ) = Supervisor ->
     _get_Mstatus_SXL (register_lookup mstatus (wm_regs σ)) = 'b"10" ->
-    exec_eff (effectivePrivilege acc (register_lookup mstatus (wm_regs σ)) Supervisor)
-      (wflat_st σ) = Some (Supervisor, wflat_st σ, []) ->
-    exec_eff (is_shadow_stack_access acc) (wflat_st σ)
-      = Some (false, wflat_st σ, []) ->
+    (* the two [exec_eff] gates: owed at the post-[minstret_increment]-write
+       states (§2's header), and passed straight through to the dispatch *)
+    (forall bf : bool,
+       exec_eff (effectivePrivilege acc (register_lookup mstatus (wm_regs σ)) Supervisor)
+         (set_mi (wflat_st σ) bf)
+       = Some (Supervisor, set_mi (wflat_st σ) bf, [])) ->
+    (forall bf : bool,
+       exec_eff (is_shadow_stack_access acc) (set_mi (wflat_st σ) bf)
+       = Some (false, set_mi (wflat_st σ) bf, [])) ->
     pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
     (T_kpt <= w_vrNew (wm_ws σ))%nat ->
     kmap_at (svpn_of va) ppn pc -∗
@@ -644,23 +816,34 @@ Section WeakKptStaleAbsorb.
          equation for the family member that ACTUALLY ran pins [sg'], and
          the wand advances the ghost registers to it and hands the residue
          back — [tlb_ok_pt_fill] absorbs whichever A/D-variant entry the
-         run installed. *)
-      (∀ (av dv : mword 1) (sg' : mstate) (es : list weff),
+         run installed.  It is keyed on the flag [bf] too, and its INPUT is
+         the already-flag-advanced register map: the WP leaf owns the
+         [minstret_increment] points-to and performs that [reg_update]
+         itself, before invoking this. *)
+      (∀ (bf : bool) (av dv : mword 1) (sg' : mstate) (es : list weff),
          ⌜pte_ad_le (pte_set_ad w0 av dv) lw⌝ -∗
          ⌜exec_stale la 8 (pte_set_ad w0 av dv)
-            (translateAddr (Virtaddr va) acc) (wflat_st σ)
+            (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es)⌝ -∗
-         reg_interp (wm_regs σ) ==∗
+         reg_interp (register_set (R_bool minstret_increment) bf (wm_regs σ)) ==∗
          reg_interp (sregs sg') ∗ wtlb_res_pt root_ppn T_kpt) ∗
       ( (* READ-ONLY: the log does not move *)
         (⌜forall av dv : mword 1,
             pte_ad_le (pte_set_ad w0 av dv) lw ->
+            forall bf : bool,
             exists (sg' : mstate) (es : list weff),
               exec_stale la 8 (pte_set_ad w0 av dv)
-                (translateAddr (Virtaddr va) acc) (wflat_st σ)
+                (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
               = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
               mem sg' = wflat (wm_img σ) (wm_log σ) /\
               mdev sg' = wm_dev σ /\
+              (* §2bis: the sregs description, in the tlbvec-free form —
+                 RELATIVE TO THE FLAG-MODIFIED START.  For [r] other than the
+                 flag this is the lookup at [wm_regs σ], one
+                 [irrelevant_register_set] away. *)
+              (forall r : register, register_beq r tlb = false ->
+                 register_lookup r (sregs sg')
+                 = register_lookup r (sregs (set_mi (wflat_st σ) bf))) /\
               (es = [] \/
                es = [WEread wak_plain a2 8; WEread wak_plain a1 8;
                      WEread wak_plain la 8] \/
@@ -671,17 +854,31 @@ Section WeakKptStaleAbsorb.
          wlog_auth (wm_log σ) ∗ wlat_interp (wm_img σ) (wm_log σ))
         ∨
         (* WRITE-BACK: one message, the same for every family member *)
-        (∃ (lw' : mword 64) (kcls : wm_class),
+        (* THE MESSAGE CLASS IS PINNED AT [WCexcl] (not existential): the
+           walk's write-back is [ak_latest], and [WeakStale.wm_class_rp_latest]
+           sends every [ak_latest] write to [WCexcl] whatever the writer's
+           pending-release flag — so the log-identity projection of the
+           trace ([WkWalkRule] §4) names exactly this message, and a consumer
+           re-establishing [wlog_auth (wm_log σ')] needs the two to AGREE.
+           With the class existentially quantified the two logs could not be
+           identified and the successor's log authority was unusable. *)
+        (∃ lw' : mword 64,
            ⌜update_PTE_Bits (lw : mword 64) acc = Some lw'⌝ ∗
            ⌜exists wtr : bool,
             forall av dv : mword 1,
               pte_ad_le (pte_set_ad w0 av dv) lw ->
+              forall bf : bool,
               exists (sg' : mstate) (es : list weff),
                 exec_stale la 8 (pte_set_ad w0 av dv)
-                  (translateAddr (Virtaddr va) acc) (wflat_st σ)
+                  (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sg', es) /\
                 mem sg' = write_bytes (wflat (wm_img σ) (wm_log σ)) (la : Arch.pa) 8 lw' /\
                 mdev sg' = wm_dev σ /\
+                (* §2bis: the sregs description, in the tlbvec-free form,
+                   relative to the flag-modified start *)
+                (forall r : register, register_beq r tlb = false ->
+                   register_lookup r (sregs sg')
+                   = register_lookup r (sregs (set_mi (wflat_st σ) bf))) /\
                 es = (if wtr
                       then [WEread wak_plain a2 8; WEread wak_plain a1 8;
                             WEread wak_plain la 8;
@@ -689,9 +886,9 @@ Section WeakKptStaleAbsorb.
                             WEwrite (AkInfo false true false) la 8 (lw' : mword 64)]
                       else [WEread (AkInfo false true false) la 8;
                             WEwrite (AkInfo false true false) la 8 (lw' : mword 64)])⌝ ∗
-           wlog_auth (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]) ∗
+           wlog_auth (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)]) ∗
            wlat_interp (wm_img σ)
-             (wm_log σ ++ [wwrite_msg tid kcls (la : Arch.pa) 8 (lw' : mword 64)]))).
+             (wm_log σ ++ [wwrite_msg tid WCexcl (la : Arch.pa) 8 (lw' : mword 64)]))).
   Proof.
     intros HE Hchk Hval Hcanon Hid4k Hwlog Hmisa Hmenv Hhtif Hcp HSXL Heff Hss
            Hall Hrcpt.
@@ -722,9 +919,30 @@ Section WeakKptStaleAbsorb.
     assert (Hcov' : (ram_base + ram_size
       <= uint (vec_access_dec (register_lookup pmpaddr_n (wm_regs σ)) 0) * 4)%Z)
       by (rewrite Hpav; exact Hcov).
-    assert (Htm : exec_eff (translationMode Supervisor) (wflat_st σ)
-                  = Some (Sv39, wflat_st σ, []))
-      by exact (exec_eff_translationMode_S_sv39 satp0 (wflat_st σ) HSXL Hsatpv Hmode).
+    (* the flag write frames every register lookup, so the two σ-level facts
+       [translationMode] is built from transport; the RUN itself does not, so
+       it is re-run at each modified state *)
+    assert (Hregb : forall (bf : bool) (r : register),
+              register_beq r (R_bool minstret_increment) = false ->
+              register_lookup r (sregs (set_mi (wflat_st σ) bf))
+              = register_lookup r (wm_regs σ)).
+    { intros bf r Hr. rewrite sregs_set_reg.
+      exact (irrelevant_register_set r (R_bool minstret_increment)
+               (wm_regs σ) bf Hr). }
+    assert (HSXLb : forall bf : bool,
+              _get_Mstatus_SXL
+                (register_lookup mstatus (sregs (set_mi (wflat_st σ) bf))) = 'b"10").
+    { intros bf. rewrite (Hregb bf mstatus ltac:(vm_compute; reflexivity)).
+      exact HSXL. }
+    assert (Hsatpb : forall bf : bool,
+              register_lookup satp (sregs (set_mi (wflat_st σ) bf)) = satp0).
+    { intros bf. rewrite (Hregb bf satp ltac:(vm_compute; reflexivity)).
+      exact Hsatpv. }
+    assert (Htm : forall bf : bool,
+              exec_eff (translationMode Supervisor) (set_mi (wflat_st σ) bf)
+              = Some (Sv39, set_mi (wflat_st σ) bf, []))
+      by (intros bf; exact (exec_eff_translationMode_S_sv39 satp0
+                              (set_mi (wflat_st σ) bf) (HSXLb bf) (Hsatpb bf) Hmode)).
     assert (Hout : zero_extend' 64 (concat_vec
         ((autocast (T := mword) ((autocast (T := mword)
             (PPN_of_PTE (mk_pte ppn (kperm_flags pc) : mword 64))) : mword 44)) : mword 44)
@@ -829,19 +1047,20 @@ Section WeakKptStaleAbsorb.
     - (* ================= READ-ONLY: nothing moved ================= *)
       assert (Hfam' : forall av dv : mword 1,
           pte_ad_le (pte_set_ad w0 av dv) lw ->
+          forall bf : bool,
           exists (sgx : mstate) (esx : list weff),
             exec_stale la 8 (pte_set_ad w0 av dv)
-              (translateAddr (Virtaddr va) acc) (wflat_st σ)
+              (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgx, esx)
             /\ mem sgx = wflat (wm_img σ) (wm_log σ)
             /\ mdev sgx = wm_dev σ
-            /\ (sregs sgx = wm_regs σ \/
+            /\ (sregs sgx = sregs (set_mi (wflat_st σ) bf) \/
                 (exists ae de : mword 1,
                    sregs sgx = register_set tlb
                      (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                         (Some (u_walk_entry vpn p2 p1 (pte_set_ad w0 ae de)
                                  (mword_of_int 0))))
-                     (wm_regs σ)))
+                     (sregs (set_mi (wflat_st σ) bf))))
             /\ (esx = [] \/
                 esx = [WEread wak_plain
                          (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) 8;
@@ -877,18 +1096,18 @@ Section WeakKptStaleAbsorb.
       iFrame "Hri".
       iSplitL "Hsatp Htlb Hpc Hpa".
       { (* ---- the REGISTER WAND (read-only arm) ---- *)
-        iIntros (av dv sgc esc) "%Hle %Hrun Hri".
+        iIntros (bf av dv sgc esc) "%Hle %Hrun Hri".
         assert (Hrun' : exec_stale la 8 (pte_set_ad w0 av dv)
-                          (translateAddr (Virtaddr va) acc) (wflat_st σ)
+                          (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
                         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgc, esc))
           by exact Hrun.
-        destruct (Hfam' av dv Hle) as (sgx & esx & Hrunx & _ & _ & Hsrx & _).
+        destruct (Hfam' av dv Hle bf) as (sgx & esx & Hrunx & _ & _ & Hsrx & _).
         rewrite Hrun' in Hrunx.
         assert (Hsgeq : sgx = sgc) by congruence.
         subst sgx.
         destruct Hsrx as [Hsr | (ae & de & Hsr)].
         - (* no register moved *)
-          iModIntro. rewrite Hsr. iFrame "Hri".
+          iModIntro. rewrite Hsr sregs_set_reg wflat_st_regs. iFrame "Hri".
           iApply (wtlb_res_pt_intro root_ppn T_kpt satp0 tlbvec t
                     Hmode Hasid Hppn Htlbok with "Hsatp Htlb Hlbt [Hpc Hpa] Hkinv").
           iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
@@ -901,20 +1120,24 @@ Section WeakKptStaleAbsorb.
           { apply (tlb_ok_pt_fill (mword_of_int 0) t tlbvec vpn p2 p1 lw
                      (pte_set_ad w0 ae de) Hmaps); [|exact Htlbok].
             exists ae, de. symmetry. exact (pte_set_ad_absorb w0 a0 d0 ae de). }
-          iMod (reg_update (wm_regs σ) tlb tlbvec
+          iMod (reg_update (register_set (R_bool minstret_increment) bf (wm_regs σ))
+                  tlb tlbvec
                   (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                      (Some (u_walk_entry vpn p2 p1 (pte_set_ad w0 ae de)
                               (mword_of_int 0))))
                   with "Hri Htlb") as "[Hri Htlb]".
-          iModIntro. rewrite Hsr. iFrame "Hri".
+          iModIntro. rewrite Hsr sregs_set_reg wflat_st_regs. iFrame "Hri".
           iApply (wtlb_res_pt_intro root_ppn T_kpt satp0 _ t
                     Hmode Hasid Hppn Hokf with "Hsatp Htlb Hlbt [Hpc Hpa] Hkinv").
           iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
                     HA Hord HX HW HR Hcov with "Hpc Hpa"). }
       iLeft. iFrame "Hla Hi". iPureIntro.
-      intros av dv Hle.
-      destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & _ & H5).
-      exists sgx, esx. split_and!; [exact H1|exact H2|exact H3|exact H5].
+      intros av dv Hle bf.
+      destruct (Hfam' av dv Hle bf) as (sgx & esx & H1 & H2 & H3 & H4 & H5).
+      exists sgx, esx. split_and!;
+        [exact H1|exact H2|exact H3| |exact H5].
+      apply wtlb_regs_preserved.
+      destruct H4 as [H4 | (ae & de & H4)]; [by left | right; by eexists].
     - (* ================= WRITE-BACK, absorbed ================= *)
       set (lw' := pte_set_ad lw a1 d1) in *.
       assert (Habs : lw' = pte_set_ad w0 a1 d1)
@@ -923,9 +1146,10 @@ Section WeakKptStaleAbsorb.
         by exact Hupd.
       assert (Hfam' : forall av dv : mword 1,
           pte_ad_le (pte_set_ad w0 av dv) lw ->
+          forall bf : bool,
           exists (sgx : mstate) (esx : list weff),
             exec_stale la 8 (pte_set_ad w0 av dv)
-              (translateAddr (Virtaddr va) acc) (wflat_st σ)
+              (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
             = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgx, esx)
             /\ mem sgx = write_bytes (wflat (wm_img σ) (wm_log σ))
                            (la : Arch.pa) 8 (lw' : mword 64)
@@ -935,7 +1159,7 @@ Section WeakKptStaleAbsorb.
                     (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                        (Some (u_walk_entry vpn p2 p1 (pte_set_ad w0 ae de)
                                 (mword_of_int 0))))
-                    (wm_regs σ))
+                    (sregs (set_mi (wflat_st σ) bf)))
             /\ esx = (if wtr
                       then [WEread wak_plain
                               (u_pte_addr root_ppn (subrange_vec_dec vpn 26 18)) 8;
@@ -1073,12 +1297,12 @@ Section WeakKptStaleAbsorb.
       iFrame "Hri".
       iSplitL "Hsatp Htlb Hpc Hpa".
       { (* ---- the REGISTER WAND (write-back arm) ---- *)
-        iIntros (av dv sgc esc) "%Hle %Hrun Hri".
+        iIntros (bf av dv sgc esc) "%Hle %Hrun Hri".
         assert (Hrun' : exec_stale la 8 (pte_set_ad w0 av dv)
-                          (translateAddr (Virtaddr va) acc) (wflat_st σ)
+                          (translateAddr (Virtaddr va) acc) (set_mi (wflat_st σ) bf)
                         = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), sgc, esc))
           by exact Hrun.
-        destruct (Hfam' av dv Hle) as (sgx & esx & Hrunx & _ & _ & Hsrx & _).
+        destruct (Hfam' av dv Hle bf) as (sgx & esx & Hrunx & _ & _ & Hsrx & _).
         rewrite Hrun' in Hrunx.
         assert (Hsgeq : sgx = sgc) by congruence.
         subst sgx.
@@ -1090,22 +1314,26 @@ Section WeakKptStaleAbsorb.
         { apply (tlb_ok_pt_fill (mword_of_int 0) (ptree_set_leaf t vpn lw') tlbvec
                    vpn p2 p1 lw' (pte_set_ad w0 ae de) Hmaps'); [|exact Htlbokt].
           exists ae, de. rewrite Habs pte_set_ad_absorb. reflexivity. }
-        iMod (reg_update (wm_regs σ) tlb tlbvec
+        iMod (reg_update (register_set (R_bool minstret_increment) bf (wm_regs σ))
+                tlb tlbvec
                 (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
                    (Some (u_walk_entry vpn p2 p1 (pte_set_ad w0 ae de)
                             (mword_of_int 0))))
                 with "Hri Htlb") as "[Hri Htlb]".
-        iModIntro. rewrite Hsr. iFrame "Hri".
+        iModIntro. rewrite Hsr sregs_set_reg wflat_st_regs. iFrame "Hri".
         iApply (wtlb_res_pt_intro root_ppn T_kpt satp0 _ (ptree_set_leaf t vpn lw')
                   Hmode Hasid Hppn Hokf with "Hsatp Htlb Hlb' [Hpc Hpa] Hkinv").
         iApply (pmp_config_intro root_ppn pmpcfg0 pmpaddr00
                   HA Hord HX HW HR Hcov with "Hpc Hpa"). }
-      iRight. iExists (lw' : mword 64), WCexcl.
+      iRight. iExists (lw' : mword 64).
       iSplitR; [iPureIntro; exact Hupd'|].
       iSplitR.
-      { iPureIntro. exists wtr. intros av dv Hle.
-        destruct (Hfam' av dv Hle) as (sgx & esx & H1 & H2 & H3 & _ & H5).
-        exists sgx, esx. split_and!; [exact H1|exact H2|exact H3|exact H5]. }
+      { iPureIntro. exists wtr. intros av dv Hle bf.
+        destruct (Hfam' av dv Hle bf) as (sgx & esx & H1 & H2 & H3 & H4 & H5).
+        exists sgx, esx. split_and!;
+          [exact H1|exact H2|exact H3| |exact H5].
+        apply wtlb_regs_preserved.
+        destruct H4 as (ae & de & H4). right. by eexists. }
       iFrame "Hla Hi".
   Qed.
 

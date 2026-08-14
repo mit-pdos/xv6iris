@@ -1,5 +1,15 @@
 # The walk's racy leaf: the peel/bridge split (DECIDED: option (a))
 
+**STATUS (2026-08-13): THE RACY FETCH-WALK IS DONE, MODEL TO WP TO CAPSTONE.**
+Every stage below is landed — stale mirror, absorption, peels, ⇐-bridge with
+the log identity, whole-step certificate, the WP rule `wp_wwalk_step`, the
+minstret-flag widening, the tail dischargers (`WkWalkTails.v`), and the
+validation capstone `wwp_walk_addi` (`WkWalkCapstone.v`), a complete WP leaf
+for a fetch-walking S-mode instruction.  Remaining on this front: the 6c
+funnel/leaf sweep, straddle/RVC fetch arms, the writing-execute constancy
+export, and the φ clean-arm wiring.  The stacked blocks below are the
+chronological record.
+
 **STATUS (2026-08-12): §8.3's six items are ALL LANDED, and the store-case
 restriction is CLOSED** — the stale mirror (`iris/WeakStale.v`), the walk
 at it (`iris/WeakWalkStale.v`), the racy absorption theorem
@@ -33,11 +43,289 @@ phase-mono — legal because that trace has NO unpinned read, so the
 backward transfer (`trace_off_win`, vacuous) applies and the family is
 constant.  NO `trace_stale` widening was needed.
 
-What remains of this front: the rest of the 6b/6c consumer — the S-mode
-fetch-chain restatement and the WP rule that composes this peel (via the
-§9 kit for the two-translation case) with the instruction's certified
-tail, plus the step-level ghost matching against the absorption
-theorem's register wand and log arms.
+**AND THE FETCH PEEL IS IN (2026-08-12, `iris/WkFetchPeel.v` — 6a's
+restatement, the peel half, ALIGNED case).**  `wfetch_peel_of_exports`
+(+ the CPS `wfetch_peel_k`, the form 6c's funnel consumes; both
+`plat_term_write` only): the walk-peel premise bundle at
+`acc := InstructionFetch tt` plus a tail interface gives the peel of
+`fetch tt` at the PC page's leaf window.  THREE findings that shape the
+rest of 6a/6c:
+- **There is no `Defs.bind (translateAddr …) rest` seam in the base
+  monad** — the translation sits two `catch_early_return` levels down,
+  under `liftR`, in the early-return monad, and `try_catch` is a
+  fixpoint, not a bind.  The fix is generic and landed: `WkFetchPeel`
+  §1's **`wstep_ok_racy_kR`** — the CPS peel restated over
+  `Defs.monadR` (early return is a VALUE of the peel) with transports
+  to the `M`-level kit (`_kR_bind`, `_kR_liftR`, `_k_cer`).
+  Window-generic; anything else stated over `catch_early_return`
+  (i.e. every real instruction body) will peel through it.
+- **The 2-aligned (straddling) fetch is TWO translations at two
+  DIFFERENT leaf windows** (`fetch_bytes va va 2` then
+  `fetch_bytes va (va+2) 2`) — precisely the §9 seq-kit shape; TODO
+  recorded in the file header (aligned `F_Base` delivered; RVC-4 is
+  single-window and near-verbatim).
+- **The σ → post-translation pinnedness transport is NOT
+  peel-derivable** at `wD_any`/`W := True` (the write arm constrains no
+  address there, and the run-level exports sit at `W := False`), so the
+  tail rides an interface premise `wfetch_tail` at the post-translation
+  states — its READ half's producer is supplied
+  (`wfetch_tail_read`, from per-byte text pinnedness via
+  `wstep_eff_confined_pin`); its OUTCOME half (the translation's result
+  value and the post-state's text-pinnedness) is exactly what the IRIS
+  half of the restatement must discharge from the absorption theorem's
+  register wand + log arms.  That ghost half is 6a's remaining piece.
+
+**AND THE ⇐-BRIDGE IS IN (2026-08-13, `WeakStale` §10 — the
+ghost-matching keystone, all exports closed under the global context).**
+`wrun_exec_stale_elim` (+ `wexec_exec_stale_elim`): peel + the actual
+weak run ⇒ the run's result and post-state MATCH some Φ-admissible
+family member — `exec_stale ra rn w m (wflat_st s) = Some (x,
+wflat_st s', es)` — so a consumer pins result / post-registers /
+post-memory / trace by rewriting against the family it already owns
+(`exec_stale` is a function).  This is the walk's replacement for the
+started cone's patched-exec bridge.  THREE things to know:
+- **The correspondence needs the family's `trace_stale` traces as a
+  premise — nothing weaker works.**  Two irrefutable failure modes kill
+  any "no window read after a window write" attempt: (i) write-then-read
+  (a store raises the writer's own `coh`, making `pinned_read` true and
+  the machine read its own write while the mirror reads the patch), and
+  (ii) READ-ONLY — after a stale racy read, observing ANY newer message
+  anywhere (or a fence) pushes `w_vrNew` past the window's `latest_ts`,
+  `pinned_read` flips true, and a second unpinned window read returns
+  the latest while the mirror still returns the patch.  So the post-racy
+  tail must be `trace_off_win` — i.e. exactly `trace_stale`'s tail —
+  and the ⇐-bridge takes the SAME family-with-`trace_stale` bundle the
+  peel producer consumes.  One hypothesis serves both directions.
+- **The peel can take the AWAY arm at the window** (with `D := wD_any`
+  nothing forbids treating a pinned window read as ordinary), so the
+  witness discipline has three sources: the racy arm's value, the
+  coherent word when the run ends pre-racy, and the coherent word at an
+  away-arm window read.  The core elim is phase-GENERIC for this reason.
+- **The sixth shape (TLB-hit write-back `[excl; write]`) is refused by
+  `trace_stale`** (pre-racy write) and needs its own constant-family
+  elim `wrun_exec_stale_elim_const` (§10d) — vacuous `trace_off_win`,
+  no witness quantification — mirroring the peel side where that arm
+  also takes the non-stale route.  A consumer case-splitting on the
+  absorption arms gets ONE postcondition shape from both routes.
+
+**`wfetch_tail` IS DISCHARGED (2026-08-13) — the aligned fetch peel is
+SELF-CONTAINED.**  `WkFetchPeel` §4: `wfetch_peel_selfcontained` (+ the
+CPS `_k_` form; both `plat_term_write` only) — exports + text
+pins/contents + pure register gates in, the peel of the whole `fetch tt`
+out, no interface premises left.  The pieces: §10-0's log-append
+characterization (the ⇐-bridge elims now export "`latest_ts` unchanged
+at bytes no trace write touches" — the negative-case `latest_ts` append
+lemma did not exist and does now), `wwalk_run_outcome` (every run of a
+peeled translation returns `Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)`,
+with dev unchanged, `ws_le`, and latest_ts/flat preservation off the
+leaf window), and `pinned_read_ts_mono` (pinnedness transports along a
+run from the byte's OWN latest_ts stability + view growth alone).  The
+text-vs-window disjointness is the cheap premise `racc_disj la 8 pa 4`.
+ONE residual, deliberate: `wfetch_gates` (the tail's pure register
+facts, stated at post-translation states) stays a premise — the
+exports bundle drops the walk's `sregs` disjunct (tlb-only update), so
+recovering the gates σ-locally would need either a bundle extension or
+an `exec_eff` register-frame lemma; none of the gate registers is
+`tlb`, and the Iris layer will hold them from register ownership
+anyway.
+
+**THE IRIS FUPD IS IN (2026-08-13, `WkFetchPeel` §§5–6 —
+`wkpt_fetch_peel_at`; `plat_term_write` + funext, same as the
+absorption theorem it opens).**  One fupd: the absorption theorem's
+resources in (`kmap_at`/`reg_interp`/`wlog_auth`/`wlat_interp`/
+`wtlb_res_pt`), its full conclusion out PLUS the pure conjunct
+`racc_disj la 8 pa 4 → (the peel of `fetch tt` at the PC page's window
+∧ its wadm_filter)` — CONDITIONAL because `la` is minted inside the ∃
+(the funnel discharges the text-vs-slot disjointness from region
+geometry once it holds `la`).  Enablers, both worth knowing:
+- the absorption theorem's ghost-arm families now export the SC-shaped
+  register preservation `∀ r, register_beq r tlb = false →
+  register_lookup r (sregs sg') = register_lookup r (wm_regs σ)`
+  (derived from the dispatch's tlb-only disjunct via
+  `irrelevant_register_set`; `tlbvec` never exposed) — carried in
+  `wwalk_exports` as ONE hoisted run-equation-keyed field, so the
+  peel-side arms stay verbatim;
+- `wfetch_gates_of_regs`: the fetch tail's gates all discharge at σ
+  (pmpcfg/pmpaddr/pma_regions/htif/cur_privilege — none is `tlb`),
+  with only the text word's RAM geometry + the four PMP-grant facts +
+  `pma_allows_all` left as premises; the fetch-side pmp grant needed
+  one new lemma (`exec_eff_pmpCheck_supervisor_grant_fetch`, the load
+  grant's script with R→X).
+
+**THE WHOLE-STEP LAYER IS IN (2026-08-13, `iris/WkStepPeel.v` — peel,
+family and Q-half of `riscv_step tick` for a fetch-walking instruction
+with a window-free execute; axioms = `plat_term_write` + the
+reservation quartet, the same set the M-mode whole-step certificate
+carries once `execute` is mentioned).**  `wstep_peel_fetchwalk` /
+`wstep_family_fetchwalk` / `wstep_outcome_fetchwalk` /
+`wexec_outcome_of_peel`.  Structure facts worth keeping:
+`riscv_step tick = bind (try_step 0 false) (tick?)`; everything in
+`try_step` except `run_hart_active` is register-only; the fetch sits
+one `catch_early_return` down under a `liftR`, as the second argument
+of a `bind0` UNDER A BINDER (the interrupt result) — the §0 Ltac
+continuation-extractors (`rha_after_fetch`/`ts_after_rha`, extracted
+from the model term, not re-typed) exist for that reason.  Two new §1
+transports are the enabling ideas: `wstep_ok_racy_k_of_eff_nil` (an
+empty-trace `exec_eff` fact IS a CPS peel at either phase — makes every
+register-only wrapper free) and `wstep_ok_racy_kR_of_k_cer` (the
+converse of `_k_cer` — lets the post-fetch remainder be owed as an
+ordinary `wstep_ok` of its `catch_early_return`).  The family needed a
+genuine S-mode `fetch` at the stale mirror (`exec_stale_fetch_S` — did
+not exist).  Interfaces: three peel-side tails (`wexec_tail`,
+`wstep_post_tail`, `wstep_tick_tail`) and two family-side
+(`wstep_tail_eff`, `wstep_family_ready`) — kept SEPARATE (keyed on
+weak vs mirror post-states).  Gates: the interrupt arm is gated by
+⌜`dispatchInterrupt Supervisor = None`⌝ (the S-mode analog of the
+M-mode `MIE = false`); fetch-side premises are owed at `wmi σ b` for
+BOTH minstret-flag values (the funnel's choice is invisible).  ONE
+recorded narrowness: a WRITING window-free execute passes the peel but
+not the family on the TLB-hit shapes (no racy read + `trace_stale`
+forbids pre-racy writes) — the fix is routing those shapes through the
+`_const` disjunct, which needs `wwalk_exports` to expose the family
+member's per-shape CONSTANCY (the absorption theorem produces it; the
+bundle drops it).  Additive when needed.
+
+**THE WP RULE IS IN (2026-08-13, `iris/WkWalkRule.v` —
+`wp_wwalk_step`; axioms = WkStepPeel's set, NO funext).**  `wwalk_cert`
+(peel + disjunctive family + wexec-keyed Q-half at
+`wD_any`/`W := True`), the rule mirroring `wp_wracy_load`'s
+`wp_wrun_step` plumbing with the continuation's equation being
+`exec_stale la 8 u (riscv_step tick) (wflat_st σ) = Some (tt,
+wflat_st σ', es)` — the leaf's ghost work rewrites it against the
+family — plus the §10 latest_ts-off-window conjunct and
+`wstep_post_racy`.  NO `sync_win` premise: the PT window's φ-obligation
+is the CLEAN arm (witness: the absorption theorem's `nv_free` export);
+the wiring into φ's preservation is flagged in the header as the
+φ-mechanization's debt.  Inhabitation is real: `wwalk_site` bundles the
+peel+family site premises indexed on (σ, tick), and
+`wp_wwalk_step_cert_of_peel` turns "every P-state is a site" + a
+Q-half into a `wwalk_cert` — P is the leaf's site predicate, which is
+how the funnel instantiates it.
+
+**AND THE LOG IDENTITY IS EXPORTED (2026-08-13, the last ghost-matching
+gap).**  The rule's continuation now carries `wm_log σ' = wm_log σ ++
+wtrace_msgs tid rp es` — needed because flat-memory equality does NOT
+pin the log delta (a same-value rewrite appends invisibly), and the
+interp's log auth must match σ' exactly.  Finding: the message CLASS is
+not event-recoverable (`wm_class_of` reads the dynamic release-pending
+flag `w_relp`) but IS trace-recoverable — `wtrace_msgs` threads that
+one boolean and stays exact.  The WCexcl agreement between the
+projection of the walk's CAS write and the absorption theorem's
+appended-log arm is MACHINE-CHECKED (`wtrace_msgs_walk_ro/_wb` in
+WkWalkRule §4: read-only shapes project to `[]`, write-back to the one
+`WCexcl` message).  Small debt: the base elims keep their old
+five-conjunct statements with `_msgs` twins alongside (WkFetchPeel
+destructures positionally); collapsing is a 3-token widening at
+WkFetchPeel:1053/1088/1122, noted at WeakStale §10c — take it in the
+next consolidation sweep.
+
+**THE MINSTRET-FLAG WIDENING (2026-08-13) — the one gap the capstone
+recon found in the "no known gaps" path, closed by interface surgery.**
+`wwalk_site` owes the walk exports and fetch gates at the POST-flag-write
+states `wmi σ b` (the model's `try_step` writes `minstret_increment`
+BEFORE fetching, for both values the funnel may choose), but the fupd
+exported them at σ — and an `exec_stale` EQUATION cannot be transported
+across a register write after the fact (the run's register reads are not
+in the trace).  Lookup-shaped facts transport by `irrelevant_register_set`;
+run equations must be RE-PRODUCED at the modified start state, and only
+their producer can do it.  So the family became flag-indexed at its
+source: `wptree_translateAddr_stale_cases`' two arms gained an inner
+`∀ bf` with members starting at `set_reg sg (R_bool minstret_increment)
+bf` (arm choice stays bf-free — it is decided by the tlb/slot data), the
+absorption theorem passes it through, and `wkpt_fetch_peel_at` now
+exports `∀ bf, wwalk_exports/wfetch_gates` at the `wset_reg` states —
+i.e. exactly `wfetch_ready` at both `wmi σ b`.  Two consequences to
+know: the three exec_eff premises of the chain (`translationMode`,
+`effectivePrivilege`, `is_shadow_stack_access`) are now owed ∀bf at the
+modified states (the leaf discharges them from lookups); and the
+REGISTER WAND is keyed at the flag-advanced map — the LEAF advances the
+`minstret_increment` cell itself (it owns it) and the wand only crosses
+the hidden tlb update.  General lesson: any absorption-style export a
+whole-step consumer will use MID-STEP must be stated at the mid-step
+register states from the start.
+
+**AND THE TAIL DISCHARGERS ARE IN (2026-08-13, `iris/WkWalkTails.v` —
+the ladder between the fupd's exports and `wwalk_site`'s four tails).**
+`wfetch_site`/`winstr_site` premise bundles (instantiated at `wmi σ bmi`
+via `_wmi` transports); `wfetch_run_outcome` — every weak run of
+`fetch tt` at a site returns `F_Base w` with non-tlb registers and
+off-window memory preserved (the `wwalk_run_outcome` recipe one level
+up: peel + stale family + ⇐-bridge elims); `wexec_regonly i F` (the
+register-only-execute interface; the only F-fact the ladder needs is
+`F hart_state = false`) with the mirror remainder
+`exec_eff_rha_after_fetch_base` (the landing-pad check short-circuits on
+a clear `elp`, so no `is_lpad_instruction` premise) and the new
+`wstep_ok_of_eff_nil` embedding; `wexec_tail_of` / `wstep_post_tail_of`
+/ `wstep_tick_tail_of` / `wstep_family_ready_of`.  Routes that matter:
+`ts_after_rha` is NOT total-quiet (trap arms + the retire arm's
+hart-active assert), so `wstep_post_tail` pins `sv` via an rha-level
+run-outcome rather than totality; `step_tick` IS total-quiet, but
+`tick_clock`'s totality carries funext (via
+`exec_eff_clint_dispatch_false`), so the funext lives in one optional
+corollary (`wstep_tick_tail_of_tick`) and nowhere else.  One interface
+fix on the way: `wstep_family_ready` is now GUARDED by
+`wwalk_filter w0 lw` (the unguarded `∀ u : bv 64` demanded mirror runs
+for wild words the walk layer cannot describe; all of
+`wstep_family_fetchwalk`'s uses already held the filter fact).
+
+**AND 6c'S VALIDATION CAPSTONE IS IN (2026-08-13, `iris/WkWalkCapstone.v`
+— `wwp_walk_addi`; axioms = `plat_term_write` + funext + the reservation
+quartet, i.e. the WP rule's set plus the funext the tick-totality premise
+brings in).**  One whole WP leaf for a FETCH-WALKING S-mode `addi rd,rs1,imm`
+at a kernel VA mapped executable by the kernel table: `wkpt_fetch_peel_at`'s
+outputs threaded into a `wwalk_site`-shaped site predicate, `wp_wwalk_step`
+driven, and `wmstate_interp σ'` fully re-established (registers, log,
+latest-write, device, views, φ).  Four things worth keeping:
+
+- **THE ARM'S MESSAGE CLASS HAD TO BE PINNED, and it was an interface
+  defect, not a proof gap.**  `wtlb_res_pt_translateAddr_stale_at`'s
+  write-back arm handed out `wlog_auth (wm_log σ ++ [wwrite_msg tid kcls …])`
+  with `kcls` EXISTENTIALLY quantified, while the rule's log-identity
+  conjunct names the same message at `WCexcl` (`wm_class_rp_latest`) — so the
+  successor's log authority could not be identified with `wm_log σ'` and the
+  write-back arm was unclosable.  The theorem's own proof already
+  instantiates `WCexcl`; the fix was to say so in the statement (WeakKptStale
+  §3 and its `WkFetchPeel` §6 re-export).  **General rule: an existential in
+  a ghost-arm's LOG SHAPE is unusable — the consumer must re-establish the
+  interp at the log the machine really produced.**
+- **The region is not σ-recoverable**: nothing exports the
+  `matching_pma_region` equation outside a `wrun` premise, so the leaf's site
+  predicate quantifies `region` EXISTENTIALLY (`wsite_addi`) and its
+  certificate destructs it; `p2 p1 lw`, by contrast, are leaf PARAMETERS
+  that the caller's σ-callback pins with three `pt_slot_mem` facts
+  (`pt_slot_mem_inj`: a slot fact is a flat lookup, hence functional).
+- **The reducibility witness needed a new transfer.**  `wp_wwalk_step` asks
+  for an ordinary `exec (riscv_step false) (wflat_st σ)`, and
+  `exec_eff_of_exec_stale`'s `trace_off_win` side condition is FALSE for a
+  walk (the plain leaf read is an unpinned read AT the window).  What is true
+  is that at the COHERENT word the patch is the identity
+  (`write_bytes_id`), so §2's `exec_eff_of_exec_stale_id` transfers the
+  member at `u := lw` back to `exec_eff` under `tstale_id` — "after the first
+  RAM write, the rest of the trace is `trace_off_win`", which the walk's six
+  shapes satisfy (the CAS write is last, and only the TEXT read follows).
+- **Two mechanical mirrors the tree still lacked**, both in the capstone
+  file and both reusable: `exec_eff_getPendingSet_supervisor_none` /
+  `_dispatchInterrupt_supervisor_none` (SmodeCore's S-mode gate at
+  `exec_eff`; `misa.S`, `mie & ~mideleg = 0`, `mstatus.SIE = 0`), and
+  `exec_eff_ts_after_rha_retire_at` — `WkWalkTails`' retire postlude with its
+  POST-STATE SPELLED OUT, which the ghost side needs (the totality form
+  cannot say which registers moved).  The whole-step mirror at the ADDI,
+  post-state and trace included, is `exec_stale_step_addi`.
+
+The capstone's caller-facing obligations, deliberately left as a σ-callback:
+the three slot pins, ⌜∀ a, `nv_free` (wm_log σ) a⌝ (the φ-mechanization's
+stand-in — the absorption theorem exports the leaf window's half already),
+and `wwalk_cert`'s vestigial PC-window `pinned_read` (inherited from
+`wracy_cert`'s shape, where the pc window was physical;
+`wp_wwalk_step_cert_of_peel` never uses it).
+
+**The fetch-walking instruction story is now complete from the Sail
+model to the WP, ghost matching included**: model mirrors → absorption
+→ peels → ⇐-bridge (outcome + registers + memory + LOG) → step
+certificate → `wp_wwalk_step`, with `wkpt_fetch_peel_at` supplying the
+resource side.  What remains of this front: the funnel/leaf sweep proper, the
+straddle/RVC fetch arms over §9 + `wstep_ok_racy_kR`, the
+writing-execute constancy export, and the φ clean-arm wiring.
 
 **DECISION (2026-08-12, the φ-upgrade author, as §5 requested): take
 option (a), and do NOT start until the in-flight C/D/S points-to surgery
