@@ -1063,3 +1063,7 @@ WkYieldFrame.v
 WkCtxSurface.v
 KernelSitesDef.v
 KernelSites.v
+
+WeakEvLang.v
+WeakEvPf.v
+WeakEvAdequacy.v
