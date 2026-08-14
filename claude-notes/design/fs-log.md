@@ -1967,3 +1967,21 @@ on `SpecKexec` and three inline lemma statements plus four intro lines in
 
 Gate: MAKE_EXIT=0, 1086 `.vo`, staleness 0, `make -n` 0 `COQC`, md5s
 verified on all sixteen files.
+
+
+### G.23 C4 LANDED (2026-08-14, 7792d247) — the writer's tier
+
+The probe's verdict held: the mint is hoisted above the arm split and the
+auth is live at the AU's fire point, so the wand change was a re-ordering
+(~25 lines).  The closing wand now hands the ghost step's own witness
+(logged_at γ e0 (uint bno) with ⌜v <= e0⌝, v bound INSIDE the fupd — the
+probe's correction to §1.4's signature, since the region's counter value
+exists only under the invariant).  §G.17's blocker-4 paragraph described
+only the depositor's tier; this section is the writer's.  The sixth
+iupdate body wp_iupdate_unlink consumes the ilink and takes the receipt
+premise DISJUNCTIVELY — the witness route (ties inside the arm — with
+them unconditional the disjunction is inert, RATIFIED) for the
+zero-writing flush, the vacuous route (⌜nlink ≠ 0⌝) for the
+parent-decrement; both live, first consumers create's fail arm and
+sys_unlink respectively.  The mirror copy /shared/xv6iris-c4 stays for a
+cheap re-gate until the campaign closes.
