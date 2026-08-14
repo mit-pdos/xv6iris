@@ -85,6 +85,9 @@ Require Import RiscvPtsto RiscvExtras.
    No class comes with it: the log's ghost lives in [logG], which this file
    does not need and does not take. *)
 Require Import LogInv.
+(* [WpLock] for [lockG] itself -- [Import] is not transitive, and without it
+   the [!lockG Σ] binders below auto-generalize into a fresh variable. *)
+Require Import WpLock SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -428,6 +431,19 @@ Class icfg := MkIcfg {
   icfg_log : log_names;
   icfg_ist : Z;
   icfg_iep : Z -> gname;
+  (* THE PER-SLOT SLEEPLOCK GNAME, and it is here for exactly [icfg_iep]'s
+     reason.  A reference to slot [k] carries a share of the right to attempt
+     that slot's sleeplock ([SleepLock.slh_tok], the thing whose authoritative
+     zero lets [iput] take the lock without blocking -- see
+     claude-notes/projects/iput-acquiresleep.md), so [iref_tok] has to NAME
+     the gname; it cannot stay existential inside [ic_sleeplocks].  A FAMILY
+     over the SLOT rather than one gname because each slot's lock is its own.
+
+     It is allocated BEFORE any lock is built ([isl_fun_alloc] below, and
+     [SleepLock.new_sleeplock_gen_at] which builds a lock at a gname it is
+     given) -- the ordinary constructor allocates the gname itself, which is
+     too late for anything that has to mention it. *)
+  icfg_isl : nat -> gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -511,7 +527,28 @@ Proof.
   case_decide as Hd; [exfalso; lia | done].
 Qed.
 
-Lemma icfg_alloc `{!riscvGS Σ, !icacheG Σ} (dv : mword 32) (nib : nat)
+(* the per-slot sleeplock ghosts, allocated as a family exactly as
+   [iep_fun_alloc] allocates the observation counters.  What comes out per
+   slot is [sl_free_tok] -- an unbuilt lock's free arm -- and the
+   authoritative zero, which is what [itable_body] parks for a free slot. *)
+Lemma isl_fun_alloc {Σ} `{!riscvGS Σ, !lockG Σ} (n j : nat) :
+  ⊢@{iPropI Σ} |==> ∃ f : nat -> gname,
+    [∗ list] k ∈ seq j n, sl_free_tok (f k) ∗ slh_auth (f k) None.
+Proof.
+  iInduction n as [|n IH] forall (j).
+  { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
+  iMod slh_ghost_alloc as (γ) "Hg".
+  iMod ("IH" $! (S j)) as (f) "Hf".
+  iModIntro. iExists (fun z => if decide (z = j) then γ else f z).
+  assert (Hcons : seq j (S n) = j :: seq (S j) n) by reflexivity.
+  rewrite Hcons big_sepL_cons. iSplitL "Hg".
+  { case_decide as Hd; [iExact "Hg" | congruence]. }
+  iApply (big_sepL_mono with "Hf"). intros i k Hk.
+  apply lookup_seq in Hk as [-> _].
+  case_decide as Hd; [exfalso; lia | done].
+Qed.
+
+Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (nib : nat)
     (LM : linkUR) (γlog : log_names) (ist : Z) :
   ✓ LM ->
   ⊢ |==> ∃ (ICFG : icfg) (g0 : gname),
@@ -521,10 +558,13 @@ Lemma icfg_alloc `{!riscvGS Σ, !icacheG Σ} (dv : mword 32) (nib : nat)
       own icfg_live (live_boot_map g0) ∗
       own icfg_link LM ∗
       ([∗ list] k ∈ seq 0 (16 * nib),
-         mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0).
+         mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0) ∗
+      ([∗ list] k ∈ seq 0 NINODE,
+         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None).
 Proof.
   intros HLM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
+  iMod (isl_fun_alloc NINODE 0) as (fisl) "Hisl".
   iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
   { by apply auth_auth_valid. }
   (* the boot generation: a gname is all the pool needs, and minting it as a
@@ -535,8 +575,8 @@ Proof.
   iMod (own_alloc (live_boot_map g0)) as (γl) "Hl".
   { apply live_boot_map_valid. }
   iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
-  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep), g0.
-  cbn [icfg_iep]. by iFrame "Ha Hl Hlk Hep".
+  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl), g0.
+  cbn [icfg_iep icfg_isl]. by iFrame "Ha Hl Hlk Hep Hisl".
 Qed.
 
 (* ===================================================================== *)

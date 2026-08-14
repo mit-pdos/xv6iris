@@ -66,6 +66,97 @@ tracks. No new premise on
 `"sleep lock" ∉ {["itable"]} ∪ lks` needs only that the two names differ. The
 single consumption site is `ProofIput.v:1881`.
 
+### Step 4, worked out: the share rides on `iref_tok`, at the SAME fraction
+
+The pieces all exist; what follows is where each one goes. Read
+[`design/fs-icache.md`](../design/fs-icache.md) §3 (the Arc algebra) and §5(b)
+(REF-1) first — this only adds a second fragment alongside the ones already
+there.
+
+**(1) The sleeplock gname becomes a canonical FAMILY on `icfg`.**
+`iref_tok k q` has to name the slot-`k` sleeplock's `γ`, so it cannot stay
+existential inside `ic_sleeplocks`. Add `icfg_isl : nat -> gname` beside
+`icfg_iep : Z -> gname`, which is the same device for the same reason
+(`IcacheRef.v`'s comment on `icfg_iep`), allocated in `icfg_alloc` by a family
+allocator mirroring `iep_fun_alloc`. `ic_sleeplocks` then pins its second
+gname: `∃ γil, is_sleeplock_gen γil (icfg_isl k) (i_lock (ientry k)) "inode"
+(ic_tok cn k) (slh_tok (icfg_isl k))`, and its consumers
+(`ic_sleeplocks_acc`'s `as (gil gisl)` in ProofFileclose / ProofFilewrite /
+ProofFilestat / ProofKexit / ProofDirlink / ProofIput) drop the second binder.
+
+**This needs one new SleepLock constructor.** `new_sleeplock_gen` allocates the
+gname itself, but `icfg_alloc` runs before the locks are built, so boot must
+allocate the NINODE ghosts FIRST and build each lock at a gname it is given.
+Add `slh_ghost_alloc : |==> ∃ γ, sl_free_tok γ ∗ slh_auth γ None` and an
+`_at` form of `new_sleeplock_gen`/`sl_fresh_new_gen` that consumes
+`sl_free_tok γ` instead of allocating. Small and self-contained.
+
+**(2) `iref_tok k q` carries `slh_tok (icfg_isl k) q` — the same `q`.**
+That is the whole trick and it is why the share had to be a fraction: a
+reference is already `iref_frag k q ∗ live_frac k q` at a `q : Qp`, and the
+sleeplock share splits and joins along exactly the same axis, so `idup`'s
+split and `iget`/`iput`'s mint/return need no new arithmetic.
+
+**(3) `itable_body` gains `isl_auths M`, coupled to `M` the way `live_pool M`
+already is:**
+
+```coq
+Definition isl_auths (M : gmap nat (Qp * positive)) : iProp Σ :=
+  ([∗ list] k ∈ seq 0 NINODE, slh_auth (icfg_isl k) (fst <$> M !! k))%I.
+```
+
+i.e. the total outstanding sleeplock share for slot `k` IS the total reference
+fraction the Arc authority records, and `None` — the authoritative zero — for a
+free slot. The four ghost steps then line up one-for-one with the Arc ones:
+`iget` on a free slot `slh_mint_none`; `idup` splits the token and leaves the
+authority alone (the total is unchanged); a non-last `iput` `slh_return`s; the
+last one `slh_return_last`s to `None`.
+
+**(4) REF-1 hands `iput` the zero.** At `ip->ref == 1`, `iref_lookup` already
+gives `M !! k = Some (q, 1)` with `q` the thread's own share
+(`design/fs-icache.md` §5(b)). So the invariant holds `slh_auth (icfg_isl k)
+(Some q)` and the thread holds `slh_tok (icfg_isl k) q`;
+`slh_return_last` turns the pair into `slh_auth (icfg_isl k) None`, which is
+exactly `wp_acquiresleep_nb_sconf`'s premise. The call mints a fresh share for
+its own deposit and returns `slh_auth (icfg_isl k) (Some q')`; the matching
+`releasesleep` (the `_gen` contract) hands `slh_tok (icfg_isl k) q'` back and a
+second `slh_return_last` restores the zero — which is what the now-free slot's
+`isl_auths` wants, since `iput` has retired the entry.
+
+**(5) `ilock`/`iunlock` move to the `_gen` contracts** so the deposit is
+threaded: `ilock` spends the caller's `slh_tok (icfg_isl k) q` into the lock
+and returns `sleeplocked_q (icfg_isl k) q`; `iunlock` gives it back. Their
+callers see no new premise — the share was already inside `iref_tok`.
+
+**Order of work.** (1) SleepLock's `_at` constructors + `icfg_isl` + the
+`ic_sleeplocks` re-pin; (2) `iref_tok` and `isl_auths`, with the four ghost
+steps; (3) ilock/iunlock; (4) iput and the axiom; (5) step 5 below. Stages 1
+and 2 rebuild most of the tree, so batch them.
+
+**5. THE NESTED BLOCKING CONTRACT GOES, AND acquiresleep BECOMES noff = 0
+ONLY.** `NOT DONE`, and it falls out of step 4 rather than needing work of its
+own. `sched()` panics on `noff != 1` (`SpecSleep.v`'s header: the nested sleep
+"reaches sched() at noff >= 2", and only one of its two arms panics), so a
+contract that can SLEEP must be entered at noff = 0 if that panic is ever to be
+shown unreachable. `wp_acquiresleep_sconf` already is (`cpu_own 0`). The only
+violator is the NESTED BLOCKING contract
+(`wp_acquiresleep_nested_{gen_,}sconf`, entry `cpu_own (S n)`): its wait loop
+reaches `sleep` at noff = n+2, and it is provable only because
+`SpecSleep.wp_sleep_nested_body` offers the panic arm.
+
+Its only consumer is `ProofIput.v:1882`; and that wait loop is in turn
+`wp_sleep_nested_*`'s only consumer. So once step 4 moves `iput` to
+`wp_acquiresleep_nb_sconf`, DELETE `wp_acquiresleep_nested_gen_body` /
+`wp_acquiresleep_nested_body` and their proofs, `asl_nloop_proof`, and the
+`asl_nexit`/`asl_nloop` pair with them — after which every contract that can
+sleep is entered at noff = 0 and `SpecSleep`'s nested arm is client-less, which
+is the setup for retiring the "sched locks" panic.
+
+**Sequencing decided:** do step 4 first and let step 5 fall out of it, rather
+than deleting the nested contract early and giving `iput` a stand-in axiom.
+The tree then never carries an axiom for this at all — the FALSE one is
+replaced by a proof, not by a truer axiom.
+
 ## What the sleeplock layer grew for step 3
 
 ### The HELD arm cannot stay pure, and that is forced

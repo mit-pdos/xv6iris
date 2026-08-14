@@ -464,6 +464,50 @@ Section SleepLock.
      two persistent names and the resource become a sleeplock.  The counting
      authority starts at the AUTHORITATIVE ZERO, which is what a tracked
      client keeps and hands out shares from. *)
+  (* ---- ALLOCATING THE GHOST BEFORE THE LOCK.
+
+     [new_sleeplock_gen] allocates the gname itself, which is right for a
+     caller that builds one lock and names it afterwards.  A client whose
+     OTHER resources have to mention the gname cannot use it: the icache's
+     [iref_tok k q] carries [slh_tok (icfg_isl k) q], so [icfg_isl] has to
+     exist -- and be fixed in the ambient config -- before any inode
+     sleeplock is built (claude-notes/projects/iput-acquiresleep.md, step 4).
+
+     So the ghost is separable: allocate it, put the names where they belong,
+     and build each lock AT the gname it was given.  [sl_free_tok γ] is
+     exactly what an unbuilt lock's free arm wants, which is why it is the
+     thing handed over. *)
+  Lemma slh_ghost_alloc : ⊢ |==> ∃ γ : gname, sl_free_tok γ ∗ slh_auth γ None.
+  Proof.
+    iMod (own_alloc (((●E (1%Qp : leibnizO Qp), ε) : slhUR)
+                     ⋅ ((◯E (1%Qp : leibnizO Qp), ε) : slhUR)
+                     ⋅ ((ε, ● (None : optionUR ufracR)) : slhUR))) as (γ) "Hg".
+    { rewrite -!pair_op !left_id !right_id. apply pair_valid.
+      split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
+    iDestruct "Hg" as "[[Hha Htok] Hauth]".
+    iModIntro. iExists γ. iFrame "Hauth". iExists 1%Qp. iFrame.
+  Qed.
+
+  Lemma new_sleeplock_gen_at E (γ : gname) (slk : mword 64) (s : string)
+      (R : iProp Σ) (H : Qp -> iProp Σ) :
+    sl_free_tok γ -∗
+    lock_name (sl_lk slk) "sleep lock"%string -∗
+    sl_name slk s -∗
+    sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
+    slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    R ={E}=∗ ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
+  Proof.
+    iIntros "Hfree #Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
+    iDestruct "Hfree" as (q0) "[Htok Hha]".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H)
+            with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+    { iApply (sl_res_close_free with "Hw Htok Hha Hpid HR"). }
+    iModIntro. iExists γl.
+    iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
+  Qed.
+
   Lemma new_sleeplock_gen E (slk : mword 64) (s : string) (R : iProp Σ)
       (H : gname -> Qp -> iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
@@ -550,6 +594,19 @@ Section SleepLock.
   Proof.
     iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
     iApply (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
+  Qed.
+
+  (* [sl_fresh_new_gen] at a PRE-ALLOCATED gname -- what an array
+     initializer (iinit over itable.inode[]) uses when the gnames had to be
+     fixed before the locks were built.  See [new_sleeplock_gen_at]. *)
+  Lemma sl_fresh_new_gen_at E (γ : gname) (slk : mword 64) (s : string)
+      (R : iProp Σ) (H : Qp -> iProp Σ) :
+    sl_free_tok γ -∗ sl_fresh slk s -∗ R ={E}=∗
+    ∃ γl : gname, is_sleeplock_gen γl γ slk s R H.
+  Proof.
+    iIntros "Hfree (Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
+    iApply (new_sleeplock_gen_at E γ slk s R H
+              with "Hfree Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
   Qed.
 
   (* the TRACKED end: the caller keeps the authoritative zero and hands out
