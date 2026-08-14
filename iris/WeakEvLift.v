@@ -699,6 +699,7 @@ Section ram.
     (∀ σ : wgstate,
        ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
        ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+       wlog_lb (wglog σ) -∗
        wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
        ▷ |={∅,⊤}=>
          ⌜forall j : nat, (j < N.to_nat n)%nat ->
@@ -721,7 +722,8 @@ Section ram.
     iDestruct (weak_state_interp_mem σ c with "Hσ") as
       "(%Hbnd & %Hnv & %Hwf & Hlog & Hlat & Hwsa & Hcl)".
     iDestruct (hart_ws_agree with "Hwsa Hws") as %->.
-    iMod ("Hk" $! σ with "[//] [//] [%] Hlat") as "Hk"; [exact (Hbnd c)|].
+    iDestruct (wlog_snapshot with "Hlog") as "[Hlog #Hlb]".
+    iMod ("Hk" $! σ with "[//] [//] [%] Hlb Hlat") as "Hk"; [exact (Hbnd c)|].
     iModIntro. iSplitR.
     { iPureIntro. do 2 eexists. simpl. rewrite Hdev. by split_and!. }
     iNext. iIntros (e' σ') "%Hcy". simpl in Hcy. rewrite Hdev in Hcy.
@@ -780,6 +782,7 @@ Section ram.
     (∀ σ : wgstate,
        ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
        ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+       wlog_lb (wglog σ) -∗
        wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
        (* THE READ IS ENABLED: the caller exhibits one admissible read *)
        ⌜exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
@@ -818,14 +821,15 @@ Section ram.
     iDestruct (weak_state_interp_mem σ c with "Hσ") as
       "(%Hbnd & %Hnv & %Hwf & Hlog & Hlat0 & Hwsa & Hcl)".
     iDestruct (hart_ws_agree with "Hwsa Hws") as %->.
-    iMod ("Hk" $! σ with "[//] [//] [%] Hlat0") as "[%Hen Hk]";
+    iDestruct (wlog_snapshot with "Hlog") as "[Hlog #Hlb]".
+    iMod ("Hk" $! σ with "[//] [//] [%] Hlb Hlat0") as "[%Hen Hk]";
       [exact (Hbnd c)|].
     iModIntro. iSplitR.
     { iPureIntro. destruct Hen as (w & tvs & Hlen & Hbytes & Hrd).
       do 2 eexists. simpl. rewrite Hdev. split; [exact Hcoh|].
-      left. exists w, tvs. by split_and!. }
+      left. split; [exact Hlat|]. exists w, tvs. by split_and!. }
     iNext. iIntros (e' σ') "%Hcy". simpl in Hcy. rewrite Hdev in Hcy.
-    destruct Hcy as (_ & [(w & tvs & Hlen & Hbytes & Hrd & -> & ->)
+    destruct Hcy as (_ & [(_ & w & tvs & Hlen & Hbytes & Hrd & -> & ->)
                          |(Hbad & _)]); [|by rewrite Hlat in Hbad].
     iMod ("Hk" $! w tvs with "[//] [//] [//]") as "(%Hnvok & Hlat0 & Hcont)".
     iMod (hart_ws_update c (wgws σ c) (wgws σ c)
@@ -851,3 +855,468 @@ Section ram.
   Qed.
 
 End ram.
+
+(* ====================================================================== *)
+(** ** 6. THE FUSED RMW — the one-event lock acquire (S4 gap 2)
+
+    [WeakEvLang] (D3): the exclusive read, the silent window and the
+    conditional write are ONE event, so a lock acquire is ONE
+    invariant/escrow access exactly as it is at instruction granularity —
+    which is why fail criterion 2 does not bite at the acquire (finding
+    (F5)).  The rule is [ewp_ev_store] and [ewp_ev_load] fused: its callback
+    is opened once, around the single event, and it pays C/D/S for every
+    floor the fused pair moved.
+
+    THE ONE PLACE THE BATCHING FOOTPRINT LEAKS INTO A MEMORY-EVENT RULE, and
+    the recorded reason.  The window's register writes happen INSIDE the
+    event, so the successor's register file is the machine's [rs1] and the
+    rule must move the register authority there in one ghost update — which
+    it can only do for registers the caller's frame covers.  Hence the pure
+    premise [Hconf]: every window the machine can take at this node is one
+    the reflective stepper takes at the declared footprint [D].  It is a fact
+    about the node (no state, no logic), it is exactly what the certification
+    computes anyway, and without it the rule is not merely harder to prove —
+    it is FALSE, because a window that writes an unowned register cannot
+    re-establish [gregs_interp]. *)
+
+Definition ermw_ok (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
+    (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit)
+    (w : bv (8 * n)) (tvs : list (nat * bv 8)) (data : list (bv 8))
+    (rl : bool) (m1 m2 : M unit) (rs1 : regstate) : Prop :=
+  length tvs = N.to_nat n /\
+  (forall j : nat, (j < N.to_nat n)%nat -> tvs.*2 !! j = Some (nth_byte w j)) /\
+  read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c)
+    (ak_sync (classify (Interface.ReadReq.access_kind req))) false
+    (pa_z (Interface.ReadReq.pa req)) tvs /\
+  excl_ok (wglog σ) (fin_to_nat c) (pa_z (Interface.ReadReq.pa req)) tvs
+    (S (length (wglog σ))) /\
+  data <> [] /\ length tvs = length data /\
+  esilent_run (K (inl (w, None)), wgregs σ c) (m1, rs1) /\
+  ewr_node m1 rl (pa_z (Interface.ReadReq.pa req)) data m2.
+
+(** The successor's view: the load's post-state, then the store's. *)
+Definition ermw_ws (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
+    (tvs : list (nat * bv 8)) (data : list (bv 8)) (rl : bool) : wstate :=
+  store_post_run
+    (load_post_run (wgws σ c)
+       (ak_sync (classify (Interface.ReadReq.access_kind req)))
+       (pa_z (Interface.ReadReq.pa req)) tvs.*1)
+    rl (pa_z (Interface.ReadReq.pa req)) (length data) (S (length (wglog σ))).
+
+Definition ermw_msg (σ : wgstate) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
+    (data : list (bv 8)) : wmsg :=
+  WMsg (pa_z (Interface.ReadReq.pa req)) data (Some (fin_to_nat c)) WCexcl.
+
+Section rmw.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  (** The combined accessor: [weak_state_interp_regs] and
+      [weak_state_interp_mem] at ONCE, closing at [ewg_rmw] — which is the
+      only σ-update shape that moves registers, views and the log together. *)
+  Lemma weak_state_interp_rmw (σ : wgstate) (c : CPU) :
+    weak_state_interp σ ⊢
+      ⌜forall c' : CPU, ws_bounded (wgws σ c') (length (wglog σ))⌝ ∗
+      ⌜no_violation (wglog σ) (wgws σ)⌝ ∗ ⌜wlog_wf (wglog σ)⌝ ∗
+      reg_interp_at (cpu_reg_name c) (wgregs σ c) ∗
+      wlog_auth (wglog σ) ∗ wlat_interp (wgimg σ) (wglog σ) ∗
+      wws_auth c (wgws σ c) ∗
+      (∀ (rs' : regstate) (ws' : wstate) (lg' : list wmsg),
+         ⌜(length (wglog σ) ≤ length lg')%nat⌝ -∗
+         ⌜ws_bounded ws' (length lg')⌝ -∗
+         ⌜nv_hart lg' c ws'⌝ -∗
+         ⌜exists ms, lg' = (wglog σ ++ ms)%list /\
+                (forall m, m ∈ ms -> wm_tid m = Some (fin_to_nat c))⌝ -∗
+         ⌜wlog_wf lg'⌝ -∗
+         reg_interp_at (cpu_reg_name c) rs' -∗
+         wlog_auth lg' -∗ wlat_interp (wgimg σ) lg' -∗ wws_auth c ws' -∗
+         weak_state_interp (ewg_rmw σ c rs' ws' lg')).
+  Proof.
+    rewrite /weak_state_interp /ewg_rmw.
+    cbn [wgregs wgimg wglog wgws wgdev wggen wgpow].
+    iIntros "(%Hpin & %Hbnd & %Hnv & %Hwf & Hgr & $ & Hlog & Hlat & Hws)".
+    iDestruct (gregs_interp_acc_at c with "Hgr") as "[$ Hgrcl]".
+    iDestruct (wws_interp_acc_at c with "Hws") as "[Hwsc Hwscl]".
+    iFrame "Hlog Hlat Hwsc". iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iIntros (rs' ws' lg') "%Hlen %Hb' %Hnvh %Hown %Hwf' Hrs Hlog Hlat Hwsc".
+    iDestruct ("Hgrcl" with "Hrs") as "Hgr".
+    iDestruct ("Hwscl" with "Hwsc") as "Hws".
+    iSplitR; [by iPureIntro|].
+    iSplitR.
+    { iPureIntro. intros c0. destruct (decide (c0 = c)) as [->|Hne].
+      - rewrite gws_insert_eq. exact Hb'.
+      - rewrite gws_insert_ne; [|done].
+        exact (ws_bounded_mono _ _ _ (Hbnd c0) Hlen). }
+    iSplitR.
+    { iPureIntro. destruct Hown as (ms & Hms & Hms2). rewrite Hms.
+      apply (no_violation_step (wglog σ) ms (wgws σ) _ c Hnv Hbnd Hms2).
+      - intros c0 Hne. by rewrite gws_insert_ne.
+      - rewrite gws_insert_eq -Hms. exact Hnvh. }
+    iSplitR; [by iPureIntro|].
+    rewrite /insert /greg_insert. iFrame "Hgr Hlog Hlat Hws".
+  Qed.
+
+  (** *** The register accounting of ONE silent node, factored out of
+      [ewp_ev_sil_node] so that the fused RMW's window can reuse it at the
+      GHOST level (there is no WP inside an event). *)
+  Lemma ereg_frame_node (c : CPU) (D : gset register)
+      (rs rs1 rs0 rs2 : regstate) (m m1 : M unit) :
+    esil_node D rs m = Some (rs1, m1) ->
+    esil_node D rs0 m = Some (rs2, m1) ->
+    reg_interp_at (cpu_reg_name c) rs0 -∗ ereg_frame c rs D ==∗
+    reg_interp_at (cpu_reg_name c) rs2 ∗ ereg_frame c rs1 D.
+  Proof.
+    intros Hnode Hnode2. iIntros "Hri Hrf".
+    destruct m as [y|T oc k]; [by simpl in Hnode|].
+    destruct oc; simpl in Hnode; try discriminate Hnode;
+      first
+        [ case_decide as HrD; [|discriminate Hnode];
+          injection Hnode as Hq1 Hq2; simpl in Hnode2;
+          case_decide; [|discriminate Hnode2];
+          injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+          iMod (ereg_frame_update c rs D _ regval rs0 HrD with "Hri Hrf")
+            as "[Hri Hrf]";
+          iModIntro; by iFrame "Hri Hrf"
+        | case_decide as HrD; [|discriminate Hnode];
+          injection Hnode as Hq1 Hq2; simpl in Hnode2;
+          case_decide; [|discriminate Hnode2];
+          injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+          iModIntro; iFrame "Hri"; by iApply (ereg_frame_ext c rs rs D)
+        | injection Hnode as Hq1 Hq2; simpl in Hnode2;
+          injection Hnode2 as Hq3 Hq4; subst rs1 rs2;
+          iModIntro; iFrame "Hri"; by iApply (ereg_frame_ext c rs rs D) ].
+  Qed.
+
+  Lemma ereg_frame_of c rs rs' D :
+    reg_agree_on D rs rs' -> ereg_frame c rs D -∗ ereg_frame c rs' D.
+  Proof.
+    intros H. rewrite (ereg_frame_ext c rs rs' D H). iIntros "H". iExact "H".
+  Qed.
+
+  Lemma reg_agree_on_sym D rs rs' :
+    reg_agree_on D rs rs' -> reg_agree_on D rs' rs.
+  Proof. intros H r Hr. by rewrite (H r Hr). Qed.
+
+  (** ... and a WHOLE silent stretch, at the ghost level: the authority
+      follows the machine, the frame follows it pointwise on [D]. *)
+  Lemma ereg_frame_rtc (c : CPU) (D : gset register) (x y : M unit * regstate) :
+    rtc (esilD D) x y ->
+    forall rs : regstate, reg_agree_on D rs x.2 ->
+    reg_interp_at (cpu_reg_name c) x.2 -∗ ereg_frame c rs D ==∗
+    reg_interp_at (cpu_reg_name c) y.2 ∗ ereg_frame c y.2 D.
+  Proof.
+    induction 1 as [x|x y0 z Hxy _ IH]; intros rs Hag.
+    - iIntros "Hri Hrf". iModIntro. iFrame "Hri".
+      by iApply (ereg_frame_of c rs x.2 D Hag).
+    - iIntros "Hri Hrf". rewrite /esilD in Hxy.
+      destruct (esil_node_agree D x.2 rs x.1 y0.1 y0.2
+                  (reg_agree_on_sym D rs x.2 Hag) Hxy)
+        as (rs2 & Hnode2 & Hag2).
+      iMod (ereg_frame_node c D rs rs2 x.2 y0.2 x.1 y0.1 Hnode2 Hxy
+              with "Hri Hrf") as "[Hri Hrf]".
+      iApply (IH rs2 (reg_agree_on_sym D y0.2 rs2 Hag2) with "Hri Hrf").
+  Qed.
+
+  (** THE RULE.  Compare [WeakAcquire.wwp_acquire_swap]: same shape, one
+      event instead of one instruction, and the escrow/invariant is opened
+      around exactly this event. *)
+  Lemma ewp_ev_rmw (gen : nat) (c : CPU) (n : N) (req : Interface.ReadReq.t n)
+      (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit)
+      (D : gset register) (rs : regstate) (ws : wstate) :
+    gen = 0%nat ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_coh (classify (Interface.ReadReq.access_kind req)) = false ->
+    ak_latest (classify (Interface.ReadReq.access_kind req)) = true ->
+    acc_wf (Interface.ReadReq.pa req) n ->
+    (* the window is footprint-confined — see the section header *)
+    (forall (w : bv (8 * n)) (rs0 rs1 : regstate) (m1 : M unit),
+       esilent_run (K (inl (w, None)), rs0) (m1, rs1) ->
+       rtc (esilD D) (K (inl (w, None)), rs0) (m1, rs1)) ->
+    hart_ws c ws -∗ ereg_frame c rs D -∗
+    (∀ σ : wgstate,
+       ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
+       ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+       ⌜reg_agree_on D rs (wgregs σ c)⌝ -∗
+       wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
+       ⌜exists w tvs data rl m1 m2 rs1, ermw_ok σ c n req K w tvs data rl m1 m2 rs1⌝ ∗
+       ▷ (∀ w tvs data rl m1 m2 rs1,
+            ⌜ermw_ok σ c n req K w tvs data rl m1 m2 rs1⌝ ={∅,⊤}=∗
+              ⌜forall a : Z,
+                 (coh ws a < coh (ermw_ws σ c n req tvs data rl) a)%nat ->
+                 nv_ok (wglog σ) c a⌝ ∗
+              wlat_interp (wgimg σ) (wglog σ ++ [ermw_msg σ c n req data]) ∗
+              (hart_ws c (ermw_ws σ c n req tvs data rl) -∗
+               ereg_frame c rs1 D -∗
+               EWP (ECycle gen c m2 None) @ ⊤))) -∗
+    EWP (ECycle gen c (Interface.Next (Interface.MemRead n req) K) None) @ ⊤.
+  Proof.
+    iIntros (Hgen Hdev Hcoh Hlatest Hacc Hconf) "Hws Hrf Hk".
+    iApply (ewp_ecycle gen c _ None Hgen). iIntros (σ) "Hσ".
+    iDestruct (weak_state_interp_rmw σ c with "Hσ") as
+      "(%Hbnd & %Hnv & %Hwf & Hri & Hlog & Hlat & Hwsa & Hcl)".
+    iDestruct (hart_ws_agree with "Hwsa Hws") as %->.
+    iDestruct (ereg_frame_agree c rs D (wgregs σ c) with "Hri Hrf") as %Hag.
+    iMod ("Hk" $! σ with "[//] [//] [%] [//] Hlat") as "[%Hen Hk]";
+      [exact (Hbnd c)|].
+    iModIntro. iSplitR.
+    { iPureIntro.
+      destruct Hen as (w & tvs & data & rl & m1 & m2 & rs1 &
+                       Hlen & Hbytes & Hrd & Hex & Hne & Hlend & Hwin & Hwr).
+      do 2 eexists. simpl. rewrite Hdev. split; [exact Hcoh|]. right.
+      split; [exact Hlatest|]. exists w, tvs, data, rl, m1, m2, rs1.
+      by split_and!. }
+    iNext. iIntros (e' σ') "%Hcy". simpl in Hcy. rewrite Hdev in Hcy.
+    destruct Hcy as (_ & [(Hbad & _)
+                         |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
+                           Hlen & Hbytes & Hrd & Hex & Hne & Hlend & Hwin &
+                           Hwr & -> & ->)]).
+    { (* the PLAIN arm is excluded by its own guard — [WeakEvLang]'s finding
+         F6: without it the fused RMW would not be atomic and this rule could
+         not be stated. *)
+      exfalso. by rewrite Hlatest in Hbad. }
+    have Hok : ermw_ok σ c n req K w tvs data rl m1 m2 rs1 by split_and!.
+    iMod ("Hk" $! w tvs data rl m1 m2 rs1 with "[//]")
+      as "(%Hpay & Hlat & Hcont)".
+    iMod (wlog_update (wglog σ) _ with "Hlog") as "Hlog".
+    iMod (hart_ws_update c (wgws σ c) (wgws σ c)
+            (ermw_ws σ c n req tvs data rl) with "Hwsa Hws") as "[Hwsa Hws]".
+    iMod (ereg_frame_rtc c D (K (inl (w, None)), wgregs σ c) (m1, rs1)
+            (Hconf w (wgregs σ c) rs1 m1 Hwin) rs Hag with "Hri Hrf")
+      as "[Hri Hrf]".
+    iModIntro. iSplitR "Hws Hrf Hcont"; [|by iApply ("Hcont" with "Hws Hrf")].
+    iApply ("Hcl" with "[%] [%] [%] [%] [%] Hri Hlog Hlat Hwsa").
+    - rewrite length_app /=. lia.
+    - rewrite /ermw_ws. eapply store_post_run_bounded;
+        [apply load_post_run_bounded;
+           [exact (Hbnd c)|by eapply read_ok_ts_bounded]
+        |rewrite length_app /=; lia|rewrite length_app /=; lia].
+    - apply (nv_hart_coh_step _ c (wgws σ c)).
+      + apply nv_hart_app_own; [exact (no_violation_hart _ _ c Hnv)|].
+        intros mm Hmm. apply elem_of_list_singleton in Hmm as ->. reflexivity.
+      + intros a Hlt. apply nv_byte_of_ok. intros n0.
+        apply (nv_byte_app_own (wglog σ) _ c _ n0 (Hpay a Hlt n0)).
+        intros mm Hmm. apply elem_of_list_singleton in Hmm as ->. reflexivity.
+    - eexists. split; [reflexivity|]. intros mm Hmm.
+      apply elem_of_list_singleton in Hmm as ->. reflexivity.
+    - apply Forall_app. split; [exact Hwf|]. apply Forall_singleton.
+      rewrite /wmsg_wf /ermw_msg /=. rewrite -Hlend Hlen.
+      pose proof (pa_z_range (Interface.ReadReq.pa req)).
+      rewrite /acc_wf in Hacc. lia.
+  Qed.
+
+End rmw.
+
+(* ====================================================================== *)
+(** ** 7. THE CERTIFICATION ADAPTER (batching item 3, S4 gap 3)
+
+    The design's "certifications lift wholesale": today's leaf certification is
+    an INTERPRETER RUN plus the instruction's memory effects
+    ([WeakCert.wstep_cert cid pc (wP_eff tid es) …] with
+    [es = [WEread akf pf nf; WEwrite akw ea 4 v]] — a fetch read and a data
+    write).  At event granularity the same data is the pair "a REFLECTIVE
+    silent stretch, then the memory node it stops at", and the adapter is one
+    combinator per event kind: each consumes ONE computed equation
+    ([erun_silent … = (rs', <the node>)], discharged by a single
+    [vm_cast_no_check] at the call site — see [WeakEvStarted] §4) and one
+    memory-event rule, and leaves an obligation ONLY at the memory event.
+
+    A whole instruction is the combinators CHAINED, in the order the
+    certification lists the effects; the register footprint [D] is threaded
+    once and is never re-examined between events.  Cost per leaf: today's
+    cost, plus one application per memory event — which is the design's stated
+    target, and §4 of [WeakEvStarted] measures it. *)
+
+Section adapter.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  (** *** 7a. The BARRIER event (the fence instruction's only memory event).
+
+      No φ payment: a fence moves no coherence floor, only the view
+      frontiers — which is [efence_apply_coh] and is why this rule has no
+      [nv_ok] obligation at all. *)
+  Lemma efence_apply_coh (ws : wstate) o (a : Z) :
+    coh (efence_apply ws o) a = coh ws a.
+  Proof. by destruct o as [[[[pr pw] sr] sw]|]. Qed.
+
+  Lemma efence_apply_bounded (ws : wstate) (n : nat) o :
+    ws_bounded ws n -> ws_bounded (efence_apply ws o) n.
+  Proof.
+    intros Hb. destruct o as [[[[pr pw] sr] sw]|]; [|exact Hb].
+    destruct Hb as (H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8).
+    rewrite /ws_bounded /fence_post /=. split_and!; try (simpl; lia).
+    - destruct sr; [|lia]. destruct pr, pw; simpl; lia.
+    - destruct sw; [|lia]. destruct pr, pw; simpl; lia.
+    - intros a. exact (H7 a).
+    - intros a tv Ha. exact (H8 a tv Ha).
+  Qed.
+
+  Lemma ewp_ev_barrier (gen : nat) (c : CPU) (b : barrier_kind)
+      (K : unit -> M unit) (ws : wstate) :
+    gen = 0%nat ->
+    hart_ws c ws -∗
+    ▷ (hart_ws c (efence_apply ws (ebar_now b)) -∗
+         EWP (ECycle gen c (K tt) (ebar_park b)) @ ⊤) -∗
+    EWP (ECycle gen c (Interface.Next (Interface.Barrier b) K) None) @ ⊤.
+  Proof.
+    iIntros (Hgen) "Hws H". iApply (ewp_ecycle gen c _ None Hgen).
+    iIntros (σ) "Hσ".
+    iDestruct (weak_state_interp_mem σ c with "Hσ") as
+      "(%Hbnd & %Hnv & %Hwf & Hlog & Hlat & Hwsa & Hcl)".
+    iDestruct (hart_ws_agree with "Hwsa Hws") as %->.
+    iApply fupd_mask_intro; [set_solver|]. iIntros "Hmask".
+    iSplitR; [iPureIntro; by do 2 eexists|].
+    iNext. iIntros (e' σ') "%Hcy". simpl in Hcy. destruct Hcy as (-> & ->).
+    iMod "Hmask" as "_".
+    iMod (hart_ws_update c (wgws σ c) (wgws σ c)
+            (efence_apply (wgws σ c) (ebar_now b)) with "Hwsa Hws")
+      as "[Hwsa Hws]".
+    iModIntro. iSplitR "Hws H"; [|by iApply "H"].
+    iDestruct ("Hcl" $! (efence_apply (wgws σ c) (ebar_now b)) (wglog σ)
+                 with "[%] [%] [%] [%] [%] Hlog Hlat Hwsa") as "Hσ".
+    - reflexivity.
+    - by apply efence_apply_bounded.
+    - apply (nv_hart_coh_step (wglog σ) c (wgws σ c));
+        [exact (no_violation_hart _ _ c Hnv)|].
+      intros a Hlt. exfalso. rewrite efence_apply_coh in Hlt. lia.
+    - exists []. rewrite app_nil_r. split; [reflexivity|].
+      intros mm Hmm. by apply elem_of_nil in Hmm.
+    - exact Hwf.
+    - rewrite /ewg_store /ewg_ws. iExact "Hσ".
+  Qed.
+
+  (** *** 7b. The four chaining combinators.
+
+      Each is "ONE computed equation + ONE memory-event rule".  The stretch
+      is advanced with [ewp_ev_batch] (n nodes, one application), the event
+      with §5's rule, and the frame is handed on. *)
+
+  Lemma ewp_ev_seq_ret (gen : nat) (c : CPU) (D : gset register) (nn : nat)
+      (rs rs' : regstate) (m : M unit) (u : unit) :
+    gen = 0%nat ->
+    erun_silent nn D rs m = (rs', Interface.Ret u) ->
+    ereg_frame c rs D -∗
+    ▷ (ereg_frame c rs' D -∗ EWP (ELoop gen c) @ ⊤) -∗
+    EWP (ECycle gen c m None) @ ⊤.
+  Proof.
+    iIntros (Hgen Hrun) "Hrf H".
+    iApply (ewp_ev_batch gen c D nn m (Interface.Ret u) rs rs' Hgen Hrun
+              with "Hrf").
+    iIntros "Hrf". iApply (ewp_ev_ret gen c u Hgen). by iApply "H".
+  Qed.
+
+  Lemma ewp_ev_seq_barrier (gen : nat) (c : CPU) (D : gset register) (nn : nat)
+      (rs rs' : regstate) (m : M unit) (b : barrier_kind) (K : unit -> M unit)
+      (ws : wstate) :
+    gen = 0%nat ->
+    erun_silent nn D rs m = (rs', Interface.Next (Interface.Barrier b) K) ->
+    hart_ws c ws -∗ ereg_frame c rs D -∗
+    ▷ (hart_ws c (efence_apply ws (ebar_now b)) -∗ ereg_frame c rs' D -∗
+         EWP (ECycle gen c (K tt) (ebar_park b)) @ ⊤) -∗
+    EWP (ECycle gen c m None) @ ⊤.
+  Proof.
+    iIntros (Hgen Hrun) "Hws Hrf H".
+    iApply (ewp_ev_batch gen c D nn m _ rs rs' Hgen Hrun with "Hrf").
+    iIntros "Hrf". iApply (ewp_ev_barrier gen c b K ws Hgen with "Hws").
+    iNext. iIntros "Hws". by iApply ("H" with "Hws Hrf").
+  Qed.
+
+  Lemma ewp_ev_seq_store (gen : nat) (c : CPU) (D : gset register) (nn : nat)
+      (rs rs' : regstate) (m : M unit) (n : N) (req : Interface.WriteReq.t n)
+      (K : (option bool + Arch.abort)%type -> M unit) (ws : wstate) :
+    gen = 0%nat ->
+    erun_silent nn D rs m = (rs', Interface.Next (Interface.MemWrite n req) K) ->
+    dev_addr (Interface.WriteReq.pa req) = false ->
+    n <> 0%N ->
+    acc_wf (Interface.WriteReq.pa req) n ->
+    hart_ws c ws -∗ ereg_frame c rs D -∗
+    (∀ σ : wgstate,
+       ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
+       ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+       wlog_lb (wglog σ) -∗
+       wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
+       ▷ |={∅,⊤}=>
+         ⌜forall j : nat, (j < N.to_nat n)%nat ->
+            nv_ok (wglog σ) c (acc_addr (Interface.WriteReq.pa req) j)⌝ ∗
+         wlat_interp (wgimg σ)
+           (wglog σ ++
+            [wwrite_msg (Some (fin_to_nat c))
+               (wm_class_of (classify (Interface.WriteReq.access_kind req)) ws)
+               (Interface.WriteReq.pa req) n (Interface.WriteReq.value req)]) ∗
+         (hart_ws c
+            (store_post_run ws
+               (ak_sync (classify (Interface.WriteReq.access_kind req)))
+               (pa_z (Interface.WriteReq.pa req)) (N.to_nat n)
+               (S (length (wglog σ)))) -∗
+          ereg_frame c rs' D -∗
+          EWP (ECycle gen c (K (inl None)) None) @ ⊤)) -∗
+    EWP (ECycle gen c m None) @ ⊤.
+  Proof.
+    iIntros (Hgen Hrun Hdev Hn Hacc) "Hws Hrf Hk".
+    iApply (ewp_ev_batch gen c D nn m _ rs rs' Hgen Hrun with "Hrf").
+    iIntros "Hrf".
+    iApply (ewp_ev_store gen c n req K ws Hgen Hdev Hn Hacc with "Hws").
+    iIntros (σ) "%Hws %Hwf %Hbnd #Hlb Hlat".
+    iMod ("Hk" $! σ with "[//] [//] [//] Hlb Hlat") as "Hk". iModIntro. iNext.
+    iMod "Hk" as "(%Hpay & Hlat & Hcont)". iModIntro. iFrame "Hlat".
+    iSplitR; [by iPureIntro|]. iIntros "Hws". by iApply ("Hcont" with "Hws Hrf").
+  Qed.
+
+  Lemma ewp_ev_seq_load (gen : nat) (c : CPU) (D : gset register) (nn : nat)
+      (rs rs' : regstate) (m : M unit) (n : N) (req : Interface.ReadReq.t n)
+      (K : (bv (8 * n) * option bool + Arch.abort)%type -> M unit)
+      (ws : wstate) :
+    gen = 0%nat ->
+    erun_silent nn D rs m = (rs', Interface.Next (Interface.MemRead n req) K) ->
+    dev_addr (Interface.ReadReq.pa req) = false ->
+    ak_coh (classify (Interface.ReadReq.access_kind req)) = false ->
+    ak_latest (classify (Interface.ReadReq.access_kind req)) = false ->
+    hart_ws c ws -∗ ereg_frame c rs D -∗
+    (∀ σ : wgstate,
+       ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
+       ⌜ws_bounded ws (length (wglog σ))⌝ -∗
+       wlog_lb (wglog σ) -∗
+       wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
+       ⌜exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
+          length tvs = N.to_nat n /\
+          (forall j : nat, (j < N.to_nat n)%nat ->
+             tvs.*2 !! j = Some (nth_byte w j)) /\
+          read_ok (img_z (wgimg σ)) (wglog σ) ws
+            (ak_sync (classify (Interface.ReadReq.access_kind req)))
+            false (pa_z (Interface.ReadReq.pa req)) tvs⌝ ∗
+       ▷ (∀ (w : bv (8 * n)) (tvs : list (nat * bv 8)),
+            ⌜length tvs = N.to_nat n⌝ -∗
+            ⌜forall j : nat, (j < N.to_nat n)%nat ->
+               tvs.*2 !! j = Some (nth_byte w j)⌝ -∗
+            ⌜read_ok (img_z (wgimg σ)) (wglog σ) ws
+               (ak_sync (classify (Interface.ReadReq.access_kind req)))
+               false (pa_z (Interface.ReadReq.pa req)) tvs⌝
+            ={∅,⊤}=∗
+              ⌜forall a : Z,
+                 (coh ws a <
+                  coh (load_post_run ws
+                         (ak_sync (classify (Interface.ReadReq.access_kind req)))
+                         (pa_z (Interface.ReadReq.pa req)) tvs.*1) a)%nat ->
+                 nv_ok (wglog σ) c a⌝ ∗
+              wlat_interp (wgimg σ) (wglog σ) ∗
+              (hart_ws c
+                 (load_post_run ws
+                    (ak_sync (classify (Interface.ReadReq.access_kind req)))
+                    (pa_z (Interface.ReadReq.pa req)) tvs.*1) -∗
+               ereg_frame c rs' D -∗
+               EWP (ECycle gen c (K (inl (w, None))) None) @ ⊤))) -∗
+    EWP (ECycle gen c m None) @ ⊤.
+  Proof.
+    iIntros (Hgen Hrun Hdev Hcoh Hlat) "Hws Hrf Hk".
+    iApply (ewp_ev_batch gen c D nn m _ rs rs' Hgen Hrun with "Hrf").
+    iIntros "Hrf".
+    iApply (ewp_ev_load gen c n req K ws Hgen Hdev Hcoh Hlat with "Hws").
+    iIntros (σ) "%Hws %Hwf %Hbnd #Hlb Hlat0".
+    iMod ("Hk" $! σ with "[//] [//] [//] Hlb Hlat0") as "[%Hen Hk]".
+    iModIntro. iSplitR; [by iPureIntro|]. iNext.
+    iIntros (w tvs) "%H1 %H2 %H3".
+    iMod ("Hk" $! w tvs with "[//] [//] [//]") as "(%Hpay & Hlat0 & Hcont)".
+    iModIntro. iFrame "Hlat0". iSplitR; [by iPureIntro|].
+    iIntros "Hws". by iApply ("Hcont" with "Hws Hrf").
+  Qed.
+
+End adapter.

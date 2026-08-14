@@ -279,9 +279,18 @@ Section hart.
                  σ' = ewg_dev σ d'
              else
                ak_coh (classify (Interface.ReadReq.access_kind req)) = false /\
-               ((* the PLAIN RAM read (exclusive or not: a bare exclusive
-                   read is an ordinary load) *)
-                (exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
+               ((* the PLAIN RAM read.  GUARDED by [ak_latest = false] (S5
+                   finding F6): with the guard absent the two disjuncts
+                   OVERLAP at an exclusive read, the fused RMW ceases to be
+                   atomic (the machine may take the read alone and let the
+                   write arrive as a separate store event), and no
+                   ONE-INVARIANT-ACCESS acquire rule can be stated — the
+                   caller would have to prove the instruction's remainder in
+                   the unfused case as well.  The cost of the guard is that a
+                   bare exclusive read with no fused write is STUCK; xv6
+                   executes none (its acquire is [amoswap.w.aq]). *)
+                (ak_latest (classify (Interface.ReadReq.access_kind req)) = false /\
+                 exists (w : bv (8 * n)) (tvs : list (nat * bv 8)),
                    length tvs = N.to_nat n /\
                    (forall j : nat, (j < N.to_nat n)%nat ->
                       tvs.*2 !! j = Some (nth_byte w j)) /\
@@ -607,7 +616,7 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
-    + intros (_ & [(w & tvs & _ & _ & _ & _ & ->)
+    + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]); reflexivity.
   - (* MemWrite *)
@@ -626,7 +635,7 @@ Proof.
   destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
-    + intros (_ & [(w & tvs & _ & _ & _ & _ & ->)
+    + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]); by split.
   - destruct (dev_addr _).
@@ -648,7 +657,7 @@ Proof.
     try (intros (-> & _); right; by do 2 eexists); try (by intros []).
   - destruct (dev_addr _).
     + intros (w & d' & _ & -> & _). right. by do 2 eexists.
-    + intros (_ & [(w & tvs & _ & _ & _ & -> & _)
+    + intros (_ & [(_ & w & tvs & _ & _ & _ & -> & _)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & _ & _ & _ & _ & _ & _ & -> & _)]);
         right; by do 2 eexists.
@@ -670,7 +679,7 @@ Proof.
     try (by intros []).
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). exists []. by rewrite app_nil_r.
-    + intros (_ & [(w & tvs & _ & _ & _ & _ & ->)
+    + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]).
       * exists []. by rewrite app_nil_r.
@@ -692,7 +701,7 @@ Proof.
     try (by intros (_ & ->)); try (by intros []).
   - destruct (dev_addr _).
     + by intros (w & d' & _ & _ & ->).
-    + intros (_ & [(w & tvs & _ & _ & _ & _ & ->)
+    + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]);
         [rewrite /ewg_ws /=|rewrite /ewg_rmw /=]; by rewrite gws_insert_ne.
@@ -712,7 +721,7 @@ Proof.
   destruct oc; simpl; try (by intros (_ & ->)); try (by intros []).
   - destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). reflexivity.
-    + intros (_ & [(w & tvs & _ & _ & _ & _ & ->)
+    + intros (_ & [(_ & w & tvs & _ & _ & _ & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & _ & _ & _ & _ & _ & _ & _ & ->)]).
       * rewrite /ewg_ws /= gws_insert_eq. apply load_post_run_le.

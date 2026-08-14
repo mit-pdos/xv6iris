@@ -497,7 +497,7 @@ Proof.
   - (* MemRead *)
     destruct (dev_addr _).
     + intros (w & d' & _ & _ & ->). exists LSilent. by split.
-    + intros (_ & [(w & tvs & _ & _ & Hrd & _ & ->)
+    + intros (_ & [(_ & w & tvs & _ & _ & Hrd & _ & ->)
                   |(_ & w & tvs & data & rl & m1 & m2 & rs1 &
                     _ & _ & Hrd & Hex & Hne & Hlend & _ & _ & _ & ->)]).
       * eexists (LLoad _ false _ tvs).
