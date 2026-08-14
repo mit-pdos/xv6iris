@@ -70,13 +70,13 @@ Section ProofReleasesleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_releasesleep_sconf 
+  Lemma wp_releasesleep_gen_sconf
       (γs : list gname)
-      (γl γsl : gname) (s : string) (R : iProp Σ)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
+    : wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb C b lks.
   Proof.
-    cbv beta delta [wp_releasesleep_sconf_body].
+    cbv beta delta [wp_releasesleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -90,7 +90,7 @@ Section ProofReleasesleep.
        [wp_next (match 0 with O => eb | S _ => false end)]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
     assert (Hbeb : eb = b) by (symmetry; exact Hbmatch). subst eb.
-    iDestruct (is_sleeplock_lock with "Hslp") as "#Hlockinv".
+    iDestruct (is_sleeplock_gen_lock with "Hslp") as "#Hlockinv".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
     iPoseProof (rsl_00 with "Htext") as "Hi00".
@@ -234,7 +234,7 @@ Section ProofReleasesleep.
        moved to a fresh one, so acquire wants it at CID10. *)
     iDestruct (cpu_own_transport CID CID10 0%nat b pme C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) Kacq
+    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) Kacq
               0%nat b pme C (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -260,7 +260,7 @@ Section ProofReleasesleep.
                          (sign_extend' 64 (mword_of_int 0x28 : mword 12)) = sl_pid slk).
     { rgne. rewrite HMacqs1. reflexivity. }
     (* open sl_res as the holder: the token refutes the free arm. *)
-    iDestruct (sl_res_open_held γsl slk R with "HRsl Hslk") as "[Hslk Hcell]".
+    iDestruct (sl_res_open_held_q γsl slk R H q with "HRsl Hslk") as "(Hslk & Hha & HHdep & Hcell)".
     iDestruct "Hcell" as (v) "[Hslkw %Hnz]".
     (* ===== sw zero,0(s1) : slk->locked := 0 ===== *)
     iPoseProof (rsl_18 with "Htext") as "Hi18".
@@ -372,9 +372,9 @@ Section ProofReleasesleep.
       rewrite /R2 upd_ne; [| vm_compute; discriminate].
       rewrite /R1 upd_eq. reflexivity. }
     (* rebuild the FREE sl_res: zeroed word + token + zeroed pid + R. *)
-    iDestruct (sl_res_close_free γsl slk R with "Hslkw Hslk Hpid HRcaller") as "HRsl".
+    iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) Krel
+    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
               0%nat b pme C (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
@@ -498,7 +498,7 @@ Section ProofReleasesleep.
     iDestruct (cpu_own_transport CIDrel CIDe6 0%nat b pme C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc").
+    iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc HHdep").
     (* callee_saved m Q34 *)
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> mword_of_int 1 -> c <> csp_rs1 -> c <> mword_of_int 8 ->
@@ -542,6 +542,26 @@ Section ProofReleasesleep.
       rewrite /Q32 upd_eq.
       rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]. }
     repeat split; apply Hthread; vm_compute; first [reflexivity | discriminate].
+  Qed.
+
+  (* THE UNTRACKED INSTANCE, which is what every existing caller takes: the
+     deposit is [emp], so the holder's fraction is irrelevant and its token
+     is the fraction-free [sleeplocked]. *)
+  Lemma wp_releasesleep_sconf
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R : iProp Σ)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
+  Proof.
+    cbv beta delta [wp_releasesleep_sconf_body].
+    intros pcE slk ret_tgt Hav Hno.
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HR #Hpanic #Hpinv Hcont".
+    iDestruct "Hslk" as (q) "Hslk".
+    iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb C b lks
+              Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk Hpid HR Hpanic Hpinv").
+    iIntros (CIDf Hsf mf Hcs) "Hcg Hown Hpc _".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc"). exact Hcs.
   Qed.
 
 End ProofReleasesleep.

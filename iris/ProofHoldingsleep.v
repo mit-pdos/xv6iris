@@ -66,12 +66,12 @@ Section ProofHoldingsleep.
       | rewrite upd_ne; [| vm_compute; discriminate]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
-  Lemma wp_holdingsleep_sconf
-      (γl γsl : gname) (s : string) (R : iProp Σ)
+  Lemma wp_holdingsleep_gen_sconf
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
+    : wp_holdingsleep_gen_sconf_body γl γsl s R H m p pidv av eb C dq b lks.
   Proof.
-    cbv beta delta [wp_holdingsleep_sconf_body].
+    cbv beta delta [wp_holdingsleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -91,7 +91,7 @@ Section ProofHoldingsleep.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb5 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 5).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iDestruct (is_sleeplock_lock with "Hsleeplock") as "#Hlk".
+    iDestruct (is_sleeplock_gen_lock with "Hsleeplock") as "#Hlk".
     (* ===================== PROLOGUE ===================== *)
     iPoseProof (hsl_00 with "Htext") as "Hi00".
     assert (Hpush : add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = pa_stk sp0 6) by exact Hspr6.
@@ -233,7 +233,7 @@ Section ProofHoldingsleep.
     iDestruct (cpu_own_transport CID CID10 0%nat b p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
-    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res γsl slk R) M5
+    iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) M5
               0%nat b p C (av - 6)%nat b lks
               ltac:(lia)
               ltac:(lia)
@@ -246,7 +246,7 @@ Section ProofHoldingsleep.
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     (* open sl_res with the caller's token: refute the free arm. *)
-    iDestruct (sl_res_open_held γsl slk R with "HR Hsl") as "(Hsl & Hcellex)".
+    iDestruct (sl_res_open_held γsl slk R H with "HR Hsl") as "(Hsl & Hdep & Hcellex)".
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
     (* +0x18 c.lw a5,0(s1) : a5 := sext v *)
     iPoseProof (hsl_18 with "Htext") as "Hi18".
@@ -480,9 +480,9 @@ Section ProofHoldingsleep.
       rewrite /D1e upd_ne; [| vm_compute; discriminate].
       rewrite /C46 upd_ne; [| vm_compute; discriminate]. exact HC42csp. }
     (* close sl_res again (held), for release's R argument. *)
-    iDestruct (sl_res_close_held γsl slk R v Hvnz with "Hslk") as "HR2".
+    iDestruct (sl_res_close_held γsl slk R H v Hvnz with "Hslk Hdep") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
-    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) D20
+    iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) D20
               0%nat b p C (av - 6)%nat ({["sleep lock"]} ∪ lks)
               ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)
@@ -710,6 +710,13 @@ Section ProofHoldingsleep.
         apply Hthr; vm_compute; first [reflexivity | discriminate].
       - exact HE2e_a0. }
   Qed.
+
+  (* the untracked instance, which is what every existing caller takes *)
+  Lemma wp_holdingsleep_sconf
+      (γl γsl : gname) (s : string) (R : iProp Σ)
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
+    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
+  Proof. exact (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked m p pidv av eb C dq b lks). Qed.
 
 End ProofHoldingsleep.
 

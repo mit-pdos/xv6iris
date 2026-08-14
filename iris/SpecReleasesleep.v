@@ -41,8 +41,49 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
+(* THE GENERAL FORM, over the sleeplock's holder DEPOSIT [H] (SleepLock.v):
+   the holder hands the token, the pid field and [R] back into the lock, and
+   gets its own deposit [H q] out -- the same fraction it put in, which
+   [sl_res_open_held_q] pins.  A client whose reference to the object is
+   itself split (many [struct file]s over one inode reference) needs exactly
+   that; "some fraction back" would not let it rebuild its share.
+
+   [wp_releasesleep_sconf] below is this at the untracked instance, where
+   [H q] is [emp] and the caller's token is the fraction-free [sleeplocked]. *)
+Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γs : list gname)
+    (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
+  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
+                   in
+  (22 <= av)%nat ->
+  locks_below lks "sleep lock" ->
+  sie_cap_gpr m av b pme -∗
+  cpu_own 0 eb pme C b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  is_sleeplock_gen γl γsl slk s R H -∗
+  (* the holder's bundle, surrendered back into the lock *)
+  sleeplocked_q γsl q -∗
+  sl_pid slk ↦₄ pd -∗
+  R -∗
+  panic_wp_any -∗
+  (* wakeup's resources *)
+  procs_inv γs -∗
+  wp_next b pme (fun (CID : CpuId) =>
+    ∀ mf : regfile,
+      ⌜ callee_saved m mf ⌝ -∗
+      sie_cap_gpr mf av b pme -∗
+      cpu_own 0 eb pme C b lks -∗
+      pc_is ret_tgt -∗
+      (* the deposit comes back, at the holder's own fraction *)
+      H q -∗
+          WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    
+
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
@@ -81,6 +122,12 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   WP (Loop : expr riscv_lang).
 
 Module Type RELEASESLEEP.
+  Parameter wp_releasesleep_gen_sconf :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γs : list gname)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
+      wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb C b lks.
   Parameter wp_releasesleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
 

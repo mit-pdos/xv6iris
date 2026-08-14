@@ -34,7 +34,7 @@
                         window between its cpu clear and its word clear)
      Some (i, true)  -- held by i, lk->cpu = cpus_ptr i                     *)
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl gmap.
+From iris.algebra Require Import excl gmap auth ufrac.
 From iris.algebra.lib Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants cancelable_invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
@@ -58,8 +58,44 @@ Definition lock_state : Type := option (CPU * bool).
 
 Definition lockUR : ucmra := excl_authUR (leibnizO lock_state).
 
-Class lockG (Σ : gFunctors) := LockG { lock_inG :: inG Σ lockUR }.
-Definition lockΣ : gFunctors := #[GFunctor lockUR].
+(* ===================================================================== *)
+(* The SLEEPlock's ghost state (SleepLock.v).                             *)
+(*                                                                       *)
+(* It lives here, and inside [lockG], for one reason: putting it in a     *)
+(* class of its own would add a [!slhG Σ] to the ambient context of every *)
+(* one of the ~35 files that so much as mentions [is_sleeplock].  A       *)
+(* sleeplock already needs [lockG] for its inner spinlock, so a second    *)
+(* field on the same class reaches every one of them for free -- and      *)
+(* [lockΣ] gains the functor in the same breath, so SystemAdequacy's      *)
+(* instantiation is unchanged.                                            *)
+(*                                                                       *)
+(* Two components, under the sleeplock's OWN gname (the [γ] of            *)
+(* [is_sleeplock γl γ ...]), so that no client-visible predicate gains an *)
+(* index:                                                                 *)
+(*                                                                       *)
+(*   excl_auth Qp        -- WHICH FRACTION THE HOLDER DEPOSITED.  The     *)
+(*      fragment is the holder's token ([SleepLock.sleeplocked_q]); the   *)
+(*      authority rides with the deposit inside the lock, so a releaser   *)
+(*      gets back exactly the fraction it put in rather than "some"       *)
+(*      fraction -- which is what lets a client whose reference is itself *)
+(*      split (many [struct file]s sharing one inode reference) rebuild   *)
+(*      its own share.                                                     *)
+(*                                                                       *)
+(*   auth (option ufrac) -- THE OUTSTANDING-TOKEN COUNT.  [◯ Some q] is   *)
+(*      a q-share of the "somebody may hold this sleeplock" right and     *)
+(*      [● t] is the total handed out, [None] meaning NONE -- the         *)
+(*      authoritative zero that refutes the lock being held at all.       *)
+(*      UNBOUNDED fractions ([ufrac], not [frac]): the total is the sum   *)
+(*      over however many references exist, so it is not capped at 1.     *)
+(* ===================================================================== *)
+Definition slhUR : ucmra :=
+  prodUR (excl_authUR (leibnizO Qp)) (authUR (optionUR ufracR)).
+
+Class lockG (Σ : gFunctors) := LockG {
+  lock_inG :: inG Σ lockUR;
+  slh_inG :: inG Σ slhUR;
+}.
+Definition lockΣ : gFunctors := #[GFunctor lockUR; GFunctor slhUR].
 Global Instance subG_lockΣ {Σ} : subG lockΣ Σ -> lockG Σ.
 Proof. solve_inG. Qed.
 

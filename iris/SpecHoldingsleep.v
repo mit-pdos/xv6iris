@@ -39,8 +39,13 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
-Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γl γsl : gname) (s : string) (R : iProp Σ)
+(* THE GENERAL FORM, over the sleeplock's holder DEPOSIT [H] (SleepLock.v).
+   holdingsleep only PEEKS: it opens the held arm to read the pid, puts the
+   deposit straight back and re-closes, so [H] appears nowhere but in the
+   lock predicate -- and [wp_holdingsleep_sconf_body] below is literally this
+   at the untracked instance. *)
+Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ)
     (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -55,7 +60,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
   sie_cap_gpr m av b p -∗
   cpu_own 0 eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_sleeplock γl γsl slk s R -∗
+  is_sleeplock_gen γl γsl slk s R H -∗
   (* the holder's bundle (returned untouched) *)
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pidv -∗
@@ -75,7 +80,16 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γl γsl : gname) (s : string) (R : iProp Σ)
+    (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string) :=
+  wp_holdingsleep_gen_sconf_body γl γsl s R sl_untracked m p pidv av eb C dq b lks.
+
 Module Type HOLDINGSLEEP.
+  Parameter wp_holdingsleep_gen_sconf :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ)
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset string),
+      wp_holdingsleep_gen_sconf_body γl γsl s R H m p pidv av eb C dq b lks.
   Parameter wp_holdingsleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset string),

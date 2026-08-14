@@ -1,27 +1,79 @@
 (* SleepLock.v -- the separation-logic sleeplock (kernel/sleeplock.c),
    mirroring the spinlock layer in WpLock.v one level up:
 
-     sleeplocked γ   -- the (exclusive, ghost) sleeplock-ownership token
-     sl_res          -- the resource protected by the INNER spinlock:
+     sleeplocked_q γ q -- the sleeplock-ownership token, carrying the
+                        FRACTION its holder deposited
+     sleeplocked γ    -- the same with the fraction forgotten; what a client
+                        that does not track holders says
+     sl_res_gen       -- the resource protected by the INNER spinlock:
                         ∃ v, locked word ↦₄ v ∗
-                             (v = 0 ∗ sleeplocked γ ∗ pid ↦₄ 0 ∗ R  ∨  v ≠ 0)
-     is_sleeplock    -- the sleeplock's name + the inner spinlock (is_lock,
-                        named "sleep lock") protecting sl_res  (persistent)
+                          (v = 0 ∗ sl_free_tok γ ∗ pid ↦₄ 0 ∗ R
+                           ∨ v ≠ 0 ∗ ∃ q, sl_hauth γ q ∗ H q)
+     is_sleeplock_gen -- the sleeplock's name + the inner spinlock (is_lock,
+                        named "sleep lock") protecting it  (persistent)
 
    When the sleeplock word is 0 (free) the inner critical section holds the
    token, the pid field (pinned 0: both initsleeplock and releasesleep write
    it back to 0) and the protected resource R; acquiresleep takes all three
    out and re-closes with the "held" disjunct, so the HOLDER of a sleeplock
-   carries [sleeplocked γ ∗ sl_pid slk ↦₄ pid ∗ R] -- the pid field rides
+   carries [sleeplocked_q γ q ∗ sl_pid slk ↦₄ pid ∗ R] -- the pid field rides
    with the holder exactly like the spinlock's cpu word rides with the
    caller.  The held disjunct records the word's non-zeroness in the shape
    the c.beqz/c.bnez tests consume.
+
+   ==================================================================== *)
+(*  THE HOLDER DEPOSIT [H], AND WHAT IT BUYS: A NON-BLOCKING acquiresleep.
+
+   The held disjunct used to be PURE ([⌜v ≠ 0⌝] and nothing else), and that
+   is exactly why no caller could ever prove a sleeplock FREE.  Anything a
+   would-be acquirer can learn about the lock it learns by opening the inner
+   spinlock, and a purely pure held arm says only "the word is nonzero",
+   which is not refutable from outside.
+
+   THE REFUTATION HAS TO COST THE ACQUIRER SOMETHING, and that is forced, not
+   a design choice.  Suppose the held arm's resources could be manufactured
+   from the free arm's alone.  A client's evidence [P] that the lock is free
+   must satisfy [P ∗ (held arm) ⊢ False]; but [P] is a frame for the acquire's
+   ghost step, and a frame-preserving update from the free arm to the held arm
+   would then carry [P] across it -- so [P ∗ (held arm)] is consistent after
+   all.  The acquirer must therefore bring a resource of its OWN and leave it
+   in the lock: [H q], the DEPOSIT.
+
+   So [sl_res_gen] is indexed by [H : Qp -> iProp Σ] and acquiresleep's
+   contract consumes [H q] where releasesleep's hands it back.  Two
+   instantiations exist:
+
+     [sl_untracked] (= fun _ => emp) -- the ordinary sleeplock.  Nothing is
+        deposited, nothing can be refuted, no caller pays anything, and
+        [is_sleeplock] / [sl_res] / [new_sleeplock] are its shorthands, so
+        every existing client reads exactly as before.
+
+     [slh_tok γ] -- the TRACKED sleeplock.  [slh_tok γ q] is a q-share of the
+        "somebody may hold this sleeplock" right, [slh_auth γ t] is the total
+        outstanding, and [slh_auth γ None] -- the AUTHORITATIVE ZERO -- says
+        no share exists anywhere, hence no deposit, hence the held arm is
+        refuted and the lock is FREE.  That is the premise the non-blocking
+        acquiresleep takes in place of a lock-order bound
+        (claude-notes/projects/iput-acquiresleep.md).
+
+   WHY THE SHARE IS A FRACTION rather than a whole token: one inode reference
+   can be shared by many [struct file]s, all of which may race for the inode's
+   sleeplock, so the right to attempt the lock has to split along with the
+   reference.  [ufrac] (unbounded fractions) rather than [frac] because the
+   total is a sum over however many references exist and is not capped at 1.
+
+   WHY THE DEPOSITED FRACTION IS PINNED: the holder's token carries [q] and
+   agrees with the [sl_hauth] authority that rides with the deposit, so a
+   releaser recovers EXACTLY the share it put in.  Handing back "some"
+   fraction would leave a client whose reference is itself split unable to
+   rebuild its own share.
 
    struct sleeplock layout (sleeplock.h, offsets from the disassembly):
    locked@0 (4B), lk@8 (24B inner spinlock: word@8 name@16 cpu@24),
    name@32 (8B), pid@40 (4B). *)
 From iris.proofmode Require Import proofmode.
-From iris.algebra Require Import excl.
+From iris.algebra Require Import excl auth ufrac updates local_updates.
+From iris.algebra.lib Require Import excl_auth.
 From iris.base_logic.lib Require Import invariants own.
 Require Import SailStdpp.Base SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d.
@@ -34,7 +86,7 @@ Section SleepLock.
 
   (* ---- geometry, in the EXACT instruction address forms so the cells
      unify with the leaf and call specs without rewriting:
-     [sl_lk] is the [addi s2,a0,8] form (the &lk->lk argument every inner
+     [sl_lk] is the [addi a0+8] form (the &lk->lk argument every inner
      acquire/release receives); [sl_lkcpu] is acquire/release/holding's
      [a_cpu] form instantiated at lk0 = sl_lk slk; [sl_name_field]/[sl_pid]
      are the sd/sw/lw store-address forms. *)
@@ -55,88 +107,387 @@ Section SleepLock.
   Global Instance sl_name_persistent slk s : Persistent (sl_name slk s).
   Proof. apply _. Qed.
 
-  (* the holder's exclusive token: the bare exclusive token of WpLock's RA
-     under its own gname.  Deliberately NOT the spinlock's [locked], which is
-     keyed by the holding HART -- a sleeplock is held by a PROCESS (its pid
-     rides in [sl_pid]), across context switches and possibly harts. *)
-  Definition sleeplocked (γ : gname) : iProp Σ := lock_tok_excl γ.
+  (* ===================================================================== *)
+  (*  THE GHOST STATE ([WpLock.slhUR], under the sleeplock's own gname).    *)
+  (* ===================================================================== *)
 
-  Lemma sleeplocked_exclusive γ : sleeplocked γ -∗ sleeplocked γ -∗ False.
-  Proof. apply lock_tok_excl_exclusive. Qed.
+  (* the holder's exclusive token, carrying the fraction it deposited.
+     Deliberately NOT the spinlock's [locked], which is keyed by the holding
+     HART -- a sleeplock is held by a PROCESS (its pid rides in [sl_pid]),
+     across context switches and possibly harts. *)
+  Definition sleeplocked_q (γ : gname) (q : Qp) : iProp Σ :=
+    own γ ((◯E (q : leibnizO Qp), ε) : slhUR).
 
+  (* the authority that pins it, and which rides with the DEPOSIT inside the
+     lock, so that opening the held arm as the holder proves the deposited
+     fraction is the holder's own. *)
+  Definition sl_hauth (γ : gname) (q : Qp) : iProp Σ :=
+    own γ ((●E (q : leibnizO Qp), ε) : slhUR).
+
+  (* "somebody may hold this sleeplock", a q-share of it *)
+  Definition slh_tok (γ : gname) (q : Qp) : iProp Σ :=
+    own γ ((ε, ◯ (Some q : optionUR ufracR)) : slhUR).
+
+  (* the total outstanding; [None] is the AUTHORITATIVE ZERO *)
+  Definition slh_auth (γ : gname) (t : option Qp) : iProp Σ :=
+    own γ ((ε, ● (t : optionUR ufracR)) : slhUR).
+
+  (* the holder token with the fraction forgotten: what [sl_res]'s clients
+     that do not track holders (every untracked sleeplock) carry. *)
+  Definition sleeplocked (γ : gname) : iProp Σ := (∃ q : Qp, sleeplocked_q γ q)%I.
+
+  Global Instance sleeplocked_q_timeless γ q : Timeless (sleeplocked_q γ q).
+  Proof. apply _. Qed.
+  Global Instance sl_hauth_timeless γ q : Timeless (sl_hauth γ q).
+  Proof. apply _. Qed.
+  Global Instance slh_tok_timeless γ q : Timeless (slh_tok γ q).
+  Proof. apply _. Qed.
+  Global Instance slh_auth_timeless γ t : Timeless (slh_auth γ t).
+  Proof. apply _. Qed.
   Global Instance sleeplocked_timeless γ : Timeless (sleeplocked γ).
   Proof. apply _. Qed.
 
-  (* the resource protected by the inner spinlock. *)
-  Definition sl_res (γ : gname) (slk : mword 64) (R : iProp Σ) : iProp Σ :=
+  (* ---- the excl_auth half: exclusivity and agreement ------------------ *)
+
+  Lemma sleeplocked_q_exclusive γ q q' :
+    sleeplocked_q γ q -∗ sleeplocked_q γ q' -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    destruct Hv as [Hv1 _].
+    destruct (proj1 (excl_auth_frag_op_valid _ _) Hv1).
+  Qed.
+
+  Lemma sleeplocked_exclusive γ : sleeplocked γ -∗ sleeplocked γ -∗ False.
+  Proof.
+    iIntros "H1 H2". iDestruct "H1" as (q) "H1". iDestruct "H2" as (q') "H2".
+    iApply (sleeplocked_q_exclusive with "H1 H2").
+  Qed.
+
+  (* THE PINNING LAW: the deposit's authority agrees with the holder's token,
+     so a releaser recovers exactly the fraction it deposited. *)
+  Lemma sl_hauth_agree γ q q' :
+    sl_hauth γ q -∗ sleeplocked_q γ q' -∗ ⌜q = q'⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    destruct Hv as [Hv1 _].
+    iPureIntro. exact (excl_auth_agree_L _ _ Hv1).
+  Qed.
+
+  (* re-targeting: whoever holds BOTH halves may set the fraction, which is
+     what an acquirer does with the junk fraction it finds in the free arm. *)
+  Lemma sl_hauth_update γ q q' :
+    sl_hauth γ q -∗ sleeplocked_q γ q ==∗ sl_hauth γ q' ∗ sleeplocked_q γ q'.
+  Proof.
+    iIntros "Ha Hf".
+    iMod (own_update_2 _ _ _ ((●E (q' : leibnizO Qp) ⋅ ◯E (q' : leibnizO Qp), ε) : slhUR)
+            with "Ha Hf") as "H".
+    { rewrite -pair_op left_id.
+      apply prod_update; simpl; [ apply excl_auth_update | done ]. }
+    iModIntro. rewrite pair_op_1 own_op. iDestruct "H" as "[$ $]".
+  Qed.
+
+  (* ---- the counting half: shares, the zero, and the two ghost steps ---- *)
+
+  Lemma slh_tok_split γ p q :
+    slh_tok γ (p + q)%Qp ⊣⊢ slh_tok γ p ∗ slh_tok γ q.
+  Proof.
+    rewrite /slh_tok -own_op. f_equiv.
+    rewrite -pair_op left_id -auth_frag_op -Some_op. done.
+  Qed.
+
+  Lemma slh_tok_join γ p q :
+    slh_tok γ p -∗ slh_tok γ q -∗ slh_tok γ (p + q)%Qp.
+  Proof. iIntros "H1 H2". iApply slh_tok_split. iFrame. Qed.
+
+  (* THE AUTHORITATIVE ZERO REFUTES EVERY SHARE.  This is the whole point of
+     the counting half: a client presenting [slh_auth γ None] has proved that
+     nobody anywhere holds a deposit for this sleeplock. *)
+  Lemma slh_auth_none_no_tok γ q :
+    slh_auth γ None -∗ slh_tok γ q -∗ False.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    destruct Hv as [_ Hv2]. simpl in Hv2.
+    apply auth_both_valid_discrete in Hv2 as [Hincl _].
+    apply option_included in Hincl as [Hbad | (a & b & _ & Hbad & _)]; by inversion Hbad.
+  Qed.
+
+  (* and the general bound, for a client that keeps a running total *)
+  Lemma slh_auth_tok_le γ t q :
+    slh_auth γ t -∗ slh_tok γ q -∗ ⌜∃ t', t = Some t' /\ (q ≤ t')%Qp⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv.
+    destruct Hv as [_ Hv2]. simpl in Hv2.
+    apply auth_both_valid_discrete in Hv2 as [Hincl _].
+    apply option_included in Hincl as [Hbad | (a & b & Ha & Hb & Hle)];
+      [ by inversion Hbad |].
+    apply (inj Some) in Ha. subst a. subst t.
+    iPureIntro. exists b. split; [ reflexivity |].
+    destruct Hle as [Heq | [z Hz]].
+    - rewrite Heq. reflexivity.
+    - rewrite Hz. apply Qp.le_add_l.
+  Qed.
+
+  Lemma slh_mint_none γ q :
+    slh_auth γ None ==∗ slh_auth γ (Some q) ∗ slh_tok γ q.
+  Proof.
+    iIntros "Ha".
+    iMod (own_update _ _ ((ε, ● (Some q : optionUR ufracR) ⋅ ◯ (Some q : optionUR ufracR)) : slhUR)
+            with "Ha") as "H".
+    { apply prod_update; simpl; [ done |].
+      apply (auth_update_alloc _ (Some q : optionUR ufracR) (Some q : optionUR ufracR)).
+      apply (alloc_option_local_update (q : ufracR) None). done. }
+    iModIntro. rewrite pair_op_2 own_op. iDestruct "H" as "[$ $]".
+  Qed.
+
+  Lemma slh_mint γ t q :
+    slh_auth γ (Some t) ==∗ slh_auth γ (Some (t + q)%Qp) ∗ slh_tok γ q.
+  Proof.
+    iIntros "Ha".
+    iMod (own_update _ _
+            ((ε, ● (Some (t + q)%Qp : optionUR ufracR) ⋅ ◯ (Some q : optionUR ufracR)) : slhUR)
+            with "Ha") as "H".
+    { apply prod_update; simpl; [ done |].
+      apply (auth_update_alloc _ (Some (t + q)%Qp : optionUR ufracR) (Some q : optionUR ufracR)).
+      apply local_update_unital_discrete. intros z _ Heq.
+      rewrite left_id in Heq. split; [ done |].
+      rewrite -Heq -Some_op. by rewrite (comm Qp.add t q). }
+    iModIntro. rewrite pair_op_2 own_op. iDestruct "H" as "[$ $]".
+  Qed.
+
+  (* the two returns: a share comes back, and the LAST one restores the
+     authoritative zero -- which is what a client does before asking for the
+     non-blocking acquiresleep. *)
+  Lemma slh_return γ t q :
+    slh_auth γ (Some (t + q)%Qp) -∗ slh_tok γ q ==∗ slh_auth γ (Some t).
+  Proof.
+    iIntros "Ha Hf".
+    iMod (own_update_2 _ _ _ ((ε, ● (Some t : optionUR ufracR)) : slhUR)
+            with "Ha Hf") as "H".
+    { rewrite -pair_op left_id.
+      apply prod_update; simpl; [ done |].
+      apply (auth_update_dealloc _ _ (Some t : optionUR ufracR)).
+      apply local_update_unital_discrete. intros z _ Heq.
+      split; [ done |]. rewrite left_id.
+      destruct z as [z|].
+      - rewrite -Some_op in Heq. apply (inj Some) in Heq.
+        assert (Ht : t = z).
+        { apply (inj (fun x => (x + q)%Qp)). rewrite Heq. apply (comm Qp.add). }
+        by rewrite Ht.
+      - rewrite right_id in Heq. apply (inj Some) in Heq. exfalso.
+        rewrite (comm Qp.add t q) in Heq. exact (Qp.add_id_free q t Heq). }
+    iModIntro. done.
+  Qed.
+
+  Lemma slh_return_last γ q :
+    slh_auth γ (Some q) -∗ slh_tok γ q ==∗ slh_auth γ None.
+  Proof.
+    iIntros "Ha Hf".
+    iMod (own_update_2 _ _ _ ((ε, ● (None : optionUR ufracR)) : slhUR)
+            with "Ha Hf") as "H".
+    { rewrite -pair_op left_id.
+      apply prod_update; simpl; [ done |].
+      apply (auth_update_dealloc _ _ (None : optionUR ufracR)).
+      apply local_update_unital_discrete. intros z _ Heq.
+      split; [ done |]. rewrite left_id.
+      destruct z as [z|]; [| done ].
+      exfalso. rewrite -Some_op in Heq. apply (inj Some) in Heq.
+      symmetry in Heq. exact (Qp.add_id_free q z Heq). }
+    iModIntro. done.
+  Qed.
+
+  (* ===================================================================== *)
+  (*  THE RESOURCE THE INNER SPINLOCK PROTECTS.                            *)
+  (* ===================================================================== *)
+
+  (* the free arm's ghost pair: the holder token and its authority, both idle.
+     The fraction is junk while free -- an acquirer re-targets it to its own
+     ([sl_free_retarget]). *)
+  Definition sl_free_tok (γ : gname) : iProp Σ :=
+    (∃ q : Qp, sleeplocked_q γ q ∗ sl_hauth γ q)%I.
+
+  (* the held arm's DEPOSIT: the acquirer's share of [H], with the authority
+     that says which fraction it was. *)
+  Definition sl_dep (γ : gname) (H : Qp -> iProp Σ) : iProp Σ :=
+    (∃ q : Qp, sl_hauth γ q ∗ H q)%I.
+
+  (* what an untracked sleeplock deposits: nothing. *)
+  Definition sl_untracked : Qp -> iProp Σ := fun _ => emp%I.
+
+  Definition sl_res_gen (γ : gname) (slk : mword 64) (R : iProp Σ)
+      (H : Qp -> iProp Σ) : iProp Σ :=
     (∃ v : mword 32,
        slk ↦₄ v ∗
-       (⌜v = (mword_of_int 0 : mword 32)⌝ ∗ sleeplocked γ ∗
+       (⌜v = (mword_of_int 0 : mword 32)⌝ ∗ sl_free_tok γ ∗
           sl_pid slk ↦₄ (mword_of_int 0 : mword 32) ∗ R
-        ∨ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
+        ∨ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝ ∗ sl_dep γ H))%I.
+
+  Definition sl_res (γ : gname) (slk : mword 64) (R : iProp Σ) : iProp Σ :=
+    sl_res_gen γ slk R sl_untracked.
 
   (* the whole sleeplock: its name plus the inner spinlock -- named
      "sleep lock", the literal initsleeplock passes to initlock -- over
-     [sl_res].  Persistent: every user shares it. *)
+     [sl_res_gen].  Persistent: every user shares it. *)
+  Definition is_sleeplock_gen (γl γ : gname) (slk : mword 64) (s : string)
+      (R : iProp Σ) (H : Qp -> iProp Σ) : iProp Σ :=
+    (sl_name slk s ∗
+     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H))%I.
+
   Definition is_sleeplock (γl γ : gname) (slk : mword 64) (s : string)
       (R : iProp Σ) : iProp Σ :=
-    (sl_name slk s ∗
-     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R))%I.
+    is_sleeplock_gen γl γ slk s R sl_untracked.
 
+  (* the TRACKED sleeplock: the deposit is a share of the "may hold" right,
+     so [slh_auth γ None] refutes the held arm.  This is the shape the
+     non-blocking acquiresleep is stated over. *)
+  Definition is_sleeplock_tok (γl γ : gname) (slk : mword 64) (s : string)
+      (R : iProp Σ) : iProp Σ :=
+    is_sleeplock_gen γl γ slk s R (slh_tok γ).
+
+  Global Instance is_sleeplock_gen_persistent γl γ slk s R H :
+    Persistent (is_sleeplock_gen γl γ slk s R H).
+  Proof. apply _. Qed.
   Global Instance is_sleeplock_persistent γl γ slk s R :
     Persistent (is_sleeplock γl γ slk s R).
   Proof. apply _. Qed.
+  Global Instance is_sleeplock_tok_persistent γl γ slk s R :
+    Persistent (is_sleeplock_tok γl γ slk s R).
+  Proof. apply _. Qed.
+
+  Lemma is_sleeplock_gen_name γl γ slk s R H :
+    is_sleeplock_gen γl γ slk s R H -∗ sl_name slk s.
+  Proof. iIntros "[$ _]". Qed.
+  Lemma is_sleeplock_gen_lock γl γ slk s R H :
+    is_sleeplock_gen γl γ slk s R H -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H).
+  Proof. iIntros "[_ $]". Qed.
+  Lemma is_sleeplock_gen_intro γl γ slk s R H :
+    sl_name slk s -∗
+    is_lock γl (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R H) -∗
+    is_sleeplock_gen γl γ slk s R H.
+  Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
 
   Lemma is_sleeplock_name γl γ slk s R :
     is_sleeplock γl γ slk s R -∗ sl_name slk s.
-  Proof. iIntros "[$ _]". Qed.
+  Proof. apply is_sleeplock_gen_name. Qed.
   Lemma is_sleeplock_lock γl γ slk s R :
     is_sleeplock γl γ slk s R -∗
     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R).
-  Proof. iIntros "[_ $]". Qed.
+  Proof. apply is_sleeplock_gen_lock. Qed.
   Lemma is_sleeplock_intro γl γ slk s R :
     sl_name slk s -∗
     is_lock γl (sl_lk slk) "sleep lock"%string (sl_res γ slk R) -∗
     is_sleeplock γl γ slk s R.
-  Proof. iIntros "#Hn #Hl". by iFrame "Hn Hl". Qed.
+  Proof. apply is_sleeplock_gen_intro. Qed.
 
-  (* ---- opening/closing [sl_res] inside the inner critical section ---- *)
+  (* ---- opening/closing [sl_res_gen] inside the inner critical section -- *)
 
   (* as the HOLDER (token in hand): the free disjunct is refuted by token
-     exclusivity, leaving the held shape (word cell + non-zeroness). *)
-  Lemma sl_res_open_held γ slk R :
-    sl_res γ slk R -∗ sleeplocked γ -∗
-    sleeplocked γ ∗
+     exclusivity, leaving the held shape (word cell + non-zeroness) and the
+     deposit, which the holder must put back when it re-closes. *)
+  Lemma sl_res_open_held γ slk R H :
+    sl_res_gen γ slk R H -∗ sleeplocked γ -∗
+    sleeplocked γ ∗ sl_dep γ H ∗
     (∃ v : mword 32,
        slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝).
   Proof.
-    iIntros "Hres Htok". iDestruct "Hres" as (v) "[Hw [(_ & Htok' & _)|%Hnz]]".
-    { iExFalso. iApply (sleeplocked_exclusive with "Htok Htok'"). }
-    iFrame "Htok". iExists v. by iFrame "Hw".
+    iIntros "Hres Htok".
+    iDestruct "Hres" as (v) "[Hw [(_ & Hfree & _) | [%Hnz Hdep]]]".
+    { iExFalso. iDestruct "Hfree" as (q) "[Htok' _]".
+      iDestruct "Htok" as (q') "Htok".
+      iApply (sleeplocked_q_exclusive with "Htok Htok'"). }
+    iFrame "Htok Hdep". iExists v. by iFrame "Hw".
+  Qed.
+
+  (* the PRECISE form: the deposit's authority agrees with the holder's own
+     fraction, so what comes out is exactly [H q] for the holder's [q].  This
+     is what releasesleep needs -- see the header on why "some fraction" will
+     not do. *)
+  Lemma sl_res_open_held_q γ slk R H q :
+    sl_res_gen γ slk R H -∗ sleeplocked_q γ q -∗
+    sleeplocked_q γ q ∗ sl_hauth γ q ∗ H q ∗
+    (∃ v : mword 32,
+       slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝).
+  Proof.
+    iIntros "Hres Htok".
+    iDestruct "Hres" as (v) "[Hw [(_ & Hfree & _) | [%Hnz Hdep]]]".
+    { iExFalso. iDestruct "Hfree" as (q0) "[Htok' _]".
+      iApply (sleeplocked_q_exclusive with "Htok Htok'"). }
+    iDestruct "Hdep" as (q0) "[Hha HH]".
+    iDestruct (sl_hauth_agree with "Hha Htok") as %<-.
+    iFrame "Htok Hha HH". iExists v. by iFrame "Hw".
   Qed.
 
   (* re-close in the held state (acquiresleep after its [locked := 1] store;
      releasesleep/holdingsleep before touching the word). *)
-  Lemma sl_res_close_held γ slk R (v : mword 32) :
+  Lemma sl_res_close_held γ slk R H (v : mword 32) :
     neq_vec (sign_extend' 64 v) zero_reg = true ->
-    slk ↦₄ v -∗ sl_res γ slk R.
-  Proof. iIntros (Hnz) "Hw". iExists v. iFrame "Hw". by iRight. Qed.
+    slk ↦₄ v -∗ sl_dep γ H -∗ sl_res_gen γ slk R H.
+  Proof. iIntros (Hnz) "Hw Hdep". iExists v. iFrame "Hw". iRight. by iFrame. Qed.
+
+  Lemma sl_res_close_held_q γ slk R H (v : mword 32) (q : Qp) :
+    neq_vec (sign_extend' 64 v) zero_reg = true ->
+    slk ↦₄ v -∗ sl_hauth γ q -∗ H q -∗ sl_res_gen γ slk R H.
+  Proof.
+    iIntros (Hnz) "Hw Hha HH".
+    iApply (sl_res_close_held with "Hw"); [ exact Hnz |]. iExists q. iFrame.
+  Qed.
 
   (* close in the free state (releasesleep after its two zero stores). *)
-  Lemma sl_res_close_free γ slk R :
+  Lemma sl_res_close_free γ slk R H (q : Qp) :
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    sleeplocked γ -∗
+    sleeplocked_q γ q -∗
+    sl_hauth γ q -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
     R -∗
-    sl_res γ slk R.
+    sl_res_gen γ slk R H.
   Proof.
-    iIntros "Hw Htok Hpid HR". iExists (mword_of_int 0 : mword 32).
-    iFrame "Hw". iLeft. iFrame "Htok Hpid HR". done.
+    iIntros "Hw Htok Hha Hpid HR". iExists (mword_of_int 0 : mword 32).
+    iFrame "Hw". iLeft. iFrame "Hpid HR". iSplitR; [ done |]. iExists q. iFrame.
+  Qed.
+
+  (* the acquirer's ghost step: the free arm's junk fraction becomes the
+     acquirer's own, so that the deposit it is about to make is pinned to the
+     token it walks away with. *)
+  Lemma sl_free_retarget γ (q : Qp) :
+    sl_free_tok γ ==∗ sleeplocked_q γ q ∗ sl_hauth γ q.
+  Proof.
+    iIntros "Hfree". iDestruct "Hfree" as (q0) "[Htok Hha]".
+    iMod (sl_hauth_update γ q0 q with "Hha Htok") as "[$ $]". done.
   Qed.
 
   (* ---- construction (the "newsleeplock" ghost step): what a caller does
      with initsleeplock's postcondition -- the freshly zeroed fields, the
-     two persistent names and the resource become a sleeplock. *)
+     two persistent names and the resource become a sleeplock.  The counting
+     authority starts at the AUTHORITATIVE ZERO, which is what a tracked
+     client keeps and hands out shares from. *)
+  Lemma new_sleeplock_gen E (slk : mword 64) (s : string) (R : iProp Σ)
+      (H : gname -> Qp -> iProp Σ) :
+    lock_name (sl_lk slk) "sleep lock"%string -∗
+    sl_name slk s -∗
+    sl_lk slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
+    slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
+    R ={E}=∗ ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
+  Proof.
+    iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
+    iMod (own_alloc (((●E (1%Qp : leibnizO Qp), ε) : slhUR)
+                     ⋅ ((◯E (1%Qp : leibnizO Qp), ε) : slhUR)
+                     ⋅ ((ε, ● (None : optionUR ufracR)) : slhUR))) as (γ) "Hg".
+    { rewrite -!pair_op !left_id !right_id. apply pair_valid.
+      split; [ by apply excl_auth_valid | by apply auth_auth_valid ]. }
+    iDestruct "Hg" as "[[Hha Htok] Hauth]".
+    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res_gen γ slk R (H γ))
+            with "Hlnm Hlkw Hcpu [Hw Htok Hha Hpid HR]") as (γl) "#Hlk".
+    { iApply (sl_res_close_free with "Hw Htok Hha Hpid HR"). }
+    iModIntro. iExists γl, γ. iFrame "Hauth".
+    iApply (is_sleeplock_gen_intro with "Hsnm Hlk").
+  Qed.
+
   Lemma new_sleeplock E (slk : mword 64) (s : string) (R : iProp Σ) :
     lock_name (sl_lk slk) "sleep lock"%string -∗
     sl_name slk s -∗
@@ -147,12 +498,9 @@ Section SleepLock.
     R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
     iIntros "#Hlnm #Hsnm Hlkw Hcpu Hw Hpid HR".
-    iMod lock_tok_excl_alloc as (γ) "Htok".
-    iMod (newlock E (sl_lk slk) "sleep lock"%string (sl_res γ slk R)
-            with "Hlnm Hlkw Hcpu [Hw Htok Hpid HR]") as (γl) "#Hlk".
-    { iApply (sl_res_close_free with "Hw Htok Hpid HR"). }
-    iModIntro. iExists γl, γ.
-    iApply (is_sleeplock_intro with "Hsnm Hlk").
+    iMod (new_sleeplock_gen E slk s R (fun _ => sl_untracked)
+            with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR") as (γl γ) "[#Hsl _]".
+    iModIntro. iExists γl, γ. iExact "Hsl".
   Qed.
 
   (* ---- the two ends of initsleeplock, bundled.
@@ -188,11 +536,28 @@ Section SleepLock.
   (* the ghost step from initsleeplock's output to a usable sleeplock: the cpu
      word of the inner spinlock goes INTO [lock_inv] (WpLock.v owns both lock
      words). *)
+  Lemma sl_fresh_new_gen E (slk : mword 64) (s : string) (R : iProp Σ)
+      (H : gname -> Qp -> iProp Σ) :
+    sl_fresh slk s -∗ R ={E}=∗
+    ∃ γl γ : gname, is_sleeplock_gen γl γ slk s R (H γ) ∗ slh_auth γ None.
+  Proof.
+    iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
+    iApply (new_sleeplock_gen E slk s R H with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
+  Qed.
+
   Lemma sl_fresh_new E (slk : mword 64) (s : string) (R : iProp Σ) :
     sl_fresh slk s -∗ R ={E}=∗ ∃ γl γ : gname, is_sleeplock γl γ slk s R.
   Proof.
     iIntros "(Hw & Hlkw & #Hlnm & Hcpu & #Hsnm & Hpid) HR".
     iApply (new_sleeplock E slk s R with "Hlnm Hsnm Hlkw Hcpu Hw Hpid HR").
   Qed.
+
+  (* the TRACKED end: the caller keeps the authoritative zero and hands out
+     shares from it.  [slh_auth γ None] in hand is exactly the evidence the
+     non-blocking acquiresleep asks for. *)
+  Lemma sl_fresh_new_tok E (slk : mword 64) (s : string) (R : iProp Σ) :
+    sl_fresh slk s -∗ R ={E}=∗
+    ∃ γl γ : gname, is_sleeplock_tok γl γ slk s R ∗ slh_auth γ None.
+  Proof. iIntros "Hf HR". iApply (sl_fresh_new_gen E slk s R slh_tok with "Hf HR"). Qed.
 
 End SleepLock.
