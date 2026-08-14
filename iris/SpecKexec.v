@@ -469,6 +469,25 @@ Definition wp_kexec_sconf_body
   (* ---- the running process ---- *)
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
+  (* ---- THE INTERRUPT INDEX IS NOT A CHOICE THIS CONTRACT MAKES ----------
+     [b = true] is FORCED by kexec's own callees, not by anything in its
+     body: [SpecBeginOp], [SpecNamei], [SpecIlock], [SpecReadi],
+     [SpecIunlockput] and [SpecEndOp] all state their continuation as
+     [wp_next true pj], i.e. they are callable only with interrupts enabled,
+     and phase A reaches the first of them at +0x00c.  That is a tree-wide
+     convention (50 Spec files spell it the same way), not kexec's to
+     change; relaxing it is an FS-layer sweep, recorded in
+     claude-notes/projects/kexec.md.
+
+     ONCE [b = true], THE OTHER THREE INDICES ARE THEOREMS RATHER THAN
+     PREMISES.  [CpuOwn.cpu_own_on] reads
+       [cpu_own n eb p C true lks  ⊣⊢  ⌜n = 0 /\ eb = true /\ lks = ∅⌝ ∗ C]
+     so the nesting level is 0, the saved enable state is [true] and the
+     held-lock set is empty on any run this contract describes -- a caller
+     supplies them by supplying the bundle, and every seam in the proof can
+     read them back off it.  [eb = true] below is therefore redundant with
+     [b = true]; it is kept because it is what the callee contracts quote. *)
+  b = true ->
   eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj C b lks -∗

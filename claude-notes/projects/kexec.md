@@ -522,11 +522,38 @@ that the next phase (or the next loop anywhere) should reuse:
   and a "Cannot find witness" from `lia`.  `rewrite -!Z.add_assoc` between
   the two passes fixes it.
 
-**What is left: phase D (`+0x2a6 .. +0x31a`), then `ProofKexec.v` +
-`LinkKexec.v`, then `sys_exec`.**  Phase D is drafted in `ProofKexecD.v`
-(not yet in `_CoqProject`): the name scan's three lemmas
-(`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`) and the commit's
-helper facts are written; the commit body itself is not.
+**PHASE D IS DONE TOO — `ProofKexecD.v`, admit-free.**  Every instruction
+of kexec is now covered by a proven block; what is left is the
+COMPOSITION (`ProofKexec.v` + `LinkKexec.v`) and then `sys_exec`.
+
+**THE SEAMS' `cpu_own 0 true … true ∅` IS NOT A HARDCODING DECISION — IT
+IS THE ONLY INHABITED INSTANCE.  SETTLED; DO NOT RE-OPEN IT.**  The
+question looks like four free indices (`n`, `eb`, `b`, `lks`) that the
+seams pin by fiat.  It is one:
+
+* **`b = true` is forced by kexec's CALLEES, not by kexec.**
+  `SpecBeginOp`, `SpecNamei`, `SpecIlock`, `SpecReadi`, `SpecIunlockput`
+  and `SpecEndOp` each state their continuation as `wp_next true pj` —
+  callable only with interrupts enabled — and phase A reaches the first
+  at `+0x00c`.  Fifty Spec files in the tree spell it that way; the
+  page-table and string callees phase C/D use (`uvmalloc`, `uvmclear`,
+  `walkaddr`, `strlen`, `copyout`, `safestrcpy`,
+  `proc_freepagetable`, `myproc`, `proc_pagetable`) are all `wp_next b`
+  generic, so it is *only* the FS layer that pins it.  Relaxing it is an
+  FS-contract sweep, not a kexec change.
+* **Once `b = true`, the other three are THEOREMS.**
+  `CpuOwn.cpu_own_on` reads
+  `cpu_own n eb p C true lks ⊣⊢ ⌜n = 0 /\ eb = true /\ lks = ∅⌝ ∗ C`.
+  So writing the seams with `n`, `eb`, `lks` free would state the *same*
+  proposition, just less readably: the pure conjunct pins all three.
+
+`SpecKexec` therefore carries `b = true` as a premise, with the reason at
+the premise.  **The evidence, if it is ever re-checked:** generalising
+`kxc_bad64` over `b` fails at its `iunlockput` call, whose
+`trap_csrs_ext eb` / `cpu_claim_ext eb` premises are `emp` only at
+`eb = true`, and then `wp_next_chain` cannot close `CIDf = CID0` because
+`iunlockput`'s own crossing is stated at the literal `true` and so is
+never specialised.  That is the whole proof of the paragraph above.
 
 **THE NAME SCAN'S INVARIANT IS DELIBERATELY WEAK, and that is the design
 decision worth keeping.** `kexec_ok` asks only for an EXISTENTIAL name of
@@ -673,6 +700,7 @@ Spec file — `coqdep` is how you confirm it worked (grep the consuming phase's
 | phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |
 | phase C — `kxc_argv_loop` (the fuel induction over the step) | **landed, proven** |
 | phase C — the closing copyout (`+0x272 .. +0x2a6`), `kxc_c_close`, and the `kxc_d_res` / `kxc_at_2a6` seam | **landed, proven** |
+| phase D — **THE COMMIT PROVEN** (`+0x2a6 .. +0x31a`): `ProofKexecD.v`'s name scan (`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`), `kxd_commit`, `kxd_phaseD` | **landed, proven** |
 | phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
