@@ -140,3 +140,23 @@ Honesty check against the hardness data: fragments would have insulated
 the SHAPE premises' churn (dir_links threading, the type bundles) but
 NOT the ledger renegotiations (wi16/dl16/crz) — those were about log
 accounting, orthogonal to shape.
+
+## 7. RULED (2026-08-15): create_fresh_ty's retirement path runs through here
+
+The user's ruling: the span axiom stays for now, and the tree layer is
+its designated retirement.  The reasoning, recorded so F1/F1.5's designer
+builds for it: the axiom exists because "freshly allocated, not yet
+visible" is a GLOBAL NEGATIVE the current model cannot state — no (L2)
+completeness (dangling records may name a freed-and-reclaimed inum) and
+no iget licence (nothing promises references arise only from records).
+The tree gives both in one stroke: `inum ∉ tree t` is a statement OVER
+the abstract state, and an allocated-unlinked inode is an OWNED DETACHED
+FRAGMENT (F1.5) — exclusive by construction, composable into the tree
+only by the dirlink that names it.  With that, ialloc's post returns the
+detached fragment, the ialloc→ilock window carries ownership instead of
+an axiom, and create_fresh_ty DELETES.  This also retires the licence
+(d) question in its original form: the enumeration "references traverse
+records" becomes the tree layer's fs_rep adequacy, stated once, instead
+of a per-contract promise.  Success criterion for F1.5: the fragment
+algebra is right when create_fresh_ty's deletion is a refactor, not a
+campaign.
