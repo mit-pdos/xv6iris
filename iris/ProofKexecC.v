@@ -1386,6 +1386,8 @@ Section KexecCSetup.
         by (rewrite /W7 upd_ne; [exact HW6a0 | nz]).
       assert (HW7sp : W7 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /W7 upd_ne; [exact HW6sp | nz]).
+      assert (HW7s0 : W7 !!! Regidx Rs0 = sp0)
+        by (rewrite /W7 upd_ne; [exact HW6s0 | nz]).
       assert (HW7s1 : W7 !!! Regidx Rs1 = (mword_of_int 0 : mword 64))
         by (rewrite /W7 upd_ne; [exact HW6s1 | nz]).
       assert (HW7s2 : W7 !!! Regidx Rs2 = sz1)
@@ -1421,6 +1423,8 @@ Section KexecCSetup.
         by (rewrite /W8 upd_ne; [exact HW7a0 | nz]).
       assert (HW8sp : W8 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /W8 upd_ne; [exact HW7sp | nz]).
+      assert (HW8s0 : W8 !!! Regidx Rs0 = sp0)
+        by (rewrite /W8 upd_ne; [exact HW7s0 | nz]).
       assert (HW8s1 : W8 !!! Regidx Rs1 = (mword_of_int 0 : mword 64))
         by (rewrite /W8 upd_ne; [exact HW7s1 | nz]).
       assert (HW8s2 : W8 !!! Regidx Rs2 = sz1)
@@ -1509,14 +1513,17 @@ Section KexecCSetup.
         rewrite /kxc_at_272.
         iSplitR.
         { iPureIntro. split_and!;
-            [ exact HW8sp | exact HW8s1
+            [ exact HW8sp | exact HW8s0 | exact HW8s1
             | rewrite HW8s2 /kxc_sp uint_unsigned w32_moi_unsigned; reflexivity
             | exact HW8s4 | exact HW8s5
             | rewrite HrootF Hroot'; exact HW8s6 | rewrite -Hs7eq; exact HW8s7
             | exact HW8s8 | exact HW8s9 | exact HW8s10]. }
         iSplitR.
-        { iPureIntro. split_and!; [lia | lia |].
-          rewrite -HW8a0. exact Heq0. }
+        (* the stackbase bound at [c = 0] is [kxc_sp]'s base case: the loop has
+           not moved [sp] yet, so it reads [uint sz1 - 4096 <= uint sz1]. *)
+        { iPureIntro. split_and!;
+            [ lia | lia | rewrite -HW8a0; exact Heq0
+            | cbn [kxc_sp]; lia ]. }
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
@@ -1546,13 +1553,15 @@ Section KexecCSetup.
         rewrite /kxc_at_21a.
         iSplitR.
         { iPureIntro. split_and!;
-            [ exact HW8sp | exact HW8s1 | rewrite -HW8a0; reflexivity
+            [ exact HW8sp | exact HW8s0 | exact HW8s1 | rewrite -HW8a0; reflexivity
             | rewrite HW8s2 /kxc_sp uint_unsigned w32_moi_unsigned; reflexivity
             | exact HW8s4 | exact HW8s5
             | rewrite HrootF Hroot'; exact HW8s6 | rewrite -Hs7eq; exact HW8s7
             | exact HW8s8 | exact HW8s9 | exact HW8s10]. }
         iSplitR.
-        { iPureIntro. split_and!; [lia | lia | rewrite -HW8a0; exact Hne0]. }
+        { iPureIntro. split_and!;
+            [ lia | lia | rewrite -HW8a0; exact Hne0
+            | cbn [kxc_sp]; lia ]. }
         iSplitR.
         { iPureIntro. split_and!;
             [rewrite HtfpF Htfp'; exact HPtfp | exact HbelowF | exact HcovF]. }
