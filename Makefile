@@ -109,6 +109,7 @@ model: $(MODEL)/CoqMakefile
 # to develop on.  An existing $(XV6_DIR) is left alone (see xv6-rev-check).
 $(XV6_DIR):
 	git clone $(XV6_URL) $@
+	git -C $@ fetch -q origin $(XV6_REV)
 	git -C $@ checkout --detach $(XV6_REV)
 
 # Warn when the checkout is not the revision the tracked dumps came from.

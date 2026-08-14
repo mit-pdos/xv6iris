@@ -75,12 +75,20 @@
    What IS verified against the regenerated `CodeCreate.v` at this revision:
 
      +0x00  c.addi16sp -80                   FRAME STILL 80 BYTES / 10 SLOTS
-            (0x715d), eight callee-saves at 72/64/56/48/40/32/24/16
+            (0x715d), and **SEVEN** callee-saves in the prologue --
+            ra 72, s0 64, s1 56, s2 48, s4 32, s5 24, s6 16.  SLOT 40 IS
+            s3's AND THE PROLOGUE DOES NOT WRITE IT: the [c.sdsp s3,40(sp)]
+            is at +0x8a, i.e. on the ALLOCATE HALF ONLY, and it is reloaded
+            per-arm (+0xd0 C-OK, +0xdc A-FAIL, +0x144 FAIL) rather than by
+            the shared epilogue, which restores the same seven.  s3 is
+            therefore callee-saved on ARMS N / G / F-BAD / F-OK for the
+            trivial reason that they never write it.
      +0x1c  jal nameiparent  / +0x20 mv s1,a0 (dp) / +0x22 beqz -> ARM N
      +0x26  jal ilock                        (a0 still dp)
-     +0x2a  lhu a5,74(s1)                    dp->nlink                 [GUARD]
+     +0x2a  lh  a5,74(s1)                    dp->nlink                 [GUARD]
      +0x2e  c.beqz a5 -> +0x76               [ARM G, the guard's exit]
      +0x30  li a2,0 / addi a1,s0,-80 / mv a0,s1 / +0x38 jal dirlookup
+     +0x62  mv a0,s2                         THE EPILOGUE FUNNEL, s2 = answer
      +0x76  mv a0,s1 / +0x78 jal iunlockput (dp) / +0x7c li s2,0
      +0x7e  c.j +0x62                        (the epilogue funnel)
 
@@ -100,9 +108,9 @@
    The guard's DECISION is `ProofNamex`'s at +0xce/+0xd2 verbatim -- the
    halfword comes out of the `i_nlink` conjunct of `ic_loaded`'s
    `inode_meta`, and `sign_extend' 64` is injective on `mword 16`, so the
-   `c.beqz` decides `di_nlink dn = 0` exactly (`ProofNamex.nx_nlz_eq` /
-   `nx_nlz_ne`; those two want hoisting out of `ProofNamex.v` rather than
-   copying).  The FALL-THROUGH is the interesting half: it hands the walk
+   `c.beqz` decides `di_nlink dn = 0` exactly (`ProofNamexParts.nx_nlz_eq` /
+   `nx_nlz_ne`, hoisted there by stage B' precisely so both walkers can
+   name them).  The FALL-THROUGH is the interesting half: it hands the walk
    `bv_unsigned (di_nlink dn) <> 0` at the SAME `dn` that `ic_loaded` names
    in its `dinode_at` and quantifies its `dir_links` over -- which is the
    raw material §20.17's step 4/5 consume.
@@ -451,6 +459,13 @@ Definition wp_create_sconf_body
   (* ---- the file system's geometry (the union of every callee's) ---- *)
   dev = icfg_dev ->
   nib = icfg_nib ->
+  (* the region's two AMBIENT TIES (fs-log.md §G.25's ruling: pure premises,
+     beside the [dev]/[nib] pair above, because there is one log and one
+     inode region and a boolean to opt out of that would be an interface
+     the guiding principle says never to keep).  create threads them
+     verbatim to [wp_nameiparent_gen], which is where they are consumed. *)
+  γ = icfg_log ->
+  inodestart = icfg_ist ->
   dev = ROOTDEV ->
   (0 < nib)%nat ->
   log_geom_ok cov logstart ->

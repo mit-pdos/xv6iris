@@ -4,10 +4,12 @@
    contract:
 
    (1) THE RECORD SURGERY.  create writes inode metadata with three
-       halfword stores and nothing else -- [sh s5,70(s2)] / [sh s6,72(s2)]
-       / [sh a5,74(s2)] at +0x90..+0x9a (major, minor, nlink := 1),
-       [sh zero,74(s2)] at +0x11c (the fail arm's nlink := 0), and
-       [lhu/addiw/sh 74(s1)] at +0x10a..+0x110 (the parent's nlink++).
+       halfword stores and nothing else -- [sh s5,70(s3)] / [sh s6,72(s3)]
+       / [sh a4,74(s3)] at +0x9c / +0xa0 / +0xa6 (major, minor, nlink := 1),
+       [sh zero,74(s3)] at +0x12e (the fail arm's nlink := 0), and
+       [lhu/addiw/sh 74(s1)] at +0x11c..+0x122 (the parent's nlink++).
+       (The child is in s3 on the allocate half -- s3 is the register the
+       prologue does NOT save; see SpecCreate.v's header.)
        Every one of them is [cr_setf], and the two facts a re-park of
        [IcacheEscrow.ic_loaded] needs -- [InodeLock.inode_ok] and
        [DirView.dir_ok] -- survive it for the same reason: neither
@@ -26,7 +28,8 @@
        section's finding 2.)
 
    (3) THE TWO NAME LITERALS.  dirlink wants FOURTEEN bytes of name
-       buffer; the "." and ".." arguments at +0xd6 / +0xea are rodata
+       buffer; the "." and ".." arguments the auipc/addi pairs at
+       +0xe4/+0xe8 and +0xf8/+0xfc compute are the rodata
        addresses 0x800075e0 and 0x800075e8, whose fourteen-byte windows
        run into their neighbours ("." 's window contains the ".." two
        bytes further on, and ".." 's contains the head of "unlink").
@@ -58,6 +61,9 @@ Require Import InodeLock.
 Require Import InodeRegion.
 Require Import SpecIalloc.
 Require Import SpecCreate.
+(* [nx_sext16_inj] -- the halfword-decision cluster B' hoisted out of
+   ProofNamex precisely so create could name it. *)
+Require Import ProofNamexParts.
 From Kernel Require KernelData.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -244,7 +250,9 @@ Section CreateParts.
   Qed.
 
   (* the two instances, at the two rodata addresses the auipc/addi pairs
-     at +0xd2..+0xd6 and +0xe6..+0xea compute *)
+     at +0xe4..+0xe8 and +0xf8..+0xfc compute.  Both checked against
+     CodeCreate.v at this revision: create + 0xe4 + 0x3000 - 1608
+     = 0x800075e0 and create + 0xf8 + 0x3000 - 1620 = 0x800075e8. *)
   Lemma cr_dot_window (a : mword 64) :
     a = mword_of_int cr_dot_addr ->
     kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ□ cr_dot_f j).
@@ -268,6 +276,102 @@ Section CreateParts.
   Qed.
 
 End CreateParts.
+
+(* ===================================================================== *)
+(*  (3b) THE FOUND ARM'S TWO TYPE DECISIONS (D0 pre-stage 3)              *)
+(*                                                                        *)
+(*  create's found arm runs TWO tests and they are NOT the same shape as  *)
+(*  namex's, which is why [ProofNamexParts.nx_tdir_eq]/[_ne] do not        *)
+(*  transfer even though the guard's [c.beqz] pair does:                   *)
+(*                                                                        *)
+(*    +0x4c  li  a5,2                                                     *)
+(*    +0x4e  bne s4,a5 -> +0x80          type != T_FILE          [SIGNED] *)
+(*    +0x52  lhu a5,68(s2)               ip->type              [UNSIGNED] *)
+(*    +0x56  addiw a5,a5,-2                                               *)
+(*    +0x58  slli a5,a5,48                                                *)
+(*    +0x5a  srli a5,a5,48                                                *)
+(*    +0x5c  li  a4,1                                                     *)
+(*    +0x5e  bltu a4,a5 -> +0x80         (ip->type - 2) mod 2^16 > 1      *)
+(*                                                                        *)
+(*  The FIRST is namex's shape at a different literal: the argument [ty]   *)
+(*  reached create in a1 SIGN-extended by the ABI, so the [bne] compares   *)
+(*  whole 64-bit registers and [sign_extend' 64]'s injectivity on          *)
+(*  [mword 16] decides the halfword exactly.  Those two lemmas are below   *)
+(*  and they are three-line corollaries of [nx_sext16_inj], exactly as     *)
+(*  [nx_tdir_eq]/[_ne] are.                                                *)
+(*                                                                        *)
+(*  The SECOND is a ZERO-EXTENDED RANGE TEST and has no analogue anywhere  *)
+(*  in the tree: [lhu] zero-extends, the [addiw] wraps at 32 bits, and the *)
+(*  [slli 48; srli 48] pair truncates back to sixteen, so the compared     *)
+(*  word is [(ip->type - 2) mod 2^16] and the [bltu a4,a5] falls through   *)
+(*  exactly on [ip->type in {2,3}].  [cr_trange] NAMES that word -- it is  *)
+(*  what the three ALU leaves leave in a5, spelled at their own output     *)
+(*  shapes -- so the walk never has to write the term out, and the two     *)
+(*  values the contract's F-OK arm claims are computed below.             *)
+(* ===================================================================== *)
+
+Lemma cr_sext_two :
+  (sign_extend' 64 T_FILE : mword 64) = (mword_of_int 2 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* +0x4e, TAKEN: the requested type is not T_FILE, so the arm is F-BAD *)
+Lemma cr_tfile_ne (t : mword 16) : t <> T_FILE ->
+  neq_vec (sign_extend' 64 t : mword 64) (mword_of_int 2 : mword 64) = true.
+Proof.
+  intro Hne. unfold neq_vec.
+  rewrite (proj2 (eq_vec_false_iff _ _)); [reflexivity |].
+  intro Hc. apply Hne. apply nx_sext16_inj. rewrite Hc cr_sext_two.
+  reflexivity.
+Qed.
+
+(* +0x4e, FALL-THROUGH: the requested type IS T_FILE, which is the [ty =
+   T_FILE] conjunct [SpecCreate]'s [made = false] arm claims *)
+Lemma cr_tfile_eq (t : mword 16) : t = T_FILE ->
+  neq_vec (sign_extend' 64 t : mword 64) (mword_of_int 2 : mword 64) = false.
+Proof.
+  intros ->. unfold neq_vec. rewrite cr_sext_two.
+  rewrite (proj2 (eq_vec_true_iff _ _) eq_refl). reflexivity.
+Qed.
+
+(* THE WORD THE THREE ALU LEAVES LEAVE IN a5, at their own output shapes:
+   [wp_lhu_s_sconf] gives [zero_extend' 64 t], [wp_caddiw_s_sconf] gives
+   [sign_extend' 64 (subrange_vec_dec (add_vec _ (sign_extend' 64
+   (sign_extend' 12 imm))) 31 0)], and [wp_cslli_s_sconf] /
+   [wp_csrli_s_sconf] give [shift_bits_left] / [shift_bits_right] at
+   [subrange_vec_dec shamt (log2_xlen - 1) 0].  Naming it is what keeps the
+   [bltu] side condition one lemma application wide. *)
+Definition cr_trange (t : mword 16) : mword 64 :=
+  shift_bits_right
+    (shift_bits_left
+       (sign_extend' 64
+          (subrange_vec_dec
+             (add_vec (zero_extend' 64 t : mword 64)
+                      (sign_extend' 64
+                         (sign_extend' 12 (mword_of_int 62 : mword 6))))
+             31 0))
+       (subrange_vec_dec (mword_of_int 48 : mword 6) (Z.sub log2_xlen 1) 0))
+    (subrange_vec_dec (mword_of_int 48 : mword 6) (Z.sub log2_xlen 1) 0).
+
+(* the two values the F-OK arm is about, computed *)
+Lemma cr_trange_file : cr_trange T_FILE = (mword_of_int 0 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma cr_trange_device : cr_trange T_DEVICE = (mword_of_int 1 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* ...so at either of them the [bltu a4,a5] at +0x5e FALLS THROUGH, which
+   is ARM F-OK.  (The converse -- that falling through IMPLIES the type is
+   one of the two -- is the range test's real content and needs
+   [bv_unsigned (cr_trange t) = (bv_unsigned t - 2) mod 65536]; it is the
+   next increment's first obligation and is written up in
+   claude-notes/projects/fs-sysfile.md under D0.) *)
+Lemma cr_trange_file_fall :
+  zopz0zI_u (mword_of_int 1 : mword 64) (cr_trange T_FILE) = false.
+Proof. rewrite cr_trange_file. vm_compute. reflexivity. Qed.
+
+Lemma cr_trange_device_fall :
+  zopz0zI_u (mword_of_int 1 : mword 64) (cr_trange T_DEVICE) = false.
+Proof. rewrite cr_trange_device. vm_compute. reflexivity. Qed.
 
 (* ===================================================================== *)
 (*  (4) THE CONSTANTS                                                     *)

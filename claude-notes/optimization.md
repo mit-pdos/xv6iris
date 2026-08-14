@@ -84,7 +84,15 @@ its own continuations.** Folding is a drop-in — the proof script does not chan
 Two limits: when `GEN`/`CID0` are LEMMA binders rather than section context the
 body definitions must take them explicitly; and a continuation with no `wp_next`
 wrapper (a pinned-hart stretch, index `false`) cannot be folded — the next
-leaf's implicit process pointer stops unifying.
+leaf's implicit process pointer stops unifying (`iSpecialize: cannot instantiate
+… false ?p`), and making `p` an explicit parameter of the definition does not
+rescue it. Confirmed thrice — ProofPiperead (WXP/CLOOP), ProofIget (both scan
+blocks; the rule-3 `iApply ("IH" $! …)` fails the same way, so the fold's own
+IH is subject to the limit), ProofFilealloc (the descriptor scan); each file's
+header records the exact error. The limit is that pinned-`false` shape
+specifically, NOT bare folds: ProofScheduler's four `□ (∀ …)` blocks have no
+`wp_next` wrapper either and three folded clean for −17 % (its leaves take the
+zero process pointer literally, so nothing needs `?p` through the fold).
 
 ### Seal a whole-function proof's continuation
 
@@ -263,7 +271,19 @@ worth 20× on individual files.
   of a 305 s file) in a big one. Keep `set` only where the abstraction is the
   point — a value that really does occur throughout the goal. Note `set (x := e)`
   *with parentheses* is vanilla Coq's `set`, not ssr's, so it does not fail when
-  it finds no occurrence.
+  it finds no occurrence. A `set (X := e)` immediately followed by `change e
+  with X` is the fully-redundant form — the `change` alone produces the same
+  goal, so the pair is `pose` + `change` (measured in ProofPipewrite: 66 such
+  `set`s cost 4.4 s where the sibling's 83 `pose`s cost 0.29 s, ~20× per call).
+- **`Local Strategy opaque [rget tp_pin rf_upd]` in a whole-function proof whose
+  leaves state their premises over `rget`.** Every such `iApply` otherwise makes
+  the unifier walk `rget → tp_pin → rf_upd` down the whole update chain, and the
+  `Qed` re-walks it (ProofPipewrite: 8 hot `iApply`s ~14 s → ~1.5 s, final `Qed`
+  18.9 s → 15.5 s). The trap: any premise spelled `M !!! Regidx r` where the
+  leaf's statement says `rget M r` was bridging by delta and now REGRESSES —
+  restate it in the `rget` spelling via `rget_ne` (HartTp.v) before the `iApply`
+  and the site goes syntactic. Audit: `-time` before and after; the regressing
+  sites are the ones that got slower.
 - **`reg_lookup` (RegFile.v) by default** — one `vm_compute` over the concrete-key
   if-chain. Where the target value is SYMBOLIC, `vm_compute` would try to reduce
   it and hang; use the lemma-based `peel_reg`, which peels via `upd_eq`/`upd_ne`

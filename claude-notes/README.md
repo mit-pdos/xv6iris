@@ -144,9 +144,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   driver; uart.c is 4/4 functions and the cone is axiom-clean. Read it for the
   transmit path's shape and for the rotated-loop / nested-iLöb /
   `uart_sent_sub` techniques.
-- **[`lock-set.md`](projects/lock-set.md)** — the per-CPU held-lock set: what
-  landed hidden, and the tree-wide `cpu_own`-index sweep that turns it into
-  acquire's no-reentrance premise and the "interrupts on ⟹ no locks held"
+- **[`lock-set.md`](projects/lock-set.md)** — the per-CPU held-lock set and the
+  lock ORDER: the audit of every simultaneous lock pair in xv6, the rank table
+  it yields, and the single tree-wide `cpu_own`-index sweep that turns them
+  into acquire's order premise and the "interrupts on ⟹ no locks held"
   theorem.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory

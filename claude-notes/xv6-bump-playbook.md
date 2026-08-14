@@ -337,6 +337,35 @@ Each of these is a bug that was found the hard way:
   name the same instruction in both images.
 * **anything that is not the operand of `mword_of_int`** — see below.
 
+### A REBASE ONTO THE BUMP CARRIES STALE IMMEDIATES IN SILENCE
+
+The batch sweeps the tree the bump ran against. It cannot reach a proof
+**written before the bump and rebased onto it afterwards** — that text did not
+exist when the tools ran, and git replays it without a murmur because an
+immediate is just a number and nothing conflicts. The first symptom is an
+`instr` premise that will not unify, in a file the bump's own diff never
+touched.
+
+So after rebasing in-flight proof work across a bump, re-derive every
+immediate the new text spells, from the regenerated `Code<F>.v` rather than
+from the disassembly you wrote it against. The map is the same one
+`relayout_map.py map` prints; what changes is only which files you apply it
+to. Two shortcuts that make it quick:
+
+- **`git diff <pre-bump> <bump> -- iris/Code<F>.v`** lists exactly the
+  immediates that moved in the function you were working in, old beside new.
+- The immediates that move are the ones crossing a group boundary. A `jal`
+  whose caller and callee shifted **together** is unchanged, and so is an
+  `auipc` whose page did not move — but the `addi` completing that
+  `auipc`'s address does move, since the pc changed and the target did not.
+  (Worked instance: kexec's loadseg loop over `1a70c2e`, where kexec moved
+  +14 and readi / walkaddr / panic did not — three `jal`s and one `addi`,
+  all −14, and the `auipc` untouched.)
+
+The same applies to any hand-written substitution: obey
+"only the operand of `mword_of_int`" and "one pass" below, and confirm by
+compiling, never by inspection.
+
 ### THE RULE THAT SUBSUMES THE OTHERS
 
 Every immediate a proof spells goes through `mword_of_int`. A line carries

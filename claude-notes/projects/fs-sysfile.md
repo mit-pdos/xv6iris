@@ -6312,3 +6312,151 @@ the credited entry pins).
 under "Restage rulings" above: the +0xb2 T_DIR sub-branch cut,
 `wp_dirlink_gen`'s `dl_need`-shaped premise, the found arm's own decision
 pair, and the prose corrections.
+
+
+### D₀ PRE-STAGES LANDED (2026-08-13); the walk itself did NOT start, and
+### the CFG below is the verified thing it consumes
+
+Every restage item above is now landed and full-tree green.  What did not
+happen is the walk: `ProofCreate.v` does not exist.  The reason is scope,
+stated so nobody re-plans around a wrong number — **the cut the restage
+ruling chose (failure family including FAIL's non-dir entry) requires the
+WHOLE allocate half**, because +0xc4 is reached only through ialloc,
+ilock(ip), three `sh`s, iupdate(ip) and a `dirlink(dp,name)`.  That is more
+code than everything before it.  The cut that is actually one increment is
+**the found half**: prologue, nameiparent, ARM N, ilock, the guard, ARM G,
+dirlookup, F-BAD, F-OK — with the ALLOCATE half (+0x8a onward, reached by
+the +0x3e `c.beqz` taken) parked behind one gate.  Re-cut there.
+
+**THE 332-BYTE CFG, EVERY TARGET COMPUTED FROM `CodeCreate.v`** (not from
+any prose listing; all seven prose listings in the tree were wrong
+somewhere).  `s2` is the answer register; `s1` = dp; `s4` = ty, `s5` =
+major, `s6` = minor; `s3` = ip on the allocate half only.
+
+```
+ +0x00 c.addi16sp -80          +0x02..0x0e sd ra/s0/s1/s2/s4/s5/s6   (SEVEN)
+ +0x10 addi s0,sp,80           +0x12..0x16 mv s4,a1 / s5,a2 / s6,a3
+ +0x18 addi a1,s0,-80          +0x1c jal nameiparent
+ +0x20 mv s1,a0                +0x22 beqz a0    -> +0x148  [ARM N]
+ +0x26 jal ilock (a0 = dp)
+ +0x2a lh  a5,74(s1)           +0x2e c.beqz a5  -> +0x76   [ARM G]
+ +0x30 li a2,0 / +0x32 addi a1,s0,-80 / +0x36 mv a0,s1 / +0x38 jal dirlookup
+ +0x3c mv s2,a0                +0x3e c.beqz a0  -> +0x8a   [ALLOCATE half]
+ +0x40 mv a0,s1 / +0x42 jal iunlockput (dp)
+ +0x46 mv a0,s2 / +0x48 jal ilock (ip)
+ +0x4c li a5,2                 +0x4e bne s4,a5  -> +0x80   [ARM F-BAD]
+ +0x52 lhu a5,68(s2) / +0x56 addiw -2 / +0x58 slli 48 / +0x5a srli 48
+ +0x5c li a4,1                 +0x5e bltu a4,a5 -> +0x80   [ARM F-BAD]
+ +0x62 mv a0,s2                THE EPILOGUE FUNNEL (F-OK falls in here)
+ +0x64..0x70 ld ra/s0/s1/s2/s4/s5/s6   +0x72 c.addi16sp +80   +0x74 c.ret
+ +0x76 mv a0,s1 / jal iunlockput / li s2,0 / c.j +0x62       [ARM G]
+ +0x80 mv a0,s2 / jal iunlockput / li s2,0 / c.j +0x62       [ARM F-BAD]
+ +0x8a sd s3,40(sp)            THE EIGHTH SAVE, allocate half only
+ +0x8c mv a1,s4 / +0x8e lw a0,0(s1) / +0x90 jal ialloc
+ +0x94 mv s3,a0                +0x96 c.beqz a0  -> +0xd4   [ARM A-FAIL]
+ +0x98 jal ilock (a0 = ip)
+ +0x9c sh s5,70(s3) / +0xa0 sh s6,72(s3) / +0xa4 li a4,1 / +0xa6 sh a4,74(s3)
+ +0xaa mv a0,s3 / +0xac jal iupdate
+ +0xb0 li a4,1                 +0xb2 beq s4,a4  -> +0xe0   [THE T_DIR CUT]
+ +0xb6 lw a2,4(s3) / +0xba addi a1,s0,-80 / +0xbe mv a0,s1
+ +0xc0 jal dirlink (dp,name)   +0xc4 bltz a0    -> +0x12e  [ARM FAIL, non-dir]
+ +0xc8 mv a0,s1 / +0xca jal iunlockput (dp)
+ +0xce mv s2,s3 / +0xd0 ld s3,40(sp) / +0xd2 c.j +0x62      [ARM C-OK]
+ +0xd4 mv a0,s1 / +0xd6 jal iunlockput (dp)
+ +0xda mv s2,s3 (= 0) / +0xdc ld s3,40(sp) / +0xde c.j +0x62 [ARM A-FAIL]
+ +0xe0 lw a2,4(s3) / +0xe4 auipc+addi a1 = 0x800075e0 (".") / +0xec mv a0,s3
+ +0xee jal dirlink (ip,".")    +0xf2 bltz a0    -> +0x12e
+ +0xf6 lw a2,4(s1) / +0xf8 auipc+addi a1 = 0x800075e8 ("..") / +0x100 mv a0,s3
+ +0x102 jal dirlink (ip,"..")  +0x106 bltz a0   -> +0x12e
+ +0x10a lw a2,4(s3) / +0x10e addi a1,s0,-80 / +0x112 mv a0,s1
+ +0x114 jal dirlink (dp,name)  +0x118 bltz a0   -> +0x12e
+ +0x11c lhu a5,74(s1) / +0x120 addiw a5,1 / +0x122 sh a5,74(s1)  dp->nlink++
+ +0x126 mv a0,s1 / +0x128 jal iupdate (dp) / +0x12c c.j +0xc8   (into C-OK)
+ +0x12e sh zero,74(s3) / +0x132 mv a0,s3 / +0x134 jal iupdate (ip)
+ +0x138 mv a0,s3 / +0x13a jal iunlockput (ip)
+ +0x13e mv a0,s1 / +0x140 jal iunlockput (dp)
+ +0x144 ld s3,40(sp) / +0x146 c.j +0x62                      [ARM FAIL]
+ +0x148 mv s2,a0 (= 0) / +0x14a c.j +0x62                    [ARM N]
+```
+
+**ARM CENSUS, checked against the contract: seven arms, five failing.**
+N (+0x148), G (+0x76), F-BAD (+0x80), A-FAIL (+0xd4), FAIL (+0x12e) all
+reach the funnel with `s2 = 0`; F-OK falls through +0x5e and C-OK is
++0xc8..+0xd2, both with `s2` = the locked inode.  FAIL has FOUR entries
+(+0xc4, +0xf2, +0x106, +0x118) and three of them are behind the T_DIR
+branch.  `s2` is zero on the FAIL and A-FAIL arms for the same reason the
+old listing gave for `s3`: +0x3c stored dirlookup's 0 into it and nothing
+on the allocate half writes it again until +0xce/+0xda.
+
+**ARM G's `crz` IS FALSE, AND THAT IS THE INTERESTING PART OF THE LEDGER.**
+`crz` buys itrunc's tail-flush unit with a GROUP witness,
+`InodeRegion.nlz_obs inum e0` — and `nlz_obs` is minted only at an
+observation that the record's `nlink` is **NONZERO** (fs-log.md §G.26: the
+mint is one fupd at namex's guard FALL-THROUGH).  ARM G is the guard
+TAKEN, i.e. `di_nlink dn = 0` observed, so the mint is unavailable by
+construction — not merely unthreaded.  ARM G's `iunlockput(dp)` therefore
+runs at `crb = cru = crz = false` and spends `SpecIput.ip_spend_w w false
+false = ip_bm w + 1 <= 2`.  It closes anyway with room: nothing has been
+logged before the guard, so the count is `cr_uw w >= 9` against
+`iput_units = 3`.  §20.17.1's ledger check said `ns' = ns` for the SLOT
+ledger and said nothing about the LOG ledger; this is that gap closed, and
+`CreateBudget.cr_budget_found_w` is the theorem.  The same figure covers
+ARM F-BAD's two uncredited `iunlockput`s and ARM A-FAIL's one.
+
+**LEDGER, PER ARM OF THE FOUND HALF** (`u` the entry count, `w`
+nameiparent's paid-bitmap report, `n1 = u - np_spend w >= 9`):
+
+| arm | calls after nameiparent | needs | leaves |
+|---|---|---|---|
+| N | none | — | `n1` |
+| G | `iunlockput(dp)` uncredited | 3 <= n1 | >= n1 - 2 |
+| F-BAD | `iunlockput(dp)`, `iunlockput(ip)`, both uncredited | 3 <= n1, 3 <= n1 - 2 | >= n1 - 4 |
+| F-OK | `iunlockput(dp)` uncredited | 3 <= n1 | >= n1 - 2 |
+
+All four are `cr_budget_found_w`.  The slot ledger is `ns - 1` after
+nameiparent's success (two out, one back), each `iunlockput` returns one,
+and the found arm's `dirlookup` iget takes the second — so `create_slots =
+3` is never approached on this half.
+
+**WHAT THE FOUND HALF STILL OWES, and it is exactly one lemma.**  The
+`bltu` at +0x5e falls through iff `(ip->type - 2) mod 2^16 <= 1`, and ARM
+F-OK's contract clause is `di_type dn = T_FILE \/ di_type dn = T_DEVICE`.
+`ProofCreateParts.cr_trange` names the compared word at the three ALU
+leaves' own output shapes and `cr_trange_file` / `cr_trange_device` compute
+it at the two literals; the missing direction is
+
+```coq
+  Lemma cr_trange_unsigned (t : mword 16) :
+    bv_unsigned (cr_trange t) = (bv_unsigned t - 2) `mod` 65536.
+```
+
+from which `zopz0zI_u 1 (cr_trange t) = false -> t = T_FILE \/ t =
+T_DEVICE` is `lia` over `0 <= bv_unsigned t < 65536`.  The four steps are:
+`add_vec` is `+ mod 2^64`; `subrange_vec_dec _ 31 0` is `mod 2^32`;
+`sign_extend' 64` preserves the low 32; `shift_bits_left 48` then
+`shift_bits_right 48` keeps bits 15..0.  Nothing in the tree has a
+slli/srli-pair lemma, so this is new work in the `BootReset.v` §3a idiom
+(`change` to the bv-level term, then stdpp's `bv_extract`/`bv_concat`
+algebra).  **It is the found half's only unproven step and it should land
+in `ProofCreateParts` before the walk starts**, not during it.
+
+**FILE ORGANIZATION FOR THE WALK, decided against both models.**
+`ProofCreate.v` = `Module CreateProof (NP : NAMEIPARENT) (IL : ILOCK)
+(IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (IA : IALLOC) (IU : IUPDATE) (DLK :
+DIRLINK) : CREATE.`, one `Section ProofCreateMain`, `Set Printing Depth
+40.`, and RULE ONE named bodies for: `cr_tail_body` (the funnel at +0x62,
+`□`-persistent with an abstract continuation — SIX arms reach it, so it
+may speak only of the seven restored registers and the ten frame slots,
+i.e. a `cr_tregs`), `cr_fail_body` (+0x12e, four entries), and
+`cr_alloc_body` (+0x8a, the parked gate).  No loop, so no `∀ fuel`
+anywhere — create is the first fs whole-function walk that is
+straight-line-with-branches, which is why ProofDirlink and not ProofNamex
+is the closer model for everything except the guard.
+
+**THE PARKED GATE'S SHAPE** (the +0x3e `c.beqz` TAKEN branch, i.e. the
+whole allocate half) is `Hdlblk`'s, not `Hrest`'s: an `iAssert`ed
+`wp_next` over a `cr_alloc_body` that takes the register file, the pc and
+the `dn`/`bm` of the parent as ARGUMENTS and captures everything else,
+introduced `with "[Hcont …]"`.  Stated that way it is a hypothesis of the
+walk lemma and `Print Assumptions` sees nothing — which is the difference
+between "lands gated" and an `Admitted`.

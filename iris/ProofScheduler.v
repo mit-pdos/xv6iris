@@ -279,7 +279,142 @@ Section ProofScheduler.
   Notation Rs7 := (mword_of_int 23 : mword 5).
   Notation Rs8 := (mword_of_int 24 : mword 5).
 
-  Lemma wp_scheduler_sconf 
+  (* ---- THE BLOCK STATEMENTS, NAMED (claude-notes/optimization.md, RULE
+     ONE) -- [Tail]/[Scan]/[Outer] are each stated below as a bare (no
+     [wp_next] wrapper: this whole span runs at the FIXED hart [cid_word] --
+     the scheduler thread never migrates) [iAssert] whose body is tens of
+     lines of ∀/wands; spelled out in place, EVERY proofmode step re-embeds
+     that whole statement in the proof term (the cost is |Δ| times the
+     number of steps it survives).  Naming the body turns each into a
+     constant applied to [γs]/[av] -- the LEMMA's own binders, not section
+     context, so unlike [GEN]/[CID] they must be threaded explicitly
+     (optimization.md's "two limits").
+
+     TRANSPARENT ON PURPOSE, same reason as every other file in this tree:
+     the use sites below ([iSpecialize]/[iApply "Tail"/"Scan"/"Outer"/"IHo"])
+     must unify through them without an extra [iEval (rewrite /X)].
+
+     [Outer] is only ~13 statement lines -- borderline by the line-count
+     rule alone -- but it is proved by [iLöb as "IHo"], so its IH is a full
+     copy of the statement carried in [Δ] for the ENTIRE dispatch-loop tail
+     of the proof (every step from +0x86 through the wfi/dispatch arms);
+     folding shrinks that copy to one application, which is the dominant
+     share of the win.  [IntrOn] (~10 statement lines, no Löb, no long
+     tail) is UNDER the fold threshold and stays inline -- precedent:
+     ProofDirlookup's file header records a 13-line body ruled the same
+     way. *)
+
+  Definition sc_tail_body (γs : list gname) (av : nat) : iProp Σ :=
+    (∀ (jj : nat) (γl : gname) (Mt : regfile) (ebx : bool) (n : nat),
+        ⌜(jj < NPROC)%nat⌝ -∗ ⌜γs !! jj = Some γl⌝ -∗
+        (* [n] is the index the tail RETURNS at, i.e. the index that goes with
+           the round's base enable [ebx] over the fixed carve [av - 10].  Its
+           own entry is in-lock (arm [false]) and so at the carve itself. *)
+        ⌜ (trap_res ebx + n)%nat = (av - 10)%nat ⌝ -∗
+        ⌜ Mt !!! Regidx Rs1 = proc_addr jj
+          /\ Mt !!! Regidx Rs2 = proc_addr NPROC
+          /\ Mt !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
+          /\ add_vec (Mt !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
+          /\ Mt !!! Regidx Rs6 = a_cpu_ctx cid_word
+          /\ neq_vec (add_vec zero_reg (Mt !!! Regidx Rs7)) zero_reg = true
+          /\ trunc32 (Mt !!! Regidx Rs8) = RUNNING ⌝ -∗
+        ⌜ neq_vec (Mt !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
+        (* the tail is entered holding proc jj's lock, i.e. at noff = 1, so
+           the ambient SIE index is the literal [false] (CpuOwn.cpu_own_eb_agree)
+           however the ROUND's base enable [ebx] came out. *)
+        sie_cap_gpr Mt (av - 10)%nat false zero_reg -∗
+        pc_is (mword_of_int (KernelSyms.scheduler + 0x4a)) -∗
+        locked γl cpu_id -∗
+        proc_lock_res γs γl (proc_addr jj) -∗
+        cpu_own 1 ebx zero_reg emp false -∗
+        trap_csrs -∗
+        own_ctx (a_cpu_ctx cid_word) -∗
+        ( ( ⌜(S jj < NPROC)%nat⌝ -∗ ∀ (Mn : regfile),
+              ⌜ Mn !!! Regidx Rs1 = proc_addr (S jj)
+                /\ Mn !!! Regidx Rs2 = proc_addr NPROC
+                /\ Mn !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
+                /\ add_vec (Mn !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
+                /\ Mn !!! Regidx Rs6 = a_cpu_ctx cid_word
+                /\ neq_vec (add_vec zero_reg (Mn !!! Regidx Rs7)) zero_reg = true
+                /\ trunc32 (Mn !!! Regidx Rs8) = RUNNING ⌝ -∗
+              ⌜ neq_vec (Mn !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
+              sie_cap_gpr Mn n ebx zero_reg -∗
+              pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
+              cpu_own 0 ebx zero_reg emp ebx -∗
+              (if ebx then emp else trap_csrs) -∗
+              own_ctx (a_cpu_ctx cid_word) -∗
+              WP (Loop : expr riscv_lang) )
+          ∧ ( ∀ (Me : regfile),
+              ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
+                /\ Me !!! Regidx Rs6 = a_cpu_ctx cid_word
+                /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
+                /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
+              ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
+              sie_cap_gpr Me n ebx zero_reg -∗
+              pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
+              cpu_own 0 ebx zero_reg emp ebx -∗
+              (if ebx then emp else trap_csrs) -∗
+              own_ctx (a_cpu_ctx cid_word) -∗
+              WP (Loop : expr riscv_lang) ) ) -∗
+        WP (Loop : expr riscv_lang))%I.
+
+  (* fuel-indexed: [av]/[γs] as above; [fuel] is the recursion measure --
+     kept as an explicit trailing parameter so the CALL site can keep
+     [∀ fuel] visible (RULE 3) and [iInduction] leaves the IH folded. *)
+  Definition sc_scan_body (γs : list gname) (av : nat) (fuel : nat) : iProp Σ :=
+    (∀ (jj : nat) (M : regfile) (ebc : bool) (n : nat),
+        ⌜(NPROC - jj <= fuel)%nat⌝ -∗ ⌜(jj < NPROC)%nat⌝ -∗
+        (* the index that goes with this round's base enable over the fixed
+           carve [av - 10] -- see the [sc_res_le]/[sc_idx_ok] header. *)
+        ⌜ (trap_res ebc + n)%nat = (av - 10)%nat ⌝ -∗
+        ⌜ M !!! Regidx Rs1 = proc_addr jj
+          /\ M !!! Regidx Rs2 = proc_addr NPROC
+          /\ M !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
+          /\ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
+          /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word
+          /\ neq_vec (add_vec zero_reg (M !!! Regidx Rs7)) zero_reg = true
+          /\ trunc32 (M !!! Regidx Rs8) = RUNNING ⌝ -∗
+        ⌜ neq_vec (M !!! Regidx Rs5) zero_reg = false -> ebc = false ⌝ -∗
+        (* level 0: the ambient SIE index IS the base enable (cpu_own_eb_agree),
+           so [ebc] and NOT a blanket [false]. *)
+        sie_cap_gpr M n ebc zero_reg -∗
+        pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
+        cpu_own 0 ebc zero_reg emp ebc -∗
+        (if ebc then emp else trap_csrs) -∗
+        own_ctx (a_cpu_ctx cid_word) -∗
+        ( ∀ (Me : regfile) (eb2 : bool) (n2 : nat),
+            ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
+              /\ Me !!! Regidx Rs6 = a_cpu_ctx cid_word
+              /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
+              /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
+            ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> eb2 = false ⌝ -∗
+            (* a dispatch may hand the round back at a DIFFERENT base enable,
+               so the exit carries its own arm AND its own index. *)
+            ⌜ (trap_res eb2 + n2)%nat = (av - 10)%nat ⌝ -∗
+            sie_cap_gpr Me n2 eb2 zero_reg -∗
+            pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
+            cpu_own 0 eb2 zero_reg emp eb2 -∗
+            (if eb2 then emp else trap_csrs) -∗
+            own_ctx (a_cpu_ctx cid_word) -∗
+            WP (Loop : expr riscv_lang) ) -∗
+        WP (Loop : expr riscv_lang))%I.
+
+  Definition sc_outer_body (av : nat) : iProp Σ :=
+    (∀ (M : regfile) (eb : bool) (n : nat),
+        ⌜ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
+          /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word
+          /\ neq_vec (add_vec zero_reg (M !!! Regidx Rs7)) zero_reg = true
+          /\ trunc32 (M !!! Regidx Rs8) = RUNNING ⌝ -∗
+        (* the index that goes with the arm over the fixed carve [av - 10] *)
+        ⌜ (trap_res eb + n)%nat = (av - 10)%nat ⌝ -∗
+        sie_cap_gpr M n eb zero_reg -∗
+        pc_is (mword_of_int (KernelSyms.scheduler + 0x86)) -∗
+        cpu_own 0 eb zero_reg emp eb -∗
+        (if eb then emp else trap_csrs) -∗
+        own_ctx (a_cpu_ctx cid_word) -∗
+        WP (Loop : expr riscv_lang))%I.
+
+  Lemma wp_scheduler_sconf
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64)
     : wp_scheduler_sconf_body γs m av p0.
   Proof.
@@ -795,58 +930,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE RELEASE TAIL, +0x4a..+0x54, over an arbitrary arrival map.      *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ (jj : nat) (γl : gname) (Mt : regfile) (ebx : bool) (n : nat),
-        ⌜(jj < NPROC)%nat⌝ -∗ ⌜γs !! jj = Some γl⌝ -∗
-        (* [n] is the index the tail RETURNS at, i.e. the index that goes with
-           the round's base enable [ebx] over the fixed carve [av - 10].  Its
-           own entry is in-lock (arm [false]) and so at the carve itself. *)
-        ⌜ (trap_res ebx + n)%nat = (av - 10)%nat ⌝ -∗
-        ⌜ Mt !!! Regidx Rs1 = proc_addr jj
-          /\ Mt !!! Regidx Rs2 = proc_addr NPROC
-          /\ Mt !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
-          /\ add_vec (Mt !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
-          /\ Mt !!! Regidx Rs6 = a_cpu_ctx cid_word
-          /\ neq_vec (add_vec zero_reg (Mt !!! Regidx Rs7)) zero_reg = true
-          /\ trunc32 (Mt !!! Regidx Rs8) = RUNNING ⌝ -∗
-        ⌜ neq_vec (Mt !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-        (* the tail is entered holding proc jj's lock, i.e. at noff = 1, so
-           the ambient SIE index is the literal [false] (CpuOwn.cpu_own_eb_agree)
-           however the ROUND's base enable [ebx] came out. *)
-        sie_cap_gpr Mt (av - 10)%nat false zero_reg -∗
-        pc_is (mword_of_int (KernelSyms.scheduler + 0x4a)) -∗
-        locked γl cpu_id -∗
-        proc_lock_res γs γl (proc_addr jj) -∗
-        cpu_own 1 ebx zero_reg emp false -∗
-        trap_csrs -∗
-        own_ctx (a_cpu_ctx cid_word) -∗
-        ( ( ⌜(S jj < NPROC)%nat⌝ -∗ ∀ (Mn : regfile),
-              ⌜ Mn !!! Regidx Rs1 = proc_addr (S jj)
-                /\ Mn !!! Regidx Rs2 = proc_addr NPROC
-                /\ Mn !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
-                /\ add_vec (Mn !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
-                /\ Mn !!! Regidx Rs6 = a_cpu_ctx cid_word
-                /\ neq_vec (add_vec zero_reg (Mn !!! Regidx Rs7)) zero_reg = true
-                /\ trunc32 (Mn !!! Regidx Rs8) = RUNNING ⌝ -∗
-              ⌜ neq_vec (Mn !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-              sie_cap_gpr Mn n ebx zero_reg -∗
-              pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
-              cpu_own 0 ebx zero_reg emp ebx -∗
-              (if ebx then emp else trap_csrs) -∗
-              own_ctx (a_cpu_ctx cid_word) -∗
-              WP (Loop : expr riscv_lang) )
-          ∧ ( ∀ (Me : regfile),
-              ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
-                /\ Me !!! Regidx Rs6 = a_cpu_ctx cid_word
-                /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
-                /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
-              ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> ebx = false ⌝ -∗
-              sie_cap_gpr Me n ebx zero_reg -∗
-              pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
-              cpu_own 0 ebx zero_reg emp ebx -∗
-              (if ebx then emp else trap_csrs) -∗
-              own_ctx (a_cpu_ctx cid_word) -∗
-              WP (Loop : expr riscv_lang) ) ) -∗
-        WP (Loop : expr riscv_lang) ))%I
+    iAssert (□ sc_tail_body γs av)%I
       with "[]" as "#Tail".
     { iModIntro.
       iIntros (jj γl Mt ebx n) "%Hjj %Hgl %Hn %Hpins %Htie Hcg Hpc Hlocked HR Hcpu Hcsrs Hown Hcont".
@@ -996,42 +1080,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE INNER SCAN, entry +0x58, fuel induction on the remaining count. *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ (fuel jj : nat) (M : regfile) (ebc : bool) (n : nat),
-        ⌜(NPROC - jj <= fuel)%nat⌝ -∗ ⌜(jj < NPROC)%nat⌝ -∗
-        (* the index that goes with this round's base enable over the fixed
-           carve [av - 10] -- see the [sc_res_le]/[sc_idx_ok] header. *)
-        ⌜ (trap_res ebc + n)%nat = (av - 10)%nat ⌝ -∗
-        ⌜ M !!! Regidx Rs1 = proc_addr jj
-          /\ M !!! Regidx Rs2 = proc_addr NPROC
-          /\ M !!! Regidx Rs3 = sign_extend' 64 RUNNABLE
-          /\ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
-          /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word
-          /\ neq_vec (add_vec zero_reg (M !!! Regidx Rs7)) zero_reg = true
-          /\ trunc32 (M !!! Regidx Rs8) = RUNNING ⌝ -∗
-        ⌜ neq_vec (M !!! Regidx Rs5) zero_reg = false -> ebc = false ⌝ -∗
-        (* level 0: the ambient SIE index IS the base enable (cpu_own_eb_agree),
-           so [ebc] and NOT a blanket [false]. *)
-        sie_cap_gpr M n ebc zero_reg -∗
-        pc_is (mword_of_int (KernelSyms.scheduler + 0x58)) -∗
-        cpu_own 0 ebc zero_reg emp ebc -∗
-        (if ebc then emp else trap_csrs) -∗
-        own_ctx (a_cpu_ctx cid_word) -∗
-        ( ∀ (Me : regfile) (eb2 : bool) (n2 : nat),
-            ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
-              /\ Me !!! Regidx Rs6 = a_cpu_ctx cid_word
-              /\ neq_vec (add_vec zero_reg (Me !!! Regidx Rs7)) zero_reg = true
-              /\ trunc32 (Me !!! Regidx Rs8) = RUNNING ⌝ -∗
-            ⌜ neq_vec (Me !!! Regidx Rs5) zero_reg = false -> eb2 = false ⌝ -∗
-            (* a dispatch may hand the round back at a DIFFERENT base enable,
-               so the exit carries its own arm AND its own index. *)
-            ⌜ (trap_res eb2 + n2)%nat = (av - 10)%nat ⌝ -∗
-            sie_cap_gpr Me n2 eb2 zero_reg -∗
-            pc_is (mword_of_int (KernelSyms.scheduler + 0x7e)) -∗
-            cpu_own 0 eb2 zero_reg emp eb2 -∗
-            (if eb2 then emp else trap_csrs) -∗
-            own_ctx (a_cpu_ctx cid_word) -∗
-            WP (Loop : expr riscv_lang) ) -∗
-        WP (Loop : expr riscv_lang) ))%I
+    iAssert (□ ( ∀ fuel : nat, sc_scan_body γs av fuel))%I
       with "[]" as "#Scan".
     { iModIntro. iIntros (fuel). iInduction fuel as [|fuel IH] "IH";
         iIntros (jj M ebc n) "%Hfuel %Hjj %Hn %Hpins %Htie Hcg Hpc Hcpu Hcsrs Hown Hexit".
@@ -1536,6 +1585,13 @@ Section ProofScheduler.
     (* body be written once; hence this is its own resource rather than a     *)
     (* [destruct] inside the Löb body.                                        *)
     (* ================================================================== *)
+    (* RULE ONE (optimization.md) judgment: NOT folded.  This statement is
+       only ~10 lines between [iAssert (□ (] and the closing [))%I] -- under
+       the fold threshold (precedent: ProofDirlookup's header records a
+       13-line body skipped the same way) -- and "IntrOn" is consumed once,
+       immediately, by "Outer" rather than living in [Δ] across a long tail,
+       so there is no Löb-IH multiplier to offset the cost of a definition
+       either.  Left inline. *)
     iAssert (□ ( ∀ (M : regfile) (eb : bool) (nx : nat),
         ⌜ (trap_res eb + nx)%nat = (av - 10)%nat ⌝ -∗
         sie_cap_gpr M nx eb zero_reg -∗
@@ -1585,19 +1641,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE OUTER DISPATCH LOOP, entry +0x86, by iLöb.                     *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ (M : regfile) (eb : bool) (n : nat),
-        ⌜ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
-          /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word
-          /\ neq_vec (add_vec zero_reg (M !!! Regidx Rs7)) zero_reg = true
-          /\ trunc32 (M !!! Regidx Rs8) = RUNNING ⌝ -∗
-        (* the index that goes with the arm over the fixed carve [av - 10] *)
-        ⌜ (trap_res eb + n)%nat = (av - 10)%nat ⌝ -∗
-        sie_cap_gpr M n eb zero_reg -∗
-        pc_is (mword_of_int (KernelSyms.scheduler + 0x86)) -∗
-        cpu_own 0 eb zero_reg emp eb -∗
-        (if eb then emp else trap_csrs) -∗
-        own_ctx (a_cpu_ctx cid_word) -∗
-        WP (Loop : expr riscv_lang) ))%I
+    iAssert (□ sc_outer_body av)%I
       with "[]" as "#Outer".
     { iModIntro. iLöb as "IHo".
       iIntros (M eb n) "%Hpo %Hn Hcg Hpc Hcpu Hcsrs Hown".
@@ -1777,7 +1821,8 @@ Section ProofScheduler.
       iEval (rewrite Ho58) in "Hpc".
       (* the scan runs interrupts-off at the FULL carve: [trap_res false + n]
          is [n] by conversion, so the index equation is [reflexivity]. *)
-      iApply ("Scan" $! NPROC 0%nat B5 false (av - 10)%nat
+      iSpecialize ("Scan" $! NPROC).
+      iApply ("Scan" $! 0%nat B5 false (av - 10)%nat
                 with "[%] [%] [%] [%] [%] Hcg Hpc Hcpu Hcsrs Hown").
       { lia. }
       { unfold NPROC. lia. }
