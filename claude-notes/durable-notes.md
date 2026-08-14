@@ -1028,3 +1028,22 @@ Two habits that catch it immediately:
 The line-count check is also what distinguishes "my rewriter ate this" from
 "someone else's work landed here", which is worth being sure about before
 reverting anything.
+
+## `make -k` leaves the stale `.vo` AND skips the dependents silently
+
+When a file fails to compile, its previous `.vo` is not necessarily removed,
+and `make -k` then builds nothing downstream of it while reporting only the
+one failure.  Counting `*** [X.vo] Error` lines therefore measures "files that
+fail to compile", NOT "everything else is verified" -- the layer below a
+failure can be sitting on artifacts from before whatever change you are
+testing.
+
+The tell is a timestamp comparison, not `ls`: any `.vo` OLDER than a root
+dependency you edited (`LockRank.vo`, `CpuOwn.vo`) was built against the old
+version and was not rebuilt.
+
+    stat -c "%y %n" LockRank.vo <suspect>.vo
+
+Before trusting a failure count after a semantic change, `rm` the failing
+files' `.vo` and the `.vo` of everything that requires them, then rebuild.
+The number goes up; that is the real one.
