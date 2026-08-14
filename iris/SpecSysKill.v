@@ -54,7 +54,7 @@ Import Defs.
 Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-    (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :=
+    (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_kill in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -63,8 +63,12 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 18 for argint's, 16 for kkill's *)
   (22 <= av)%nat ->
+  (* sys_kill's cone is exactly kkill's: it acquires each "proc" lock
+     (rank 11, LockRank.v) in turn.  argint exposes no locks_below premise
+     of its own. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
   p_trapframe p ↦₈{dqt} page_base tfp -∗
@@ -78,7 +82,7 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
         mf !!! Regidx (mword_of_int 10 : mword 5) = rv /\
         (rv = (zero_reg : mword 64) \/ rv = mword_of_int (-1)) ⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b -∗
+      cpu_own n eb p C b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
@@ -90,6 +94,6 @@ Module Type SYSKILL.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool),
-      wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b.
+      (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset nat),
+      wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b lks.
 End SYSKILL.

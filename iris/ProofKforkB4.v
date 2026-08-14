@@ -219,7 +219,7 @@ Section KforkB4Proof.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
-      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) :
+      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) (lks : gset nat) :
     (22 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (* the itable this block holds the lock for IS the one [cwd_ref] names,
@@ -230,12 +230,16 @@ Section KforkB4Proof.
        off it. *)
     m !!! Regidx Rs5 = pme ->
     m !!! Regidx Rs4 = npa ->
+    (* THE FRESHNESS PREMISE: this block's [idup(p->cwd)] acquires and
+       releases [itable.lock] internally (balanced -- [lks] is unchanged),
+       so the caller must already hold only locks BELOW its rank. *)
+    locks_below lks (lock_rank "itable") ->
     (* THE PARENT HAS A WORKING DIRECTORY.  [ProcInv.cwd_ref] is two-armed
        on the pointer -- a process between [p->cwd = 0] and its next chdir
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]
        with no null test, so this is the honest reading of the code. *)
     sie_cap_gpr m (rsv + (K - 8))%nat false pme -∗
-    cpu_own lvl eb pme C false -∗
+    cpu_own lvl eb pme C false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
     panic_wp_any -∗
@@ -255,7 +259,7 @@ Section KforkB4Proof.
             mf !!! Regidx r = m !!! Regidx r) /\
          mf !!! Regidx Rs1 = sign_extend' 64 pid_c⌝ -∗
         sie_cap_gpr mf (rsv + (K - 8))%nat false pme -∗
-        cpu_own lvl eb pme C false -∗
+        cpu_own lvl eb pme C false lks -∗
         pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
         proc_priv γf pme pid_p Vp -∗
         (∃ Vc' : pprivate,
@@ -267,7 +271,7 @@ Section KforkB4Proof.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hms5 Hms4.
+    intros HK Hlvl Hms5 Hms4 Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hir Hparent Hchild Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
@@ -361,12 +365,14 @@ Section KforkB4Proof.
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
     iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
-              ck (cq/2)%Qp cdev cinum M1 lvl eb pme C (rsv + (K - 8))%nat false
+              ck (cq/2)%Qp cdev cinum M1 lvl eb pme C (rsv + (K - 8))%nat false lks
               (* the callee's bound is stated with a NAMED constant, so go through
                  [etransitivity] rather than [lia]: [exact] converts the name to
                  its literal, and only the [rsv] slack is left for [lia]. *)
               ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
+              Hfresh
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hshr").
+    all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".
     (* THE GATHER: the share comes back at the fraction it left at (nothing

@@ -95,11 +95,12 @@ Section ProofAllocpid.
 
 
   Lemma wp_allocpid_sconf (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_allocpid_sconf_body γp m av n eb p C b.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat)
+    : wp_allocpid_sconf_body γp m av n eb p C b lks.
   Proof.
     cbv beta delta [wp_allocpid_sconf_body].
-    intros pcE ret_tgt Hn Hav.
+    intros pcE ret_tgt Hn Hav Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hislock #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq. symmetry in Hbeq.
@@ -235,9 +236,10 @@ Section ProofAllocpid.
        hart (CID1..CID8), so acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p C (av - 4)%nat b
-              Hn ltac:(pose proof (apid_K10 av Hav); lia)
+    iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p C (av - 4)%nat b lks
+              Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq0) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".
     (* ===================== CRITICAL SECTION (fixed b = false) ===================== *)
@@ -409,9 +411,16 @@ Section ProofAllocpid.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p C (av - 4)%nat
+              ({[lock_rank "nextpid"]} ∪ lks)
               Hlka ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcsrel Hcpu".
+    (* allocpid is BALANCED: what it acquired it released, so the set
+       release hands back collapses to the entry [lks] -- [Hfresh] is what
+       makes the singleton insert/delete cancel. *)
+    assert (Hsetback : ({[lock_rank "nextpid"]} ∪ lks) ∖ {[lock_rank "nextpid"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+    iEval (rewrite Hsetback) in "Hcpu".
     (* ===================== EPILOGUE (generic b again) ===================== *)
     (* the porting guide's release table: [wp_next]'s own index is release's
        [outb], syntactically [match n with O => eb | S _ => false end], not

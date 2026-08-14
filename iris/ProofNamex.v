@@ -1078,7 +1078,7 @@ Section ProofNamexMain.
       (g : log_names) (gfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
       (used : gset Z) (cwdv : mword 64) (npar : bool) (n : nat) (Sb : gset Z)
-      (pidv : mword 32) (dq dqb dqs dqc : dfrac) (fuel : nat) (CIDl : CpuId) : iProp Σ :=
+      (pidv : mword 32) (dq dqb dqs dqc : dfrac) (fuel : nat) (CIDl : CpuId) (lks : gset nat) : iProp Σ :=
     (* THE GROWING SET (fs-sysfile GR-2b, retrofit 6).  [Sb] is the caller's,
        fixed; [Scur] is the loop's running set, existentially fresh at every
        turn because each iteration's iunlockput returns a set it chose.  The
@@ -1109,7 +1109,7 @@ Section ProofNamexMain.
      ⌜nx_regs m sp0 (pa_add pv off) ipv nb
               (m !!! Regidx Ra1 : mword 64) Ml⌝ -∗
      sie_cap_gpr Ml (K - 12)%nat b (proc_addr j) -∗
-     cpu_own 0 eb (proc_addr j) C b -∗
+     cpu_own 0 eb (proc_addr j) C b lks -∗
      pc_is (mword_of_int (NX + 0xf4)) -∗
      (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
      (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
@@ -1143,7 +1143,7 @@ Section ProofNamexMain.
         (through ilock, down to sleep), so the contract's own continuation
         is about an arbitrary hart. *)
      wp_next (CID0 := CIDl) true (proc_addr j) (fun CIDc : CpuId =>
-       namex_postS (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb C
+       namex_postS (CID := CIDc) (proc_addr j) pv nb ret_tgt pl m K b eb C lks
                    g gfs bn cov logstart bmapstart inodestart size used
                    cwdv plen pfun npar n Sb pidv dq dqb dqs dqc) -∗
      WP (Loop : expr riscv_lang))%I.
@@ -1155,7 +1155,7 @@ Section ProofNamexMain.
       (g : log_names) (gfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
       (cwdv : mword 64) (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (CIDt : CpuId) : iProp Σ :=
+      (CIDt : CpuId) (lks : gset nat) : iProp Σ :=
     (∀ (Mt : regfile) (nf' : nat -> bv 8),
      ⌜nx_regs m sp0 (pa_add pv e) ipv nb
         (m !!! Regidx Ra1 : mword 64) Mt⌝ -∗
@@ -1163,7 +1163,7 @@ Section ProofNamexMain.
       = take 14 (bview (e - a)%nat
                    (fun i => pfun (a + i)%nat))⌝ -∗
      sie_cap_gpr Mt (K - 12)%nat b (proc_addr j) -∗
-     cpu_own 0 eb (proc_addr j) C b -∗
+     cpu_own 0 eb (proc_addr j) C b lks -∗
      pc_is (mword_of_int (NX + 0xae)) -∗
      (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
      (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
@@ -1211,16 +1211,16 @@ Section ProofNamexMain.
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used cwdv plen pfun nfun npar n Sb
-                        pidv dq dqb dqs dqc m K eb C b.
+                        pidv dq dqb dqs dqc m K eb C b lks.
   Proof.
     cbv beta delta [wp_namex_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
            HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
-           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Heb.
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Heb Hbelow.
     destruct (nx_kb K HK) as (Kmp & Kid & Kig & Kmm & Kil & Kiu & Kiup
                               & Kdl & Kip & Kpop & K12).
     (* N3d trap 1's whole-function fix: rename the [let]-bound [pj], fold
@@ -2619,7 +2619,7 @@ Section ProofNamexMain.
                (fun CIDl : CpuId =>
                   nx_loop_body j b K m sp0 pv nb ret_tgt plen L pfun pl eb C
                                g gfs bn cov logstart bmapstart inodestart size
-                               used cwdv npar n Sb pidv dq dqb dqs dqc fuel CIDl))%I
+                               used cwdv npar n Sb pidv dq dqb dqs dqc fuel CIDl lks))%I
       with "[]" as "Hloop".
     { (* ---- local disequality helpers, used all through the body ---- *)
       assert (Hcsne : forall c r : mword 5,
@@ -2742,7 +2742,7 @@ Section ProofNamexMain.
                iDestruct (nx_slk_acc cn pk Hpk with "Hslks")
                  as (gilp gislp) "#Hslkp".
                iDestruct (cpu_own_transport CIDl CIDA3 0%nat eb (proc_addr j)
-                            C b ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+                           C b  ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
                iDestruct (wp_next_shift (b := true) (CIDa := CIDl) (CIDb := CIDA3)
                             ltac:(wp_next_chain) with "Hcont") as "Hcont".
                iDestruct (log_opS_named with "Hlog") as (enxA) "Hlog".
@@ -2751,13 +2751,14 @@ Section ProofNamexMain.
                          nib size dev usedc pk pq pinum ncur Scur wc false
                          false enxA pidv dq dqb dqs
                          T2 (K - 12)%nat eb C b
-                         Kip Hpk HbW ltac:(discriminate)
+                         _ Kip Hpk HbW ltac:(discriminate)
                          Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
                          Hibc Hibl Hpb' Hcovb HbD
-                         Hj Hgs HT2a0
+                         Hj Hgs HT2a0 Hbelow
                          with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl
                                Hescp Hireg Hslkp Href Hbmap Hinos Hbits Hppid
                                Hprocs Hdev Hgeom Hdlk Hbslot [] Hlog").
+               all: try lkbelow.
                { rewrite Heb /trap_csrs_ext. done. }
                { rewrite Heb /cpu_claim_ext. done. }
                { iEval (cbn beta iota). iEmpIntro. }
@@ -3048,7 +3049,7 @@ Section ProofNamexMain.
                              nx_rest_body j b K m sp0 pv nb plen a e pfun ipv ncur
                                           usedc Scur eb C g gfs bn cov logstart bmapstart
                                           inodestart size cwdv pidv dq dqb dqs dqc
-                                          CIDt))%I
+                                          CIDt lks))%I
                  with "[IHl Hcont]" as "Hrest".
                { iIntros (CIDt Hst Mt nf') "%Hregt %Hviewt Hcg Hcnt Hpc
                           Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
@@ -3185,11 +3186,13 @@ Section ProofNamexMain.
                    iApply (IL.wp_ilock_sconf gs j gl gu gd gk pd pav pu bn
                              gfs gi cn gilk gislk cov logstart inodestart nib
                              ik (iq/2)%Qp gsh dev iinum pidv dq dqs
-                             V2 (K - 12)%nat eb C b
+                             V2 (K - 12)%nat eb C b lks
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
+                             ltac:(lkbelow)
                              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesck
                                    Hireg Hslkk Hshr Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1").
+                   all: try lkbelow.
                    { rewrite Heb /trap_csrs_ext. done. }
                    { rewrite Heb /cpu_claim_ext. done. }
                    iIntros (CIDil Hqil mil dnl bml fl_)
@@ -3401,16 +3404,17 @@ Section ProofNamexMain.
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb C b
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb C b lks
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
-                               HND2a0
+                               HND2a0 Hbelow
                                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
+                     all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
                      { iEval (cbn beta iota). iEmpIntro. }
@@ -3680,11 +3684,13 @@ Section ProofNamexMain.
                                     with "Hcnt") as "Hcnt".
                        iApply (IU.wp_iunlock_sconf gs gfs gi cn gilk gislk
                                  cov logstart ik (iq/2)%Qp gsh dev iinum dnl bml
-                                 pidv dq NP3 (K - 12)%nat eb (proc_addr j) C b
+                                 pidv dq NP3 (K - 12)%nat eb (proc_addr j) C b lks
                                  Kiu Hik HP3a0
+                                 ltac:(lkbelow)
                                  with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesck
                                        Hslkk Hslkd Hslpid Hppid Hprocs Hdep
                                        Hidev Hiinum Hivalid Hload Hshot").
+                       all: try lkbelow.
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr".
                        assert (Hpc80 : ret_pc (NP3 !!! Regidx Rra)
@@ -3829,7 +3835,7 @@ Section ProofNamexMain.
                             ⌜nx_regs m sp0 (pa_add pv o2) ipv nb
                                (m !!! Regidx Ra1 : mword 64) Mz⌝ -∗
                             sie_cap_gpr Mz (K - 12)%nat b (proc_addr j) -∗
-                            cpu_own 0 eb (proc_addr j) C b -∗
+                            cpu_own 0 eb (proc_addr j) C b lks -∗
                             pc_is (mword_of_int (NX + 0xde)) -∗
                             ([∗ list] i ∈ seq 0 (S plen),
                                pa_add pv i ↦ₘ pfun i) -∗
@@ -3966,7 +3972,7 @@ Section ProofNamexMain.
                                    logstart nib dev (ientry ik) bml datl dnl
                                    nf' false (mword_of_int 0 : mword 32)
                                    pidv dq (DfracOwn (1/2)) (DfracOwn 1)
-                                   GA4 (K - 12)%nat eb C b
+                                   GA4 (K - 12)%nat eb C b lks
                                    Kdl Htyd Hlg Hbwf Hbcov Hszb Hdio Hj Hgs
                                    HGA4a0
                                    ltac:(rewrite HGA4a2; vm_compute;
@@ -3975,6 +3981,7 @@ Section ProofNamexMain.
                                          Hidev Hmeta Hmap Hblocks [Hname] []
                                          Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                                          Hitb2 Hitbl Hesc Hisl").
+                         all: try lkbelow.
                          { iEval (rewrite HGA4a1). iExact "Hname". }
                          { done. }
                          iIntros (CIDdl Hqdl mdl found kdir kslot qq)
@@ -4145,17 +4152,18 @@ Section ProofNamexMain.
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GB3 (K - 12)%nat eb C b
+                                     GB3 (K - 12)%nat eb C b lks
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
-                                     Hiu Hj Hgs HGB3a0
+                                     Hiu Hj Hgs HGB3a0 Hbelow
                                      with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep2 Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
+                           all: try lkbelow.
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
@@ -4362,17 +4370,18 @@ Section ProofNamexMain.
                                      size dev usedc ik (iq/2)%Qp (iq/2)%Qp gsh
                                      iinum dnl bml ncur Scur wc false true
                                      enx pidv dq dqb dqs
-                                     GC3 (K - 12)%nat eb C b
+                                     GC3 (K - 12)%nat eb C b lks
                                      Kiup Hik HbW ltac:(discriminate)
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
-                                     Hiu Hj Hgs HGC3a0
+                                     Hiu Hj Hgs HGC3a0 Hbelow
                                      with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep2 Hbmap
                                            Hinos Hbits Hppid Hprocs Hdev
                                            Hgeom Hdlk Hbslot Hcrz Hlog").
+                           all: try lkbelow.
                            { rewrite Heb /trap_csrs_ext. done. }
                            { rewrite Heb /cpu_claim_ext. done. }
                            iIntros (CIDup Hqup mup nup usedup Sup wup)
@@ -4647,16 +4656,17 @@ Section ProofNamexMain.
                                bmapstart inodestart nib size dev usedc
                                ik (iq/2)%Qp (iq/2)%Qp gsh iinum dnl bml ncur
                                Scur wc false false enxB
-                               pidv dq dqb dqs ND2 (K - 12)%nat eb C b
+                               pidv dq dqb dqs ND2 (K - 12)%nat eb C b lks
                                Kiup Hik HbW ltac:(discriminate)
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
-                               HND2a0
+                               HND2a0 Hbelow
                                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
                                      Hdev Hgeom Hdlk Hbslot [] Hlog").
+                     all: try lkbelow.
                      { rewrite Heb /trap_csrs_ext. done. }
                      { rewrite Heb /cpu_claim_ext. done. }
                      { iEval (cbn beta iota). iEmpIntro. }
@@ -5412,10 +5422,11 @@ Section ProofNamexMain.
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID23)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
-                A3 0%nat eb (proc_addr j) C (K - 12)%nat b
+                A3 0%nat eb (proc_addr j) C (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
-                Hrino HA3a0 HA3a1
+                Hrino HA3a0 HA3a1 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl1").
+      all: try lkbelow.
       iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href".
       destruct Higp as (Hcsig & Hkig & Higa0).
       assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
@@ -5620,7 +5631,7 @@ Section ProofNamexMain.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (MP.wp_myproc_sconf B1 (K - 12)%nat 0%nat eb (proc_addr j) C b
+      iApply (MP.wp_myproc_sconf B1 (K - 12)%nat 0%nat eb (proc_addr j) C b _
                 ltac:(vm_compute; reflexivity) Kmp
                 with "Hcg Hcnt Htext Hpc").
       iIntros (CIDmp Hqmp msv mf1) "%Hmsf Hcg Hcnt Hpc %Hmpp".
@@ -5669,9 +5680,10 @@ Section ProofNamexMain.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ID.wp_idup_sconf gtl cn gfs gi cov logstart nib
                 ck (cq/2)%Qp dev cinum
-                B3 0%nat eb (proc_addr j) C (K - 12)%nat b
-                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0
+                B3 0%nat eb (proc_addr j) C (K - 12)%nat b lks
+                Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 ltac:(lkbelow)
                 with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hpanic Hisl1 Hcshr").
+      all: try lkbelow.
       iIntros (CIDid Hqid mid) "Hcg Hcnt Hpc %Hidp Hcshr (%qn & Href)".
       destruct Hidp as [Hcsid Hida0].
       (* ---- THE GATHER: the cwd reference is whole again ---- *)
@@ -5872,16 +5884,16 @@ Section ProofNamexMain.
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool)
+      (b : bool) (lks : gset nat)
     : wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n
-                          pidv dq dqb dqs dqc m K eb C b.
+                          pidv dq dqb dqs dqc m K eb C b lks.
   Proof.
     cbv beta delta [wp_namex_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
            HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
-           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Heb.
+           Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Heb Hbelow.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
@@ -5889,14 +5901,15 @@ Section ProofNamexMain.
     iDestruct "Hlog" as (Sb0) "Hlog".
     iApply (wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
-              plen pfun nfun npar n Sb0 pidv dq dqb dqs dqc m K eb C b
+              plen pfun nfun npar n Sb0 pidv dq dqb dqs dqc m K eb C b lks
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen
-              (walk_need_counted L n Hbud) Hj Hgs Ha1 Heb
+              (walk_need_counted L n Hbud) Hj Hgs Ha1 Heb Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog
                     [Hcont]").
+    all: try lkbelow.
     iEval (rewrite /wp_next).
     iIntros (CIDf) "%Hchain".
     rewrite /namex_postS.

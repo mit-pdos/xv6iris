@@ -153,7 +153,7 @@ Definition wp_prepare_return_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
     (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-    (epc : mword 64) (b : bool) :=
+    (epc : mword 64) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.prepare_return in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_prepare_return <= av)%nat ->
@@ -163,7 +163,7 @@ Definition wp_prepare_return_sconf_body
      [cpu_own]'s base-enable is [b] because at level 0 the two agree
      ([CpuOwn.cpu_own_eb_agree]); writing anything else would be vacuous. *)
   sie_cap_gpr m av b p -∗
-  cpu_own 0%nat b p C b -∗
+  cpu_own 0%nat b p C b lks -∗
   (* the trap CSRs, from the caller at [b = false] and [emp] at [b = true],
      where the function's own [intr_off] produces them ([trap_csrs_ext]). *)
   trap_csrs_ext b -∗
@@ -194,7 +194,7 @@ Definition wp_prepare_return_sconf_body
          where the intena arm is existential and the [eb] index is dead, plus
          [intr_count 0 false]) alongside the [C] that came in.  Listing the
          cells or the token again beside it would promise them twice. *)
-      cpu_own 0%nat false p C false -∗
+      cpu_own 0%nat false p C false lks -∗
       (* THE RUNNING CLAIM, on the same two-sided split: at [b = true] the
          [intr_off]'s dismantled arm pays it out, at [b = false] the caller
          never handed it over and keeps its own, so the conjunct is [emp].
@@ -237,6 +237,6 @@ Module Type PREPARE_RETURN.
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (ks : mword 64) (pid : mword 32) (V : pprivate)
       (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
-      (epc : mword 64) (b : bool),
-      wp_prepare_return_sconf_body γf ks pid V m av C p epc b.
+      (epc : mword 64) (b : bool) (lks : gset nat),
+      wp_prepare_return_sconf_body γf ks pid V m av C p epc b lks.
 End PREPARE_RETURN.

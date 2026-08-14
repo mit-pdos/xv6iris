@@ -32,6 +32,18 @@ Require Export DevModel.
    Sail, no iris -- so importing them costs ~0.03 s per file and pulls in
    nothing that could shift a typeclass instance. *)
 From Kernel Require KernelInstrs KernelData.
+
+(* ---- the tree-wide [set_solver] override (see FastSetSolver.v) ----      *)
+(* This file is here as a PROPAGATION HUB, not because it uses sets: it is  *)
+(* [Require Import]ed DIRECTLY by 796 of the tree's 1090 files, and         *)
+(* [Require Export] only reaches a file that imports THIS one directly (or  *)
+(* through an unbroken chain of Exports, which this tree does not have).    *)
+(* Without a hub like this, a new proof would silently get stdpp's slow     *)
+(* [set_solver] -- which is exactly the trap the override exists to remove. *)
+(* EXPORT, not Import, and deliberately "dead": the nightly dead-import     *)
+(* sweep skips [Require Export] lines.                                     *)
+Require Export FastSetSolver.
+
 (* NB: deliberately NO `Set Default Proof Using "Type"` — some merged sections   *)
 (* use bare `Proof.` and rely on Coq's default (generalize over the section      *)
 (* Hypotheses actually used), as in their original (Set-free) files.             *)

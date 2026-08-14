@@ -76,7 +76,7 @@ Import Defs.
 Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) :=
+    (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
   let oldsz := mm !!! Regidx (mword_of_int 11) in
   let newsz := mm !!! Regidx (mword_of_int 12) in
@@ -133,8 +133,12 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   (forall i, (i < n)%nat ->
      (bv_unsigned (pgroundup oldsz) + 4096 * Z.of_nat i + 4096 <= uvm_maxsz)%Z ->
      P.(ud_um) !! vpn_at vpn0 i = None) ->
+  (* every loop iteration's kalloc (success) and kfree (mappages-failure
+     rollback) are both bound at "kmem" (13); nothing else uvmalloc touches
+     ranks lower.  One premise covers the whole cone. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
-  cpu_own 0%nat eb p C b -∗
+  cpu_own 0%nat eb p C b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
@@ -142,7 +146,7 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own 0%nat eb p C b -∗
+    cpu_own 0%nat eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ( (* out of memory: rolled back to exactly the table we were given *)
@@ -176,6 +180,6 @@ Module Type UVMALLOC.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool),
-      wp_uvmalloc_sconf_body γa mm P xperm K eb p C b.
+      (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_uvmalloc_sconf_body γa mm P xperm K eb p C b lks.
 End UVMALLOC.

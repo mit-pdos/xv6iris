@@ -106,12 +106,12 @@ Section ProofIdup.
      presentations of the same SIE state, and the ghost eighth they share
      pins the relationship.  Read once at entry, it is what lets release's
      derived exit index equal idup's own (symmetric) [b]. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -125,16 +125,16 @@ Section ProofIdup.
       (cov : gset Z) (logstart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (K : nat) (b : bool)
+      (K : nat) (b : bool) (lks : gset nat)
     : wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
-                         m n eb p C K b.
+                         m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
-    intros pcE ret_tgt HK HnZ Hk Ha0.
+    intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
     unfold K_idup in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hpanic Hislot Href Hcont".
-    iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (idi_00 with "Htext") as "Hi00".
@@ -289,9 +289,11 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p C (K - 4)%nat b
+              n eb p C (K - 4)%nat b lks
               HnZ ltac:(lia)
+              Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.idup + 0x18)).
@@ -528,13 +530,19 @@ Section ProofIdup.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) D5
-              n eb p C (K - 4)%nat
+              n eb p C (K - 4)%nat ({[lock_rank "itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
+    (* release handed back the FULL entry set minus the rank it just gave up;
+       [Hfresh]'s bound gives the non-membership that collapses it back to
+       the untouched [lks]. *)
+    pose proof (locks_below_not_elem _ _ Hfresh) as Hfresh_ne.
+    iEval (rewrite (_ : ({[lock_rank "itable"]} ∪ lks) ∖ {[lock_rank "itable"]} = lks);
+           [| apply locks_add_del_below; lkbelow]) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.
     assert (Hpc2a : ret_pc (D5 !!! Regidx Rra) = mword_of_int (KernelSyms.idup + 0x2a)).

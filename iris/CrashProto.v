@@ -32,6 +32,12 @@ From stdpp Require Import gmap sets.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map mono_nat invariants.
 From iris.program_logic Require Import language weakestpre lifting adequacy.
+(* The tree-wide [set_solver] override.  EXPORT, not Import, and that is not
+   cosmetic: this import is deliberately "dead" -- everything here compiles
+   without it, just far slower -- so the nightly dead-import sweep
+   (.github/workflows/dead-imports.yml) would delete it.  The sweep skips
+   [Require Export] lines.  See FastSetSolver.v. *)
+Require Export FastSetSolver.
 Local Open Scope nat_scope.
 
 (* ---------------------------------------------------------------------- *)

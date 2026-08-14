@@ -351,8 +351,8 @@ Section ProofFetchaddr.
   (* =================================================================== *)
   Lemma wp_fetchaddr_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool)
-    : wp_fetchaddr_sconf_body γa γf m av eb p C pid V oldv b.
+      (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset nat)
+    : wp_fetchaddr_sconf_body γa γf m av eb p C pid V oldv b lks.
   Proof.
     cbv beta delta [wp_fetchaddr_sconf_body].
     intros pcE addr ip ret_tgt Hav.
@@ -366,6 +366,10 @@ Section ProofFetchaddr.
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     iIntros "Hcg Hcpu #Htext Hpc Hpriv #Henv Hip Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iPoseProof (fai_00 with "Htext") as "Hi00".
     iPoseProof (fai_02 with "Htext") as "Hi02".
     iPoseProof (fai_04 with "Htext") as "Hi04".
@@ -540,7 +544,7 @@ Section ProofFetchaddr.
        [cpu_own] premise can take it. *)
     iDestruct (cpu_own_transport CID CID9 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf M5 (av - 4)%nat 0%nat eb p C b
-              fa_n0 ltac:(lia)
+              _ fa_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID10 Hk10 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -917,8 +921,9 @@ Section ProofFetchaddr.
         iDestruct (cpu_own_transport CID10 CID19 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iApply (Copyin.wp_copyin_sconf γa A7 (pv_upt V) (pv_sz V) 8%nat
                   (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p C b
-                  HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
+                  _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
+        all: try lkbelow.
         iIntros (CID20 Hk20 mr P' dst_new) "Hcg Hcpu Hpc Hpt Hbuf %Hcsr %Hext %Hret".
         assert (Hpc2e : ret_pc (A7 !!! Regidx Rra) = mword_of_int (KernelSyms.fetchaddr + 0x2e))
           by (rewrite HA7ra; apply bv_eq; vm_compute; reflexivity).

@@ -66,11 +66,11 @@ Section ProofSysKill.
 
   Lemma wp_sys_kill_sconf  (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool)
-    : wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b.
+      (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset nat)
+    : wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_kill_sconf_body].
-    intros pcE ret_tgt Hlen Hws Hn Hav.
+    intros pcE ret_tgt Hlen Hws Hn Hav Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Htf Hpage #Hprocs Hpanic Hcont".
     iPoseProof (skli_00 with "Htext") as "Hi00".
@@ -218,7 +218,7 @@ Section ProofSysKill.
     (* ===================== argint(0, &pid) ===================== *)
     iEval (rewrite -HA4a1) in "Hb3hi".
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p C 0%nat tfp ws v (word_hi w3) dqt b
+    iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p C 0%nat tfp ws v (word_hi w3) dqt b lks
               ltac:(unfold NARG; lia) HA4a0 Hws Hn ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
@@ -266,9 +266,10 @@ Section ProofSysKill.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kkill(pid) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kkill.wp_kkill_sconf γs B2 (av - 4)%nat n eb p C b
-              Hlen Hn ltac:(lia)
+    iApply (Kkill.wp_kkill_sconf γs B2 (av - 4)%nat n eb p C b lks
+              Hlen Hn ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic").
+    all: try lkbelow.
     iIntros (CID11 Hk11 Mkk rv) "%Hkk Hcg Hcpu Hpc".
     destruct Hkk as (HcsKk & HKka0 & Hrv).
     assert (Hpp1a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_kill + 0x1a))

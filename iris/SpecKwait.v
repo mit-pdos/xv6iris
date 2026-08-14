@@ -143,7 +143,7 @@ Definition K_kwait : nat := 62%nat.
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    (pid : mword 32) (V : pprivate) :=
+    (pid : mword 32) (V : pprivate) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -152,9 +152,13 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
   (K_kwait <= av)%nat ->
   (* the PARKING premise: everything that sleeps needs it (SpecSched.v) *)
   eb = true ->
+  (* kwait acquires wait_lock (10) and, nested under it, each pp->lock ("proc",
+     11); freeproc/either_copyout reach "kmem" (13).  10 is the floor, and the
+     nested acquires follow by [locks_below_union_singleton]/[locks_below_mono]. *)
+  locks_below lks (lock_rank "wait_lock") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain sleep parks into *)
   procs_inv γs -∗
@@ -172,7 +176,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
         mf !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 rv ⌝ -∗
       ⌜ uptd_ext_sz (pv_sz V) (pv_upt V) P' ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -183,6 +187,6 @@ Module Type KWAIT.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (pid : mword 32) (V : pprivate),
-      wp_kwait_sconf_body γa γf γw γs j γl m av eb C b pid V.
+      (pid : mword 32) (V : pprivate) (lks : gset nat),
+      wp_kwait_sconf_body γa γf γw γs j γl m av eb C b pid V lks.
 End KWAIT.

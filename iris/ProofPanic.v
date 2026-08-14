@@ -193,11 +193,11 @@ Section ProofPanic.
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
       (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
-      (dm : pk_arg_desc)
-    : wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm.
+      (dm : pk_arg_desc) (lks : gset nat)
+    : wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
-    intros HK Hdm Hn31.
+    intros HK Hdm Hn31 Hbelow.
     iIntros "#Hpan Hcg Hown #Htext #Hkdata Hpc #Henv #Hsub Hmsg".
     iDestruct "Henv" as "(#Hlk & #Hdev & #Htx)".
     iPoseProof (pni_00 with "Htext") as "Hi00".
@@ -365,11 +365,12 @@ Section ProofPanic.
     iDestruct (cpu_own_transport CID CID9 n eb p C b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID9) (dqf := DfracDiscarded)
-              γpr γl γd γv P5 (K - 4)%nat bs n eb C pn_hdr [] b p
+              γpr γl γd γv P5 (K - 4)%nat bs n eb C pn_hdr [] b p lks
               (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
-              ltac:(cbn [length]; lia) Hn31
+              ltac:(cbn [length]; lia) Hn31 Hbelow
               with "Hcg Hown Htext Hkdata Hpc Hpan [Hhdr] [] Hlk Hdev Htx Hsub").
+    all: try lkbelow.
     { rewrite HP5a0. iExact "Hhdr". }
     { done. }
     iIntros (CID10 Hs10 mf cs) "Hcg Hown Hpc %Hcs1 _ _ #Hsub1".
@@ -453,12 +454,13 @@ Section ProofPanic.
     iDestruct (cpu_own_transport CID10 CID14 n eb p C b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID14) (dqf := DfracDiscarded)
-              γpr γl γd γv Q3 (K - 4)%nat (bs ++ cs)%list n eb C pn_fmt [dm] b p
+              γpr γl γd γv Q3 (K - 4)%nat (bs ++ cs)%list n eb C pn_fmt [dm] b p lks
               (pn_Kpk K HK) pn_fmt_len pn_fmt_nonul
               ltac:(rewrite pn_fmt_kinds; cbn [map pk_desc_kind];
                     rewrite Hdm; reflexivity)
-              ltac:(cbn [length]; lia) Hn31
+              ltac:(cbn [length]; lia) Hn31 Hbelow
               with "Hcg Hown Htext Hkdata Hpc Hpan [Hfmt] [Hmsg] Hlk Hdev Htx Hsub1").
+    all: try lkbelow.
     { rewrite HQ3a0. iExact "Hfmt". }
     { rewrite big_sepL_singleton Hva. iExact "Hmsg". }
     iIntros (CID15 Hs15 mg cs2) "Hcg Hown Hpc %Hcs2 _ _ #Hsub2".

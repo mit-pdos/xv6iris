@@ -106,7 +106,7 @@ Definition wp_sys_exit_sconf_body
     (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    (pid : mword 32) (V : pprivate) (v0 : mword 64) :=
+    (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
@@ -122,9 +122,14 @@ Definition wp_sys_exit_sconf_body
   (* the PARKING premise, inherited from kexit: everything that sleeps or
      parks needs it *)
   eb = true ->
+  (* THE FRESHNESS PREMISE, INHERITED FROM KEXIT.  sys_exit acquires no lock
+     of its own -- it is a pure pass-through to kexit, whose own lowest rank
+     is "ftable" (1), via the fileclose loop -- so this is exactly kexit's
+     own premise, unconsumed. *)
+  locks_below lks (lock_rank "log") ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0%nat eb pj C b -∗
+  cpu_own 0%nat eb pj C b lks -∗
   (* [kernel_data] is argint/argraw's own premise (the jump table it reads
      lives there); kexit needs none of it *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -185,9 +190,9 @@ Module Type SYSEXIT.
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-      (pid : mword 32) (V : pprivate) (v0 : mword 64),
+      (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset nat),
       wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
                              γi cn γtl bmapstart inodestart nib size dqb dqs us
-                             on fn m av eb C b pid V v0.
+                             on fn m av eb C b pid V v0 lks.
 End SYSEXIT.

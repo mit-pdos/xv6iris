@@ -40,6 +40,12 @@
 
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list list_numbers bitvector.definitions.
+(* The tree-wide [set_solver] override.  EXPORT, not Import, and that is not
+   cosmetic: this import is deliberately "dead" -- everything here compiles
+   without it, just far slower -- so the nightly dead-import sweep
+   (.github/workflows/dead-imports.yml) would delete it.  The sweep skips
+   [Require Export] lines.  See FastSetSolver.v. *)
+Require Export FastSetSolver.
 
 Local Open Scope Z_scope.
 

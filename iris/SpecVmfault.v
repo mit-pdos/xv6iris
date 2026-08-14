@@ -70,7 +70,7 @@ From Kernel Require KernelSyms.
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) :=
+    (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
   (* a0 = pagetable, a1 = psz, a2 = va, a3 = read *)
   let va := mm !!! Regidx (mword_of_int 12) in
@@ -92,8 +92,12 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      [lvl] is otherwise generic -- vmfault runs at whatever nesting its
      caller holds (usertrap at 0, pipewrite/piperead's copies at 1) *)
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
+  (* vmfault's whole cone bottoms out at "kmem" (13): the kalloc for the new
+     page and, on the mappages-failure arm, the kfree that undoes it.
+     ismapped/mappages take no lock, so one premise covers everything. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b -∗
+  cpu_own lvl eb p C b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
@@ -101,7 +105,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗ proc_pt P)
@@ -119,6 +123,6 @@ Module Type VMFAULT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool),
-      wp_vmfault_sconf_body γa mm P szv K lvl eb p C b.
+      (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
 End VMFAULT.

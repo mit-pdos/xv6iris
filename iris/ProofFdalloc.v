@@ -424,8 +424,8 @@ Section ProofFdalloc.
   Lemma wp_fdalloc_sconf
       (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_fdalloc_sconf_body γf k D m av n eb p C pid V b.
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+    : wp_fdalloc_sconf_body γf k D m av n eb p C pid V b lks.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].
     intros pcE ret_tgt Ha0 Hk Hn Hav.
@@ -571,7 +571,7 @@ Section ProofFdalloc.
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ===================== myproc() ===================== *)
     iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p C b
-              Hn ltac:(lia)
+              _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MP) "%Hms Hcg Hcpu Hpc %HcsMP".
     destruct HcsMP as [HcsMP HMPa0].
@@ -696,7 +696,7 @@ Section ProofFdalloc.
               r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 ->
               M !!! Regidx r = m !!! Regidx r) ⌝ -∗
       sie_cap_gpr (CID:=CID0) M (av - 4)%nat b p -∗
-      cpu_own (CID:=CID0) n eb p C b -∗
+      cpu_own (CID:=CID0) n eb p C b lks -∗
       pc_is (CID:=CID0) (mword_of_int (KernelSyms.fdalloc + 0x1a) : mword 64) -∗
       proc_priv_core p pid V -∗
       proc_ofiles_owe γf p (pv_ofile V) D -∗
@@ -708,7 +708,7 @@ Section ProofFdalloc.
         ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
           sie_cap_gpr mf av b p -∗
-          cpu_own n eb p C b -∗
+          cpu_own n eb p C b lks -∗
           pc_is ret_tgt -∗
           proc_priv_core p pid V -∗
           fdalloc_post γf p V D k (mf !!! Regidx Ra0) -∗

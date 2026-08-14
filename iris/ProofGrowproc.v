@@ -412,8 +412,8 @@ Section ProofGrowproc.
   (* =================================================================== *)
   Lemma wp_growproc_sconf (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_growproc_sconf_body γa γf m av eb p C pid V b.
+      (pid : mword 32) (V : pprivate) (b : bool) (lks : gset nat)
+    : wp_growproc_sconf_body γa γf m av eb p C pid V b lks.
   Proof.
     cbv beta delta [wp_growproc_sconf_body].
     intros pcE nv ret_tgt Hav.
@@ -427,6 +427,10 @@ Section ProofGrowproc.
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
     iIntros "Hcg Hcpu #Htext Hpc Hpriv #Henv Hcont".
+    (* depth 0 forces the held set empty, so this body needs no order
+       premise of its own -- every [locks_below] its callees raise is
+       [locks_below ∅ _], which [lkbelow] closes outright. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iPoseProof (gpi_00 with "Htext") as "Hi00".
     iPoseProof (gpi_02 with "Htext") as "Hi02".
     iPoseProof (gpi_04 with "Htext") as "Hi04".
@@ -566,7 +570,7 @@ Section ProofGrowproc.
     iDestruct (cpu_own_transport CID CID8 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Myproc.wp_myproc_sconf M4 (av - 4)%nat 0%nat eb p C b
-              gp_n0 ltac:(lia)
+              _ gp_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID9 Hn9 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -663,7 +667,7 @@ Section ProofGrowproc.
         ⌜um_below szv' (ud_um P')⌝ -∗
         ⌜growproc_ok (pv_sz V) nv (pv_upt V) P' szv' rv⌝ -∗
         sie_cap_gpr (CID:=CIDx) Mf (av - 4)%nat b p -∗
-        cpu_own (CID:=CIDx) 0%nat eb p C b -∗
+        cpu_own (CID:=CIDx) 0%nat eb p C b lks -∗
         pc_is (CID:=CIDx) (mword_of_int (KernelSyms.growproc + 0x3c) : mword 64) -∗
         p_sz p ↦₈ szv' -∗
         p_pagetable p ↦₈ page_base (ud_root (pv_upt V)) -∗
@@ -1029,7 +1033,7 @@ Section ProofGrowproc.
         rewrite (HC3pne r N4). apply HthrC3; assumption. }
       iDestruct (cpu_own_transport CID9 CID20 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (Uvmalloc.wp_uvmalloc_sconf γa C3p (pv_upt V) 4 (av - 4)%nat eb p C b
+      iApply (Uvmalloc.wp_uvmalloc_sconf γa C3p (pv_upt V) 4 (av - 4)%nat eb p C b lks
                 ltac:(lia) HC3ptp HC3pa0 HC3pa3 gp_xperm_rng gp_perm_ok
                 ltac:(rewrite HC3pa1 uint_unsigned uvm_maxsz_val; exact Hszmaxz)
                 (* growproc TESTS the bound ([sz + n > TRAPFRAME] returns -1),
@@ -1039,6 +1043,7 @@ Section ProofGrowproc.
                       exact Hnewle)
                 ltac:(rewrite HC3pa1 HC3pa2; exact Hfresh)
                 with "Hcg Hcpu Htext Hpc Hpt Henv").
+      all: try lkbelow.
       iIntros (CID21 Hn21 mr) "Hcg Hcpu Hpc %Hcsr Hpost".
       assert (Hpc32 : ret_pc (C3p !!! Regidx Rra) = mword_of_int (KernelSyms.growproc + 0x32))
         by (rewrite HC3pra; apply bv_eq; vm_compute; reflexivity).
@@ -1323,10 +1328,11 @@ Section ProofGrowproc.
       rewrite /E1 upd_ne; [| congruence]. apply HthrA2; assumption. }
     iDestruct (cpu_own_transport CID9 CID16 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa E3 (pv_upt V) (av - 4)%nat eb p C b
+    iApply (Uvmdealloc.wp_uvmdealloc_sconf γa E3 (pv_upt V) (av - 4)%nat eb p C b lks
               ltac:(lia) HE3a0
               ltac:(rewrite HE3a1; exact Hszmax)
               with "Hcg Hcpu Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CID17 Hn17 md) "Hcg Hcpu Hpc %Hcsd %Hdret Hpt".
     rewrite HE3a1 HE3a2 in Hdret.
     iEval (rewrite HE3a1 HE3a2) in "Hpt".

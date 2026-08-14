@@ -94,7 +94,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
-    (pidv : mword 32) (dqp : dfrac) :=
+    (pidv : mword 32) (dqp : dfrac) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartwrite in
   let pj := proc_addr j in
   (* a0 = the buffer, a1 = the count *)
@@ -111,9 +111,20 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      trap CSRs across the crossing -- at level 0 with an enabled base the
      pushing acquire produces exactly that set.  See SpecSched.v. *)
   eb = true ->
+  (* THE LOWEST RANK, NOT "uart".  uartwrite's cone touches "uart" (15) at
+     its own acquire, but ALSO "proc" (11, LockRank.v) at both
+     sleep_prepare and sleep -- and both of those run BEFORE the acquire in
+     the loop body (sleep_prepare(&tx_chan); acquire(&tx_lock)), against the
+     same held set [lks] the function starts with.  A bound at "uart" says
+     nothing about "proc" (mono only lifts a LOW bound to a higher rank, never
+     the reverse), so the premise has to be stated at "proc" -- the true
+     floor of the cone -- and [locks_below_mono] (11 <= 15) lifts it to
+     "uart" for the acquire call.  uartwrite is BALANCED overall (each byte's
+     acquire/release pair cancels), so [lks] is unchanged end to end. *)
+  locks_below lks (lock_rank "proc") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
-  cpu_own 0%nat eb pj C b -∗
+  cpu_own 0%nat eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the device, and the transmitter's lock -- the whole credential.  The
      lock is a SLEEPLOCK now (UartTxInv.v): uartwrite parks between bytes and
@@ -139,7 +150,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b -∗
+      cpu_own 0%nat eb pj C b lks -∗
       pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
       p_pid pj ↦₄{dqp} pidv -∗
@@ -154,6 +165,6 @@ Module Type UARTWRITE.
       (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
-      (pidv : mword 32) (dqp : dfrac),
-      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp.
+      (pidv : mword 32) (dqp : dfrac) (lks : gset nat),
+      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp lks.
 End UARTWRITE.

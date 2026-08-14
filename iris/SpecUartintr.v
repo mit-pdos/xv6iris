@@ -70,15 +70,20 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names)
      (γs : list gname)
-    (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
   (* the transient noff increment (wakeup's per-proc lock) stays in int range *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (uartintr_stack <= av)%nat ->
+  (* uartintr's cone: it takes no lock of its own, and the lowest rank its
+     call tree touches is "cons" (5, LockRank.v), through consoleintr; the
+     THRE arm's wakeup call needs only the higher "proc" (11), which
+     [locks_below_mono] recovers from this one bound. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av b pme -∗
-  cpu_own lvl eb pme C b -∗
+  cpu_own lvl eb pme C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE DEVICE, AND NOTHING ELSE.  The transmit lock is gone from this
      contract: ae96fd0's uartintr takes no lock and moves no device ghost --
@@ -103,7 +108,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
       sie_cap_gpr mf av b pme -∗
-      cpu_own lvl eb pme C b -∗
+      cpu_own lvl eb pme C b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -114,6 +119,6 @@ Module Type UARTINTR.
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names)
       (γs : list gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),
-      wp_uartintr_sconf_body γu γv γs m av lvl eb pme C b.
+      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_uartintr_sconf_body γu γv γs m av lvl eb pme C b lks.
 End UARTINTR.

@@ -612,7 +612,7 @@ Section KexecBSeam.
        um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -695,7 +695,7 @@ Section KexecBSeam.
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -759,7 +759,7 @@ Section KexecBSeam.
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -811,7 +811,7 @@ Section KexecBSeam.
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
      iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -929,7 +929,7 @@ Section KexecBSeam.
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
                sp0 ra0 s00 s10 s20 pv av
@@ -982,7 +982,7 @@ Section KexecBSeam.
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∗
+     cpu_own 0 true (proc_addr jp) C true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
                sp0 ra0 s00 s10 s20 pv av

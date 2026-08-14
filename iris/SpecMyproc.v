@@ -43,7 +43,7 @@ Import Defs.
    run there), so nothing here needs [b = false].  Contrast [cpuid()]/
    [mycpu()] itself, whose returned hart id a migration WOULD invalidate. *)
 Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.myproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
                    in
@@ -51,13 +51,13 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (10 <= av)%nat ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mf : regfile),
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b -∗
+      cpu_own n eb p C b lks -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = p ⌝ -∗
@@ -66,6 +66,6 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
 
 Module Type MYPROC.
   Parameter wp_myproc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
-      wp_myproc_sconf_body m av n eb p C b.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_myproc_sconf_body m av n eb p C b lks.
 End MYPROC.

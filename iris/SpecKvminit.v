@@ -33,20 +33,22 @@ From Kernel Require KernelSyms.
    [kvm_bridge].
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)
 Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) :=
+    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset nat) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (50 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
+  (* kvminit -> kvmmake -> kvmmap -> mappages -> walk -> kalloc *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b -∗ kernel_text -∗
+  cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvminit) -∗
   (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0 -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64)
@@ -64,6 +66,6 @@ Definition wp_kvminit_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type KVMINIT.
   Parameter wp_kvminit_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool),
-      wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b.
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset nat),
+      wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks.
 End KVMINIT.

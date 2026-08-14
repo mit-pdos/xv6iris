@@ -62,8 +62,8 @@ Section KvminitBody.
      per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_kvmmake_sconf_body γa mm lvl K eb p C on b.
+      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -71,11 +71,11 @@ Section KvminitBody.
     end.
 
   Lemma wp_kvminit_sconf_gen (γa : gname) (mm : regfile)
-      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) :
-    wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b.
+      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset nat) :
+    wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
-    intros Hlvl HK Hex.
+    intros Hlvl HK Hex Hlkbelow.
     destruct Hex as (nb & Hon & Hnbk). subst lvl. subst on.
     pose proof (kii_cap_bounds K HK) as (Hc2 & HKmk).
     iIntros "Hcg Hcnt #Htext Hpc Hcell Henv Hcont".
@@ -162,10 +162,11 @@ Section KvminitBody.
        two uses of the same lemma. ---- *)
     iDestruct (cpu_own_transport CID CID5 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmake γa J 0%nat (K - 2)%nat eb p C (Some nb) b
+    iApply (wp_kvmmake γa J 0%nat (K - 2)%nat eb p C (Some nb) b lks
               eq_refl HKmk
               ltac:(exists nb; split; [reflexivity | exact Hnbk])
               with "Hcg Hcnt Htext Hpc Henv").
+    all: try lkbelow.
     iIntros (CID6 Hs6 mr t pas) "Hcg Hcnt Hpc Hptree %Ha0 %Hrep %Hnodes Henv %Hcs %Hpasok Hpages".
     assert (Hret0c : ret_pc (J !!! Regidx (mword_of_int 1)) = mword_of_int (KernelSyms.kvminit + 0x0c)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -278,11 +279,11 @@ End KvminitBody.
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool)
-      : wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b :=
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset nat)
+      : wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument
        insertion would silently resolve [KMK.wp_kvmmake_sconf]'s [CID] at
        THIS definition's own ambient hart, defeating [wp_kvminit_sconf_gen]'s
        hypothesis (which needs it callable at ANY hart). *)
-    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa mm lvl K eb p C on kpt0 b.
+    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa mm lvl K eb p C on kpt0 b lks.
 End KvminitProof.

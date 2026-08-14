@@ -235,11 +235,11 @@ Section ProofUvmfree.
   Lemma wp_uvmfree_sconf
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool)
-    : wp_uvmfree_sconf_body γa mm uroot um K eb p C ilvl b.
+      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset nat)
+    : wp_uvmfree_sconf_body γa mm uroot um K eb p C ilvl b lks.
   Proof.
     cbv beta delta [wp_uvmfree_sconf_body].
-    intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom.
+    intros pcE sz vpn0 n ret_tgt HK Hilvl Hroot Hbnd Hdom Hlkbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iIntros "Hcg Hcpu #Htext Hpc Hpt #Henv Hcont".
@@ -426,7 +426,7 @@ Section ProofUvmfree.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CIDj) mj (K - 4)%nat b p -∗
-        cpu_own (CID := CIDj) ilvl eb p C b -∗
+        cpu_own (CID := CIDj) ilvl eb p C b lks -∗
         pc_is (mword_of_int (KernelSyms.uvmfree + 0x0e) : mword 64) -∗
         bare_pt uroot ∅ -∗
         WP (Loop : expr riscv_lang))%I
@@ -488,8 +488,9 @@ Section ProofUvmfree.
       iDestruct (cpu_own_transport CIDj CIDk2 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* ---- freewalk() at lvl = 2 ---- *)
-      iApply (Freewalk.wp_freewalk_sconf γa J1 t 2%nat (K - 4)%nat eb p C ilvl b
+      iApply (Freewalk.wp_freewalk_sconf γa J1 t 2%nat (K - 4)%nat eb p C ilvl b lks
                 HKfw Hilvl HJ1a0 Hfree with "Hcg Hcpu Htext Hpc Ht Henv").
+      all: try lkbelow.
       iIntros (CIDk3 Hsk3 mr) "Hcg Hcpu Hpc %Hcs".
       assert (Hret14 : ret_pc (J1 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmfree + 0x14)).
       { rewrite HJ1ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -862,9 +863,10 @@ Section ProofUvmfree.
     { rewrite HB7a1.
       assert (Hz : uint (mword_of_int 0 : mword 64) = 0) by (vm_compute; reflexivity).
       rewrite Hz. rewrite Z.add_0_l. exact Hnrange. }
-    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa B7 uroot um n (K - 4)%nat eb p C ilvl b
+    iApply (Uvmunmap.wp_uvmunmap_bare_sconf γa B7 uroot um n (K - 4)%nat eb p C ilvl b lks
               HKuu Hilvl HB7a0 Halign HB7a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv").
+    all: try lkbelow.
     iIntros (CID15 Hs15 mr) "Hcg Hcpu Hpc %Hcs Hpt".
     iEval (rewrite HB7a1) in "Hpt".
     (* everything the table still mapped was inside the run it just cleared *)

@@ -88,7 +88,7 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
     (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-    (src_bytes dst_olds : nat -> bv 8) (b : bool) :=
+    (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.either_copyin in
   let dst := m !!! Regidx (mword_of_int 10 : mword 5) in
   let src := m !!! Regidx (mword_of_int 12 : mword 5) in
@@ -102,8 +102,10 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
   (* myproc's push_off, and vmfault's kalloc inside copyin, keep their
      transient noff increments in int range *)
   (Z.of_nat lvl + 1 < 2 ^ 31) ->
+  (* order premise at the lowest rank this cone reaches. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m av b p -∗
-  cpu_own lvl eb p C b -∗
+  cpu_own lvl eb p C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   kalloc_env γa None -∗
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ dst_olds j) -∗
@@ -114,7 +116,7 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own lvl eb p C b -∗
+      cpu_own lvl eb p C b lks -∗
       pc_is ret_tgt -∗
       either_copyin_post user γf p pid V dst src len src_bytes
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
@@ -126,7 +128,7 @@ Module Type EITHER_COPYIN.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
-      (src_bytes dst_olds : nat -> bv 8) (b : bool),
+      (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset nat),
       wp_either_copyin_sconf_body γa γf m av lvl eb p C pid V user len
-        src_bytes dst_olds b.
+        src_bytes dst_olds b lks.
 End EITHER_COPYIN.

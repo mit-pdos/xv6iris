@@ -229,86 +229,74 @@ Section Lock.
     (lk ↦₄ v)%I.
 
   (* ===================================================================
-     THE OWNER FIELD, SHARED WITH THE HOLDER'S CPU.
+     THE OWNER FIELD, AND THE HELD-SET FRAGMENT BESIDE IT.
 
-     [lk->cpu] ([LockSet.lock_cpu], the 8-byte word at +16) is NOT owned
-     outright by the invariant once the lock is held: the invariant keeps
-     HALF, and the holding hart's held-lock set ([LockSet.cpu_locks]) keeps
-     the other half, pinned at that hart's own [struct cpu].  Beside it the
-     invariant keeps the set-membership fragment [lk_in i lk].  So the two
-     readings of "this lock is held by hart i" -- the C field and the ghost
-     set -- are one resource, and neither can drift from the other.
+     [lk->cpu] ([LockSet.lock_cpu], the 8-byte word at +16) is owned WHOLE by
+     the invariant in every state.  What varies is what sits beside it: while
+     hart [i] holds the lock, the invariant also keeps the held-set fragment
+     [lk_in i r] at this lock's RANK ([LockRank.lock_rank] of its name).  So
+     the two readings of "this lock is held by hart i" -- the C field and the
+     ghost set -- are one resource, and neither can drift from the other:
 
-     Two things fall out, and they are the reason for the split:
+       - RELEASE's [lk->cpu = 0] retires the fragment, which is exactly the
+         licence to take the rank out of the hart's set
+         ([LockSet.cpu_locks_delete]).
+       - ACQUIRE's [lk->cpu = mycpu()] mints it, which needs [r ∉ S] -- and
+         that is supplied by the caller's ORDER PREMISE
+         ([LockRank.locks_below S r]), not read off the machine.
+       - a hart whose set omits [r] therefore CANNOT be the holder, so
+         [holding(lk)] is provably 0 and acquire's [if(holding(lk)) panic()]
+         arm is DEAD rather than discharged by a panic credential.
 
-       - RELEASE's [lk->cpu = 0] needs the WHOLE cell, so it cannot happen
-         until the hart hands its stake back; [lk_in i lk] is exactly the
-         licence to take it out of the set ([cpu_locks_delete]).
-       - ACQUIRE's [lk->cpu = mycpu()] finds the cell WHOLE and reading 0
-         (the lock is in its one-store window), which REFUTES [lk ∈ S] --
-         a hart already holding [lk] would be holding half of this same
-         cell at a nonzero value.  That is what lets acquire mint the
-         fragment with no precondition on the caller, and it is the
-         resource form of the C code's own argument: a hart that already
-         holds the lock never reaches this store, because [acquire] runs
-         [if(holding(lk)) panic()] first.
-
-     A free lock, and a lock in either one-store window, holds the cell
-     whole at 0 exactly as before -- so [newlock], the finisher, the
-     amoswap leaf and the word-clear leaf see no change at all.
-
-     SPLIT AT A FIXED HALF, NOT AT A STATE-DEPENDENT FRACTION.  The
-     invariant always keeps the SAME half, and what varies is what sits
-     beside it: the OTHER half when nobody holds the lock, the set fragment
-     when somebody does.  That is what keeps the two READ leaves state-blind
-     -- [WpSconfMem.wp_load_s_sconf_au] fixes its [dqm] OUTSIDE the fupd that
-     opens the invariant, so a fraction depending on the (existentially
-     quantified) [st] could not be supplied at all. *)
-  Definition lk_cpu_half (st : lock_state) (lk : mword 64) : iProp Σ :=
-    (lock_cpu lk ↦₈{DfracOwn (1/2)} lk_cpu_val st)%I.
-
-  Definition lk_cpu_rest (st : lock_state) (lk : mword 64) : iProp Σ :=
+     WHAT THIS REPLACED, AND WHY THE SIMPLIFICATION IS THE ORDER'S DOING.
+     Before the lock order existed, acquire had no premise to lean on, so
+     [r ∉ S] had to be DERIVED: the hart co-owned HALF of every held lock's
+     cpu cell (pinned at [cpus_ptr i]) and freshness fell out of the cell
+     disagreeing at 0 in acquire's one-store window.  That forced a
+     state-dependent sibling ([lk_cpu_half] / [lk_cpu_rest]), a fixed 1/2
+     fraction the two READ leaves had to be blind to -- because
+     [WpSconfMem.wp_load_s_sconf_au] fixes its [dqm] OUTSIDE the fupd that
+     opens the invariant, where [st] is still existential -- and an EXCHANGE
+     wand in each of the two cpu-word STORE leaves.  With the premise
+     supplying freshness, all of it goes: the cell is [DfracOwn 1] in every
+     state, the read leaves are state-blind for free, and the stores are
+     ordinary stores. *)
+  Definition lk_cpu_frag (st : lock_state) (r : nat) : iProp Σ :=
     match st with
-    | Some (i, true) => lk_in i lk
-    | _ => lk_cpu_half st lk
+    | Some (i, true) => lk_in i r
+    | _ => emp
     end%I.
 
-  Definition lk_cpu_res (st : lock_state) (lk : mword 64) : iProp Σ :=
-    (lk_cpu_half st lk ∗ lk_cpu_rest st lk)%I.
+  Definition lk_cpu_res (st : lock_state) (lk : mword 64) (r : nat) : iProp Σ :=
+    (lock_cpu lk ↦₈ lk_cpu_val st ∗ lk_cpu_frag st r)%I.
 
   (* the leaves strip this under [>] inside the step engine's callback, and
      [st] is a VARIABLE there, so the match is stuck and the structural
      instances cannot see the two branches.  Stated once, here. *)
-  Global Instance lk_cpu_rest_timeless st lk : Timeless (lk_cpu_rest st lk).
+  Global Instance lk_cpu_frag_timeless st r : Timeless (lk_cpu_frag st r).
   Proof. destruct st as [[i []]|]; apply _. Qed.
-  Global Instance lk_cpu_res_timeless st lk : Timeless (lk_cpu_res st lk).
+  Global Instance lk_cpu_res_timeless st lk r : Timeless (lk_cpu_res st lk r).
   Proof. apply _. Qed.
 
-  (* the whole cell, out of the two halves -- the form every leaf that STORES
-     to the field needs, and the form [newlock] and the finisher speak. *)
-  Lemma lk_cpu_halves (st : lock_state) (lk : mword 64) :
-    lk_cpu_half st lk ∗ lk_cpu_half st lk ⊣⊢ lock_cpu lk ↦₈ lk_cpu_val st.
-  Proof.
-    rewrite /lk_cpu_half -word_pointsto_frac_split.
-    by rewrite Qp.half_half.
-  Qed.
-
-  (* the free / window form: the whole cell at 0, exactly as before. *)
-  Lemma lk_cpu_res_free (lk : mword 64) :
-    lk_cpu_res None lk ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
-  Proof. rewrite /lk_cpu_res /=. exact (lk_cpu_halves None lk). Qed.
-  Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) :
-    lk_cpu_res (Some (i, false)) lk ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
-  Proof. rewrite /lk_cpu_res /=. exact (lk_cpu_halves (Some (i, false)) lk). Qed.
-  Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) :
-    lk_cpu_res (Some (i, true)) lk ⊣⊢
-    lock_cpu lk ↦₈{DfracOwn (1/2)} cpus_ptr i ∗ lk_in i lk.
+  (* the free / window form: the whole cell at 0 and no fragment. *)
+  Lemma lk_cpu_res_free (lk : mword 64) (r : nat) :
+    lk_cpu_res None lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
+  Proof. rewrite /lk_cpu_res /=. apply bi.sep_emp. Qed.
+  Lemma lk_cpu_res_win (i : CPU) (lk : mword 64) (r : nat) :
+    lk_cpu_res (Some (i, false)) lk r ⊣⊢ lock_cpu lk ↦₈ (zero_reg : mword 64).
+  Proof. rewrite /lk_cpu_res /=. apply bi.sep_emp. Qed.
+  Lemma lk_cpu_res_held (i : CPU) (lk : mword 64) (r : nat) :
+    lk_cpu_res (Some (i, true)) lk r ⊣⊢
+    lock_cpu lk ↦₈ cpus_ptr i ∗ lk_in i r.
   Proof. reflexivity. Qed.
 
-  Definition lock_inv (γ : gname) (lk : mword 64) (R : iProp Σ) : iProp Σ :=
+  (* [s] -- the lock's NAME -- rather than a bare rank: [is_lock] already
+     carries it, so instantiating with [lock_rank s] leaves no second degree
+     of freedom that could disagree with the name in [lock_name]. *)
+  Definition lock_inv (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) : iProp Σ :=
     (∃ (v : mword 32) (st : lock_state),
        lock_word lk v ∗
-       lk_cpu_res st lk ∗
+       lk_cpu_res st lk (lock_rank s) ∗
        lock_auth γ st ∗
        (⌜st = None⌝ ∗ ⌜v = (mword_of_int 0 : mword 32)⌝ ∗ lock_frag γ None ∗ R
         ∨ ⌜st ≠ None⌝ ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝))%I.
@@ -344,14 +332,14 @@ Section Lock.
 
   (* a lock is its (immutable) name plus the invariant over its two words. *)
   Definition is_lock (γ : gname) (lk : mword 64) (s : string) (R : iProp Σ) : iProp Σ :=
-    (lock_name lk s ∗ inv lockN (lock_inv γ lk R))%I.
+    (lock_name lk s ∗ inv lockN (lock_inv γ lk s R))%I.
 
   Global Instance is_lock_persistent γ lk s R : Persistent (is_lock γ lk s R).
   Proof. apply _. Qed.
 
   (* PERFORMANCE, and it is a big one: WITHOUT this seal, every [iIntros "#Hlk"]
      of an [is_lock] re-derives persistence by UNFOLDING the definition and
-     descending through [lock_inv γ lk R] into [R].  For a lock whose resource
+     descending through [lock_inv γ lk s R] into [R].  For a lock whose resource
      is large (the virtio disk lock's [disk_res], with its 4096-entry
      descriptor big-ops) that single [#]-intro measured **5.1 s** -- 22 % of
      [ProofEndOp]'s whole [typeclasses eauto] budget, at three sites.  With the
@@ -368,10 +356,10 @@ Section Lock.
      longer take it apart, which is the point: it must come through here. *)
   Lemma is_lock_name γ lk s R : is_lock γ lk s R -∗ lock_name lk s.
   Proof. rewrite /is_lock. iIntros "[$ _]". Qed.
-  Lemma is_lock_inv γ lk s R : is_lock γ lk s R -∗ inv lockN (lock_inv γ lk R).
+  Lemma is_lock_inv γ lk s R : is_lock γ lk s R -∗ inv lockN (lock_inv γ lk s R).
   Proof. rewrite /is_lock. iIntros "[_ $]". Qed.
   Lemma is_lock_intro γ lk s R :
-    lock_name lk s -∗ inv lockN (lock_inv γ lk R) -∗ is_lock γ lk s R.
+    lock_name lk s -∗ inv lockN (lock_inv γ lk s R) -∗ is_lock γ lk s R.
   Proof. rewrite /is_lock. iIntros "#Hn #Hi". by iFrame "Hn Hi". Qed.
 
   (* ---- THE OPENING INTERFACE ------------------------------------------
@@ -387,10 +375,10 @@ Section Lock.
 
      Two instances, and they are the whole point:
 
-       inv lockN (lock_inv γ lk R)              -- any T, D := False
+       inv lockN (lock_inv γ lk s R)              -- any T, D := False
             anyone may open, nobody may destroy: a static kernel lock, and
             exactly today's behaviour
-       inv lockN (lock_inv γ lk R ∨ D)          -- any T that REFUTES D
+       inv lockN (lock_inv γ lk s R ∨ D)          -- any T that REFUTES D
             the object may die: the invariant degenerates into a husk holding
             [D], and whoever can produce [D] puts it there and walks off with
             the memory.  [T] is whatever proves the object is not dead yet.
@@ -406,21 +394,21 @@ Section Lock.
 
      The mask is universally quantified so this file needs no [minstretN]; the
      leaves instantiate it at [⊤ ∖ ↑minstretN]. *)
-  Definition lock_openable (γ : gname) (lk : mword 64) (R D : iProp Σ) : iProp Σ :=
+  Definition lock_openable (γ : gname) (lk : mword 64) (s : string) (R D : iProp Σ) : iProp Σ :=
     (□ ∀ (E : coPset) (T : iProp Σ),
          ⌜↑lockN ⊆ E⌝ -∗ (T -∗ D -∗ False) -∗ T ={E, E ∖ ↑lockN}=∗
-         ▷ lock_inv γ lk R ∗ T ∗
-         ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)      (* put it back *)
+         ▷ lock_inv γ lk s R ∗ T ∗
+         ((▷ lock_inv γ lk s R ={E ∖ ↑lockN, E}=∗ True)      (* put it back *)
           ∧ (D ={E ∖ ↑lockN, E}=∗ True)))%I.               (* or destroy it *)
 
-  Global Instance lock_openable_persistent γ lk R D :
-    Persistent (lock_openable γ lk R D).
+  Global Instance lock_openable_persistent γ lk s R D :
+    Persistent (lock_openable γ lk s R D).
   Proof. apply _. Qed.
 
   (* a permanent [inv]: nothing has to be refuted, and no disposal is
      possible. *)
-  Lemma lock_openable_inv γ lk R :
-    inv lockN (lock_inv γ lk R) ⊢ lock_openable γ lk R False.
+  Lemma lock_openable_inv γ lk s R :
+    inv lockN (lock_inv γ lk s R) ⊢ lock_openable γ lk s R False.
   Proof.
     iIntros "#Hi !>" (E T HE) "_ HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
@@ -430,7 +418,7 @@ Section Lock.
 
   (* the bridge every existing lock user rides: today's lock IS the permanent
      instance of the generic one. *)
-  Lemma is_lock_openable γ lk s R : is_lock γ lk s R ⊢ lock_openable γ lk R False.
+  Lemma is_lock_openable γ lk s R : is_lock γ lk s R ⊢ lock_openable γ lk s R False.
   Proof. iIntros "H". iApply lock_openable_inv. by iApply is_lock_inv. Qed.
 
   (* the refutation obligation is vacuous for a lock that cannot die. *)
@@ -450,8 +438,8 @@ Section Lock.
 
      [D] must be timeless: the dead branch is refuted UNDER a later, and there
      is no step to take there. *)
-  Lemma lock_openable_of_dead γ lk R D `{!Timeless D} :
-    inv lockN (lock_inv γ lk R ∨ D) ⊢ lock_openable γ lk R D.
+  Lemma lock_openable_of_dead γ lk s R D `{!Timeless D} :
+    inv lockN (lock_inv γ lk s R ∨ D) ⊢ lock_openable γ lk s R D.
   Proof.
     iIntros "#Hi !>" (E T HE) "Hrefute HT".
     iMod (inv_acc E lockN with "Hi") as "[Hbody Hclose]"; [done|].
@@ -476,9 +464,9 @@ Section Lock.
      Pieces, not a reassembled [lock_inv]: a destroying caller needs the ghost
      state (that is what it turns into a certificate) and a closing one can
      rebuild the body from them.  The two canonical instances are below. *)
-  Definition lock_finisher (γ : gname) (lk : mword 64) (R D Out : iProp Σ)
+  Definition lock_finisher (γ : gname) (lk : mword 64) (s : string) (R D Out : iProp Σ)
       (E : coPset) : iProp Σ :=
-    ( ((▷ lock_inv γ lk R ={E ∖ ↑lockN, E}=∗ True)
+    ( ((▷ lock_inv γ lk s R ={E ∖ ↑lockN, E}=∗ True)
        ∧ (D ={E ∖ ↑lockN, E}=∗ True)) -∗
       lock_auth γ None -∗ lock_frag γ None -∗
       lk ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -488,7 +476,7 @@ Section Lock.
 
   (* put it back: today's release, and equally the release of an object that
      merely still has other holders -- [D] is not used, only not taken. *)
-  Lemma lock_finisher_close γ lk R D E : ⊢ lock_finisher γ lk R D emp E.
+  Lemma lock_finisher_close γ lk s R D E : ⊢ lock_finisher γ lk s R D emp E.
   Proof.
     iIntros "[Hclose _] Hauth Hfrag Hword Hcpu HR".
     iMod ("Hclose" with "[Hauth Hfrag Hword Hcpu HR]") as "_"; [| by iModIntro].
@@ -503,9 +491,9 @@ Section Lock.
      multiply-owned object needs: the last holder to let go has necessarily
      already surrendered its share of the certificate into [R], and [R] is
      only in hand at this instant (see PipeInv.pipe_res_dead). *)
-  Lemma lock_finisher_destroy γ lk R D Out E :
+  Lemma lock_finisher_destroy γ lk s R D Out E :
     (lock_frag γ None -∗ R ==∗ D ∗ Out) -∗
-    lock_finisher γ lk R D
+    lock_finisher γ lk s R D
       (lk ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lk ↦₈ (zero_reg : mword 64) ∗ Out) E.
   Proof.
     iIntros "Hcomplete [_ Hdispose] Hauth Hfrag Hword Hcpu HR".
@@ -527,10 +515,10 @@ Section Lock.
      constructions share, and a basic update, so it can be done before the
      invariant's namespace or gname exists (which is what an object whose
      resource mentions its OWN cancel gname needs; see [newlock_c_delayed]). *)
-  Lemma lock_inv_alloc (lk : mword 64) (R : iProp Σ) :
+  Lemma lock_inv_alloc (lk : mword 64) (s : string) (R : iProp Σ) :
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lk ↦₈ (zero_reg : mword 64) -∗
-    R ==∗ ∃ γ : gname, lock_inv γ lk R.
+    R ==∗ ∃ γ : gname, lock_inv γ lk s R.
   Proof.
     iIntros "Hword Hcpu HR".
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
@@ -547,18 +535,18 @@ Section Lock.
      lock state is chosen FIRST, so [R] and [D] may both mention it -- which
      they do for any object whose dead state parks the lock's own state
      fragment (PipeInv.pipe_dead). *)
-  Lemma newlock_d E (lk : mword 64) :
+  Lemma newlock_d E (lk : mword 64) (s : string) :
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_cpu lk ↦₈ (zero_reg : mword 64) ==∗
     ∃ γ : gname, ∀ (R D : iProp Σ),
-      R ={E}=∗ inv lockN (lock_inv γ lk R ∨ D).
+      R ={E}=∗ inv lockN (lock_inv γ lk s R ∨ D).
   Proof.
     iIntros "Hword Hcpu".
     iMod (own_alloc ((●E (None : leibnizO lock_state) ⋅ ◯E (None : leibnizO lock_state))
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R D) "HR".
-    iApply (inv_alloc lockN E (lock_inv γ lk R ∨ D)).
+    iApply (inv_alloc lockN E (lock_inv γ lk s R ∨ D)).
     iNext. iLeft. iExists (mword_of_int 0 : mword 32), None.
     rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
     iLeft. iFrame "Hf HR". done.
@@ -573,8 +561,8 @@ Section Lock.
     R ={E}=∗ ∃ γ : gname, is_lock γ lk s R.
   Proof.
     iIntros "#Hnm Hword Hcpu HR".
-    iMod (lock_inv_alloc lk R with "Hword Hcpu HR") as (γ) "Hbody".
-    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hbody]") as "#Hinv";
+    iMod (lock_inv_alloc lk s R with "Hword Hcpu HR") as (γ) "Hbody".
+    iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hbody]") as "#Hinv";
       [ by iNext | ].
     iModIntro. iExists γ.
     iApply (is_lock_intro with "Hnm Hinv").
@@ -601,7 +589,7 @@ Section Lock.
                      : lockUR)) as (γ) "H"; [ apply excl_auth_valid | ].
     iDestruct (own_op with "H") as "[Ha Hf]".
     iModIntro. iExists γ. iIntros (R) "HR".
-    iMod (inv_alloc lockN E (lock_inv γ lk R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
+    iMod (inv_alloc lockN E (lock_inv γ lk s R) with "[Hword Hcpu Ha Hf HR]") as "#Hinv".
     { iNext. iExists (mword_of_int 0 : mword 32), None.
       rewrite /lock_word lk_cpu_res_free. iFrame "Hword Hcpu Ha".
       iLeft. iFrame "Hf HR". done. }

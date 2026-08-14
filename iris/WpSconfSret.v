@@ -116,7 +116,11 @@ Section WpSconfSret.
        one.  A caller has it from its own [intr_off], which is where the
        matching csrci put it. *)
     strans_bit strans_bit_kpt -∗
-    cpu_priv 0 true p -∗
+    (* ∅, NOT a threaded set: sret re-enables interrupts, and the enabled arm
+       carries [lks = ∅] ([CpuOwn.cpu_own_on]).  So "you may only turn
+       interrupts back on holding no spinlock" is enforced HERE, at the one
+       instruction that does it. *)
+    cpu_priv 0 true p ∅ -∗
     cpu_claim p -∗
     pc_is pc -∗
     instr pc false (SRET tt) -∗

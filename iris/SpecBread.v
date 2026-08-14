@@ -72,7 +72,7 @@ Definition wp_bread_sconf_body
     (bn : bio_names) (V : bio_view Σ)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -91,9 +91,14 @@ Definition wp_bread_sconf_body
      64-bit compares against the sign-extending [lw]s are then exact *)
   m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
   m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
+  (* bread directly acquires "bcache" (rank 4, via the inlined bget) and its
+     own acquiresleep call needs "sleep lock" (rank 6, LockRank.v); the bound
+     is stated at the LOWER rank -- [locks_below_mono] (4 <= 6) lifts it to
+     cover the acquiresleep call too, so one premise suffices for both. *)
+  locks_below lks (lock_rank "bcache") ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  This function acquires at
      level 0 and releases before returning, so it is push/pop-BALANCED: its
      own [acquire] mints [arm_pay 0 eb _], and at [eb = true] that IS the
@@ -138,7 +143,7 @@ Definition wp_bread_sconf_body
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -160,7 +165,7 @@ Module Type BREAD.
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
-                          pidv dev bno dq m K eb C b.
+                          pidv dev bno dq m K eb C b lks.
 End BREAD.

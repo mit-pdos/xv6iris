@@ -100,6 +100,14 @@ Require Import LogInv.        (* MAXOPBLOCKS, log_op, log_opS *)
 Require Import BitmapInv.     (* BPB, bitmap_geom_ok, BBLOCK *)
 Require Import SpecWritei.    (* wi_blocks, wi_cost, wi_cost_bmonly *)
 Require Import SpecBmap.      (* bmap_cost, bmap_need -- the link-2 contract *)
+(* The [set_solver] override.  EXPORT, not Import: this import is         *)
+(* deliberately "dead" -- the file compiles without it, just far slower --  *)
+(* and the nightly dead-import sweep skips [Require Export] lines.         *)
+(* It has to be HERE rather than inherited: [Require Export] only          *)
+(* propagates through an unbroken chain of Exports, and this tree's        *)
+(* intermediate files use [Require Import], so nothing downstream inherits *)
+(* it.  See FastSetSolver.v.                                              *)
+Require Export FastSetSolver.
 
 Local Open Scope Z_scope.
 

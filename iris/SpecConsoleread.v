@@ -110,7 +110,7 @@ Definition wp_consoleread_sconf_body
     (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) :=
+    (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -128,9 +128,17 @@ Definition wp_consoleread_sconf_body
   (consoleread_stack <= av)%nat ->
   (* PARKING PREMISE (hart-generic scheduler protocol).  See SpecSched.v. *)
   eb = true ->
+  (* consoleread's own acquire(&cons.lock) needs every lock this hart
+     already holds to rank below "cons".  The lock is released again
+     before every exit (the killed early-return, the ^D/copy/'\n' breaks,
+     and the [n <= 0] loop exit all release before returning), so [lks]
+     itself is unchanged end to end -- none of consoleread's other callees
+     (myproc, killed, sleep_prepare, sleep, either_copyout) surface a lock
+     of their own through this contract. *)
+  locks_below lks (lock_rank "cons") ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
-  cpu_own 0%nat eb pj C b -∗
+  cpu_own 0%nat eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE WHOLE CREDENTIAL: cons.lock, whose resource is the ring and the
      three indices (ConsoleInv.v).  Persistent, so nothing about the console
@@ -149,7 +157,7 @@ Definition wp_consoleread_sconf_body
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b -∗
+      cpu_own 0%nat eb pj C b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -162,6 +170,6 @@ Module Type CONSOLEREAD.
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γc : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b.
+      (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset nat),
+      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b lks.
 End CONSOLEREAD.

@@ -8,6 +8,9 @@
 # the resulting "notation was already used" warning project-wide.
 -arg -w
 -arg -notation-overridden
+SetShrink.v
+FastSetSolver.v
+FastSetSolverTests.v
 BvShift.v
 ArchReset.v
 RiscvModelBytes.v
@@ -196,6 +199,7 @@ SpecUser.v
 ProofUser.v
 UserKernelBridge.v
 IntrDefs.v
+LockRank.v
 LockSet.v
 WpIntrInv.v
 SpecKerneltrap.v

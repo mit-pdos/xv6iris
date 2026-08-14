@@ -390,13 +390,13 @@ Section UwProps.
   Definition uw_next_cont `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (i : nat) : iProp Σ :=
+      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M' : regfile,
        ⌜ (S i < n)%nat ⌝ -∗
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n (S i) ⌝ -∗
        sie_cap_gpr M' (av - 10)%nat true (proc_addr j) -∗
-       cpu_own 0%nat eb (proc_addr j) C true -∗
+       cpu_own 0%nat eb (proc_addr j) C true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
        uart_sent_sub γu (uw_bytes f (S i)) -∗
@@ -407,12 +407,12 @@ Section UwProps.
   Definition uw_exit_cont `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) : iProp Σ :=
+      (pidv : mword 32) (dqp : dfrac) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M' : regfile,
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n n ⌝ -∗
        sie_cap_gpr M' (av - 10)%nat true (proc_addr j) -∗
-       cpu_own 0%nat eb (proc_addr j) C true -∗
+       cpu_own 0%nat eb (proc_addr j) C true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
        uart_sent_sub γu (uw_bytes f n) -∗
@@ -423,28 +423,28 @@ Section UwProps.
   Definition uw_head `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (i : nat) : iProp Σ :=
+      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ M : regfile,
        ⌜ uw_loop_regs m0 M (pa_stk sp0 10) buf n i ⌝ -∗
        sie_cap_gpr M (av - 10)%nat true (proc_addr j) -∗
-       cpu_own 0%nat eb (proc_addr j) C true -∗
+       cpu_own 0%nat eb (proc_addr j) C true lks -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
        p_pid (proc_addr j) ↦₄{dqp} pidv -∗
        uart_sent_sub γu (uw_bytes f i) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       uw_exit_cont (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp -∗
+       uw_exit_cont (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp lks -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* the tail's own continuation: uartwrite's postcondition, at ANY hart *)
   Definition uw_ret `{CID0 : CpuId} (γu : uart_names)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) : iProp Σ :=
+      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset nat) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
        ∀ mf : regfile,
          ⌜ callee_saved m0 mf ⌝ -∗
          sie_cap_gpr mf av true (proc_addr j) -∗
-         cpu_own 0%nat eb (proc_addr j) C true -∗
+         cpu_own 0%nat eb (proc_addr j) C true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          Rbuf -∗
          p_pid (proc_addr j) ↦₄{dqp} pidv -∗
@@ -483,7 +483,7 @@ Section UwBodies.
   Lemma uw_tail `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
       (γu : uart_names)
       (j : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ) (sp0 : mword 64)
-      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) :
+      (bs : list (bv 8)) (Rbuf : iProp Σ) (pidv : mword 32) (dqp : dfrac) (lks : gset nat) :
     let pj := proc_addr j in
     uw_tail_regs m0 M (pa_stk sp0 10) ->
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -492,13 +492,13 @@ Section UwBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
     sie_cap_gpr M (av - 10)%nat true pj -∗
-    cpu_own 0%nat eb pj C true -∗
+    cpu_own 0%nat eb pj C true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
     uart_sent_sub γu bs -∗
     uw_saved sp0 m0 -∗ uw_slot10 sp0 -∗
     Rbuf -∗
-    uw_ret (CID0 := CID0) γu j m0 av eb C bs Rbuf pidv dqp -∗
+    uw_ret (CID0 := CID0) γu j m0 av eb C bs Rbuf pidv dqp lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hregs Hsp0 Hav Heb Hanch. subst eb.
@@ -751,7 +751,7 @@ Section UwBodies.
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (i : nat) :
+      (pidv : mword 32) (dqp : dfrac) (i : nat) (lks : gset nat) :
     let pj := proc_addr j in
     (i < n)%nat ->
     (Z.of_nat n < 2 ^ 31)%Z ->
@@ -760,19 +760,24 @@ Section UwBodies.
     eb = true ->
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     uw_loop_regs m0 M (pa_stk sp0 10) buf n i ->
+    (* THE LOWEST RANK IN THE TURN'S CONE: "proc" (11), reached by
+       sleep_prepare AND sleep, both of which run before the acquire
+       against the unchanged [lks] -- see SpecUartwrite.v.  The acquire
+       call (at "uart", 15) widens this with [locks_below_mono]. *)
+    locks_below lks (lock_rank "proc") ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
     procs_inv γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 10)%nat true pj -∗
-    cpu_own 0%nat eb pj C true -∗
+    cpu_own 0%nat eb pj C true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
     uart_sent_sub γu (uw_bytes f i) -∗
     uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-    ( uw_next_cont (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp i
-      ∧ uw_exit_cont (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp ) -∗
+    ( uw_next_cont (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp i lks
+      ∧ uw_exit_cont (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp lks ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hin Hn31 Hj Hjlp Hav Heb Hanch Hregs. subst eb.
+    intros pj Hin Hn31 Hj Hjlp Hav Heb Hanch Hregs Hfresh. subst eb.
     assert (H231 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
     assert (H263 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
     rewrite H231 in Hn31.
@@ -841,12 +846,12 @@ Section UwBodies.
       ∀ M1 : regfile,
       ⌜ uw_loop_regs m0 M1 (pa_stk sp0 10) buf n i ⌝ -∗
       sie_cap_gpr M1 (av - 10)%nat true pj -∗
-      cpu_own 0%nat true pj C true -∗
+      cpu_own 0%nat true pj C true lks -∗
       pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
       p_pid pj ↦₄{dqp} pidv -∗
       uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-      ( uw_next_cont (CID0 := CID0) γu j m0 av true C sp0 buf n f dq pidv dqp i
-        ∧ uw_exit_cont (CID0 := CID0) γu j m0 av true C sp0 buf n f dq pidv dqp ) -∗
+      ( uw_next_cont (CID0 := CID0) γu j m0 av true C sp0 buf n f dq pidv dqp i lks
+        ∧ uw_exit_cont (CID0 := CID0) γu j m0 av true C sp0 buf n f dq pidv dqp lks ) -∗
       WP (Loop : expr riscv_lang)))%I with "[]" as "Turn".
     { iLöb as "IH".
       iIntros (CIDh Hsh M1) "%Hregs1 Hcg Hcnt Hpc Hpid Hfull Hbuf Hcont".
@@ -882,10 +887,11 @@ Section UwBodies.
       { rewrite /Q2. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsQ1]. }
       iDestruct (cpu_own_transport CIDh CIDa2 0 true pj C true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Q2 (av - 10)%nat 0%nat true C true
+      iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Q2 (av - 10)%nat 0%nat true C true lks
                 Hj Hjlp ltac:(rewrite HQ2a0; vm_compute; reflexivity) ltac:(lia)
-                ltac:(unfold uartwrite_stack in Hav; lia)
+                ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
                 with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+      all: try lkbelow.
       iIntros (CIDp Hsp' MP) "%HcsP Hcg Hcnt Hpc".
       iEval (rewrite HQ2ra P50) in "Hpc".
       assert (HregsP : uw_loop_regs m0 MP (pa_stk sp0 10) buf n i).
@@ -924,9 +930,11 @@ Section UwBodies.
       iDestruct (cpu_own_transport CIDp CIDa4 0 true pj C true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γu) Q4
-                0%nat true pj C (av - 10)%nat true ltac:(lia)
+                0%nat true pj C (av - 10)%nat true lks ltac:(lia)
                 ltac:(unfold uartwrite_stack in Hav; lia)
+                ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc [Hlk] Hpanic").
+      all: try lkbelow.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
       iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR Hcnt Hpay".
       iEval (rewrite HQ4ra P56) in "Hpc".
@@ -1007,12 +1015,18 @@ Section UwBodies.
         assert (HcsK2 : callee_saved D2 K2).
         { rewrite /K2. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsK1]. }
         iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) K2
-                  0%nat true pj C (av - 10)%nat
+                  0%nat true pj C (av - 10)%nat ({[lock_rank "uart"]} ∪ lks)
                   ltac:(rewrite HK2a0; apply uw_addv_0)
                   ltac:(unfold uartwrite_stack in Hav; lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu l with "Hown"). }
         iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hcnt".
+        (* the release/park window: nothing is held across sleep() *)
+        pose proof (locks_below_not_elem lks (lock_rank "uart")
+                      ltac:(lkbelow)) as Hnotin.
+        assert (Hsetback : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+        iEval (rewrite Hsetback) in "Hcnt".
         iEval (rewrite HK2ra P42) in "Hpc".
         assert (HregsR : uw_loop_regs m0 MR (pa_stk sp0 10) buf n i).
         { apply (uw_loop_regs_cs m0 K2 MR); [exact HcsR|].
@@ -1034,9 +1048,10 @@ Section UwBodies.
               [vm_compute; reflexivity | apply callee_saved_refl]).
         iDestruct (cpu_own_transport CIDr CIDa5 0 true pj C true ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Sleep.wp_sleep_sconf γs j γlp K3 (av - 10)%nat true C Hj Hjlp
-                  ltac:(unfold uartwrite_stack in Hav; lia)
+        iApply (Sleep.wp_sleep_sconf γs j γlp K3 (av - 10)%nat true C lks Hj Hjlp
+                  ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
                   with "Hcg Hcnt Ht Hpc Hpinv Hpanic [] []").
+        all: try lkbelow.
         { rewrite /trap_csrs_ext. done. }
         { rewrite /cpu_claim_ext. done. }
         iIntros (CIDs Hss MS) "%HcsS Hcg Hcnt Hpc _ _".
@@ -1159,12 +1174,18 @@ Section UwBodies.
         assert (HcsG4 : callee_saved D2 G4).
         { rewrite /G4. apply callee_saved_insert_r; [vm_compute; reflexivity | exact HcsG3]. }
         iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) G4
-                  0%nat true pj C (av - 10)%nat
+                  0%nat true pj C (av - 10)%nat ({[lock_rank "uart"]} ∪ lks)
                   ltac:(rewrite HG4a0; apply uw_addv_0)
                   ltac:(unfold uartwrite_stack in Hav; lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu ((l ++ [f i])%list) with "Hown"). }
         iIntros (CIDr2 Hsr2 MR2) "Hcg Hpc %HcsR2 Hcnt".
+        (* the byte's own turn is BALANCED: what it acquired it released *)
+        pose proof (locks_below_not_elem lks (lock_rank "uart")
+                      ltac:(lkbelow)) as Hnotin2.
+        assert (Hsetback2 : ({[lock_rank "uart"]} ∪ lks) ∖ {[lock_rank "uart"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+        iEval (rewrite Hsetback2) in "Hcnt".
         iEval (rewrite HG4ra P72) in "Hpc".
         assert (HregsR2 : uw_loop_regs m0 MR2 (pa_stk sp0 10) buf n i).
         { apply (uw_loop_regs_cs m0 G4 MR2); [exact HcsR2|].
@@ -1253,23 +1274,26 @@ Section UwBodies.
       (γs : list gname) (j : nat) (γlp : gname)
       (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 buf : mword 64) (n : nat) (f : nat -> bv 8) (dq : dfrac)
-      (pidv : mword 32) (dqp : dfrac) (k : nat) :
+      (pidv : mword 32) (dqp : dfrac) (k : nat) (lks : gset nat) :
     (Z.of_nat n < 2 ^ 31)%Z ->
     (j < NPROC)%nat -> γs !! j = Some γlp ->
     (uartwrite_stack <= av)%nat ->
     eb = true ->
+    (* the turn's own lowest rank ("proc", 11 -- see [uw_one]), threaded
+       unchanged to every [uw_one] turn *)
+    locks_below lks (lock_rank "proc") ->
     forall i : nat, (i + S k)%nat = n ->
     ⊢ kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
       procs_inv γs -∗ panic_wp_any -∗
-      uw_head (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp i.
+      uw_head (CID0 := CID0) γu j m0 av eb C sp0 buf n f dq pidv dqp i lks.
   Proof.
-    intros Hn31 Hj Hjlp Hav Heb.
+    intros Hn31 Hj Hjlp Hav Heb Hfresh.
     induction k as [|k IH].
     - intros i Hik. iIntros "#Ht #Hdinv #Htxl #Hpinv #Hpanic".
       rewrite /uw_head.
       iIntros (CIDh Hsh M) "%Hregs Hcg Hcnt Hpc Hpid #Hsub Hfull Hbuf Hexit".
       iApply (uw_one (CID := CIDh) CID0 γl γu γv γs j γlp m0 M av eb C sp0 buf n f dq
-                pidv dqp i ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs
+                pidv dqp i lks ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs Hfresh
                 with "Ht Hdinv Htxl Hpinv Hpanic Hcg Hcnt Hpc Hpid Hsub Hfull Hbuf [Hexit]").
       iSplit.
       + (* the back edge is dead: this was the last byte *)
@@ -1279,7 +1303,7 @@ Section UwBodies.
       rewrite /uw_head.
       iIntros (CIDh Hsh M) "%Hregs Hcg Hcnt Hpc Hpid #Hsub Hfull Hbuf Hexit".
       iApply (uw_one (CID := CIDh) CID0 γl γu γv γs j γlp m0 M av eb C sp0 buf n f dq
-                pidv dqp i ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs
+                pidv dqp i lks ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs Hfresh
                 with "Ht Hdinv Htxl Hpinv Hpanic Hcg Hcnt Hpc Hpid Hsub Hfull Hbuf [Hexit]").
       iSplit.
       + rewrite /uw_next_cont.
@@ -1310,11 +1334,11 @@ Section ProofUartwrite.
       (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
-      (pidv : mword 32) (dqp : dfrac)
-    : wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp.
+      (pidv : mword 32) (dqp : dfrac) (lks : gset nat)
+    : wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp lks.
   Proof.
     cbv beta delta [wp_uartwrite_sconf_body].
-    intros pcE pj buf ret_tgt Hj Hjlp Ha1 Hn31 Hav Heb.
+    intros pcE pj buf ret_tgt Hj Hjlp Ha1 Hn31 Hav Heb Hfresh.
     iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Htxl Hpid Hbuf #Hpinv #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hbt : b = true) by (rewrite -Hbm; exact Heb).
@@ -1687,7 +1711,7 @@ Section ProofUartwrite.
       iDestruct (cpu_own_transport CID CID23 0 eb pj C true ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iPoseProof (uw_iter CID γl γu γv γs j γlp m av eb C sp0 buf n f dq
-                    pidv dqp (n - 1)%nat ltac:(lia) Hj Hjlp Hav Heb 0%nat ltac:(lia)
+                    pidv dqp (n - 1)%nat lks ltac:(lia) Hj Hjlp Hav Heb Hfresh 0%nat ltac:(lia)
                     with "Ht Hdinv Htxl Hpinv Hpanic") as "Iter".
       rewrite /uw_head.
       iSpecialize ("Iter" $! CID23 with "[%]"); [wp_next_chain|].
@@ -1700,7 +1724,7 @@ Section ProofUartwrite.
       pose proof Hregs' as Hregs''.
       destruct Hregs'' as (Wsp & Ws1 & Ws2 & Ws3 & Ws4 & Ws5 & Ws6 & Ws7 & W24 & W25 & W26 & W27).
       iApply (uw_tail (CID := CIDx) CID γu j m M' av eb C sp0 (uw_bytes f n)
-                (uw_buf buf dq f n) pidv dqp
+                (uw_buf buf dq f n) pidv dqp lks
                 ltac:(unfold uw_tail_regs; split_and!; assumption) Hspm Hav Heb
                 ltac:(wp_next_chain)
                 with "Ht Hcg Hcnt Hpc Hpid Hout Hsv Hs10 Hbuf [Hcont]").

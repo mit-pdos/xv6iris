@@ -39,19 +39,21 @@ From Kernel Require KernelSyms.
    stack_own bound 48 = own 4-slot frame + proc_mapstacks' 44 (PROVISIONAL,
    pending the decode pass). *)
 Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   lvl = 0%nat ->
   (48 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_kvmmake < nb)%nat) ->
+  (* kvmmake kallocs the root table and every kvmmap page: "kmem" (13). *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b -∗ kernel_text -∗
+  cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmake) -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t : ptree) (pas : nat -> mword 44),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t -∗
     ⌜mr !!! Regidx (mword_of_int 10)
@@ -69,6 +71,6 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
 Module Type KVMMAKE.
   Parameter wp_kvmmake_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_kvmmake_sconf_body γa mm lvl K eb p C on b.
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks.
 End KVMMAKE.

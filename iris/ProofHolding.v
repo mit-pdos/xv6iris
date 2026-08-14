@@ -89,9 +89,9 @@ Section ProofHolding.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_holding_lockinv_s_sconf
-      (γl : gname) (lka : mword 64) (R Tc Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64)
-    : wp_holding_lockinv_s_sconf_body γl lka R Tc Dc m n p.
+    : wp_holding_lockinv_s_sconf_body γl lka s R Tc Dc m n p.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
     intros pcE lk ret_tgt Hlka Hn Href.
@@ -105,7 +105,7 @@ Section ProofHolding.
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockopen_s_sconf γl lka R Tc Dc pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockopen_s_sconf γl lka s R Tc Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
               Hlka ltac:(vm_compute; discriminate) ltac:(rdok) Href
               with "Hcg Hpc Hi00 Hlock HTc").
@@ -271,7 +271,7 @@ Section ProofHolding.
     assert (Hacpu : add_vec (S2 !!! Regidx (mword_of_int 10 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka)
       by (rewrite Ha0S2 Hlkeq; reflexivity).
-    iApply (wp_cld_lkcpu_lockopen_s_sconf γl lka R Tc Dc (mword_of_int (KernelSyms.holding + 0x12))
+    iApply (wp_cld_lkcpu_lockopen_s_sconf γl lka s R Tc Dc (mword_of_int (KernelSyms.holding + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat false
               Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Href
@@ -492,9 +492,9 @@ Section ProofHolding.
   Qed.
 
   Lemma wp_holding_lockinv_locked_s_sconf
-      (γl : gname) (lka : mword 64) (R Dc : iProp Σ)
+      (γl : gname) (lka : mword 64) (s : string) (R Dc : iProp Σ)
       (m : regfile) (n : nat) (p : mword 64)
-    : wp_holding_lockinv_locked_s_sconf_body γl lka R Dc m n p.
+    : wp_holding_lockinv_locked_s_sconf_body γl lka s R Dc m n p.
   Proof.
     cbv beta delta [wp_holding_lockinv_locked_s_sconf_body].
     intros pcE lk ret_tgt held_cpu Hlka Hn Href.
@@ -508,7 +508,7 @@ Section ProofHolding.
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
-    iApply (wp_clw_lockopen_locked_s_sconf γl lka R Dc pcE (mword_of_int 15) (mword_of_int 10)
+    iApply (wp_clw_lockopen_locked_s_sconf γl lka s R Dc pcE (mword_of_int 15) (mword_of_int 10)
               (mword_of_int 0) m n false
               Hlka ltac:(vm_compute; discriminate) ltac:(rdok) Href
               with "Hcg Hpc Hi00 Hlock Htok").
@@ -630,7 +630,7 @@ Section ProofHolding.
     assert (Hacpu : add_vec (S2 !!! Regidx (mword_of_int 10 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka)
       by (rewrite Ha0S2 Hlkeq; reflexivity).
-    iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γl lka R Dc (mword_of_int (KernelSyms.holding + 0x12))
+    iApply (wp_cld_lkcpu_lockopen_locked_s_sconf γl lka s R Dc (mword_of_int (KernelSyms.holding + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 16 : mword 12) S2 (n - 4)%nat false
               Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Href

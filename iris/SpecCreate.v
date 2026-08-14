@@ -486,7 +486,7 @@ Definition wp_create_sconf_body
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
@@ -546,7 +546,7 @@ Definition wp_create_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol) *)
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
+  cpu_own 0 eb pj C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the two persistent credentials ialloc's printk arm needs, and the
@@ -598,7 +598,7 @@ Definition wp_create_sconf_body
     (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
+      cpu_own 0 eb pj C b lks -∗
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -670,9 +670,9 @@ Module Type CREATE.
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (lks : gset nat),
       wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
                            ninodes size dev used plen pfun ty major minor
-                           V u Sb ns pidv dqb dqs dqbs dqn m K eb C b.
+                           V u Sb ns pidv dqb dqs dqbs dqn m K eb C b lks.
 End CREATE.

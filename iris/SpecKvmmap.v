@@ -25,7 +25,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of va in
@@ -48,6 +48,9 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (uint pa + Z.of_nat npages * 4096 < 2 ^ 56)%Z ->
   pt_rep0 t m ->
   (forall i, (i < npages)%nat -> m !! vpn_at vpn0 i = None) ->
+  (* order premise at the lowest rank this cone reaches: kvmmap -> mappages
+     -> walk -> kalloc ("kmem", 13). *)
+  locks_below lks (lock_rank "kmem") ->
   match on with
   | None => panic_wp_any   (* hart-GENERIC: the panic arm is reached after
                               [b]-generic instructions, i.e. possibly on a
@@ -55,14 +58,14 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   | Some nb => ⌜(pt_missing t vpn0 npages < nb)%nat⌝
   end -∗
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b -∗ kernel_text -∗
+  cpu_own lvl eb p C b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b -∗
+    cpu_own lvl eb p C b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -78,6 +81,6 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type KVMMAP.
   Parameter wp_kvmmap_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b.
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset nat),
+      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
 End KVMMAP.

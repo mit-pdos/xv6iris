@@ -41,7 +41,7 @@ Fixpoint prun (pa_end s1 : mword 64) (ps : list (mword 64)) : Prop :=
       /\ prun pa_end (add_vec s1 PGSIZEv) rest
   end.
 
-Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) :=
+Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -52,8 +52,12 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   lk = mword_of_int KernelSyms.kmem ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   prun pa_end s1entry ps ->
+  (* THE FRESHNESS PREMISE: freerange's loop acquires and releases
+     [kmem.lock] once per page (balanced -- [lks] is unchanged), so the
+     caller must already hold only locks BELOW "kmem"'s rank. *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m K b pcur -∗
-  cpu_own ncnt eb pcur C b -∗
+  cpu_own ncnt eb pcur C b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
@@ -62,7 +66,7 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b pcur -∗
-    cpu_own ncnt eb pcur C b -∗
+    cpu_own ncnt eb pcur C b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (Some (length ps)) -∗
@@ -71,6 +75,6 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
 
 Module Type FREERANGE.
   Parameter wp_freerange_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool),
-      wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b.
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b lks.
 End FREERANGE.

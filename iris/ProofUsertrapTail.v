@@ -116,16 +116,21 @@ Section ProofUsertrapTail.
      kexit does not want, and dropping it is right -- the syscalls' footprint
      belongs to a process that is going to run one. *)
   Lemma ut_kexit (N : ut_names) (V : pprivate) (m : regfile) (nx : nat)
-      (C : iProp Σ) (b : bool) :
+      (C : iProp Σ) (b : bool) (lks : gset nat) :
     ut_wf N ->
     (K_kexit <= nx)%nat ->
+    (* kexit's own cone bottoms out at "ftable" (1) -- the fileclose loop --
+       and every deeper lock it reaches (itable/log/wait_lock/proc) follows
+       by [locks_below_mono] inside its own contract, so this is the ONE
+       premise the tail owes it. *)
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b -∗
+    ut_hold Rsys N V C b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hnx. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
+    intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iDestruct "Hcaps" as "(#Hpi & #Hpa & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
@@ -137,10 +142,11 @@ Section ProofUsertrapTail.
               (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
               (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
-              None (un_fn N) m nx b C b (un_pid N) V
-              eq_refl Hj Hjl Hnx Hlg
+              None (un_fn N) m nx b C b _ (un_pid N) V
+              eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcpu Hcsrs Hclm Htext Hpc Hpi Hpa Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
+    all: try lkbelow.
   Qed.
 
 
@@ -169,7 +175,7 @@ Section UtRet2.
   Lemma ut_ret2 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 mf : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
       (uepc : mword 64) (vb : mword 1)
-      (mie_v menvcfg0 : mword 64) :
+      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -190,7 +196,7 @@ Section UtRet2.
     pc_is (mword_of_int (UT + 0xb2)) -∗
     (* ---- exactly what prepare_return handed back ---- *)
     sie_cap_gpr mf (trap_res b + nx)%nat false (un_pj N) -∗
-    cpu_own 0%nat false (un_pj N) C false -∗
+    cpu_own 0%nat false (un_pj N) C false lks -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ mepc_val uepc -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
@@ -215,6 +221,10 @@ Section UtRet2.
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
              Hkptr [#Hcaps Hown] Hframe Hcont".
+    (* the boundary hands the trap resource back at the literal [∅] that
+       [ut_res] pins -- depth 0 forces the held set empty, so this is a
+       re-spelling, not an obligation. *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
        it existential because it never reads it; the arm it also hands back is
        at [false], and [sie_arm_half_agree] reads the live SIE off that index,
@@ -604,7 +614,7 @@ Section UtRet2.
           iSplitL "Hq4". { iExact "Hq4". }
           iSplitL "Htie". { iExact "Htie". }
           iExact "Hsret". }
-        iSplitL "Hcpu". { iExact "Hcpu". }
+        iSplitL "Hcpu". { iEval (rewrite Hlkempty) in "Hcpu". iExact "Hcpu". }
         iExact "Hclm".
       + rewrite /ut_env. iSplitR; [iExact "Hcaps"|]. iExact "Hown".
   Qed.
@@ -623,7 +633,7 @@ Section UtRet.
   (* ==================================================================== *)
   Lemma ut_ret (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (mie_v menvcfg0 : mword 64) :
+      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -638,7 +648,7 @@ Section UtRet.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b -∗
+    ut_hold Rsys N V C b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -685,7 +695,7 @@ Section UtRet.
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) V
-              M1 nx C (un_pj N) uepc b ltac:(unfold K_prepare_return; lia) Hepc
+              M1 nx C (un_pj N) uepc b lks ltac:(unfold K_prepare_return; lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn Hcg Hcpu Hclmpay Hsepc Hscause Hstval
@@ -710,7 +720,7 @@ Section UtRet.
     assert (HVrupt : pv_upt Vr = pv_upt V) by (rewrite /Vr; destruct V; reflexivity).
     iDestruct ("Hownback" $! Vr with "Hpv Hsy") as "Hown".
     iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx C b uepc vb
-              mie_v menvcfg0
+              mie_v menvcfg0 lks
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
                               ltac:(vm_compute; reflexivity)); exact HM1sp)
@@ -742,7 +752,7 @@ Section UtA6.
      s2,0] is stepped and its value never read again. *)
   Lemma ut_a6 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (mie_v menvcfg0 : mword 64) :
+      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -754,10 +764,15 @@ Section UtA6.
     ut_cs m0 m ->
     mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
+    (* the block's whole cone bottoms out at "ftable" (1), via the killed
+       branch's [ut_kexit]; killed itself (rank "proc" = 11) follows by
+       [locks_below_mono].  The not-killed branch (ut_ret / prepare_return)
+       touches no lock at all. *)
+    locks_below lks (lock_rank "log") ->
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b -∗
+    ut_hold Rsys N V C b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -765,7 +780,7 @@ Section UtA6.
                      mie_v menvcfg0) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
+    intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -825,9 +840,11 @@ Section UtA6.
     iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (KI.wp_killed_sconf (CID := CID2) (un_s N) (un_j N) (un_l N)
-              M2 nx 0%nat b (un_pj N) C b
+              M2 nx 0%nat b (un_pj N) C b lks
               HM2a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
+              ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+    all: try lkbelow.
     iIntros (CID3 Hk3 mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hretac : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0xac))
       by (rewrite HM2ra; pcw).
@@ -924,7 +941,8 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx C b Hwf' ltac:(unfold K_kexit; lia) with "Htext Hpc Hcg [-]").
+                nx C b lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
+                with "Htext Hpc Hcg [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
@@ -948,7 +966,7 @@ Section UtA6.
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID4) Rsys N V pt ksp m0 mf av nx C b
-                mie_v menvcfg0
+                mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -977,7 +995,7 @@ Section UtFa.
      has to be re-anchored on the far side. *)
   Lemma ut_fa (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
-      (mie_v menvcfg0 : mword 64) :
+      (mie_v menvcfg0 : mword 64) (lks : gset nat) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
     (trap_res b + nx)%nat = (av - 4)%nat ->
@@ -992,7 +1010,7 @@ Section UtFa.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b -∗
+    ut_hold Rsys N V C b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -1008,6 +1026,9 @@ Section UtFa.
     iPoseProof (uti_0fc with "Htext") as "Hifc".
     iPoseProof (uti_0fe with "Htext") as "Hife".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
+    (* depth 0 forces the held set empty, which is what lets the yield arm
+       hand [cpu_own ... ∅] to a contract that pins [∅] (SpecYield.v). *)
+    iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
     iAssert (panic_wp_any) with "[]" as "#Hpa".
@@ -1057,7 +1078,7 @@ Section UtFa.
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID2) Rsys N V pt ksp m0 M1 av nx C b
-                mie_v menvcfg0
+                mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
@@ -1106,6 +1127,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
       iDestruct (cpu_claim_ext_transport CID CID3 b (un_pj N)
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
+      iEval (rewrite Hlkempty) in "Hcpu".
       iApply (YI.wp_yield_sconf (CID := CID3) (un_s N) (un_j N) (un_l N)
                 M2 nx b C Hj Hjl ltac:(lia)
                 with "Hcg Hcpu Htext Hpc Hpi Hpa Hcsrs Hclm [-]").
@@ -1143,11 +1165,13 @@ Section UtFa.
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ut_ret (CID := CID5) Rsys N V pt ksp m0 mf av nx C b
-                mie_v menvcfg0
+                mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv
                 with "Htext Hpc Hcg [-Hframe Hcont] Hframe Hcont").
-      rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
+      (* the yield arm came back at the literal [∅]; [lks = ∅] at depth 0
+         makes that the set [ut_hold] names. *)
+      rewrite /ut_hold Hlkempty. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
       iSplitL "Hclm"; [iExact "Hclm"|].
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].

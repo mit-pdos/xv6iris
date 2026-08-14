@@ -79,7 +79,7 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ,
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (v : mword 64)
-    (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) :=
+    (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argstr in
   let buf := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -91,8 +91,10 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ,
   (argstr_stack <= av)%nat ->
   m !!! Regidx (mword_of_int 12 : mword 5) = (mword_of_int (Z.of_nat maxn) : mword 64) ->
   (Z.of_nat maxn < 2 ^ 31)%Z ->
+  (* argstr -> fetchstr -> copyinstr -> walkaddr -> walk *)
+  locks_below lks (lock_rank "kmem") ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b -∗
+  cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
@@ -102,7 +104,7 @@ Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ,
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b -∗
+      cpu_own n eb p C b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_new j) -∗
@@ -115,6 +117,6 @@ Module Type ARGSTR.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
-      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool),
-      wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b.
+      (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset nat),
+      wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b lks.
 End ARGSTR.

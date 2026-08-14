@@ -97,12 +97,12 @@ Section ProofFiledup.
      index rather than stating it" describes.  Read once at function entry,
      it is exactly the fact that lets release's derived exit index equal
      filedup's own (symmetric) [b]. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset nat) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as [-> ->]. done.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
       iDestruct "Hcnt" as "[[_ Hint] _]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
@@ -113,14 +113,15 @@ Section ProofFiledup.
 
   Lemma wp_filedup_sconf
       (γl γf : gname) (k : nat) (q : Qp) (Cf : fcontent)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_filedup_sconf_body γl γf k q Cf m n eb p C K b.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset nat)
+    : wp_filedup_sconf_body γl γf k q Cf m n eb p C K b lks.
   Proof.
     cbv beta delta [wp_filedup_sconf_body].
-    intros pcE ret_tgt HK HnZ Ha0.
+    intros pcE ret_tgt HK HnZ Ha0 Hbelow.
+    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hfdslot Href Hcont".
-    iDestruct (sie_b_agree m n K eb b p C with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (fdi_00 with "Htext") as "Hi00".
@@ -276,9 +277,10 @@ Section ProofFiledup.
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "ftable"%string (ftable_res γf) mA
-              n eb p C (K - 4)%nat b
-              HnZ ltac:(lia)
+              n eb p C (K - 4)%nat b lks
+              HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+    all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
     assert (Hpc18 : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.filedup + 0x18)).
@@ -452,11 +454,17 @@ Section ProofFiledup.
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) D5
               n eb p C (K - 4)%nat
+              ({[lock_rank "ftable"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
+    (* filedup is BALANCED: the set release hands back collapses to the entry
+       [lks] -- [Hfresh] is what makes the singleton insert/delete cancel. *)
+    assert (Hsetback : ({[lock_rank "ftable"]} ∪ lks) ∖ {[lock_rank "ftable"]} = lks)
+      by (apply locks_add_del_below; lkbelow).
+    iEval (rewrite Hsetback) in "Hcnt".
     iEval (rewrite <- Houtb) in "Hcg". iEval (rewrite <- Houtb) in "Hcnt".
     rewrite <- Houtb in Hsr.
     pose proof Hrelpins as Hrelpins_cs.

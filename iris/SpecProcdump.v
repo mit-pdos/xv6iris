@@ -152,7 +152,7 @@ End ProcdumpView.
 Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γd : uart_names) (γv : disk_names)
-    (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
+    (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE : mword 64 := mword_of_int KernelSyms.procdump in
   let ra0 := m !!! Regidx ra_idx in
@@ -161,9 +161,13 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (58 <= K)%nat ->
   (* the callee, as a hypothesis and not a functor -- see the header *)
   printk_gen_contract γpr γd γv ->
+  (* procdump takes no lock of its own (the header's whole point); its one
+     callee, printk, is entered at rank "pr" -- the lowest (only) rank this
+     cone touches, so this is the whole order premise. *)
+  locks_below lks (lock_rank "pr") ->
   sie_cap_gpr m K b p -∗
   (* the interrupt level is left exactly as found: printk's acquire/release *)
-  cpu_own 0%nat eb p C b -∗
+  cpu_own 0%nat eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   printk_env γpr γd γv -∗
@@ -174,7 +178,7 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       sie_cap_gpr mf K b p -∗
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-      cpu_own 0%nat eb p C b -∗
+      cpu_own 0%nat eb p C b lks -∗
       procdump_view -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -184,6 +188,6 @@ Module Type PROCDUMP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
-      wp_procdump_sconf_body γpr γd γv m K eb p C b.
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset nat),
+      wp_procdump_sconf_body γpr γd γv m K eb p C b lks.
 End PROCDUMP.
