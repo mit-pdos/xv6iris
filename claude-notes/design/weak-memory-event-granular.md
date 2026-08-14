@@ -1,6 +1,6 @@
 # The event-granular weak language — design (supersedes the two-machine lift)
 
-**Status (2026-08-14): DESIGN, spike in flight
+**Status (2026-08-14): DESIGN, spike COMPLETE and PASSED
 ([`projects/weak-memory-event-lang.md`](../projects/weak-memory-event-lang.md)).
 The instruction-atomic architecture it supersedes is retained side by side
 — [`weak-memory.md`](weak-memory.md), the lift record
@@ -140,45 +140,75 @@ exhibit-level route of the premises worklist's phase 2) + the WP package
 - The disk agent matches the pf disk 1:1; the `wa_dd = wgdev` and
   flat-memory-pinning residues disappear.
 
-## Proof engineering: reflective batching is MANDATORY (2026-08-14)
+## Proof engineering: reflective batching is MANDATORY, over TOTAL
+## PROJECTIONS AND UNEVALUATED COMPOSITIONS (revised 2026-08-14, post-spike)
 
 THE COMMITMENT: the language's step granularity must not become the
 proof's step granularity.  Stepping the proofmode through every bind
 (an interp-open per `RegRead`) would be strictly worse than today's
-vm_compute-style execution and is forbidden as the proof interface:
+vm_compute-style execution and is forbidden as the proof interface
+(measured: ~19 ms of proofmode per node ⇒ ~5.6 s per real instruction,
+against ~0.15 s for the same instruction in three batched stretches):
 
 - Per-node rules are the SEMANTICS (for the correspondence and
   adequacy).  The PROOF INTERFACE is one derived rule per SILENT
-  STRETCH: a reflective `run_silent : regfile → M unit →
-  option (regfile × M unit)` (the `DecodeSetU.bval`/`goodbP` mold;
-  `Choose` values supplied by the certification) computing through
-  consecutive non-memory nodes to the next memory event / fence / Ret.
-  Its soundness lemma (`run_silent … = Some … → rtc silent-step …`) and
-  the Iris n-step rule are proven ONCE; each use is one application +
-  one vm_compute equation — per-site proof terms O(1), reduction in the
-  VM, never in the proofmode.
+  STRETCH: a reflective `erun_silent : nat → footprint → regfile → M unit →
+  regfile × M unit` (the `DecodeSetU.bval`/`goodbP` mold) computing through
+  consecutive non-memory nodes to the next memory event / fence / `Ret`.
+  Its soundness lemma and the Iris n-step rule are proven ONCE.
+- **THE FORM RULE, and it is load-bearing (spike finding F8): NO CALL SITE
+  MAY EVER WRITE A RESIDUAL — OR A REGISTER FILE — DOWN.**  Naming a residual
+  monad means reading a VM *closure* back into a term, which re-does the whole
+  rest of the instruction symbolically (measured: >110 s, killed, against
+  0.1 s for the same run projected to a number); naming the post-boot register
+  file costs >3 min.  The durable-notes
+  compute-once-into-a-`Definition`-plus-`vm_cast_no_check` recipe was written
+  for VALUES and does not transfer.  So the interface is:
+    * a CURSOR `ecur = regstate * M unit` with TOTAL steppers
+      (`esil n D`, `ecur_read v`, `ecur_write`, `ecur_bar`, `ecur_loop tick`).
+      A certification — of one instruction or of a whole sequence — is a
+      CHAIN OF APPLICATIONS, never normalised;
+    * the batched rule takes **no equation at all**: its successor is the
+      unevaluated composition;
+    * TOTAL PROJECTIONS with SMALL outputs are what a rule matches on
+      (`enode_tag`, `eread_req_at n`, `ewrite_req_at n`, `ebar_at`), each
+      per-site fact one `vm_cast_no_check` with a hand-written right-hand
+      side, plus ONCE-PROVEN inversion lemmas exhibiting the continuation;
+    * per-site cost is then O(1) on BOTH axes: 0.16 s of VM for a whole
+      293-node instruction, and no readback but a five-field request record.
+  GOTCHA (durable): discharge a cursor equation with
+  `have H : … by reflexivity` and PASS `H`.  A bare `eq_refl` inside the
+  application hands the problem to the elaborator's unifier, which unfolds
+  the stepper instead of the cursor and starts LAZILY EVALUATING the stretch
+  (5.3 s, then unbounded).
+- **THE FETCH IS A MEMORY EVENT, AND IT GETS ITS OWN DERIVED RULE (finding
+  F7).**  Decision 6 ("instruction fetch is declared coherent") is NOT what
+  `riscv_step` emits — the fetch request classifies as an ordinary
+  `AK_explicit` plain read — so every instruction carries one memory event
+  more than its instruction-atomic twin.  The answer is not to change the
+  model but to exploit that KERNEL TEXT IS IMMUTABLE: `ewp_ev_fetch` consumes
+  the persistent era-image points-to (`WeakInstr.wkernel_text`'s elements,
+  windowed as `etext_word`) and concludes the fetch returns exactly the
+  certified word, with no caller callback, no `read_ok` obligation and no φ
+  payment — because a never-written byte forces every admissible timestamp to
+  0 and owes nothing at any floor.  Every leaf that fetches should use it.
 - DECODE IS IMPORTED, NOT RE-SOLVED: after the fetch event,
   decode+prologue is one silent stretch = one reflective step; the
   `kd_` catalogue / `decode_bridge_ms` / concrete-state bridge are
-  consumed inside `run_silent`'s computation unchanged.
+  consumed inside `erun_silent`'s computation unchanged.
 - CERTIFICATIONS LIFT WHOLESALE: the chain lemma's real form is an
-  adapter from today's certification data (interpreter run + read
-  values + register delta + event list) to `EWP (CycleE …)`, with
-  obligations ONLY at memory events.  Cost target per leaf: today's
-  cost + one application per memory event.
+  adapter from today's certification data to `EWP (ECycle …)`, with
+  obligations ONLY at memory events (`ewp_ev_seq_load` / `_fetch` / `_store`
+  / `_barrier` / `_ret`).
 - WHY BATCHING IS SOUND: a silent stretch touches only hart-exclusive
   state (own registers, own expression), so interference neither
   disables it nor changes its result — frame once across the stretch.
   Memory events are exactly the points where the world may act, and
   are NOT batched.
-- Proof-term discipline per durable-notes applies verbatim
-  (`vm_cast_no_check`, compute-once-into-a-Definition, async-Qed
-  traps): `run_silent` on a decode stretch must be VM-cast, never
-  lazily Qed-rechecked.
-- S5's measurement matrix: batched (the real interface) vs naive
-  per-node (calibration only, to document why batching is mandatory)
-  vs today's instruction-atomic originals; parity target = batched ≈
-  today.
+- MEASURED PARITY (S5, both sides re-measured in one session): 1.19× the
+  instruction-atomic leaves' time on three whole-function leaves, 1.03× with
+  the two-instruction composition, 1.66–1.78× the lines — the line residue
+  being the per-event ITEMISATION of the certification in the statement.
 
 ## The risks the spike must test (fail criteria, named in advance)
 

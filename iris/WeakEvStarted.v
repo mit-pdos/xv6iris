@@ -105,18 +105,6 @@ Lemma whart_view_img (σ : wgstate) (c : CPU) :
   wimg (whart_view σ c) = img_z (wgimg σ).
 Proof. reflexivity. Qed.
 
-Lemma read_ok_wbyte_ok (σ : wgstate) (c : CPU) (ak : akinfo) (base : Z)
-    (tvs : list (nat * bv 8)) (j t : nat) (v : bv 8) :
-  ak_coh ak = false -> ak_latest ak = false ->
-  read_ok (img_z (wgimg σ)) (wglog σ) (wgws σ c) (ak_sync ak) false base tvs ->
-  tvs !! j = Some (t, v) ->
-  wbyte_ok (whart_view σ c) ak (base + Z.of_nat j) t v.
-Proof.
-  intros Hcoh Hlat Hrd Hj. destruct (Hrd j t v Hj) as (Hb & Hrdbl & _).
-  rewrite /wbyte_ok Hcoh /=. split; [exact Hb|]. split; [exact Hrdbl|].
-  by rewrite Hlat.
-Qed.
-
 (** The admissibility of ONE read event, bundled: [WeakEvLift]'s two RAM rules
     carry these three conjuncts separately (they are three [⌜⌝] arguments of
     the callback); a leaf reads better with them named. *)
@@ -138,55 +126,59 @@ Section started_ev.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Implicit Types P : vProp Σ.
 
-  (** THE CALLER'S FETCH OBLIGATION.  The event-granular twin of the
-      [⌜∀ j < 4, pinned_read σ (acc_addr pc j)⌝] conjunct every
-      instruction-atomic leaf callback returns, plus the φ payment for the
-      floors the fetch moves.  It is stated at the FETCH EVENT's own σ. *)
-  Definition ev_fetch_cb (c : CPU) (n : N) (req : Interface.ReadReq.t n)
-      (wf : bv (8 * n)) (ws : wstate) : iProp Σ :=
-    (∀ σ : wgstate,
-       ⌜wgws σ c = ws⌝ -∗ ⌜wlog_wf (wglog σ)⌝ -∗
-       ⌜ws_bounded ws (length (wglog σ))⌝ -∗
-       wlog_lb (wglog σ) -∗
-       wlat_interp (wgimg σ) (wglog σ) ={⊤,∅}=∗
-         ⌜exists (w : bv (8 * n)) tvs, eread_adm σ ws n req w tvs⌝ ∗
-         ▷ (∀ (w : bv (8 * n)) (tvs : list (nat * bv 8)),
-              ⌜eread_adm σ ws n req w tvs⌝ ={∅,⊤}=∗
-                (* the text is PINNED: every admissible read returns the
-                   certified word *)
-                ⌜w = wf⌝ ∗
-                ⌜forall a : Z,
-                   (coh ws a < coh (eread_ws σ ws n req tvs) a)%nat ->
-                   nv_ok (wglog σ) c a⌝ ∗
-                wlat_interp (wgimg σ) (wglog σ)))%I.
+  (** THE BRIDGE from the tree's kernel-text resource to [WeakEvLift]'s
+      window form.  [WeakInstr.wkernel_text bs] is a big-op of PERSISTENT
+      era-image elements [wlat_pointsto (pa_z a) DfracDiscarded 0 b] over an
+      [Arch.pa]-keyed map; the log — and hence [WeakEvLift.etext] — is keyed
+      at [Z], and [WeakBridge.acc_wf_byte] is the conversion.  This is the
+      whole connection between the fetch rule (F7) and the tree's existing
+      pinned-text discipline; it is stated HERE rather than in [WeakEvLift]
+      so that the event tier keeps no dependency on the superseded
+      instruction-atomic files. *)
+  Lemma wkernel_text_etext_word (bs : gmap Arch.pa (bv 8)) (pa : Arch.pa)
+      (n : N) (w : bv (8 * n)) :
+    acc_wf pa n ->
+    (forall j : nat, (j < N.to_nat n)%nat ->
+       bs !! pa_add pa j = Some (nth_byte w j)) ->
+    wkernel_text bs -∗ etext_word (pa_z pa) n w.
+  Proof.
+    intros Hacc Hdom. iIntros "#Ht". rewrite /etext_word.
+    iApply big_sepL_intro. iIntros "!>" (i j Hj).
+    apply lookup_seq in Hj as [-> Hlt]. simpl.
+    rewrite /etext -/(acc_addr pa i) -(acc_wf_byte pa n i Hacc Hlt).
+    by iDestruct (big_sepM_lookup _ _ _ _ (Hdom i Hlt) with "Ht") as "$".
+  Qed.
 
 (* ====================================================================== *)
 (** ** 1. THE PUBLISHER — [sw a4,0(a5)] with a4 = 1, a5 = &started
 
     [WeakAcquire.wwp_started_set] at event granularity.  Read the premises in
-    two groups: the CERTIFICATION (three computed stretches — boundary to
-    fetch, fetch to store, store to [Ret] — and the shape facts of the two
-    nodes, all of them [vm_compute] outputs, see §5), and the RESOURCES (the
-    escrow, the hart's view with the release fence's [w_relp] already set, the
-    register frame, the payload).
+    three groups: the CERTIFICATION (three cursor equations, all [eq_refl] —
+    the stretches are UNEVALUATED COMPOSITIONS, nothing is named), the NODE
+    PROJECTIONS (three small [vm_cast_no_check]s: the fetch's request, the
+    store's request, and "the tail ends at [Ret]"), and the RESOURCES (the
+    escrow, the pinned text, the hart's view with the release fence's
+    [w_relp] already set, the register frame, the payload).
 
     The store event's obligations are discharged HERE, from the escrow, by
-    [WeakStarted.wstarted_set] — verbatim, at [whart_view]. *)
+    [WeakStarted.wstarted_set] — verbatim, at [whart_view].  The FETCH costs
+    ONE application of [WeakEvLift.ewp_ev_seq_fetch] and nothing else: no
+    callback, no [read_ok], no φ payment (finding F7's answer). *)
 
   Lemma ewp_ev_started_set (a : Arch.pa) P (c : CPU) (D : gset register)
-      (m : M unit) (ws : wstate) (rs rs1 rs2 rs3 : regstate)
-      (n1 n2 n3 : nat)
-      (nf : N) (reqf : Interface.ReadReq.t nf)
-      (Kf : (bv (8 * nf) * option bool + Arch.abort)%type -> M unit)
-      (wf : bv (8 * nf))
-      (reqw : Interface.WriteReq.t 4)
-      (Kw : (option bool + Arch.abort)%type -> M unit) :
-    (* --- the certification --- *)
-    erun_silent n1 D rs m = (rs1, Interface.Next (Interface.MemRead nf reqf) Kf) ->
-    erun_silent n2 D rs1 (Kf (inl (wf, None)))
-      = (rs2, Interface.Next (Interface.MemWrite 4 reqw) Kw) ->
-    erun_silent n3 D rs2 (Kw (inl None)) = (rs3, Interface.Ret tt) ->
-    (* --- the fetch node: a plain RAM read --- *)
+      (m : M unit) (ws : wstate) (rs : regstate) (n1 n2 n3 : nat)
+      (x1 x2 x3 : ecur)
+      (nf : N) (reqf : Interface.ReadReq.t nf) (wf : bv (8 * nf))
+      (reqw : Interface.WriteReq.t 4) :
+    (* --- the certification: three unevaluated compositions --- *)
+    x1 = esil n1 D (rs, m) ->
+    x2 = esil n2 D (ecur_read (bv_unsigned wf) x1) ->
+    x3 = esil n3 D (ecur_write x2) ->
+    (* --- the three nodes, by TOTAL PROJECTION --- *)
+    eread_req_at nf x1.2 = Some reqf ->
+    ewrite_req_at 4 x2.2 = Some reqw ->
+    enode_tag x3.2 = 0%nat ->
+    (* --- the fetch node: a plain RAM read, of PINNED TEXT --- *)
     dev_addr (Interface.ReadReq.pa reqf) = false ->
     ak_coh (classify (Interface.ReadReq.access_kind reqf)) = false ->
     ak_latest (classify (Interface.ReadReq.access_kind reqf)) = false ->
@@ -198,34 +190,29 @@ Section started_ev.
     (* --- the release fence ran (φ-upgrade §1, as in [wwp_started_set]) --- *)
     w_relp ws = true ->
     wstarted_inv a P -∗
+    etext_word (pa_z (Interface.ReadReq.pa reqf)) nf wf -∗
     hart_ws c ws -∗ ereg_frame c rs D -∗ vwp_hold P ws -∗
-    ev_fetch_cb c nf reqf wf ws -∗
     ▷ (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗
-         hart_ws c ws' -∗ ereg_frame c rs3 D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
+         hart_ws c ws' -∗ ereg_frame c x3.1 D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
     EWP (ECycle 0%nat c m None) @ ⊤.
   Proof.
-    iIntros (Hr1 Hr2 Hr3 Hdevf Hcohf Hlatf Hdevw Hpaw Hvalw Hacc Hrelp)
-      "#Hinv Hws Hrf HP Hfetch Hcont".
+    iIntros (Hx1 Hx2 Hx3 Hnf Hnw Htag Hdevf Hcohf Hlatf Hdevw Hpaw Hvalw Hacc
+             Hrelp) "#Hinv #Htext Hws Hrf HP Hcont".
+    subst x1 x2 x3.
     (* ---------------- the FETCH event ---------------- *)
-    iApply (ewp_ev_seq_load 0%nat c D n1 rs rs1 m nf reqf Kf ws
-              eq_refl Hr1 Hdevf Hcohf Hlatf with "Hws Hrf").
-    iIntros (σ) "%Hwseq %Hwf %Hbnd #Hlb Hlat".
-    iMod ("Hfetch" $! σ with "[//] [//] [//] Hlb Hlat") as "[%Hen Hfk]".
-    iModIntro. iSplitR.
-    { iPureIntro. destruct Hen as (w & tvs & Hadm). by exists w, tvs. }
-    iNext. iIntros (w tvs) "%H1 %H2 %H3".
-    iMod ("Hfk" $! w tvs with "[%]") as "(%Hpin & %Hpay & Hlat)";
-      [by split_and!|].
-    iModIntro. iFrame "Hlat". iSplitR; [iPureIntro; exact Hpay|].
-    iIntros "Hws Hrf". subst w.
-    (* ---------------- the STORE event ---------------- *)
-    set (wsf := eread_ws σ ws nf reqf tvs).
-    have Hle_f : ws_le ws wsf by apply load_post_run_le.
-    have Hrelpf : w_relp wsf = true
-      by rewrite /wsf /eread_ws load_post_run_relp.
+    iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
+              eq_refl Hnf Hdevf Hcohf Hlatf with "Htext Hws Hrf").
+    iNext. iIntros "Hws Hrf".
+    set (wsf := efetch_ws ws
+                  (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
+                  (pa_z (Interface.ReadReq.pa reqf)) nf).
+    have Hle_f : ws_le ws wsf by apply efetch_ws_le.
+    have Hrelpf : w_relp wsf = true by rewrite /wsf efetch_ws_relp.
     iDestruct (vwp_hold_mono P ws wsf Hle_f with "HP") as "HP".
-    iApply (ewp_ev_seq_store 0%nat c D n2 rs1 rs2 _ 4 reqw Kw wsf
-              eq_refl Hr2 Hdevw ltac:(done) ltac:(by rewrite Hpaw)
+    (* ---------------- the STORE event ---------------- *)
+    iApply (ewp_ev_seq_store 0%nat c D n2
+              (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) 4 reqw wsf
+              eq_refl Hnw Hdevw ltac:(done) ltac:(by rewrite Hpaw)
               with "Hws Hrf").
     iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
     iInv wstartedN as "Hbody" "Hclose".
@@ -276,7 +263,10 @@ Section started_ev.
     rewrite /σm' /=. iFrame "Hlat2".
     iIntros "Hws Hrf".
     (* ---------------- the TAIL: back to the boundary ---------------- *)
-    iApply (ewp_ev_seq_ret 0%nat c D n3 rs2 rs3 _ tt eq_refl Hr3 with "Hrf").
+    iApply (ewp_ev_seq_ret 0%nat c D n3
+              (ecur_write (esil n2 D
+                 (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
+              eq_refl Htag with "Hrf").
     iNext. iIntros "Hrf". iApply ("Hcont" $! wsw with "[%] Hws Hrf").
     rewrite /wsw. etrans; [exact Hle_f|apply store_post_run_le].
   Qed.
@@ -334,20 +324,18 @@ Section started_ev.
                 wlat_interp (wgimg σ) (wglog σ)))%I.
 
   Lemma ewp_ev_started_load (a : Arch.pa) P `{!Persistent P} (c : CPU)
-      (D : gset register) (m : M unit) (ws : wstate)
-      (rs rs1 rs2 : regstate) (rs3 : bv (8 * 4) -> regstate)
-      (n1 n2 n3 : nat)
-      (nf : N) (reqf : Interface.ReadReq.t nf)
-      (Kf : (bv (8 * nf) * option bool + Arch.abort)%type -> M unit)
-      (wf : bv (8 * nf))
-      (reql : Interface.ReadReq.t 4)
-      (Kl : (bv (8 * 4) * option bool + Arch.abort)%type -> M unit) :
-    (* --- the certification: the tail is PARAMETRIC in the word read --- *)
-    erun_silent n1 D rs m = (rs1, Interface.Next (Interface.MemRead nf reqf) Kf) ->
-    erun_silent n2 D rs1 (Kf (inl (wf, None)))
-      = (rs2, Interface.Next (Interface.MemRead 4 reql) Kl) ->
+      (D : gset register) (m : M unit) (ws : wstate) (rs : regstate)
+      (n1 n2 n3 : nat) (x1 x2 : ecur)
+      (nf : N) (reqf : Interface.ReadReq.t nf) (wf : bv (8 * nf))
+      (reql : Interface.ReadReq.t 4) :
+    (* --- the certification: the tail is PARAMETRIC in the word read, and it
+       is a composition, not a family of named residuals --- *)
+    x1 = esil n1 D (rs, m) ->
+    x2 = esil n2 D (ecur_read (bv_unsigned wf) x1) ->
+    eread_req_at nf x1.2 = Some reqf ->
+    eread_req_at 4 x2.2 = Some reql ->
     (forall w : bv (8 * 4),
-       erun_silent n3 D rs2 (Kl (inl (w, None))) = (rs3 w, Interface.Ret tt)) ->
+       enode_tag (esil n3 D (ecur_read (bv_unsigned w) x2)).2 = 0%nat) ->
     (* --- the fetch node --- *)
     dev_addr (Interface.ReadReq.pa reqf) = false ->
     ak_coh (classify (Interface.ReadReq.access_kind reqf)) = false ->
@@ -358,34 +346,32 @@ Section started_ev.
     ak_latest (classify (Interface.ReadReq.access_kind reql)) = false ->
     Interface.ReadReq.pa reql = a ->
     wstarted_inv a P -∗
+    etext_word (pa_z (Interface.ReadReq.pa reqf)) nf wf -∗
     hart_ws c ws -∗ ereg_frame c rs D -∗
-    ev_fetch_cb c nf reqf wf ws -∗
     (∀ ws0 : wstate, ⌜ws_le ws ws0⌝ -∗ ev_flag_cb c a ws0 reql) -∗
     ▷ (∀ (ws' : wstate) (w : bv (8 * 4)), ⌜ws_le ws ws'⌝ -∗
          (⌜w = lock_zero⌝ ∨ ⌜w <> lock_zero⌝ ∗ ev_rcpt P ws') -∗
-         hart_ws c ws' -∗ ereg_frame c (rs3 w) D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
+         hart_ws c ws' -∗
+         ereg_frame c (esil n3 D (ecur_read (bv_unsigned w) x2)).1 D -∗
+         EWP (ELoop 0%nat c) @ ⊤) -∗
     EWP (ECycle 0%nat c m None) @ ⊤.
   Proof.
-    iIntros (Hr1 Hr2 Hr3 Hdevf Hcohf Hlatf Hdevl Hcohl Hlatl Hpal)
-      "#Hinv Hws Hrf Hfetch Hflag Hcont".
+    iIntros (Hx1 Hx2 Hnf Hnl Htag Hdevf Hcohf Hlatf Hdevl Hcohl Hlatl Hpal)
+      "#Hinv #Htext Hws Hrf Hflag Hcont".
+    subst x1 x2.
     (* ---------------- the FETCH event ---------------- *)
-    iApply (ewp_ev_seq_load 0%nat c D n1 rs rs1 m nf reqf Kf ws
-              eq_refl Hr1 Hdevf Hcohf Hlatf with "Hws Hrf").
-    iIntros (σ) "%Hwseq %Hwf %Hbnd #Hlb Hlat".
-    iMod ("Hfetch" $! σ with "[//] [//] [//] Hlb Hlat") as "[%Hen Hfk]".
-    iModIntro. iSplitR.
-    { iPureIntro. destruct Hen as (w & tvs & Hadm). by exists w, tvs. }
-    iNext. iIntros (w tvs) "%H1 %H2 %H3".
-    iMod ("Hfk" $! w tvs with "[%]") as "(%Hpin & %Hpay & Hlat)";
-      [by split_and!|].
-    iModIntro. iFrame "Hlat". iSplitR; [iPureIntro; exact Hpay|].
-    iIntros "Hws Hrf". subst w.
-    set (wsf := eread_ws σ ws nf reqf tvs).
-    have Hle_f : ws_le ws wsf by apply load_post_run_le.
+    iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
+              eq_refl Hnf Hdevf Hcohf Hlatf with "Htext Hws Hrf").
+    iNext. iIntros "Hws Hrf".
+    set (wsf := efetch_ws ws
+                  (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
+                  (pa_z (Interface.ReadReq.pa reqf)) nf).
+    have Hle_f : ws_le ws wsf by apply efetch_ws_le.
     iDestruct ("Hflag" $! wsf with "[//]") as "Hflag".
     (* ---------------- the FLAG event, escrow open ---------------- *)
-    iApply (ewp_ev_seq_load 0%nat c D n2 rs1 rs2 _ 4 reql Kl wsf
-              eq_refl Hr2 Hdevl Hcohl Hlatl with "Hws Hrf").
+    iApply (ewp_ev_seq_load 0%nat c D n2
+              (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) 4 reql wsf
+              eq_refl Hnl Hdevl Hcohl Hlatl with "Hws Hrf").
     iIntros (σ2) "%Hws2 %Hwf2 %Hbnd2 #Hlb2 Hlat2".
     iInv wstartedN as "Hbody" "Hclose".
     iMod ("Hflag" $! σ2 with "[//] [//] [//] Hlb2 Hlat2")
@@ -449,8 +435,10 @@ Section started_ev.
     iModIntro. iFrame "Hlat2". iSplitR; [iPureIntro; exact Hpay2|].
     iIntros "Hws Hrf".
     (* ---------------- the TAIL ---------------- *)
-    iApply (ewp_ev_seq_ret 0%nat c D n3 rs2 (rs3 w) _ tt eq_refl (Hr3 w)
-              with "Hrf").
+    iApply (ewp_ev_seq_ret 0%nat c D n3
+              (ecur_read (bv_unsigned w)
+                 (esil n2 D (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
+              eq_refl (Htag w) with "Hrf").
     iNext. iIntros "Hrf". iApply ("Hcont" $! wsl w with "[%] Harm Hws Hrf").
     rewrite /wsl /eread_ws. etrans; [exact Hle_f|apply load_post_run_le].
   Qed.
@@ -465,49 +453,46 @@ Section started_ev.
     ([WeakEvLift.efence_apply_coh]: a fence moves no coherence floor). *)
 
   Lemma ewp_ev_started_fence P (c : CPU) (D : gset register)
-      (m : M unit) (ws : wstate) (rs rs1 rs2 rs3 : regstate) (n1 n2 n3 : nat)
-      (nf : N) (reqf : Interface.ReadReq.t nf)
-      (Kf : (bv (8 * nf) * option bool + Arch.abort)%type -> M unit)
-      (wf : bv (8 * nf))
-      (b : barrier_kind) (Kb : unit -> M unit) :
+      (m : M unit) (ws : wstate) (rs : regstate) (n1 n2 n3 : nat)
+      (x1 x2 x3 : ecur)
+      (nf : N) (reqf : Interface.ReadReq.t nf) (wf : bv (8 * nf))
+      (b : barrier_kind) :
     (* --- the certification --- *)
-    erun_silent n1 D rs m = (rs1, Interface.Next (Interface.MemRead nf reqf) Kf) ->
-    erun_silent n2 D rs1 (Kf (inl (wf, None)))
-      = (rs2, Interface.Next (Interface.Barrier b) Kb) ->
+    x1 = esil n1 D (rs, m) ->
+    x2 = esil n2 D (ecur_read (bv_unsigned wf) x1) ->
+    x3 = esil n3 D (ecur_bar x2) ->
+    eread_req_at nf x1.2 = Some reqf ->
+    ebar_at x2.2 = Some b ->
+    enode_tag x3.2 = 0%nat ->
     ebar_park b = None ->
-    erun_silent n3 D rs2 (Kb tt) = (rs3, Interface.Ret tt) ->
     (* --- the barrier is a PRED-R fence (the kernel's is [fence r,rw]) --- *)
     acq_pred_r b ->
     (* --- the fetch node --- *)
     dev_addr (Interface.ReadReq.pa reqf) = false ->
     ak_coh (classify (Interface.ReadReq.access_kind reqf)) = false ->
     ak_latest (classify (Interface.ReadReq.access_kind reqf)) = false ->
+    etext_word (pa_z (Interface.ReadReq.pa reqf)) nf wf -∗
     hart_ws c ws -∗ ereg_frame c rs D -∗ ev_rcpt P ws -∗
-    ev_fetch_cb c nf reqf wf ws -∗
     ▷ (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗ vwp_hold P ws' -∗
-         hart_ws c ws' -∗ ereg_frame c rs3 D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
+         hart_ws c ws' -∗ ereg_frame c x3.1 D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
     EWP (ECycle 0%nat c m None) @ ⊤.
   Proof.
-    iIntros (Hr1 Hr2 Hpark Hr3 Hacq Hdevf Hcohf Hlatf)
-      "Hws Hrf Hrcpt Hfetch Hcont".
+    iIntros (Hx1 Hx2 Hx3 Hnf Hnb Htag Hpark Hacq Hdevf Hcohf Hlatf)
+      "#Htext Hws Hrf Hrcpt Hcont".
+    subst x1 x2 x3.
     (* ---------------- the FETCH event ---------------- *)
-    iApply (ewp_ev_seq_load 0%nat c D n1 rs rs1 m nf reqf Kf ws
-              eq_refl Hr1 Hdevf Hcohf Hlatf with "Hws Hrf").
-    iIntros (σ) "%Hwseq %Hwf %Hbnd #Hlb Hlat".
-    iMod ("Hfetch" $! σ with "[//] [//] [//] Hlb Hlat") as "[%Hen Hfk]".
-    iModIntro. iSplitR.
-    { iPureIntro. destruct Hen as (w & tvs & Hadm). by exists w, tvs. }
-    iNext. iIntros (w tvs) "%H1 %H2 %H3".
-    iMod ("Hfk" $! w tvs with "[%]") as "(%Hpin & %Hpay & Hlat)";
-      [by split_and!|].
-    iModIntro. iFrame "Hlat". iSplitR; [iPureIntro; exact Hpay|].
-    iIntros "Hws Hrf". subst w.
-    set (wsf := eread_ws σ ws nf reqf tvs).
-    have Hle_f : ws_le ws wsf by apply load_post_run_le.
+    iApply (ewp_ev_seq_fetch 0%nat c D n1 (rs, m) nf reqf wf ws
+              eq_refl Hnf Hdevf Hcohf Hlatf with "Htext Hws Hrf").
+    iNext. iIntros "Hws Hrf".
+    set (wsf := efetch_ws ws
+                  (ak_sync (classify (Interface.ReadReq.access_kind reqf)))
+                  (pa_z (Interface.ReadReq.pa reqf)) nf).
+    have Hle_f : ws_le ws wsf by apply efetch_ws_le.
     iDestruct (ev_rcpt_mono P ws wsf Hle_f with "Hrcpt") as "Hrcpt".
     (* ---------------- the BARRIER event ---------------- *)
-    iApply (ewp_ev_seq_barrier 0%nat c D n2 rs1 rs2 _ b Kb wsf
-              eq_refl Hr2 with "Hws Hrf").
+    iApply (ewp_ev_seq_barrier 0%nat c D n2
+              (ecur_read (bv_unsigned wf) (esil n1 D (rs, m))) b wsf
+              eq_refl Hnb with "Hws Hrf").
     iNext. iIntros "Hws Hrf".
     (* the barrier's post-view IS [barrier_post], since nothing is parked *)
     have Hbp : efence_apply wsf (ebar_now b) = barrier_post wsf b.
@@ -522,7 +507,10 @@ Section started_ev.
       rewrite /wV_fence. cbn [wm_ws]. rewrite /wsb Hbp. reflexivity. }
     rewrite Hpark.
     (* ---------------- the TAIL ---------------- *)
-    iApply (ewp_ev_seq_ret 0%nat c D n3 rs2 rs3 _ tt eq_refl Hr3 with "Hrf").
+    iApply (ewp_ev_seq_ret 0%nat c D n3
+              (ecur_bar (esil n2 D
+                 (ecur_read (bv_unsigned wf) (esil n1 D (rs, m)))))
+              eq_refl Htag with "Hrf").
     iNext. iIntros "Hrf". iApply ("Hcont" $! wsb with "[%] HP Hws Hrf").
     etrans; [exact Hle_f|exact Hle_b].
   Qed.
@@ -531,44 +519,133 @@ End started_ev.
 
 (* ====================================================================== *)
 (* ====================================================================== *)
-(** ** 4. THE TWO-INSTRUCTION COMPOSITION — NOT DELIVERED, and why
+(** ** 4. THE TWO-INSTRUCTION COMPOSITION — DELIVERED (it was blocked on F8)
 
-    [WkStartedLoad.wwp_started_wait_seq] (an [Example], not a theorem of
-    record) chains the waiter's load and fence.  Its event-granular twin is
-    blocked on nothing conceptual — §2 hands the receipt out and §3 takes it
-    in, and [ev_rcpt_mono] carries it across the gap — but on FORM: chaining at
-    the boundary means [ewp_eloop], which quantifies over the tick, so the
-    fence instruction's certification has to be supplied for BOTH values of
-    [tick] as a family (a dependent record over [reqf]'s width).  That is
-    exactly the shape F8's form change removes, since under it the
-    certification is a composition of applications rather than a bundle of
-    named terms.  Deferred to the interface change, with the note that the
-    composition costs no weak-memory content: §2's exit edge and §3's entry
-    edge already meet. *)
+    [WkStartedLoad.wwp_started_wait_seq] chains the waiter's load and its
+    acquire fence.  Its event-granular twin was blocked on nothing conceptual
+    — §2 hands the receipt out, §3 takes it in, and [ev_rcpt_mono] carries it
+    across the gap — but on FORM: chaining at the boundary means [ewp_eloop],
+    which quantifies over the tick, so the SECOND instruction's certification
+    had to be supplied as a family indexed by the tick AND by the word the
+    load returned, i.e. as a family of NAMED RESIDUAL MONADS, which F8 says
+    cannot be written.  Under the F8-fixed form the family is a family of
+    APPLICATIONS ([y1]/[y2]/[y3] below are functions of [w] and [tick] whose
+    bodies are compositions), and the chaining is immediate.
 
-(* ====================================================================== *)
+    WHAT IT COSTS: nothing in weak-memory content.  The only genuinely new
+    obligation is that the fence's certification be UNIFORM IN THE WORD READ —
+    the load writes that word into a register, so the fence instruction's
+    stretches run over a register file that depends on it.  That is a true
+    fact about the composition (the baseline packages the same uniformity
+    inside [wstep_cert]'s ∀-over-states), not an artifact.
+
+    (An [Example], not a theorem of record: what it checks is that the racy
+    load, the escrow's collapse and the fence meet with no adapter.) *)
+
+Section wait_seq.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  Example ewp_ev_started_wait_seq (a : Arch.pa) (P : vProp Σ)
+      `{!Persistent P} (c : CPU) (D : gset register)
+      (m : M unit) (ws : wstate) (rs : regstate)
+      (n1 n2 n3 k1 k2 k3 : nat)
+      (x1 x2 : ecur) (x3 : bv (8 * 4) -> ecur)
+      (y1 y2 y3 : bv (8 * 4) -> bool -> ecur)
+      (nf : N) (reqf : Interface.ReadReq.t nf) (wf : bv (8 * nf))
+      (reql : Interface.ReadReq.t 4)
+      (gf : N) (reqg : Interface.ReadReq.t gf) (wg : bv (8 * gf))
+      (b : barrier_kind) :
+    (* --- INSTRUCTION 1, the racy load: §2's certification --- *)
+    x1 = esil n1 D (rs, m) ->
+    x2 = esil n2 D (ecur_read (bv_unsigned wf) x1) ->
+    (forall w : bv (8 * 4), x3 w = esil n3 D (ecur_read (bv_unsigned w) x2)) ->
+    eread_req_at nf x1.2 = Some reqf ->
+    eread_req_at 4 x2.2 = Some reql ->
+    (forall w : bv (8 * 4), enode_tag (x3 w).2 = 0%nat) ->
+    dev_addr (Interface.ReadReq.pa reqf) = false ->
+    ak_coh (classify (Interface.ReadReq.access_kind reqf)) = false ->
+    ak_latest (classify (Interface.ReadReq.access_kind reqf)) = false ->
+    dev_addr (Interface.ReadReq.pa reql) = false ->
+    ak_coh (classify (Interface.ReadReq.access_kind reql)) = false ->
+    ak_latest (classify (Interface.ReadReq.access_kind reql)) = false ->
+    Interface.ReadReq.pa reql = a ->
+    (* --- INSTRUCTION 2, the acquire fence: §3's certification, UNIFORMLY in
+       the word read and in the boundary's tick --- *)
+    (forall w tick, y1 w tick = esil k1 D (ecur_loop tick (x3 w))) ->
+    (forall w tick,
+       y2 w tick = esil k2 D (ecur_read (bv_unsigned wg) (y1 w tick))) ->
+    (forall w tick, y3 w tick = esil k3 D (ecur_bar (y2 w tick))) ->
+    (forall w tick, eread_req_at gf (y1 w tick).2 = Some reqg) ->
+    (forall w tick, ebar_at (y2 w tick).2 = Some b) ->
+    (forall w tick, enode_tag (y3 w tick).2 = 0%nat) ->
+    ebar_park b = None ->
+    acq_pred_r b ->
+    dev_addr (Interface.ReadReq.pa reqg) = false ->
+    ak_coh (classify (Interface.ReadReq.access_kind reqg)) = false ->
+    ak_latest (classify (Interface.ReadReq.access_kind reqg)) = false ->
+    wstarted_inv a P -∗
+    etext_word (pa_z (Interface.ReadReq.pa reqf)) nf wf -∗
+    etext_word (pa_z (Interface.ReadReq.pa reqg)) gf wg -∗
+    hart_ws c ws -∗ ereg_frame c rs D -∗
+    (∀ ws0 : wstate, ⌜ws_le ws ws0⌝ -∗ ev_flag_cb c a ws0 reql) -∗
+    (* the CLEARED arm is the spin loop's retry edge and carries no
+       weak-memory content at all *)
+    ▷ (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗ hart_ws c ws' -∗
+         ereg_frame c (x3 lock_zero).1 D -∗ EWP (ELoop 0%nat c) @ ⊤) -∗
+    (* ... and the other one exits through the fence with the payload *)
+    ▷ (∀ (ws' : wstate) (w : bv (8 * 4)) (tick : bool),
+         ⌜ws_le ws ws'⌝ -∗ ⌜w <> lock_zero⌝ -∗ vwp_hold P ws' -∗
+         hart_ws c ws' -∗ ereg_frame c (y3 w tick).1 D -∗
+         EWP (ELoop 0%nat c) @ ⊤) -∗
+    EWP (ECycle 0%nat c m None) @ ⊤.
+  Proof.
+    iIntros (Hx1 Hx2 Hx3 Hnf Hnl Htag Hdevf Hcohf Hlatf Hdevl Hcohl Hlatl Hpal
+             Hy1 Hy2 Hy3 Hgf Hgb Hgtag Hpark Hacq Hdevg Hcohg Hlatg)
+      "#Hinv #Htf #Htg Hws Hrf Hflag Hclear Hexit".
+    iApply (ewp_ev_started_load a P c D m ws rs n1 n2 n3 x1 x2 nf reqf wf reql
+              Hx1 Hx2 Hnf Hnl
+              ltac:(intros w; by rewrite -Hx3)
+              Hdevf Hcohf Hlatf Hdevl Hcohl Hlatl Hpal
+              with "Hinv Htf Hws Hrf Hflag").
+    iNext. iIntros (ws' w) "%Hle Harm Hws Hrf". rewrite -Hx3.
+    iDestruct "Harm" as "[->|[%Hne #Hrcpt]]".
+    { by iApply ("Hclear" $! ws' with "[//] Hws Hrf"). }
+    (* ---- the boundary: the tick is the language's, not the caller's ---- *)
+    iApply (ewp_eloop 0%nat c eq_refl). iNext. iIntros (tick).
+    (* ---- INSTRUCTION 2: the fence cashes the receipt ---- *)
+    iApply (ewp_ev_started_fence P c D (riscv_step tick) ws' (x3 w).1
+              k1 k2 k3 (y1 w tick) (y2 w tick) (y3 w tick) gf reqg wg b
+              (Hy1 w tick) (Hy2 w tick) (Hy3 w tick)
+              (Hgf w tick) (Hgb w tick) (Hgtag w tick) Hpark Hacq
+              Hdevg Hcohg Hlatg with "Htg Hws Hrf Hrcpt").
+    iNext. iIntros (ws'') "%Hle' HP Hws Hrf".
+    iApply ("Hexit" $! ws'' w tick with "[%] [//] HP Hws Hrf").
+    by etrans.
+  Qed.
+
+End wait_seq.
+
 (** ** 5. THE CONCRETE INSTANTIATION — [main+0xb0], [c.sw a4,0(a5)] = 0xc398
-           (S4 gap 4: where the O(1)-per-site claim is tested)
+           (S4 gap 4 / F8: where the O(1)-per-site claim is tested)
 
     xv6's [started = 1] IS a compressed store ([kernel.asm], [main+0xb0]), and
     this section runs the publisher's certification at it, on the REAL
     post-boot register file ([ColdBoot.cold_regs], the tree's own
     computed-once cold-boot state) with [a5 = &started] and [a4 = 1].
 
-    THE RECIPE, and it is the durable-notes one verbatim: compute each stretch
-    ONCE into its own [Definition] ([erun_silent]'s residual monad is a Sail
-    continuation — naming it is what keeps every later mention a shallow
-    conversion), then tie it to the model with ONE [vm_cast_no_check].  A
-    plain [vm_compute; reflexivity] would leave the kernel's LAZY evaluator to
-    redo the whole stretch at [Qed].
+    THE RECIPE, IN THE F8-FIXED FORM.  A certification is a CHAIN OF
+    UNEVALUATED COMPOSITIONS on [WeakEvLift.ecur] cursors, and every per-site
+    fact is a TOTAL PROJECTION with a SMALL output, closed by one
+    [vm_cast_no_check].  Nothing below names a residual monad or a register
+    file — [ev_x1], [ev_x2], [ev_x3] are DEFINITIONS OF COMPOSITIONS, not of
+    computed values, and the VM only ever runs inside a conversion check.
 
     WHAT THE MEASUREMENT SHOWS (numbers in the worklist's S5 table): the
     instruction is 107 silent nodes to the fetch, 178 from the fetch to the
-    store, and a short tail — 285+ nodes in all — and each stretch is ONE
-    application plus one VM-checked equation.  The footprint [ev_D] is
-    computed, not guessed: [ev_regs] is a measurement-side collector (it is
-    NOT part of the proof interface) that lists the registers a stretch
-    touches. *)
+    store, and a short tail — 293 in all — and each stretch is ONE application
+    plus one VM-checked equation.  The footprint [ev_D] is computed, not
+    guessed: [ev_regs] is a measurement-side collector (it is NOT part of the
+    proof interface) that lists the registers a stretch touches. *)
 
 (** *** 5a. The measurement-side scaffolding: a footprint collector *)
 
@@ -625,64 +702,6 @@ Fixpoint erun_regs (n : nat) (rs : regstate) (m : M unit) : list register :=
             end
   end.
 
-(** The read answer a certification supplies at a read event. *)
-Definition eresume_z (v : Z) (m : M unit) : option (M unit) :=
-  match m with
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> option (M unit) with
-       | Interface.MemRead n req => fun k =>
-           Some (k (inl (Z_to_bv (8 * n) v, None)))
-       | _ => fun _ => None
-       end) k
-  | _ => None
-  end.
-
-(** *** 5b. Node-kind projections with SMALL outputs
-
-    Every fact this section states about the real instruction is a projection
-    whose value is a number, a boolean or a 64-bit word — never the residual
-    monad.  THAT RESTRICTION IS THE SECTION'S MAIN FINDING; see 5e. *)
-
-Definition enode_tag (m : M unit) : nat :=
-  match m with
-  | Interface.Ret _ => 0
-  | Interface.Next oc _ =>
-      match oc with
-      | Interface.MemRead _ _ => 1
-      | Interface.MemWrite _ _ => 2
-      | Interface.Barrier _ => 3
-      | Interface.Choose _ => 4
-      | _ => 5
-      end
-  end.
-
-Definition eread_facts (m : M unit) : option (N * Z * bool * bool * bool) :=
-  match m with
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> _ with
-       | Interface.MemRead n req => fun _ =>
-           let a := classify (Interface.ReadReq.access_kind req) in
-           Some (n, pa_z (Interface.ReadReq.pa req),
-                 ak_coh a, ak_latest a, ak_sync a)
-       | _ => fun _ => None
-       end) k
-  | _ => None
-  end.
-
-Definition ewrite_facts (m : M unit) : option (N * Z * Z * bool * bool) :=
-  match m with
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> _ with
-       | Interface.MemWrite n req => fun _ =>
-           let a := classify (Interface.WriteReq.access_kind req) in
-           Some (n, pa_z (Interface.WriteReq.pa req),
-                 bv_unsigned (Interface.WriteReq.value req),
-                 ak_latest a, ak_sync a)
-       | _ => fun _ => None
-       end) k
-  | _ => None
-  end.
-
 (** The steps a stretch actually takes AT THE DECLARED FOOTPRINT — which is
     also the test that the footprint is big enough (a short count means
     [erun_silent] stopped at a register outside [D]). *)
@@ -696,12 +715,22 @@ Fixpoint erun_count (n : nat) (D : gset register) (rs : regstate) (m : M unit)
             end
   end.
 
-(** *** 5c. The concrete state: the post-boot file, at [main+0xb0] *)
+Definition ecount (n : nat) (D : gset register) (x : ecur) : nat :=
+  erun_count n D x.1 x.2.
+
+(** *** 5b. The concrete state: the post-boot file, at [main+0xb0] *)
 
 Definition ev_pc : SailStdpp.Values.mword 64 :=
   SailStdpp.Values.mword_of_int (KernelSyms.main + 0xb0).
 Definition ev_flag : Arch.pa := SailStdpp.Values.mword_of_int KernelSyms.started.
 Definition ev_word : Z := 0xc398.
+
+(** The fetched word, as the [bv] the certification's resume function wants.
+    ([eread_resume] takes a [Z] — the width lives in the node — so the cursor
+    chain stays simply typed; [Z_to_bv_bv_unsigned] is the round trip, and
+    spelling the cursors with [bv_unsigned ev_wf] keeps every certification
+    equation an [eq_refl].) *)
+Definition ev_wf : bv 16 := Z_to_bv 16 ev_word.
 
 (** THE BASE REGISTER FILE: the tree's own COLD-BOOT file
     ([ColdBoot.cold_regs], the computed output of the model's ~300-write boot
@@ -712,8 +741,8 @@ Definition ev_word : Z := 0xc398.
     IT HAS TO BE THAT FILE, and the alternative is a measured trap: over
     [WpDecodeBridge.dregs] (the small decode-reference file, config CSRs zero)
     the same [riscv_step] takes 141 silent nodes and ends at [Ret] WITHOUT a
-    fetch — the run traps, because a file with no PMA regions cannot fetch.  A
-    "concrete register state" that is not the machine's own is not a
+    fetch — the run traps, because a file with no PMA regions cannot fetch.
+    A "concrete register state" that is not the machine's own is not a
     certification of anything. *)
 Definition ev_rs0 : regstate :=
   register_set (R_bitvector_64 nextPC) ev_pc
@@ -723,134 +752,195 @@ Definition ev_rs0 : regstate :=
            (SailStdpp.Values.mword_of_int 1)
            (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int 0))))).
 
-(** *** 5d. THE MEASUREMENT, as compiled evidence.
-
-    Three stretches, three residuals, all computed by the VM and checked by
-    the kernel's VM at [Qed] ([vm_cast_no_check]).  Nothing below names a
-    residual monad. *)
-
-(* stretch 1: the boundary to the FETCH event.  [erun_any] is the collector's
-   footprint-free stepper; [erun_count] below re-runs the same stretch AT THE
-   DECLARED FOOTPRINT, which is what a proof would use. *)
-Definition ev_s1 : regstate * M unit := erun_any 400 ev_rs0 (riscv_step false).
-Definition ev_m1 : M unit :=
-  match eresume_z ev_word ev_s1.2 with
-  | Some m => m
-  | None => Interface.Ret tt
-  end.
-Definition ev_s2 : regstate * M unit := erun_any 600 ev_s1.1 ev_m1.
-Definition ev_m2 : M unit :=
-  match ev_s2.2 with
-  | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> M unit with
-       | Interface.MemWrite _ _ => fun k => k (inl None)
-       | _ => fun _ => Interface.Ret tt
-       end) k
-  | _ => Interface.Ret tt
-  end.
-Definition ev_s3 : regstate * M unit := erun_any 400 ev_s2.1 ev_m2.
-
 (** THE FOOTPRINT, collected rather than guessed — a list of register names,
     hence a SMALL readback. *)
+Definition ev_c1 : regstate * M unit := erun_any 400 ev_rs0 (riscv_step false).
+Definition ev_c2 : regstate * M unit :=
+  erun_any 600 ev_c1.1 (eread_resume (bv_unsigned ev_wf) ev_c1.2).
 Definition ev_Dl : list register :=
   ltac:(let x := eval vm_compute in
           (app (erun_regs 400 ev_rs0 (riscv_step false))
-             (app (erun_regs 600 ev_s1.1 ev_m1)
-                  (erun_regs 400 ev_s2.1 ev_m2))) in
+             (app (erun_regs 600 ev_c1.1
+                     (eread_resume (bv_unsigned ev_wf) ev_c1.2))
+                  (erun_regs 400 ev_c2.1 (ewrite_resume ev_c2.2)))) in
         exact x).
 Definition ev_D : gset register := list_to_set ev_Dl.
+
+(** *** 5c. THE CERTIFICATION, as three unevaluated compositions.
+
+    This is the whole F8 fix at a call site: the three cursors below are
+    DEFINITIONS OF APPLICATIONS.  Compare the pre-fix form, which needed
+    [erun_silent … = (rs', m')] with [rs'] and [m'] WRITTEN OUT — and could
+    not be closed, because the readback of one stretch's residual did not
+    finish in 110 s while the same run projected to a number finished in
+    0.1 s. *)
+
+Definition ev_x0 : ecur := (ev_rs0, riscv_step false).
+Definition ev_x1 : ecur := esil 400 ev_D ev_x0.
+Definition ev_x2 : ecur := esil 600 ev_D (ecur_read (bv_unsigned ev_wf) ev_x1).
+Definition ev_x3 : ecur := esil 400 ev_D (ecur_write ev_x2).
+
+(** THE TWO REQUESTS, by SMALL READBACK of a total projection.  A request is
+    a five-field record over a [bv 64], an access kind, an option and a
+    boolean — a value, unlike the continuation the old form forced out. *)
+Definition ev_reqf : Interface.ReadReq.t 2 :=
+  ltac:(let x := eval vm_compute in (eread_req_at 2 ev_x1.2) in
+        lazymatch x with Some ?r => exact r | _ => fail 1 "not a read node" end).
+
+Definition ev_reqw : Interface.WriteReq.t 4 :=
+  ltac:(let x := eval vm_compute in (ewrite_req_at 4 ev_x2.2) in
+        lazymatch x with Some ?r => exact r | _ => fail 1 "not a write node" end).
+
+(** *** 5d. THE MEASUREMENT, as compiled evidence.
+
+    Six facts, each a single VM-checked conversion ([vm_cast_no_check], so the
+    kernel rechecks with the VM too rather than with its lazy evaluator). *)
 
 (** (i) THE INSTRUCTION'S EVENT STRUCTURE.  107 silent nodes to the fetch,
     178 more to the store, 8 more to [Ret]: 293 silent nodes, three stretches,
     two memory events, one instruction. *)
-Lemma ev_len1 : erun_count 400 ev_D ev_rs0 (riscv_step false) = 107%nat.
+Lemma ev_len1 : ecount 400 ev_D ev_x0 = 107%nat.
 Proof. vm_cast_no_check (eq_refl 107%nat). Qed.
-Lemma ev_len2 : erun_count 600 ev_D ev_s1.1 ev_m1 = 178%nat.
+Lemma ev_len2 : ecount 600 ev_D (ecur_read (bv_unsigned ev_wf) ev_x1) = 178%nat.
 Proof. vm_cast_no_check (eq_refl 178%nat). Qed.
-Lemma ev_len3 : erun_count 400 ev_D ev_s2.1 ev_m2 = 8%nat.
+Lemma ev_len3 : ecount 400 ev_D (ecur_write ev_x2) = 8%nat.
 Proof. vm_cast_no_check (eq_refl 8%nat). Qed.
 
-(** (ii) THE FETCH IS AN ORDINARY PLAIN RAM READ — width 2 (the instruction
-    is compressed) at [main+0xb0], and its access kind classifies with
-    [ak_coh = false].  So it takes [WeakEvLift.ewp_ev_load], the SAME rule a
-    racy data load takes, and the design's "instruction fetch is declared
-    coherent" (Decision 6) is NOT what this model emits. *)
-Lemma ev_fetch_node :
-  eread_facts ev_s1.2 = Some (2%N, 2147487534, false, false, false).
-Proof.
-  vm_cast_no_check (eq_refl (Some (2%N, 2147487534, false, false, false))).
-Qed.
+(** (ii) THE FETCH NODE — and it IS the certification premise §1 takes, not a
+    paraphrase of it. *)
+Lemma ev_fetch_req : eread_req_at 2 ev_x1.2 = Some ev_reqf.
+Proof. vm_cast_no_check (eq_refl (Some ev_reqf)). Qed.
 
-(** (iii) THE STORE IS THE FLAG WORD: width 4 at [&started], value 1, plain
-    (the release is carried by the hart's [w_relp], set by the [fence rw,w]
-    at [main+0xac] — exactly as [WeakStarted]'s writer half says). *)
-Lemma ev_store_node :
-  ewrite_facts ev_s2.2 = Some (4%N, 2147525168, 1, false, false).
-Proof. vm_cast_no_check (eq_refl (Some (4%N, 2147525168, 1, false, false))). Qed.
+(** ... and finding F7, off the request itself: this model's fetch is an
+    ORDINARY PLAIN read (width 2 — the instruction is compressed — at
+    [main+0xb0], classifying [(coh, latest, sync) = (false, false, false)]),
+    NOT an [AK_ifetch] coherent one.  That is why §5c of [WeakEvLift] exists:
+    the rule that makes it cheap is derived from the text's immutability, not
+    from the access kind. *)
+Lemma ev_fetch_plain :
+  classify (Interface.ReadReq.access_kind ev_reqf) = AkInfo false false false.
+Proof. vm_cast_no_check (eq_refl (AkInfo false false false)). Qed.
+Lemma ev_fetch_pa : pa_z (Interface.ReadReq.pa ev_reqf) = 2147487534.
+Proof. vm_cast_no_check (eq_refl 2147487534). Qed.
+
+(** (iii) THE STORE NODE: width 4 at [&started], value 1, plain (the release
+    is carried by the hart's [w_relp], set by the [fence rw,w] at [main+0xac]
+    — exactly as [WeakStarted]'s writer half says). *)
+Lemma ev_store_req : ewrite_req_at 4 ev_x2.2 = Some ev_reqw.
+Proof. vm_cast_no_check (eq_refl (Some ev_reqw)). Qed.
+Lemma ev_store_pa : Interface.WriteReq.pa ev_reqw = ev_flag.
+Proof. vm_cast_no_check (eq_refl ev_flag). Qed.
+Lemma ev_store_val : Interface.WriteReq.value ev_reqw = lock_one.
+Proof. vm_cast_no_check (eq_refl lock_one). Qed.
+Lemma ev_store_plain :
+  classify (Interface.WriteReq.access_kind ev_reqw) = AkInfo false false false.
+Proof. vm_cast_no_check (eq_refl (AkInfo false false false)). Qed.
 
 (** (iv) THE TAIL ENDS AT [Ret]: the instruction has exactly two memory
     events. *)
-Lemma ev_tail_ret : enode_tag ev_s3.2 = 0%nat.
+Lemma ev_tail_ret : enode_tag ev_x3.2 = 0%nat.
 Proof. vm_cast_no_check (eq_refl 0%nat). Qed.
 
-(** *** 5e. WHAT THE MEASUREMENT REFUTES, and the form change it prescribes
+(** The two side conditions the store rule needs, likewise computed. *)
+Lemma ev_fetch_ram : dev_addr (Interface.ReadReq.pa ev_reqf) = false.
+Proof. vm_cast_no_check (eq_refl false). Qed.
+Lemma ev_store_ram : dev_addr (Interface.WriteReq.pa ev_reqw) = false.
+Proof. vm_cast_no_check (eq_refl false). Qed.
+Lemma ev_store_wf : acc_wf ev_flag 4.
+Proof. rewrite /acc_wf. apply Z.leb_le. vm_cast_no_check (eq_refl true). Qed.
+
+(** *** 5e. THE WHOLE-STRETCH INSTANTIATION — §1's rule AT THE REAL
+    INSTRUCTION, every certification premise discharged.
+
+    This is what F8 blocked and what the form change unblocks: the six
+    certification premises of [ewp_ev_started_set] are the three [eq_refl]s
+    above and the three VM-checked projections, and the leaf applies with no
+    residual and no register file ever written down. *)
+
+
+
+(** *** 5e. THE WHOLE-STRETCH INSTANTIATION — §1's rule AT THE REAL
+    INSTRUCTION, every certification premise discharged.
+
+    This is what F8 blocked and what the form change unblocks: the six
+    certification premises of [ewp_ev_started_set] are three [reflexivity]s
+    (the cursor chain) and three VM-checked projections, and the leaf applies
+    with no residual and no register file ever written down.
+
+    ONE PROOF-ENGINEERING NOTE, MEASURED AND WORTH KEEPING.  The cursor
+    equations must be discharged by a [have … by reflexivity] and PASSED, not
+    written as a bare [eq_refl] inside the application: [reflexivity] calls
+    CONVERSION (which unfolds the cursor definition, sees the same term and
+    stops, 0.003 s), whereas a bare [eq_refl] leaves the problem to the
+    ELABORATOR'S UNIFIER, which unfolds [esil] instead and starts LAZILY
+    EVALUATING the stretch — 5.3 s for the second equation and unbounded for
+    the third.  Same statement, same proof term; only the tactic that builds
+    it differs. *)
+
+Section instantiated.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  Lemma ewp_ev_started_set_at_main (P : vProp Σ) (c : CPU) (ws : wstate) :
+    w_relp ws = true ->
+    wstarted_inv ev_flag P -∗
+    etext_word (pa_z (Interface.ReadReq.pa ev_reqf)) 2 ev_wf -∗
+    hart_ws c ws -∗ ereg_frame c ev_rs0 ev_D -∗ vwp_hold P ws -∗
+    ▷ (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗
+         hart_ws c ws' -∗ ereg_frame c ev_x3.1 ev_D -∗
+         EWP (ELoop 0%nat c) @ ⊤) -∗
+    EWP (ECycle 0%nat c (riscv_step false) None) @ ⊤.
+  Proof.
+    intros Hrelp.
+    have H1 : ev_x1 = esil 400 ev_D (ev_rs0, riscv_step false) by reflexivity.
+    have H2 : ev_x2 = esil 600 ev_D (ecur_read (bv_unsigned ev_wf) ev_x1)
+      by reflexivity.
+    have H3 : ev_x3 = esil 400 ev_D (ecur_write ev_x2) by reflexivity.
+    iIntros "#Hinv #Ht Hws Hrf HP Hcont".
+    iApply (ewp_ev_started_set ev_flag P c ev_D (riscv_step false) ws ev_rs0
+              400 600 400 ev_x1 ev_x2 ev_x3 2 ev_reqf ev_wf ev_reqw
+              H1 H2 H3 ev_fetch_req ev_store_req ev_tail_ret
+              ev_fetch_ram
+              ltac:(by rewrite ev_fetch_plain) ltac:(by rewrite ev_fetch_plain)
+              ev_store_ram ev_store_pa ev_store_val ev_store_wf Hrelp
+              with "Hinv Ht Hws Hrf HP Hcont").
+  Qed.
+
+End instantiated.
+
+(** *** 5f. WHAT THE MEASUREMENT SETTLED (finding F8, RESOLVED)
 
     THE CLAIM UNDER TEST (design, "reflective batching is MANDATORY"): each
     use of the batched rule is "one application + one vm_compute equation —
     per-site proof terms O(1)".
 
-    WHAT IS TRUE.  The COMPUTATION is O(1)-ish and fast: the whole
-    instruction is 297 silent nodes in three stretches, and each stretch
-    reduces in the VM in ~0.1–0.3 s at the real registers (the lemmas above
-    are exactly those runs, VM-checked at [Qed] too).
+    WHAT WAS TRUE ALL ALONG.  The COMPUTATION is O(1)-ish and fast: the whole
+    instruction is 293 silent nodes in three stretches, and each stretch
+    reduces in the VM in ~0.1–0.3 s at the real registers.
 
-    WHAT IS FALSE AS SPECIFIED.  The equation the batched rule
-    ([WeakEvLift.ewp_ev_batch]) takes is
-    [erun_silent n D rs m = (rs', m')], and CLOSING IT AT A REAL INSTRUCTION
-    REQUIRES NAMING [m'] — the residual Sail continuation.  Naming it means
-    READING THE VM'S VALUE BACK INTO A TERM, and the value is a CLOSURE: its
-    readback normalises the entire rest of the instruction under a fresh
-    variable, i.e. it re-does symbolically exactly the decode the concrete
-    computation avoided ([WpDecodeBridge]'s header: symbolic decode is 4–11 s
-    per instruction — and readback is worse, because it is eager and total).
-    MEASURED: [let x := eval vm_compute in (erun_silent … ).2 in exact x] at
-    this instruction DID NOT FINISH IN 110 s (killed); the same computation
-    projected to a NUMBER finishes in 0.1 s.  The durable-notes recipe
-    ("compute once into a Definition, then [vm_cast_no_check]") therefore does
-    NOT transfer to this interface: it was written for values (a [regstate], an
-    [mstate]), and a monad residual is not one.
+    WHAT WAS FALSE AS ORIGINALLY SPECIFIED, and is now fixed.  The equation
+    the batched rule first took was [erun_silent n D rs m = (rs', m')], and
+    closing it at a real instruction REQUIRES NAMING [m'] — a Sail
+    continuation.  Naming it means READING THE VM'S VALUE BACK INTO A TERM,
+    and the value is a CLOSURE: its readback normalises the entire rest of
+    the instruction under a fresh variable, i.e. it re-does symbolically
+    exactly the decode the concrete computation avoided.  MEASURED: the
+    readback did NOT FINISH IN 110 s (killed), while the same computation
+    projected to a number finished in 0.1 s; and the cold-boot register file
+    computes in 0.09 s but reads back in over three minutes.  The
+    durable-notes recipe ("compute once into a Definition, then
+    [vm_cast_no_check]") does not transfer to a MONAD RESIDUAL, because it
+    was written for VALUES.
 
-    A SECOND MEASUREMENT ISOLATES THE CULPRIT AS THE READBACK, NOT THE
-    REGISTER FILE: over the cold-boot file the stretch COMPUTES in ~0.09 s
-    (the lemmas above are those runs) while READING BACK the same run's pair
-    did not finish in 3 minutes.  Compute over the machine's own file freely;
-    never name the result.
+    THE FIX, and what it cost.  [WeakEvLift] §3b restates the interface over
+    TOTAL PROJECTIONS and UNEVALUATED COMPOSITIONS: [ewp_ev_batch] takes NO
+    equation at all (its successor is [esil n D x]), the node facts are small
+    projections, and the resume functions make the next stretch an
+    application.  §§1–3's rules are unchanged in CONTENT — the same events,
+    the same escrow, the same φ payments — and §5e above is the certification
+    of the real instruction, closed.  The one residual restriction is the
+    honest one: COMPUTE over the machine's own register file freely, NEVER
+    name the result. *)
 
-    THE PRESCRIBED FORM CHANGE (not attempted here; it is the post-spike
-    interface work, and it is small).  The rules must consume the residual
-    through TOTAL PROJECTIONS instead of by syntactic matching, so that no
-    call site ever writes one down:
-
-      - the stretch is named by its own unevaluated application
-        ([(erun_silent n D rs m).1] / [.2]), so the "equation" is
-        [surjective_pairing] and costs nothing;
-      - the node's shape and payload are SMALL projections
-        ([enode_tag], [eread_facts], [ewrite_facts] above are already in this
-        form) discharged by one [vm_cast_no_check] each;
-      - the successor expression is a total resume function applied to the
-        residual ([eresume_z]'s shape), so the next stretch is
-        [erun_silent n2 D (erun_silent n1 …).1 (eresume … (erun_silent n1 …).2)]
-        — a composition of applications, never a literal.
-
-    Under that form every per-site obligation has a small output and the O(1)
-    claim holds; §§1–4's rules are unaffected in CONTENT (the same events, the
-    same escrow, the same φ payments) — only the way the certification is
-    handed to them changes.  That is why the S5 lemmas above are stated
-    against [erun_silent … = (rs', <node>)]: it is the readable form, and it
-    is the form the projection version derives in one rewrite. *)
-
-
-(* ====================================================================== *)
 (** ** 6. CALIBRATION — the naive per-node proof (THE ANTI-PATTERN)
 
     The design forbids the per-node interface as the PROOF interface; this
@@ -900,15 +990,13 @@ Section calib.
     iNext. iIntros "Hrf". by iApply "H".
   Qed.
 
-  Lemma calib_batched_8 (c : CPU) (D : gset register) (rs0 rs8 : regstate)
-      (m0 m8 : M unit) :
-    erun_silent 8 D rs0 m0 = (rs8, m8) ->
-    ereg_frame c rs0 D -∗
-    (ereg_frame c rs8 D -∗ EWP (ECycle 0%nat c m8 None) @ ⊤) -∗
-    EWP (ECycle 0%nat c m0 None) @ ⊤.
+  Lemma calib_batched_8 (c : CPU) (D : gset register) (x : ecur) :
+    ereg_frame c x.1 D -∗
+    (ereg_frame c (esil 8 D x).1 D -∗
+       EWP (ECycle 0%nat c (esil 8 D x).2 None) @ ⊤) -∗
+    EWP (ECycle 0%nat c x.2 None) @ ⊤.
   Proof.
-    iIntros (Hrun) "Hrf H".
-    by iApply (ewp_ev_batch 0%nat c D 8 m0 m8 rs0 rs8 eq_refl Hrun with "Hrf").
+    iIntros "Hrf H". by iApply (ewp_ev_batch 0%nat c D 8 x eq_refl with "Hrf").
   Qed.
 
 End calib.
