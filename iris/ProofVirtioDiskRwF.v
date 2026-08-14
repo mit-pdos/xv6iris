@@ -1411,9 +1411,13 @@ Section VdrwfP6.
       rewrite /H1 upd_ne; [| reg_neq]. exact HG3sp. }
     iApply (Release.wp_release_sconf (CID := CIDx) γk d_lock "virtio_disk"%string
               (disk_res γd pd pav pu) H3 0%nat eb (proc_addr j) C (K - 12)%nat
+              ({[lock_rank "virtio_disk"]} ∪ lks)
               HH3a0 ltac:(pose proof (vdrw_K10 K HK); lia)
               with "Hcg Htext Hpc Hlk Htok HR Hown Hpay").
     iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hown".
+    (* the release gave the virtio rank back; hand the caller the bare set
+       P1-P4 name (see the two-conventions note in lock-set.md). *)
+    iEval (rewrite (locks_add_del_below (lock_rank "virtio_disk") lks Hbelow)) in "Hown".
     assert (Hp1fa : ret_pc (H3 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x21c))
       by (rewrite HH3ra; pcstep).
     iEval (rewrite Hp1fa) in "Hpc".

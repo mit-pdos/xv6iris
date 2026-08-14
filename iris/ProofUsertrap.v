@@ -158,7 +158,10 @@ Section UtEntry.
     sepc ↦ᵣ sepc_v -∗
     stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
     gpr_file m -∗
-    ut_trap (un_pj N) ksp av C -∗
+    (* the trap enters from USERSPACE, which holds no kernel lock, so the
+       held set here is the literal [∅] -- the same one the continuation
+       below names. *)
+    ut_trap (un_pj N) ksp av C ∅ -∗
     ut_env Rsys N V -∗
     (∀ (M : regfile) (V' : pprivate),
        ⌜M !!! Regidx csp_rs1 = pa_stk ksp 4⌝ -∗ ⌜M !!! Regidx Rs1 = un_pj N⌝ -∗
@@ -183,7 +186,7 @@ Section UtEntry.
       as Hks.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     iIntros "#Htext Hpc Hhs Hpriv Hms Hsc Hst Hep Hstv Hgpr Htrap Henv Hcont".
-    iDestruct (ut_trap_open (un_pj N) ksp av C m ms_v Hmsf Hsie Hspp Hspie Hsp Htp
+    iDestruct (ut_trap_open (un_pj N) ksp av C m ms_v ∅ Hmsf Hsie Hspp Hspie Hsp Htp
                  with "Hhs Hpriv Hms Hgpr Htrap")
       as "(Hcg & Hcpu & Hclm & Hq & Hkpt & Hsret)".
     iPoseProof (uti_000 with "Htext") as "Hi00".
@@ -646,7 +649,7 @@ Section UtDispatch.
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     strans_bit strans_bit_kpt -∗
     ut_env SY.syscall_env N V -∗
-    ut_hold SY.syscall_env N V C false.
+    ut_hold SY.syscall_env N V C false ∅.
   Proof.
     iIntros "#Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Henv".
     iAssert (ut_csrs_raw ep sc st)
@@ -771,7 +774,7 @@ Section UtDispatch.
                        (sign_extend' 64 (mword_of_int 90 : mword 13))
                      = mword_of_int (UT + 0x90)) by pcw.
       iEval (rewrite Hj90) in "Hpc".
-      iAssert (ut_hold SY.syscall_env N V C false)
+      iAssert (ut_hold SY.syscall_env N V C false ∅)
         with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
       { iApply (ud_hold N V C ep sc st with
                   "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
@@ -868,7 +871,7 @@ Section UtDispatch.
                             (concat_vec (mword_of_int 85 : mword 8) ('b"0"))))
                        = mword_of_int (UT + 0xea)) by pcw.
         iEval (rewrite Hjea) in "Hpc".
-        iAssert (ut_hold SY.syscall_env N V C false)
+        iAssert (ut_hold SY.syscall_env N V C false ∅)
           with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
         { iApply (ud_hold N V C ep sc st with
                     "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
@@ -941,7 +944,7 @@ Section UtDispatch.
                            (sign_extend' 64 (mword_of_int 136 : mword 13))
                          = mword_of_int (UT + 0xd0)) by pcw.
           iEval (rewrite Hjd0) in "Hpc".
-          iAssert (ut_hold SY.syscall_env N V C false)
+          iAssert (ut_hold SY.syscall_env N V C false ∅)
             with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
           { iApply (ud_hold N V C ep sc st with
                       "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
@@ -1015,7 +1018,7 @@ Section UtDispatch.
                               (sign_extend' 64 (mword_of_int 126 : mword 13))
                             = mword_of_int (UT + 0xd0)) by pcw.
              iEval (rewrite Hjd0') in "Hpc".
-             iAssert (ut_hold SY.syscall_env N V C false)
+             iAssert (ut_hold SY.syscall_env N V C false ∅)
                with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
              { iApply (ud_hold N V C ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
@@ -1033,7 +1036,7 @@ Section UtDispatch.
              assert (Hp56 : add_vec_int (mword_of_int (UT + 0x52) : mword 64) 4
                             = mword_of_int (UT + 0x56)) by pcw.
              iEval (rewrite Hp56) in "Hpc".
-             iAssert (ut_hold SY.syscall_env N V C false)
+             iAssert (ut_hold SY.syscall_env N V C false ∅)
                with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
              { iApply (ud_hold N V C ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
