@@ -1986,7 +1986,7 @@ Proof.
   have Hco : ∀ a, co_tc TS a
     by eapply (co_serialized_pkg pstep pdev TS sync Hwf Hwfl Hbytes).
   destruct (promise_run_shape (wp_init img d0 ps) mid Hprom)
-    as (Hpimg & Hplen & Hpst).
+    as (Hpimg & Hplen & Hpdev & Hpst).
   have Hof' := Hof.
   destruct Hof' as (Himg0 & Hlog0 & Hlent & Hwft & Hfst & Hlst
                     & Hclogc & Hcimgc & Hclenc).
@@ -2009,8 +2009,9 @@ Proof.
   have Hacyc : gdep2_acyclic TS.
   { eapply (gdep2_acyclic_bad_free pstep nh TS Hwf Hfo Hee Hsplit).
     intros e1 e2 Hbe. by destruct (Hnobad e1 e2 Hbe). }
-  eapply (sim_full pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg1
-            Hlen1 Hdata1 Hps1 Hdf c Hacyc).
+  eapply (sim_full pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl Hlf
+            Hobl Himg1 Hlen1 Hdata1 Hps1 (ptraces_wit_nil TS d0 Hdf) eq_refl
+            c (gdep3_acyclic_nodev TS d0 Hacyc)).
   - by rewrite Himg0 Hcimgc.
   - by rewrite Hlog0 Hclogc.
   - by rewrite Hclenc Hplen /wp_init /= length_map.

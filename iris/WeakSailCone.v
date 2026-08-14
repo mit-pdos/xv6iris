@@ -1030,10 +1030,10 @@ Section cone.
   Lemma cut_pquiet (order : list gev) (b2 : gev) (cf : wpcfg pxv6 unit) j ag :
     (∀ e, e ∈ order ↔ (gev_wf TS e ∧ (e = b2 ∨ tc (gdep2 TS) e b2))) →
     NoDup order →
-    qcfg (pstep_unit (pstep_xv6 riscv_step)) TS img tt ps order cf →
+    qcfg (pstep_unit (pstep_xv6 riscv_step)) TS (PDevs tt []) img tt ps order cf →
     j ≠ b2.1 → pc_ags cf !! j = Some ag → pquiet (pa_st ag).
   Proof.
-    intros Hmem Hnd (_ & _ & _ & Hlen & Hcags) Hne Hlk.
+    intros Hmem Hnd (_ & _ & _ & Hlen & Hcags & _) Hne Hlk.
     have Hjlt : (j < length ps)%nat
       by (apply lookup_lt_Some in Hlk; lia).
     have [T HT] : is_Some (pt_trs TS !! j)
@@ -2613,11 +2613,11 @@ Section package.
       as (order & cfs & cmid & Hmem & Hnd & Hlast & Hpred & Hcontig & Hinblk
           & Hrdlast & Hlenc & Hc0 & Hcfm & Hstepc & Hqc & Hrunm & Hv1 & Hv2).
     (* ---- the cut configuration ---- *)
-    have Hqcm : qcfg (pstep_unit (pstep_xv6 riscv_step)) TS img tt ps order cmid.
+    have Hqcm : qcfg (pstep_unit (pstep_xv6 riscv_step)) TS (PDevs tt []) img tt ps order cmid.
     { have Hx := Hqc (length order) cmid Hcfm.
       by rewrite (take_ge order (length order) ltac:(lia)) in Hx. }
     have Hqcm2 := Hqcm.
-    destruct Hqcm2 as (_ & Hcimg & _ & Hclen & Hcags).
+    destruct Hqcm2 as (_ & Hcimg & _ & Hclen & Hcags & _).
     have Hbndm : cfg_bnd cmid
       by apply (pf_run_bnd _ _ _ Hrunm), cfg_bnd_init.
     (* ---- the reader's record ---- *)
@@ -2807,8 +2807,8 @@ Section package.
       (c c' : wpcfg pxv6 unit) l ag :
     order !! n = Some e →
     nproc (take n order) e.1 = e.2 →
-    qcfg (pstep_unit (pstep_xv6 riscv_step)) TS img tt ps (take n order) c →
-    qcfg (pstep_unit (pstep_xv6 riscv_step)) TS img tt ps (take (S n) order) c' →
+    qcfg (pstep_unit (pstep_xv6 riscv_step)) TS (PDevs tt []) img tt ps (take n order) c →
+    qcfg (pstep_unit (pstep_xv6 riscv_step)) TS (PDevs tt []) img tt ps (take (S n) order) c' →
     pt_trs TS !! e.1 = Some T → at_evs T !! e.2 = Some ev →
     pc_ags c !! e.1 = Some ag →
     wp_pf_step (pstep_unit (pstep_xv6 riscv_step)) e.1 l c c' →
@@ -2817,7 +2817,7 @@ Section package.
     intros Hn Hnp Hqc Hqc' HT Hev Hlk Hstep ag2 msg Hag2 Hlogeq.
     rewrite Hlk in Hag2. injection Hag2 as <-.
     have Hwl : lb_writes l = true by eapply pf_step_writes.
-    destruct Hqc as (_ & Hcimg & Hclog & _ & Hcags).
+    destruct Hqc as (_ & Hcimg & Hclog & _ & Hcags & _).
     destruct Hqc' as (_ & _ & Hclog' & _ & _).
     have Htk : take (S n) order = take n order ++ [e] by apply take_S_r.
     rewrite Htk in Hclog'.
@@ -3087,7 +3087,7 @@ Section package.
     (∀ n e c c', order !! n = Some e → cfs !! n = Some c →
        cfs !! S n = Some c' → cstep (pstep_unit (pstep_xv6 riscv_step)) e.1 c c') →
     (∀ n c, cfs !! n = Some c →
-       qcfg (pstep_unit (pstep_xv6 riscv_step)) TS img tt ps (take n order) c) →
+       qcfg (pstep_unit (pstep_xv6 riscv_step)) TS (PDevs tt []) img tt ps (take n order) c) →
     ∀ n, (n ≤ length order)%nat → ∀ c, cfs !! n = Some c → seg_inv order n c.
   Proof.
     intros Hmem Hnd Hlast Hpred Hcontig Hlenc Hcfs0 Hstepc Hqcp.
@@ -3118,9 +3118,9 @@ Section package.
       by rewrite Hnp. }
     have Hqc0 := Hqcp n c0 Hc0. have Hqc1 := Hqcp (S n) c Hc.
     have Hqc0' := Hqc0.
-    destruct Hqc0' as (_ & Himg0 & Hlog0 & Hlen0 & Hags0).
+    destruct Hqc0' as (_ & Himg0 & Hlog0 & Hlen0 & Hags0 & _).
     have Hqc1' := Hqc1.
-    destruct Hqc1' as (_ & Himg1 & Hlog1 & Hlen1 & Hags1).
+    destruct Hqc1' as (_ & Himg1 & Hlog1 & Hlen1 & Hags1 & _).
     destruct (Hags0 e.1 T HT) as (agn & Hagn & Hclk0).
     rewrite Hnp in Hagn Hclk0.
     destruct (Hags1 e.1 T HT) as (agn1 & Hagn1 & Hclk1).
@@ -3375,11 +3375,11 @@ Section package.
           & Hlend & Hfr & Hbdd & Hobs).
     have Hbndm : cfg_bnd cmid
       by apply (pf_run_bnd _ _ _ Hrunm), cfg_bnd_init.
-    have Hqcm : qcfg (pstep_unit (pstep_xv6 riscv_step)) TS img tt ps order cmid.
+    have Hqcm : qcfg (pstep_unit (pstep_xv6 riscv_step)) TS (PDevs tt []) img tt ps order cmid.
     { have Hx := Hqc (length order) cmid Hcfm.
       by rewrite (take_ge order (length order) ltac:(lia)) in Hx. }
     have Hqcm2 := Hqcm.
-    destruct Hqcm2 as (_ & Hcimg & _ & Hclen & Hcags).
+    destruct Hqcm2 as (_ & Hcimg & _ & Hclen & Hcags & _).
     (* ---- close whatever is still open, completing the reader ---- *)
     have Hfin : ∃ (segs' : list seg2) (cf : wpcfg pxv6 unit),
         chained2 segs' (wp_init img tt ps) cf ∧ Forall seg2_ok segs' ∧

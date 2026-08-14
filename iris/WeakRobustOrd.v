@@ -57,14 +57,26 @@
         [gev_ts TS e2], again single [option]s.  So the sort over
         [gdep2] is CONSTRUCTIVE, like [WeakRobustLin]'s.
 
-    (4) THE SUBSET TOPOSORT.  Design item (iv) needs the induction to
-        run not on all events but on a DOWNWARD-CLOSED subset [S] (the
-        ancestor closure of a minimal bad edge).  [gdep2_toposort_S]
-        sorts the filtered carrier; [toposort_ind_S] is the induction
-        principle, whose predecessor-done step is where downward
-        closure ([dc]) is spent: a [gdep2]-predecessor of an event of
-        [S] is itself in [S], hence in the carrier, hence EARLIER.
-        [S := gev_wf TS] recovers the full case ([dc_full]).
+    (4) THE SUBSET TOPOSORT, over an ARBITRARY edge relation [R].  Design
+        item (iv) needs the induction to run not on all events but on a
+        DOWNWARD-CLOSED subset [S] (the ancestor closure of a minimal bad
+        edge).  [topo_sort_S] sorts the filtered carrier;
+        [toposort_ind_S] is the induction principle, whose
+        predecessor-done step is where downward closure ([dc]) is spent:
+        an [R]-predecessor of an event of [S] is itself in [S], hence in
+        the carrier, hence EARLIER.  [S := gev_wf TS] recovers the full
+        case ([dc_full]).  [R] is a parameter (G3) because the exhibit
+        route sorts [gdep2] while the fabric-carrying replay sorts
+        [gdep3 = gdep2 ∪ gdev]; the argument is the same one, and the two
+        properties it needs of [R] are section hypotheses ([Rwf]: edges
+        relate real events; [Rpo]: [gpo ⊆ R]).
+
+    (5) THE FABRIC-ORDERED GRAPH [gdep3 = gdep2 ∪ gdev] (G3), with the
+        acyclicity criterion [gdep3_acyclic_of_rank] and the two
+        instances that discharge it outright ([gdep3_acyclic_same_agent],
+        [gdep3_acyclic_devfree]/[gdep3_acyclic_nodev]).  READ THE
+        WARNING at the definition: the union's acyclicity is a NEW
+        obligation, not a corollary of [gdep2]'s.
 
     DELTAS FROM THE SPEC (all recorded deliberately):
 
@@ -100,6 +112,60 @@ From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakRobustTrace
                             WeakRobustAcyc WeakRobustLin.
 
 Local Open Scope Z_scope.
+
+(* ------------------------------------------------------------------ *)
+(** ** A RANK CRITERION FOR THE ACYCLICITY OF A UNION
+
+    Generic, and stated in the shape G3 needs: [R] splits into a part
+    that a rank never DECREASES along and a part it strictly INCREASES
+    along; then any [R] cycle is a cycle of the first part.  (The union of
+    an acyclic relation and a chain is NOT acyclic in general — this is
+    the fact that has to be supplied, see [gdep3_acyclic_of_rank].) *)
+
+Lemma tc_subrel {A} (R R' : A → A → Prop) :
+  (∀ u v, R u v → R' u v) → ∀ x y, tc R x y → tc R' x y.
+Proof.
+  intros Hsub x y. induction 1 as [x y Hxy|x y z Hxy _ IH];
+    [by apply tc_once, Hsub|].
+  eapply tc_l; [by apply Hsub|exact IH].
+Qed.
+
+Lemma tc_rank_le {A} (R : A → A → Prop) (rk : A → nat) :
+  (∀ u v, R u v → (rk u ≤ rk v)%nat) →
+  ∀ x y, tc R x y → (rk x ≤ rk y)%nat.
+Proof.
+  intros Hle x y. induction 1 as [x y Hxy|x y z Hxy _ IH]; [by apply Hle|].
+  etrans; [by apply Hle|done].
+Qed.
+
+Lemma tc_union_rank {A} (R R1 R2 : A → A → Prop) (rk : A → nat) :
+  (∀ u v, R u v → R1 u v ∨ R2 u v) →
+  (∀ u v, R1 u v → (rk u ≤ rk v)%nat) →
+  (∀ u v, R2 u v → (rk u < rk v)%nat) →
+  ∀ x y, tc R x y → tc R1 x y ∨ (rk x < rk y)%nat.
+Proof.
+  intros Hsplit Hle Hlt x y.
+  induction 1 as [x y Hxy|x y z Hxy _ IH].
+  - destruct (Hsplit x y Hxy) as [H1|H2]; [left; by apply tc_once|].
+    right. by apply Hlt.
+  - destruct (Hsplit x y Hxy) as [H1|H2], IH as [IH|IH].
+    + left. by eapply tc_l.
+    + right. have := Hle x y H1. lia.
+    + right. have := tc_rank_le R1 rk Hle y z IH. have := Hlt x y H2. lia.
+    + right. have := Hlt x y H2. lia.
+Qed.
+
+Lemma acyclic_union_rank {A} (R R1 R2 : A → A → Prop) (rk : A → nat) :
+  (∀ u v, R u v → R1 u v ∨ R2 u v) →
+  (∀ u v, R1 u v → (rk u ≤ rk v)%nat) →
+  (∀ u v, R2 u v → (rk u < rk v)%nat) →
+  (∀ e, ¬ tc R1 e e) →
+  ∀ e, ¬ tc R e e.
+Proof.
+  intros Hsplit Hle Hlt Hacyc e Hc.
+  destruct (tc_union_rank R R1 R2 rk Hsplit Hle Hlt e e Hc) as [Hc1|Hlt'];
+    [by apply (Hacyc e)|lia].
+Qed.
 
 (* ------------------------------------------------------------------ *)
 Section ord.
@@ -312,31 +378,177 @@ Section ord.
   Proof. intros e1 e2. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
-  (** ** DELIVERABLE 4, part 1: the SUBSET vocabulary *)
+  (** ** THE FABRIC-ORDERED GRAPH D⁺⁺ = gdep2 ∪ gdev (G3)
 
-  (** DOWNWARD CLOSURE under the extended graph: a [gdep2]-predecessor
-      of an event of [S] is itself in [S]. *)
-  Definition dc TS (S : gev → Prop) : Prop :=
-    ∀ e e', S e → gdep2 TS e' e → gev_wf TS e' → S e'.
+      [WeakRobustGraph.gdev] is the successor relation on the global
+      DEVICE-ORDER WITNESS.  Adding it to the graph is what makes every
+      topological sort process the fabric-touching events in the
+      behavior's own order — which is what lets the replay hand each of
+      them the fabric it recorded ([WeakRobustSim], G4).
+
+      ACYCLICITY IS A NEW OBLIGATION, NOT A COROLLARY.  A union of an
+      acyclic relation with a chain on a subset is not acyclic in
+      general, and here it is not even derivable from the behavior's
+      TEMPORAL order: in the promising machine an rf edge may point
+      BACKWARDS in time (a read may read a promise that its author
+      fulfils later — that is what promises are for), so no
+      behavior-order rank makes [gdep2] monotone.  What this file
+      supplies is therefore (a) the rank CRITERION
+      [gdep3_acyclic_of_rank], whose [gdep2] premise is exactly the
+      compatibility that has to be established, and (b) the two
+      instances that discharge it outright — no cross-agent device
+      access ([gdep3_acyclic_same_agent]) and, as its special case, no
+      device access at all ([gdep3_acyclic_nodev]), which is what every
+      current (dev-free-scoped) consumer runs at. *)
+
+  Definition gdep3 TS (DS : pdevs D) (e1 e2 : gev) : Prop :=
+    gdep2 TS e1 e2 ∨ gdev TS DS e1 e2.
+
+  Definition gdep3_acyclic TS DS : Prop := ∀ e, ¬ tc (gdep3 TS DS) e e.
+
+  Lemma gdep2_gdep3 TS DS e1 e2 : gdep2 TS e1 e2 → gdep3 TS DS e1 e2.
+  Proof. by left. Qed.
+  Lemma gdev_gdep3 TS DS e1 e2 : gdev TS DS e1 e2 → gdep3 TS DS e1 e2.
+  Proof. by right. Qed.
+  Lemma gdep_gdep3 TS DS e1 e2 : gdep TS e1 e2 → gdep3 TS DS e1 e2.
+  Proof. intros ?. by apply gdep2_gdep3, gdep_gdep2. Qed.
+  Lemma gpo_gdep3 TS DS e1 e2 : gpo TS e1 e2 → gdep3 TS DS e1 e2.
+  Proof. intros ?. by apply gdep2_gdep3, gpo_gdep2. Qed.
+  Lemma grf_gdep3 TS DS e1 e2 : grf TS e1 e2 → gdep3 TS DS e1 e2.
+  Proof. intros ?. by apply gdep2_gdep3, grf_gdep2. Qed.
+  Lemma gE_gdep3 TS DS e1 e2 : gE TS e1 e2 → gdep3 TS DS e1 e2.
+  Proof. intros ?. by apply gdep2_gdep3, gE_gdep2. Qed.
+
+  Lemma tc_gdep2_gdep3 TS DS x y : tc (gdep2 TS) x y → tc (gdep3 TS DS) x y.
+  Proof. apply tc_subrel. intros u v. apply gdep2_gdep3. Qed.
+
+  Lemma gdep3_acyclic_gdep2 TS DS : gdep3_acyclic TS DS → gdep2_acyclic TS.
+  Proof. intros Hac e Hc. by apply (Hac e), tc_gdep2_gdep3. Qed.
+
+  Lemma gdep3_wf TS DS e1 e2 :
+    ptraces_wit TS DS → gdep3 TS DS e1 e2 → gev_wf TS e1 ∧ gev_wf TS e2.
+  Proof.
+    intros Hwit [H2|Hd]; [by apply gdep2_wf|by eapply gdev_wf].
+  Qed.
+
+  Global Instance gdep3_dec TS DS e1 e2 : Decision (gdep3 TS DS e1 e2).
+  Proof. rewrite /gdep3. apply _. Qed.
+  Global Instance gdep3_rel_dec TS DS : RelDecision (gdep3 TS DS).
+  Proof. intros e1 e2. apply _. Qed.
+
+  (** THE CRITERION.  ([gdep2_acyclic] enters as the design prescribes;
+      the rank premise on [gdep2] is the compatibility that the
+      acyclicity band owes, NOT something the witness supplies.) *)
+  Lemma gdep3_acyclic_of_rank TS DS (rk : gev → nat) :
+    (∀ x y, gdep2 TS x y → (rk x ≤ rk y)%nat) →
+    (∀ x y, gdev TS DS x y → (rk x < rk y)%nat) →
+    gdep2_acyclic TS →
+    gdep3_acyclic TS DS.
+  Proof.
+    intros Hle Hlt Hacyc e.
+    apply (acyclic_union_rank (gdep3 TS DS) (gdep2 TS) (gdev TS DS) rk);
+      [by intros u v Hd|exact Hle|exact Hlt|exact Hacyc].
+  Qed.
+
+  (** INSTANCE 1: a witness that never crosses agents adds NOTHING —
+      (W3) already makes such a gdev edge a [gpo] edge. *)
+  Lemma gdep3_same_agent_gdep2 TS DS e1 e2 :
+    ptraces_wit TS DS → (∀ x y, gdev TS DS x y → x.1 = y.1) →
+    gdep3 TS DS e1 e2 → gdep2 TS e1 e2.
+  Proof.
+    intros Hwit Hsa [H2|Hd]; [done|].
+    apply gpo_gdep2. eapply gdev_gpo; [exact Hwit|exact Hd|by apply Hsa].
+  Qed.
+
+  Lemma gdep3_acyclic_same_agent TS DS :
+    ptraces_wit TS DS → (∀ x y, gdev TS DS x y → x.1 = y.1) →
+    gdep2_acyclic TS → gdep3_acyclic TS DS.
+  Proof.
+    intros Hwit Hsa Hacyc e Hc. apply (Hacyc e).
+    eapply tc_subrel; [|exact Hc].
+    intros u v. by apply (gdep3_same_agent_gdep2 TS DS).
+  Qed.
+
+  (** INSTANCE 2 (the dev-free collapse): with no gdev edges at all,
+      D⁺⁺ IS D⁺.  A DEV-FREE bundle has none (W1: a listed position is a
+      fabric-touching event), and so does the empty witness. *)
+  Lemma gdep3_no_gdev_gdep2 TS DS e1 e2 :
+    (∀ x y, ¬ gdev TS DS x y) → gdep3 TS DS e1 e2 → gdep2 TS e1 e2.
+  Proof. intros Hno [H2|Hd]; [done|by destruct (Hno e1 e2)]. Qed.
+
+  Lemma gdep3_acyclic_no_gdev TS DS :
+    (∀ x y, ¬ gdev TS DS x y) → gdep2_acyclic TS → gdep3_acyclic TS DS.
+  Proof.
+    intros Hno Hacyc e Hc. apply (Hacyc e).
+    eapply tc_subrel; [|exact Hc]. intros u v. by apply (gdep3_no_gdev_gdep2 TS DS).
+  Qed.
+
+  Lemma gdev_devfree TS DS :
+    ptraces_wit TS DS →
+    (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
+       ae_dev ev = None) →
+    ∀ x y, ¬ gdev TS DS x y.
+  Proof.
+    intros (HW1 & _) Hdf x y (m & Hm & _).
+    destruct (HW1 m x Hm) as (ev & Hev & Hs).
+    rewrite /ev_at in Hev.
+    destruct (pt_trs TS !! x.1) as [T|] eqn:HT; simpl in Hev; [|done].
+    rewrite (Hdf x.1 T x.2 ev HT Hev) in Hs. by destruct Hs.
+  Qed.
+
+  Lemma gdep3_acyclic_devfree TS DS :
+    ptraces_wit TS DS →
+    (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
+       ae_dev ev = None) →
+    gdep2_acyclic TS → gdep3_acyclic TS DS.
+  Proof.
+    intros Hwit Hdf. apply gdep3_acyclic_no_gdev. by eapply gdev_devfree.
+  Qed.
+
+  Lemma gdep3_nil_gdep2 TS (d : D) e1 e2 :
+    gdep3 TS (PDevs d []) e1 e2 → gdep2 TS e1 e2.
+  Proof. apply gdep3_no_gdev_gdep2. intros x y. apply gdev_nil. Qed.
+
+  Lemma gdep3_acyclic_nodev TS (d : D) :
+    gdep2_acyclic TS → gdep3_acyclic TS (PDevs d []).
+  Proof. apply gdep3_acyclic_no_gdev. intros x y. apply gdev_nil. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** DELIVERABLE 4, part 1: the SUBSET vocabulary
+
+      GENERALIZED over the edge relation [R] (G3): the sort and its
+      induction principle are run at [R := gdep2 TS] by the exhibit route
+      and at [R := gdep3 TS DS] by the fabric-carrying replay, and the
+      argument is the same one. *)
+
+  (** DOWNWARD CLOSURE under [R]: an [R]-predecessor of an event of [S]
+      is itself in [S]. *)
+  Definition dc TS (R : gev → gev → Prop) (S : gev → Prop) : Prop :=
+    ∀ e e', S e → R e' e → gev_wf TS e' → S e'.
 
   (** A WELL-FORMED SUBSET: downward closed, and made of real events.
       (The [Decision] side condition is a typeclass context, not a
       field — see the header.) *)
-  Definition sub_ok TS (S : gev → Prop) : Prop :=
-    dc TS S ∧ (∀ e, S e → gev_wf TS e).
+  Definition sub_ok TS R (S : gev → Prop) : Prop :=
+    dc TS R S ∧ (∀ e, S e → gev_wf TS e).
 
   (** THE FULL INSTANCE: [gev_wf] itself is downward closed. *)
-  Lemma dc_full TS : dc TS (gev_wf TS).
+  Lemma dc_full TS R : dc TS R (gev_wf TS).
   Proof. intros e e' _ _ Hwf. exact Hwf. Qed.
 
-  Lemma sub_ok_full TS : sub_ok TS (gev_wf TS).
+  Lemma sub_ok_full TS R : sub_ok TS R (gev_wf TS).
   Proof. split; [apply dc_full|done]. Qed.
 
+  (** [dc] only ever SHRINKS when the relation grows. *)
+  Lemma dc_mono TS (R R' : gev → gev → Prop) S :
+    (∀ x y, R x y → R' x y) → dc TS R' S → dc TS R S.
+  Proof. intros Hsub Hdc e e' HS Hr Hwf. eapply Hdc; [exact HS| |exact Hwf]. by apply Hsub. Qed.
+
   (** The packaged conclusion of the subset sort. *)
-  Definition topo_order_S TS (S : gev → Prop) (order : list gev) : Prop :=
+  Definition topo_order_S TS R (S : gev → Prop) (order : list gev) : Prop :=
     NoDup order ∧
     (∀ e, e ∈ order ↔ (gev_wf TS e ∧ S e)) ∧
-    (∀ x y i j, order !! i = Some x → order !! j = Some y → gdep2 TS x y →
+    (∀ x y i j, order !! i = Some x → order !! j = Some y → R x y →
                 (i < j)%nat).
 
 End ord.
@@ -351,6 +563,12 @@ End ord.
 Section subset.
   Context {P D : Type}.
   Context (TS : ptraces P D).
+  (** THE EDGE RELATION the sort respects — [gdep2 TS] for the exhibit
+      route, [gdep3 TS DS] for the fabric-carrying replay. *)
+  Context (R : gev → gev → Prop).
+  Context `{!RelDecision R}.
+  Context (Rwf : ∀ x y, R x y → gev_wf TS x ∧ gev_wf TS y).
+  Context (Rpo : ∀ x y, gpo TS x y → R x y).
   Context (S : gev → Prop).
   Context `{!∀ e, Decision (S e)}.
 
@@ -367,27 +585,27 @@ Section subset.
 
   (** THE SORT.  Full acyclicity is inherited by the restriction, so
       [WeakRobustLin]'s generic [topo_sort] applies verbatim with
-      [R := gdep2 TS] and the filtered carrier. *)
-  Theorem gdep2_toposort_S :
-    gdep2_acyclic TS →
+      [R] and the filtered carrier. *)
+  Theorem topo_sort_S :
+    (∀ e, ¬ tc R e e) →
     ∃ order : list gev,
       NoDup order ∧
       (∀ e, e ∈ order ↔ (gev_wf TS e ∧ S e)) ∧
-      (∀ x y i j, order !! i = Some x → order !! j = Some y → gdep2 TS x y →
+      (∀ x y i j, order !! i = Some x → order !! j = Some y → R x y →
                   (i < j)%nat).
   Proof.
     intros Hacyc.
-    destruct (topo_sort (gdep2 TS) gev_enum_S Hacyc NoDup_gev_enum_S)
+    destruct (topo_sort R gev_enum_S Hacyc NoDup_gev_enum_S)
       as (order & Hnd & Hmem & Hord).
     exists order. split_and!; [done| |].
     - intros e. rewrite Hmem. apply elem_of_gev_enum_S.
     - intros x y i j Hi Hj Hd. by eapply Hord.
   Qed.
 
-  Corollary gdep2_toposort_S_pack :
-    gdep2_acyclic TS → ∃ order, topo_order_S TS S order.
+  Corollary topo_sort_S_pack :
+    (∀ e, ¬ tc R e e) → ∃ order, topo_order_S TS R S order.
   Proof.
-    intros Hacyc. destruct gdep2_toposort_S as (order & ? & ? & ?); [done|].
+    intros Hacyc. destruct topo_sort_S as (order & ? & ? & ?); [done|].
     exists order. by split_and!.
   Qed.
 
@@ -395,24 +613,24 @@ Section subset.
   (** ** Prefix closure — where DOWNWARD CLOSURE is spent *)
 
   Lemma topo_order_S_wf order e :
-    topo_order_S TS S order → e ∈ order → gev_wf TS e ∧ S e.
+    topo_order_S TS R S order → e ∈ order → gev_wf TS e ∧ S e.
   Proof. intros (_ & Hmem & _) He. by apply Hmem. Qed.
 
   Lemma topo_order_S_index_unique order i j e :
-    topo_order_S TS S order → order !! i = Some e → order !! j = Some e → i = j.
+    topo_order_S TS R S order → order !! i = Some e → order !! j = Some e → i = j.
   Proof. intros (Hnd & _ & _) Hi Hj. by eapply list_relations.NoDup_lookup. Qed.
 
-  (** No [gdep2] edge points from OUTSIDE a prefix INTO it — provided
-      the source is a real event, which [gdep2_wf] always gives. *)
+  (** No [R] edge points from OUTSIDE a prefix INTO it — provided
+      the source is a real event, which [Rwf] always gives. *)
   Lemma topo_prefix_closed_S order n x y :
-    topo_order_S TS S order → dc TS S →
-    gdep2 TS x y → y ∈ take n order → x ∈ take n order.
+    topo_order_S TS R S order → dc TS R S →
+    R x y → y ∈ take n order → x ∈ take n order.
   Proof.
     intros Ho Hdc Hd Hy. have Ho' := Ho. destruct Ho' as (Hnd & Hmem & Hord).
     apply elem_of_take in Hy as (j & Hj & Hjn).
     have Hyin : y ∈ order by eapply elem_of_list_lookup_2.
     have Hys : gev_wf TS y ∧ S y by apply Hmem.
-    have Hxwf : gev_wf TS x by apply (gdep2_wf TS x y Hd).
+    have Hxwf : gev_wf TS x by apply (Rwf x y Hd).
     have Hxs : S x by eapply Hdc; [apply Hys|exact Hd|exact Hxwf].
     have Hx : x ∈ order by apply Hmem.
     apply elem_of_list_lookup in Hx as (i & Hi).
@@ -422,8 +640,8 @@ Section subset.
 
   (** The same fact at the exact step the induction takes. *)
   Lemma topo_pred_done_S order n e :
-    topo_order_S TS S order → dc TS S → order !! n = Some e →
-    ∀ e', gdep2 TS e' e → gev_wf TS e' → e' ∈ take n order.
+    topo_order_S TS R S order → dc TS R S → order !! n = Some e →
+    ∀ e', R e' e → gev_wf TS e' → e' ∈ take n order.
   Proof.
     intros Ho Hdc Hn e' Hd Hwf'. have Ho' := Ho.
     destruct Ho' as (Hnd & Hmem & Hord).
@@ -437,7 +655,7 @@ Section subset.
   Qed.
 
   Lemma topo_not_in_prefix_S order n e :
-    topo_order_S TS S order → order !! n = Some e → e ∉ take n order.
+    topo_order_S TS R S order → order !! n = Some e → e ∉ take n order.
   Proof.
     intros (Hnd & _ & _) Hn He.
     apply elem_of_take in He as (i & Hi & Hin).
@@ -447,23 +665,23 @@ Section subset.
   (* ---------------------------------------------------------------- *)
   (** ** PER-AGENT MONOTONICITY in the subset order
 
-      [gpo] edges are [gdep2] edges, so [WeakRobustLin]'s
+      [gpo] edges are [R] edges, so [WeakRobustLin]'s
       [topo_agent_mono] carries over verbatim — with the [gev_wf] side
       conditions supplied by membership in the (filtered) order. *)
 
   Lemma topo_agent_lt_S order i j x y :
-    topo_order_S TS S order → order !! i = Some x → order !! j = Some y →
+    topo_order_S TS R S order → order !! i = Some x → order !! j = Some y →
     x.1 = y.1 → (x.2 < y.2)%nat → (i < j)%nat.
   Proof.
     intros (Hnd & Hmem & Hord) Hi Hj Hag Hk.
-    eapply Hord; [exact Hi|exact Hj|]. apply gpo_gdep2.
+    eapply Hord; [exact Hi|exact Hj|]. apply Rpo.
     split_and!; [done|done| |].
     - apply (Hmem x). by eapply elem_of_list_lookup_2.
     - apply (Hmem y). by eapply elem_of_list_lookup_2.
   Qed.
 
   Lemma topo_agent_mono_S order i j x y :
-    topo_order_S TS S order → order !! i = Some x → order !! j = Some y →
+    topo_order_S TS R S order → order !! i = Some x → order !! j = Some y →
     x.1 = y.1 → ((i < j)%nat ↔ (x.2 < y.2)%nat).
   Proof.
     intros Ho Hi Hj Hag. split; [|by eapply topo_agent_lt_S].
@@ -480,17 +698,17 @@ Section subset.
 
   (** PER-AGENT PREFIX CLOSURE of the SUBSET itself: [S] contains the
       whole trace prefix of any event it contains (the [gpo] edge is a
-      [gdep2] edge). *)
+      [R] edge). *)
   Lemma dc_agent_prefix j k k' :
-    dc TS S → S (j, k) → gev_wf TS (j, k) → gev_wf TS (j, k') →
+    dc TS R S → S (j, k) → gev_wf TS (j, k) → gev_wf TS (j, k') →
     (k' < k)%nat → S (j, k').
   Proof.
     intros Hdc HS Hwf Hwf' Hlt. eapply Hdc; [exact HS| |exact Hwf'].
-    apply gpo_gdep2. by split_and!.
+    apply Rpo. by split_and!.
   Qed.
 
   Lemma sub_ok_agent_prefix j k k' :
-    sub_ok TS S → S (j, k) → gev_wf TS (j, k') → (k' < k)%nat → S (j, k').
+    sub_ok TS R S → S (j, k) → gev_wf TS (j, k') → (k' < k)%nat → S (j, k').
   Proof.
     intros [Hdc Hsub] HS Hwf' Hlt.
     eapply dc_agent_prefix; [exact Hdc|exact HS|by apply Hsub|exact Hwf'|exact Hlt].
@@ -501,22 +719,22 @@ Section subset.
          consumes on a downward-closed subset *)
 
   Lemma toposort_ind_S (Q : list gev → Prop) :
-    gdep2_acyclic TS → dc TS S →
+    (∀ e, ¬ tc R e e) → dc TS R S →
     Q [] →
     (∀ done e,
        Q done →
        gev_wf TS e → S e → e ∉ done →
-       (∀ e', gdep2 TS e' e → gev_wf TS e' → e' ∈ done) →
+       (∀ e', R e' e → gev_wf TS e' → e' ∈ done) →
        Q (done ++ [e])) →
     ∃ order,
       Q order ∧
       NoDup order ∧
       (∀ e, e ∈ order ↔ (gev_wf TS e ∧ S e)) ∧
-      (∀ x y i j, order !! i = Some x → order !! j = Some y → gdep2 TS x y →
+      (∀ x y i j, order !! i = Some x → order !! j = Some y → R x y →
                   (i < j)%nat).
   Proof.
     intros Hacyc Hdc Hnil Hstep.
-    destruct (gdep2_toposort_S_pack Hacyc) as (order & Ho).
+    destruct (topo_sort_S_pack Hacyc) as (order & Ho).
     (* The induction is BOUNDED by the order's length (rather than
        [WeakRobustLin.toposort_ind]'s "past the end" case) — the bound
        makes the step's lookup total, and it is what keeps this proof
@@ -551,36 +769,40 @@ Global Arguments gev_enum_S {P D} _ _ {_}.
     instance is [WeakRobustLin.gev_wf_dec], so the whole-event-set sort
     and induction are corollaries — no separate development. *)
 
-Corollary gdep2_toposort_full {P D : Type} (TS : ptraces P D) :
-  gdep2_acyclic TS →
+Corollary topo_sort_full {P D : Type} (TS : ptraces P D)
+    (R : gev -> gev -> Prop) `{!RelDecision R} :
+  (∀ e, ¬ tc R e e) →
   ∃ order : list gev,
     NoDup order ∧
     (∀ e, e ∈ order ↔ gev_wf TS e) ∧
-    (∀ x y i j, order !! i = Some x → order !! j = Some y → gdep2 TS x y →
+    (∀ x y i j, order !! i = Some x → order !! j = Some y → R x y →
                 (i < j)%nat).
 Proof.
   intros Hacyc.
-  destruct (gdep2_toposort_S TS (gev_wf TS) Hacyc) as (order & Hnd & Hmem & Hord).
+  destruct (topo_sort_S TS R (gev_wf TS) Hacyc)
+    as (order & Hnd & Hmem & Hord).
   exists order. split_and!; [done| |done].
   intros e. rewrite Hmem. tauto.
 Qed.
 
-Corollary toposort_ind_full {P D : Type} (TS : ptraces P D) (Q : list gev → Prop) :
-  gdep2_acyclic TS →
+Corollary toposort_ind_full {P D : Type} (TS : ptraces P D)
+    (R : gev -> gev -> Prop) `{!RelDecision R}
+    (Q : list gev → Prop) :
+  (∀ e, ¬ tc R e e) →
   Q [] →
   (∀ done e,
      Q done → gev_wf TS e → e ∉ done →
-     (∀ e', gdep2 TS e' e → gev_wf TS e' → e' ∈ done) →
+     (∀ e', R e' e → gev_wf TS e' → e' ∈ done) →
      Q (done ++ [e])) →
   ∃ order,
     Q order ∧
     NoDup order ∧
     (∀ e, e ∈ order ↔ gev_wf TS e) ∧
-    (∀ x y i j, order !! i = Some x → order !! j = Some y → gdep2 TS x y →
+    (∀ x y i j, order !! i = Some x → order !! j = Some y → R x y →
                 (i < j)%nat).
 Proof.
   intros Hacyc Hnil Hstep.
-  destruct (toposort_ind_S TS (gev_wf TS) Q Hacyc (dc_full TS) Hnil)
+  destruct (toposort_ind_S TS R (gev_wf TS) Q Hacyc (dc_full TS R) Hnil)
     as (order & HQ & Hnd & Hmem & Hord).
   { intros done e HQ Hwf _ Hnot Hpred. by apply Hstep. }
   exists order. split_and!; [done|done| |done].
@@ -667,6 +889,12 @@ Global Arguments ptraces_ws_init {P D} _.
     - [rd_leaves] / [rd_floor] (+ [rd_floor_ws]): the read floor as a
       LEAF LIST, and its identification with the behavior's
       [max (load_vpre, coh a)].
+
+    - [gdep3] / [gdep3_acyclic]: the FABRIC-ORDERED graph, whose sort is
+      what [WeakRobustSim]'s fabric fold runs along.  [gdep3_acyclic]
+      implies [gdep2_acyclic] ([gdep3_acyclic_gdep2]); the converse needs
+      a compatibility fact ([gdep3_acyclic_of_rank]) which the dev-free
+      and single-agent instances supply for free.
 
     - [gE] / [gdep2]: the extended graph.  [gE_ts_lt] says every E edge
       is timestamp-increasing (the fact the D⁺-acyclicity effort

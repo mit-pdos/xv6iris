@@ -71,6 +71,28 @@ for the archive.
   `Qinv_step` device arms; the read/excl cruxes untouched (fabric
   orthogonal to timestamps); `sim_prefix`/`cone_Qinv` over the extended
   graph.
+  - **G3 FINDING (2026-08-14), and it moves work into the Acyc band.**
+    The union's acyclicity is NOT free and NOT derivable from `gdep2`'s
+    plus temporal consistency, so no `W7` global-behavior-order clause
+    was added (it would have bought nothing): in the promising machine an
+    **rf edge may point BACKWARDS in behavior time** — a read may read a
+    promise its author fulfils later, which is the whole point of
+    promises — so no behavior-order rank makes `gdep2` monotone, and
+    `gdep2`-acyclic + a `gdev` chain genuinely admits a mixed cycle
+    (`e1 --gdev--> e2 --grf--> e1`).  What `WeakRobustOrd` supplies
+    instead is (a) the rank CRITERION `gdep3_acyclic_of_rank`
+    (`gdep2 ⊆ rk-nondecreasing` + `gdev ⊆ rk-increasing` + `gdep2_acyclic`
+    ⟹ `gdep3_acyclic`), whose `gdep2` premise names exactly the
+    compatibility the acyclicity band now owes, and (b) the instances
+    that discharge it outright: `gdep3_acyclic_same_agent` (a witness
+    that never crosses agents adds nothing — W3 already makes such a
+    `gdev` edge a `gpo` edge) and `gdep3_acyclic_devfree` /
+    `gdep3_acyclic_nodev` (no device events / empty witness), which is
+    what every current consumer runs at.  **G5 must therefore re-land
+    `WeakRobustAcyc2`'s walk over `gdep3`, or discharge the rank premise
+    from the discipline** — `sim_full`/`sim_prefix` now take
+    `gdep3_acyclic`.
+
 - **G5 — the composition** (`WeakRobustMain`/`WeakCompose` +
   `WeakEvPf`/`WeakEvAdequacy`): `robust_main` re-landed; `epf_step` as
   the `wp_pf_step` instance; ALSO (user-approved 2026-08-14): MERGE THE

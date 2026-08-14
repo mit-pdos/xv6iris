@@ -658,6 +658,52 @@ Section trace.
        at_ags T !! k = Some ag → at_ags T !! S k = Some ag' →
        ae_dev ev = None ∨ pdev (pa_st ag) (ae_lb ev) (pa_st ag') = true).
 
+  (** THE WITNESS ALONE — clauses (W1)–(W4), i.e. everything
+      [ptraces_dev_of] says about [DS] that does NOT mention the phase's
+      endpoints [mid]/[c].  This is the shape G3's gdev edges and G4's
+      fabric fold consume: the replay never sees the behavior's [mid], it
+      sees only the bundle and the device order.  ([W5] pins the FINAL
+      fabric and [W6] is the marker's authority over the flag; neither is
+      needed to replay, so neither is here.) *)
+  Definition ptraces_wit (TS : ptraces P D) (DS : pdevs D) : Prop :=
+    (∀ m e, pd_ord DS !! m = Some e →
+       ∃ ev, ev_at TS e = Some ev ∧ is_Some (ae_dev ev)) ∧
+    (∀ i k ev, ev_at TS (i, k) = Some ev → is_Some (ae_dev ev) →
+       ∃ m, pd_ord DS !! m = Some (i, k)) ∧
+    (∀ m1 m2 i k1 k2, (m1 < m2)%nat →
+       pd_ord DS !! m1 = Some (i, k1) → pd_ord DS !! m2 = Some (i, k2) →
+       (k1 < k2)%nat) ∧
+    (∀ m e, pd_ord DS !! m = Some e → ev_din TS e = Some (dev_at TS DS m)).
+
+  Lemma ptraces_dev_of_wit TS DS mid c :
+    ptraces_dev_of TS DS mid c → ptraces_wit TS DS.
+  Proof. intros (_ & _ & H1 & H2 & H3 & H4 & _ & _). by split_and!. Qed.
+
+  (** [dev_at] at the EMPTY witness is the initial fabric, always. *)
+  Lemma dev_at_nil TS (d : D) m : dev_at TS (PDevs d []) m = d.
+  Proof.
+    destruct m as [|m']; [done|].
+    rewrite /dev_at /pd_ord /pd_init lookup_nil //.
+  Qed.
+
+  (** …and the empty witness IS a witness of a DEV-FREE bundle: nothing is
+      listed, and nothing needs to be.  (The G3/G4 collapse: every
+      consumer scoped to dev-free traces gets the general theorems at this
+      instance.) *)
+  Lemma ptraces_wit_nil TS (d : D) :
+    (∀ i T k ev, pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
+       ae_dev ev = None) →
+    ptraces_wit TS (PDevs d []).
+  Proof.
+    intros Hdf. split_and!; simpl.
+    - intros m e Hm. by rewrite lookup_nil in Hm.
+    - intros i k ev Hev Hdd. rewrite /ev_at /= in Hev.
+      destruct (pt_trs TS !! i) as [T|] eqn:HT; simpl in Hev; [|done].
+      rewrite (Hdf i T k ev HT Hev) in Hdd. by destruct Hdd.
+    - intros ????? _ Hm. by rewrite lookup_nil in Hm.
+    - intros m e Hm. by rewrite lookup_nil in Hm.
+  Qed.
+
   (** Appending one step to a well-formed trace. *)
   Lemma asteps_wf_snoc img log i ags evs ag ev st' f :
     asteps_wf img log i ags evs →
@@ -1296,6 +1342,7 @@ Global Arguments asteps_wf {P D} _ _ _ _ _ _.
 Global Arguments atrace_wf {P D} _ _ _ _ _.
 Global Arguments ptraces_of {P D} _ _ _ _.
 Global Arguments ptraces_dev_of {P D} _ _ _ _ _.
+Global Arguments ptraces_wit {P D} _ _.
 Global Arguments ev_at {P D} _ _.
 Global Arguments ev_din {P D} _ _.
 Global Arguments ev_dout {P D} _ _.
@@ -1331,6 +1378,13 @@ Global Arguments prom_complete {P D} _.
       the witness order REFINES per-agent trace order — so the gdev chain's
       edges are consistent with the behavior's temporal order exactly as
       gdep2's are, and acyclicity of the union is free.
+
+    - [ptraces_wit] (+ [ptraces_dev_of_wit], [ptraces_wit_nil]): the
+      WITNESS-ONLY part of the bundle (W1–W4), i.e. everything G3/G4 need
+      of [DS] that does not mention the phase's endpoints.  The replay
+      never sees [mid], so this is the shape it takes; and the EMPTY
+      witness satisfies it for a dev-free bundle, which is how every
+      dev-free-scoped consumer instantiates the fabric-carrying theorems.
 
     - THE FOLD, for G4.  [dev_at TS DS m] is the fabric BEFORE witness
       position [m] ([pd_init] at the head, the previous entry's recorded

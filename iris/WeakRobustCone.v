@@ -236,35 +236,39 @@ Section stepout.
     nproc done e.1 = e.2 →
     pt_trs TS !! e.1 = Some T → at_evs T !! e.2 = Some ev →
     at_ags T !! S e.2 = Some ag' →
-    qcfg pstep TS img d0 ps done cf →
+    qcfg pstep TS (PDevs d0 []) img d0 ps done cf →
     newws = aev_post (pi TS (done ++ [e])) ev
               (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) →
+    qfab TS (PDevs d0 []) (done ++ [e]) dv →
     wp_pf_step pstep e.1 lb' cf
       (WPCfg (pc_img cf) (pf_log TS (done ++ [e])) dv
              (<[e.1 := WPAgent (pa_st ag') newws ∅]> (pc_ags cf))) →
     ∃ lb cf', wp_pf_step pstep e.1 lb cf cf' ∧
-              qcfg pstep TS img d0 ps (done ++ [e]) cf'.
+              qcfg pstep TS (PDevs d0 []) img d0 ps (done ++ [e]) cf'.
   Proof.
-    intros Hq Hnp HT Hev Hag' Hc Hnew Hstep.
+    intros Hq Hnp HT Hev Hag' Hc Hnew Hdv Hstep.
     eexists lb', _. split; [exact Hstep|].
-    by eapply (qcfg_step pstep TS img d0 ps Hwf Hwfl Hnag done e T ev ag' cf
-                 newws lb' dv).
+    by eapply (qcfg_step pstep TS (PDevs d0 []) img d0 ps Hwf Hwfl Hnag
+                 done e T ev ag' cf newws lb' dv).
   Qed.
 
   (** THE STEP, EXPORTED. *)
   Lemma Qcfg_step done e cf :
-    qorder TS done → qcfg pstep TS img d0 ps done cf →
+    qorder TS done → qcfg pstep TS (PDevs d0 []) img d0 ps done cf →
     gev_wf TS e → e ∉ done →
     (∀ e', gdep2 TS e' e → gev_wf TS e' → e' ∈ done) →
     ∃ lb cf', wp_pf_step pstep e.1 lb cf cf' ∧
-              qcfg pstep TS img d0 ps (done ++ [e]) cf'.
+              qcfg pstep TS (PDevs d0 []) img d0 ps (done ++ [e]) cf'.
   Proof.
     intros Hq Hc Hwfe Hnin Hpre.
     have Hnp : nproc done e.1 = e.2
       by exact (nproc_cur TS ps Hnag done e Hq Hwfe Hnin Hpre).
     have Hq' : qorder TS (done ++ [e])
       by exact (qorder_step TS ps Hnag done e Hq Hwfe Hnin Hpre).
-    have Hc' := Hc. destruct Hc' as (Hrun & Hcimg & Hclog & Hclen & Hcags).
+    have Hpre3 : ∀ e', gdep3 TS (PDevs d0 []) e' e → gev_wf TS e' → e' ∈ done.
+    { intros e' Hd%(gdep3_nil_gdep2 TS d0) Hw'. by apply Hpre. }
+    have Hc' := Hc.
+    destruct Hc' as (Hrun & Hcimg & Hclog & Hclen & Hcags & Hfab).
     destruct (proj1 (gev_wf_bounds TS e) Hwfe) as (T & HT & Hklt).
     have [ev Hev] : is_Some (at_evs T !! e.2) by apply lookup_lt_is_Some_2.
     have Hgev : gev_ev TS e = Some ev by rewrite /gev_ev HT /=.
@@ -272,8 +276,10 @@ Section stepout.
     destruct (asteps_wf_step pstep (pt_img TS) (pt_log TS) e.1 (at_ags T)
                 (at_evs T) e.2 ev Hatr Hev)
       as (ag & ag2 & st' & f & Hag & Hag2 & Hps & Hok & Hagn).
-    have Hpure : ∀ d, pstep (pa_st ag) d (ae_lb ev) st' d.
-    { rewrite /astep_prog (Hdf e.1 T e.2 ev HT Hev) in Hps. exact Hps. }
+    destruct (qfab_step pstep TS (PDevs d0 []) ps Hnag
+                (ptraces_wit_nil TS d0 Hdf)
+                done e T ev ag st' cf Hnin Hpre3 HT Hev Hps Hfab)
+      as (dnew & Hpure & Hfab').
     destruct (Hcags e.1 T HT) as (agn & Hagn0 & Hcflk).
     rewrite Hnp Hag in Hagn0. injection Hagn0 as <-. rewrite Hnp in Hcflk.
     have Hstpost : pa_st ag2 = st' by rewrite Hagn.
@@ -293,17 +299,17 @@ Section stepout.
       { by rewrite Hclog /pf_log (fl_app_none TS done e Hgts). }
       eapply (qcfg_step_ex done e T ev ag2 cf
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) LSilent);
-        [done|done|done|done|done|done| |].
+        [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe.
       + rewrite Hstpost Hlogq.
         apply (PFSilent pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
-                 (pc_dev cf));
-          [done|]. simpl. apply Hpure.
+                 dnew);
+          [done|]. simpl. exact Hpure.
     - (* ---- LLoad ---- *)
       have Hlat : lat = false.
       { destruct lat; [|done]. exfalso.
-        by destruct (Hlf _ _ _ _ _ _ _ (Hpure (pc_dev cf))). }
+        by destruct (Hlf _ _ _ _ _ _ _ Hpure). }
       subst lat.
       destruct Hok as (Hro & Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -320,15 +326,15 @@ Section stepout.
                  (load_post_run (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) aq base
                     ((tlabel_ts (pi TS done) tvs).*1))
                  (LLoad aq false base (tlabel_ts (pi TS done) tvs)));
-        [done|done|done|done|done|done| |].
+        [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe tlabel_ts_fst Hmap.
       + rewrite Hstpost Hlogq.
         apply (PFLoad pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 aq false base (tlabel_ts (pi TS done) tvs) st' (pc_dev cf));
+                 aq false base (tlabel_ts (pi TS done) tvs) st' dnew);
           [done| |].
         * simpl. eapply (proj1 Hobl (pa_st ag) (pc_dev cf) aq false base tvs);
-            [by rewrite tlabel_ts_snd|]. apply Hpure.
+            [by rewrite tlabel_ts_snd|]. exact Hpure.
         * simpl. rewrite Hcimg Hclog.
           eapply (read_ok_pf pstep pdev TS img ps Hwf Hwsi Hco Hwfl Himg Hnag
                     done e T ev ag (LLoad aq false base tvs) base tvs false);
@@ -350,13 +356,13 @@ Section stepout.
       eapply (qcfg_step_ex done e T ev ag2 cf
                  (store_post_run (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) rl base (length data)
                     (S (length (pc_log cf))))
-                 (LStore rl base data)); [done|done|done|done|done|done| |].
+                 (LStore rl base data)); [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe Hts Hpits.
       + rewrite Hstpost Hlogq.
         apply (PFStore pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 rl base data kc st' (pc_dev cf)); [done| |done].
-        simpl. apply Hpure.
+                 rl base data kc st' dnew); [done| |done].
+        simpl. exact Hpure.
     - (* ---- LRmw ---- *)
       destruct Hok as (ts & kc & Hlen & _ & Hlog & Hro & Hex & _ & Hf & Hts).
       have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
@@ -384,16 +390,16 @@ Section stepout.
                        ((tlabel_ts (pi TS done) tvs).*1))
                     rl base (length data) (S (length (pc_log cf))))
                  (LRmw aq rl base (tlabel_ts (pi TS done) tvs) data));
-        [done|done|done|done|done|done| |].
+        [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe Hts tlabel_ts_fst Hmap Hpits.
       + rewrite Hstpost Hlogq.
         apply (PFRmw pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
                  aq rl base (tlabel_ts (pi TS done) tvs) data kc st'
-                 (pc_dev cf));
+                 dnew);
           [done| |done| | |].
         * simpl. eapply (proj2 Hobl (pa_st ag) (pc_dev cf) aq rl base tvs);
-            [by rewrite tlabel_ts_snd|]. apply Hpure.
+            [by rewrite tlabel_ts_snd|]. exact Hpure.
         * by rewrite tlabel_ts_length.
         * simpl. rewrite Hcimg Hclog.
           eapply (read_ok_pf pstep pdev TS img ps Hwf Hwsi Hco Hwfl Himg Hnag
@@ -412,12 +418,12 @@ Section stepout.
       eapply (qcfg_step_ex done e T ev ag2 cf
                  (fence_post (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) pr pw sr sw)
                  (LFence pr pw sr sw));
-        [done|done|done|done|done|done| |].
+        [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe.
       + rewrite Hstpost Hlogq.
         apply (PFFence pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 pr pw sr sw st' (pc_dev cf)); [done|]. simpl. apply Hpure.
+                 pr pw sr sw st' dnew); [done|]. simpl. exact Hpure.
   Qed.
 
 End stepout.
@@ -691,7 +697,7 @@ Section coneblocks.
   (** the bad read IS a memory event (it reads the bad message) *)
   Context (Hb2mem : is_mem b2).
   Context (ord0 : list gev).
-  Context (HQ0 : Qinv pstep TS img d0 ps ord0).
+  Context (HQ0 : Qinv pstep TS (PDevs d0 []) img d0 ps ord0).
   Context (Hmem0 : ∀ e, e ∈ ord0 ↔ (gev_wf TS e ∧ tc (gdep2 TS) e b2)).
 
   (** The cone WITH the bad read: the carrier of every ordering
@@ -744,18 +750,19 @@ Section coneblocks.
 
   (** ONE more [Qinv_step]: the cone plus the bad read is still a
       [qorder], which is all the positional lemmas need. *)
-  Lemma HQcl : Qinv pstep TS img d0 ps cl.
+  Lemma HQcl : Qinv pstep TS (PDevs d0 []) img d0 ps cl.
   Proof.
-    eapply (Qinv_step pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg
-              Hnag Hdata Hdf ord0 b2 HQ0 Hb2wf b2_nin).
-    intros e' Hd Hw'. by apply b2_pre.
+    eapply (Qinv_step pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
+              Hlf Hobl Himg Hnag Hdata (ptraces_wit_nil TS d0 Hdf)
+              ord0 b2 HQ0 Hb2wf b2_nin).
+    intros e' Hd%(gdep3_nil_gdep2 TS d0) Hw'. by apply b2_pre.
   Qed.
 
   Lemma Hqcl : qorder TS cl.
-  Proof. by eapply (Qinv_order pstep TS img d0 ps), HQcl. Qed.
+  Proof. by eapply (Qinv_order pstep TS (PDevs d0 []) img d0 ps), HQcl. Qed.
 
   Lemma ord0_nodup : NoDup ord0.
-  Proof. by destruct (Qinv_order pstep TS img d0 ps ord0 HQ0) as (? & _). Qed.
+  Proof. by destruct (Qinv_order pstep TS (PDevs d0 []) img d0 ps ord0 HQ0) as (? & _). Qed.
 
   Lemma cl_nodup : NoDup cl.
   Proof. by destruct Hqcl as (? & _). Qed.
@@ -1329,16 +1336,18 @@ Section coneblocks.
       agent records at block boundaries". *)
 
   Lemma Qinv_prefix n :
-    (n ≤ length done_full)%nat → Qinv pstep TS img d0 ps (take n done_full).
+    (n ≤ length done_full)%nat → Qinv pstep TS (PDevs d0 []) img d0 ps (take n done_full).
   Proof.
     induction n as [|n IH]; intros Hn.
-    - rewrite take_0. by apply (Qinv_nil pstep TS img d0 ps Hwf Hnag Hps0).
+    - rewrite take_0.
+      by apply (Qinv_nil pstep TS (PDevs d0 []) img d0 ps Hwf Hnag Hps0 eq_refl).
     - have [e He] : is_Some (done_full !! n) by apply lookup_lt_is_Some_2; lia.
       rewrite (take_S_r done_full n e He).
       have Hwfe : gev_wf TS e
         by (apply cl_wf, done_full_cl; by eapply elem_of_list_lookup_2).
-      eapply (Qinv_step pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
-                Himg Hnag Hdata Hdf (take n done_full) e).
+      eapply (Qinv_step pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
+                Hlf Hobl Himg Hnag Hdata (ptraces_wit_nil TS d0 Hdf)
+                (take n done_full) e).
       + apply IH. lia.
       + done.
       + intros Hin. apply elem_of_take in Hin as (i & Hi & Hilt).
@@ -1346,7 +1355,7 @@ Section coneblocks.
           by (eapply list_relations.NoDup_lookup;
               [apply done_full_nodup|exact Hi|exact He]).
         lia.
-      + intros e' Hd Hw'.
+      + intros e' Hd%(gdep3_nil_gdep2 TS d0) Hw'.
         destruct (done_full_pred n e He e' Hd Hw') as (i & Hi & Hlk).
         apply elem_of_take. by exists i.
   Qed.
@@ -1354,7 +1363,7 @@ Section coneblocks.
   Lemma qorder_prefix n :
     (n ≤ length done_full)%nat → qorder TS (take n done_full).
   Proof.
-    intros Hn. eapply (Qinv_order pstep TS img d0 ps). by apply Qinv_prefix.
+    intros Hn. eapply (Qinv_order pstep TS (PDevs d0 []) img d0 ps). by apply Qinv_prefix.
   Qed.
 
   Lemma qorder_done_full : qorder TS done_full.
@@ -1370,7 +1379,7 @@ Section coneblocks.
     by rewrite /done_full take_app_length.
   Qed.
 
-  Lemma qcfg_nil : qcfg pstep TS img d0 ps [] (wp_init img d0 ps).
+  Lemma qcfg_nil : qcfg pstep TS (PDevs d0 []) img d0 ps [] (wp_init img d0 ps).
   Proof.
     split_and!.
     - apply rtc_refl.
@@ -1383,6 +1392,7 @@ Section coneblocks.
         as [ag0 Hag0].
       exists ag0. rewrite nproc_nil. split; [done|].
       rewrite /wp_init /= list_lookup_fmap (Hps0 j T ag0 HT Hag0) //.
+    - by apply (qfab_init TS (PDevs d0 []) d0 ps Hnag eq_refl).
   Qed.
 
   Lemma cstep_of_step i l c c' :
@@ -1399,7 +1409,7 @@ Section coneblocks.
       cfs !! 0%nat = Some (wp_init img d0 ps) ∧
       (∀ i e c c', done_full !! i = Some e →
          cfs !! i = Some c → cfs !! S i = Some c' → cstep pstep e.1 c c') ∧
-      (∀ i c, cfs !! i = Some c → qcfg pstep TS img d0 ps (take i done_full) c).
+      (∀ i c, cfs !! i = Some c → qcfg pstep TS (PDevs d0 []) img d0 ps (take i done_full) c).
   Proof.
     induction n as [|n IH]; intros Hn.
     - exists [wp_init img d0 ps]. split_and!.
@@ -1417,7 +1427,7 @@ Section coneblocks.
     - have Hn' : (n ≤ length done_full)%nat by lia.
       destruct (IH Hn') as (cfs & Hlen & H0 & Hstep & Hq).
       have [cn Hcn] : is_Some (cfs !! n) by apply lookup_lt_is_Some_2; lia.
-      have Hqn : qcfg pstep TS img d0 ps (take n done_full) cn by apply Hq.
+      have Hqn : qcfg pstep TS (PDevs d0 []) img d0 ps (take n done_full) cn by apply Hq.
       have [e He] : is_Some (done_full !! n) by apply lookup_lt_is_Some_2; lia.
       have Hwfe : gev_wf TS e
         by (apply cl_wf, done_full_cl; by eapply elem_of_list_lookup_2).
@@ -1483,7 +1493,7 @@ Section coneblocks.
       cfs !! (length done_full) = Some cf ∧
       (∀ i e c c', done_full !! i = Some e →
          cfs !! i = Some c → cfs !! S i = Some c' → cstep pstep e.1 c c') ∧
-      (∀ i c, cfs !! i = Some c → qcfg pstep TS img d0 ps (take i done_full) c) ∧
+      (∀ i c, cfs !! i = Some c → qcfg pstep TS (PDevs d0 []) img d0 ps (take i done_full) c) ∧
       rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
       (** the violation, in both the named and the hart-restricted form *)
       (∃ p m a, violates_at cf p m b1.1 b2.1 a) ∧
@@ -1503,10 +1513,10 @@ Section coneblocks.
       as (cfs & Hlen & H0 & Hstepc & Hqc).
     have [cf Hcf] : is_Some (cfs !! (length done_full))
       by apply lookup_lt_is_Some_2; lia.
-    have Hqcf : qcfg pstep TS img d0 ps done_full cf.
+    have Hqcf : qcfg pstep TS (PDevs d0 []) img d0 ps done_full cf.
     { have := Hqc (length done_full) cf Hcf. by rewrite take_ge; [lia|]. }
     have Hqcf' := Hqcf.
-    destruct Hqcf' as (Hrun & Hcimg & Hclog & Hclen & Hcags).
+    destruct Hqcf' as (Hrun & Hcimg & Hclog & Hclen & Hcags & _).
     exists cfs, cf.
     (* ---- the bad message and its pf position ---- *)
     have Hq' : qorder TS done_full by apply qorder_done_full.
@@ -1705,7 +1715,7 @@ Section main.
       cfs !! (length order) = Some cf ∧
       (∀ i e c c', order !! i = Some e → cfs !! i = Some c →
          cfs !! S i = Some c' → cstep pstep e.1 c c') ∧
-      (∀ i c, cfs !! i = Some c → qcfg pstep TS img d0 ps (take i order) c) ∧
+      (∀ i c, cfs !! i = Some c → qcfg pstep TS (PDevs d0 []) img d0 ps (take i order) c) ∧
       rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
       (** (d) THE VIOLATION, in both forms. *)
       (∃ p m a, violates_at cf p m b1.1 b2.1 a) ∧

@@ -13,7 +13,7 @@
     SCexcl via timestamp arithmetic) is NOT here; the goal it proves is
     stated at the bottom as [gdep_acyclicity_goal].
 
-    THE THREE DELIVERABLES.
+    THE FOUR DELIVERABLES.
 
     (1) EVENT IDENTITY.  An event is [gev := (agent index, step index)];
         [gev_ev] looks it up in the bundle, [gev_lb] is its label and
@@ -34,6 +34,21 @@
         topological sort, and [gdep] carries no co/fr edges — so
         [WeakAxiomatic2.ev_rfe_co_fr_cyclic] (which refutes an
         event-level EXTERNAL axiom) does not apply here.
+
+    (4) THE DEVICE-ORDER EDGES [gdev] (G3).  The successor relation on
+        the global device-order witness [pd_ord DS]
+        ([WeakRobustTrace.pdevs]): [gdev TS DS e1 e2] iff [e1] and [e2]
+        are CONSECUTIVE entries.  Adding it to the graph is what makes a
+        topological sort keep the fabric-touching events in the
+        behavior's own order, which is what lets the replay hand each of
+        them the fabric it recorded ([WeakRobustSim], G4).  Successor
+        rather than transitive chain: the closure machinery walks
+        predecessors one at a time and wants a small decidable relation
+        ([gdev_dec]); the transitive facts are derived once
+        ([gdev_chain]).  Two structural facts pay for themselves later:
+        the witness is duplicate-free ([pd_ord_index_inj], from W3) and a
+        SAME-AGENT gdev edge is already a [gpo] edge ([gdev_gpo]) — so
+        the edges [gdev] genuinely adds are the CROSS-agent ones.
 
     THE OWN-READ FINDING, PROVED ([atrace_own_read] / [grf_own_lt]):
     inside ONE agent's trace, a read of [(a, ts)] can only sit trace
@@ -591,6 +606,135 @@ Section graph.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** ** DELIVERABLE 6 (G3): THE DEVICE-ORDER EDGES
+
+      A shared device fabric breaks the replay's freedom to reorder: two
+      fabric-touching steps of different agents do not commute, so the
+      toposort must keep them in the behavior's own order.  That order is
+      the witness [pd_ord DS] ([WeakRobustTrace.pdevs]), and the edges
+      that make a topological sort respect it are the SUCCESSOR edges of
+      that list — [gdev].
+
+      SUCCESSOR, not the transitive chain, deliberately: the closure
+      machinery ([WeakRobustOrd.dc], [WeakRobustMain]'s [anc]) walks
+      predecessors one at a time and wants a FINITE, decidable relation;
+      the transitive facts are derived here once and for all
+      ([gdev_chain]). *)
+
+  (** The graph's event lookup IS the witness's — same [option] monad
+      expression, so the two vocabularies need no bridge. *)
+  Lemma gev_ev_ev_at TS e : gev_ev TS e = ev_at TS e.
+  Proof. done. Qed.
+
+  (** A FABRIC-TOUCHING event: one that carries a recorded fabric pair. *)
+  Definition gev_dev TS e : Prop :=
+    ∃ ev, gev_ev TS e = Some ev ∧ is_Some (ae_dev ev).
+
+  Global Instance gev_dev_dec TS e : Decision (gev_dev TS e).
+  Proof.
+    rewrite /gev_dev. destruct (gev_ev TS e) as [ev|] eqn:Hev.
+    - destruct (ae_dev ev) as [dd|] eqn:Hdd.
+      + left. exists ev. rewrite Hdd. split; [done|by eexists].
+      + right. intros (ev' & Hev' & Hs). simplify_eq.
+        rewrite Hdd in Hs. by destruct Hs.
+    - right. intros (ev' & Hev' & _). by simplify_eq.
+  Qed.
+
+  Lemma gev_dev_wf TS e : gev_dev TS e → gev_wf TS e.
+  Proof. intros (ev & Hev & _). by exists ev. Qed.
+
+  (** THE GDEV CHAIN. *)
+  Definition gdev TS (DS : pdevs D) (e1 e2 : gev) : Prop :=
+    ∃ m, pd_ord DS !! m = Some e1 ∧ pd_ord DS !! S m = Some e2.
+
+  Global Instance gdev_dec TS DS e1 e2 : Decision (gdev TS DS e1 e2).
+  Proof.
+    destruct (decide (Exists
+      (λ m, pd_ord DS !! m = Some e1 ∧ pd_ord DS !! S m = Some e2)
+      (seq 0 (length (pd_ord DS))))) as [Hex|Hex].
+    - left. apply list_relations.Exists_exists in Hex as (m & _ & Hm).
+      by exists m.
+    - right. intros (m & H1 & H2). apply Hex, list_relations.Exists_exists.
+      exists m. split; [|by split].
+      apply elem_of_seq. split; [lia|].
+      rewrite Nat.add_0_l. by eapply lookup_lt_Some.
+  Qed.
+
+  Global Instance gdev_rel_dec TS DS : RelDecision (gdev TS DS).
+  Proof. intros e1 e2. apply _. Qed.
+
+  (** Every listed position is a real, fabric-touching event (W1). *)
+  Lemma pd_ord_dev TS DS m e :
+    ptraces_wit TS DS → pd_ord DS !! m = Some e → gev_dev TS e.
+  Proof.
+    intros (HW1 & _) Hm. destruct (HW1 m e Hm) as (ev & Hev & Hdd).
+    by exists ev.
+  Qed.
+
+  Lemma gdev_wf TS DS e1 e2 :
+    ptraces_wit TS DS → gdev TS DS e1 e2 → gev_wf TS e1 ∧ gev_wf TS e2.
+  Proof.
+    intros Hwit (m & H1 & H2).
+    split; apply gev_dev_wf; by eapply pd_ord_dev.
+  Qed.
+
+  (** THE WITNESS IS DUPLICATE-FREE: (W3) already forbids one agent's
+      position from being listed twice, and two entries of the same agent
+      are the only way two entries can coincide. *)
+  Lemma pd_ord_index_inj TS DS m1 m2 e :
+    ptraces_wit TS DS →
+    pd_ord DS !! m1 = Some e → pd_ord DS !! m2 = Some e → m1 = m2.
+  Proof.
+    intros (_ & _ & HW3 & _) H1 H2. destruct e as [i k].
+    destruct (Nat.lt_trichotomy m1 m2) as [Hlt|[->|Hgt]]; [|done|].
+    - have := HW3 m1 m2 i k k Hlt H1 H2. lia.
+    - have := HW3 m2 m1 i k k Hgt H2 H1. lia.
+  Qed.
+
+  (** A SAME-AGENT gdev edge IS ALREADY A [gpo] EDGE — (W3) says the
+      witness refines each agent's trace order.  So the edges [gdev]
+      genuinely ADDS to the graph are the CROSS-agent ones. *)
+  Lemma gdev_gpo TS DS e1 e2 :
+    ptraces_wit TS DS → gdev TS DS e1 e2 → e1.1 = e2.1 → gpo TS e1 e2.
+  Proof.
+    intros Hwit Hd Hag.
+    destruct (gdev_wf TS DS e1 e2 Hwit Hd) as (Hw1 & Hw2).
+    have Hwit' := Hwit. destruct Hwit' as (_ & _ & HW3 & _).
+    destruct Hd as (m & H1 & H2).
+    destruct e1 as [i1 k1], e2 as [i2 k2]. simpl in Hag. subst i2.
+    split_and!; [done| |done|done].
+    apply (HW3 m (S m) i1 k1 k2); [lia|exact H1|exact H2].
+  Qed.
+
+  (** THE TRANSITIVE FACT, derived once: earlier in the witness means
+      [tc gdev]-earlier. *)
+  Lemma gdev_chain TS DS m1 m2 e1 e2 :
+    pd_ord DS !! m1 = Some e1 → pd_ord DS !! m2 = Some e2 → (m1 < m2)%nat →
+    tc (gdev TS DS) e1 e2.
+  Proof.
+    intros H1 H2 Hlt. remember (m2 - S m1)%nat as d eqn:Hd.
+    revert m2 e2 H2 Hlt Hd.
+    induction d as [|d IH]; intros m2 e2 H2 Hlt Hd.
+    - have Hm2 : m2 = S m1 by lia. subst m2.
+      apply tc_once. by exists m1.
+    - have [e He] : is_Some (pd_ord DS !! (m2 - 1)%nat).
+      { apply lookup_lt_is_Some_2.
+        (* NOTE: state the bound with [pd_ord DS] SPELLED OUT — reading it
+           off [H2] gives [@length gev], the goal wants
+           [@length (agent * nat)], and [lia] does not identify the two
+           atoms even though they are convertible. *)
+        have Hb : (m2 < length (pd_ord DS))%nat by eapply lookup_lt_Some.
+        lia. }
+      have Htc : tc (gdev TS DS) e1 e
+        by eapply (IH (m2 - 1)%nat e); [exact He|lia|lia].
+      eapply tc_r; [exact Htc|]. exists (m2 - 1)%nat. split; [done|].
+      by replace (S (m2 - 1))%nat with m2 by lia.
+  Qed.
+
+  Lemma gdev_nil TS (d : D) e1 e2 : ¬ gdev TS (PDevs d []) e1 e2.
+  Proof. intros (m & H1 & _). by rewrite lookup_nil in H1. Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** ** DELIVERABLE 5: STRUCTURAL ACYCLICITY PIECES *)
 
   (** (a) The po part embeds into the step index, so po-only paths are
@@ -811,6 +955,10 @@ End graph.
       indices.
     - [tc_gdep_cross] / [gdep_acyclic_suffices]: a cycle must contain a
       CROSS-AGENT rf edge, which is where the three class arms attach.
+    - [gdev] / [gdev_chain] / [gdev_gpo] / [pd_ord_index_inj] /
+      [gev_dev]: the device-order edges and their structure — what
+      [WeakRobustOrd.gdep3] is built from and what [WeakRobustSim]'s
+      fabric fold consumes.
     - [asteps_ws_le] and the [astep_ok_*] facts: the [coh] arithmetic
       the SCfenced/SCexcl arms will re-use (a fulfil demands
       [coh < ts] on every byte of its message; a read pushes [coh] to

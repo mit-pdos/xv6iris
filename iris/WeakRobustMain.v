@@ -855,8 +855,10 @@ Section cone.
   Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
   Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
                     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
-  (** the fabric scope, as in [WeakRobustSim]: the replay is the dev-free
-      one (G4 lifts it with the device witness) *)
+  (** the fabric scope, as in [WeakRobustSim]: the replay here is the
+      DEV-FREE instance of G4's fabric-carrying one — the witness is
+      empty, so [gdep3] is [gdep2] and the fabric never moves.  (G5
+      rewires this to the general witness.) *)
   Context (Hdf : ∀ j T k ev, pt_trs TS !! j = Some T →
                    at_evs T !! k = Some ev → ae_dev ev = None).
 
@@ -901,13 +903,13 @@ Section cone.
   Lemma Ucone_wf e : Ucone e → gev_wf TS e.
   Proof. intros H. by apply Ucone_iff in H as [? _]. Qed.
 
-  Lemma Ucone_dc : dc TS Ucone.
+  Lemma Ucone_dc : dc TS (gdep2 TS) Ucone.
   Proof.
     intros e e' HU Hd Hwf'. apply Ucone_iff. apply Ucone_iff in HU as [_ Htc].
     split; [done|]. by eapply tc_l.
   Qed.
 
-  Lemma Ucone_sub_ok : sub_ok TS Ucone.
+  Lemma Ucone_sub_ok : sub_ok TS (gdep2 TS) Ucone.
   Proof. split; [apply Ucone_dc|apply Ucone_wf]. Qed.
 
   (** The RESTRICTED relation and its acyclicity. *)
@@ -933,29 +935,30 @@ Section cone.
       simulation invariant established over the whole of it. *)
   Theorem cone_Qinv :
     ∃ order,
-      Qinv pstep TS img d0 ps order ∧
+      Qinv pstep TS (PDevs d0 []) img d0 ps order ∧
       (∀ e, e ∈ order ↔ (gev_wf TS e ∧ tc (gdep2 TS) e r)).
   Proof.
     destruct (topo_sort Rcone (gev_enum_S TS Ucone) Rcone_acyc
                 (NoDup_gev_enum_S TS Ucone)) as (order & Hnd & Hmem0 & Hord).
     have Hmem : ∀ e, e ∈ order ↔ (gev_wf TS e ∧ Ucone e).
     { intros e. rewrite Hmem0. apply elem_of_gev_enum_S. }
-    have Hpre : ∀ n, (n ≤ length order)%nat → Qinv pstep TS img d0 ps (take n order).
+    have Hpre : ∀ n, (n ≤ length order)%nat → Qinv pstep TS (PDevs d0 []) img d0 ps (take n order).
     { intros n. induction n as [|n IH]; intros Hn.
-      { rewrite take_0. by apply (Qinv_nil pstep TS img d0 ps Hwf Hnag Hps0). }
+      { rewrite take_0. by apply (Qinv_nil pstep TS (PDevs d0 []) img d0 ps Hwf Hnag Hps0 eq_refl). }
       have [e He] : is_Some (order !! n) by apply lookup_lt_is_Some_2; lia.
       rewrite (take_S_r order n e He).
       have Hein : e ∈ order by eapply elem_of_list_lookup_2.
       have Hes : gev_wf TS e ∧ Ucone e by apply Hmem.
-      eapply (Qinv_step pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
-                Himg Hnag Hdata Hdf (take n order) e).
+      eapply (Qinv_step pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
+                Hlf Hobl Himg Hnag Hdata (ptraces_wit_nil TS d0 Hdf) (take n order) e).
       - apply IH. lia.
       - apply Hes.
       - (* not already processed *)
         intros Hin. apply elem_of_take in Hin as (i & Hi & Hilt).
         have : i = n by eapply list_relations.NoDup_lookup. lia.
-      - (* every predecessor is processed *)
-        intros e' Hd Hwf'.
+      - (* every predecessor is processed (the witness is empty, so a
+           [gdep3] predecessor is a [gdep2] one) *)
+        intros e' Hd%(gdep3_nil_gdep2 TS d0) Hwf'.
         have HU' : Ucone e' by eapply Ucone_dc; [apply Hes|exact Hd|exact Hwf'].
         have He' : e' ∈ order by apply Hmem.
         apply elem_of_list_lookup in He' as (i & Hi).
@@ -1029,8 +1032,10 @@ Section exhibit.
   Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
   Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
                     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
-  (** the fabric scope, as in [WeakRobustSim]: the replay is the dev-free
-      one (G4 lifts it with the device witness) *)
+  (** the fabric scope, as in [WeakRobustSim]: the replay here is the
+      DEV-FREE instance of G4's fabric-carrying one — the witness is
+      empty, so [gdep3] is [gdep2] and the fabric never moves.  (G5
+      rewires this to the general witness.) *)
   Context (Hdf : ∀ j T k ev, pt_trs TS !! j = Some T →
                    at_evs T !! k = Some ev → ae_dev ev = None).
   Context (Hfo : ptraces_fwd_own TS).
@@ -1088,17 +1093,21 @@ Section exhibit.
     destruct (cone_Qinv pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg
                 Hnag Hdata Hps0 Hdf b2 Hb2wf Hrr (cone_acyc_of_min b2 Hmin))
       as (order & HQ & Hmem).
-    have Hq : qorder TS order by eapply (Qinv_order pstep TS img d0 ps).
+    have Hq : qorder TS order
+      by eapply (Qinv_order pstep TS (PDevs d0 []) img d0 ps).
     have Hb2nin : b2 ∉ order.
     { intros Hin. apply Hmem in Hin as [_ Htc]. by apply Hrr. }
     have Hpre2 : ∀ e', gdep2 TS e' b2 → gev_wf TS e' → e' ∈ order.
     { intros e' Hd Hw'. apply Hmem. split; [done|by apply tc_once]. }
-    have HQ' : Qinv pstep TS img d0 ps (order ++ [b2]).
-    { by eapply (Qinv_step pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
-                   Himg Hnag Hdata Hdf order b2). }
-    have Hq' : qorder TS (order ++ [b2]) by eapply (Qinv_order pstep TS img d0 ps).
-    destruct (Qinv_run pstep TS img d0 ps (order ++ [b2]) HQ')
-      as (cf & Hrun & Hcimg & Hclog & Hclen & Hcags).
+    have HQ' : Qinv pstep TS (PDevs d0 []) img d0 ps (order ++ [b2]).
+    { eapply (Qinv_step pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
+                Hlf Hobl Himg Hnag Hdata (ptraces_wit_nil TS d0 Hdf) order b2);
+        [done|done|done|].
+      intros e' Hd%(gdep3_nil_gdep2 TS d0) Hw'. by apply Hpre2. }
+    have Hq' : qorder TS (order ++ [b2])
+      by eapply (Qinv_order pstep TS (PDevs d0 []) img d0 ps).
+    destruct (Qinv_run pstep TS (PDevs d0 []) img d0 ps (order ++ [b2]) HQ')
+      as (cf & Hrun & Hcimg & Hclog & Hclen & Hcags & _).
     exists cf. split; [exact Hrun|].
     (* ---- the bad message and its pf position ---- *)
     have Hb1in : b1 ∈ order.
@@ -1327,7 +1336,7 @@ Section main.
     have Hco : ∀ a, co_tc TS a
       by eapply (co_serialized_pkg pstep pdev TS sync Hwf Hwfl Hbytes).
     destruct (promise_run_shape (wp_init img d0 ps) mid Hprom)
-      as (Hpimg & Hplen & Hpst).
+      as (Hpimg & Hplen & Hpdev & Hpst).
     have Hof' := Hof.
     destruct Hof' as (Himg0 & Hlog0 & Hlent & Hwft & Hfst & Hlst
                       & Hclogc & Hcimgc & Hclenc).
@@ -1349,8 +1358,9 @@ Section main.
     have Hacyc : gdep2_acyclic TS.
     { eapply (gdep2_acyclic_main pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf
                 Hobl Himg1 Hlen1 Hdata1 Hps1 Hdf Hfo Hee nh Hsplit Hvf Hbwf). }
-    eapply (sim_full pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg1
-              Hlen1 Hdata1 Hps1 Hdf c Hacyc).
+    eapply (sim_full pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
+              Hlf Hobl Himg1 Hlen1 Hdata1 Hps1 (ptraces_wit_nil TS d0 Hdf)
+              eq_refl c (gdep3_acyclic_nodev TS d0 Hacyc)).
     - by rewrite Himg0 Hcimgc.
     - by rewrite Hlog0 Hclogc.
     - by rewrite Hclenc Hplen /wp_init /= length_map.
