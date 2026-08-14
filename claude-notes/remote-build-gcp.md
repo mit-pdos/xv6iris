@@ -172,6 +172,46 @@ Verified: stop → restart takes ~15s with all state intact.
 Rocq builds are incrementally resumable, so a preemption mid-build costs only
 the file in flight — `make` picks up where it left off.
 
+**BUT A BUILD DRIVEN THROUGH THE SSH PIPE LOSES ITS LOG WITH THE MACHINE, AND
+THE LOG IS WHAT YOU WANTED.** `run-on-gcp make | tee build.log` streams through
+`ssh`, so a preemption kills the pipe and the local log ends wherever the pipe
+buffer last flushed — which is nowhere near where the build actually got to,
+and reads like a stall rather than a preemption. Worse, the block buffering
+means a *live* build also looks stalled for minutes at a time, so you cannot
+tell the two apart. Run it detached ON THE VM, writing its own log and its own
+sentinel, and poll that:
+
+```sh
+run-on-gcp --no-sync bash -c '
+  cd /mnt/rocq/trees/<tree>
+  setsid nohup bash -c "make -k proofs > /mnt/rocq/build.log 2>&1;
+                        echo MAKEEXIT=\$? >> /mnt/rocq/build.log" \
+    >/dev/null 2>&1 </dev/null &'
+run-on-gcp --no-sync grep -c MAKEEXIT /mnt/rocq/build.log     # 1 = finished
+```
+
+The log then survives the preemption too, so the restart resumes against a log
+you can still read.
+
+**THE VM IS SHARED, so every whole-machine reading is somebody else's build as
+much as yours.** `uptime`'s load, `pgrep -c rocqworker`, even `pgrep -x make`
+count every tree at once — several `/mnt/rocq/trees/*` build concurrently. To
+find YOUR build, ask for the working directory, which is the only thing that
+distinguishes them (the command line does not — it is `make -k proofs` in all
+of them):
+
+```sh
+for p in $(pgrep -x make); do echo "$p $(readlink /proc/$p/cwd)"; done
+```
+
+**AND NEVER PATTERN-KILL ON THE VM.** `pkill -f "rocqworker --kind=compile"` to
+stop your own build kills every *other* tree's workers in the same breath —
+their `make` reports `Error 143` on whatever was in flight and their agent sees
+a broken build with no cause. (This is `durable-notes.md`'s `pkill -f coqc`
+trap one level up: there the pattern matched the killer's own shell, here it
+matches the neighbours.) Kill the `make` you launched **by PID**, from the
+`/proc/*/cwd` list above, and leave the workers to exit with it.
+
 The VM powers itself off after **1 hour idle**, judged by live SSH sessions and
 running `rocq`/`make`/`opam` processes, so a detached build keeps it alive on
 its own. To pin it up (a long run you do not want interrupted):

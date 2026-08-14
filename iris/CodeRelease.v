@@ -114,8 +114,8 @@ Section CodeRelease.
   Proof. mk_base (KernelSyms.release + 0x30) (mword_of_int 0x40250513 : mword 32)
     (mword_of_int (KernelSyms.release + 0x30) : mword 64) (ITYPE (mword_of_int 1026 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_40250513. Qed.
 
-  Lemma rli_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.release + 0x34) : mword 64) false (JAL (mword_of_int 2096030 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.release + 0x34) (mword_of_int 0xb9fff0ef : mword 32)
-    (mword_of_int (KernelSyms.release + 0x34) : mword 64) (JAL (mword_of_int 2096030 : mword 21, Regidx (mword_of_int 1))) kd_b9fff0ef. Qed.
+  Lemma rli_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.release + 0x34) : mword 64) false (JAL (mword_of_int 2096070 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.release + 0x34) (mword_of_int 0xbc7ff0ef : mword 32)
+    (mword_of_int (KernelSyms.release + 0x34) : mword 64) (JAL (mword_of_int 2096070 : mword 21, Regidx (mword_of_int 1))) kd_bc7ff0ef. Qed.
 
 End CodeRelease.

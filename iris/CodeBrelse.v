@@ -34,13 +34,13 @@ Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
-Require Import KernelDecode22.
 Require Import KernelDecode23.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
 Require Import KernelDecode29.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -235,8 +235,8 @@ Section CodeBrelse.
   Proof. mk_base (KernelSyms.brelse + 0x7c) (mword_of_int 0x70250513 : mword 32)
     (mword_of_int (KernelSyms.brelse + 0x7c) : mword 64) (ITYPE (mword_of_int 1794 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_70250513. Qed.
 
-  Lemma bri_80 : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x80) : mword 64) false (JAL (mword_of_int 2087726 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.brelse + 0x80) (mword_of_int 0xb2ffd0ef : mword 32)
-    (mword_of_int (KernelSyms.brelse + 0x80) : mword 64) (JAL (mword_of_int 2087726 : mword 21, Regidx (mword_of_int 1))) kd_b2ffd0ef. Qed.
+  Lemma bri_80 : kernel_text -∗ instr (mword_of_int (KernelSyms.brelse + 0x80) : mword 64) false (JAL (mword_of_int 2087766 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.brelse + 0x80) (mword_of_int 0xb57fd0ef : mword 32)
+    (mword_of_int (KernelSyms.brelse + 0x80) : mword 64) (JAL (mword_of_int 2087766 : mword 21, Regidx (mword_of_int 1))) kd_b57fd0ef. Qed.
 
 End CodeBrelse.

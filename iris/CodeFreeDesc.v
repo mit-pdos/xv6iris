@@ -184,9 +184,9 @@ Section CodeFreeDesc.
   Proof. mk_base (KernelSyms.free_desc + 0x62) (mword_of_int 0xff050513 : mword 32)
     (mword_of_int (KernelSyms.free_desc + 0x62) : mword 64) (ITYPE (mword_of_int 4080 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ff050513. Qed.
 
-  Lemma fdi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) false (JAL (mword_of_int 2077132 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.free_desc + 0x66) (mword_of_int 0x9ccfb0ef : mword 32)
-    (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) (JAL (mword_of_int 2077132 : mword 21, Regidx (mword_of_int 1))) kd_9ccfb0ef. Qed.
+  Lemma fdi_66 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) false (JAL (mword_of_int 2077172 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.free_desc + 0x66) (mword_of_int 0x9f4fb0ef : mword 32)
+    (mword_of_int (KernelSyms.free_desc + 0x66) : mword 64) (JAL (mword_of_int 2077172 : mword 21, Regidx (mword_of_int 1))) kd_9f4fb0ef. Qed.
 
   Lemma fdi_6a : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x6a) : mword 64) false (UTYPE (mword_of_int 2 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.free_desc + 0x6a) (mword_of_int 0x00002517 : mword 32)
@@ -196,8 +196,8 @@ Section CodeFreeDesc.
   Proof. mk_base (KernelSyms.free_desc + 0x6e) (mword_of_int 0xff450513 : mword 32)
     (mword_of_int (KernelSyms.free_desc + 0x6e) : mword 64) (ITYPE (mword_of_int 4084 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_ff450513. Qed.
 
-  Lemma fdi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) false (JAL (mword_of_int 2077120 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.free_desc + 0x72) (mword_of_int 0x9c0fb0ef : mword 32)
-    (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) (JAL (mword_of_int 2077120 : mword 21, Regidx (mword_of_int 1))) kd_9c0fb0ef. Qed.
+  Lemma fdi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) false (JAL (mword_of_int 2077160 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.free_desc + 0x72) (mword_of_int 0x9e8fb0ef : mword 32)
+    (mword_of_int (KernelSyms.free_desc + 0x72) : mword 64) (JAL (mword_of_int 2077160 : mword 21, Regidx (mword_of_int 1))) kd_9e8fb0ef. Qed.
 
 End CodeFreeDesc.

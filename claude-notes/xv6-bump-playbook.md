@@ -181,6 +181,24 @@ then diff the two symbol tables and group by delta. The groups are the map: one
 `+0` group before the change and after the absorbing boundary, one shifted
 group between.
 
+**AND A "DELTA" NEED NOT BE A SHIFT AT ALL — gcc REORDERS FUNCTIONS, and the
+symbol diff then looks reassuringly tiny while every call site to them moved.**
+On `515391a` the whole `KernelSyms.v` diff was FOUR lines — `bfree`, `balloc`,
+`bmap` and `iget` permuted within fs.c, no symbol outside them moving by a
+byte — which reads as "nothing happened". It is the opposite: each of the four
+changed address, so every `jal` reaching one from anywhere re-encoded, each
+function's own `auipc`/`addi` data pairs re-encoded, and **their `.rodata`
+message strings permuted with them** (§4b). Nothing shifted, so grouping by
+delta finds no groups; read the diff as a PERMUTATION instead. The tell that
+it is benign is that the addresses are a rearrangement of the same multiset
+of sizes — and the `UNALIGNED` sweep, which is per-symbol and offset-relative,
+stays empty throughout, because no function's own body changed.
+
+What provokes it is not the reordered functions' own source: here the C edit
+was a callee swap in `bfree`/`bmap` (§4a-bis) plus one in `ilock` two
+functions away, and gcc took the changed inlining/ordering pressure as licence
+to re-emit fs.c's statics in a different order.
+
 **Do this before touching anything.** Skipping it and reading "48 of 55 offsets
 reshaped" off the *same-offset* tool says a function needs a from-scratch
 rewrite when it does not. The shift tool answers directly — its `UNALIGNED` list
@@ -361,6 +379,24 @@ Form 2 is the dangerous one: **specs compile fine with a wrong address**
 (it is still a well-typed `Z`), so the failure appears in a proof far away and
 a failing-file sweep never touches the spec.
 
+**AND FORM 2 IS A FORM 3 THAT NOBODY CONVERTED.** `etext` IS the base of
+`.rodata` (both `0x80007000` — the dump's `etext` and the section's VMA are the
+same address), so every one of these is `KernelSyms.etext + <offset within
+.rodata>`, and written that way the ordinary bump — one that only grows `.text`
+and slides the whole section — carries it for free. Only a `.rodata`
+*reordering* then touches the offset, which is rare. `ProofBalloc.ba_msg_addr`
+is converted, in `PageGeom.kmem_lo`'s `ltac:(eval vm_compute in …)` shape so
+the body is still a plain `Z` literal downstream and the existing
+`unfold ba_msg_addr; lia` keeps working:
+
+```coq
+Definition ba_msg_addr : Z :=
+  ltac:(let x := eval vm_compute in (KernelSyms.etext + 0x3e8)%Z in exact x).
+```
+
+The other ~23 are still transcribed literals and each is one text-growing bump
+away from the failure above. Convert one whenever a bump makes you touch it.
+
 **Derive these by CONTENT, never by arithmetic.** Search the new image for the
 NUL-terminated string each definition is *named after*, requiring a NUL before
 it so a tail cannot match, then verify all of them:
@@ -391,7 +427,13 @@ grep -rn "_str[a-z_]* : Z := 0x\|_addr : Z := 0x8000[67]" iris/*.v
 ```
 
 is the list to feed it; there are ~24 and every one must print the string its
-name claims. Also invalidate any cached byte map before using it
+name claims. **Have it print the OLD image's string at that address too, and
+where the old string went** — reconstruct the old bytes from
+`git show HEAD:kernel-rocq/KernelData.v`, which is already a byte map. Then a
+mover reports as one line that both flags it and fixes it
+(`ba_msg_addr 0x80007400 new='iget: no inodes' old='balloc: out of blocks\n'
+-> now at 0x800073e8`), instead of leaving you to search the new image by hand.
+Also invalidate any cached byte map before using it
 (`bytes_*.json`); a stale cache produced confidently wrong answers twice.
 
 ### 4c. Data symbols
@@ -444,6 +486,31 @@ obligation (refute the guard), not a relayout, and it is usually a spec-level
 change with caller obligations rather than a local edit — so the honest split
 is "N sites that are already dead" versus "M that need a precondition
 threaded", and only M matters.
+
+**GREP THE OLD CALLEE'S NAME AND YOU GET THE WRONG ANSWER TWICE OVER — RESOLVE
+THE IMMEDIATE INSTEAD.** The grep above finds every assertion naming the old
+callee, but *most of them are fine* (their site was not one of the swapped
+ones), and it cannot tell you which. Worse, the relayout has by then rewritten
+the immediate, so a swapped site reads as a perfectly ordinary assertion whose
+number happens to point somewhere else. Decide it mechanically: for each
+assertion, compute `sym + off + sign_extend(imm)` against the NEW
+`kernel-rocq/KernelSyms.v` and check the symbol you land on is the one the
+assertion names. On `515391a` that turned "17 assertions name `panic`, which of
+them broke?" into a one-line answer — **exactly one**, `ProofIlock`'s
+`ilock + 0xaa` landing on `unreachable` — with the other sixteen proved
+untouched rather than assumed so. Resolve the local proof aliases (`DL`, `KX`,
+`FW`, …) from their `Notation … := KernelSyms.<sym>` when you do it.
+
+**AND WHEN THE ONE SURVIVOR IS A DELIBERATELY-LIVE ARM, THAT IS A SOURCE
+QUESTION, NOT A PROOF TASK.** `SpecIlock.v`'s header records `ip->type == 0` as
+the tree's one live panic arm *because* "a caller premise 'this inum is
+allocated' would be undischargeable today" — so a bump converting it to
+`unreachable()` does not ask for a proof repair, it asks for the whole
+`projects/fs-sysfile.md` §20 ledger, which §20 itself calls "unproven, not
+false". The cheap resolution is upstream: keep that one site as `panic()` until
+the ledger lands, and re-assert it then. Read the spec's own header before
+pricing the repair — if the spec says the arm is live BY DESIGN, the bump is
+what has to move.
 
 ### 4a-ter. THE SHIFT IS NOT ALWAYS A SHIFT
 
