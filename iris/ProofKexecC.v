@@ -3580,4 +3580,179 @@ Section KexecCLoop.
 
 End KexecCLoop.
 
+(* ===================================================================== *)
+(*  THE ARGV LOOP, ITERATED.                                              *)
+(* ===================================================================== *)
+(* One [kxc_argv_step] per argument, measure [na - c].  Mirrors
+   [ProofKexecB3.kxc_phdr] exactly, including the two things that make that
+   shape work and are not obvious:
+
+   - [CID0] IS A LEMMA BINDER, NOT A SECTION VARIABLE.  The back edge
+     re-enters the induction hypothesis at the hart the previous iteration
+     ENDED on, so the induction has to generalise over it ([revert CID0]
+     before [induction W]); a section [Context `{CID0 : CpuId}] is one
+     shared variable and cannot be.
+   - THE [W = 0] CASE IS NOT VACUOUS BY ARITHMETIC.  It is refuted by the
+     back-edge disjunct's OWN pure part: [kxc_at_21a (S c)] carries
+     [S c <= na], which contradicts the exhausted [na - c <= 0].
+
+   [c < na] -- what the step wants and the invariant does not say -- comes
+   from the two liveness facts together: the head has [avf c <> 0] and the
+   contract has [avf na = 0], so [c <> na], and [c <= na] closes it.       *)
+Section KexecCArgvLoop.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+  Context `{GEN : GenId}.
+
+  Notation Rra := (mword_of_int 1 : mword 5).
+  Notation Rs0 := (mword_of_int 8 : mword 5).
+  Notation Rs1 := (mword_of_int 9 : mword 5).
+  Notation Rs2 := (mword_of_int 18 : mword 5).
+  Notation Rs3 := (mword_of_int 19 : mword 5).
+  Notation Rs4 := (mword_of_int 20 : mword 5).
+  Notation Rs5 := (mword_of_int 21 : mword 5).
+  Notation Rs6 := (mword_of_int 22 : mword 5).
+  Notation Rs7 := (mword_of_int 23 : mword 5).
+  Notation Rs8 := (mword_of_int 24 : mword 5).
+  Notation Rs9 := (mword_of_int 25 : mword 5).
+  Notation Rs10 := (mword_of_int 26 : mword 5).
+  Notation Rs11 := (mword_of_int 27 : mword 5).
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+
+  Lemma kxc_argv_loop `{CID0 : CpuId}
+      (jp : nat) (bn : bio_names) (gfs : fs_names) (ga gf : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z)
+      (size : Z) (used2 : gset Z)
+      (plen : nat) (pfun : nat -> bv 8)
+      (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
+      (afun : nat -> nat -> bv 8)
+      (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
+      (m : regfile) (K : nat) (C : iProp Σ)
+      (sp0 ra0 s00 s10 s20 pv av : mword 64)
+      (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
+      (ef : nat -> bv 8) (oldsz sz1 : mword 64) :
+    (K_kexec <= K)%nat ->
+    (forall i, (i < na)%nat -> (alen i < aslen i)%nat) ->
+    (forall i, (i < na)%nat -> bb_cstr (afun i) (alen i)) ->
+    (forall i, (i < na)%nat -> (Z.of_nat (alen i) < 4096)%Z) ->
+    avf na = (mword_of_int 0 : mword 64) ->
+    (8192 <= uint sz1)%Z ->
+    (forall i, (i < 8)%nat ->
+       is_aligned_paddr (Physaddr (pa_stk sp0 (54 - i))) 8 = true) ->
+    m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 ->
+    m !!! Regidx Rs0 = s00 -> m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs2 = s20 ->
+    m !!! Regidx Rs3 = w5 -> m !!! Regidx Rs4 = w6 -> m !!! Regidx Rs5 = w7 ->
+    m !!! Regidx Rs6 = w8 -> m !!! Regidx Rs7 = w9 -> m !!! Regidx Rs8 = w10 ->
+    m !!! Regidx Rs9 = w11 -> m !!! Regidx Rs10 = w12 -> m !!! Regidx Rs11 = w13 ->
+    forall (W : nat) (M : regfile) (P : uptd) (c : nat),
+    (c < na)%nat ->
+    (na - c <= W)%nat ->
+    kernel_text -∗
+    kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
+               M K C sp0 ra0 s00 s10 s20 pv av
+               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
+    wp_next true (proc_addr jp) (fun (CID : CpuId) =>
+    ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+       (entry spv szv' : mword 64),
+        ⌜callee_saved m mf⌝ -∗
+        ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+        sie_cap_gpr mf K true (proc_addr jp) -∗
+        cpu_own 0 true (proc_addr jp) C true -∗
+        pc_is (ret_pc ra0) -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+        ⌜used' ⊆ used2⌝ -∗
+        bitmap_res gfs bmapstart cov logstart size used' -∗
+        kalloc_env ga None -∗
+        proc_priv gf (proc_addr jp) pidv V' -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+        ([∗ list] i ∈ seq 0 na,
+           [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+        bslots bn 3 -∗
+        iref_slots 2 -∗
+        WP (Loop : expr riscv_lang)) -∗
+    wp_next true (proc_addr jp) (fun (CID : CpuId) =>
+      ∀ (M' : regfile) (P' : uptd) (c' : nat),
+        kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
+                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa
+                   M' K C sp0 ra0 s00 s10 s20 pv av
+                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 c' -∗
+        wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
+          ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
+             (entry spv szv' : mword 64),
+              ⌜callee_saved m mf⌝ -∗
+              ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
+              sie_cap_gpr mf K true (proc_addr jp) -∗
+              cpu_own 0 true (proc_addr jp) C true -∗
+              pc_is (ret_pc ra0) -∗
+              sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+              sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+              ⌜used' ⊆ used2⌝ -∗
+              bitmap_res gfs bmapstart cov logstart size used' -∗
+              kalloc_env ga None -∗
+              proc_priv gf (proc_addr jp) pidv V' -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
+              ([∗ list] i ∈ seq 0 na,
+                 [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
+              bslots bn 3 -∗
+              iref_slots 2 -∗
+              WP (Loop : expr riscv_lang)) -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HK Halen_bound Halen_cstr Halen_4096 Havf_na Hsz1ge Hal
+           Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
+           Hmw12 Hmw13.
+    intro W. revert CID0.
+    induction W as [| W IH]; intros CID0 M P c Hcna Hfuel.
+    { (* NO FUEL is not a case: the head is only ever entered at [c < na],
+         so [na - c] is at least one and the measure cannot be exhausted
+         here.  (Carrying [c < na] as a PREMISE rather than reading it back
+         out of the invariant is what keeps this an arithmetic one-liner --
+         and it costs the caller nothing, since the entry disjunct's own
+         [avf c <> 0] against the contract's [avf na = 0] is exactly the
+         derivation.) *)
+      exfalso. lia. }
+    iIntros "#Htext Hst Hcont Hout".
+    iApply (kxc_argv_step (CID0 := CID0) jp bn gfs ga gf cov logstart
+              bmapstart inodestart size used2 plen pfun na avf alen aslen afun
+              pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av
+              w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c
+              HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
+              (Halen_4096 c Hcna) Hsz1ge Hal
+              Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
+              Hmw12 Hmw13
+              with "Htext Hst Hcont [Hout]").
+    iIntros (CIDn Hsn M' P') "[Hnext | Hexit] Hcont".
+    - (* another argument: the BACK EDGE, re-entered at [S c] and at the hart
+         this iteration ended on. *)
+      iEval (rewrite /kxc_at_21a) in "Hnext".
+      iDestruct "Hnext" as "(%Hp1 & %Hp2 & %Hp3 & Hrest)".
+      destruct Hp2 as (HSc & Hp2b & Hp2c & Hp2d).
+      assert (HScna : (S c < na)%nat).
+      { destruct (Nat.eq_dec (S c) na) as [Heqna | Hne];
+          [ exfalso; apply Hp2c; rewrite Heqna; exact Havf_na | lia ]. }
+      assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
+                (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
+      iDestruct (wp_next_retarget CID0 CIDn true (proc_addr jp) _ Hcr
+                   with "Hout") as "Hout".
+      iApply (IH CIDn M' P' (S c) HScna ltac:(lia)
+                with "Htext [Hrest] Hcont Hout").
+      rewrite /kxc_at_21a.
+      iSplitR; [iPureIntro; exact Hp1 |].
+      iSplitR; [iPureIntro; split_and!;
+                [exact HSc | exact Hp2b | exact Hp2c | exact Hp2d] |].
+      iSplitR; [iPureIntro; exact Hp3 |].
+      iExact "Hrest".
+    - (* the loop is over *)
+      iSpecialize ("Hout" $! CIDn with "[%]"); [wp_next_chain |].
+      iApply ("Hout" $! M' P' (S c) with "Hexit Hcont").
+  Qed.
+
+End KexecCArgvLoop.
+
 End KexecCProof.
