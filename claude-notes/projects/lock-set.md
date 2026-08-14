@@ -21,6 +21,19 @@ co-ownership of that field, maintained by acquire and release, and `cpu_own`
 carries it as an index.  The existential wrapper `cpu_locks_any` that hid it
 during phase 1 is deleted; contracts name the set.
 
+## Status
+
+The substrate is landed and proven, the client sweep is essentially done, and
+the ORDER has been revised once (ftable/itable above proc -- see below).
+
+Three files were still red at the last full build:
+
+* `ProofIput` -- RED ON PURPOSE, and expected to stay that way until the
+  icache REF-1 work lands.  See "THE ONE UNLICENSED EDGE" below; the failing
+  `assert` in the file carries the same explanation.
+* `ProofUsertrapArms`, `ProofVirtioDiskRwF` -- ordinary held-set threading,
+  fixes in flight.
+
 ## The substrate is LANDED AND PROVEN, the clients are most of the way
 
 `cpu_own` carries the held set as an index, and the acquire/release pair is
