@@ -279,6 +279,7 @@ End astep.
 Section graph.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pcls : wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types TS : ptraces P D.
@@ -909,7 +910,7 @@ Section graph.
       (class_pins : image → list P → Prop) : Prop :=
     ∀ img d0 ps c mid TS,
       lat_free_prog pstep →
-      pf_violation_free cls pub pstep img d0 ps →
+      pf_violation_free cls pub pstep pcls img d0 ps →
       class_pins img ps →
       wp_behavior pstep img d0 ps c →
       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →

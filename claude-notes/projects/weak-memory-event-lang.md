@@ -312,13 +312,23 @@ or hart restriction.
    instruction-atomic leaf time and ~1.7× the lines**, and expect the
    per-leaf pattern of §§1–3 verbatim: cursor equations by `have … by
    reflexivity`, node facts by `vm_cast_no_check`, nothing else.
-3. **THE LAYER-1 GENERALISATION (S2).**  `WeakPromise.wpcfg` needs a shared
-   device component (or `WeakRobustMain`'s Section `main` needs to be
-   parametric in the configuration functor) before `WeakRobust.violation_hart`
-   can be consumed at `epf_step`.  Until then the spike's capstone is stated
-   at the fabric-shared machine, which is Layer 1's own predicate at the
-   projected configuration — the statement is right, the instantiation is
-   missing.  This is now the only *architectural* debt of the spike.
+3. **THE LAYER-1 GENERALISATION (S2) — PARTLY DONE, PARTLY REFUTED.**  The
+   shared device component LANDED (fabric effort G1–G4,
+   [`weak-memory-fabric.md`](weak-memory-fabric.md)): `WeakPromise.wpcfg`
+   carries `pc_dev : D` and `pstep` moves it.  Two of the three reasons
+   `epf_step` was still not an instance are now settled: the free message
+   class is PINNED at fulfil time (G6a), and the PLIC hart index is a
+   recorded cheap fix.  The third is **REFUTED**: the disk's DMA reads the
+   flat memory, which is a `lat` (latest) read, and Layer 1's `pstep` must
+   stay LOG-BLIND for the front-loading commutation and the cone replay to
+   work at all (design note
+   [`design/weak-memory-m6-robustness.md`](../design/weak-memory-m6-robustness.md)
+   §10).  So the instantiation cannot be completed by generalizing `pstep`
+   further; the disk arm's memory stays existential until the machine has
+   DEVICE VIEWS (M5), and the residue is a reachability-inclusion premise
+   ("the memory-free disk arm reaches nothing the flat-faithful one does
+   not"), NOT a memory-blindness premise, which is refutable.  Read the
+   fabric worklist's G6 section before attempting this again.
 4. **RETIRE THE LIFT TREE** to `completed/` once the port lands: the bracket
    files (`WeakInterp`'s wrun-as-language-step, `WeakSailLTS`/`2`,
    `WeakSailComplete`, `WeakSailCone`, `WeakRobustCone`, `WeakComposeLang`),

@@ -151,6 +151,17 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`weak-memory-fabric.md`](projects/weak-memory-fabric.md)** — the Layer-1
+  FABRIC generalization (mini-M5): `WeakPromise.wpcfg` gains a third shared
+  component `pc_dev : D`, the trace representation gains a global
+  device-order witness and the dependency graph gains `gdev` edges, so the
+  event language can become a Layer-1 INSTANCE.  G1–G6a landed (the device
+  epoch; the fulfil-time class pinning).  **G6b — the instance and the
+  one-machine capstone — is NOT deliverable as planned:** read the G6
+  findings before touching this area, in particular that the disk's DMA
+  read of the flat memory is a LATEST read and therefore irreducible at
+  Layer 1 (a log-blind `pstep` is what `wp_swap` and the cone replay both
+  depend on).
 - **[`weak-memory-premises.md`](projects/weak-memory-premises.md)** — shrinking
   the lifted capstone's premise ledger.  **The in-scope ledger is CLOSED
   (C9, 2026-08-14) — the file should move to `completed/`.**  Both halves of

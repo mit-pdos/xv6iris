@@ -1,9 +1,12 @@
 # The Layer-1 fabric generalization — worklist (mini-M5)
 
-**Status (2026-08-14): G1–G4 landed; G5a/G5b/G5c1 landed (see "G5 LANDED"
-at the bottom — the acyclicity route is the DEVICE EPOCH); G5c2/G5c3
-BLOCKED on a Layer-1 signature finding that G6 must design around; G6
-open.**
+**Status (2026-08-14): G1–G4, G5a/b/c1 and G6a LANDED.  G6b (the event
+language as a Layer-1 INSTANCE, and the one-machine capstone) is NOT
+delivered and is NOT deliverable as specified — see "G6 LANDED" at the
+bottom: half of the G5c2 blocker (the free class binder) is CLOSED by
+G6a's fulfil-time pinning, and the other half (the disk's flat memory) is
+REFUTED, i.e. it cannot be closed by any change to `pstep`'s signature.
+The successor effort must retarget, not retry.**
 The event-language spike PASSED
 ([`weak-memory-event-lang.md`](weak-memory-event-lang.md)); its one
 architectural debt is the S2 finding: `WeakPromise.wpcfg` has exactly two
@@ -279,3 +282,273 @@ EXACTLY the five rv64d axioms: `rv64d.valid_reservation`,
 `rv64d.plat_term_write`, `rv64d.match_reservation`,
 `rv64d.load_reservation`, `rv64d.cancel_reservation`.
 `tools/lemma_diff.py --ref HEAD`: CLEAN.  No `Axiom`, no `Admitted`.
+
+## G6 LANDED (2026-08-14) — a; and the REFUTATION that closes the effort
+
+### G6a — THE CLASS IS PINNED AT FULFIL TIME (landed)
+
+`WeakPromiseBridge.v`'s `Section bridge` gained a section parameter
+
+```coq
+Context (pcls : wlabel → wstate → wm_class).
+```
+
+and the promise-free fragment's two appending arms PIN the class they
+stamp: `PFStore` gained `k = pcls (LStore rl base data) (pa_ws ag)` and
+`PFRmw` gained `k = pcls (LRmw aq rl base tvs data) (pa_ws ag)`, as the
+LAST premise of each.  So the applied forms are `wp_pf_step pstep pcls …`
+/ `wp_pf_run pstep pcls …`, with `pcls` in second position.  The archive
+instantiates it at `WeakSailLTS2.lbl_class` throughout.
+
+**THE SIGNATURE IS NOT FINISHED, AND THE NEXT STAGE MUST FIX IT — read
+this before touching the class again.**  `pcls` is indexed by the LABEL
+and the `wstate`, but `WeakInterp.wm_class_of` branches on the ACCESS
+KIND *first*, and the access kind is NOT in the label (`wlabel`'s
+`LStore` carries only `(rl, base, data)`).  `WeakSailLTS`'s deltas
+(e)/(e'') make an exclusive read open NO window and step an exclusive RAM
+write as an ordinary `LStore`, so `amoswap.w.aq` — which xv6's `acquire`
+executes — appends a message the interpreter classes `WCexcl` while
+`lbl_class (LStore …)` can only be `WCrel`/`WCplain`.  Consequence: the
+archived ⇒ bracket (`xv6_pf_instr` and the four statements under it)
+carries a new side condition `WeakSailLTS.wrun_plainw` ("this run
+appended no `WCexcl` message"), which is satisfiable but EXCLUDES EVERY
+AMO.  **No capstone carries it** (the lift consumes the ⇐ direction), so
+it costs no theorem — it is a coverage restriction on an archived
+bracket, recorded at delta (e'').
+
+**THE FIX (do this first in the successor stage): index `pcls` by the
+PROGRAM STATE, `P → wlabel → wstate → wm_class`.**  The access kind lives
+there — the residual monad sits at the `MemWrite n req` node — so the
+class function returns `wm_class_of (classify (WriteReq.access_kind req))
+ws` at the `LStore` case (NOT by deferring to `lbl_class`, which
+reproduces the bug) and is then exact at EVERY write; `wrun_plainw`
+disappears.  The replay is unaffected: `qcfg` hands the acting agent the
+RECORDED `pa_st` verbatim (only the `wstate` is retimed, and
+`nproc done e.1 = e.2` makes it the very record `cls_canonical` speaks
+about), so `cls_canonical` and `pcls_obl` merely carry the extra argument
+along and the discharge is unchanged.  The same wall is waiting in
+`WeakEvLang` (its plain `MemWrite` arm also accepts `ak_latest = true`),
+so the change pays for itself twice.  **What NOT to do:** a
+`sail_shaped`-style ∀-path monad predicate ("every RAM write this monad
+reaches is plain") is REFUTABLE for the xv6 image — `classify` sends
+`AV_exclusive`/`AV_atomic_rmw` to `ak_latest = true`, so the AMO and bare
+`sc` paths in `riscv_step`'s decode tree refute it.  That mistake was
+made and caught during G6a; it is the same genre as the
+`oracle_consistent` post-mortem in `WeakCompose` §6(4).
+
+**WHY AT THE FULFIL, AND NOT IN THE LABEL.** `pstep` emits a label and
+never sees a `wstate`, so it cannot constrain the class itself — and a
+free binder makes the pf machine a STRICT over-approximation of any model
+that COMPUTES the class (the G5c2 finding, item 1).  The fulfil is the
+only point where BOTH ingredients are in scope: the agent's `wstate`
+(for `w_relp`) and the agent's program state (for the access kind).
+Hence the arms, and not the label, carry the equation.
+
+**HARDWARE CONTAINMENT IS PRESERVED — the PARM note's G6 addendum.**  The
+class is our bookkeeping: no rule reads `wm_ak` (the rule-by-rule audit is
+`WeakRetag`'s header), so pinning removes no hardware behavior — it
+selects, among behaviors differing ONLY in an inert tag, the one the model
+would have written.  Formally `wp_pf_step_rtc_wpstep` is unchanged: the
+full machine's binder is free and accepts the pinned value, so every
+containment statement proved against `wpstep` still covers the pinned
+fragment.  Recorded as the G6a addendum in `WeakCompose` §6(5).
+
+**DEVIATION, forced and recorded: ONLY the promise-free fragment is
+pinned.**  The stage brief asked for `WeakPromise.wpstep`'s `WPFulfil` /
+`WPRmw` to be pinned as well.  That is wrong, for a reason that only shows
+up downstream: pinning the FULL machine makes `WeakRetag.wpstep_retag`
+FALSE (a retagged run is not a run of a pinned machine), and the retag is
+exactly what DISCHARGES `cls_canonical` today
+(`WeakRetag.cls_canonical_canon`, consumed by
+`WeakComposeLang.xv6_weak_robust_lifted`).  Pinning only the pf fragment
+is also strictly better for every consumer: `pf_violation_free_hart`
+quantifies over `wp_pf_run` ONLY, so the premise gets WEAKER (fewer runs
+to rule out) and `robust_main`'s conclusion gets STRONGER (the exhibited
+run is canonically classed).  Both directions move the right way.
+
+**THE REPLAY'S NEW OBLIGATION, and how it is discharged.**  The exhibit
+(`WeakRobustSim.Qinv_step`, `WeakRobustCone.Qcfg_step`) BUILDS pf steps
+from a recorded trace, so it now owes `kc = pcls l ws_replay` at every
+store/rmw it replays.  Two halves, both Layer-1 vocabulary, both now in
+`WeakRobustTrace.v`:
+
+- **`cls_canonical clsf TS`** (MOVED there verbatim from `WeakRetag`) —
+  the RECORDED side: every logged message carries the class `clsf`
+  computes at its fulfil event's pre-record agent state.
+- **`pcls_obl clsf`** — the REPLAYED side: the class function must look at
+  no timestamp.  It may look at the label's non-timestamp data and at
+  `w_relp`, which is the ONLY `wstate` field the event fold computes from
+  labels alone.  This is the exact analogue of `ts_oblivious` for `pstep`,
+  and `WeakSailLTS2.lbl_class` satisfies it.
+
+The bridge between them is `WeakRobustProv.w_relp_aevs_post_indep` (it
+existed, unused, since W2b — it was written for exactly this and moved
+down from `WeakRobustMain` so `WeakRobustSim` can see it) plus the new
+`WeakRobustSim.replay_ws_relp`.  `sim_prefix`/`sim_full`/
+`bad_edge_violates`/`robust_main`/`robust_transport` each gained
+`pcls_obl pcls` and a per-bundle `cls_canonical pcls TS`; **`main_premises`
+was NOT touched** — canonicity is discharged by the retag at the capstone,
+obliviousness by the concrete class function, so neither is a new residue.
+
+### G6a2 — THE DISK'S FLAT MEMORY: REFUTED, and it closes the effort
+
+The stage brief's second half was "give the generalized `pstep` the flat
+memory as an INPUT (`pstep : P → D → mem → wlabel → P → D → Prop`), the
+machine passing `wflat (pc_img c) (pc_log c)`; the disk arm then takes the
+REAL flat and delta (i) is deleted."  **That is not implementable, and the
+obstruction is not a budget problem — it is the same one `lat_free_prog`
+exists to name.**
+
+**THE ARGUMENT.**  A flat-memory read is `latest_ts`-indexed: it reads the
+TOP write to each byte of the WHOLE log (`WeakLang.wflat_lookup` states
+exactly that).  That is the `lat = true` read shape, and Layer 1 excludes
+`lat = true` from every robustness theorem by premise, because:
+
+1. **The front-loading factorization breaks.**  `WeakPromiseFact.wp_swap`
+   commutes a state step past a promise step by RE-APPLYING the very same
+   `pstep` instance at the log with one more message appended.  It works
+   only because `pstep` is log-blind, and its `lat_free l` side condition
+   is there because `read_ok` at `lat = true` is the one memory-side
+   condition an append can destroy (`read_ok_app` is stated at
+   `lat = false`).  A flat argument is destroyed by an append for the same
+   reason and with no side condition to hide behind, so `wp_swap`,
+   `wp_front_load`, `wp_behavior_factor` and every traced-bundle theorem
+   fail.
+2. **The replay breaks, and G4's fabric treatment does not rescue it.**
+   `qfab_step` replays a fabric-touching event at its RECORDED fabric
+   because the `gdev` chain forces the witness order.  There is no
+   analogue for the flat: the replayed log is `pf_log TS done`, a
+   PERMUTED SUBSET (the cone cut drops messages), so the replay's flat is
+   not the recorded one for any ordering discipline short of forcing
+   every store into the device witness — which would chain all stores in
+   behavior order, force π to the identity and make the robustness
+   theorem vacuous.
+
+**AND WIDENING THE OTHER SIDE IS NOT HONEST EITHER.**  The symmetric move
+— widen `WeakEvLang.edisk_step` to accept the fictional memory, so the
+over-approximating pf machine still lands inside the language — makes the
+DISK THREAD'S WP obligation FALSE: with an arbitrary DMA source the burst
+writes an arbitrary address set, which breaks the C/D/S protocol conjunct
+of `weak_state_interp`.  The DMA's memory-faithfulness is LOAD-BEARING for
+φ; it cannot be dropped, and Layer 1 has no vocabulary for it.
+
+**SO delta (i) IS IRREDUCIBLE AT THIS LAYER**, and the G5c2 blocker
+survives in exactly one arm.  The honest packaging for whoever picks this
+up (design, not code — nothing was written):
+
+```coq
+(* the flat-faithful sub-relation of the instance's pf machine *)
+Definition ev_pf_run_f c c' :=
+  ∃ i l, wp_pf_step pstep_ev pcls_ev i l c c' ∧ ev_burst_faithful c i l c'.
+(* THE ONE NAMED RESIDUE: the DMA over-approximation reaches nothing new *)
+Definition ev_dma_harmless img d0 ps :=
+  ∀ c, rtc (wp_pf_run pstep_ev pcls_ev) (wp_init img d0 ps) c →
+       rtc ev_pf_run_f (wp_init img d0 ps) c.
+```
+
+`pf_violation_free_hart` over `ev_pf_run_f` IS derivable from
+`weak_ev_pf_violation_free` (that is the ⇒ direction, now unblocked at the
+class binder); `ev_dma_harmless` is what carries it to the full pf
+machine.  It is a reachability-INCLUSION claim, so it is not refutable by
+inspection the way a "the burst is memory-blind" premise would be, and it
+joins the ledger next to `xv6_block_cover`.  **Do not state the seam as
+"the burst holds at every memory" — that is refutable (`WDiskStepDma`
+reads the descriptor chain out of `mv`), and this effort has already
+burned three premises of that genre.**
+
+**THE REAL FIX is architectural and belongs to M5, not here:** the DMA's
+memory read must become a REAL machine read — a device-view read in a
+machine that HAS device views — at which point the disk stops being a
+program agent with a private oracle and delta (i) disappears with it.
+
+### G6b — NOT DELIVERED (the instance and the one-machine capstone)
+
+`epf_step` as a `wp_pf_step` instance, `weak_ev_pf_violation_free` in
+instance form, and the new capstone were NOT built.  With G6a landed the
+remaining work is well-defined and no longer blocked on a design question
+except the disk arm above:
+
+1. **`pexv6` needs the CPU** in its `PHart` constructor (the recorded
+   cheap fix for the PLIC arm's hart index).  Trivial, no consumers yet.
+2. **THE STANDALONE CONDITIONAL WRITE — solved by RETYPING `pcls`, which
+   G6a did NOT do; do it first.**  The event language's plain `MemWrite` arm
+   (`WeakEvLang.v` ≈ 345) accepts a conditional (`ak_latest = true`) RAM
+   write and stamps `wm_class_of … = WCexcl`, so `elabel_ok`'s store arm
+   is still existential in the class (`∃ k, …`).  Making it EXACT needs no
+   language change and no side condition: `pexv6`'s `PHart` carries the
+   residual monad, which at a store event sits at the `MemWrite n req`
+   node, so — once `pcls` is retyped to `P → wlabel → wstate → wm_class` —
+   `pcls (PHart m rs fn) (LStore rl base data) ws :=
+   wm_class_of (classify (WriteReq.access_kind req)) ws` is exact, and
+   `pcls (PDisk _) (LStore …) _ := WCplain` matches
+   `WeakLang.wmsgs_of_map`'s stamp.  **Do NOT guard the arm with
+   `ak_latest = false`** (that removes a real hardware behavior — the wrong
+   direction for containment; the `MemRead` F6 guard already spends that
+   coin once) **and do NOT add a `sail_shaped`-style ∀-path monad
+   predicate** ("every RAM write this monad reaches is plain") — that form
+   is REFUTABLE for the xv6 image, since `acquire` executes
+   `amoswap.w.aq`.
+3. Then `pstep_ev`/`pcls_ev`/`pdev_ev`, and the arm-by-arm factorization
+   of `emonad_step` into "program part (monad + regs + fabric) × memory
+   part (`elabel_ok`)".  This is the bulk: ≈20 arms, both directions.
+4. Then the capstone, with `ev_dma_harmless` as its single new premise.
+
+### G6c — the wrap (landed)
+
+`WeakCompose` §6 is updated for what actually holds — NOT rewritten "for
+the one-machine architecture", because that architecture is not the route
+(G6b did not land).  Four edits: (2) records that the pinned class shrinks
+`pf_violation_free_hart`'s quantification; **(3′) is NEW** — the
+`cls_canonical lbl_class TS` conjunct `m6_side_conditions` gained, in the
+same epistemic slot as (3) but one category better (a NORMALIZATION, and
+the normalization is machine-checked, so `xv6_weak_robust_lifted` has no
+such premise); (4) carries the G6a2 refutation in full, with the corrected
+upgrade path and the warning not to state the seam as memory-blindness;
+(5) carries the PARM-containment addendum plus the `wrun_plainw` coverage
+restriction and the `pcls`-retyping fix.  The durable half of the finding
+— **Layer 1's `pstep` is LOG-BLIND, and that is load-bearing** — is lifted
+into `design/weak-memory-m6-robustness.md` §10.
+
+**Audit at the G6 landing.**  Full `make -f CoqMakefile -j24 -k` green
+(exit 0, zero `Error` lines).  `Print Assumptions` over the same 15
+lemmas as at G5, with the same result: `gdep3_acyclic_epoch`,
+`robust_main`, `bad_edge_violates`, `xv6_weak_robust`,
+`xv6_weak_robust_prefix` CLOSED under the global context; the ten
+model-facing ones (`xv6_weak_robust_lifted`, `xv6_weak_robust_adequate`,
+`weak_ev_pf_violation_free`, `ewp_eloop`, `ewp_ev_ret`,
+`ewp_ev_seq_ret`, `ewp_ev_started_set`/`_load`/`_fence`/`_wait_seq`) on
+EXACTLY the five rv64d axioms.  `tools/lemma_diff.py --ref HEAD`: 9 items,
+all pure RELOCATIONS (`cls_canonical` → `WeakRobustTrace`, the eight
+`w_relp_*` → `WeakRobustProv`), each verified present in its new home.
+No `Axiom`, no `Admitted`, no `admit`.  16 `.v` files touched, no file
+added, nothing committed.
+FOLLOW-ON TRACKS, unchanged in priority: the M4 leaf retarget with
+spec-preserving packaging; the RVWMO axiomatization research track; phase-2
+`main_premises` discharge (the static site checker of §6(3)).
+
+### The G-series findings list (the durable part of this effort)
+
+- **G3 — W7 REFUTED.**  In a promising machine an `rf` edge may point
+  BACKWARDS in behavior time (a read reads a promise its author fulfils
+  later), so no behavior-order rank makes `gdep2` monotone and
+  union-acyclicity is NOT free.
+- **G5a — THE DEVICE EPOCH.**  `depoch` + the per-edge residue
+  `dev_epoch_ok` (no `rf`/`gE` edge lowers the epoch) closes `gdep3`
+  cone-acyclicity; free at the empty witness; irreducible (the
+  counterexample is a promise read across a device access).
+- **G5c2 — the pf machine OVER-APPROXIMATES a computed-class model** at
+  the free class binder, the disk's existential memory and the PLIC hart
+  index.
+- **G6a — CLASS PINNING**, at FULFIL time, in the PROMISE-FREE fragment
+  only (pinning the full machine would falsify `WeakRetag`'s retag, which
+  is what discharges canonicity).  Landed at
+  `pcls : wlabel → wstate → wm_class`, which is ONE ARGUMENT SHORT: the
+  class branches on the ACCESS KIND, which lives in the monad node and not
+  in the label, so the archived ⇒ bracket lost AMO coverage
+  (`wrun_plainw`).  The successor stage must retype it to
+  `P → wlabel → wstate → wm_class`.  Any ∀-path monad predicate offered as
+  a substitute is REFUTABLE for the xv6 image.
+- **G6a2 — THE DISK'S FLAT MEMORY IS A LATEST READ**, hence irreducible at
+  Layer 1: `wp_swap` and the cone replay both re-apply a recorded `pstep`
+  instance at a DIFFERENT log, and only a log-blind `pstep` survives that.
+  Widening the language instead falsifies the disk thread's WP.

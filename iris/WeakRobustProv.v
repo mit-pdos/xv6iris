@@ -120,6 +120,78 @@ Lemma aevs_post_app {D : Type} σ (evs : list (aev D)) ev w :
 Proof. by rewrite /aevs_post foldl_app. Qed.
 
 (* ------------------------------------------------------------------ *)
+(** ** [w_relp] IS σ-INDEPENDENT
+
+    (Moved here from [WeakRobustMain] with the G6a class pinning: the
+    replay in [WeakRobustSim] needs it to discharge the pinned-class
+    equation, and [WeakRobustSim] is upstream of [WeakRobustMain].  The
+    [w_pub_*] siblings stayed behind — only the exhibit uses those.)
+
+    No [wstate] rule computes the release-pending flag from a timestamp,
+    so the π-transported fold and the behavior's own [id]-fold agree on
+    it.  This is what makes [WeakRobustTrace.pcls_obl]'s "[clsf] may read
+    [w_relp]" licence usable. *)
+
+Lemma w_relp_foldl_load (aq : bool) (v : nat) ats :
+  ∀ w, w_relp (foldl (λ w at_, load_post_at w aq v at_.1 at_.2) w ats)
+       = w_relp w.
+Proof. induction ats as [|at_ ats IH]; intros w; [done|by rewrite /= IH]. Qed.
+
+Lemma w_relp_load_post_bytes ws aq ats :
+  w_relp (load_post_bytes ws aq ats) = w_relp ws.
+Proof. apply w_relp_foldl_load. Qed.
+
+Lemma w_relp_load_post_run ws aq base ts :
+  w_relp (load_post_run ws aq base ts) = w_relp ws.
+Proof. apply w_relp_load_post_bytes. Qed.
+
+(** [w_relp] after a store run depends on the PRE-state's [w_relp] and
+    on the byte list — never on the timestamp. *)
+Lemma w_relp_foldl_store (rl : bool) as_ :
+  ∀ w w' (t t' : nat), w_relp w = w_relp w' →
+    w_relp (foldl (λ w a, store_post w rl a t) w as_)
+    = w_relp (foldl (λ w a, store_post w rl a t') w' as_).
+Proof.
+  induction as_ as [|a as_ IH]; intros w w' t t' Heq; [done|].
+  simpl. by apply IH.
+Qed.
+
+Lemma w_relp_store_post_bytes_indep (rl : bool) as_ w w' (t t' : nat) :
+  w_relp w = w_relp w' →
+  w_relp (store_post_bytes w rl as_ t) = w_relp (store_post_bytes w' rl as_ t').
+Proof. apply w_relp_foldl_store. Qed.
+
+Lemma w_relp_store_post_run_indep (rl : bool) base n :
+  ∀ w w' (t t' : nat), w_relp w = w_relp w' →
+    w_relp (store_post_run w rl base n t)
+    = w_relp (store_post_run w' rl base n t').
+Proof. intros. by apply w_relp_store_post_bytes_indep. Qed.
+
+(** σ-INDEPENDENCE of [w_relp]: no [wstate] rule computes the
+    release-pending flag from a timestamp. *)
+Lemma w_relp_aev_post_indep {D : Type} σ σ' (ev : aev D) w w' :
+  w_relp w = w_relp w' → w_relp (aev_post σ ev w) = w_relp (aev_post σ' ev w').
+Proof.
+  intros Heq. rewrite /aev_post.
+  destruct (ae_lb ev) as [|aq lat base tvs|rl base data|aq rl base tvs data
+                          |pr pw sr sw]; [done| | | |].
+  - by rewrite !w_relp_load_post_run.
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    by apply w_relp_store_post_run_indep.
+  - destruct (ae_ts ev) as [ts|]; [|done].
+    apply w_relp_store_post_run_indep. by rewrite !w_relp_load_post_run.
+  - rewrite /fence_post /=. by destruct (pw && sw)%bool.
+Qed.
+
+Lemma w_relp_aevs_post_indep {D : Type} σ σ' (evs : list (aev D)) :
+  ∀ w w', w_relp w = w_relp w' →
+    w_relp (aevs_post σ evs w) = w_relp (aevs_post σ' evs w').
+Proof.
+  induction evs as [|ev evs IH]; intros w w' Heq; [done|].
+  rewrite /aevs_post /=. apply IH. by apply w_relp_aev_post_indep.
+Qed.
+
+(* ------------------------------------------------------------------ *)
 (** ** B. Behavior correspondence: the behavior's own [wstate] IS the
        [id]-fold of its trace prefix *)
 

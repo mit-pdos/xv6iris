@@ -412,3 +412,54 @@ dropping dependency tracking makes the model WEAKER than hardware — free for
 adequacy. The promise-free choice makes it STRONGER — adequacy needs
 hardware ⊆ model, and that strengthening is exactly what M6 discharges.
 Adding behaviors is free; removing them needs a theorem.
+
+---
+
+## 10. THE INVARIANT OF THE WHOLE LAYER: `pstep` IS LOG-BLIND
+
+Recorded 2026-08-14 (fabric effort, finding G6a2) because it was nearly
+violated twice and it is not written down anywhere else.
+
+Layer 1's program step is `pstep : P → D → wlabel → P → D → Prop`. It sees
+the program state and the shared fabric; it does **not** see the image or
+the log. That is not an accident of the interface, it is what two central
+arguments consume:
+
+- **`WeakPromiseFact.wp_swap`** — the front-loading commutation, which is
+  what turns a behavior into agent-contiguous phases — moves a state step
+  past a promise step by RE-APPLYING THE SAME `pstep` INSTANCE at a log
+  with one more message appended. Only a log-blind `pstep` survives that.
+- **`WeakRobustSim`'s replay** re-applies the recorded `pstep` instance at
+  `pf_log TS done`, a PERMUTED SUBSET of the behavior's log.
+
+Everything the machine reads from the log is therefore in the machine's own
+side conditions (`read_ok`, `excl_ok`, `fulfil_ok`), where the stability
+lemmas live — and the ONE side condition an append can destroy, a `lat`
+(latest/coherent) read, is excluded by the `lat_free_prog` premise for
+exactly this reason.
+
+**The corollary, and the trap.** Any log-derived value you are tempted to
+hand a program agent — the flat memory `wflat img log`, a "latest write"
+answer, a DMA source — is a `lat` read in disguise (`wflat` is
+`latest_ts`-indexed by definition) and breaks both arguments. G4's device
+witness rescues the FABRIC (the `gdev` chain pins each fabric-touching step
+at its recorded fabric); there is no analogue for the log, short of chaining
+every store into the witness, which forces the replay permutation to the
+identity and makes the robustness theorem vacuous.
+
+So: a device whose semantics genuinely reads memory (virtio's DMA) cannot be
+a Layer-1 program agent with an exact memory input. Either it
+over-approximates (its memory is existential — the archived `delta (i)`), or
+its read becomes a REAL machine read in a machine that has device views
+(M5). There is no third option at this interface, and "widen the language so
+the over-approximation is inside it" is not one either: it makes the disk
+thread's WP false, because the C/D/S protocol conjunct of the state
+interpretation depends on the DMA writing where its descriptors say.
+
+**Related polarity note.** The same section's closing rule applies to the
+message class: pinning `wp_pf_step`'s class binder (G6a) REMOVES behaviors,
+so it needs an argument — and it has one, namely that no rule reads
+`wm_ak`, so the removed behaviors differ from a kept one only in an inert
+tag. Contrast the `MemRead` F6 guard and any proposed `MemWrite` guard,
+which remove real hardware behavior and must be paid for by a per-image side
+condition instead (`WeakSailLTS.sail_plainw`).

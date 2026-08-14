@@ -215,6 +215,36 @@
         differ in that one inert field.  Per-image discharge, as for (e): the
         xv6 kernel uses [amoswap], not [sc].
 
+        SINCE G6a THE ⇒ DIRECTION OWES IT TOO, AND OWES MORE (G6a finding).
+        [WeakPromiseBridge]'s promise-free fragment no longer leaves the
+        message class a free binder: [PFStore]/[PFRmw] PIN it to [pcls l ws]
+        at the fulfilling agent's own [wstate].  So the bracket can no longer
+        append the interpreter's [WCexcl] at a conditional write, and it
+        carries the ⇒-side side condition [wrun_plainw] (§5).
+
+        AND THE ⇒-SIDE CONDITION IS STRICTLY BIGGER THAN THE ⇐-SIDE ONE.  On
+        the ⇐ side only a STANDALONE conditional write is a problem, because
+        a FUSED rmw appends an [LRmw] and [lbl_class] of an [LRmw] is
+        [WCexcl] — the interpreter's class exactly ([lbl_class_rmw]).  The ⇒
+        bracket has no fused arm since stage C8 (delta (e)): it takes the
+        bare one-step arm at EVERY exclusive read, so an [amoswap] becomes a
+        plain [LLoad] and a plain [LStore], and the [LStore]'s pinned class
+        is [WCrel]/[WCplain] where [wrun] stamped [WCexcl].  [wrun_plainw]
+        therefore excludes every AMO — including [amoswap.w.aq], which is
+        how xv6 spells [acquire].  This is a REAL coverage restriction on
+        the ⇒ bracket, not a per-image discharge, and it is recorded as
+        such: nothing in the development consumes the ⇒ bracket (the ⇐
+        direction is what L3 uses), so it costs no downstream theorem, but
+        the bracket no longer covers a lock acquisition.  The two recorded
+        upgrade paths are (1) reinstate the FUSED arm on the ⇒ side (the
+        stage-C8-deleted [amo_bracket]), after which the condition shrinks
+        back to the standalone-[sc] form above; or (2) index the pinned
+        class by the PROGRAM STATE ([pcls : P → wlabel → wstate → wm_class]
+        in [WeakPromiseBridge]), where the access kind still lives — after
+        which the class function is exact at every write and no side
+        condition is needed at all.  (2) is a Layer-1 change and is out of
+        this file's scope.
+
     (e') THE ANSWERS THE SHAPE PREDICATES QUANTIFY OVER ARE THE ANSWERS THIS
         LTS SUPPLIES.  [sail_mstep]'s memory arms hand the continuation
         [inl (w, None)] (read) and [inl None] (write) and nothing else, so
@@ -785,8 +815,59 @@ Proof.
   by apply writes_in_by_writes_in in Hw.
 Qed.
 
+(** THE ⇒-SIDE CLASS CONDITION (G6a; header delta (e''), second half).
+
+    Since G6a the promise-free fragment PINS the class of the message a
+    store appends to [pcls l ws], while [WeakInterp.wrun] COMPUTES it as
+    [wm_class_of ak ws] — and [ak] is the ACCESS KIND, which the [wlabel] of
+    a plain store does not carry.  The two therefore agree exactly where
+    [ak_latest ak = false] ([WeakSailLTS2.lbl_class_store]), and the bracket,
+    whose conclusion reproduces the interpreter's log MESSAGE FOR MESSAGE,
+    needs that at every write the run takes.
+
+    THIS IS A PREDICATE ON THE RUN, NOT ON THE MONAD, and deliberately so.
+    The ∀-path form ("every [MemWrite] node reachable in [m] is plain") is
+    REFUTABLE at [m := riscv_step b]: [riscv_step] decodes an arbitrary
+    fetched word, so its tree contains the [amoswap] path (an exclusive
+    [MemRead] followed by an exclusive [MemWrite]) and the bare [sc] path (an
+    exclusive [MemWrite] with no read at all), and a ∀-path predicate walks
+    into both.  This is the same failure the [oracle_consistent] post-mortem
+    records (see [WeakCompose] §6 (4)): the run form is the satisfiable one,
+    because it constrains only the writes the run ACTUALLY performed.
+
+    WHAT IT STILL EXCLUDES.  A run that really does take a conditional write
+    — every AMO, hence xv6's [acquire] ([amoswap.w.aq]) — does not satisfy
+    it, because [wrun] stamps [WCexcl] there and the ⇒ bracket's bare arm
+    (delta (e)) emits a plain [LStore].  See delta (e'') for the two recorded
+    upgrade paths; nothing in the development consumes the ⇒ bracket, so the
+    restriction costs no other theorem. *)
+Definition wrun_plainw (log log' : list wmsg) : Prop :=
+  ∀ n msg, (length log ≤ n)%nat → log' !! n = Some msg → wm_ak msg ≠ WCexcl.
+
+(** Its one consequence, at a single write. *)
+Lemma wrun_plainw_latest ak ws :
+  wm_class_of ak ws ≠ WCexcl → ak_latest ak = false.
+Proof.
+  intros H. destruct (ak_latest ak) eqn:Hl; [|reflexivity].
+  exfalso. apply H. by rewrite /wm_class_of Hl.
+Qed.
+
 Section bracket.
   Context (next : bool → M unit) (i : agent).
+
+  (** THE MESSAGE CLASS THE PF FRAGMENT PINS (G6a).  [WeakPromiseBridge]'s
+      promise-free fragment stamps the class [pcls l ws] on the message a
+      store/rmw appends, so the bracket is stated at an ARBITRARY [pcls] —
+      [WeakSailLTS2.lbl_class], the one the archive route uses, is not in
+      scope here, and nothing below needs it to be.  The one place the class
+      is not free is where the bracket must reproduce the INTERPRETER's log:
+      there the two must agree, which is [Hpcls] (satisfied by [lbl_class] —
+      [WeakSailLTS2.lbl_class_store]) together with [wrun_plainw]. *)
+  Context (pcls : wlabel → wstate → wm_class).
+  Context (Hpcls : ∀ ak ws base data,
+              ak_latest ak = false →
+              wm_class_of ak ws
+              = pcls (WeakPromise.LStore (ak_sync ak) base data) ws).
 
   Implicit Types ags : list (wpagent psail).
 
@@ -799,11 +880,11 @@ Section bracket.
   Lemma pf_silent ags ag p1 img log img' log' fin :
     ags !! i = Some ag →
     sail_step next (pa_st ag) WeakPromise.LSilent p1 →
-    rtc (wp_pf_run (pstep_unit (sail_step next)))
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img log (<[i := WPAgent p1 (pa_ws ag) (pa_prom ag)]> ags))
         (WPCfgU img' log'
            (<[i := fin]> (<[i := WPAgent p1 (pa_ws ag) (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls) (WPCfgU img log ags)
         (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hrest. rewrite list_insert_insert in Hrest.
@@ -814,13 +895,13 @@ Section bracket.
   Lemma pf_fence ags ag pr pw sr sw p1 img log img' log' fin :
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LFence pr pw sr sw) p1 →
-    rtc (wp_pf_run (pstep_unit (sail_step next)))
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img log
            (<[i := WPAgent p1 (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)]> ags))
         (WPCfgU img' log'
            (<[i := fin]>
               (<[i := WPAgent p1 (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls) (WPCfgU img log ags)
         (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hrest. rewrite list_insert_insert in Hrest.
@@ -832,7 +913,7 @@ Section bracket.
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LLoad aq lat base tvs) p1 →
     read_ok img log (pa_ws ag) aq lat base tvs →
-    rtc (wp_pf_run (pstep_unit (sail_step next)))
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img log
            (<[i := WPAgent p1 (load_post_run (pa_ws ag) aq base tvs.*1)
                       (pa_prom ag)]> ags))
@@ -840,7 +921,7 @@ Section bracket.
            (<[i := fin]>
               (<[i := WPAgent p1 (load_post_run (pa_ws ag) aq base tvs.*1)
                          (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls) (WPCfgU img log ags)
         (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hok Hrest. rewrite list_insert_insert in Hrest.
@@ -852,7 +933,8 @@ Section bracket.
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LStore rl base data) p1 →
     data ≠ [] →
-    rtc (wp_pf_run (pstep_unit (sail_step next)))
+    k = pcls (WeakPromise.LStore rl base data) (pa_ws ag) →
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
                      (store_post_run (pa_ws ag) rl base (length data)
@@ -862,10 +944,10 @@ Section bracket.
               (<[i := WPAgent p1
                         (store_post_run (pa_ws ag) rl base (length data)
                            (S (length log))) (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls) (WPCfgU img log ags)
         (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
-    intros Hlk Hst Hne Hrest. rewrite list_insert_insert in Hrest.
+    intros Hlk Hst Hne Hk Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
     exists i, (WeakPromise.LStore rl base data). by eapply PFStore.
   Qed.
@@ -877,7 +959,8 @@ Section bracket.
     length tvs = length data →
     read_ok img log (pa_ws ag) aq false base tvs →
     excl_ok log i base tvs (S (length log)) →
-    rtc (wp_pf_run (pstep_unit (sail_step next)))
+    k = pcls (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
                      (store_post_run (load_post_run (pa_ws ag) aq base tvs.*1)
@@ -889,10 +972,10 @@ Section bracket.
                         (store_post_run (load_post_run (pa_ws ag) aq base tvs.*1)
                            rl base (length data) (S (length log)))
                         (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+    rtc (wp_pf_run (pstep_unit (sail_step next)) pcls) (WPCfgU img log ags)
         (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
-    intros Hlk Hst Hne Hlen Hok Hex Hrest. rewrite list_insert_insert in Hrest.
+    intros Hlk Hst Hne Hlen Hok Hex Hk Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
     exists i, (WeakPromise.LRmw aq rl base tvs data). by eapply PFRmw.
   Qed.
@@ -918,16 +1001,24 @@ Section bracket.
       interpreter rmw maps to a load and a store rather than to a fused
       [LRmw].  That only ENLARGES the pf behaviours the sail machine is
       shown to have, which is the safe direction; the fused arm is what the
-      ⇐ direction consumes. *)
+      ⇐ direction consumes.
+
+      [wrun_plainw (wm_log s) (wm_log s')] is the SECOND obligation, new with G6a: the pf
+      fragment now pins the class of every message it appends, so a
+      CONDITIONAL write — at which the interpreter stamps [WCexcl] and the
+      pf [LStore] arm stamps [pcls] — must not occur ON THIS RUN.  It is a
+      run predicate, not a monad predicate, for the reason given at its
+      definition. *)
 
   Definition sail_bracket (m : M unit) : Prop :=
     ∀ (s : wmstate) (x : unit) (s' : wmstate),
       sail_shaped m →
       wrun (Some i) m s x s' →
+      wrun_plainw (wm_log s) (wm_log s') →
       ∀ (iq : istream) (prom : gset nat) ags,
         ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
                            (wm_ws s) prom) →
-        rtc (wp_pf_run (pstep_unit (sail_step next)))
+        rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
           (WPCfgU (wimg s) (wm_log s) ags)
           (WPCfgU (wimg s) (wm_log s')
              (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
@@ -936,9 +1027,10 @@ Section bracket.
 
   Local Ltac sbr_silent :=
     match goal with
-    | Hsh : ∀ _, sail_shaped _, Hrun : wrun _ _ _ _ _, IH : ∀ _, sail_bracket _ |- _ =>
+    | Hsh : ∀ _, sail_shaped _, Hpl : wrun_plainw _ _,
+      Hrun : wrun _ _ _ _ _, IH : ∀ _, sail_bracket _ |- _ =>
         let Hch := fresh "Hch" in
-        pose proof (IH _ _ _ _ (Hsh _) Hrun) as Hch;
+        pose proof (IH _ _ _ _ (Hsh _) Hrun Hpl) as Hch;
         intros iq prom ags Hlk;
         eapply pf_silent;
           [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |];
@@ -952,9 +1044,9 @@ Section bracket.
   Lemma sail_bracket_all (m : M unit) : sail_bracket m.
   Proof.
     induction m as [y|T oc k IH].
-    { intros s x s' _ [-> ->]. intros iq prom ags Hlk.
+    { intros s x s' _ [-> ->] _. intros iq prom ags Hlk.
       rewrite (list_insert_id _ _ _ Hlk). apply rtc_refl. }
-    intros s x s' Hsh Hrun.
+    intros s x s' Hsh Hrun Hpl.
     destruct oc as [rg akk|rg akk rv|nn req|nn req|op|szb bpa|bk|co|to|flt
                    |epa|tst|tnd|A eo|msg| | |ty| |msg2]; simpl in Hsh, Hrun;
       try (by sbr_silent); try (by exfalso; exact Hrun).
@@ -964,7 +1056,7 @@ Section bracket.
       - (* MMIO: the hart's own fabric answers, silently *)
         destruct (dev_read (wm_dev s) (Interface.ReadReq.pa req) nn)
           as [[w d']|] eqn:Hdr; [|by exfalso; exact Hrun].
-        pose proof (IH (inl (w, None)) _ _ _ (Hsh _) Hrun) as Hch.
+        pose proof (IH (inl (w, None)) _ _ _ (Hsh _) Hrun Hpl) as Hch.
         intros iq prom ags Hlk.
         eapply pf_silent; [exact Hlk| |].
         + rewrite /sail_step /= Hd (dev_read_t_Some _ _ _ _ _ Hdr) /=.
@@ -972,7 +1064,7 @@ Section bracket.
         + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
       - destruct Hrun as (w & ts & Hok & Hrun).
         rewrite /wread_post Hcoh /= in Hrun.
-        pose proof (IH (inl (w, None)) _ _ _ (Hsh _) Hrun) as Hch.
+        pose proof (IH (inl (w, None)) _ _ _ (Hsh _) Hrun Hpl) as Hch.
         intros iq prom ags Hlk.
         pose proof Hok as (Hlents & _).
         eapply pf_load with (lat := false).
@@ -992,23 +1084,49 @@ Section bracket.
       - destruct (dev_write (wm_dev s) (Interface.WriteReq.pa req) nn
                     (Interface.WriteReq.value req)) as [d'|] eqn:Hdw;
           [|by exfalso; exact Hrun].
-        pose proof (IH (inl None) _ _ _ Hsh Hrun) as Hch.
+        pose proof (IH (inl None) _ _ _ Hsh Hrun Hpl) as Hch.
         intros iq prom ags Hlk.
         eapply pf_silent; [exact Hlk| |].
         + rewrite /sail_step /= Hd (dev_write_t_Some _ _ _ _ _ Hdw).
           right. split; reflexivity.
         + apply Hch. by apply (lookup_insert_i _ _ _ Hlk).
-      - pose proof (IH (inl None) _ _ _ Hsh Hrun) as Hch.
+      - (* THE ONE PLACE THE PINNED CLASS IS LOAD-BEARING.  The message
+           [wrun] appends here sits at index [length (wm_log s)] of the
+           final log, so [wrun_plainw] says it is not [WCexcl], i.e. the
+           write is plain — and there [wm_class_of] IS [pcls]. *)
+        destruct (wrun_log_app _ _ _ _ _ Hrun) as (lext & Hlext).
+        have Hmsg : wm_log s' !! (length (wm_log s))
+                    = Some (wwrite_msg (Some i)
+                              (wm_class_of
+                                 (classify (Interface.WriteReq.access_kind req))
+                                 (wm_ws s))
+                              (Interface.WriteReq.pa req) nn
+                              (Interface.WriteReq.value req)).
+        { rewrite Hlext wwrite_post_log -app_assoc.
+          by apply list_lookup_middle. }
+        have Hlat : ak_latest
+                      (classify (Interface.WriteReq.access_kind req)) = false.
+        { apply wrun_plainw_latest with (ws := wm_ws s).
+          exact (Hpl _ _ (le_n _) Hmsg). }
+        have Hpl1 : wrun_plainw
+                      (wm_log (wwrite_post (Some i) s
+                         (classify (Interface.WriteReq.access_kind req))
+                         (Interface.WriteReq.pa req) nn
+                         (Interface.WriteReq.value req))) (wm_log s').
+        { intros nn' mg Hn' Hmg. apply (Hpl nn' mg); [|exact Hmg].
+          revert Hn'. rewrite wwrite_post_log length_app /=. lia. }
+        pose proof (IH (inl None) _ _ _ Hsh Hrun Hpl1) as Hch.
         intros iq prom ags Hlk.
         eapply pf_store.
         + exact Hlk.
         + rewrite /sail_step /= Hd. right.
           split_and!; [reflexivity|exact Hn|reflexivity].
         + by apply wbytes_nonnil.
+        + by apply Hpcls.
         + rewrite wbytes_length. apply Hch.
           by apply (lookup_insert_i _ _ _ Hlk). }
     { (* Barrier *)
-      pose proof (IH tt _ _ _ (Hsh _) Hrun) as Hch.
+      pose proof (IH tt _ _ _ (Hsh _) Hrun Hpl) as Hch.
       intros iq prom ags Hlk. destruct bk.
       1-9: eapply pf_fence;
              [exact Hlk | by (rewrite /sail_step /=; right; split; reflexivity) |];
@@ -1028,7 +1146,7 @@ Section bracket.
         apply Hch. by apply (lookup_insert_i _ _ _ Hlk). }
     { (* Choose *)
       destruct Hrun as (c & Hrun).
-      pose proof (IH c _ _ _ (Hsh _) Hrun) as Hch.
+      pose proof (IH c _ _ _ (Hsh _) Hrun Hpl) as Hch.
       intros iq prom ags Hlk.
       eapply pf_silent; [exact Hlk| |].
       - rewrite /sail_step /=. right. split; [reflexivity|]. by exists c.
@@ -1040,10 +1158,11 @@ Section bracket.
   Theorem wrun_sail_bracket (m : M unit) s x s' :
     sail_shaped m →
     wrun (Some i) m s x s' →
+    wrun_plainw (wm_log s) (wm_log s') →
     ∀ (iq : istream) (prom : gset nat) ags,
       ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
                          (wm_ws s) prom) →
-      rtc (wp_pf_run (pstep_unit (sail_step next)))
+      rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU (wimg s) (wm_log s) ags)
         (WPCfgU (wimg s) (wm_log s')
            (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
@@ -1072,11 +1191,16 @@ Require Import RiscvLang.
 
 Section instr.
   Context (i : agent).
+  Context (pcls : wlabel → wstate → wm_class).
+  Context (Hpcls : ∀ ak ws base data,
+              ak_latest ak = false →
+              wm_class_of ak ws
+              = pcls (WeakPromise.LStore (ak_sync ak) base data) ws).
 
   Lemma pf_silent_last ags p0 p1 ws prom img log :
     (i < length ags)%nat →
     sail_step riscv_step p0 WeakPromise.LSilent p1 →
-    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) pcls)
         (WPCfgU img log (<[i := WPAgent p0 ws prom]> ags))
         (WPCfgU img log (<[i := WPAgent p1 ws prom]> ags)).
   Proof.
@@ -1084,7 +1208,7 @@ Section instr.
     exists i, WeakPromise.LSilent.
     have Hlk : (<[i := WPAgent p0 ws prom]> ags) !! i = Some (WPAgent p0 ws prom)
       by apply list_lookup_insert.
-    have Hstep := PFSilent (pstep_unit (sail_step riscv_step)) i
+    have Hstep := PFSilent (pstep_unit (sail_step riscv_step)) pcls i
         (WPCfgU img log (<[i := WPAgent p0 ws prom]> ags))
         (WPAgent p0 ws prom) p1 tt Hlk Hst.
     simpl in Hstep. rewrite list_insert_insert in Hstep. exact Hstep.
@@ -1094,18 +1218,19 @@ Section instr.
   Theorem sail_instr_bracket (tick : bool) s x s' :
     sail_shaped (riscv_step tick) →
     wrun (Some i) (riscv_step tick) s x s' →
+    wrun_plainw (wm_log s) (wm_log s') →
     ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
       ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                          (wm_ws s) prom) →
-      rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+      rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) pcls)
         (WPCfgU (wimg s) (wm_log s) ags)
         (WPCfgU (wimg s) (wm_log s')
            (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                      (wm_ws s') prom]> ags)).
   Proof.
-    intros Hsh Hrun.
-    pose proof (wrun_sail_bracket riscv_step i (riscv_step tick) s x s' Hsh Hrun)
-      as Hch.
+    intros Hsh Hrun Hpl.
+    pose proof (wrun_sail_bracket riscv_step i pcls Hpcls (riscv_step tick)
+                  s x s' Hsh Hrun Hpl) as Hch.
     intros iq prom ags Hlk.
     have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
     eapply pf_silent.
@@ -1123,18 +1248,23 @@ End instr.
     [WPCfgU img log [WPAgent p ws ∅]] the W5 composition starts from
     ([<[0 := a]> [b]] reduces to [[a]], so this is [sail_instr_bracket] read
     at [i := 0] with a singleton agent list). *)
-Corollary sail_instr_bracket_single (tick : bool) s x s' :
+Corollary sail_instr_bracket_single (pcls : wlabel → wstate → wm_class)
+    (Hpcls : ∀ ak ws base data,
+        ak_latest ak = false →
+        wm_class_of ak ws = pcls (WeakPromise.LStore (ak_sync ak) base data) ws)
+    (tick : bool) s x s' :
   sail_shaped (riscv_step tick) →
   wrun (Some 0%nat) (riscv_step tick) s x s' →
+  wrun_plainw (wm_log s) (wm_log s') →
   ∀ (iq : istream) (prom : gset nat),
-    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) pcls)
       (WPCfgU (wimg s) (wm_log s)
          [WPAgent (PSail None (wm_regs s) (wm_dev s) None iq) (wm_ws s) prom])
       (WPCfgU (wimg s) (wm_log s')
          [WPAgent (PSail None (wm_regs s') (wm_dev s') None iq) (wm_ws s') prom]).
 Proof.
-  intros Hsh Hrun.
-  pose proof (sail_instr_bracket 0%nat tick s x s' Hsh Hrun) as Hch.
+  intros Hsh Hrun Hpl.
+  pose proof (sail_instr_bracket 0%nat pcls Hpcls tick s x s' Hsh Hrun Hpl) as Hch.
   intros iq prom.
   apply (Hch iq prom
            [WPAgent (PSail None (wm_regs s) (wm_dev s) None iq) (wm_ws s) prom]).

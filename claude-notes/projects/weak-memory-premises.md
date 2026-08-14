@@ -16,6 +16,21 @@ per-site WWP tokens) SURVIVES the pivot and remains the discharge plan
 for the one genuine premise family.  Do further work here ONLY if the
 spike hits a named fail criterion.
 
+**CORRECTION (2026-08-14, fabric effort G6a): `WeakRetag` IS NOT
+DELETABLE.**  The list above says the retag is among the artifacts the
+event-granular design deletes.  That is now wrong in both directions.
+`WeakPromiseBridge.wp_pf_step` PINS the appended message's class to
+`pcls l (pa_ws ag)`, so the exhibit's replay OWES class canonicity of the
+traced bundle (`cls_canonical`, moved to `WeakRobustTrace`) — and the
+retag (`WeakRetag.cls_canonical_canon`) is exactly what discharges it,
+free, because `wm_ak` is inert and retagging moves neither `prog_of` nor
+`mem_of`.  Conversely this is *why* only the PROMISE-FREE fragment is
+pinned: pinning `WeakPromise.wpstep` too would falsify
+`WeakRetag.wpstep_retag` (a retagged run is not a run of a pinned
+machine) and take the discharge with it.  Neither `cls_canonical` nor its
+sibling `pcls_obl` is a residue — both are discharged — but they are load
+bearing, and `WeakRetag` stays.
+
 
 ## C9 (LANDED 2026-08-14): the state-conditioned liveness — THE LAST
 ## PREMISE IN SCOPE.  BOTH HALVES OF SEAM (6) ARE NOW THEOREMS.

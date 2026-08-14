@@ -107,6 +107,13 @@ From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakPromiseBridg
 From xv6iris Require Import WeakRobust WeakRobustTrace WeakRobustSim WeakRobustMain.
 From xv6iris Require Import WeakInterp WeakSailLTS.
 Require Import RiscvLang.
+(* G6a: the promise-free fragment PINS the class of every message it
+   appends, so this file must name the class function it is instantiated
+   at.  That is [WeakSailLTS2.lbl_class] — the class [WeakInterp.wrun]
+   computes, expressed in the data a pf step has — together with its two
+   discharges [lbl_class_store] and [lbl_class_obl].  [WeakSailLTS2] adds
+   no other dependency here (it is [WeakSailLTS] + [WeakLang]). *)
+From xv6iris Require Import WeakSailLTS2.
 (* L0(d): the disk arm is now [WeakLang.wdisk_step]-shaped, and L0(a) fixes
    the DMA tid at [WeakLang.n_disk] — so this file DOES import [WeakLang]
    for those two definitions.  It still does NOT build the [wprim_step] ⇔
@@ -259,7 +266,30 @@ Qed.
       as OBSERVER — neither is anything φ (a statement about harts) can say
       a word about.  See [WeakRobust.violation_hart]; the exhibit
       ([WeakRobustMain.bad_edge_violates]) produces exactly the restricted
-      form, because [bad] bounds both ends of its edge. *)
+      form, because [bad] bounds both ends of its edge.
+
+    - [cls_canonical lbl_class TS] PER TRACED BUNDLE — NEW WITH G6a, and the
+      SECOND conjunct: every logged message carries the class its own
+      author's pre-record [wstate] computes.  [WeakPromiseBridge]'s
+      promise-free fragment no longer leaves a message's [wm_class] a free
+      binder — [PFStore]/[PFRmw] PIN it to [pcls l ws] — so
+      [WeakRobustMain.robust_main]'s replay has to REBUILD the recorded
+      classes, and it can only do that when the record's classes are the
+      computable ones.  It is declared here for exactly the reason the first
+      conjunct is: this file works from an ARBITRARY behavior, one bundle at
+      a time, and canonicity is a whole-behavior property.
+
+      IT IS DISCHARGEABLE, NOT MERELY ASSUMED, and the discharge is built:
+      [WeakRetag] retags any behavior into canonical form without moving
+      [prog_of] or [mem_of] ([wm_ak] is inert — no rule reads it), which is
+      precisely what [WeakComposeLang.xv6_weak_robust_lifted] does INSTEAD of
+      taking this conjunct as a premise ([WeakRetag.cls_canonical_canon]).
+
+      ITS COMPANION IS NOT DECLARED ANYWHERE.  [robust_main] also asks
+      [WeakRobustTrace.pcls_obl pcls] ("the class function reads no
+      timestamp"); at [lbl_class] that is the THEOREM
+      [WeakSailLTS2.lbl_class_obl], discharged here and at every other
+      archive consumer. *)
 Definition m6_side_conditions (next : bool → M unit) (img : image)
     (ps : list pxv6) : Prop :=
   (∀ (c mid : wpcfg pxv6 unit) (TS : ptraces pxv6 unit) (DS : pdevs unit),
@@ -267,7 +297,13 @@ Definition m6_side_conditions (next : bool → M unit) (img : image)
      rtc (wp_promise_step (P := pxv6) (D := unit)) (wp_init img tt ps) mid →
      ptraces_dev_of (pstep_unit (pstep_xv6 next)) xv6_pdev TS DS mid c →
      main_premises n_disk TS DS)
-  ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_unit (pstep_xv6 next)) img tt ps.
+  ∧ (∀ (c mid : wpcfg pxv6 unit) (TS : ptraces pxv6 unit) (DS : pdevs unit),
+       wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
+       rtc (wp_promise_step (P := pxv6) (D := unit)) (wp_init img tt ps) mid →
+       ptraces_dev_of (pstep_unit (pstep_xv6 next)) xv6_pdev TS DS mid c →
+       cls_canonical lbl_class TS)
+  ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_unit (pstep_xv6 next))
+      lbl_class img tt ps.
 
 (* ====================================================================== *)
 (** ** 4. THE HEADLINE THEOREM
@@ -286,14 +322,16 @@ Theorem xv6_weak_robust (next : bool → M unit) (img : image) (ps : list pxv6)
     (c : wpcfg pxv6 unit) :
   m6_side_conditions next img ps →
   wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
-  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 next))) (wp_init img tt ps) cf ∧
+  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class)
+          (wp_init img tt ps) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros [Hprem Hvf] Hbeh.
-  apply (robust_main (pstep_unit (pstep_xv6 next)) xv6_pdev n_disk img tt ps c
-           (xv6_pdev_ok next)
-           (xv6_lat_free next) (xv6_ts_oblivious next) Hbeh
-           (λ mid TS DS, Hprem c mid TS DS Hbeh) Hvf).
+  intros (Hprem & Hcan & Hvf) Hbeh.
+  apply (robust_main (pstep_unit (pstep_xv6 next)) lbl_class xv6_pdev n_disk
+           img tt ps c (xv6_pdev_ok next)
+           (xv6_lat_free next) (xv6_ts_oblivious next) lbl_class_obl Hbeh
+           (λ mid TS DS, Hprem c mid TS DS Hbeh)
+           (λ mid TS DS, Hcan c mid TS DS Hbeh) Hvf).
 Qed.
 
 (** W2c's COMPLETABLE-PREFIX form — the shape the adequacy composition wants,
@@ -306,13 +344,15 @@ Corollary xv6_weak_robust_prefix (next : bool → M unit) (img : image)
   completable (pstep_unit (pstep_xv6 next)) img tt ps c →
   ∃ cend cf,
     rtc (wpstep (pstep_unit (pstep_xv6 next))) c cend ∧ no_promises cend ∧
-    rtc (wp_pf_run (pstep_unit (pstep_xv6 next))) (wp_init img tt ps) cf ∧
+    rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class)
+      (wp_init img tt ps) cf ∧
     prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
 Proof.
-  intros [Hprem Hvf] Hc.
-  apply (robust_transport (pstep_unit (pstep_xv6 next)) xv6_pdev n_disk img tt
-           ps c (xv6_pdev_ok next)
-           (xv6_lat_free next) (xv6_ts_oblivious next) Hc Hprem Hvf).
+  intros (Hprem & Hcan & Hvf) Hc.
+  apply (robust_transport (pstep_unit (pstep_xv6 next)) lbl_class xv6_pdev
+           n_disk img tt ps c (xv6_pdev_ok next)
+           (xv6_lat_free next) (xv6_ts_oblivious next) lbl_class_obl Hc
+           Hprem Hcan Hvf).
 Qed.
 
 (* ====================================================================== *)
@@ -365,35 +405,35 @@ Qed.
 (** THE FRAME LEMMA, one pf step. *)
 Lemma pf_step_frame (next : bool → M unit) (dks : list (wpagent pxv6))
     (i : agent) (l : wlabel) (c c' : wpcfg psail unit) :
-  wp_pf_step (pstep_unit (sail_step next)) i l c c' →
-  wp_pf_step (pstep_unit (pstep_xv6 next)) i l (lift_cfg dks c) (lift_cfg dks c').
+  wp_pf_step (pstep_unit (sail_step next)) lbl_class i l c c' →
+  wp_pf_step (pstep_unit (pstep_xv6 next)) lbl_class i l (lift_cfg dks c) (lift_cfg dks c').
 Proof.
   intros Hst.
   destruct Hst as
     [cfg ag st' dd Hag Hps
     |cfg ag aq lat base tvs st' dd Hag Hps Hok
-    |cfg ag rl base data k st' dd Hag Hps Hne
-    |cfg ag aq rl base tvs data k st' dd Hag Hps Hne Hlen Hok Hex
+    |cfg ag rl base data k st' dd Hag Hps Hne Hkc
+    |cfg ag aq rl base tvs data k st' dd Hag Hps Hne Hlen Hok Hex Hkc
     |cfg ag pr pw sr sw st' dd Hag Hps]; destruct dd;
     (have Hlt : (i < length (pc_ags cfg))%nat
        by exact (lookup_lt_Some _ _ _ Hag));
     (have Hlk := lift_ags_lookup dks (pc_ags cfg) i ag Hag);
     rewrite /lift_cfg; cbn [pc_img pc_log pc_ags];
     rewrite (lift_ags_insert dks (pc_ags cfg) i _ Hlt).
-  - exact (PFSilent (pstep_unit (pstep_xv6 next)) i
+  - exact (PFSilent (pstep_unit (pstep_xv6 next)) lbl_class i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) (PHart st') tt Hlk Hps).
-  - exact (PFLoad (pstep_unit (pstep_xv6 next)) i
+  - exact (PFLoad (pstep_unit (pstep_xv6 next)) lbl_class i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) aq lat base tvs (PHart st') tt Hlk Hps Hok).
-  - exact (PFStore (pstep_unit (pstep_xv6 next)) i
+  - exact (PFStore (pstep_unit (pstep_xv6 next)) lbl_class i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) rl base data k (PHart st') tt Hlk Hps Hne).
-  - exact (PFRmw (pstep_unit (pstep_xv6 next)) i
+             (lift_ag ag) rl base data k (PHart st') tt Hlk Hps Hne Hkc).
+  - exact (PFRmw (pstep_unit (pstep_xv6 next)) lbl_class i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) aq rl base tvs data k (PHart st') tt
-             Hlk Hps Hne Hlen Hok Hex).
-  - exact (PFFence (pstep_unit (pstep_xv6 next)) i
+             Hlk Hps Hne Hlen Hok Hex Hkc).
+  - exact (PFFence (pstep_unit (pstep_xv6 next)) lbl_class i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) pr pw sr sw (PHart st') tt Hlk Hps).
 Qed.
@@ -402,8 +442,8 @@ Qed.
     untouched throughout. *)
 Lemma pf_run_frame (next : bool → M unit) (dks : list (wpagent pxv6))
     (c c' : wpcfg psail unit) :
-  rtc (wp_pf_run (pstep_unit (sail_step next))) c c' →
-  rtc (wp_pf_run (pstep_unit (pstep_xv6 next))) (lift_cfg dks c) (lift_cfg dks c').
+  rtc (wp_pf_run (pstep_unit (sail_step next)) lbl_class) c c' →
+  rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class) (lift_cfg dks c) (lift_cfg dks c').
 Proof.
   induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
   destruct Hxy as (i & l & Hst).
@@ -446,17 +486,20 @@ Corollary xv6_pf_instr (i : agent) (tick : bool) (s : wmstate) (x : unit)
     (s' : wmstate) (dks : list (wpagent pxv6)) :
   sail_shaped (riscv_step tick) →
   wrun (Some i) (riscv_step tick) s x s' →
+  wrun_plainw (wm_log s) (wm_log s') →
   ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
     ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                        (wm_ws s) prom) →
-    rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)))
+    rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)) lbl_class)
       (WPCfgU (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
       (WPCfgU (wimg s) (wm_log s')
          (<[i := WPAgent (PHart (PSail None (wm_regs s') (wm_dev s') None iq))
                    (wm_ws s') prom]> ((lift_ag <$> ags) ++ dks))).
 Proof.
-  intros Hsh Hrun.
-  pose proof (sail_instr_bracket i tick s x s' Hsh Hrun) as Hch.
+  intros Hsh Hrun Hpl.
+  pose proof (sail_instr_bracket i lbl_class
+                (λ ak ws base data Hlat, lbl_class_store ak ws base data Hlat)
+                tick s x s' Hsh Hrun Hpl) as Hch.
   intros iq prom ags Hlk.
   have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
   have Hr := pf_run_frame riscv_step dks _ _ (Hch iq prom ags Hlk).
@@ -542,8 +585,9 @@ Qed.
     (3)'s static side conditions and (4)'s MMIO assumption.
 
     ------------------------------------------------------------------------
-    (2) [pf_violation_free_hart cls_of pub_of n_disk] — DECLARED (the second
-    conjunct of [m6_side_conditions]).
+    (2) [pf_violation_free_hart cls_of pub_of n_disk] — DECLARED (the LAST
+    conjunct of [m6_side_conditions]; it was the second before G6a added the
+    canonicity conjunct, see (3') below).
 
     This is the Layer-2 premise: no promise-free run of the program reaches a
     configuration where some foreign HART's per-byte coherence floor has
@@ -570,6 +614,18 @@ Qed.
     exhibit machinery ([bad_edge_violates], [no_bad_edge],
     [gdep2_acyclic_main]) likewise remains valid over the premise but is
     bypassed by [robust_main_no_bad] + [gdep2_acyclic_bad_free].
+
+    THE CLASS IS NO LONGER FREE (G6a, 2026-08-14).  [WeakPromiseBridge]'s
+    promise-free fragment now PINS the class of the message its store/rmw
+    arms append to [pcls l (pa_ws ag)] — the fulfilling agent's own
+    [wstate], the only data the equation can be checked against ([pstep]
+    emits a label and never sees a [wstate]).
+    This premise therefore quantifies over STRICTLY FEWER runs than it did:
+    the pf machine can no longer reach a violating log by stamping a class
+    the model would never have written.  That closes ONE of the two ways in
+    which the pf machine over-approximated a computed-class model (the
+    fabric effort's G5c2 finding); the other — the disk's DMA memory — is
+    REFUTED as closable at this layer, see (4).
 
     HISTORICAL (why it was declared rather than proved, at the pf level):
     W3's φ analysis found the whole pf-level obligation concentrates in
@@ -625,6 +681,23 @@ Qed.
     (3d) follow from the same enumeration.  (3a)'s site facts are also
     Iris-checkable at the racy-read rules ([WeakRacy.v], [WkStartedLoad.v]) if
     the reader/writer discipline exports of W3 are built.
+
+    ------------------------------------------------------------------------
+    (3') [cls_canonical lbl_class TS] PER TRACED BUNDLE — DECLARED (the
+    second conjunct of [m6_side_conditions]), NEW WITH G6a.
+
+    The promise-free fragment now PINS the class of every message it appends
+    ([WeakPromiseBridge]'s [PFStore]/[PFRmw] carry [k = pcls l (pa_ws ag)]),
+    so the replay must reproduce the recorded classes and therefore needs the
+    record to carry the computable ones.  Same epistemic slot as (3), one
+    category better: it is not a static property of the kernel image but a
+    NORMALIZATION, and the normalization is machine-checked
+    ([WeakRetag.cls_canonical_canon] — [wm_ak] is inert, so retagging moves
+    neither [prog_of] nor [mem_of]).  [WeakComposeLang.xv6_weak_robust_lifted]
+    composes that retag and so has NO such premise; this archived statement
+    declares it only because it is stated over an arbitrary behavior.
+    [robust_main]'s other new obligation, [WeakRobustTrace.pcls_obl], is
+    declared nowhere: it is the theorem [WeakSailLTS2.lbl_class_obl].
 
     ------------------------------------------------------------------------
     (4) THE MMIO / DEVICE-FABRIC SEAM — the RETAINED MMIO-ORDERING
@@ -683,7 +756,60 @@ Qed.
     UPGRADE PATH: M5's device views, at which point the disk agent's DMA
     appends get real classes ([WeakExec.wp_wdisk_step]) and the per-hart
     fabric can be replaced by a shared device component in [wpcfg] — which
-    retires (i) outright.
+    retires (i) outright.  THE SHARED COMPONENT LANDED (fabric effort
+    G1–G4: [wpcfg] carries [pc_dev : D] and [pstep] moves it), so (i) is
+    retired for the FABRIC.  What did NOT land, and cannot, is the disk's
+    MEMORY — read on.
+
+    G6 FINDING (2026-08-14) — THE DISK'S DMA MEMORY IS A LATEST READ, SO
+    delta (i) CANNOT BE CLOSED BY A LAYER-1 SIGNATURE CHANGE.  The obvious
+    next move — give the generalized [pstep] the flat memory as an INPUT
+    ([P → D → mem → wlabel → P → D → Prop]), the machine passing
+    [WeakLang.wflat (pc_img c) (pc_log c)], so the disk arm takes the REAL
+    memory and its existential disappears — is REFUTED.  A flat read is
+    [latest_ts]-indexed ([WeakLang.wflat_lookup] says so in one line): it
+    reads the TOP write to each byte of the WHOLE log, which is exactly the
+    [lat = true] read shape [WeakPromiseFact.lat_free_prog] exists to
+    exclude.  Both reasons for that exclusion bite here:
+
+      (i)  [WeakPromiseFact.wp_swap] — the front-loading commutation, which
+           is what turns a behavior into agent-contiguous phases — moves a
+           state step past a promise step by RE-APPLYING THE SAME [pstep]
+           INSTANCE at the log with one more message appended.  It works
+           only because [pstep] is LOG-BLIND; its [lat_free l] side
+           condition is there because [read_ok] at [lat = true] is the one
+           memory-side condition an append destroys ([read_ok_app] is
+           stated at [lat = false]).  A flat argument is destroyed by the
+           same append with no side condition to hide behind, so [wp_swap],
+           [wp_front_load], [wp_behavior_factor] and every traced-bundle
+           theorem fail.
+      (ii) The replay re-applies the recorded step at
+           [WeakRobustSim.pf_log TS done], a PERMUTED SUBSET of the
+           behavior's log (the cone cut drops messages).  G4's [qfab_step]
+           rescues the FABRIC because the [gdev] chain forces the witness
+           order; there is no analogue for the flat short of chaining every
+           STORE into the device witness, which would force the replay
+           permutation π to the identity and make the robustness theorem
+           vacuous.
+
+    NOR IS WIDENING THE OTHER SIDE HONEST.  Widening [WeakEvLang.edisk_step]
+    to accept the fictional memory — so the over-approximating pf machine
+    lands back inside the language — makes the DISK THREAD'S WP FALSE: an
+    arbitrary DMA source writes an arbitrary address set, which breaks the
+    C/D/S conjunct of [WeakGhost.weak_state_interp].  The DMA's memory
+    faithfulness is LOAD-BEARING for φ, and Layer 1 has no vocabulary for
+    it.
+
+    CORRECTED UPGRADE PATH.  The DMA's memory read must become a REAL
+    machine read in a machine that HAS device views (M5) — at which point
+    the disk stops being a program agent with a private oracle and delta (i)
+    disappears with it.  Until then the honest packaging of the residue is a
+    reachability-INCLUSION premise ("the memory-free disk arm reaches
+    nothing the flat-faithful one does not"), NOT a "the burst is
+    memory-blind" premise: the latter is REFUTABLE, since
+    [WeakLang.WDiskStepDma] reads the descriptor chain out of the memory
+    view.  This effort has already burned three premises of that genre; do
+    not add a fourth.
 
     ------------------------------------------------------------------------
     (5) THE D-M6-3 PARM CORRESPONDENCE NOTE — [full machine ≡ axiomatic RVWMO],
@@ -717,6 +843,45 @@ Qed.
     RECORDED POLARITY EXCEPTION: RVWMO ppo rule 6 ([.rl] on the successor) is
     not enforced by the machine — weaker than RVWMO on that one axis, free for
     adequacy, currently vacuous (the kernel image contains no release store).
+    G6a ADDENDUM (2026-08-14) — THE PINNED MESSAGE CLASS DOES NOT NARROW
+    THE CONTAINMENT.  [WeakPromiseBridge.wp_pf_step]'s two appending arms
+    now pin the class of the message they append to [pcls l (pa_ws ag)].
+    That REMOVES runs from our machine, so by this section's own polarity
+    rule it owes an argument — and it has one, checked rule by rule in
+    [WeakRetag]'s header: no rule of [wpstep] and no side condition
+    ([read_ok], [excl_ok], [fulfil_ok], every view update) ever READS
+    [wm_ak], and [wlabel] carries no class, so two runs differing only in a
+    logged message's class are otherwise identical.  Pinning therefore
+    removes no HARDWARE behavior: it selects, among behaviors that differ
+    only in an inert tag, the one the model would have written.  The
+    containment LEG is untouched outright, because the FULL machine
+    [WeakPromise.wpstep] keeps its free binder and
+    [WeakPromiseBridge.wp_pf_step_rtc_wpstep] is unchanged — every pinned pf
+    run is still a [wpstep] run, so [hardware ⊆ native-full] covers it.
+    WHAT THE PINNING COSTS, AND THE ONE THING IT DOES NOT COVER.  [pcls]
+    is indexed by the LABEL and the [wstate], while [WeakInterp.wm_class_of]
+    branches on the ACCESS KIND first — and [wlabel]'s [LStore] carries only
+    [(rl, base, data)].  So at a CONDITIONAL RAM write, which deltas
+    (e)/(e'') let [sail_step] take through the plain-store arm and which xv6
+    executes on every [acquire] ([amoswap.w.aq]), no label-indexed [pcls]
+    can reproduce the interpreter's [WCexcl].  The ⇒ bracket
+    ([xv6_pf_instr] and the four statements below it) therefore carries
+    [WeakSailLTS.wrun_plainw] — "this run appended no [WCexcl] message" —
+    which is SATISFIABLE but excludes every AMO.  NO capstone carries it
+    (the lift consumes the ⇐ direction), so it costs no theorem here; it is
+    a coverage restriction on an archived bracket, recorded at delta (e'').
+    THE FIX, for whoever needs the ⇒ bracket back or hits the same wall in
+    the event language: index [pcls] by the PROGRAM STATE as well
+    ([P → wlabel → wstate → wm_class]), where the access kind still lives —
+    the residual monad sits at the [MemWrite n req] node, so the class
+    function returns [wm_class_of (classify (WriteReq.access_kind req)) ws]
+    at the [LStore] case and is then exact at EVERY write, and
+    [wrun_plainw] disappears.  RECORDED so the shortcut is not retried
+    instead: a [sail_shaped]-style ∀-path monad predicate ("every RAM write
+    this monad reaches is plain") is REFUTABLE for the xv6 image, in the
+    same way [oracle_consistent] was — see (4)'s post-mortem for the
+    genre.
+
     UPGRADE PATH: a Rocq-9 port of PARM.  Not undertaken.
 
     ------------------------------------------------------------------------

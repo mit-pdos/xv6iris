@@ -283,6 +283,7 @@ Qed.
 Section complete.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pcls : wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.
@@ -317,14 +318,14 @@ Section complete.
       packaged with the log delta and its authorship — the two facts the
       violation-persistence lemma consumes. *)
   Definition cstep (i : agent) c c' : Prop :=
-    (∃ l, wp_pf_step pstep i l c c') ∧
+    (∃ l, wp_pf_step pstep pcls i l c c') ∧
     ∃ ms, pc_log c' = pc_log c ++ ms ∧
           Forall (λ mq, wm_tid mq = Some i) ms.
 
-  Lemma cstep_run i c c' : cstep i c c' → wp_pf_run pstep c c'.
+  Lemma cstep_run i c c' : cstep i c c' → wp_pf_run pstep pcls c c'.
   Proof. intros [[l Hs] _]. by exists i, l. Qed.
 
-  Lemma cstep_rtc_run i c c' : rtc (cstep i) c c' → rtc (wp_pf_run pstep) c c'.
+  Lemma cstep_rtc_run i c c' : rtc (cstep i) c c' → rtc (wp_pf_run pstep pcls) c c'.
   Proof.
     induction 1 as [|x y z Hs _ IH]; [done|].
     eapply rtc_l; [by eapply cstep_run|exact IH].
@@ -333,7 +334,7 @@ Section complete.
   (** The step's SHAPE: the image is frozen, the agent vector changes at
       [i] only, and the log only grows. *)
   Lemma wp_pf_step_shape i l c c' :
-    wp_pf_step pstep i l c c' →
+    wp_pf_step pstep pcls i l c c' →
     pc_img c' = pc_img c ∧
     (∃ ag ag', pc_ags c !! i = Some ag ∧
                pc_ags c' = <[i := ag']> (pc_ags c) ∧
@@ -364,7 +365,7 @@ Section complete.
   Qed.
 
   Lemma wp_pf_step_frame i l c c' j :
-    wp_pf_step pstep i l c c' → j ≠ i → pc_ags c' !! j = pc_ags c !! j.
+    wp_pf_step pstep pcls i l c c' → j ≠ i → pc_ags c' !! j = pc_ags c !! j.
   Proof.
     intros Hs Hne.
     destruct (wp_pf_step_shape i l c c' Hs) as (_ & (ag & ag' & _ & -> & _) & _).
@@ -372,7 +373,7 @@ Section complete.
   Qed.
 
   Lemma wp_pf_step_ags_len i l c c' :
-    wp_pf_step pstep i l c c' → length (pc_ags c') = length (pc_ags c).
+    wp_pf_step pstep pcls i l c c' → length (pc_ags c') = length (pc_ags c).
   Proof.
     intros Hs.
     destruct (wp_pf_step_shape i l c c' Hs) as (_ & (ag & ag' & _ & -> & _) & _).
@@ -382,7 +383,7 @@ Section complete.
   (** The COHERENCE FLOOR only grows — for the stepping agent by
       [ws_le], for every other agent by the frame. *)
   Lemma wp_pf_step_obs_flr i l c c' j a :
-    wp_pf_step pstep i l c c' → (obs_flr c j a ≤ obs_flr c' j a)%nat.
+    wp_pf_step pstep pcls i l c c' → (obs_flr c j a ≤ obs_flr c' j a)%nat.
   Proof.
     intros Hs.
     destruct (wp_pf_step_shape i l c c' Hs)
@@ -426,7 +427,7 @@ Section complete.
   Qed.
 
   Lemma wp_pf_step_bnd i l c c' :
-    wp_pf_step pstep i l c c' → cfg_bnd c → cfg_bnd c'.
+    wp_pf_step pstep pcls i l c c' → cfg_bnd c → cfg_bnd c'.
   Proof.
     destruct 1 as [cfg ag st' dd Hag Hps
                   |cfg ag aq lat base tvs st' dd Hag Hps Hro
@@ -489,7 +490,7 @@ Section complete.
                   |pr pw sr sw].
     - (* silent *)
       eexists _, (WPAgent p' (pa_ws ag) (pa_prom ag)). split_and!.
-      + split; [eexists; by apply (PFSilent pstep i c ag p' dd)|].
+      + split; [eexists; by apply (PFSilent pstep pcls i c ag p' dd)|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists LSilent, dd.
@@ -504,7 +505,7 @@ Section complete.
                     (pa_prom ag)).
       split_and!.
       + split; [eexists;
-                by apply (PFLoad pstep i c ag aq lat base tvs' p'' dd')|].
+                by apply (PFLoad pstep pcls i c ag aq lat base tvs' p'' dd')|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists (LLoad aq lat base tvs'), dd'.
@@ -515,8 +516,11 @@ Section complete.
       split_and!.
       + split.
         * eexists.
-          by apply (PFStore pstep i c ag rl base data WCplain p' dd).
-        * exists [WMsg base data (Some i) WCplain]. split; [done|].
+          by apply (PFStore pstep pcls i c ag rl base data
+                      (pcls (LStore rl base data) (pa_ws ag)) p' dd).
+        * exists [WMsg base data (Some i)
+                    (pcls (LStore rl base data) (pa_ws ag))].
+          split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists (LStore rl base data), dd.
@@ -542,8 +546,11 @@ Section complete.
       split_and!.
       + split.
         * eexists.
-          by apply (PFRmw pstep i c ag aq rl base tvs' data' WCplain p'' dd').
-        * exists [WMsg base data' (Some i) WCplain]. split; [done|].
+          by apply (PFRmw pstep pcls i c ag aq rl base tvs' data'
+                      (pcls (LRmw aq rl base tvs' data') (pa_ws ag)) p'' dd').
+        * exists [WMsg base data' (Some i)
+                    (pcls (LRmw aq rl base tvs' data') (pa_ws ag))].
+          split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists (LRmw aq rl base tvs' data'), dd'.
@@ -551,7 +558,7 @@ Section complete.
       eexists _, (WPAgent p' (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)).
       split_and!.
       + split; [eexists;
-                by apply (PFFence pstep i c ag pr pw sr sw p' dd)|].
+                by apply (PFFence pstep pcls i c ag pr pw sr sw p' dd)|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
       + simpl. by exists (LFence pr pw sr sw), dd.
@@ -673,7 +680,7 @@ End complete.
 
 Global Arguments lts_enabled {P D} _.
 Global Arguments blk_fin {P D} _ _ _.
-Global Arguments cstep {P D} _ _ _ _.
+Global Arguments cstep {P D} _ _ _ _ _.
 Global Arguments cfg_bnd {P D} _.
 
 (* ================================================================== *)
@@ -850,6 +857,7 @@ Global Arguments cone_of {P D} _ _ _.
 Section persist.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pcls : wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.
@@ -927,11 +935,11 @@ Section persist.
       HART, and the reader — the agent that must be completed, being
       mid-block by necessity — is a DIFFERENT agent.) *)
   Theorem complete_cut_persists k c c' p m i j a :
-    rtc (cstep pstep k) c c' → k ≠ i →
+    rtc (cstep pstep pcls k) c c' → k ≠ i →
     violates_at c p m i j a → violates_at c' p m i j a.
   Proof.
     intros Hrun Hne Hv.
-    destruct (csteps_log pstep k c c' Hrun) as (ms & Hlog & Hall).
+    destruct (csteps_log pstep pcls k c c' Hrun) as (ms & Hlog & Hall).
     eapply (violates_at_append c c' p m i j a ms Hlog).
     - apply list_relations.Forall_lookup_2. intros q mq Hq. left.
       rewrite (list_relations.Forall_lookup_1 _ _ _ _ Hall Hq).
@@ -954,7 +962,7 @@ Section persist.
     pc_ags c !! k = Some ag → k ≠ i →
     violates_at c p m i j a →
     ∃ c' ag',
-      rtc (wp_pf_run pstep) c c' ∧
+      rtc (wp_pf_run pstep pcls) c c' ∧
       pc_ags c' !! k = Some ag' ∧ at_boundary (pa_st ag') ∧
       violates_at c' p m i j a ∧
       pc_img c' = pc_img c ∧ cfg_bnd c' ∧
@@ -962,7 +970,7 @@ Section persist.
       (∀ j', j' ≠ k → pc_ags c' !! j' = pc_ags c !! j').
   Proof.
     intros Hen Hfin Hi Hb Hag Hne Hv.
-    destruct (complete_block pstep at_boundary msr k c ag Hen Hfin Hi Hb Hag)
+    destruct (complete_block pstep pcls at_boundary msr k c ag Hen Hfin Hi Hb Hag)
       as (c' & ag' & Hrun & Hag' & Hbd).
     exists c', ag'. split_and!.
     - by eapply cstep_rtc_run.
@@ -988,7 +996,7 @@ Section persist.
     pc_ags c !! j = Some ag →
     violates_at c p m i j a →
     ∃ c' ag',
-      rtc (wp_pf_run pstep) c c' ∧
+      rtc (wp_pf_run pstep pcls) c c' ∧
       pc_ags c' !! j = Some ag' ∧ at_boundary (pa_st ag') ∧
       violates_at c' p m i j a ∧
       pc_img c' = pc_img c ∧ cfg_bnd c' ∧
@@ -1014,7 +1022,7 @@ Section persist.
     NoDup ks → (∀ k, k ∈ ks → k ≠ i) →
     violates_at c p m i j a →
     ∃ c',
-      rtc (wp_pf_run pstep) c c' ∧
+      rtc (wp_pf_run pstep pcls) c c' ∧
       violates_at c' p m i j a ∧
       pc_img c' = pc_img c ∧ cfg_bnd c' ∧
       length (pc_ags c') = length (pc_ags c) ∧

@@ -49,10 +49,18 @@
 
     (E) [exec_wf_pf_run] — the reverse direction, PROVED (not just stated):
         with a program LTS admitting every label ([prog_free], the "programs
-        are free" instantiation), every [exec_wf] execution over agents in
-        range IS the projection of a pf run.  The bridge is therefore an
-        exact characterization of the promise-free fragment, not merely a
-        soundness direction.
+        are free" instantiation) and an execution whose labelled classes are
+        the ones the fragment would stamp ([exec_cls_ok] — see (A)), every
+        [exec_wf] execution over agents in range IS the projection of a pf
+        run.  The bridge is therefore an exact characterization of the
+        promise-free fragment, not merely a soundness direction.
+
+    THE CLASS IS PINNED (G6a).  Since the fragment's appending arms compute
+    the class rather than binding it freely, the fragment is no longer a
+    strict over-approximation of a model that computes classes — which is
+    what made it unusable as a Layer-1 INSTANCE of such a model.  The
+    section header on [pcls] below records the whole argument, including why
+    the FULL machine deliberately keeps its free binder.
 
     DEPENDENCY-FREE like its three inputs: stdpp, [WeakMem], [WeakPromise],
     [WeakPromiseFact], [WeakAxiomatic].  No Iris, no Sail, no [WeakLitmus].
@@ -80,6 +88,50 @@ Local Open Scope Z_scope.
 Section bridge.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
+
+  (** THE MESSAGE CLASS, PINNED AT FULFIL TIME (G6a).  [pcls l ws] is the
+      class the machine stamps on the message a store/rmw labelled [l]
+      appends, read at the FULFILLING agent's own [wstate] — which is
+      exactly the data the class is a function of on the model side
+      ([WeakInterp.wm_class_of ak ws] reads [w_relp ws] and the label's
+      access kind).  It is ABSTRACT here, as [pstep] is: Layer 1 never
+      inspects it.
+
+      WHY AT FULFIL AND NOT AT PROMISE.  The class is not derivable from
+      the program state — the program never sees a [wstate] — so [pstep]
+      cannot constrain it, and a free binder makes the promise-free
+      machine a STRICT over-approximation of any model whose classes are
+      computed (the G5c2 finding).  At the fulfil the agent's [wstate] IS
+      in scope, so the equation is checkable, and it is checkable exactly
+      there: [WeakPromise.wpstep]'s promise arm stays free, so a promise
+      may still be appended with any class and only canonically-classed
+      promises are ever consumed.
+
+      HARDWARE CONTAINMENT IS PRESERVED (the PARM-containment note's G6
+      addendum).  The class is OUR bookkeeping — no PARM rule reads it,
+      and no [read_ok]/[excl_ok]/[fulfil_ok]/view update mentions [wm_ak]
+      (see [WeakRetag]'s header for the rule-by-rule audit).  Pinning it
+      therefore removes no hardware behavior: it selects, among the
+      behaviors that differ ONLY in an inert tag, the one whose tag the
+      model would have written.  Formally: [wp_pf_step] with [pcls] pinned
+      is still a [WeakPromise.wpstep] run ([wp_pf_step_rtc_wpstep] is
+      unchanged — the full machine's binder is free and accepts the pinned
+      value), so every containment statement proved against the full
+      machine still covers it.
+
+      WHY ONLY THE PROMISE-FREE FRAGMENT IS PINNED (deviation, recorded).
+      The consumer of the pinning is [WeakRobust.pf_violation_free_hart],
+      which quantifies over [wp_pf_run] ONLY; pinning here makes that
+      premise WEAKER (fewer runs to rule out) and [WeakRobustMain]'s
+      conclusion STRONGER (the exhibited run is canonically classed), so
+      both directions of every consumer move the right way.  Pinning
+      [WeakPromise.wpstep] as well would in addition make
+      [cls_canonical] a machine invariant — but it would also
+      make [WeakRetag]'s retag simulation FALSE (a retagged run is not a
+      run of a pinned machine), and the retag is what DISCHARGES
+      canonicity today.  So the full machine keeps its free binder and the
+      replay takes canonicity as [WeakRetag] supplies it. *)
+  Context (pcls : wlabel → wstate → wm_class).
 
   Implicit Types c cfg : wpcfg P D.
 
@@ -113,6 +165,7 @@ Section bridge.
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (pc_dev cfg) (WeakPromise.LStore rl base data) st' d' →
       data ≠ [] →
+      k = pcls (WeakPromise.LStore rl base data) (pa_ws ag) →
       wp_pf_step i (WeakPromise.LStore rl base data) cfg
         (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
                (<[i := WPAgent st'
@@ -127,6 +180,7 @@ Section bridge.
       length tvs = length data →
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
+      k = pcls (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
       wp_pf_step i (WeakPromise.LRmw aq rl base tvs data) cfg
         (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
                (<[i := WPAgent st'
@@ -157,8 +211,8 @@ Section bridge.
     intros Hwf Hnp Hstep. destruct Hstep as
       [cfg ag st' d' Hlk Hps
       |cfg ag aq lat base tvs st' d' Hlk Hps Hr
-      |cfg ag rl base data k st' d' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He
+      |cfg ag rl base data k st' d' Hlk Hps Hnn Hk
+      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps].
     - apply rtc_once. by eapply WPSilent.
     - apply rtc_once. by eapply WPLoad.
@@ -360,8 +414,8 @@ Section bridge.
     intros Hoc Hstep. destruct Hstep as
       [cfg ag st' d' Hlk Hps
       |cfg ag aq lat base tvs st' d' Hlk Hps Hr
-      |cfg ag rl base data k st' d' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He
+      |cfg ag rl base data k st' d' Hlk Hps Hnn Hk
+      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|reflexivity].
     - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply load_post_run_le].
@@ -423,8 +477,8 @@ Section bridge.
     destruct Hstep as
       [cfg ag st' d' Hlk Hps
       |cfg ag aq lat base tvs st' d' Hlk Hps Hr
-      |cfg ag rl base data k st' d' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He
+      |cfg ag rl base data k st' d' Hlk Hps Hnn Hk
+      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He Hk
       |cfg ag pr pw sr sw st' d' Hlk Hps]; subst img lg;
       [exists WCplain| exists WCplain| exists k| exists k| exists WCplain];
       simpl.
@@ -561,6 +615,26 @@ Section bridge.
         WeakPromise.LRmw aq rl base (zip ts rvs) wvs
     end.
 
+  (** THE REVERSE BRIDGE'S ONE NEW PREMISE (G6a).  The axiomatic side
+      CARRIES the class in its label ([WeakAxiomatic.lb_cls]) and the pf
+      fragment now COMPUTES it, so the inverse direction is onto only for
+      executions whose labelled classes are the ones [pcls] would have
+      written.  This is the exact analogue of [cls_canonical] one
+      layer down, and it is free for every consumer that builds its
+      execution from a pf run in the first place ([wp_pf_bridge] emits
+      [proj_lbl (pcls …) …]). *)
+  Definition mstep_cls_ok (σ : mstate) (i : agent) (lb : WeakAxiomatic.lbl)
+      : Prop :=
+    match lb with
+    | WeakAxiomatic.LStore _ _ _ k => k = pcls (unproj_lbl lb) (ms_ws σ i)
+    | WeakAxiomatic.LRmw _ _ _ _ _ _ k => k = pcls (unproj_lbl lb) (ms_ws σ i)
+    | _ => True
+    end.
+
+  Definition exec_cls_ok (E : exec) : Prop :=
+    ∀ n s, ex_tr E !! n = Some s →
+      mstep_cls_ok (stt E n) (es_ag s) (es_lb s).
+
   Lemma rd_ok_read_ok img log ws aq base ts vs :
     rd_ok img log ws aq base ts vs →
     read_ok img log ws aq false base (zip ts vs).
@@ -591,10 +665,11 @@ Section bridge.
 
   Lemma mstep_wp_pf_step σ σ' i lb c :
     prog_free → cfg_match c σ → (i < length (pc_ags c))%nat →
+    mstep_cls_ok σ i lb →
     mstep σ i lb σ' →
     ∃ c', wp_pf_step i (unproj_lbl lb) c c' ∧ cfg_match c' σ'.
   Proof.
-    intros Hpf Hm Hi Hms.
+    intros Hpf Hm Hi Hck Hms.
     destruct (lookup_lt_is_Some_2 (pc_ags c) i Hi) as [ag Hlk].
     destruct σ as [img lg f].
     destruct Hm as (Himg & Hlg & Hf). simpl in Himg, Hlg, Hf.
@@ -608,11 +683,16 @@ Section bridge.
       eapply (cfg_match_upd_gen _ _ _ _ i ag st' w pr f); [done|done| |].
       - by rewrite upd_ws_eq.
       - intros j Hne. by rewrite upd_ws_ne. }
+    (* [Hck] is REVERTED across the inversion: [simplify_eq/=] would reduce
+       [mstep_cls_ok] at the constructor and substitute the class binder
+       away, which is exactly the binder each arm still has to name. *)
+    revert Hck.
     inversion Hms as
       [aq base ts vs Hrd Hlb Hσ'
       |rl base vs kc Hnn Hlb Hσ'
       |pr pw sr sw Hlb Hσ'
-      |aq rl base ts rvs wvs kc Hnn Hlen Hrd Hlat Hlb Hσ']; simplify_eq/=.
+      |aq rl base ts rvs wvs kc Hnn Hlen Hrd Hlat Hlb Hσ']; simplify_eq/=;
+      intros Hck.
     - (* load *)
       pose proof Hrd as [Hlen _].
       eexists. split.
@@ -623,7 +703,8 @@ Section bridge.
     - (* store *)
       eexists. split.
       + apply (PFStore i c ag rl base vs kc (pa_st ag) (pc_dev c));
-          [done|apply Hpf|done].
+          [done|apply Hpf|done|].
+        rewrite -(Hf i ag Hlk). exact Hck.
       + rewrite (Hf i ag Hlk). apply Hmatch.
     - (* fence *)
       eexists. split.
@@ -635,21 +716,22 @@ Section bridge.
       eexists. split.
       + apply (PFRmw i c ag aq rl base (zip ts rvs) wvs kc (pa_st ag)
                  (pc_dev c));
-          [done|apply Hpf|done| | |].
+          [done|apply Hpf|done| | | |].
         * rewrite length_zip_with. lia.
         * rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.
         * by apply (rmw_latest_excl_ok (pc_img c) _ i base ts rvs).
+        * rewrite -(Hf i ag Hlk). exact Hck.
       + rewrite fst_zip; [lia|]. rewrite (Hf i ag Hlk). apply Hmatch.
   Qed.
 
   Lemma exec_prefix_pf_run ps d0 E n :
-    prog_free → exec_wf E →
+    prog_free → exec_wf E → exec_cls_ok E →
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
     (n ≤ length (ex_tr E))%nat →
     ∃ c, rtc wp_pf_run (wp_init (ex_img E) d0 ps) c ∧
          length (pc_ags c) = length ps ∧ cfg_match c (stt E n).
   Proof.
-    intros Hpf HE Hag. induction n as [|n IH]; intros Hn.
+    intros Hpf HE Hck Hag. induction n as [|n IH]; intros Hn.
     - exists (wp_init (ex_img E) d0 ps). split_and!; [done| |].
       + by rewrite /= length_map.
       + split_and!.
@@ -662,7 +744,8 @@ Section bridge.
       destruct (exec_tr_lookup E n ltac:(lia)) as [s Hs].
       pose proof (exec_step_at E n s HE Hs) as Hms.
       destruct (mstep_wp_pf_step (stt E n) (stt E (S n)) (es_ag s)
-                  (es_lb s) c Hpf Hm ltac:(rewrite Hlen; by eapply Hag) Hms)
+                  (es_lb s) c Hpf Hm ltac:(rewrite Hlen; by eapply Hag)
+                  (Hck n s Hs) Hms)
         as (c' & Hstep & Hm').
       exists c'. split_and!; [|by rewrite (wp_pf_step_ags_length _ _ _ _ Hstep)|done].
       eapply rtc_r; [done|]. by exists (es_ag s), (unproj_lbl (es_lb s)).
@@ -672,21 +755,21 @@ Section bridge.
       [exec_wf] execution over agents [0 .. length ps - 1] is the projection
       of a promise-free run of the full machine. *)
   Theorem exec_wf_pf_run ps d0 E :
-    prog_free → exec_wf E →
+    prog_free → exec_wf E → exec_cls_ok E →
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
     ∃ c, rtc wp_pf_run (wp_init (ex_img E) d0 ps) c ∧
          cfg_match c (stt E (length (ex_tr E))).
   Proof.
-    intros Hpf HE Hag.
-    destruct (exec_prefix_pf_run ps d0 E (length (ex_tr E)) Hpf HE Hag
+    intros Hpf HE Hck Hag.
+    destruct (exec_prefix_pf_run ps d0 E (length (ex_tr E)) Hpf HE Hck Hag
                 ltac:(lia)) as (c & ? & _ & ?).
     by exists c.
   Qed.
 
 End bridge.
 
-Global Arguments wp_pf_step {P D} _ _ _ _ _.
-Global Arguments wp_pf_run {P D} _ _ _.
+Global Arguments wp_pf_step {P D} _ _ _ _ _ _.
+Global Arguments wp_pf_run {P D} _ _ _ _.
 Global Arguments cfg_match {P D} _ _.
 Global Arguments own_coh {P D} _.
 Global Arguments proj_ws {P D} _ _.

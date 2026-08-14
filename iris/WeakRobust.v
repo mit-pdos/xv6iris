@@ -133,17 +133,19 @@ Section violation.
       statements below and in [WeakRobustGraph]; [pf_violation_free_hart]
       is what [WeakRobustMain] and [WeakCompose] actually consume. *)
   Definition pf_violation_free (pstep : P → D → wlabel → P → D → Prop)
+      (pcls : wlabel → wstate → wm_class)
       (img : image) (d0 : D) (ps : list P) : Prop :=
-    ∀ c, rtc (wp_pf_run pstep) (wp_init img d0 ps) c → ¬ violation c.
+    ∀ c, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c → ¬ violation c.
 
   Definition pf_violation_free_hart (nh : nat)
-      (pstep : P → D → wlabel → P → D → Prop) (img : image) (d0 : D)
+      (pstep : P → D → wlabel → P → D → Prop)
+      (pcls : wlabel → wstate → wm_class) (img : image) (d0 : D)
       (ps : list P) : Prop :=
-    ∀ c, rtc (wp_pf_run pstep) (wp_init img d0 ps) c → ¬ violation_hart nh c.
+    ∀ c, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c → ¬ violation_hart nh c.
 
-  Lemma pf_violation_free_hart_weaken nh pstep img d0 ps :
-    pf_violation_free pstep img d0 ps →
-    pf_violation_free_hart nh pstep img d0 ps.
+  Lemma pf_violation_free_hart_weaken nh pstep pcls img d0 ps :
+    pf_violation_free pstep pcls img d0 ps →
+    pf_violation_free_hart nh pstep pcls img d0 ps.
   Proof. intros H c Hrun Hv. by eapply H, violation_hart_violation. Qed.
 
   (** Sanity: the initial configuration violates nothing (empty log). *)
@@ -172,6 +174,7 @@ Definition prog_of {P D : Type} (c : wpcfg P D) : list P := pa_st <$> pc_ags c.
 
 Section goal.
   Context {P D : Type} (pstep : P → D → wlabel → P → D → Prop).
+  Context (pcls : wlabel → wstate → wm_class).
   Context (cls : wmsg → store_class).
   Context (pub : wpcfg P D → nat → Prop).
 
@@ -191,9 +194,9 @@ Section goal.
   Definition robust : Prop :=
     ∀ img d0 ps c,
       lat_free_prog pstep →
-      pf_violation_free cls pub pstep img d0 ps →
+      pf_violation_free cls pub pstep pcls img d0 ps →
       wp_behavior pstep img d0 ps c →
-      ∃ c', rtc (wp_pf_run pstep) (wp_init img d0 ps) c' ∧
+      ∃ c', rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c' ∧
             prog_of c' = prog_of c ∧
             (∀ a : Z, mem_of c' a = mem_of c a).
 

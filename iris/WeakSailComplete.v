@@ -417,16 +417,16 @@ Qed.
     of §8 moves across other agents' steps. *)
 Definition pf_solo_q (next : bool → M unit) (i : agent)
     (c c' : wpcfg psail unit) : Prop :=
-  ∃ l, lbl_quiet l ∧ wp_pf_step (pstep_unit (sail_step_ni next)) i l c c'.
+  ∃ l, lbl_quiet l ∧ wp_pf_step (pstep_unit (sail_step_ni next)) lbl_class i l c c'.
 
 Lemma pf_quiet_nolog next i l c c' :
-  lbl_quiet l → wp_pf_step (pstep_unit (sail_step_ni next)) i l c c' → pc_log c' = pc_log c.
+  lbl_quiet l → wp_pf_step (pstep_unit (sail_step_ni next)) lbl_class i l c c' → pc_log c' = pc_log c.
 Proof.
   intros Hq Hstep. destruct Hstep as
     [cfg ag st' dd Hlk Hps
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps]; try done;
     by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx.
 Qed.
@@ -491,7 +491,7 @@ Proof.
       [cfg ag0 st' dd Hlk0 Hps
       |cfg ag0 aq lat base tvs st' dd Hlk0 Hps Hr
       |cfg ag0 rl base data kk st' dd Hlk0 Hps Hne
-      |cfg ag0 aq rl base tvs data kk st' dd Hlk0 Hps Hne Hlen Hr He
+      |cfg ag0 aq rl base tvs data kk st' dd Hlk0 Hps Hne Hlen Hr He Hkc
       |cfg ag0 pr pw sr sw st' dd Hlk0 Hps];
       simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
       try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
@@ -503,7 +503,7 @@ Proof.
       [cfg ag0 st' dd Hlk0 Hps
       |cfg ag0 aq lat base tvs st' dd Hlk0 Hps Hr
       |cfg ag0 rl base data kk st' dd Hlk0 Hps Hne
-      |cfg ag0 aq rl base tvs data kk st' dd Hlk0 Hps Hne Hlen Hr He
+      |cfg ag0 aq rl base tvs data kk st' dd Hlk0 Hps Hne Hlen Hr He Hkc
       |cfg ag0 pr pw sr sw st' dd Hlk0 Hps];
       simpl in Hlk; rewrite Hlk in Hlk0; injection Hlk0 as <-;
       try (by destruct Hql as [Hx|(?&?&?&?&Hx)]; inversion Hx);
@@ -552,8 +552,8 @@ Proof.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps];
     try (by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx).
   - split_and!; [done|done|by intros j Hj; apply lookup_insert_other|].
@@ -626,11 +626,11 @@ Qed.
 Lemma pf_solo_tframe next i c c' : pf_solo next i c c' → tframe i c c'.
 Proof.
   intros (l & Hstep & _ & _).
-  destruct (wp_pf_step_shape (pstep_unit (sail_step_ni next)) i l c c' Hstep)
+  destruct (wp_pf_step_shape (pstep_unit (sail_step_ni next)) lbl_class i l c c' Hstep)
     as (Himg & _ & (ms & Hlog & Hall)).
   split_and!; [by exists ms|done| |].
-  - intros j Hj. exact (wp_pf_step_frame (pstep_unit (sail_step_ni next)) i l c c' j Hstep Hj).
-  - intros j a. exact (wp_pf_step_obs_flr (pstep_unit (sail_step_ni next)) i l c c' j a Hstep).
+  - intros j Hj. exact (wp_pf_step_frame (pstep_unit (sail_step_ni next)) lbl_class i l c c' j Hstep Hj).
+  - intros j a. exact (wp_pf_step_obs_flr (pstep_unit (sail_step_ni next)) lbl_class i l c c' j a Hstep).
 Qed.
 
 Lemma pf_solo_run_tframe next i c c' :
@@ -645,7 +645,7 @@ Lemma pf_solo_run_bnd next i c c' :
   rtc (pf_solo next i) c c' → cfg_bnd c → cfg_bnd c'.
 Proof.
   induction 1 as [|x y z (l & Hxy & _ & _) _ IH]; [by intros Hb|].
-  intros Hb. apply IH. exact (wp_pf_step_bnd (pstep_unit (sail_step_ni next)) i l x y Hxy Hb).
+  intros Hb. apply IH. exact (wp_pf_step_bnd (pstep_unit (sail_step_ni next)) lbl_class i l x y Hxy Hb).
 Qed.
 
 (* ====================================================================== *)
@@ -680,7 +680,7 @@ Section complete.
              (WPAgent st' (pa_ws ag) (pa_prom ag)).
       split_and!; [|exact (lookup_insert_at (pc_ags c) i ag _ Hlk)|done].
       exists WeakPromise.LSilent. split; [by left|].
-      exact (PFSilent (pstep_unit (sail_step_ni next)) i c ag st' tt Hlk Hstep).
+      exact (PFSilent (pstep_unit (sail_step_ni next)) lbl_class i c ag st' tt Hlk Hstep).
     - exists (WPCfgU (pc_img c) (pc_log c)
                (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
                          (pa_prom ag)]> (pc_ags c))),
@@ -688,7 +688,7 @@ Section complete.
       split_and!; [|exact (lookup_insert_at (pc_ags c) i ag _ Hlk)|done].
       exists (WeakPromise.LFence pr pw sr sw).
       split; [right; by eexists _, _, _, _|].
-      exact (PFFence (pstep_unit (sail_step_ni next)) i c ag pr pw sr sw st' tt
+      exact (PFFence (pstep_unit (sail_step_ni next)) lbl_class i c ag pr pw sr sw st' tt
                Hlk Hstep).
   Qed.
 
@@ -1079,7 +1079,7 @@ Section tail.
            (WPAgent st' (load_post_run (pa_ws ag) aq base tvs.*1) (pa_prom ag)).
     split_and!; [|exact (lookup_insert_at (pc_ags c) i ag _ Hlk)|done|done].
     exists (WeakPromise.LLoad aq false base tvs). split_and!;
-      [exact (PFLoad (pstep_unit (sail_step_ni next)) i c ag aq false base tvs
+      [exact (PFLoad (pstep_unit (sail_step_ni next)) lbl_class i c ag aq false base tvs
                 st' tt Hlk Hstep Hro)
       |by apply cls_canon_nolog|exact I].
   Qed.
@@ -1105,8 +1105,8 @@ Section tail.
                      (store_post_run (pa_ws ag) rl base (length data)
                         (S (length (pc_log c)))) (pa_prom ag)]> (pc_ags c))).
     { exists (WeakPromise.LStore rl base data). split_and!.
-      - exact (PFStore (pstep_unit (sail_step_ni next)) i c ag rl base data kc
-                 st' tt Hlk Hstep Hne).
+      - exact (PFStore (pstep_unit (sail_step_ni next)) lbl_class i c ag rl base data kc
+                 st' tt Hlk Hstep Hne eq_refl).
       - intros ag2 msg Hag2 Heq. simpl in Heq.
         apply app_inv_head in Heq. injection Heq as <-.
         rewrite Hlk in Hag2. by injection Hag2 as <-.
@@ -1159,8 +1159,8 @@ Section tail.
           |exact Hncw]
       |exact (lookup_insert_at (pc_ags c) i ag _ Hlk)|done].
     exists (WeakPromise.LRmw aq rl base tvs data). split_and!.
-    - exact (PFRmw (pstep_unit (sail_step_ni next)) i c ag aq rl base tvs data
-               kc st' tt Hlk Hstep Hne Hlen Hro Hex).
+    - exact (PFRmw (pstep_unit (sail_step_ni next)) lbl_class i c ag aq rl base tvs data
+               kc st' tt Hlk Hstep Hne Hlen Hro Hex eq_refl).
     - intros ag2 msg Hag2 Heq. simpl in Heq.
       apply app_inv_head in Heq. injection Heq as <-.
       rewrite Hlk in Hag2. by injection Hag2 as <-.
@@ -1507,11 +1507,12 @@ End tail.
     OTHER agent's step be replayed after the quiet step has moved in front
     of it. *)
 Lemma wp_pf_step_transplant {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     i l (c c' d : wpcfg P unit) :
-  wp_pf_step pstep i l c c' →
+  wp_pf_step pstep pcls i l c c' →
   pc_img d = pc_img c → pc_log d = pc_log c → pc_ags d !! i = pc_ags c !! i →
   ∃ ag', pc_ags c' = <[i := ag']> (pc_ags c) ∧ pc_img c' = pc_img c ∧
-         wp_pf_step pstep i l d
+         wp_pf_step pstep pcls i l d
            (WPCfgU (pc_img c') (pc_log c') (<[i := ag']> (pc_ags d))).
 Proof.
   intros Hstep Himg Hlog Hags.
@@ -1519,43 +1520,44 @@ Proof.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps];
     destruct dd; rewrite Hdev in Hps;
     have Hlkd : pc_ags d !! i = Some ag by rewrite Hags.
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
-    rewrite -Himg -Hlog. exact (PFSilent pstep i d ag st' tt Hlkd Hps).
+    rewrite -Himg -Hlog. exact (PFSilent pstep pcls i d ag st' tt Hlkd Hps).
   - have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws ag) aq lat base tvs
       by rewrite Himg Hlog.
     eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog.
-    exact (PFLoad pstep i d ag aq lat base tvs st' tt Hlkd Hps Hr').
+    exact (PFLoad pstep pcls i d ag aq lat base tvs st' tt Hlkd Hps Hr').
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog.
-    exact (PFStore pstep i d ag rl base data kk st' tt Hlkd Hps Hne).
+    exact (PFStore pstep pcls i d ag rl base data kk st' tt Hlkd Hps Hne Hkc).
   - have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws ag) aq false base tvs
       by rewrite Himg Hlog.
     have He' : excl_ok (pc_log d) i base tvs (S (length (pc_log d)))
       by rewrite Hlog.
     eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog.
-    exact (PFRmw pstep i d ag aq rl base tvs data kk st' tt
-             Hlkd Hps Hne Hlen Hr' He').
+    exact (PFRmw pstep pcls i d ag aq rl base tvs data kk st' tt
+             Hlkd Hps Hne Hlen Hr' He' Hkc).
   - eexists. split_and!; [reflexivity|reflexivity|]. simpl.
     rewrite -Himg -Hlog.
-    exact (PFFence pstep i d ag pr pw sr sw st' tt Hlkd Hps).
+    exact (PFFence pstep pcls i d ag pr pw sr sw st' tt Hlkd Hps).
 Qed.
 
 (** The QUIET transplant, which needs only the stepping agent's slot: a
     silent/fence step neither reads nor writes the log or the image. *)
 Lemma quiet_transplant {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     k lk (c1 c2 d : wpcfg P unit) :
-  wp_pf_step pstep k lk c1 c2 → lbl_quiet lk →
+  wp_pf_step pstep pcls k lk c1 c2 → lbl_quiet lk →
   pc_ags d !! k = pc_ags c1 !! k →
   ∃ agk', pc_ags c2 = <[k := agk']> (pc_ags c1) ∧
           pc_img c2 = pc_img c1 ∧ pc_log c2 = pc_log c1 ∧
-          wp_pf_step pstep k lk d
+          wp_pf_step pstep pcls k lk d
             (WPCfgU (pc_img d) (pc_log d) (<[k := agk']> (pc_ags d))).
 Proof.
   intros Hstep Hq Hags.
@@ -1563,34 +1565,35 @@ Proof.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kc st' dd Hlk Hps Hne
-    |cfg ag aq rl base tvs data kc st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag rl base data kc st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data kc st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps];
     try (by destruct Hq as [Hx|(?&?&?&?&Hx)]; inversion Hx);
     destruct dd; rewrite Hdev in Hps;
     have Hlkd : pc_ags d !! k = Some ag by rewrite Hags.
   - eexists. split_and!; [reflexivity|reflexivity|reflexivity|].
-    exact (PFSilent pstep k d ag st' tt Hlkd Hps).
+    exact (PFSilent pstep pcls k d ag st' tt Hlkd Hps).
   - eexists. split_and!; [reflexivity|reflexivity|reflexivity|].
-    exact (PFFence pstep k d ag pr pw sr sw st' tt Hlkd Hps).
+    exact (PFFence pstep pcls k d ag pr pw sr sw st' tt Hlkd Hps).
 Qed.
 
 (** THE COMMUTATION.  ([lbl_quiet lk] is the disjunction
     "[lk = LSilent] or [lk] is a fence".) *)
 Lemma pf_local_commute {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     i l k lk (c c1 c2 : wpcfg P unit) :
-  wp_pf_step pstep i l c c1 → wp_pf_step pstep k lk c1 c2 → k ≠ i →
+  wp_pf_step pstep pcls i l c c1 → wp_pf_step pstep pcls k lk c1 c2 → k ≠ i →
   lbl_quiet lk →
-  ∃ c1', wp_pf_step pstep k lk c c1' ∧ wp_pf_step pstep i l c1' c2.
+  ∃ c1', wp_pf_step pstep pcls k lk c c1' ∧ wp_pf_step pstep pcls i l c1' c2.
 Proof.
   intros Hi Hk Hne Hq.
   have Hfr : pc_ags c !! k = pc_ags c1 !! k.
-  { symmetry. exact (wp_pf_step_frame pstep i l c c1 k Hi Hne). }
-  destruct (quiet_transplant pstep k lk c1 c2 c Hk Hq Hfr)
+  { symmetry. exact (wp_pf_step_frame pstep pcls i l c c1 k Hi Hne). }
+  destruct (quiet_transplant pstep pcls k lk c1 c2 c Hk Hq Hfr)
     as (agk' & Hags2 & Himg2 & Hlog2 & Hstepk).
   exists (WPCfgU (pc_img c) (pc_log c) (<[k := agk']> (pc_ags c))).
   split; [exact Hstepk|].
-  destruct (wp_pf_step_transplant pstep i l c c1
+  destruct (wp_pf_step_transplant pstep pcls i l c c1
               (WPCfgU (pc_img c) (pc_log c) (<[k := agk']> (pc_ags c)))
               Hi eq_refl eq_refl
               ltac:(simpl; apply lookup_insert_other; by intros ->))
@@ -1607,23 +1610,26 @@ Qed.
 (** The two run relations the surgery is stated over: [k]'s own quiet steps,
     and everybody else's steps. *)
 Definition pf_quiet_run {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     (k : agent) (c c' : wpcfg P unit) : Prop :=
-  ∃ lk, lbl_quiet lk ∧ wp_pf_step pstep k lk c c'.
+  ∃ lk, lbl_quiet lk ∧ wp_pf_step pstep pcls k lk c c'.
 
 Definition pf_other_run {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     (k : agent) (c c' : wpcfg P unit) : Prop :=
-  ∃ j l, j ≠ k ∧ wp_pf_step pstep j l c c'.
+  ∃ j l, j ≠ k ∧ wp_pf_step pstep pcls j l c c'.
 
 Lemma pf_quiet_commute_run {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     k (c c1 c2 : wpcfg P unit) :
-  rtc (pf_other_run pstep k) c c1 → pf_quiet_run pstep k c1 c2 →
-  ∃ c1', pf_quiet_run pstep k c c1' ∧ rtc (pf_other_run pstep k) c1' c2.
+  rtc (pf_other_run pstep pcls k) c c1 → pf_quiet_run pstep pcls k c1 c2 →
+  ∃ c1', pf_quiet_run pstep pcls k c c1' ∧ rtc (pf_other_run pstep pcls k) c1' c2.
 Proof.
   intros Hrun. revert c2. induction Hrun as [|x y z Hxy _ IH]; intros c2 Hq.
   { exists c2. split; [exact Hq|apply rtc_refl]. }
   destruct (IH c2 Hq) as (y' & (lk & Hlk & Hstepk) & Hrest).
   destruct Hxy as (j & lj & Hjne & Hstepj).
-  destruct (pf_local_commute pstep j lj k lk x y y' Hstepj Hstepk
+  destruct (pf_local_commute pstep pcls j lj k lk x y y' Hstepj Hstepk
               (not_eq_sym Hjne) Hlk)
     as (x' & Hqx & Hjx).
   exists x'. split; [by exists lk|].
@@ -1634,15 +1640,16 @@ Qed.
     OTHER agents' steps can be moved to the FRONT of that run — which is how
     an epilogue completion is inserted right after its agent's last event. *)
 Lemma pf_run_insert_local {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     k (c c1 c2 : wpcfg P unit) :
-  rtc (pf_other_run pstep k) c c1 → rtc (pf_quiet_run pstep k) c1 c2 →
-  ∃ c1', rtc (pf_quiet_run pstep k) c c1' ∧
-         rtc (pf_other_run pstep k) c1' c2.
+  rtc (pf_other_run pstep pcls k) c c1 → rtc (pf_quiet_run pstep pcls k) c1 c2 →
+  ∃ c1', rtc (pf_quiet_run pstep pcls k) c c1' ∧
+         rtc (pf_other_run pstep pcls k) c1' c2.
 Proof.
   intros Hoth Hqui. revert c Hoth.
   induction Hqui as [|x y z Hxy _ IH]; intros c Hoth.
   { exists c. split; [apply rtc_refl|exact Hoth]. }
-  destruct (pf_quiet_commute_run pstep k c x y Hoth Hxy)
+  destruct (pf_quiet_commute_run pstep pcls k c x y Hoth Hxy)
     as (c1' & Hq1 & Hoth1).
   destruct (IH c1' Hoth1) as (c2' & Hq2 & Hoth2).
   exists c2'. split; [|exact Hoth2]. eapply rtc_l; [exact Hq1|exact Hq2].
@@ -1651,11 +1658,11 @@ Qed.
 (** A quiet solo run at the Sail LTS IS a [pf_quiet_run], so the splice
     applies directly to [quiet_complete_q]'s output. *)
 Lemma pf_solo_q_quiet_run next i c c' :
-  pf_solo_q next i c c' → pf_quiet_run (pstep_unit (sail_step_ni next)) i c c'.
+  pf_solo_q next i c c' → pf_quiet_run (pstep_unit (sail_step_ni next)) lbl_class i c c'.
 Proof. by intros (l & Hq & Hstep); exists l. Qed.
 
 Lemma pf_solo_q_run_quiet_run next i c c' :
-  rtc (pf_solo_q next i) c c' → rtc (pf_quiet_run (pstep_unit (sail_step_ni next)) i) c c'.
+  rtc (pf_solo_q next i) c c' → rtc (pf_quiet_run (pstep_unit (sail_step_ni next)) lbl_class i) c c'.
 Proof.
   induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
   eapply rtc_l; [exact (pf_solo_q_quiet_run next i x y Hxy)|exact IH].
@@ -2262,8 +2269,9 @@ Definition post_ws (l : wlabel) (ws : wstate) (n : nat) : wstate :=
   end.
 
 Lemma wp_pf_step_inv {P : Type} (pstep : P → unit → wlabel → P → unit → Prop)
+    (pcls : wlabel → wstate → wm_class)
     i l (c c' : wpcfg P unit) ag :
-  wp_pf_step pstep i l c c' → pc_ags c !! i = Some ag →
+  wp_pf_step pstep pcls i l c c' → pc_ags c !! i = Some ag →
   ∃ st' ms,
     pstep (pa_st ag) tt l st' tt ∧
     pc_img c' = pc_img c ∧ pc_log c' = pc_log c ++ ms ∧
@@ -2274,7 +2282,7 @@ Lemma wp_pf_step_inv {P : Type} (pstep : P → unit → wlabel → P → unit �
        pa_prom agd = pa_prom ag →
        pc_img d = pc_img c → pc_log d = pc_log c →
        pstep (pa_st agd) (pc_dev d) l stD tt →
-       wp_pf_step pstep i l d
+       wp_pf_step pstep pcls i l d
          (WPCfgU (pc_img c) (pc_log c ++ ms)
             (<[i := WPAgent stD (post_ws l (pa_ws ag) (length (pc_log c)))
                        (pa_prom ag)]> (pc_ags d)))).
@@ -2283,8 +2291,8 @@ Proof.
   destruct Hstep as
     [cfg ag0 st' dd Hlk Hps
     |cfg ag0 aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag0 rl base data kk st' dd Hlk Hps Hne
-    |cfg ag0 aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag0 rl base data kk st' dd Hlk Hps Hne Hkc
+    |cfg ag0 aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr pw sr sw st' dd Hlk Hps];
     destruct dd;
     (have Hdv : pc_dev cfg = tt by destruct (pc_dev cfg));
@@ -2294,19 +2302,21 @@ Proof.
       [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
     rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
-    exact (PFSilent pstep i d agd stD tt Hlkd Hpsd).
+    exact (PFSilent pstep pcls i d agd stD tt Hlkd Hpsd).
   - exists st', []. split_and!;
       [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
     have Hr' : read_ok (pc_img d) (pc_log d) (pa_ws agd) aq lat base tvs
       by rewrite Himg Hlog Hws.
     rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
-    exact (PFLoad pstep i d agd aq lat base tvs stD tt Hlkd Hpsd Hr').
+    exact (PFLoad pstep pcls i d agd aq lat base tvs stD tt Hlkd Hpsd Hr').
   - exists st', [WMsg base data (Some i) kk]. split_and!;
       [exact Hps|reflexivity|reflexivity|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
+    have Hkc' : kk = pcls (WeakPromise.LStore rl base data) (pa_ws agd)
+      by rewrite Hws.
     rewrite -Himg -{1}Hlog -{1}Hlog -Hws -Hprom.
-    exact (PFStore pstep i d agd rl base data kk stD tt Hlkd Hpsd Hne).
+    exact (PFStore pstep pcls i d agd rl base data kk stD tt Hlkd Hpsd Hne Hkc').
   - exists st', [WMsg base data (Some i) kk]. split_and!;
       [exact Hps|reflexivity|reflexivity|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
@@ -2314,14 +2324,16 @@ Proof.
       by rewrite Himg Hlog Hws.
     have He' : excl_ok (pc_log d) i base tvs (S (length (pc_log d)))
       by rewrite Hlog.
+    have Hkc' : kk = pcls (WeakPromise.LRmw aq rl base tvs data) (pa_ws agd)
+      by rewrite Hws.
     rewrite -Himg -{1}Hlog -{1}Hlog -Hws -Hprom.
-    exact (PFRmw pstep i d agd aq rl base tvs data kk stD tt
-             Hlkd Hpsd Hne Hlen Hr' He').
+    exact (PFRmw pstep pcls i d agd aq rl base tvs data kk stD tt
+             Hlkd Hpsd Hne Hlen Hr' He' Hkc').
   - exists st', []. split_and!;
       [exact Hps|reflexivity|by rewrite app_nil_r|reflexivity|].
     intros d agd stD Hlkd Hws Hprom Himg Hlog Hpsd.
     rewrite app_nil_r -Himg -Hlog -Hws -Hprom.
-    exact (PFFence pstep i d agd pr pw sr sw stD tt Hlkd Hpsd).
+    exact (PFFence pstep pcls i d agd pr pw sr sw stD tt Hlkd Hpsd).
 Qed.
 
 (** *** 9.7 configurations that differ only in one agent's register file *)
@@ -2370,7 +2382,7 @@ Proof.
   have Hlkd : pc_ags d !! i = Some ag'
     by rewrite Hags; eapply lookup_insert_at, Hlk.
   destruct Hsolo as (l & Hstep & Hcc & Hrt).
-  destruct (wp_pf_step_inv (pstep_unit (sail_step_ni next)) i l c c' ag Hstep Hlk)
+  destruct (wp_pf_step_inv (pstep_unit (sail_step_ni next)) lbl_class i l c c' ag Hstep Hlk)
     as (st' & ms & Hps & Himg' & Hlog' & Hags' & Hre).
   destruct Heqv as (Hpa & Hirq).
   destruct (sail_step_ni_frame (λ _, False) next (pa_st ag) (pa_st ag') l st'
@@ -2451,10 +2463,10 @@ Definition pf_irq (i : agent) (c c' : wpcfg psail unit) : Prop :=
 Lemma pf_irq_pf_step next i c c' :
   pf_irq i c c' →
   (∀ ag, pc_ags c !! i = Some ag → sp_fence (pa_st ag) = None) →
-  wp_pf_step (pstep_unit (sail_step next)) i WeakPromise.LSilent c c'.
+  wp_pf_step (pstep_unit (sail_step next)) lbl_class i WeakPromise.LSilent c c'.
 Proof.
   intros (ag & st' & Hlk & Hdel & ->) Hf.
-  apply (PFSilent (pstep_unit (sail_step next)) i c ag st' tt Hlk).
+  apply (PFSilent (pstep_unit (sail_step next)) lbl_class i c ag st' tt Hlk).
   rewrite /pstep_unit /sail_step (Hf ag Hlk). by left.
 Qed.
 Lemma pf_irq_frame i c c' :
@@ -2467,16 +2479,16 @@ Proof.
 Qed.
 
 Lemma wp_pf_step_irq_or_ni next i l c c' :
-  wp_pf_step (pstep_unit (sail_step next)) i l c c' →
+  wp_pf_step (pstep_unit (sail_step next)) lbl_class i l c c' →
   (l = WeakPromise.LSilent ∧ pf_irq i c c')
-  ∨ wp_pf_step (pstep_unit (sail_step_ni next)) i l c c'.
+  ∨ wp_pf_step (pstep_unit (sail_step_ni next)) lbl_class i l c c'.
 Proof.
   intros Hstep.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps];
     destruct dd; rewrite /pstep_unit in Hps;
     destruct (sail_step_irq_or_ni next (pa_st ag) _ st' Hps)
@@ -2518,7 +2530,7 @@ Lemma seip_free_cfg_step next i c c' :
   in_block i c → seip_free_cfg i c → pf_solo next i c c' → seip_free_cfg i c'.
 Proof.
   intros (ag & Hlk & Hm) Hfr (l & Hstep & _ & _).
-  destruct (wp_pf_step_inv (pstep_unit (sail_step_ni next)) i l c c' ag Hstep Hlk)
+  destruct (wp_pf_step_inv (pstep_unit (sail_step_ni next)) lbl_class i l c c' ag Hstep Hlk)
     as (st' & ms & Hps & _ & _ & Hags & _).
   intros ag2 Hlk2. rewrite Hags in Hlk2.
   rewrite (lookup_insert_at (pc_ags c) i ag _ Hlk) in Hlk2.
@@ -2540,7 +2552,7 @@ Proof.
                            (pc_ags c))) !! i
               = Some (WPAgent stD (pa_ws ag) (pa_prom ag))
     := lookup_insert_at (pc_ags c) i ag _ Hlk.
-  destruct (wp_pf_step_inv (pstep_unit (sail_step_ni next)) i l _ c2 _ Hstep Hlk1)
+  destruct (wp_pf_step_inv (pstep_unit (sail_step_ni next)) lbl_class i l _ c2 _ Hstep Hlk1)
     as (st2 & ms & Hps & Himg2 & Hlog2 & Hags2 & Hre).
   simpl in Hps, Himg2, Hlog2, Hags2, Hre.
   destruct (irq_commute_step next (pa_st ag) stD l st2 (Hfr ag Hlk) Hdel Hps)

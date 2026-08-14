@@ -105,6 +105,46 @@ Global Arguments pt_img {P D} _.
 Global Arguments pt_log {P D} _.
 Global Arguments pt_trs {P D} _.
 
+(* ------------------------------------------------------------------ *)
+(** ** THE MESSAGE CLASS OF A TRACED BUNDLE (G6a)
+
+    [WeakPromiseBridge.wp_pf_step] now PINS the class of the message a
+    store/rmw appends to [pcls l ws] at the fulfilling agent's own
+    [wstate].  The replay ([WeakRobustSim]) rebuilds pf steps from a traced
+    behavior, so it owes that equation at every store it replays, and the
+    two halves of the obligation live here because they are statements
+    about [ptraces] and about [pcls] alone:
+
+    - [cls_canonical clsf TS] — the RECORDED side: every logged message
+      carries the class [clsf] computes at its fulfil event's PRE-record
+      agent state.  (Moved here from [WeakRetag], which proves that every
+      bundle can be brought into this form by retagging — [wm_ak] is
+      inert, so the retag moves neither [prog_of] nor [mem_of].)
+
+    - [pcls_obl clsf] — the REPLAYED side: the replay hands the same
+      events at PERMUTED timestamps, so the class function must not look
+      at any timestamp.  It may look at the label's non-timestamp data and
+      at [w_relp], which is the only [wstate] field the fold computes from
+      labels alone ([WeakRobustProv.w_relp_aevs_post_indep]).  This is the
+      exact analogue of [WeakRobustSim.ts_oblivious] for [pstep], and
+      [WeakSailLTS2.lbl_class] satisfies it. *)
+
+Definition cls_canonical {P D : Type} (clsf : wlabel → wstate → wm_class)
+    (TS : ptraces P D) : Prop :=
+  ∀ i T k ev ag ts m,
+    pt_trs TS !! i = Some T →
+    at_evs T !! k = Some ev → at_ags T !! k = Some ag →
+    ae_ts ev = Some ts → pt_log TS !! (ts - 1)%nat = Some m →
+    wm_ak m = clsf (ae_lb ev) (pa_ws ag).
+
+Definition pcls_obl (clsf : wlabel → wstate → wm_class) : Prop :=
+  (∀ rl base data ws ws', w_relp ws = w_relp ws' →
+     clsf (LStore rl base data) ws = clsf (LStore rl base data) ws') ∧
+  (∀ aq rl base tvs tvs' data ws ws',
+     tvs.*2 = tvs'.*2 → w_relp ws = w_relp ws' →
+     clsf (LRmw aq rl base tvs data) ws
+     = clsf (LRmw aq rl base tvs' data) ws').
+
 (** THE GLOBAL DEVICE-ORDER WITNESS.  [pd_init] is the fabric the state
     phase starts at ([pc_dev mid]); [pd_ord] lists, IN BEHAVIOR ORDER,
     every fabric-touching step as the pair (acting agent, index of that

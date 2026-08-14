@@ -425,6 +425,7 @@ Definition ts_oblivious {P D : Type}
 Section sim.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pcls : wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (DS : pdevs D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
@@ -433,6 +434,19 @@ Section sim.
   Context (Hwfl : writes_fulfilled TS).
   Context (Hlf : lat_free_prog pstep).
   Context (Hobl : ts_oblivious pstep).
+  (** THE CLASS HALVES OF G6a.  [wp_pf_step] PINS the class of the message
+      a store/rmw appends to [pcls l ws] at the fulfilling agent's own
+      [wstate], so the replay owes that equation at every store it
+      rebuilds.  [Hcls] supplies the RECORDED side (the logged message
+      already carries the class [pcls] computes at its fulfil event's
+      pre-record agent state — [WeakRetag] brings any bundle into this
+      form) and [Hclsobl] the REPLAYED side ([pcls] reads neither the
+      store's own timestamp nor the read timestamps, so the π-permuted
+      replay computes the same class as the recording did; the only
+      [wstate] field it may read, [w_relp], is σ-independent by
+      [WeakRobustProv.w_relp_aevs_post_indep]). *)
+  Context (Hcls : cls_canonical pcls TS).
+  Context (Hclsobl : pcls_obl pcls).
   Context (Himg : pt_img TS = img).
   Context (Hnag : length (pt_trs TS) = length ps).
   Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
@@ -575,7 +589,7 @@ Section sim.
       the replayed configuration's fabric is the [dev_at] fold of the
       PROCESSED witness prefix. *)
   Definition qcfg done (cf : wpcfg P D) : Prop :=
-    rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
+    rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
     pc_img cf = img ∧ pc_log cf = pf_log TS done ∧
     length (pc_ags cf) = length ps ∧
     (∀ j T, pt_trs TS !! j = Some T →
@@ -1071,6 +1085,34 @@ Section sim.
   Qed.
 
   (* ---------------------------------------------------------------- *)
+  (** *** THE REPLAYED AGENT STATE AGREES WITH THE RECORDED ONE ON
+          [w_relp] (the G6a bridge)
+
+      The replay hands the acting agent the π-transported fold
+      [aevs_post (pi TS done) (take k (at_evs T)) ws_init]; the recording
+      held [pa_ws ag], which is the SAME fold at σ = [id]
+      ([WeakRobustProv.asteps_ws_fold], with [Hwsi] pinning the trace's
+      first record at [ws_init]).  [w_relp] is σ-independent
+      ([WeakRobustProv.w_relp_aevs_post_indep]), so the two agree on it —
+      and [w_relp] is the only [wstate] field [pcls_obl] lets [pcls]
+      read. *)
+  Lemma replay_ws_relp (j : agent) (k : nat) T ag σ :
+    pt_trs TS !! j = Some T → at_ags T !! k = Some ag →
+    w_relp (pa_ws ag) = w_relp (aevs_post σ (take k (at_evs T)) ws_init).
+  Proof.
+    intros HT Hag.
+    have Hwfi : atrace_wf pstep (pt_img TS) (pt_log TS) j T by apply Hwf.
+    destruct (atrace_first_is_Some pstep (pt_img TS) (pt_log TS) j T Hwfi)
+      as [ag0 Hag0].
+    have Hws0 : pa_ws ag0 = ws_init by eapply Hwsi.
+    have Hfold : pa_ws ag = aevs_post id (take k (at_evs T)) (pa_ws ag0).
+    { eapply (asteps_ws_fold pstep (pt_img TS) (pt_log TS) j
+                (at_ags T) (at_evs T) k ag0 ag);
+        [exact Hwfi|exact Hag0|exact Hag]. }
+    rewrite Hfold Hws0. by apply w_relp_aevs_post_indep.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
   (** *** Assembling the configuration half after one pf step
 
       Every label arm produces a configuration of the SAME shape — the
@@ -1086,7 +1128,7 @@ Section sim.
     newws = aev_post (pi TS (done ++ [e])) ev
               (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) →
     qfab (done ++ [e]) dv →
-    wp_pf_step pstep e.1 lb' cf
+    wp_pf_step pstep pcls e.1 lb' cf
       (WPCfg (pc_img cf) (pf_log TS (done ++ [e])) dv
              (<[e.1 := WPAgent (pa_st ag') newws ∅]> (pc_ags cf))) →
     qcfg (done ++ [e])
@@ -1166,7 +1208,7 @@ Section sim.
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe.
       + rewrite Hstpost Hlogq.
-        apply (PFSilent pstep e.1 cf (WPAgent (pa_st ag)
+        apply (PFSilent pstep pcls e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
                  dnew);
           [done|]. simpl. exact Hpure.
@@ -1193,7 +1235,7 @@ Section sim.
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe tlabel_ts_fst Hmap.
       + rewrite Hstpost Hlogq.
-        apply (PFLoad pstep e.1 cf (WPAgent (pa_st ag)
+        apply (PFLoad pstep pcls e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
                  aq false base (tlabel_ts (pi TS done) tvs) st' dnew);
           [done| |].
@@ -1223,10 +1265,16 @@ Section sim.
                  (LStore rl base data)); [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe Hts Hpits.
       + rewrite Hstpost Hlogq.
-        apply (PFStore pstep e.1 cf (WPAgent (pa_st ag)
+        apply (PFStore pstep pcls e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 rl base data kc st' dnew); [done| |done].
-        simpl. exact Hpure.
+                 rl base data kc st' dnew); [done| |done|].
+        * simpl. exact Hpure.
+        * (* THE PINNED CLASS (G6a) *)
+          have Hkc : kc = pcls (ae_lb ev) (pa_ws ag).
+          { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
+                     HT Hev Hag Hts Hlog). }
+          simpl. rewrite Hkc Hlbe.
+          apply (proj1 Hclsobl). by eapply replay_ws_relp.
     - (* ---- LRmw ---- *)
       destruct Hok as (ts & kc & Hlen & _ & Hlog & Hro & Hex & _ & Hf & Hts).
       have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
@@ -1257,11 +1305,11 @@ Section sim.
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe Hts tlabel_ts_fst Hmap Hpits.
       + rewrite Hstpost Hlogq.
-        apply (PFRmw pstep e.1 cf (WPAgent (pa_st ag)
+        apply (PFRmw pstep pcls e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
                  aq rl base (tlabel_ts (pi TS done) tvs) data kc st'
                  dnew);
-          [done| |done| | |].
+          [done| |done| | | |].
         * simpl. eapply (proj2 Hobl (pa_st ag) (pc_dev cf) aq rl base tvs);
             [by rewrite tlabel_ts_snd|]. exact Hpure.
         * by rewrite tlabel_ts_length.
@@ -1273,6 +1321,13 @@ Section sim.
           eapply (excl_ok_pf done e T ev ag f aq rl base tvs data ts);
             [done|done|done|done|done|exact Hlbe|exact Hts|].
           by rewrite Hlbe.
+        * (* THE PINNED CLASS (G6a) *)
+          have Hkc : kc = pcls (ae_lb ev) (pa_ws ag).
+          { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
+                     HT Hev Hag Hts Hlog). }
+          simpl. rewrite Hkc Hlbe.
+          apply (proj2 Hclsobl); [by rewrite tlabel_ts_snd|].
+          by eapply replay_ws_relp.
     - (* ---- LFence ---- *)
       destruct Hok as (Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -1284,7 +1339,7 @@ Section sim.
         [done|done|done|done|done|done| |exact Hfab'|].
       + by rewrite /aev_post Hlbe.
       + rewrite Hstpost Hlogq.
-        apply (PFFence pstep e.1 cf (WPAgent (pa_st ag)
+        apply (PFFence pstep pcls e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
                  pr pw sr sw st' dnew); [done|].
         simpl. exact Hpure.
@@ -1345,7 +1400,7 @@ Section sim.
     length (pc_ags cend) = length ps →
     (∀ j T, pt_trs TS !! j = Some T →
        at_ags T !! length (at_evs T) = pc_ags cend !! j) →
-    ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
+    ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
   Proof.
     intros Hacyc Himgc Hlogc Hlenc Hlast.
@@ -1441,9 +1496,10 @@ End sim.
     [Qinv] is transparent, but the minimal-bad-edge consumer only ever
     wants the pf run and the per-agent picture; this is that projection. *)
 
-Lemma Qinv_run {P D} (pstep : P → D → wlabel → P → D → Prop) TS DS img d0 ps done :
-  Qinv pstep TS DS img d0 ps done →
-  ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
+Lemma Qinv_run {P D} (pstep : P → D → wlabel → P → D → Prop)
+    (pcls : wlabel → wstate → wm_class) TS DS img d0 ps done :
+  Qinv pstep pcls TS DS img d0 ps done →
+  ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
         pc_img cf = img ∧ pc_log cf = pf_log TS done ∧
         length (pc_ags cf) = length ps ∧
         (∀ j T, pt_trs TS !! j = Some T →
@@ -1455,8 +1511,9 @@ Lemma Qinv_run {P D} (pstep : P → D → wlabel → P → D → Prop) TS DS img
         qfab TS DS done (pc_dev cf).
 Proof. intros [_ (cf & Hc)]. by exists cf. Qed.
 
-Lemma Qinv_order {P D} (pstep : P → D → wlabel → P → D → Prop) TS DS img d0 ps done :
-  Qinv pstep TS DS img d0 ps done → qorder TS done.
+Lemma Qinv_order {P D} (pstep : P → D → wlabel → P → D → Prop)
+    (pcls : wlabel → wstate → wm_class) TS DS img d0 ps done :
+  Qinv pstep pcls TS DS img d0 ps done → qorder TS done.
 Proof. by intros [? _]. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -1471,6 +1528,7 @@ Proof. by intros [? _]. Qed.
 Section wrapper.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pcls : wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.
@@ -1549,23 +1607,37 @@ Section wrapper.
       [gdep3 = gdep2 ∪ gdev] is acyclic and every byte's writes are
       serialized.  The replay then processes the fabric-touching events in
       witness order and hands each of them the fabric it recorded. *)
+  (** THE CLASS PREMISES (G6a).  [wp_pf_run] pins the class of every
+      message it appends, so the replay owes the pinned equation: [pcls]
+      must be timestamp-blind ([pcls_obl]) and the behavior's own log must
+      already carry the classes [pcls] computes ([cls_canonical], which
+      [WeakRetag]'s retag establishes for any bundle).  They are SEPARATE
+      premises, not part of the acyclicity bundle, because canonicity is
+      discharged by the retag at the capstone and obliviousness by the
+      concrete class function. *)
   Theorem wp_behavior_robust_dev img d0 ps c :
     pdev_ok pstep pdev →
     lat_free_prog pstep → ts_oblivious pstep →
+    pcls_obl pcls →
     wp_behavior pstep img d0 ps c →
     (∀ mid TS DS,
        rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
        ptraces_dev_of pstep pdev TS DS mid c →
        gdep3_acyclic TS DS ∧ (∀ a, co_tc TS a)) →
-    ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
+    (∀ mid TS DS,
+       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+       ptraces_dev_of pstep pdev TS DS mid c →
+       cls_canonical pcls TS) →
+    ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
   Proof.
-    intros Hpok Hlf Hobl Hb Hprem.
+    intros Hpok Hlf Hobl Hclsobl Hb Hprem Hpcan.
     destruct (wp_behavior_fulfil_once_dev pstep pdev img d0 ps c Hpok Hlf Hb)
       as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
     have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
     have Hinit : pd_init DS = pc_dev mid by destruct Hofd as (_ & ? & _).
     destruct (Hprem mid TS DS Hprom Hofd) as (Hacyc & Hco).
+    have Hcls : cls_canonical pcls TS by apply (Hpcan mid TS DS Hprom Hofd).
     destruct Hofd as (Hof & _).
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
     have Hla : log_authored (pc_log mid).
@@ -1596,8 +1668,8 @@ Section wrapper.
       rewrite /wp_init /= list_lookup_fmap in Hag.
       destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
       injection Hag as <-. by rewrite Hst. }
-    eapply (sim_full pstep pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
-              Himg1 Hlen1 Hdata1 Hps1 Hwit Hd01 c Hacyc).
+    eapply (sim_full pstep pcls pdev TS DS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl
+              Hcls Hclsobl Himg1 Hlen1 Hdata1 Hps1 Hwit Hd01 c Hacyc).
     - by rewrite Himg0 Hcimgc.
     - by rewrite Hlog0 Hclogc.
     - by rewrite Hclenc Hplen /wp_init /= length_map.
@@ -1612,22 +1684,29 @@ Section wrapper.
     pdev_ok pstep pdev →
     (∀ p l p', pdev p l p' = false) →
     lat_free_prog pstep → ts_oblivious pstep →
+    pcls_obl pcls →
     wp_behavior pstep img d0 ps c →
     (∀ mid TS,
        rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
        ptraces_of pstep TS mid c →
        gdep2_acyclic TS ∧ (∀ a, co_tc TS a)) →
-    ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
+    (∀ mid TS,
+       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
+       ptraces_of pstep TS mid c →
+       cls_canonical pcls TS) →
+    ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
   Proof.
-    intros Hpok Hnodev Hlf Hobl Hb Hprem.
-    eapply (wp_behavior_robust_dev img d0 ps c Hpok Hlf Hobl Hb).
-    intros mid TS DS Hprom Hofd.
-    have Hdf := ptraces_dev_of_free pstep pdev TS DS mid c Hnodev Hofd.
-    have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
-    destruct Hofd as (Hof & _).
-    destruct (Hprem mid TS Hprom Hof) as (Hacyc & Hco).
-    split; [|done]. by eapply gdep3_acyclic_devfree.
+    intros Hpok Hnodev Hlf Hobl Hclsobl Hb Hprem Hpcan.
+    eapply (wp_behavior_robust_dev img d0 ps c Hpok Hlf Hobl Hclsobl Hb).
+    - intros mid TS DS Hprom Hofd.
+      have Hdf := ptraces_dev_of_free pstep pdev TS DS mid c Hnodev Hofd.
+      have Hwit : ptraces_wit TS DS by eapply ptraces_dev_of_wit.
+      destruct Hofd as (Hof & _).
+      destruct (Hprem mid TS Hprom Hof) as (Hacyc & Hco).
+      split; [|done]. by eapply gdep3_acyclic_devfree.
+    - intros mid TS DS Hprom Hofd. destruct Hofd as (Hof & _).
+      by apply (Hpcan mid TS Hprom Hof).
   Qed.
 
 End wrapper.

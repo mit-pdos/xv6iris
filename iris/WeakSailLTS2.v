@@ -93,14 +93,23 @@
     the pf machine's own dynamics; both are recorded in [pf_solo] as side
     conditions on the block, exactly as [dev_ok_blk] records the device seam.
 
-    (a) MESSAGE CLASS.  [PFStore]/[PFRmw] carry the [wm_class] as a FREE
-        BINDER ("inert — no rule reads it", WeakMem §5), while [wrun] COMPUTES
-        it ([wm_class_of]).  [lbl_class] is that computation expressed in the
-        data a pf step has ([wlabel] + the agent's [wstate]) — it agrees with
-        [wm_class_of] on every step [sail_step] can take, because the plain
-        store arm pins [ak_latest = false] and [ak_sync = rl] and the fused
-        arm pins [ak_latest = true] ([lbl_class_store], [wr_node_class]).
+    (a) MESSAGE CLASS.  [wrun] COMPUTES the class ([wm_class_of]).
+        [lbl_class] is that computation expressed in the data a pf step has
+        ([wlabel] + the agent's [wstate]) — it agrees with [wm_class_of] on
+        every step [sail_step] can take, because the plain store arm pins
+        [ak_latest = false] and [ak_sync = rl] and the fused arm pins
+        [ak_latest = true] ([lbl_class_store], [wr_node_class]).
         [cls_canon] requires the block's messages to carry it.
+
+        SINCE G6a [PFStore]/[PFRmw] PIN the class rather than leaving it a
+        free binder ("inert — no rule reads it", WeakMem §5): the arms carry
+        [k = pcls l (pa_ws ag)], and every pf step below is taken at
+        [pcls := lbl_class].  [cls_canon] is therefore now IMPLIED by the
+        step it accompanies rather than an independent restriction — it is
+        kept in [pf_solo] verbatim because the ⇐ direction reads it directly
+        and because it is the statement that survives if the machine's binder
+        is ever freed again.  [lbl_class_obl] discharges the replay-side half
+        of the pinning ([WeakRobustTrace.pcls_obl]) once, below.
 
     (b) RMW READ ADMISSIBILITY.  [PFRmw] carries [read_ok … lat := false] plus
         PARM's [excl_ok], which forbids only OTHER agents' writes in the
@@ -138,6 +147,9 @@ Require Import RiscvModelBytes.
 Require Import DevModel.
 From xv6iris Require Import WeakMem WeakPromise WeakPromiseFact WeakPromiseBridge.
 From xv6iris Require Import WeakInterp WeakInterpProj WeakSailLTS.
+(* [WeakRobustTrace] only for [pcls_obl], the replay-side obligation
+   [lbl_class] discharges below (§2); it depends on nothing Sail-side. *)
+From xv6iris Require Import WeakRobustTrace.
 Require Import RiscvLang WeakLang.
 
 Local Open Scope Z_scope.
@@ -238,6 +250,19 @@ Lemma lbl_class_rmw ak ws aq rl base tvs data :
   wm_class_of ak ws = lbl_class (WeakPromise.LRmw aq rl base tvs data) ws.
 Proof. intros H. by rewrite /wm_class_of /lbl_class H. Qed.
 
+(** THE REPLAY-SIDE OBLIGATION (G6a).  [lbl_class] is the canonical [pcls]
+    for the whole archive route, and the replay ([WeakRobustSim]) hands the
+    same events back at PERMUTED timestamps — so the class function must look
+    at no timestamp.  [lbl_class] looks at [rl] and at [w_relp ws] on the
+    store arm and is constant on the rmw arm, so it does not.  Every archive
+    consumer that owes [WeakRobustTrace.pcls_obl] discharges it with this. *)
+Lemma lbl_class_obl : pcls_obl lbl_class.
+Proof.
+  split.
+  - intros rl base data ws ws' Hrel. by rewrite /lbl_class Hrel.
+  - intros aq rl base tvs tvs' data ws ws' _ _. reflexivity.
+Qed.
+
 (** (a) the class the step appends is the computed one. *)
 Definition cls_canon (i : agent) (l : wlabel) (c c' : wpcfg psail unit) : Prop :=
   ∀ ag msg, pc_ags c !! i = Some ag → pc_log c' = pc_log c ++ [msg] →
@@ -256,25 +281,25 @@ Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail unit) : Prop :=
 Definition pf_solo (next : bool → M unit) (i : agent)
     (c c' : wpcfg psail unit) : Prop :=
   ∃ l : wlabel,
-    wp_pf_step (pstep_unit (sail_step_ni next)) i l c c' ∧
+    wp_pf_step (pstep_unit (sail_step_ni next)) lbl_class i l c c' ∧
     cls_canon i l c c' ∧ rmw_tight i l c.
 
 (** A block IS a promise-free run — the two brackets sandwich the same
     relation. *)
 Lemma pf_solo_run next i c c' :
-  pf_solo next i c c' → wp_pf_run (pstep_unit (sail_step next)) c c'.
+  pf_solo next i c c' → wp_pf_run (pstep_unit (sail_step next)) lbl_class c c'.
 Proof.
   intros (l & Hstep & _ & _). exists i, l.
   destruct Hstep as
     [cfg ag st' dd Hlk Hps
     |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-    |cfg ag rl base data kk st' dd Hlk Hps Hne
-    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
+    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
     |cfg ag pr pw sr sw st' dd Hlk Hps];
     [ by eapply PFSilent, sail_step_ni_step
     | by eapply PFLoad; [done|apply sail_step_ni_step|done]
-    | by eapply PFStore; [done|apply sail_step_ni_step|done]
-    | by eapply PFRmw; [done|apply sail_step_ni_step|done|done|done|done]
+    | by eapply PFStore; [done|apply sail_step_ni_step|done|done]
+    | by eapply PFRmw; [done|apply sail_step_ni_step|done|done|done|done|done]
     | by eapply PFFence; [done|apply sail_step_ni_step] ].
 Qed.
 
@@ -290,8 +315,8 @@ Proof.
   destruct Hstep as
     [cfg ag0 st' dd H0 Hps
     |cfg ag0 aq lat base tvs st' dd H0 Hps Hr
-    |cfg ag0 rl base data kk st' dd H0 Hps Hne
-    |cfg ag0 aq rl base tvs data kk st' dd H0 Hps Hne Hlen Hr He
+    |cfg ag0 rl base data kk st' dd H0 Hps Hne Hkc
+    |cfg ag0 aq rl base tvs data kk st' dd H0 Hps Hne Hlen Hr He Hkc
     |cfg ag0 pr pw sr sw st' dd H0 Hps];
     simpl in Hlk; rewrite Hlk in H0; injection H0 as <-;
     (eexists; (split;
@@ -603,8 +628,8 @@ Section peel.
     destruct Hstep as
       [cfg ag st' dd Hlk Hps
       |cfg ag aq lat base tvs st' dd Hlk Hps Hr
-      |cfg ag rl base data kk st' dd Hlk Hps Hne
-      |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+      |cfg ag rl base data kk st' dd Hlk Hps Hne Hkc
+      |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He Hkc
       |cfg ag pr pw sr sw st' dd Hlk Hps]; destruct dd.
     - exists ag. split; [done|]. left. by exists st'.
     - exists ag. split; [done|]. right; left. by exists aq, lat, base, tvs, st'.
@@ -1259,24 +1284,27 @@ Qed.
 (** ⇒ — [WeakSailLTS.sail_instr_bracket] at the [wgstate] seam. *)
 Theorem wprim_hart_block_fwd (cpu : CPU) (gen : nat) (g g' : wgstate) :
   (∀ b, sail_shaped (riscv_step b)) →
+  wrun_plainw (wglog g) (wglog g') →
   wthread_live g gen →
   wprim_step (LoopE gen cpu) g [] (LoopE gen cpu) g' [] →
   ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
     ags !! (fin_to_nat cpu)
       = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq)
                 (wgws g cpu) prom) →
-    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) lbl_class)
       (WPCfgU (img_z (wgimg g)) (wglog g) ags)
       (WPCfgU (img_z (wgimg g)) (wglog g')
          (<[fin_to_nat cpu :=
               WPAgent (PSail None (wgregs g' cpu) (wgdev g') None iq)
                 (wgws g' cpu) prom]> ags)).
 Proof.
-  intros Hsh Hlive Hstep.
+  intros Hsh Hpl Hlive Hstep.
   apply wprim_step_loop_inv in Hstep as (_ & _ & _ & [(_ & tick & u & ss & Hrun & ->)|(Hnl & _)]);
     [|done].
-  pose proof (sail_instr_bracket (fin_to_nat cpu) tick (whart_view g cpu) u ss
-                (Hsh tick) Hrun) as Hch.
+  rewrite whart_write_log in Hpl. rewrite -(whart_view_log g cpu) in Hpl.
+  pose proof (sail_instr_bracket (fin_to_nat cpu) lbl_class
+                (λ ak ws base data Hlat, lbl_class_store ak ws base data Hlat)
+                tick (whart_view g cpu) u ss (Hsh tick) Hrun Hpl) as Hch.
   intros iq prom ags Hlk.
   rewrite whart_write_log whart_write_regs_eq whart_write_ws_eq
           whart_write_dev.
@@ -1306,11 +1334,12 @@ Theorem wprim_hart_block (cpu : CPU) (gen : nat) (g : wgstate)
   ∧
   (* ⇒ : one hart step IS a run of the same shape, at the same fabric *)
   (∀ g', wprim_step (LoopE gen cpu) g [] (LoopE gen cpu) g' [] →
+     wrun_plainw (wglog g) (wglog g') →
      ∀ (iq' : istream) (prom' : gset nat) (ags' : list (wpagent psail)),
        ags' !! (fin_to_nat cpu)
          = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq')
                    (wgws g cpu) prom') →
-       rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+       rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) lbl_class)
          (WPCfgU (img_z (wgimg g)) (wglog g) ags')
          (WPCfgU (img_z (wgimg g)) (wglog g')
             (<[fin_to_nat cpu :=
@@ -1319,5 +1348,6 @@ Theorem wprim_hart_block (cpu : CPU) (gen : nat) (g : wgstate)
 Proof.
   intros Hsh Hlive Hlk. split.
   - intros c' Hdev Hfus Hblk. by eapply wprim_hart_block_bwd.
-  - intros g' Hstep. exact (wprim_hart_block_fwd cpu gen g g' Hsh Hlive Hstep).
+  - intros g' Hstep Hpl.
+    exact (wprim_hart_block_fwd cpu gen g g' Hsh Hpl Hlive Hstep).
 Qed.

@@ -309,10 +309,14 @@
     ------------------------------------------------------------------------
     §C  THE cls_canon / rmw_tight RESIDUE (L2's header) — PAID, NOT ASSUMED.
 
-    [WeakPromiseBridge.wp_pf_step] carries a message's [wm_class] as a FREE
-    BINDER, while [WeakInterp.wrun] COMPUTES it; L2 records the gap as
+    [WeakInterp.wrun] COMPUTES a message's [wm_class]; L2 records the gap as
     [WeakSailLTS2.cls_canon] (and [rmw_tight] for the exclusive read window),
-    both side conditions of [pf_solo] and hence of [sail_block].  Neither is
+    both side conditions of [pf_solo] and hence of [sail_block].  (Since G6a
+    [WeakPromiseBridge.wp_pf_step] no longer leaves the class a FREE BINDER
+    either — [PFStore]/[PFRmw] pin it to [pcls l (pa_ws ag)], and every pf
+    step of the archive route is taken at [pcls := WeakSailLTS2.lbl_class].
+    That makes [cls_canon] a consequence of the step rather than an extra
+    restriction; it is kept because the ⇐ direction reads it directly.)  Neither is
     a premise HERE: [WeakSailCone.pf_xsolo] already carries both at every
     step of every segment it exports ([xcls_canon] / [xrmw_tight]), and §3's
     projection transports them verbatim to the [psail] side.  On the disk
@@ -421,7 +425,7 @@
          [xv6_cone_premises]'s [Hcls] conjunct ("a logged message carries
          its author's computed class") is now handed TO the supplier:
          the per-bundle package is required only when
-         [WeakRetag.cls_canonical lbl_class TS] holds, and the capstone
+         [cls_canonical lbl_class TS] holds, and the capstone
          discharges it by PRECOMPOSING WITH THE RETAG — [wm_ak] is inert
          ([WeakRetag]), so the behavior's own [wp_behavior_fulfil_once]
          bundle retagged at [WeakRetag.canon_f] is canonical, describes a
@@ -679,7 +683,7 @@ Proof.
 Qed.
 
 Lemma pf_run_no_promises (c c' : wpcfg pxv6 unit) :
-  rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step))) c c' → no_promises c → no_promises c'.
+  rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)) lbl_class) c c' → no_promises c → no_promises c'.
 Proof.
   induction 1 as [|x y z (i & l & Hs) _ IH]; [done|].
   intros Hnp. apply IH. by eapply wp_pf_step_no_promises.
@@ -826,9 +830,9 @@ Section prj.
 
       |cfg ag aq lat base tvs st' dv Hlk Hps Hr
 
-      |cfg ag rl base data kk st' dv Hlk Hps Hne
+      |cfg ag rl base data kk st' dv Hlk Hps Hne Hkc
 
-      |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He
+      |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
 
       |cfg ag pr pw sr sw st' dv Hlk Hps];
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
@@ -855,9 +859,9 @@ Section prj.
 
       |cfg ag aq lat base tvs st' dv Hlk Hps Hr
 
-      |cfg ag rl base data kk st' dv Hlk Hps Hne
+      |cfg ag rl base data kk st' dv Hlk Hps Hne Hkc
 
-      |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He
+      |cfg ag aq rl base tvs data kk st' dv Hlk Hps Hne Hlen Hr He Hkc
 
       |cfg ag pr pw sr sw st' dv Hlk Hps]; destruct dv;
       simpl in Hax; rewrite Hlk in Hax; injection Hax as <-;
@@ -873,7 +877,7 @@ Section prj.
       { exists (WPAgent (PHart q') (pa_ws ag) (pa_prom ag)), q'. simpl.
         split; [by eapply lookup_insert_self|done]. }
       exists WeakPromise.LSilent. split_and!.
-      + apply (PFSilent (pstep_unit (sail_step_ni next)) i (prj_cfg q0 cfg)
+      + apply (PFSilent (pstep_unit (sail_step_ni next)) lbl_class i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) q' tt Hlks).
         rewrite /prj_ag /= Hstx. exact Hps.
       + intros ag2 msg Hag2 Heq. simpl in Heq.
@@ -884,7 +888,7 @@ Section prj.
                   (pa_prom ag)), q'. simpl.
         split; [by eapply lookup_insert_self|done]. }
       exists (WeakPromise.LLoad aq lat base tvs). split_and!.
-      + apply (PFLoad (pstep_unit (sail_step_ni next)) i (prj_cfg q0 cfg)
+      + apply (PFLoad (pstep_unit (sail_step_ni next)) lbl_class i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) aq lat base tvs q' tt Hlks);
           [rewrite /prj_ag /= Hstx; exact Hps|exact Hr].
       + intros ag2 msg Hag2 Heq. simpl in Heq.
@@ -893,9 +897,9 @@ Section prj.
     - split.
       { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
       exists (WeakPromise.LStore rl base data). split_and!.
-      + apply (PFStore (pstep_unit (sail_step_ni next)) i (prj_cfg q0 cfg)
+      + apply (PFStore (pstep_unit (sail_step_ni next)) lbl_class i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) rl base data kk q' tt Hlks);
-          [rewrite /prj_ag /= Hstx; exact Hps|exact Hne].
+          [rewrite /prj_ag /= Hstx; exact Hps|exact Hne|exact Hkc].
       + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
         rewrite Hlks in Hag2. injection Hag2 as <-.
         exact (Hcls ag msg Hlk Heq).
@@ -903,10 +907,10 @@ Section prj.
     - split.
       { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
       exists (WeakPromise.LRmw aq rl base tvs data). split_and!.
-      + apply (PFRmw (pstep_unit (sail_step_ni next)) i (prj_cfg q0 cfg)
+      + apply (PFRmw (pstep_unit (sail_step_ni next)) lbl_class i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) aq rl base tvs data kk q' tt Hlks);
           [rewrite /prj_ag /= Hstx; exact Hps|exact Hne|exact Hlen
-          |exact Hr|exact He].
+          |exact Hr|exact He|exact Hkc].
       + intros ag2 msg Hag2 Heq. simpl in Heq, Hag2.
         rewrite Hlks in Hag2. injection Hag2 as <-.
         exact (Hcls ag msg Hlk Heq).
@@ -915,7 +919,7 @@ Section prj.
     - split.
       { eexists _, q'. simpl. split; [by eapply lookup_insert_self|done]. }
       exists (WeakPromise.LFence pr pw sr sw). split_and!.
-      + apply (PFFence (pstep_unit (sail_step_ni next)) i (prj_cfg q0 cfg)
+      + apply (PFFence (pstep_unit (sail_step_ni next)) lbl_class i (prj_cfg q0 cfg)
                  (prj_ag q0 ag) pr pw sr sw q' tt Hlks).
         rewrite /prj_ag /= Hstx. exact Hps.
       + intros ag2 msg Hag2 Heq. simpl in Heq.
@@ -1611,7 +1615,7 @@ Proof.
   - (* ---------------- ONE INTERRUPT DELIVERY ---------------- *)
     destruct Hlift as (cpu & -> & Hwire).
     destruct Hfine as (Hbnd & Hxirq).
-    have Hpfstep : wp_pf_step (pstep_unit (pstep_xv6 riscv_step)) (fin_to_nat cpu)
+    have Hpfstep : wp_pf_step (pstep_unit (pstep_xv6 riscv_step)) lbl_class (fin_to_nat cpu)
                      WeakPromise.LSilent (wl_cfg g u) c'
       := pf_xirq_pf_step riscv_step (fin_to_nat cpu) (wl_cfg g u) c'
            (xfence_free_bnd _ _ Hbnd) Hxirq.
@@ -1624,7 +1628,7 @@ Proof.
     destruct Hdel as (_ & v & iq & Hiq & Hq'). simpl in Hiq, Hq'.
     destruct (Hwire v iq Hiq) as (Hv & Hlift').
     have Hnp : no_promises c'
-      := wp_pf_step_no_promises (pstep_unit (pstep_xv6 riscv_step)) (fin_to_nat cpu)
+      := wp_pf_step_no_promises (pstep_unit (pstep_xv6 riscv_step)) lbl_class (fin_to_nat cpu)
            WeakPromise.LSilent _ _ (wl_cfg_no_promises g u) Hpfstep.
     have Hag' : ag' = WPAgent (PHart q') (wgws g cpu) ∅.
     { have Hpr : pa_prom ag' = ∅ := Hnp _ _ Hlk'.
@@ -1897,7 +1901,7 @@ Theorem xv6_no_bad_edge (gen : nat) (g0 : wgstate) (u0 : wlaux)
   tb_facts (pstep_unit (pstep_xv6 riscv_step)) n_disk (img_z (wgimg g0))
     (xv6_ps0 g0 u0) (PDevs tt []) TS →
   xv6_cone_premises TS →
-  WeakRetag.cls_canonical lbl_class TS →
+  cls_canonical lbl_class TS →
   cone_liftable gen g0 u0 TS →
   ∀ e1 e2, ¬ bad n_disk TS (PDevs tt []) e1 e2.
 Proof.
@@ -1914,7 +1918,7 @@ Proof.
   destruct (Hbwf e1 e2 Hbad) as (f1 & f2 & Hbad' & Hmin).
   destruct (cone_segments2 TS (img_z (wgimg g0)) (xv6_ps0 g0 u0)
               Hwf Hwsi Hco Hwfl Himg Hnag Hdata Hdf Hps0 Hfo Hee n_disk Hsplit
-              (xv6_ps0_bnd g0 u0) Hcq Hres Himgt Hseip Hcls f1 f2 Hbad' Hmin)
+              (xv6_ps0_bnd g0 u0) Hcq Hres Himgt Hcls Hseip f1 f2 Hbad' Hmin)
     as (segs & cf & Hch & Hok & _ & Hvio & Hbnd).
   rewrite (wp_init_wl g0 u0 Hlog0 Hws0 Hdws0) in Hch.
   (** THE REFINEMENT (§4): the hart segments become single blocks and the
@@ -1953,22 +1957,24 @@ Qed.
 
 Theorem robust_main_no_bad {P D : Type}
     (pstep : P → D → wlabel → P → D → Prop)
+    (pcls : wlabel → wstate → wm_class)
     (pdev : P → wlabel → P → bool)
     (nh : nat) (img : image) (d0 : D) (ps : list P)
     (c mid : wpcfg P D) (TS : ptraces P D) :
-  lat_free_prog pstep → ts_oblivious pstep →
+  lat_free_prog pstep → ts_oblivious pstep → pcls_obl pcls →
   rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
   ptraces_of pstep TS mid c →
   fulfil_acct mid TS →
   main_premises nh TS (PDevs d0 []) →
+  cls_canonical pcls TS →
   (∀ j T k ev, pt_trs TS !! j = Some T →
      at_evs T !! k = Some ev → ae_dev ev = None) →
   (tb_facts pstep nh img ps (PDevs d0 []) TS →
      ∀ e1 e2, ¬ bad nh TS (PDevs d0 []) e1 e2) →
-  ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
+  ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
-  intros Hlf Hobl Hprom Hof Hacct Hprem Hdf Hnb.
+  intros Hlf Hobl Hclsobl Hprom Hof Hacct Hprem Hcanon Hdf Hnb.
   destruct Hprem as (Hsplit & Hbwf & Hee & Hepo & (sync & Hbytes)).
   (* the derived bundle facts — verbatim [robust_main]'s *)
   have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
@@ -2010,8 +2016,9 @@ Proof.
   have Hacyc : gdep2_acyclic TS.
   { eapply (gdep2_acyclic_bad_free pstep nh TS (PDevs d0 []) Hwf Hfo Hee Hsplit).
     intros e1 e2 Hbe. by destruct (Hnobad e1 e2 Hbe). }
-  eapply (sim_full pstep pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl Hlf
-            Hobl Himg1 Hlen1 Hdata1 Hps1 (ptraces_wit_nil TS d0 Hdf) eq_refl
+  eapply (sim_full pstep pcls pdev TS (PDevs d0 []) img d0 ps Hwf Hwsi Hco Hwfl
+            Hlf Hobl Hcanon Hclsobl Himg1 Hlen1 Hdata1 Hps1
+            (ptraces_wit_nil TS d0 Hdf) eq_refl
             c (gdep3_acyclic_nodev TS d0 Hacyc)).
   - by rewrite Himg0 Hcimgc.
   - by rewrite Hlog0 Hclogc.
@@ -2035,11 +2042,11 @@ Corollary xv6_weak_robust_lifted (gen : nat) (g0 : wgstate) (u0 : wlaux)
      rtc (wp_promise_step (P := pxv6) (D := unit))
        (wp_init (img_z (wgimg g0)) tt (xv6_ps0 g0 u0)) mid →
      ptraces_of (pstep_unit (pstep_xv6 riscv_step)) TS mid cb →
-     WeakRetag.cls_canonical lbl_class TS →
+     cls_canonical lbl_class TS →
      main_premises n_disk TS (PDevs tt []) ∧ xv6_cone_premises TS ∧
      cone_liftable gen g0 u0 TS) →
   wp_behavior (pstep_unit (pstep_xv6 riscv_step)) (img_z (wgimg g0)) tt (xv6_ps0 g0 u0) c →
-  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)))
+  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)) lbl_class)
           (wp_init (img_z (wgimg g0)) tt (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
@@ -2083,7 +2090,7 @@ Proof.
   { eapply (WeakRetag.cfg_wf_promise_run (pstep_unit (pstep_xv6 riscv_step)));
       [apply (cfg_wf_init (P := pxv6) (img_z (wgimg g0)) tt (xv6_ps0 g0 u0))
       |exact Hprom]. }
-  have Hcanon : WeakRetag.cls_canonical lbl_class
+  have Hcanon : cls_canonical lbl_class
                   (WeakRetag.retag_traces (WeakRetag.canon_f lbl_class TS) TS).
   { apply (WeakRetag.cls_canonical_canon (pstep_unit (pstep_xv6 riscv_step))
              (λ _ _ _, false)).
@@ -2092,10 +2099,11 @@ Proof.
                    (pstep_unit (pstep_xv6 riscv_step)) (λ _ _ _, false)). }
   destruct (Hprem _ _ _ Hbeh' Hprom' Hof' Hcanon) as (Hmain & Hcp & Hcl).
   destruct (robust_main_no_bad (pstep_unit (pstep_xv6 riscv_step))
-              (λ _ _ _, false) n_disk
+              lbl_class (λ _ _ _, false) n_disk
               (img_z (wgimg g0)) tt (xv6_ps0 g0 u0) _ _ _
               (xv6_lat_free riscv_step) (xv6_ts_oblivious riscv_step)
-              Hprom' Hof' (fulfil_acct_retag _ mid TS Hacct) Hmain Hdf)
+              lbl_class_obl
+              Hprom' Hof' (fulfil_acct_retag _ mid TS Hacct) Hmain Hcanon Hdf)
     as (cf & Hrun & Hpg & Hmm).
   { intros Htb.
     destruct Hmain as (_ & Hbwf & _ & _ & _).
@@ -2141,11 +2149,11 @@ Corollary xv6_weak_robust_adequate Σ `{!riscvGpreS Σ, !weakGpreS Σ}
      rtc (wp_promise_step (P := pxv6) (D := unit))
        (wp_init (img_z (wgimg g0)) tt (xv6_ps0 g0 u0)) mid →
      ptraces_of (pstep_unit (pstep_xv6 riscv_step)) TS mid cb →
-     WeakRetag.cls_canonical lbl_class TS →
+     cls_canonical lbl_class TS →
      main_premises n_disk TS (PDevs tt []) ∧ xv6_cone_premises TS ∧
      cone_liftable gen_id g0 u0 TS) →
   wp_behavior (pstep_unit (pstep_xv6 riscv_step)) (img_z (wgimg g0)) tt (xv6_ps0 g0 u0) c →
-  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)))
+  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)) lbl_class)
           (wp_init (img_z (wgimg g0)) tt (xv6_ps0 g0 u0)) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.

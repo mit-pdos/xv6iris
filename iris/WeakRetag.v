@@ -563,13 +563,10 @@ Section machine.
       [clsf] (the consumer instantiates [clsf := WeakSailLTS2.lbl_class];
       that definition is program-type-independent, so nothing is lost). *)
 
-  Definition cls_canonical (clsf : wlabel → wstate → wm_class)
-      (TS : ptraces P D) : Prop :=
-    ∀ i T k ev ag ts m,
-      pt_trs TS !! i = Some T →
-      at_evs T !! k = Some ev → at_ags T !! k = Some ag →
-      ae_ts ev = Some ts → pt_log TS !! (ts - 1)%nat = Some m →
-      wm_ak m = clsf (ae_lb ev) (pa_ws ag).
+  (** [cls_canonical] MOVED to [WeakRobustTrace] (G6a): the pinned pf
+      fragment consumes it in the replay, so it is Layer-1 vocabulary now,
+      not this file's.  What stays here is what this file PROVES — that
+      every bundle can be brought into that form. *)
 
   (** THE SCAN.  [f] must be a FUNCTION, and the fulfil event of a log
       position is only known to EXIST — but the trace is a finite list, so
@@ -751,7 +748,6 @@ End machine.
 
 Global Arguments retag_cfg {P D} _ _.
 Global Arguments retag_traces {P D} _ _.
-Global Arguments cls_canonical {P D} _ _.
 Global Arguments canon_f {P D} _ _ _.
 Global Arguments fulfil_at {P D} _ _.
 Global Arguments ts_pos {P D} _.
