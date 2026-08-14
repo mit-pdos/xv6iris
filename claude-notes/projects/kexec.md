@@ -20,6 +20,23 @@ B1, the whole phdr loop with the inlined loadseg loop inside it, and all
 seven of phase B's `bad:` entries.**  `ProofKexecB3.kxc_b2` /
 `kxc_b2z` are the two paths from phase B1's two outputs to `+0x1ae`.
 
+**THE PHASE B2/B3/C BUILD CHAIN IS BROKEN.** `ProofKexecB3.v` no longer
+`Require`s `ProofKexecB2.v`, and `ProofKexecC.v` requires neither
+`ProofKexecB2.v` nor `ProofKexecB3.v` — `coqdep` confirms none of the three
+`.vo`s appears in another's dependency list. `SpecKexecB2.v` states
+`kxc_ls`/`kxc_bad324` (what B3 actually consumes out of B2) as `Module Type
+KEXECB2` Parameters over `_body` `Definition`s, plus the WHOLE of
+`KexecB2Frame`/`KexecB2Res` (the frame algebra and the resource bundle,
+verbatim — B3 turned out to call several of their small lemmas too, not
+just the two headline `Definition`s); `ProofKexecB3.v`'s `KexecB2Proof`
+ascribes `: KEXECB2` and `ProofKexecB3.v` takes `B2` as an abstract functor
+argument of that type instead of applying the functor itself. `SpecKexecB3.v`
+does the same for `kxc_b2`/`kxc_b2z`, ready for when phase C's argv loop
+needs them — `ProofKexecC.v` does not yet take a `(B3 : KEXECB3)` argument
+because it does not yet consume them; add that argument, not a
+`Require Import ProofKexecB3.`, when it does. See SpecKexecB2.v's header
+for the full rationale and the design/spec-modules.md pattern this applies.
+
 **PHASE C IS IN PROGRESS.**  Its design is worked out in full below (control
 flow re-verified independently, instruction by instruction, off the
 generated `CodeKexec.v` — not just transcribed from an earlier read), and its
@@ -610,7 +627,9 @@ edge — is the unit the phdr loop's induction is over.
 | `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
 | `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`) | **landed, proven** |
 | `ProofKexecSeam.v` — the B1/B2 seam layer (the two seam states, the frame algebra, the elf carve, `kxc_cs_cases`) | **landed, proven** |
+| `SpecKexecB2.v` — `KEXECB2` (the `kxc_ls`/`kxc_bad324` interface B3 consumes), the frame algebra and the resource bundle | **landed, proven** |
 | `ProofKexecB2.v` — `kxc_frameBpin`, the shared `bad:` tail `kxc_bad324`, `kxc_res` + the peel/seal pairs, and the loadseg loop `kxc_ls` | **landed, proven** |
+| `SpecKexecB3.v` — `KEXECB3` (the `kxc_b2`/`kxc_b2z` interface phase C will consume) | **landed, proven, not yet consumed** |
 | `ProofKexecB3.v` — **THE PHDR LOOP**: `kxc_incr`, `kxc_ph_step`, `kxc_phdr`, `kxc_seam1a2`, `kxc_close`, and phase B2 whole (`kxc_b2` / `kxc_b2z`) | **landed, proven** |
 | `W32Arith.v` — the two-ABI-uint laws and the `slli/srli` truncation | **landed, proven** |
 | `SpecUvmalloc` / `ProofUvmalloc` — the success arm now names the new LEAVES (blocker §6) | **landed, proven** |
@@ -629,6 +648,26 @@ modules each already named. **Every later phase will hit this too** — C and D
 both reach the epilogue through tails A already proved — so put the next shared
 tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
 other only through that one.
+
+**THAT RULE IS FOR REUSABLE VOCABULARY — A PROVEN, PHASE-SPECIFIC FACT (e.g.
+a whole loop's induction) NEEDS THE `SpecKexecB2.v`/`SpecKexecB3.v` MOVE
+INSTEAD.** `ProofKexecTail.v`'s move works when the shared thing can just be
+RELOCATED to a neutral leaf both phases require directly (it is cheap and has
+no phase-specific proof weight). `kxc_ls`/`kxc_bad324`/`kxc_b2`/`kxc_b2z` are
+the opposite: each is the expensive PAYOFF of one phase's own file (a loop
+induction, a resource-shuffle) that the NEXT phase only ever consumes as an
+opaque fact, never re-derives. Relocating those would just drag their whole
+proof machinery into the shared leaf. The fix is `spec-modules.md`'s
+Spec/Proof functor pattern turned inward on one function's own phase split:
+state the consumed lemmas' types (plus whatever pure vocabulary they are
+phrased over — take the WHOLE section they live in, not just the headline
+`Definition`, since the next phase tends to call the small lemmas around it
+too) in a `Module Type` in a `Spec<Phase><Phase>.v` file; have the producing
+phase's functor ascribe to it; have the consuming phase take the producer as
+an ABSTRACT functor argument of that type rather than applying the producer's
+functor itself. The two phases then meet only through the fast, `Qed`-free
+Spec file — `coqdep` is how you confirm it worked (grep the consuming phase's
+`.vo` dependency line for the producer's `.vo`; it should not appear).
 | phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
 | phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **landed, proven** |
 | phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |

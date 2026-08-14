@@ -7,9 +7,15 @@
    claude-notes/projects/kexec.md has the design (re-verified against
    CodeKexec.v's decoded ASTs, not just the C).
 
-   Reached through a MODULE APPLICATION, ProofKexecTail.v's reason: [B3 :=
-   ProofKexecB3.KexecB3Proof ...] gives this file phase B whole, at the same
-   functor arguments B3 itself took, plus [Uvmclear], the one new callee. *)
+   This file does NOT require ProofKexecB3.v (nor build phase B whole via a
+   [B3 := ProofKexecB3.KexecB3Proof ...] application) -- it does not yet
+   consume [kxc_b2]/[kxc_b2z] (the argv loop that will is still in
+   progress, claude-notes/projects/kexec.md's checkpoint), and requiring
+   that ~3600-line proof file outright, unused, would only put phase B3 and
+   phase C in series on the build's critical path for nothing -- the same
+   mistake ProofKexecTail.v's header documents phase A/B making and fixes.
+   [A] is built the same way ProofKexecB2.v/ProofKexecB3.v build it, a
+   direct application of [ProofKexecTail.KexecTailProof]. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -101,7 +107,12 @@ Require Import SpecCopyout.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
-Require Import ProofKexecB3.
+(* No require of ProofKexecB3.v (nor even SpecKexecB3.v): this file does
+   not yet consume [kxc_b2]/[kxc_b2z] (the argv loop that will is still in
+   progress).  When that resumes, SpecKexecB3.v is ready with those two
+   statements -- add a [(B3 : KEXECB3)] functor argument to [KexecCProof]
+   the way ProofKexecB3.v itself takes [(B2 : KEXECB2)], never a
+   [Require Import ProofKexecB3.]. *)
 Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
@@ -121,10 +132,8 @@ Module KexecCProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                    (Uvmalloc : UVMALLOC) (Uvmclear : UVMCLEAR)
                    (Strlen : STRLEN) (Copyout : COPYOUT).
 
-Module B3 := ProofKexecB3.KexecB3Proof Myproc BeginOp Namei Ilock Readi
-                                       Iunlockput EndOp PFP Walkaddr
-                                       Flags2perm Uvmalloc.
-Module A := B3.A.
+Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
+                                          Iunlockput EndOp.
 Module TC := ProofKexecTail.KexecTailProofC Myproc BeginOp Namei Ilock Readi
                                             Iunlockput EndOp PFP.
 
