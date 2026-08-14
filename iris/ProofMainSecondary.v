@@ -58,7 +58,7 @@ Require Import FileInvDefs.
 Require Import DevModel DiskPtsto WpUart.
 Require Import PrintkFmt.
 Require Import PanicStub StartedInv.
-Require Import SpecCpuid SpecPrintk SpecPrintkGen.
+Require Import SpecCpuid SpecPrintk.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
 Require Import SpecDevintr SpecClockintr DiskInv TimerCap.
@@ -99,7 +99,7 @@ Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compu
    sized by: the loop-head enable funds [kv_frame_slots] out of what the arm
    hands it. *)
 Lemma ms_bounds (K : nat) : (K_main_secondary <= K)%nat ->
-  (2 <= K)%nat /\ (38 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
+  (2 <= K)%nat /\ (48 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
 Proof. unfold K_main_secondary, kv_frame_slots. lia. Qed.
 
 (* ===================================================================== *)
@@ -435,7 +435,7 @@ Section ProofMainSecondary.
   Local Lemma ms_printk (γpr : gname) 
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) :
-    (38 <= n)%nat ->
+    (48 <= n)%nat ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗ kernel_data -∗ panic_wp -∗
     pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
@@ -743,7 +743,7 @@ Section ProofMainSecondary.
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hccaps & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
-    iDestruct "Hpenv2" as "(_ & _ & #Hdev)".
+    iDestruct "Hpenv2" as "(_ & _ & #Hdev & _ & _)".
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hcpu".

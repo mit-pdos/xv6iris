@@ -300,7 +300,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import ByteBuf.
 Require Import DinodeEnc.
 Require Import DirentEnc.
@@ -331,18 +331,19 @@ Local Open Scope Z_scope.
 (* create's own frame is 80 bytes (10 slots) -- UNCHANGED by 9da28f5's guard,
    which added instructions but no stack (the `c.addi16sp` at +0x00 is still
    0x715d = -80 and the eight callee-saves still go to 72..16).  Its deepest
-   callee is nameiparent (98); dirlink wants 94, dirlookup 84, iunlockput 64,
-   ialloc 48, ilock and iupdate 44 each.
+   callee is nameiparent (104); dirlink wants 100, dirlookup 90, iunlockput
+   64, ialloc 56, ilock and iupdate 44 each.
 
-   98, and the three that moved all moved for ONE reason, the copyout chain
-   SpecDirlookup.v documents: [psz] needs a callee-saved home in copyout, so
-   copyout went 50 -> 52, either_copyout 56 -> 58, readi 70 -> 72, dirlookup
-   82 -> 84, and from there namex 94 -> 96, nameiparent 96 -> 98, dirlink
-   92 -> 94.  10 + 98 = 108.  Checked against SpecNameiparent.v:78 (98),
-   SpecDirlink.v:195 (94), SpecDirlookup.v:159 (84), SpecIunlockput.v:106
-   (64), SpecIalloc.v:153 (48), SpecIlock.v:165 (44), SpecIupdate.v:113 (44).
+   104, and every one of nameiparent/dirlink/dirlookup/ialloc moved for ONE
+   reason, the bmap chain SpecReadi.v documents: printk's real stack need
+   (48, printk_stack) dominates bmap (64), which dominates balloc's
+   out-of-blocks arm (58), which pushed bmap's callers readi 72 -> 78 and
+   dirlookup 84 -> 90, and from there namex 96 -> 102, nameiparent 98 -> 104,
+   dirlink 94 -> 100.  10 + 104 = 114.  Checked against SpecNameiparent.v
+   (104), SpecDirlink.v (100), SpecDirlookup.v (90), SpecIunlockput.v (64),
+   SpecIalloc.v (56), SpecIlock.v (44), SpecIupdate.v (44).
    [ProofCreateParts.cr_K_value] carries the same number. *)
-Definition K_create : nat := 108%nat.
+Definition K_create : nat := 114%nat.
 
 (* THE LEDGER UNITS create must have in hand.  nameiparent takes two and
    returns one on success; dirlookup's iget takes the second on the found

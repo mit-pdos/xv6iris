@@ -300,7 +300,7 @@ Require Import InodeRegion.
 Require Import BitmapInv.
 Require Import SpecBmap.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -313,10 +313,12 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
-(* writei's own frame is 112 bytes (14 slots).  Its deepest callees are bmap
-   and either_copyin, both 56; iupdate wants 44, bread 40, brelse 26,
-   log_write 18. *)
-Definition K_writei : nat := 70%nat.
+(* writei's own frame is 112 bytes (14 slots).  Its deepest callee is now
+   bmap at 64 (itself dominated by balloc's out-of-blocks printk, 58, which
+   is itself dominated by printk's own real stack need, printk_stack = 48;
+   see SpecReadi.v's header); either_copyin wants 56 (unaffected -- it does
+   not reach printk), iupdate 44, bread 40, brelse 26, log_write 18. *)
+Definition K_writei : nat := 78%nat.
 
 (* [file_byte], [file_byte_block] and [blk_holes_zero] live in InodeInv.v,
    next to [inode_blocks] whose flat view they are.  They were parked here

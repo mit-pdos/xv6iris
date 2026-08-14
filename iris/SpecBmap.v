@@ -120,7 +120,7 @@ Require Import FsCrash.
 Require Import InodeInv.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -129,8 +129,9 @@ Local Open Scope Z_scope.
 
 (* bmap's own frame is 48 bytes (6 slots) -- [c.addi16sp sp,-48] at +0x00
    (s4 rides in the same frame, at slot 0, on the indirect paths).  Its
-   deepest callee is balloc (50); bread wants 40 and log_write 18. *)
-Definition K_bmap : nat := 56%nat.
+   deepest callee is balloc (58, itself dominated by printk's out-of-blocks
+   path); bread wants 40 and log_write 18. *)
+Definition K_bmap : nat := 64%nat.
 
 (* ===================================================================== *)
 (*  THE ARMS, AS THE CALLER READS THEM OFF THE BLOCK MAP                  *)
@@ -291,7 +292,7 @@ Definition wp_bmap_sconf_body
   bitmap_geom_ok cov logstart bmapstart size ->
   (* balloc's out-of-blocks arm calls the GENERAL printk path; its contract
      rides as a hypothesis, never a functor, so that neither balloc nor bmap
-     inherits LinkPrintkGen's Axiom.  See SpecBalloc.v's header. *)
+     inherits LinkPrintk's Axiom.  See SpecBalloc.v's header. *)
   printk_gen_contract γpr γu γd ->
   (* KILLS THE PANIC ARM *)
   (fbn < MAXFILE)%nat ->

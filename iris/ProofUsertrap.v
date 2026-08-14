@@ -29,7 +29,7 @@
    neither [SpecPanic]'s contract nor printk's panic path is in this cone.
    The only printk usertrap reaches is the GENERAL one, on the
    unexpected-scause arm, and that is [ProofUsertrapArms]' threaded
-   [SpecPrintkGen.printk_gen_contract] hypothesis -- discharged from the
+   [SpecPrintk.printk_gen_contract] hypothesis -- discharged from the
    [PRINTK_GEN] functor argument at the seal below.
 
    TWO THINGS ABOUT THE DISPATCH, both from the notes:
@@ -92,7 +92,7 @@ Require Import CodeUsertrap.
 Require Import SpecMyproc.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecDevintr SpecVmfault.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
@@ -1057,7 +1057,7 @@ End UtDispatch.
    * printk's contract is a PURE hypothesis all the way down
      ([ProofUsertrapArms]' [ut_56]/[ut_d0] take it as an [->]), so that the
      three blocks below the dispatch carry no functor argument for it.  It is
-     OBTAINED here from [PK], which is what puts [LinkPrintkGen]'s axiom in
+     OBTAINED here from [PK], which is what puts [LinkPrintk]'s axiom in
      usertrap's footprint -- deliberately, since the unexpected-scause arm is
      LIVE and does call printk on its general path.
    * the boundary's crossing is at [wp_next true (proc_addr j)] while the

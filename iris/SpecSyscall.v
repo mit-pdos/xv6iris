@@ -1,6 +1,6 @@
 (* SpecSyscall.v -- the public interface of syscall() (syscall.c), stated
    ahead of its proof.  THIS CONTRACT IS ASSUMED: LinkSyscall.v supplies it
-   with an [Axiom], the way LinkPrintkGen.v and LinkConsoleintr.v do for
+   with an [Axiom], the way LinkPrintk.v and LinkConsoleintr.v do for
    their functions.  It exists so usertrap can be proved against a stated
    interface rather than against nothing.
 

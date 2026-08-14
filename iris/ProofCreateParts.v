@@ -377,11 +377,11 @@ Proof. rewrite cr_trange_device. vm_compute. reflexivity. Qed.
 (*  (4) THE CONSTANTS                                                     *)
 (* ===================================================================== *)
 
-(* 10 own slots + nameiparent's 98.  Moved 106 -> 108 with the copyout chain
-   that pushed dirlookup 82 -> 84 (SpecCreate.v's note on [K_create] has the
+(* 10 own slots + nameiparent's 104.  Moved 108 -> 114 with the bmap chain
+   that pushed dirlookup 84 -> 90 (SpecCreate.v's note on [K_create] has the
    whole ladder); 9da28f5's [dp->nlink == 0] guard did NOT move it, because
    the frame is still 80 bytes. *)
-Lemma cr_K_value : K_create = 108%nat.
+Lemma cr_K_value : K_create = 114%nat.
 Proof. reflexivity. Qed.
 
 Lemma cr_slots_value : create_slots = 3%nat.

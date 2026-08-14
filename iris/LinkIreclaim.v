@@ -28,10 +28,10 @@
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  ireclaim's orphan
    arm calls printk on its GENERAL path -- and, unlike balloc's and ialloc's
    messages, with a [%d] conversion -- and [PRINTK_GEN]'s only instance is
-   [LinkPrintkGen]'s own [Axiom].  Instantiating that functor -- here or in
+   [LinkPrintk]'s own [Axiom].  Instantiating that functor -- here or in
    [ProofIreclaim.v] -- would put a SEVENTH entry in [Print Assumptions
    Ireclaim.wp_ireclaim_sconf].  [SpecIreclaim.v] therefore takes printk's
-   contract as a PURE HYPOTHESIS ([SpecPrintkGen.printk_gen_contract]), which
+   contract as a PURE HYPOTHESIS ([SpecPrintk.printk_gen_contract]), which
    keeps the count at the standing six -- but that is NOT self-containment:
    ireclaim's six are modulo a THREADED printk obligation that its callers
    (fsinit, and the boot client above it) must eventually discharge, exactly

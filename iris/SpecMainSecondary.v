@@ -66,7 +66,7 @@ Require Import IntrDefs.
 Require Import KptShare KptExecMap KvmMap.
 Require Import PanicStub.
 Require Import StartedInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv.
 Require Import PanicStub.

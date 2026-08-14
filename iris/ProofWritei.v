@@ -74,7 +74,7 @@ Require Import SpecBmap SpecBread SpecBrelse SpecLogWrite SpecEitherCopyin
 Require Import ProofWriteiParts.
 Require Import BitmapInv.
 Require Import KernelDataInv.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecWritei.
 (* the loop's ledger algebra: bm_pot, wi_inv_bud/wi_inv_spent, the two step
    lemmas, wi_inv_enter/wi_inv_exit and the two iteration bounds.  Section 10

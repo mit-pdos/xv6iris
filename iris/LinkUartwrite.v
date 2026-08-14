@@ -22,7 +22,7 @@
    spinlock again, so [main_locks_raw] carries [lk_raw a_tx_lock] down through
    consoleinit and uartinit hands [lk_fresh a_tx_lock "uart"] back (ProofMain
    binds it as [Hlkfresh]).  And the RESOURCE half stopped being contested when
-   `d80e61c5` put uartputc_sync behind tx_lock too: [SpecPrintkGen.pr_res] is
+   `d80e61c5` put uartputc_sync behind tx_lock too: [SpecPrintk.pr_res] is
    [emp] now, so the transmitter is tx_lock's alone.
      What is left is a CONSUMER, not a gap: nothing main promises mentions
    [is_txlock], so wiring the [newlock] in means putting [is_txlock] into the

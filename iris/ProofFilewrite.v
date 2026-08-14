@@ -374,40 +374,40 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 
 Lemma fw_K12 (K : nat) : (filewrite_stack <= K)%nat -> (12 <= K)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
 
 Lemma fw_av_writei (K : nat) :
   (filewrite_stack <= K)%nat -> (K_writei <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack, K_writei. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_writei. lia. Qed.
 
 Lemma fw_av_pipe (K : nat) :
   (filewrite_stack <= K)%nat -> (pipewrite_stack <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack, pipewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack, pipewrite_stack. lia. Qed.
 
 Lemma fw_av_cons (K : nat) :
   (filewrite_stack <= K)%nat -> (consolewrite_stack <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
 
 Lemma fw_av_ilock (K : nat) :
   (filewrite_stack <= K)%nat -> (K_ilock <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack, K_ilock. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_ilock. lia. Qed.
 
 Lemma fw_av_iunlock (K : nat) :
   (filewrite_stack <= K)%nat -> (K_iunlock <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack, K_iunlock. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_iunlock. lia. Qed.
 
 Lemma fw_av_begin_op (K : nat) :
   (filewrite_stack <= K)%nat -> (K_begin_op <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack, K_begin_op. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_begin_op. lia. Qed.
 
 Lemma fw_av_end_op (K : nat) :
   (filewrite_stack <= K)%nat -> (K_end_op <= K - 12)%nat.
-Proof. unfold filewrite_stack, consolewrite_stack, K_end_op. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_end_op. lia. Qed.
 
 (* The frame trade-back, at the arity the epilogue wants. *)
 Lemma fw_K_back (K : nat) :
   (filewrite_stack <= K)%nat -> ((K - 12) + 12)%nat = K.
-Proof. unfold filewrite_stack, consolewrite_stack. lia. Qed.
+Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE BUDGET.                                                            *)
@@ -1464,7 +1464,7 @@ Section ProofFilewrite.
          ∉ log_region_set (fwn_logstart fn)) ->
     BitmapInv.bitmap_geom_ok (fwn_cov fn) (fwn_logstart fn)
       (fwn_bmapstart fn) (fwn_size fn) ->
-    SpecPrintkGen.printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
+    SpecPrintk.printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) ->
     (* ---- THE FUEL, and everything the loop carries under it ---- *)
     forall (W : nat) (iz : Z) (PI : uptd) (SI : gset Z) (M : regfile),
     (n - iz <= Z.of_nat W)%Z ->
@@ -1516,7 +1516,7 @@ Section ProofFilewrite.
     fs_crash_seam (fwn_cov fn) (fwn_logstart fn) -∗
     gen_cert -∗
     KernelDataInv.kernel_data -∗
-    SpecPrintkGen.printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) -∗
+    SpecPrintk.printk_env (fwn_pr fn) (fwn_uart fn) (fwn_disk fn) -∗
     IcacheInv.itable_inv -∗
     (* the FAMILIES, since the slot is the carve's output and not the
        caller's to name *)

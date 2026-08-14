@@ -737,8 +737,6 @@ SpecPanic.v
 ProofPanic.v
 LinkPanic.v
 CodePanic.v
-SpecPrintkGen.v
-LinkPrintkGen.v
 SpecArgaddr.v
 SpecFdalloc.v
 SpecSysPipe.v

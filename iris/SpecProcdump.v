@@ -76,11 +76,11 @@
      premise: procdump's format strings and its six state names are image
      bytes, not caller state.
    - printk runs on its GENERAL path here (procdump is not panic code), so
-     the callee is [SpecPrintkGen]: its persistent credential [printk_env]
+     the callee is [SpecPrintk]: its persistent credential [printk_env]
      plus its contract carried as a Coq HYPOTHESIS
-     ([SpecPrintkGen.printk_gen_contract]) rather than as a functor argument
+     ([SpecPrintk.printk_gen_contract]) rather than as a functor argument
      -- the shape SpecBalloc.v uses, and for the same reason: PRINTK_GEN's
-     only instance is LinkPrintkGen's [Axiom], and taking it as a functor
+     only instance is LinkPrintk's [Axiom], and taking it as a functor
      would drag that axiom into procdump's [Print Assumptions] and into
      every caller's.
    - [cpu_own 0 eb p C b] is threaded net-zero (printk's acquire/release
@@ -90,7 +90,7 @@
      wakeup and kkill.
    - K >= 48: procdump's own ten slots plus printk's thirty-eight.
 
-   Requires only the definitional layer plus SpecPrintkGen.v's vocabulary --
+   Requires only the definitional layer plus SpecPrintk.v's vocabulary --
    never a [Proof*] file. *)
 From Stdlib Require Import ZArith Lia List String Ascii.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -115,7 +115,7 @@ Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import PrintkFmt.
 Require Import PanicStub.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
@@ -157,8 +157,8 @@ Definition wp_procdump_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   let pcE : mword 64 := mword_of_int KernelSyms.procdump in
   let ra0 := m !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
-  (* ten slots of its own, thirty-eight for printk *)
-  (48 <= K)%nat ->
+  (* ten slots of its own, forty-eight for printk (printk_stack) *)
+  (58 <= K)%nat ->
   (* the callee, as a hypothesis and not a functor -- see the header *)
   printk_gen_contract γpr γd γv ->
   sie_cap_gpr m K b p -∗

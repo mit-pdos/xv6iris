@@ -28,8 +28,8 @@
 
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  ireclaim's orphan
    arm calls printk on its general path (with a [%d]), and [PRINTK_GEN]'s only
-   instance is [LinkPrintkGen]'s own [Axiom].  SpecIreclaim.v therefore takes
-   printk's contract as a PURE HYPOTHESIS ([SpecPrintkGen.printk_gen_contract])
+   instance is [LinkPrintk]'s own [Axiom].  SpecIreclaim.v therefore takes
+   printk's contract as a PURE HYPOTHESIS ([SpecPrintk.printk_gen_contract])
    and SpecFsinit.v threads that same hypothesis down to it -- so the
    obligation is now TWO deep, and the boot client above fsinit (forkret /
    main) is where it finally has to be discharged, or accepted as

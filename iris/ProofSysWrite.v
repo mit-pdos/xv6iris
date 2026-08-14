@@ -352,7 +352,7 @@ Section ProofSysWrite.
            Harg0 Harg1 Harg2 Hn0 Heb.
     (* every budget, or [lia] cannot see past [filewrite_stack] -- it is an
        expression, not a literal, on purpose (SpecSysWrite.v). *)
-    unfold sys_write_stack, filewrite_stack, consolewrite_stack in Hav.
+    unfold sys_write_stack, filewrite_stack, K_writei, consolewrite_stack in Hav.
     (* THE UPPER HALF IS FREE (SpecSysRead.sys_rw_count_lt); only the lower
        bound is owed upward.  Hoisted to a NAMED fact rather than written as
        an inline [ltac:] in argument position -- durable-notes' divergence
@@ -952,7 +952,7 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filewrite.wp_filewrite_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb C (sys_rw_count v2) b
-                ltac:(unfold filewrite_stack, consolewrite_stack; lia) Hkk Hj Hgs Hlens
+                ltac:(unfold filewrite_stack, K_writei, consolewrite_stack; lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
       iIntros (CID25 Hs25 mf rv P' used')

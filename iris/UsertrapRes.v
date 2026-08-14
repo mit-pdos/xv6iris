@@ -71,7 +71,7 @@ Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
 Require Import SpecDevintr.
-Require Import SpecPrintkGen.
+Require Import SpecPrintk.
 Require Import SpecSyscall.
 Require Import SpecKexit.
 Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
