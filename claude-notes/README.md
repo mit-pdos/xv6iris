@@ -144,11 +144,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   driver; uart.c is 4/4 functions and the cone is axiom-clean. Read it for the
   transmit path's shape and for the rotated-loop / nested-iLöb /
   `uart_sent_sub` techniques.
-- **[`lock-set.md`](projects/lock-set.md)** — the per-CPU held-lock set and the
-  lock ORDER: the audit of every simultaneous lock pair in xv6, the rank table
-  it yields, and the single tree-wide `cpu_own`-index sweep that turns them
-  into acquire's order premise and the "interrupts on ⟹ no locks held"
-  theorem.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
@@ -169,3 +164,10 @@ about failure modes that COMPILE: `explicit-cpuid.md` with its porting guide
 scoreboard of six contracts that were stated falsely and compiled anyway), and
 `fs-namei.md`'s close-out (what the fs.c contracts THREAD rather than
 discharge — which is what `sysfile.c` and the boot client inherit).
+
+`lock-set.md` is the third, and the one to read BEFORE adding a lock or
+changing where one sits: it carries the audit of every simultaneous lock pair
+in xv6 and the installed rank table. Unlike the rest of this directory it has
+a live consequence — `ProofIput.iput_acquiresleep_order_ADMITTED` is a FALSE
+axiom the project left behind deliberately, tracked separately, and everything
+downstream of `iput` is vacuous until it is discharged.

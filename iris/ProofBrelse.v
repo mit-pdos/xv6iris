@@ -258,7 +258,7 @@ Section ProofBrelse.
        own held-set, threaded through unchanged -- this helper is entered
        ALREADY holding "bcache" (its precondition below is
        [{["bcache"]} ∪ lks], not bare [lks]; see the OUTER/INNER
-       convention in claude-notes/projects/lock-set.md). *)
+       convention in claude-notes/completed/lock-set.md). *)
     locks_below lks "bcache" ->
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false p -∗
     kernel_text -∗

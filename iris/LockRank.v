@@ -14,7 +14,7 @@
    any of them at once.  So a rank on the name alone totally orders every pair
    xv6 can actually hold, and [gset string] is the whole state.  The reasons are
    per-family and two of them are load-bearing rather than incidental -- see
-   claude-notes/projects/lock-set.md, which also carries the edge table this
+   claude-notes/completed/lock-set.md, which also carries the edge table this
    ranking extends.
 
    A rank of 0 is the default for a name not in the table: such a lock may be

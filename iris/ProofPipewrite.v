@@ -1071,7 +1071,7 @@ Section ProofPipewrite.
     intros pcE pj pi ret_tgt Hj Hjlp Hlen Ha2 Hnrange Hav Heb Hbelow. subst eb.
     (* every callee that wants "proc" (wakeup / killed / sleep_prepare /
        sleep) is reached with the held set still at [lks] (the entry set --
-       see claude-notes/projects/lock-set.md's note on this function's
+       see claude-notes/completed/lock-set.md's note on this function's
        region-crossing threading), so this one lift covers all of them. *)
     assert (Hbelowproc : locks_below lks "proc")
       by lkbelow.
