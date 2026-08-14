@@ -1099,5 +1099,3 @@ LinkSysRead.v
 ProofSysWrite.v
 LinkSysWrite.v
 SpecSysChdir.v
-ProofSysChdir.v
-LinkSysChdir.v
