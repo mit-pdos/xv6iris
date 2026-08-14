@@ -15,7 +15,7 @@
     - the PROMISE-FREE LOG [pf_log done]: the behavior's messages, in the
       same processing order — literally [msg_at <$> fl done], so the
       log/timestamp correspondence is a [list_lookup_fmap] away.
-    - a pf configuration [cf] reached from [wp_init img ps] whose agent
+    - a pf configuration [cf] reached from [wp_init img d0 ps] whose agent
       [j] sits at trace position [nproc done j] with [wstate]
       [aevs_post (pi done) (take (nproc done j) evs) ws_init] — the
       π-transported fold of [WeakRobustProv].
@@ -199,9 +199,10 @@ Qed.
 (** ** LAYER 2: the bookkeeping over a processed prefix *)
 
 Section book.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
-  Context (TS : ptraces P).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
+  Context (TS : ptraces P D).
 
   Implicit Types done : list gev.
   Implicit Types e : gev.
@@ -348,11 +349,12 @@ Proof.
   intros [= <- <-]. by exists t.
 Qed.
 
-Lemma aev_post_ext σ σ' ev w :
+Lemma aev_post_ext {D : Type} σ σ' (ev : aev D) w :
   (∀ t, aev_ts_occurs ev t → σ t = σ' t) →
   aev_post σ ev w = aev_post σ' ev w.
 Proof.
-  intros Hag. destruct ev as [lb ts]. rewrite /aev_post /aev_ts_occurs /= in Hag |- *.
+  intros Hag. destruct ev as [lb ts dd].
+  rewrite /aev_post /aev_ts_occurs /= in Hag |- *.
   have Hread : ∀ base tvs, lb_reads lb = tvs_reads base tvs →
                  σ <$> tvs.*1 = σ' <$> tvs.*1.
   { intros base tvs Hlb. apply list_fmap_ext. intros i u Hu.
@@ -367,7 +369,7 @@ Proof.
   - done.
 Qed.
 
-Lemma aevs_post_ext σ σ' evs w :
+Lemma aevs_post_ext {D : Type} σ σ' (evs : list (aev D)) w :
   (∀ t, ev_ts_occurs evs t → σ t = σ' t) →
   aevs_post σ evs w = aevs_post σ' evs w.
 Proof.
@@ -396,16 +398,20 @@ Qed.
     programs that do not branch on a timestamp.  The Sail instantiation
     satisfies this trivially — a program sees VALUES, never timestamps. *)
 
-Definition ts_oblivious {P : Type} (pstep : P → wlabel → P → Prop) : Prop :=
-  (∀ p aq lat base tvs tvs' p', tvs.*2 = tvs'.*2 →
-     pstep p (LLoad aq lat base tvs) p' → pstep p (LLoad aq lat base tvs') p') ∧
-  (∀ p aq rl base tvs tvs' data p', tvs.*2 = tvs'.*2 →
-     pstep p (LRmw aq rl base tvs data) p' → pstep p (LRmw aq rl base tvs' data) p').
+Definition ts_oblivious {P D : Type}
+    (pstep : P → D → wlabel → P → D → Prop) : Prop :=
+  (∀ p d aq lat base tvs tvs' p' d', tvs.*2 = tvs'.*2 →
+     pstep p d (LLoad aq lat base tvs) p' d' →
+     pstep p d (LLoad aq lat base tvs') p' d') ∧
+  (∀ p d aq rl base tvs tvs' data p' d', tvs.*2 = tvs'.*2 →
+     pstep p d (LRmw aq rl base tvs data) p' d' →
+     pstep p d (LRmw aq rl base tvs' data) p' d').
 
 Section sim.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
-  Context (TS : ptraces P) (img : image) (ps : list P).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
+  Context (TS : ptraces P D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
   Context (Hwsi : ptraces_ws_init TS).
   Context (Hco : ∀ a, co_tc TS a).
@@ -417,6 +423,24 @@ Section sim.
   Context (Hdata : ∀ p m, pt_log TS !! p = Some m → wm_data m ≠ []).
   Context (Hps0 : ∀ j T ag0, pt_trs TS !! j = Some T →
                     at_ags T !! 0%nat = Some ag0 → ps !! j = Some (pa_st ag0)).
+  (** THE FABRIC SCOPE OF THIS FILE (G4's boundary).  The replay reorders
+      events, so a FABRIC-TOUCHING event cannot in general be replayed at
+      the fabric it recorded — that is exactly what the global device
+      witness ([WeakRobustTrace.pdevs]) and the [qcfg] fabric fold are for,
+      and they are G4's business.  Here the traces are dev-free, so every
+      program step is available at EVERY fabric and the pf run keeps the
+      fabric it started at. *)
+  Context (Hdevfree : ∀ j T k ev, pt_trs TS !! j = Some T →
+                        at_evs T !! k = Some ev → ae_dev ev = None).
+
+  Lemma sim_pstep j T k ev ag st' :
+    pt_trs TS !! j = Some T → at_evs T !! k = Some ev →
+    astep_prog pstep ag ev st' →
+    ∀ d, pstep (pa_st ag) d (ae_lb ev) st' d.
+  Proof.
+    intros HT Hev Hpr. rewrite /astep_prog (Hdevfree j T k ev HT Hev) in Hpr.
+    exact Hpr.
+  Qed.
 
   Implicit Types done : list gev.
   Implicit Types e : gev.
@@ -433,8 +457,8 @@ Section sim.
     (∀ j k, (j, k) ∈ done ↔ (gev_wf TS (j, k) ∧ (k < nproc done j)%nat)).
 
   (** The pf-configuration half. *)
-  Definition qcfg done (cf : wpcfg P) : Prop :=
-    rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+  Definition qcfg done (cf : wpcfg P D) : Prop :=
+    rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
     pc_img cf = img ∧ pc_log cf = pf_log TS done ∧
     length (pc_ags cf) = length ps ∧
     (∀ j T, pt_trs TS !! j = Some T →
@@ -496,7 +520,7 @@ Section sim.
   Lemma NoDup_fl done : qorder done → NoDup (fl TS done).
   Proof.
     intros (Hnd & _ & _). apply NoDup_omap_inj; [done|].
-    intros x y b _ _ Hx Hy. by eapply (grf_source_unique pstep).
+    intros x y b _ _ Hx Hy. by eapply (grf_source_unique pstep pdev).
   Qed.
 
   Lemma pi_mem done i t :
@@ -914,12 +938,12 @@ Section sim.
         { rewrite Hlog2 in Hm. by injection Hm. }
         exists m. split_and!; [done|done|]. rewrite -Hmm Htid2.
         have Heq2 : e2 = ehat.
-        { eapply (grf_source_unique pstep); [done|exact Hts2|exact Hts_]. }
+        { eapply (grf_source_unique pstep pdev); [done|exact Hts2|exact Hts_]. }
         rewrite Heq2. exact Hfor.
       + destruct (decide (that = ts)) as [->|Hne].
         * (* the rmw's OWN message: its event is not processed *)
           have Heq3 : ehat = e.
-          { eapply (grf_source_unique pstep); [done|apply Hwb|exact Hgts]. }
+          { eapply (grf_source_unique pstep pdev); [done|apply Hwb|exact Hgts]. }
           apply Hnin. by rewrite -Heq3.
         * (* strictly above: co would drag the current event into [done] *)
           have Htc : tc (gdep TS) e ehat.
@@ -935,7 +959,7 @@ Section sim.
       new pf log, and the acting agent's record advanced by one trace
       position — so the bookkeeping is done once here. *)
 
-  Lemma qcfg_step done e T ev ag' cf newws lb' :
+  Lemma qcfg_step done e T ev ag' cf newws lb' (dv : D) :
     qorder done →
     nproc done e.1 = e.2 →
     pt_trs TS !! e.1 = Some T → at_evs T !! e.2 = Some ev →
@@ -944,10 +968,10 @@ Section sim.
     newws = aev_post (pi TS (done ++ [e])) ev
               (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) →
     wp_pf_step pstep e.1 lb' cf
-      (WPCfg (pc_img cf) (pf_log TS (done ++ [e]))
+      (WPCfg (pc_img cf) (pf_log TS (done ++ [e])) dv
              (<[e.1 := WPAgent (pa_st ag') newws ∅]> (pc_ags cf))) →
     qcfg (done ++ [e])
-      (WPCfg (pc_img cf) (pf_log TS (done ++ [e]))
+      (WPCfg (pc_img cf) (pf_log TS (done ++ [e])) dv
              (<[e.1 := WPAgent (pa_st ag') newws ∅]> (pc_ags cf))).
   Proof.
     intros Hq Hnp HT Hev Hag' Hc Hnew Hstep.
@@ -992,6 +1016,8 @@ Section sim.
     destruct (asteps_wf_step pstep (pt_img TS) (pt_log TS) e.1 (at_ags T)
                 (at_evs T) e.2 ev Hatr Hev)
       as (ag & ag2 & st' & f & Hag & Hag2 & Hps & Hok & Hagn).
+    have Hpure : ∀ d, pstep (pa_st ag) d (ae_lb ev) st' d
+      by eapply (sim_pstep e.1 T e.2 ev).
     destruct (Hcags e.1 T HT) as (agn & Hagn0 & Hcflk).
     rewrite Hnp Hag in Hagn0. injection Hagn0 as <-. rewrite Hnp in Hcflk.
     have Hstpost : pa_st ag2 = st' by rewrite Hagn.
@@ -1014,11 +1040,13 @@ Section sim.
       + by rewrite /aev_post Hlbe.
       + rewrite Hstpost Hlogq.
         apply (PFSilent pstep e.1 cf (WPAgent (pa_st ag)
-                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st');
-          [done|]. by simpl.
+                 (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅) st'
+                 (pc_dev cf));
+          [done|]. simpl. apply Hpure.
     - (* ---- LLoad ---- *)
       have Hlat : lat = false.
-      { destruct lat; [|done]. exfalso. by destruct (Hlf _ _ _ _ _ Hps). }
+      { destruct lat; [|done]. exfalso.
+        by destruct (Hlf _ _ _ _ _ _ _ (Hpure (pc_dev cf))). }
       subst lat.
       destruct Hok as (Hro & Hf & Hts0).
       have Hgts : gev_ts TS e = None by rewrite /gev_ts Hgev /= Hts0.
@@ -1040,9 +1068,10 @@ Section sim.
       + rewrite Hstpost Hlogq.
         apply (PFLoad pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 aq false base (tlabel_ts (pi TS done) tvs) st'); [done| |].
-        * simpl. eapply (proj1 Hobl (pa_st ag) aq false base tvs);
-            [by rewrite tlabel_ts_snd|exact Hps].
+                 aq false base (tlabel_ts (pi TS done) tvs) st' (pc_dev cf));
+          [done| |].
+        * simpl. eapply (proj1 Hobl (pa_st ag) (pc_dev cf) aq false base tvs);
+            [by rewrite tlabel_ts_snd|]. apply Hpure.
         * simpl. rewrite Hcimg Hclog.
           eapply (read_ok_pf done e T ev ag (LLoad aq false base tvs) base tvs
                     false);
@@ -1069,7 +1098,8 @@ Section sim.
       + rewrite Hstpost Hlogq.
         apply (PFStore pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 rl base data kc st'); [done| |done]. by simpl.
+                 rl base data kc st' (pc_dev cf)); [done| |done].
+        simpl. apply Hpure.
     - (* ---- LRmw ---- *)
       destruct Hok as (ts & kc & Hlen & _ & Hlog & Hro & Hex & _ & Hf & Hts).
       have Hgts : gev_ts TS e = Some ts by rewrite /gev_ts Hgev /= Hts.
@@ -1102,10 +1132,11 @@ Section sim.
       + rewrite Hstpost Hlogq.
         apply (PFRmw pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 aq rl base (tlabel_ts (pi TS done) tvs) data kc st');
+                 aq rl base (tlabel_ts (pi TS done) tvs) data kc st'
+                 (pc_dev cf));
           [done| |done| | |].
-        * simpl. eapply (proj2 Hobl (pa_st ag) aq rl base tvs);
-            [by rewrite tlabel_ts_snd|exact Hps].
+        * simpl. eapply (proj2 Hobl (pa_st ag) (pc_dev cf) aq rl base tvs);
+            [by rewrite tlabel_ts_snd|]. apply Hpure.
         * by rewrite tlabel_ts_length.
         * simpl. rewrite Hcimg Hclog.
           eapply (read_ok_pf done e T ev ag (LRmw aq rl base tvs data) base tvs
@@ -1128,7 +1159,8 @@ Section sim.
       + rewrite Hstpost Hlogq.
         apply (PFFence pstep e.1 cf (WPAgent (pa_st ag)
                  (aevs_post (pi TS done) (take e.2 (at_evs T)) ws_init) ∅)
-                 pr pw sr sw st'); [done|]. by simpl.
+                 pr pw sr sw st' (pc_dev cf)); [done|].
+        simpl. apply Hpure.
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -1145,7 +1177,7 @@ Section sim.
       + intros j k. split.
         * intros He. by apply elem_of_nil in He.
         * rewrite nproc_nil. intros [_ Hlt]. lia.
-    - exists (wp_init img ps). split_and!.
+    - exists (wp_init img d0 ps). split_and!.
       + apply rtc_refl.
       + done.
       + done.
@@ -1178,14 +1210,14 @@ Section sim.
   (* ---------------------------------------------------------------- *)
   (** *** THE FULL SIMULATION: the promise-free witness of a behavior *)
 
-  Theorem sim_full cend :
+  Theorem sim_full (cend : wpcfg P D) :
     gdep2_acyclic TS →
     pt_img TS = pc_img cend →
     pt_log TS = pc_log cend →
     length (pc_ags cend) = length ps →
     (∀ j T, pt_trs TS !! j = Some T →
        at_ags T !! length (at_evs T) = pc_ags cend !! j) →
-    ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+    ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
   Proof.
     intros Hacyc Himgc Hlogc Hlenc Hlast.
@@ -1281,9 +1313,9 @@ End sim.
     [Qinv] is transparent, but the minimal-bad-edge consumer only ever
     wants the pf run and the per-agent picture; this is that projection. *)
 
-Lemma Qinv_run {P} (pstep : P → wlabel → P → Prop) TS img ps done :
-  Qinv pstep TS img ps done →
-  ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+Lemma Qinv_run {P D} (pstep : P → D → wlabel → P → D → Prop) TS img d0 ps done :
+  Qinv pstep TS img d0 ps done →
+  ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
         pc_img cf = img ∧ pc_log cf = pf_log TS done ∧
         length (pc_ags cf) = length ps ∧
         (∀ j T, pt_trs TS !! j = Some T →
@@ -1294,8 +1326,8 @@ Lemma Qinv_run {P} (pstep : P → wlabel → P → Prop) TS img ps done :
                           ws_init) ∅)).
 Proof. intros [_ (cf & Hc)]. by exists cf. Qed.
 
-Lemma Qinv_order {P} (pstep : P → wlabel → P → Prop) TS img ps done :
-  Qinv pstep TS img ps done → qorder TS done.
+Lemma Qinv_order {P D} (pstep : P → D → wlabel → P → D → Prop) TS img d0 ps done :
+  Qinv pstep TS img d0 ps done → qorder TS done.
 Proof. by intros [? _]. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -1308,10 +1340,11 @@ Proof. by intros [? _]. Qed.
     payload. *)
 
 Section wrapper.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types c : wpcfg P.
+  Implicit Types c : wpcfg P D.
 
   (** Every logged message carries a nonempty payload — the promise
       rule's [data ≠ []] as a run invariant (mirrors
@@ -1319,7 +1352,8 @@ Section wrapper.
   Definition log_ne (log : list wmsg) : Prop :=
     ∀ p m, log !! p = Some m → wm_data m ≠ [].
 
-  Lemma log_ne_init img ps : log_ne (pc_log (wp_init (P:=P) img ps)).
+  Lemma log_ne_init img d0 ps :
+    log_ne (pc_log (wp_init (P:=P) (D:=D) img d0 ps)).
   Proof. intros p m Hp. by rewrite /wp_init /= lookup_nil in Hp. Qed.
 
   Lemma log_ne_promise_step c c' :
@@ -1338,7 +1372,7 @@ Section wrapper.
   Qed.
 
   Lemma log_ne_promise_run c c' :
-    log_ne (pc_log c) → rtc (wp_promise_step (P:=P)) c c' → log_ne (pc_log c').
+    log_ne (pc_log c) → rtc (wp_promise_step (P:=P) (D:=D)) c c' → log_ne (pc_log c').
   Proof.
     intros H0 Hr. induction Hr as [|??? Hs _ IH]; [done|].
     apply IH. by eapply log_ne_promise_step.
@@ -1347,7 +1381,7 @@ Section wrapper.
   (** The promise phase freezes the image, the agent count and every
       program state. *)
   Lemma promise_run_shape c c' :
-    rtc (wp_promise_step (P:=P)) c c' →
+    rtc (wp_promise_step (P:=P) (D:=D)) c c' →
     pc_img c' = pc_img c ∧ length (pc_ags c') = length (pc_ags c) ∧
     (∀ i ag', pc_ags c' !! i = Some ag' →
        ∃ ag, pc_ags c !! i = Some ag ∧ pa_st ag' = pa_st ag).
@@ -1375,19 +1409,29 @@ Section wrapper.
       ACYCLIC extended dependency graph and SERIALIZED writes is matched
       by a promise-free run with the same program states and the same flat
       memory. *)
-  Theorem wp_behavior_robust img ps c :
+  Theorem wp_behavior_robust img d0 ps c :
+    pdev_ok pstep pdev →
+    (** THE FABRIC SCOPE of this file: the marker never fires, i.e. the
+        program never touches the fabric.  The replay REORDERS events, so
+        a fabric-touching one cannot be replayed at the fabric it
+        recorded; discharging that from the global device witness (and
+        carrying the fabric as the fold of the processed device events)
+        is G4's job. *)
+    (∀ p l p', pdev p l p' = false) →
     lat_free_prog pstep → ts_oblivious pstep →
-    wp_behavior pstep img ps c →
+    wp_behavior pstep img d0 ps c →
     (∀ mid TS,
-       rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
+       rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
        ptraces_of pstep TS mid c →
        gdep2_acyclic TS ∧ (∀ a, co_tc TS a)) →
-    ∃ cf, rtc (wp_pf_run pstep) (wp_init img ps) cf ∧
+    ∃ cf, rtc (wp_pf_run pstep) (wp_init img d0 ps) cf ∧
           prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
   Proof.
-    intros Hlf Hobl Hb Hprem.
-    destruct (wp_behavior_fulfil_once pstep img ps c Hlf Hb)
-      as (mid & TS & Hprom & Hof & Hnp & Hacct).
+    intros Hpok Hnodev Hlf Hobl Hb Hprem.
+    destruct (wp_behavior_fulfil_once_dev pstep pdev img d0 ps c Hpok Hlf Hb)
+      as (mid & TS & DS & Hprom & Hofd & Hnp & Hacct).
+    have Hdf := ptraces_dev_of_free pstep pdev TS DS mid c Hnodev Hofd.
+    destruct Hofd as (Hof & _).
     destruct (Hprem mid TS Hprom Hof) as (Hacyc & Hco).
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
     have Hla : log_authored (pc_log mid).
@@ -1399,7 +1443,7 @@ Section wrapper.
     have Hwsi : ptraces_ws_init TS.
     { eapply (ptraces_of_ws_init pstep TS mid c); [exact Hof|].
       eapply cfg_ws_init_promise_run; [apply cfg_ws_init_init|exact Hprom]. }
-    destruct (promise_run_shape (wp_init img ps) mid Hprom)
+    destruct (promise_run_shape (wp_init img d0 ps) mid Hprom)
       as (Hpimg & Hplen & Hpst).
     have Hof' := Hof.
     destruct Hof' as (Himg0 & Hlog0 & Hlent & Hwft & Hfst & Hlst
@@ -1417,8 +1461,8 @@ Section wrapper.
       rewrite /wp_init /= list_lookup_fmap in Hag.
       destruct (ps !! j) as [p0|] eqn:Hp0; simpl in Hag; [|done].
       injection Hag as <-. by rewrite Hst. }
-    eapply (sim_full pstep TS img ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg1 Hlen1
-              Hdata1 Hps1 c Hacyc).
+    eapply (sim_full pstep pdev TS img d0 ps Hwf Hwsi Hco Hwfl Hlf Hobl Himg1 Hlen1
+              Hdata1 Hps1 Hdf c Hacyc).
     - by rewrite Himg0 Hcimgc.
     - by rewrite Hlog0 Hclogc.
     - by rewrite Hclenc Hplen /wp_init /= length_map.

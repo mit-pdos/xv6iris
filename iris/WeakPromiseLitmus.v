@@ -178,10 +178,17 @@ Qed.
     Step 5 is what makes this a BEHAVIOR rather than a doomed run: the final
     configuration has every promise set empty ([no_promises]). *)
 
+(** THE FABRIC SHIM.  This litmus program does not touch the device fabric,
+    so it instantiates the generalized machine at the CONSTANT fabric
+    ([WeakPromise.pstep_of_pure], [D := unit]) — the archived per-hart
+    machine is exactly that instance. *)
+Definition lbstep' : lbp → unit → wlabel → lbp → unit → Prop :=
+  pstep_of_pure lbstep.
+
 Theorem lb_weak_outcome_reachable :
-  ∃ (cfg : wpcfg lbp) (ag0 ag1 : wpagent lbp),
+  ∃ (cfg : wpcfg lbp unit) (ag0 ag1 : wpagent lbp),
     (* a genuine behavior of the FULL machine: reachable, all promises kept *)
-    wp_behavior lbstep img0 [lb_p0; lb_p1] cfg ∧
+    wp_behavior lbstep' img0 tt [lb_p0; lb_p1] cfg ∧
     (* hart 0's final program state records r1 = 1 … *)
     pc_ags cfg !! 0%nat = Some ag0 ∧ pa_st ag0 = LBDone b1 ∧
     (* … and hart 1's records r2 = 1 *)
@@ -191,23 +198,25 @@ Proof.
   { (* ---- the interleaving ---- *)
     (* 1. hart 0 PROMISES y := 1; the log was empty, so ts = 1 *)
     eapply rtc_l.
-    { eapply (WPPromise lbstep _ 0%nat _ ay [b1] WCplain); [reflexivity|done]. }
+    { eapply (WPPromise lbstep' _ 0%nat _ ay [b1] WCplain); [reflexivity|done]. }
     (* 2. hart 1 LOADS y and reads that promise *)
     eapply rtc_l.
-    { eapply (WPLoad lbstep _ 1%nat _ false false ay [(1%nat, b1)]);
-        [reflexivity|apply LBSLoad|apply read_ok_h1]. }
+    { eapply (WPLoad lbstep' _ 1%nat _ false false ay [(1%nat, b1)]);
+        [reflexivity|split; [apply LBSLoad|reflexivity]|apply read_ok_h1]. }
     (* 3. hart 1 STORES x := 1 (promise + immediate fulfil at the fresh top) *)
     eapply rtc_transitive.
-    { eapply (wpstep_store_now lbstep _ 1%nat _ false ax [b1] WCplain);
-        [reflexivity|apply LBSStore|done|apply ws_bounded_h1|set_solver]. }
+    { eapply (wpstep_store_now lbstep' _ 1%nat _ false ax [b1] WCplain);
+        [reflexivity|split; [apply LBSStore|reflexivity]|done
+        |apply ws_bounded_h1|set_solver]. }
     (* 4. hart 0 LOADS x and reads hart 1's store *)
     eapply rtc_l.
-    { eapply (WPLoad lbstep _ 0%nat _ false false ax [(2%nat, b1)]);
-        [reflexivity|apply LBSLoad|apply read_ok_h0]. }
+    { eapply (WPLoad lbstep' _ 0%nat _ false false ax [(2%nat, b1)]);
+        [reflexivity|split; [apply LBSLoad|reflexivity]|apply read_ok_h0]. }
     (* 5. hart 0 FULFILS its ts = 1 promise of y := 1 *)
     eapply rtc_l; [|apply rtc_refl].
-    eapply (WPFulfil lbstep _ 0%nat _ false ay [b1] WCplain 1%nat);
-      [reflexivity|apply LBSStore|set_solver|reflexivity|apply fulfil_ok_h0]. }
+    eapply (WPFulfil lbstep' _ 0%nat _ false ay [b1] WCplain 1%nat);
+      [reflexivity|split; [apply LBSStore|reflexivity]|set_solver|reflexivity
+      |apply fulfil_ok_h0]. }
   { (* ---- every promise discharged ---- *)
     intros i ag Hlk. destruct i as [|[|i]]; simplify_eq/=; [set_solver|done]. }
   (* ---- the outcome: both harts recorded the value 1 ---- *)
@@ -217,8 +226,8 @@ Qed.
 (** The same statement with the litmus registers spelled out numerically:
     [r1 = r2 = 1]. *)
 Corollary lb_weak_outcome_regs :
-  ∃ (cfg : wpcfg lbp) (ag0 ag1 : wpagent lbp) (r1 r2 : bv 8),
-    wp_behavior lbstep img0 [lb_p0; lb_p1] cfg ∧
+  ∃ (cfg : wpcfg lbp unit) (ag0 ag1 : wpagent lbp) (r1 r2 : bv 8),
+    wp_behavior lbstep' img0 tt [lb_p0; lb_p1] cfg ∧
     pc_ags cfg !! 0%nat = Some ag0 ∧ pa_st ag0 = LBDone r1 ∧
     pc_ags cfg !! 1%nat = Some ag1 ∧ pa_st ag1 = LBDone r2 ∧
     bv_unsigned r1 = 1 ∧ bv_unsigned r2 = 1.

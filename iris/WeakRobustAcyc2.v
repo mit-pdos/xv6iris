@@ -101,8 +101,8 @@ Local Open Scope Z_scope.
     is the very same conjunction with [a] hoisted out. *)
 
 Section edges.
-  Context {P : Type}.
-  Implicit Types TS : ptraces P.
+  Context {P D : Type}.
+  Implicit Types TS : ptraces P D.
 
   Definition gE_ra TS (r : gev) (a : Z) (e1 e2 : gev) : Prop :=
     ∃ l ts tstar that,
@@ -150,7 +150,7 @@ End edges.
 
     Shape note: like [rf_edges_ok] it carries NO cycle quantifier — it
     is a property of the bundle alone, per (edge, later fulfil). *)
-Definition ee_ok {P : Type} (TS : ptraces P) : Prop :=
+Definition ee_ok {P D : Type} (TS : ptraces P D) : Prop :=
   ∀ r a e1 et ey y,
     gE_ra TS r a e1 et →
     et.1 = ey.1 → (et.2 < ey.2)%nat →
@@ -159,10 +159,11 @@ Definition ee_ok {P : Type} (TS : ptraces P) : Prop :=
 
 (* ------------------------------------------------------------------ *)
 Section acyc2.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types TS : ptraces P.
+  Implicit Types TS : ptraces P D.
   Implicit Types e : gev.
 
   (* ---------------------------------------------------------------- *)
@@ -464,10 +465,11 @@ Section acyc2.
       obligation of W2b (iii)).  [ptraces_ws_init] is exported because
       W2b's simulation wants it (it is NOT used by the acyclicity proof
       — see the header's boundedness note). *)
-  Theorem wp_behavior_gdep2_acyclic img ps c :
-    lat_free_prog pstep → wp_behavior pstep img ps c →
+  Theorem wp_behavior_gdep2_acyclic img d0 ps c :
+    pdev_ok pstep pdev →
+    lat_free_prog pstep → wp_behavior pstep img d0 ps c →
     ∃ mid TS,
-      rtc (wp_promise_step (P:=P)) (wp_init img ps) mid ∧
+      rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid ∧
       ptraces_of pstep TS mid c ∧
       no_promises c ∧
       ptraces_wf pstep TS ∧
@@ -475,12 +477,12 @@ Section acyc2.
       ptraces_ws_init TS ∧
       (rf_edges_ok TS → ee_ok TS → gdep2_acyclic TS).
   Proof.
-    intros Hlfp Hb.
-    destruct (wp_behavior_traced pstep img ps c Hlfp Hb)
+    intros Hpok Hlfp Hb.
+    destruct (wp_behavior_traced pstep pdev img d0 ps c Hpok Hlfp Hb)
       as (mid & TS & Hprom & HTS & Hnp).
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
     have Hinit : cfg_ws_init mid.
-    { eapply cfg_ws_init_promise_run; [apply cfg_ws_init_init|exact Hprom]. }
+    { eapply cfg_ws_init_promise_run; [apply (cfg_ws_init_init img d0 ps)|exact Hprom]. }
     have Hfo : ptraces_fwd_own TS by eapply ptraces_of_fwd_own.
     have Hwsi : ptraces_ws_init TS by eapply ptraces_of_ws_init.
     exists mid, TS. split_and!; [done|done|done|done|done|done|].

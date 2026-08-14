@@ -91,16 +91,24 @@ Global Arguments pa_st {P} _.
 Global Arguments pa_ws {P} _.
 Global Arguments pa_prom {P} _.
 
-Record wpcfg (P : Type) := WPCfg {
+(** A configuration has THREE shared components — the era-initial image, the
+    write log, and the DEVICE FABRIC [pc_dev] — plus the per-agent records.
+    The fabric is an ABSTRACT type parameter [D] here and in every Layer-1
+    file: nothing below ever inspects it, exactly as nothing inspects [P].
+    (The event language instantiates [D := DevModel.dev_state]; the archived
+    per-hart-stream machines instantiate [D := unit], see [pstep_of_pure].) *)
+Record wpcfg (P D : Type) := WPCfg {
   pc_img : image;
   pc_log : list wmsg;
+  pc_dev : D;
   pc_ags : list (wpagent P);
 }.
 Add Printing Constructor wpcfg.
-Global Arguments WPCfg {P} _ _ _.
-Global Arguments pc_img {P} _.
-Global Arguments pc_log {P} _.
-Global Arguments pc_ags {P} _.
+Global Arguments WPCfg {P D} _ _ _ _.
+Global Arguments pc_img {P D} _.
+Global Arguments pc_log {P D} _.
+Global Arguments pc_dev {P D} _.
+Global Arguments pc_ags {P D} _.
 
 (* ------------------------------------------------------------------ *)
 (** ** Side conditions *)
@@ -225,58 +233,69 @@ Qed.
 (** ** The machine *)
 
 Section machine.
-  Context {P : Type}.
-  (** The abstract per-agent program: [pstep p l p'] — in state [p] the
-      program can emit label [l] and continue as [p'].  All dependency
-      structure (what the program does with values it read) lives here. *)
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  (** The abstract per-agent program: [pstep p d l p' d'] — in state [p],
+      with the shared device fabric at [d], the program can emit label [l]
+      and continue as [p'] with the fabric moved to [d'].  All dependency
+      structure (what the program does with values it read) lives here, and
+      so does every device access: a step may READ and MOVE the fabric.
 
-  Implicit Types cfg : wpcfg P.
+      THE GENERAL FORM IS DELIBERATE.  All five state rules thread the
+      fabric, including the memory-labeled ones — a single program step may
+      well be both an MMIO access and (in another instantiation) a memory
+      event, and nothing in the machine needs the restriction.  The event
+      language's instance moves the fabric only on device-access SILENT
+      steps, which is the special case [pdev]-marked in
+      [WeakPromiseFact]. *)
+  Context (pstep : P → D → wlabel → P → D → Prop).
+
+  Implicit Types cfg : wpcfg P D.
 
   (** One machine step.  [WPPromise] is PARM's [promise_step]
       (unconditional, program does not move, Promising.v:798); every
       other rule is a [state_step] arm.  A plain (non-promised) store
       does not exist as a primitive: it is promise-then-fulfil, exactly
       as in PARM — see [wpstep_store_now] below for the fused form. *)
-  Inductive wpstep : wpcfg P → wpcfg P → Prop :=
+  Inductive wpstep : wpcfg P D → wpcfg P D → Prop :=
   | WPPromise cfg i ag base data k :
       pc_ags cfg !! i = Some ag →
       data ≠ [] →
       wpstep cfg
         (WPCfg (pc_img cfg)
                (pc_log cfg ++ [WMsg base data (Some i) k])
+               (pc_dev cfg)
                (<[i := WPAgent (pa_st ag) (pa_ws ag)
                          ({[S (length (pc_log cfg))]} ∪ pa_prom ag)]>
                   (pc_ags cfg)))
-  | WPSilent cfg i ag st' :
+  | WPSilent cfg i ag st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) LSilent st' →
+      pstep (pa_st ag) (pc_dev cfg) LSilent st' d' →
       wpstep cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags cfg)))
-  | WPLoad cfg i ag aq lat base tvs st' :
+  | WPLoad cfg i ag aq lat base tvs st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (LLoad aq lat base tvs) st' →
+      pstep (pa_st ag) (pc_dev cfg) (LLoad aq lat base tvs) st' d' →
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq lat base tvs →
       wpstep cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
                          (load_post_run (pa_ws ag) aq base (tvs.*1))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | WPFulfil cfg i ag rl base data k ts st' :
+  | WPFulfil cfg i ag rl base data k ts st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (LStore rl base data) st' →
+      pstep (pa_st ag) (pc_dev cfg) (LStore rl base data) st' d' →
       ts ∈ pa_prom ag →
       pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i) k) →
       fulfil_ok (pa_ws ag) rl base (length data) ts →
       wpstep cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
                          (store_post_run (pa_ws ag) rl base (length data) ts)
                          (pa_prom ag ∖ {[ts]})]> (pc_ags cfg)))
-  | WPRmw cfg i ag aq rl base tvs data k ts st' :
+  | WPRmw cfg i ag aq rl base tvs data k ts st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (LRmw aq rl base tvs data) st' →
+      pstep (pa_st ag) (pc_dev cfg) (LRmw aq rl base tvs data) st' d' →
       length tvs = length data →
       ts ∈ pa_prom ag →
       pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i) k) →
@@ -285,25 +304,25 @@ Section machine.
       fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
                 (length data) ts →
       wpstep cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
                          (store_post_run
                             (load_post_run (pa_ws ag) aq base (tvs.*1))
                             rl base (length data) ts)
                          (pa_prom ag ∖ {[ts]})]> (pc_ags cfg)))
-  | WPFence cfg i ag pr pw sr sw st' :
+  | WPFence cfg i ag pr pw sr sw st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (LFence pr pw sr sw) st' →
+      pstep (pa_st ag) (pc_dev cfg) (LFence pr pw sr sw) st' d' →
       wpstep cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
                          (pa_prom ag)]> (pc_ags cfg))).
 
   (* ---------------------------------------------------------------- *)
   (** ** Initial configurations and behaviors *)
 
-  Definition wp_init (img : image) (ps : list P) : wpcfg P :=
-    WPCfg img [] (map (λ p, WPAgent p ws_init ∅) ps).
+  Definition wp_init (img : image) (d0 : D) (ps : list P) : wpcfg P D :=
+    WPCfg img [] d0 (map (λ p, WPAgent p ws_init ∅) ps).
 
   (** All promises discharged — PARM [Machine.no_promise]
       (Promising.v:1576). *)
@@ -315,8 +334,8 @@ Section machine.
       (undischargeable promises) are model artifacts pruned here, which
       is why full-machine adequacy quantifies over completable prefixes
       (design doc §2 consequence (a)). *)
-  Definition wp_behavior (img : image) (ps : list P) cfg : Prop :=
-    rtc wpstep (wp_init img ps) cfg ∧ no_promises cfg.
+  Definition wp_behavior (img : image) (d0 : D) (ps : list P) cfg : Prop :=
+    rtc wpstep (wp_init img d0 ps) cfg ∧ no_promises cfg.
 
   (* ---------------------------------------------------------------- *)
   (** ** Well-formedness: the machine invariant
@@ -338,7 +357,7 @@ Section machine.
       ws_bounded (pa_ws ag) (length (pc_log cfg)) ∧
       prom_wf (pc_log cfg) i ag.
 
-  Lemma cfg_wf_init img ps : cfg_wf (wp_init img ps).
+  Lemma cfg_wf_init img d0 ps : cfg_wf (wp_init img d0 ps).
   Proof.
     intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
     destruct (ps !! i) as [p|]; simplify_eq/=.
@@ -451,15 +470,16 @@ Section machine.
       inclusion, stated one rule at a time; slice 2's bridge composes
       them into a machine-level embedding. *)
 
-  Lemma wpstep_store_now cfg i ag rl base data k st' :
+  Lemma wpstep_store_now cfg i ag rl base data k st' d' :
     pc_ags cfg !! i = Some ag →
-    pstep (pa_st ag) (LStore rl base data) st' →
+    pstep (pa_st ag) (pc_dev cfg) (LStore rl base data) st' d' →
     data ≠ [] →
     ws_bounded (pa_ws ag) (length (pc_log cfg)) →
     S (length (pc_log cfg)) ∉ pa_prom ag →
     rtc wpstep cfg
       (WPCfg (pc_img cfg)
              (pc_log cfg ++ [WMsg base data (Some i) k])
+             d'
              (<[i := WPAgent st'
                        (store_post_run (pa_ws ag) rl base (length data)
                           (S (length (pc_log cfg))))
@@ -473,6 +493,7 @@ Section machine.
     { by eapply (WPPromise cfg i ag base data k). }
     (* step 2: fulfil it immediately *)
     set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+                 (pc_dev cfg)
                  (<[i := WPAgent (pa_st ag) (pa_ws ag)
                            ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
     eapply rtc_l; [|apply rtc_refl].
@@ -481,7 +502,9 @@ Section machine.
     { rewrite /mid /= list_lookup_insert //. }
     have Hmsg : pc_log mid !! (ts - 1)%nat = Some (WMsg base data (Some i) k).
     { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
-    pose proof (WPFulfil mid i _ rl base data k ts st' Hmidlk Hp
+    have Hpd : pstep (pa_st ag) (pc_dev mid) (LStore rl base data) st' d'
+      by rewrite /mid /=.
+    pose proof (WPFulfil mid i _ rl base data k ts st' d' Hmidlk Hpd
                   ltac:(set_solver) Hmsg) as Hful.
     have Hok : fulfil_ok (pa_ws ag) rl base (length data) ts.
     { split.
@@ -500,9 +523,9 @@ Section machine.
       [WeakPromiseBridge] by the W4 batch), proved the same way: the read
       half and the exclusivity window survive the append because the read is
       plain and the window ends at the old top. *)
-  Lemma wpstep_rmw_now cfg i ag aq rl base tvs data k st' :
+  Lemma wpstep_rmw_now cfg i ag aq rl base tvs data k st' d' :
     pc_ags cfg !! i = Some ag →
-    pstep (pa_st ag) (LRmw aq rl base tvs data) st' →
+    pstep (pa_st ag) (pc_dev cfg) (LRmw aq rl base tvs data) st' d' →
     data ≠ [] →
     length tvs = length data →
     ws_bounded (pa_ws ag) (length (pc_log cfg)) →
@@ -511,6 +534,7 @@ Section machine.
     excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
     rtc wpstep cfg
       (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+             d'
              (<[i := WPAgent st'
                        (store_post_run
                           (load_post_run (pa_ws ag) aq base (tvs.*1))
@@ -524,6 +548,7 @@ Section machine.
     eapply rtc_l.
     { by eapply (WPPromise cfg i ag base data k). }
     set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+                 (pc_dev cfg)
                  (<[i := WPAgent (pa_st ag) (pa_ws ag)
                            ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
     eapply rtc_l; [|apply rtc_refl].
@@ -548,8 +573,10 @@ Section machine.
       - intros j Hj. destruct Hbl as (_&_&_&_&_&_&Hcoh&_).
         pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
       - pose proof (fulfil_vpre_bounded _ rl _ Hbl). rewrite /ts. lia. }
-    pose proof (WPRmw mid i _ aq rl base tvs data k ts st'
-                  Hmidlk Hps Hlen ltac:(set_solver) Hmsg Hr' He' Hok) as Hrmw.
+    have Hpd : pstep (pa_st ag) (pc_dev mid) (LRmw aq rl base tvs data) st' d'
+      by rewrite /mid /=.
+    pose proof (WPRmw mid i _ aq rl base tvs data k ts st' d'
+                  Hmidlk Hpd Hlen ltac:(set_solver) Hmsg Hr' He' Hok) as Hrmw.
     rewrite /mid /= in Hrmw.
     have Hprom : ({[ts]} ∪ pa_prom ag) ∖ {[ts]} = pa_prom ag by set_solver.
     rewrite Hprom list_insert_insert in Hrmw.
@@ -558,11 +585,11 @@ Section machine.
 
   (** A promise-free step never leaves promises behind: [wpstep_store_now]
       starts and ends [no_promises]-clean when the config was clean. *)
-  Lemma no_promises_store_now cfg i ag k st' ws' :
+  Lemma no_promises_store_now cfg i ag k st' ws' d' :
     no_promises cfg →
     pc_ags cfg !! i = Some ag →
     no_promises
-      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg (0%Z) [] (Some i) k])
+      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg (0%Z) [] (Some i) k]) d'
              (<[i := WPAgent st' ws' (pa_prom ag)]> (pc_ags cfg))).
   Proof.
     intros Hnp Hlk i' ag' Hlk'. simpl in *.
@@ -575,12 +602,77 @@ Section machine.
 
 End machine.
 
-Global Arguments wpstep {P} _ _ _.
-Global Arguments wp_init {P} _ _.
-Global Arguments no_promises {P} _.
-Global Arguments wp_behavior {P} _ _ _ _.
-Global Arguments cfg_wf {P} _.
+Global Arguments wpstep {P D} _ _ _.
+Global Arguments wp_init {P D} _ _ _.
+Global Arguments no_promises {P D} _.
+Global Arguments wp_behavior {P D} _ _ _ _ _.
+Global Arguments cfg_wf {P D} _.
 Global Arguments prom_wf {P} _ _ _.
+
+(* ------------------------------------------------------------------ *)
+(** ** THE COMPATIBILITY SHIM: the old machine is the constant-fabric
+       instance
+
+    Before the fabric generalization the program step was
+    [P → wlabel → P → Prop] and a configuration had two shared components.
+    That machine is EXACTLY this one at a fabric that never moves:
+    [pstep_of_pure ps] lifts an old-style program LTS by pinning the
+    fabric, and every instantiation may then take [D := unit], [d0 := tt].
+
+    Two facts make the correspondence usable: the lift never moves the
+    fabric ([pstep_of_pure_dev]) and it is available at EVERY fabric
+    ([pstep_of_pure_any]) — which is precisely [WeakPromiseFact]'s
+    dev-freeness, so under the shim no step is ever fabric-touching and
+    the device-order witness of a run is EMPTY. *)
+
+Definition pstep_of_pure {P D : Type} (ps : P → wlabel → P → Prop)
+    : P → D → wlabel → P → D → Prop :=
+  λ p d l p' d', ps p l p' ∧ d' = d.
+
+Lemma pstep_of_pure_dev {P D} (ps : P → wlabel → P → Prop) p (d : D) l p' d' :
+  pstep_of_pure ps p d l p' d' → d' = d.
+Proof. by intros [_ ->]. Qed.
+
+Lemma pstep_of_pure_any {P D} (ps : P → wlabel → P → Prop) p (d : D) l p' d' :
+  pstep_of_pure ps p d l p' d' → ∀ d0 : D, pstep_of_pure ps p d0 l p' d0.
+Proof. intros [? _] d0. by split. Qed.
+
+Lemma pstep_of_pure_intro {P D} (ps : P → wlabel → P → Prop) p (d : D) l p' :
+  ps p l p' → pstep_of_pure ps p d l p' d.
+Proof. by split. Qed.
+
+Lemma pstep_of_pure_elim {P D} (ps : P → wlabel → P → Prop) p (d : D) l p' d' :
+  pstep_of_pure ps p d l p' d' → ps p l p'.
+Proof. by intros [? _]. Qed.
+
+(** AT [D := unit] THE FABRIC EQUATION IS AUTOMATIC, so the lift is the old
+    program step VERBATIM — no conjunct, no equation to discharge.  That is
+    what makes the archived per-hart-stream files ([WeakSailLTS] and the
+    lift tree above it) port by a signature change alone: every
+    [pstep p l p'] obligation of the old machine is LITERALLY the [pstep_unit]
+    obligation of the new one.  [WPCfgU] is the matching configuration
+    abbreviation.  Use [pstep_of_pure] when [D] must stay abstract. *)
+Definition pstep_unit {P : Type} (ps : P → wlabel → P → Prop)
+    : P → unit → wlabel → P → unit → Prop :=
+  λ p _ l p' _, ps p l p'.
+
+Notation WPCfgU img log ags := (WPCfg img log tt ags).
+
+Lemma pstep_unit_of_pure {P} (ps : P → wlabel → P → Prop) p d l p' d' :
+  pstep_unit ps p d l p' d' ↔ pstep_of_pure ps p d l p' d'.
+Proof.
+  split; [intros ?; split; [done|by destruct d, d']|by intros [? _]].
+Qed.
+
+(** The fabric of a constant-fabric run never moves. *)
+Lemma wpstep_pure_dev {P D} (ps : P → wlabel → P → Prop) (c c' : wpcfg P D) :
+  wpstep (pstep_of_pure ps) c c' → pc_dev c' = pc_dev c.
+Proof.
+  destruct 1; simpl; try done;
+    match goal with
+    | H : pstep_of_pure _ _ _ _ _ _ |- _ => by destruct H as [_ ->]
+    end.
+Qed.
 
 (* ------------------------------------------------------------------ *)
 (** ** Slice-2 goals (stated here as comments so the file is honest

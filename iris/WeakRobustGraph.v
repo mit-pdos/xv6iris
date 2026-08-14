@@ -262,12 +262,13 @@ End astep.
 
 (* ------------------------------------------------------------------ *)
 Section graph.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types TS : ptraces P.
-  Implicit Types T : atrace P.
-  Implicit Types c : wpcfg P.
+  Implicit Types TS : ptraces P D.
+  Implicit Types T : atrace P D.
+  Implicit Types c : wpcfg P D.
 
   (* ---------------------------------------------------------------- *)
   (** ** Trace-level plumbing *)
@@ -382,8 +383,8 @@ Section graph.
 
   Implicit Types e : gev.
 
-  Definition gev_tr TS e : option (atrace P) := pt_trs TS !! e.1.
-  Definition gev_ev TS e : option aev :=
+  Definition gev_tr TS e : option (atrace P D) := pt_trs TS !! e.1.
+  Definition gev_ev TS e : option (aev D) :=
     T ← pt_trs TS !! e.1; at_evs T !! e.2.
   Definition gev_lb TS e : option wlabel := ae_lb <$> gev_ev TS e.
   (** The timestamp the event FULFILLED ([None] for a non-store). *)
@@ -427,7 +428,7 @@ Section graph.
     ∃ T ag ag' st' f,
       pt_trs TS !! e.1 = Some T ∧
       at_ags T !! e.2 = Some ag ∧ at_ags T !! S e.2 = Some ag' ∧
-      pstep (pa_st ag) (ae_lb ev) st' ∧
+      astep_prog pstep ag ev st' ∧
       astep_ok (pt_img TS) (pt_log TS) e.1 ag (ae_lb ev) f (ae_ts ev) ∧
       pa_ws ag' = f (pa_ws ag).
   Proof.
@@ -558,7 +559,7 @@ Section graph.
     destruct (at_evs T !! e2.2) as [ev2|] eqn:Hev2; simpl; [|done].
     intros Hts1 Hts2.
     have Hk : e1.2 = e2.2.
-    { eapply (asteps_fulfil_unique pstep (pt_img TS) (pt_log TS) e1.1
+    { eapply (asteps_fulfil_unique pstep pdev (pt_img TS) (pt_log TS) e1.1
                 (at_ags T) (at_evs T) ts); [by apply Hwf|done|done|done|done]. }
     destruct e1 as [i1 k1], e2 as [i2 k2]. simpl in Hag, Hk. by subst.
   Qed.
@@ -690,24 +691,25 @@ Section graph.
   Qed.
 
   Lemma log_authored_promise_run c c' :
-    log_authored (pc_log c) → rtc (wp_promise_step (P:=P)) c c' →
+    log_authored (pc_log c) → rtc (wp_promise_step (P:=P) (D:=D)) c c' →
     log_authored (pc_log c').
   Proof.
     intros H0 Hr. induction Hr as [|??? Hs _ IH]; [done|].
     apply IH. by eapply log_authored_promise_step.
   Qed.
 
-  Lemma log_authored_init img ps :
-    log_authored (pc_log (wp_init (P:=P) img ps)).
+  Lemma log_authored_init img d0 ps :
+    log_authored (pc_log (wp_init (P:=P) (D:=D) img d0 ps)).
   Proof. intros p m Hp. by rewrite /wp_init /= lookup_nil in Hp. Qed.
 
   (** THE TRACED BEHAVIOR, GRAPH-READY: the traced form plus rf
       totality (every read of a nonzero timestamp has a source) and rf
       functionality (that source is unique). *)
-  Theorem wp_behavior_graph img ps c :
-    lat_free_prog pstep → wp_behavior pstep img ps c →
+  Theorem wp_behavior_graph img d0 ps c :
+    pdev_ok pstep pdev →
+    lat_free_prog pstep → wp_behavior pstep img d0 ps c →
     ∃ mid TS,
-      rtc (wp_promise_step (P:=P)) (wp_init img ps) mid ∧
+      rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid ∧
       ptraces_of pstep TS mid c ∧
       no_promises c ∧
       (** rf TOTALITY *)
@@ -717,8 +719,8 @@ Section graph.
       (∀ e1 e2 ts, gev_ts TS e1 = Some ts → gev_ts TS e2 = Some ts →
          e1 = e2).
   Proof.
-    intros Hlfp Hb.
-    destruct (wp_behavior_fulfil_once pstep img ps c Hlfp Hb)
+    intros Hpok Hlfp Hb.
+    destruct (wp_behavior_fulfil_once pstep pdev img d0 ps c Hpok Hlfp Hb)
       as (mid & TS & Hprom & HTS & Hnp & Hacct).
     have Hwf : ptraces_wf TS by eapply ptraces_of_wf.
     exists mid, TS. split_and!; [done|done|done| |].
@@ -759,14 +761,14 @@ Section graph.
       goal with the premise abstract keeps this file honest: nothing
       here claims violation-freedom ALONE suffices. *)
   Definition gdep_acyclicity_goal
-      (cls : wmsg → store_class) (pub : wpcfg P → nat → Prop)
+      (cls : wmsg → store_class) (pub : wpcfg P D → nat → Prop)
       (class_pins : image → list P → Prop) : Prop :=
-    ∀ img ps c mid TS,
+    ∀ img d0 ps c mid TS,
       lat_free_prog pstep →
-      pf_violation_free cls pub pstep img ps →
+      pf_violation_free cls pub pstep img d0 ps →
       class_pins img ps →
-      wp_behavior pstep img ps c →
-      rtc (wp_promise_step (P:=P)) (wp_init img ps) mid →
+      wp_behavior pstep img d0 ps c →
+      rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid →
       ptraces_of pstep TS mid c →
       gdep_acyclic TS.
 

@@ -239,13 +239,13 @@ Lemma lbl_class_rmw ak ws aq rl base tvs data :
 Proof. intros H. by rewrite /wm_class_of /lbl_class H. Qed.
 
 (** (a) the class the step appends is the computed one. *)
-Definition cls_canon (i : agent) (l : wlabel) (c c' : wpcfg psail) : Prop :=
+Definition cls_canon (i : agent) (l : wlabel) (c c' : wpcfg psail unit) : Prop :=
   ∀ ag msg, pc_ags c !! i = Some ag → pc_log c' = pc_log c ++ [msg] →
     wm_ak msg = lbl_class l (pa_ws ag).
 
 (** (b) the rmw read half is admissible in the interpreter's STRONG sense
     (no write at all in the window, not merely no other agent's). *)
-Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail) : Prop :=
+Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail unit) : Prop :=
   match l with
   | WeakPromise.LRmw aq _ base tvs _ =>
       ∀ ag, pc_ags c !! i = Some ag →
@@ -254,23 +254,23 @@ Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail) : Prop :=
   end.
 
 Definition pf_solo (next : bool → M unit) (i : agent)
-    (c c' : wpcfg psail) : Prop :=
+    (c c' : wpcfg psail unit) : Prop :=
   ∃ l : wlabel,
-    wp_pf_step (sail_step_ni next) i l c c' ∧
+    wp_pf_step (pstep_unit (sail_step_ni next)) i l c c' ∧
     cls_canon i l c c' ∧ rmw_tight i l c.
 
 (** A block IS a promise-free run — the two brackets sandwich the same
     relation. *)
 Lemma pf_solo_run next i c c' :
-  pf_solo next i c c' → wp_pf_run (sail_step next) c c'.
+  pf_solo next i c c' → wp_pf_run (pstep_unit (sail_step next)) c c'.
 Proof.
   intros (l & Hstep & _ & _). exists i, l.
   destruct Hstep as
-    [cfg ag st' Hlk Hps
-    |cfg ag aq lat base tvs st' Hlk Hps Hr
-    |cfg ag rl base data kk st' Hlk Hps Hne
-    |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
-    |cfg ag pr pw sr sw st' Hlk Hps];
+    [cfg ag st' dd Hlk Hps
+    |cfg ag aq lat base tvs st' dd Hlk Hps Hr
+    |cfg ag rl base data kk st' dd Hlk Hps Hne
+    |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+    |cfg ag pr pw sr sw st' dd Hlk Hps];
     [ by eapply PFSilent, sail_step_ni_step
     | by eapply PFLoad; [done|apply sail_step_ni_step|done]
     | by eapply PFStore; [done|apply sail_step_ni_step|done]
@@ -288,11 +288,11 @@ Lemma pf_solo_irq next i c c' ag :
 Proof.
   intros (l & Hstep & _ & _) Hlk.
   destruct Hstep as
-    [cfg ag0 st' H0 Hps
-    |cfg ag0 aq lat base tvs st' H0 Hps Hr
-    |cfg ag0 rl base data kk st' H0 Hps Hne
-    |cfg ag0 aq rl base tvs data kk st' H0 Hps Hne Hlen Hr He
-    |cfg ag0 pr pw sr sw st' H0 Hps];
+    [cfg ag0 st' dd H0 Hps
+    |cfg ag0 aq lat base tvs st' dd H0 Hps Hr
+    |cfg ag0 rl base data kk st' dd H0 Hps Hne
+    |cfg ag0 aq rl base tvs data kk st' dd H0 Hps Hne Hlen Hr He
+    |cfg ag0 pr pw sr sw st' dd H0 Hps];
     simpl in Hlk; rewrite Hlk in H0; injection H0 as <-;
     (eexists; (split;
       [ by eapply lookup_insert_at, Hlk
@@ -301,10 +301,10 @@ Qed.
 
 (** The agent's position in the block: at an instruction boundary, or
     strictly inside one. *)
-Definition at_boundary (i : agent) (c : wpcfg psail) : Prop :=
+Definition at_boundary (i : agent) (c : wpcfg psail unit) : Prop :=
   ∃ ag, pc_ags c !! i = Some ag ∧ sp_m (pa_st ag) = None.
 
-Definition in_block (i : agent) (c : wpcfg psail) : Prop :=
+Definition in_block (i : agent) (c : wpcfg psail unit) : Prop :=
   ∃ ag, pc_ags c !! i = Some ag ∧ sp_m (pa_st ag) ≠ None.
 
 Lemma boundary_not_in_block i c : at_boundary i c → in_block i c → False.
@@ -318,13 +318,13 @@ Qed.
     in-block configuration to a boundary can pass through no boundary
     strictly inside. *)
 Definition pf_in_block (next : bool → M unit) (i : agent)
-    (c c' : wpcfg psail) : Prop :=
+    (c c' : wpcfg psail unit) : Prop :=
   in_block i c ∧ pf_solo next i c c'.
 
 (** THE BLOCK: boundary, one step that loads [next tick], the instruction's
     events, boundary. *)
 Definition sail_block (next : bool → M unit) (i : agent)
-    (c c' : wpcfg psail) : Prop :=
+    (c c' : wpcfg psail unit) : Prop :=
   at_boundary i c ∧ at_boundary i c' ∧
   ∃ c0, pf_solo next i c c0 ∧ rtc (pf_in_block next i) c0 c'.
 
@@ -363,11 +363,11 @@ Definition dev_ok_m (d : dev_state) (m : option (M unit)) : Prop :=
   | _ => True
   end.
 
-Definition dev_ok (i : agent) (c : wpcfg psail) : Prop :=
+Definition dev_ok (i : agent) (c : wpcfg psail unit) : Prop :=
   ∀ ag, pc_ags c !! i = Some ag → dev_ok_m (sp_dev (pa_st ag)) (sp_m (pa_st ag)).
 
 Definition dev_ok_blk (next : bool → M unit) (i : agent)
-    (c' : wpcfg psail) : Prop :=
+    (c' : wpcfg psail unit) : Prop :=
   ∀ c1, rtc (pf_in_block next i) c1 c' → dev_ok i c1.
 
 (** *** [fused_blk]: the exclusive-window seam, the SECOND run-local side
@@ -417,7 +417,7 @@ Definition excl_read_node (m : option (M unit)) : Prop :=
   | _ => False
   end.
 
-Definition at_excl_read (i : agent) (c : wpcfg psail) : Prop :=
+Definition at_excl_read (i : agent) (c : wpcfg psail unit) : Prop :=
   ∃ ag, pc_ags c !! i = Some ag ∧ sp_fence (pa_st ag) = None ∧
         excl_read_node (sp_m (pa_st ag)).
 
@@ -437,12 +437,12 @@ Definition con_write_node (m : option (M unit)) : Prop :=
   | _ => False
   end.
 
-Definition at_con_write (i : agent) (c : wpcfg psail) : Prop :=
+Definition at_con_write (i : agent) (c : wpcfg psail unit) : Prop :=
   ∃ ag, pc_ags c !! i = Some ag ∧ sp_fence (pa_st ag) = None ∧
         con_write_node (sp_m (pa_st ag)).
 
 Definition pf_solo_f (next : bool → M unit) (i : agent)
-    (c c' : wpcfg psail) : Prop :=
+    (c c' : wpcfg psail unit) : Prop :=
   pf_solo next i c c' ∧ (at_excl_read i c → pc_log c' ≠ pc_log c) ∧
   ¬ at_con_write i c.
 
@@ -450,7 +450,7 @@ Lemma pf_solo_f_solo next i c c' : pf_solo_f next i c c' → pf_solo next i c c'
 Proof. by intros [H _]. Qed.
 
 Definition fused_blk (next : bool → M unit) (i : agent)
-    (c' : wpcfg psail) : Prop :=
+    (c' : wpcfg psail unit) : Prop :=
   ∀ c1 c2, pf_solo next i c1 c2 → rtc (pf_in_block next i) c2 c' →
            pf_solo_f next i c1 c2.
 
@@ -553,7 +553,7 @@ Qed.
 Section peel.
   Context (next : bool → M unit) (i : agent).
 
-  Implicit Types c : wpcfg psail.
+  Implicit Types c : wpcfg psail unit.
   Implicit Types ags : list (wpagent psail).
 
   (** The five pf arms with the two faithfulness conditions already read
@@ -563,18 +563,18 @@ Section peel.
     pf_solo next i c c' →
     ∃ ag, pc_ags c !! i = Some ag ∧
       ((∃ st', sail_step_ni next (pa_st ag) WeakPromise.LSilent st' ∧
-          c' = WPCfg (pc_img c) (pc_log c)
+          c' = WPCfgU (pc_img c) (pc_log c)
                  (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags c)))
      ∨ (∃ aq lat base tvs st',
           sail_step_ni next (pa_st ag) (WeakPromise.LLoad aq lat base tvs) st' ∧
           read_ok (pc_img c) (pc_log c) (pa_ws ag) aq lat base tvs ∧
-          c' = WPCfg (pc_img c) (pc_log c)
+          c' = WPCfgU (pc_img c) (pc_log c)
                  (<[i := WPAgent st' (load_post_run (pa_ws ag) aq base tvs.*1)
                            (pa_prom ag)]> (pc_ags c)))
      ∨ (∃ rl base data st',
           sail_step_ni next (pa_st ag) (WeakPromise.LStore rl base data) st' ∧
           data ≠ [] ∧
-          c' = WPCfg (pc_img c)
+          c' = WPCfgU (pc_img c)
                  (pc_log c ++ [WMsg base data (Some i)
                                  (lbl_class (WeakPromise.LStore rl base data)
                                     (pa_ws ag))])
@@ -586,7 +586,7 @@ Section peel.
           data ≠ [] ∧ length tvs = length data ∧
           read_ok (pc_img c) (pc_log c) (pa_ws ag) aq true base tvs ∧
           excl_ok (pc_log c) i base tvs (S (length (pc_log c))) ∧
-          c' = WPCfg (pc_img c)
+          c' = WPCfgU (pc_img c)
                  (pc_log c ++ [WMsg base data (Some i) WCexcl])
                  (<[i := WPAgent st'
                            (store_post_run
@@ -595,17 +595,17 @@ Section peel.
                            (pa_prom ag)]> (pc_ags c)))
      ∨ (∃ pr pw sr sw st',
           sail_step_ni next (pa_st ag) (WeakPromise.LFence pr pw sr sw) st' ∧
-          c' = WPCfg (pc_img c) (pc_log c)
+          c' = WPCfgU (pc_img c) (pc_log c)
                  (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
                            (pa_prom ag)]> (pc_ags c)))).
   Proof.
     intros (l & Hstep & Hcls & Hrmw).
     destruct Hstep as
-      [cfg ag st' Hlk Hps
-      |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data kk st' Hlk Hps Hne
-      |cfg ag aq rl base tvs data kk st' Hlk Hps Hne Hlen Hr He
-      |cfg ag pr pw sr sw st' Hlk Hps].
+      [cfg ag st' dd Hlk Hps
+      |cfg ag aq lat base tvs st' dd Hlk Hps Hr
+      |cfg ag rl base data kk st' dd Hlk Hps Hne
+      |cfg ag aq rl base tvs data kk st' dd Hlk Hps Hne Hlen Hr He
+      |cfg ag pr pw sr sw st' dd Hlk Hps]; destruct dd.
     - exists ag. split; [done|]. left. by exists st'.
     - exists ag. split; [done|]. right; left. by exists aq, lat, base, tvs, st'.
     - exists ag. split; [done|]. right; right; left.
@@ -645,14 +645,14 @@ Section peel.
       (Q : psail → Prop) :
     ags !! i = Some (WPAgent p ws prom) → sp_m p ≠ None →
     (∀ l st', sail_step_ni next p l st' → l = WeakPromise.LSilent ∧ Q st') →
-    rtc (pf_in_block next i) (WPCfg img log ags) c' →
+    rtc (pf_in_block next i) (WPCfgU img log ags) c' →
     at_boundary i c' →
     ∃ p1, Q p1 ∧
       rtc (pf_in_block next i)
-        (WPCfg img log (<[i := WPAgent p1 ws prom]> ags)) c'.
+        (WPCfgU img log (<[i := WPAgent p1 ws prom]> ags)) c'.
   Proof.
     intros Hlk Hne Hforce Hrtc Hbd.
-    destruct (block_peel (WPCfg img log ags) c' _ Hlk Hne Hrtc Hbd)
+    destruct (block_peel (WPCfgU img log ags) c' _ Hlk Hne Hrtc Hbd)
       as (c1 & Hsolo & Hrtc1).
     destruct (pf_solo_inv _ _ Hsolo) as (ag & Hag & Hcase).
     simpl in Hag. rewrite Hlk in Hag. injection Hag as <-. simpl in Hcase.
@@ -670,14 +670,14 @@ Section peel.
     ags !! i = Some (WPAgent p ws prom) → sp_m p ≠ None →
     (∀ l st', sail_step_ni next p l st' →
        l = WeakPromise.LFence pr pw sr sw ∧ st' = p1) →
-    rtc (pf_in_block next i) (WPCfg img log ags) c' →
+    rtc (pf_in_block next i) (WPCfgU img log ags) c' →
     at_boundary i c' →
     rtc (pf_in_block next i)
-      (WPCfg img log (<[i := WPAgent p1 (fence_post ws pr pw sr sw) prom]> ags))
+      (WPCfgU img log (<[i := WPAgent p1 (fence_post ws pr pw sr sw) prom]> ags))
       c'.
   Proof.
     intros Hlk Hne Hforce Hrtc Hbd.
-    destruct (block_peel (WPCfg img log ags) c' _ Hlk Hne Hrtc Hbd)
+    destruct (block_peel (WPCfgU img log ags) c' _ Hlk Hne Hrtc Hbd)
       as (c1 & Hsolo & Hrtc1).
     destruct (pf_solo_inv _ _ Hsolo) as (ag & Hag & Hcase).
     simpl in Hag. rewrite Hlk in Hag. injection Hag as <-. simpl in Hcase.
@@ -694,11 +694,11 @@ Section peel.
   Lemma block_forced_stuck (p : psail) ws img log prom ags c' :
     ags !! i = Some (WPAgent p ws prom) → sp_m p ≠ None →
     (∀ l st', ¬ sail_step_ni next p l st') →
-    rtc (pf_in_block next i) (WPCfg img log ags) c' →
+    rtc (pf_in_block next i) (WPCfgU img log ags) c' →
     at_boundary i c' → False.
   Proof.
     intros Hlk Hne Hforce Hrtc Hbd.
-    destruct (block_peel (WPCfg img log ags) c' _ Hlk Hne Hrtc Hbd)
+    destruct (block_peel (WPCfgU img log ags) c' _ Hlk Hne Hrtc Hbd)
       as (c1 & Hsolo & _).
     destruct (pf_solo_inv _ _ Hsolo) as (ag & Hag & Hcase).
     simpl in Hag. rewrite Hlk in Hag. injection Hag as <-. simpl in Hcase.
@@ -729,17 +729,17 @@ Section unbracket.
 
   Definition sail_unbracket (m : M unit) : Prop :=
     ∀ (s : wmstate) (iq : istream) (prom : gset nat)
-      (ags : list (wpagent psail)) (c' : wpcfg psail),
+      (ags : list (wpagent psail)) (c' : wpcfg psail unit),
       sail_shaped m →
       dev_ok_blk next i c' →
       fused_blk next i c' →
       ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
                          (wm_ws s) prom) →
-      rtc (pf_in_block next i) (WPCfg (wimg s) (wm_log s) ags) c' →
+      rtc (pf_in_block next i) (WPCfgU (wimg s) (wm_log s) ags) c' →
       at_boundary i c' →
       ∃ (x : unit) (s' : wmstate),
         wrun (Some i) m s x s' ∧
-        c' = WPCfg (wimg s) (wm_log s')
+        c' = WPCfgU (wimg s) (wm_log s')
                (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                          (wm_ws s') prom]> ags).
 
@@ -756,7 +756,7 @@ Section unbracket.
   Definition amo_unbracket (base : Z) (m : M unit) : Prop :=
     ∀ (s : wmstate) (m1 m2 : M unit) (rs1 : regstate) (rl : bool)
       (data : list (bv 8)) (iq : istream) (prom : gset nat)
-      (ags : list (wpagent psail)) (c' : wpcfg psail),
+      (ags : list (wpagent psail)) (c' : wpcfg psail unit),
       sail_shaped m →
       dev_ok_blk next i c' →
       fused_blk next i c' →
@@ -766,12 +766,12 @@ Section unbracket.
                          (store_post_run (wm_ws s) rl base (length data)
                             (S (length (wm_log s)))) prom) →
       rtc (pf_in_block next i)
-        (WPCfg (wimg s) (wm_log s ++ [WMsg base data (Some i) WCexcl]) ags)
+        (WPCfgU (wimg s) (wm_log s ++ [WMsg base data (Some i) WCexcl]) ags)
         c' →
       at_boundary i c' →
       ∃ (x : unit) (s' : wmstate),
         wrun (Some i) m s x s' ∧
-        c' = WPCfg (wimg s) (wm_log s')
+        c' = WPCfgU (wimg s) (wm_log s')
                (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                          (wm_ws s') prom]> ags).
 
@@ -820,7 +820,7 @@ Section unbracket.
                     Hlk ltac:(done) ltac:(intros ? ? HH; exact HH) Hrtc Hbd)
           as (p1 & -> & Hrtc1).
         have Hbd1 : at_boundary i
-          (WPCfg (wimg s) (wm_log s)
+          (WPCfgU (wimg s) (wm_log s)
              (<[i := WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                        (wm_ws s) prom]> ags)).
         { eexists. split; [by eapply lk_ins, Hlk|reflexivity]. }
@@ -875,7 +875,7 @@ Section unbracket.
           exists xx, ss. split; [exact Hrun|exact Heq].
         * (* RAM read: a plain load (any access kind), or the fused RMW *)
           destruct Hsh as (Hcoh & Hsh).
-          destruct (block_peel next i (WPCfg (wimg s) (wm_log s) ags) c' _
+          destruct (block_peel next i (WPCfgU (wimg s) (wm_log s) ags) c' _
                       Hlk ltac:(done) Hrtc Hbd) as (c1 & Hsolo & Hrtc1).
           destruct (pf_solo_inv next i _ _ Hsolo) as (ag & Hag & Hcase).
           simpl in Hag. rewrite Hlk in Hag. injection Hag as <-.
@@ -956,7 +956,7 @@ Section unbracket.
             as (xx & ss & Hrun & Heq).
           rewrite list_insert_insert in Heq.
           exists xx, ss. split; [exact Hrun|exact Heq].
-        * destruct (block_peel next i (WPCfg (wimg s) (wm_log s) ags) c' _
+        * destruct (block_peel next i (WPCfgU (wimg s) (wm_log s) ags) c' _
                       Hlk ltac:(done) Hrtc Hbd) as (c1 & Hsolo & Hrtc1).
           (* THE STANDALONE CONDITIONAL WRITE (delta (e'')) is what
              [fused_blk]'s [at_con_write] conjunct excludes: [wrun] would
@@ -1006,7 +1006,7 @@ Section unbracket.
       + (* Barrier: the label table [barrier_lbl] mirrors [barrier_post] *)
         rewrite /wrun.
         have Hrtc1 : rtc (pf_in_block next i)
-          (WPCfg (wimg s) (wm_log s)
+          (WPCfgU (wimg s) (wm_log s)
              (<[i := WPAgent (PSail (Some (k tt)) (wm_regs s) (wm_dev s) None iq)
                        (barrier_post (wm_ws s) bk) prom]> ags)) c'.
         { destruct bk.
@@ -1160,11 +1160,11 @@ Section unbracket.
     fused_blk next i c' →
     ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
                        (wm_ws s) prom) →
-    rtc (pf_in_block next i) (WPCfg (wimg s) (wm_log s) ags) c' →
+    rtc (pf_in_block next i) (WPCfgU (wimg s) (wm_log s) ags) c' →
     at_boundary i c' →
     ∃ (x : unit) (s' : wmstate),
       wrun (Some i) m s x s' ∧
-      c' = WPCfg (wimg s) (wm_log s')
+      c' = WPCfgU (wimg s) (wm_log s')
              (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                        (wm_ws s') prom]> ags).
   Proof. apply (proj1 (sail_unbracket_all m)). Qed.
@@ -1173,16 +1173,16 @@ Section unbracket.
   (** ** 8. The block statement: boundary to boundary *)
 
   Theorem sail_block_wrun (s : wmstate) (iq : istream)
-      (prom : gset nat) (ags : list (wpagent psail)) (c' : wpcfg psail) :
+      (prom : gset nat) (ags : list (wpagent psail)) (c' : wpcfg psail unit) :
     (∀ b, sail_shaped (next b)) →
     dev_ok_blk next i c' →
     fused_blk next i c' →
     ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                        (wm_ws s) prom) →
-    sail_block next i (WPCfg (wimg s) (wm_log s) ags) c' →
+    sail_block next i (WPCfgU (wimg s) (wm_log s) ags) c' →
     ∃ (tick : bool) (x : unit) (s' : wmstate),
       wrun (Some i) (next tick) s x s' ∧
-      c' = WPCfg (wimg s) (wm_log s')
+      c' = WPCfgU (wimg s) (wm_log s')
              (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                        (wm_ws s') prom]> ags).
   Proof.
@@ -1220,7 +1220,7 @@ End unbracket.
     partial [dev_read]/[dev_write] accepted — which the ⇒ direction gets for
     free, because a [wrun] cannot take any other.
 
-    The ⇒ direction lands in [wp_pf_run (sail_step riscv_step)] (what
+    The ⇒ direction lands in [wp_pf_run (pstep_unit (sail_step riscv_step))] (what
     [sail_instr_bracket] proves) and the ⇐ direction starts from the finer
     [sail_block] (solo, irq-free, faithfully classed); [pf_solo_run] is the
     inclusion that makes them a sandwich. *)
@@ -1228,7 +1228,7 @@ End unbracket.
 (** ⇐ — what L3 consumes. *)
 Theorem wprim_hart_block_bwd (cpu : CPU) (gen : nat) (g : wgstate)
     (iq : istream) (prom : gset nat)
-    (ags : list (wpagent psail)) (c' : wpcfg psail) :
+    (ags : list (wpagent psail)) (c' : wpcfg psail unit) :
   (∀ b, sail_shaped (riscv_step b)) →
   dev_ok_blk riscv_step (fin_to_nat cpu) c' →
   fused_blk riscv_step (fin_to_nat cpu) c' →
@@ -1237,10 +1237,10 @@ Theorem wprim_hart_block_bwd (cpu : CPU) (gen : nat) (g : wgstate)
     = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq)
               (wgws g cpu) prom) →
   sail_block riscv_step (fin_to_nat cpu)
-    (WPCfg (img_z (wgimg g)) (wglog g) ags) c' →
+    (WPCfgU (img_z (wgimg g)) (wglog g) ags) c' →
   ∃ g' : wgstate,
     wprim_step (LoopE gen cpu) g [] (LoopE gen cpu) g' [] ∧
-    c' = WPCfg (img_z (wgimg g)) (wglog g')
+    c' = WPCfgU (img_z (wgimg g)) (wglog g')
            (<[fin_to_nat cpu :=
                 WPAgent (PSail None (wgregs g' cpu) (wgdev g') None iq)
                   (wgws g' cpu) prom]> ags).
@@ -1265,9 +1265,9 @@ Theorem wprim_hart_block_fwd (cpu : CPU) (gen : nat) (g g' : wgstate) :
     ags !! (fin_to_nat cpu)
       = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq)
                 (wgws g cpu) prom) →
-    rtc (wp_pf_run (sail_step riscv_step))
-      (WPCfg (img_z (wgimg g)) (wglog g) ags)
-      (WPCfg (img_z (wgimg g)) (wglog g')
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+      (WPCfgU (img_z (wgimg g)) (wglog g) ags)
+      (WPCfgU (img_z (wgimg g)) (wglog g')
          (<[fin_to_nat cpu :=
               WPAgent (PSail None (wgregs g' cpu) (wgdev g') None iq)
                 (wgws g' cpu) prom]> ags)).
@@ -1296,10 +1296,10 @@ Theorem wprim_hart_block (cpu : CPU) (gen : nat) (g : wgstate)
   (∀ c', dev_ok_blk riscv_step (fin_to_nat cpu) c' →
      fused_blk riscv_step (fin_to_nat cpu) c' →
      sail_block riscv_step (fin_to_nat cpu)
-       (WPCfg (img_z (wgimg g)) (wglog g) ags) c' →
+       (WPCfgU (img_z (wgimg g)) (wglog g) ags) c' →
      ∃ g' : wgstate,
        wprim_step (LoopE gen cpu) g [] (LoopE gen cpu) g' [] ∧
-       c' = WPCfg (img_z (wgimg g)) (wglog g')
+       c' = WPCfgU (img_z (wgimg g)) (wglog g')
               (<[fin_to_nat cpu :=
                    WPAgent (PSail None (wgregs g' cpu) (wgdev g') None iq)
                      (wgws g' cpu) prom]> ags))
@@ -1310,9 +1310,9 @@ Theorem wprim_hart_block (cpu : CPU) (gen : nat) (g : wgstate)
        ags' !! (fin_to_nat cpu)
          = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq')
                    (wgws g cpu) prom') →
-       rtc (wp_pf_run (sail_step riscv_step))
-         (WPCfg (img_z (wgimg g)) (wglog g) ags')
-         (WPCfg (img_z (wgimg g)) (wglog g')
+       rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+         (WPCfgU (img_z (wgimg g)) (wglog g) ags')
+         (WPCfgU (img_z (wgimg g)) (wglog g')
             (<[fin_to_nat cpu :=
                  WPAgent (PSail None (wgregs g' cpu) (wgdev g') None iq')
                    (wgws g' cpu) prom']> ags'))).

@@ -114,13 +114,18 @@ Lemma lookup_insert_other {A} (l : list A) i x j :
   j ≠ i → (<[i := x]> l) !! j = l !! j.
 Proof. intros Hne. apply list_lookup_insert_ne. intros ->. by apply Hne. Qed.
 
-Lemma lb_writes_ts_none {P : Type} img log i (ag : wpagent P) l f D :
-  astep_ok img log i ag l f D → lb_writes l = false → D = None.
+Lemma lb_writes_ts_none {P : Type} img log i (ag : wpagent P) l f Dl :
+  astep_ok img log i ag l f Dl → lb_writes l = false → Dl = None.
 Proof. intros Hok. destruct l; simpl; try done; by apply astep_ok_ts_none in Hok. Qed.
 
 Section shape.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
+  (** SOME fabric: a dev-free traced step is a program step at EVERY
+      fabric, so reading one out needs a witness that [D] is inhabited.
+      Every real configuration supplies one ([pc_dev]). *)
+  Context (dflt : D).
   Context (at_boundary : P → Prop).
   (** THE A/D MARKER: [ad p l] — the step is the hardware walker's
       accessed/dirty write-back CAS, the ONE write admitted mid-block. *)
@@ -133,15 +138,15 @@ Section shape.
         it is the A/D write-back.  Together with the fact that a block
         starts at a boundary this is also "≤ ONE data store per block",
         and it makes "fetch and reads first" automatic. *)
-    bs_store_last : ∀ p l p',
-      pstep p l p' → lb_writes l = true → ¬ ad p l → at_boundary p';
+    bs_store_last : ∀ p d l p' d',
+      pstep p d l p' d' → lb_writes l = true → ¬ ad p l → at_boundary p';
     (** The A/D write-back is an [LRmw] (an exclusive-conditional pair). *)
-    bs_ad_rmw : ∀ p l p',
-      pstep p l p' → ad p l →
+    bs_ad_rmw : ∀ p d l p' d',
+      pstep p d l p' d' → ad p l →
       ∃ aq rl base tvs data, l = LRmw aq rl base tvs data;
     (** …and it sits STRICTLY INSIDE its block: the translated data
         access still follows, so it does not retire the instruction. *)
-    bs_ad_mid : ∀ p l p', pstep p l p' → ad p l → ¬ at_boundary p';
+    bs_ad_mid : ∀ p d l p' d', pstep p d l p' d' → ad p l → ¬ at_boundary p';
   }.
 
   (** STORE-LAST, on a trace of [WeakRobustTrace]: a non-A/D write event
@@ -157,21 +162,22 @@ Section shape.
     destruct (asteps_wf_step pstep img log i (at_ags T) (at_evs T) k ev Hwf Hev)
       as (ag0 & ag0' & st' & f & Hag0 & Hag0' & Hps & _ & ->).
     rewrite Hag in Hag0. rewrite Hag' in Hag0'. simplify_eq/=.
+    apply (astep_prog_step pstep dflt) in Hps as (d & d' & Hps).
     by eapply (bs_store_last Hbs).
   Qed.
 
   (** SUB-BLOCK BOUNDARIES (the plan's fallback, mechanized): a boundary,
       or the point just after an A/D write-back. *)
   Definition at_boundary_ad (p : P) : Prop :=
-    at_boundary p ∨ ∃ q l, pstep q l p ∧ ad q l.
+    at_boundary p ∨ ∃ q d l d', pstep q d l p d' ∧ ad q l.
 
   Lemma at_boundary_ad_intro p : at_boundary p → at_boundary_ad p.
   Proof. by left. Qed.
 
 End shape.
 
-Global Arguments blk_shape {P} _ _ _.
-Global Arguments at_boundary_ad {P} _ _ _.
+Global Arguments blk_shape {P D} _ _ _.
+Global Arguments at_boundary_ad {P D} _ _ _ _.
 
 (* ================================================================== *)
 (** * §2  [img_total] AND READ ADMISSIBILITY (obstacle 2, piece (i))
@@ -275,31 +281,33 @@ Qed.
 (** * §3  PROMISE-FREE COMPLETION OF A BLOCK (obstacle 2) *)
 
 Section complete.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types c : wpcfg P.
+  Implicit Types c : wpcfg P D.
 
   (** VALUE-ENABLEDNESS of the LTS.  The completion runs the residual
       block against WHATEVER memory offers, so the program must accept
       any answer of the right width; and every label it emits must have
       the shape the promise-free rules require. *)
   Record lts_enabled : Prop := LtsEnabled {
-    le_lb_ok : ∀ p l p', pstep p l p' → lb_ok l;
-    le_load : ∀ p aq lat base tvs tvs' p',
-      length tvs = length tvs' → pstep p (LLoad aq lat base tvs) p' →
-      ∃ p'', pstep p (LLoad aq lat base tvs') p'';
-    le_rmw : ∀ p aq rl base tvs data tvs' p',
-      length tvs = length tvs' → pstep p (LRmw aq rl base tvs data) p' →
-      ∃ data' p'', length data' = length data ∧
-                   pstep p (LRmw aq rl base tvs' data') p'';
+    le_lb_ok : ∀ p d l p' d', pstep p d l p' d' → lb_ok l;
+    le_load : ∀ p d aq lat base tvs tvs' p' d',
+      length tvs = length tvs' → pstep p d (LLoad aq lat base tvs) p' d' →
+      ∃ p'' d'', pstep p d (LLoad aq lat base tvs') p'' d'';
+    le_rmw : ∀ p d aq rl base tvs data tvs' p' d',
+      length tvs = length tvs' → pstep p d (LRmw aq rl base tvs data) p' d' →
+      ∃ data' p'' d'', length data' = length data ∧
+                   pstep p d (LRmw aq rl base tvs' data') p'' d'';
   }.
 
   (** A BLOCK IS A FINITE, NEVER-STUCK RUN: off a boundary the program
       always has a step, and every step strictly decreases a measure. *)
   Record blk_fin (at_boundary : P → Prop) (msr : P → nat) : Prop := BlkFin {
-    bf_prog : ∀ p, ¬ at_boundary p → ∃ l p', pstep p l p';
-    bf_meas : ∀ p l p', pstep p l p' → ¬ at_boundary p → (msr p' < msr p)%nat;
+    bf_prog : ∀ p d, ¬ at_boundary p → ∃ l p' d', pstep p d l p' d';
+    bf_meas : ∀ p d l p' d',
+      pstep p d l p' d' → ¬ at_boundary p → (msr p' < msr p)%nat;
   }.
 
   (* ---------------------------------------------------------------- *)
@@ -332,10 +340,11 @@ Section complete.
                ws_le (pa_ws ag) (pa_ws ag')) ∧
     (∃ ms, pc_log c' = pc_log c ++ ms ∧ Forall (λ mq, wm_tid mq = Some i) ms).
   Proof.
-    destruct 1 as [cfg ag st' Hag Hps|cfg ag aq lat base tvs st' Hag Hps Hro
-                  |cfg ag rl base data k st' Hag Hps Hdne
-                  |cfg ag aq rl base tvs data k st' Hag Hps Hdne Hlen Hro Hex
-                  |cfg ag pr pw sr sw st' Hag Hps]; simpl.
+    destruct 1 as [cfg ag st' dd Hag Hps
+                  |cfg ag aq lat base tvs st' dd Hag Hps Hro
+                  |cfg ag rl base data k st' dd Hag Hps Hdne
+                  |cfg ag aq rl base tvs data k st' dd Hag Hps Hdne Hlen Hro Hex
+                  |cfg ag pr pw sr sw st' dd Hag Hps]; simpl.
     - split_and!; [done| |exists []; rewrite app_nil_r; by split].
       exists ag, (WPAgent st' (pa_ws ag) (pa_prom ag)). split_and!; [done|done|].
       reflexivity.
@@ -392,7 +401,7 @@ Section complete.
   Definition cfg_bnd c : Prop :=
     ∀ j ag, pc_ags c !! j = Some ag → ws_bounded (pa_ws ag) (length (pc_log c)).
 
-  Lemma cfg_bnd_init img ps : cfg_bnd (wp_init (P:=P) img ps).
+  Lemma cfg_bnd_init img d0 ps : cfg_bnd (wp_init (P:=P) (D:=D) img d0 ps).
   Proof.
     intros j ag Hag. rewrite /wp_init /= list_lookup_fmap in Hag.
     destruct (ps !! j) as [p|]; simplify_eq/=. apply ws_bounded_init.
@@ -419,10 +428,11 @@ Section complete.
   Lemma wp_pf_step_bnd i l c c' :
     wp_pf_step pstep i l c c' → cfg_bnd c → cfg_bnd c'.
   Proof.
-    destruct 1 as [cfg ag st' Hag Hps|cfg ag aq lat base tvs st' Hag Hps Hro
-                  |cfg ag rl base data k st' Hag Hps Hdne
-                  |cfg ag aq rl base tvs data k st' Hag Hps Hdne Hlen Hro Hex
-                  |cfg ag pr pw sr sw st' Hag Hps];
+    destruct 1 as [cfg ag st' dd Hag Hps
+                  |cfg ag aq lat base tvs st' dd Hag Hps Hro
+                  |cfg ag rl base data k st' dd Hag Hps Hdne
+                  |cfg ag aq rl base tvs data k st' dd Hag Hps Hdne Hlen Hro Hex
+                  |cfg ag pr pw sr sw st' dd Hag Hps];
       intros Hb j ag2 Hag2; simpl in Hag2 |- *.
     - destruct (decide (j = i)) as [->|Hne].
       + rewrite (lookup_insert_self _ _ _ _ Hag) in Hag2.
@@ -466,12 +476,12 @@ Section complete.
       level): under a total image and a bounded configuration, ANY step
       the program offers can be taken in the promise-free machine — the
       reads land at their bytes' latest writes. *)
-  Theorem cstep_available i c ag l p' :
+  Theorem cstep_available i c ag l p' dd :
     lts_enabled → img_total (pc_img c) →
     ws_bounded (pa_ws ag) (length (pc_log c)) →
-    pc_ags c !! i = Some ag → pstep (pa_st ag) l p' →
+    pc_ags c !! i = Some ag → pstep (pa_st ag) (pc_dev c) l p' dd →
     ∃ c' ag', cstep i c c' ∧ pc_ags c' !! i = Some ag' ∧
-              ∃ l', pstep (pa_st ag) l' (pa_st ag').
+              ∃ l' d', pstep (pa_st ag) (pc_dev c) l' (pa_st ag') d'.
   Proof.
     intros Hen Hi Hb Hag Hps.
     have Hlt : (i < length (pc_ags c))%nat by eapply lookup_lt_Some.
@@ -479,42 +489,44 @@ Section complete.
                   |pr pw sr sw].
     - (* silent *)
       eexists _, (WPAgent p' (pa_ws ag) (pa_prom ag)). split_and!.
-      + split; [eexists; by apply (PFSilent pstep i c ag p')|].
+      + split; [eexists; by apply (PFSilent pstep i c ag p' dd)|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists LSilent.
+      + simpl. by exists LSilent, dd.
     - (* load: read every byte at its latest write *)
       destruct (read_latest_exists (pc_img c) (pc_log c) base (length tvs) Hi)
         as (tvs' & Hlen' & Hrl).
-      destruct (le_load Hen (pa_st ag) aq lat base tvs tvs' p' (eq_sym Hlen') Hps)
-        as (p'' & Hps').
+      destruct (le_load Hen (pa_st ag) (pc_dev c) aq lat base tvs tvs' p' dd
+                  (eq_sym Hlen') Hps) as (p'' & dd' & Hps').
       have Hro : read_ok (pc_img c) (pc_log c) (pa_ws ag) aq lat base tvs'
         by apply read_latest_read_ok.
       eexists _, (WPAgent p'' (load_post_run (pa_ws ag) aq base (tvs'.*1))
                     (pa_prom ag)).
       split_and!.
-      + split; [eexists; by apply (PFLoad pstep i c ag aq lat base tvs' p'')|].
+      + split; [eexists;
+                by apply (PFLoad pstep i c ag aq lat base tvs' p'' dd')|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LLoad aq lat base tvs').
+      + simpl. by exists (LLoad aq lat base tvs'), dd'.
     - (* store *)
-      have Hne : data ≠ [] by apply (le_lb_ok Hen (pa_st ag) _ p' Hps).
+      have Hne : data ≠ [] by apply (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps).
       eexists _, (WPAgent p' (store_post_run (pa_ws ag) rl base (length data)
                                (S (length (pc_log c)))) (pa_prom ag)).
       split_and!.
       + split.
-        * eexists. by apply (PFStore pstep i c ag rl base data WCplain p').
+        * eexists.
+          by apply (PFStore pstep i c ag rl base data WCplain p' dd).
         * exists [WMsg base data (Some i) WCplain]. split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LStore rl base data).
+      + simpl. by exists (LStore rl base data), dd.
     - (* rmw: the exclusive window is clean because the read half is
          LATEST — nothing above it writes the byte at all *)
-      destruct (le_lb_ok Hen (pa_st ag) _ p' Hps) as [Hnedata Hlend].
+      destruct (le_lb_ok Hen (pa_st ag) _ _ p' dd Hps) as [Hnedata Hlend].
       destruct (read_latest_exists (pc_img c) (pc_log c) base (length tvs) Hi)
         as (tvs' & Hlen' & Hrl).
-      destruct (le_rmw Hen (pa_st ag) aq rl base tvs data tvs' p'
-                  (eq_sym Hlen') Hps) as (data' & p'' & Hlend' & Hps').
+      destruct (le_rmw Hen (pa_st ag) (pc_dev c) aq rl base tvs data tvs' p' dd
+                  (eq_sym Hlen') Hps) as (data' & p'' & dd' & Hlend' & Hps').
       have Hro : read_ok (pc_img c) (pc_log c) (pa_ws ag) aq false base tvs'
         by apply read_latest_read_ok.
       have Hex : excl_ok (pc_log c) i base tvs' (S (length (pc_log c)))
@@ -530,18 +542,19 @@ Section complete.
       split_and!.
       + split.
         * eexists.
-          by apply (PFRmw pstep i c ag aq rl base tvs' data' WCplain p'').
+          by apply (PFRmw pstep i c ag aq rl base tvs' data' WCplain p'' dd').
         * exists [WMsg base data' (Some i) WCplain]. split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LRmw aq rl base tvs' data').
+      + simpl. by exists (LRmw aq rl base tvs' data'), dd'.
     - (* fence *)
       eexists _, (WPAgent p' (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)).
       split_and!.
-      + split; [eexists; by apply (PFFence pstep i c ag pr pw sr sw p')|].
+      + split; [eexists;
+                by apply (PFFence pstep i c ag pr pw sr sw p' dd)|].
         exists []. rewrite /= app_nil_r. by split.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
-      + simpl. by exists (LFence pr pw sr sw).
+      + simpl. by exists (LFence pr pw sr sw), dd.
   Qed.
 
   Lemma cstep_bnd i c c' : cstep i c c' → cfg_bnd c → cfg_bnd c'.
@@ -632,9 +645,10 @@ Section complete.
     intros c ag Hn Hi Hb Hag.
     destruct (decide (at_boundary (pa_st ag))) as [Hbd|Hbd].
     { exists c, ag. split_and!; [apply rtc_refl|done|done]. }
-    destruct (bf_prog _ _ Hfin (pa_st ag) Hbd) as (l & p' & Hps).
-    destruct (cstep_available i c ag l p' Hen Hi (Hb i ag Hag) Hag Hps)
-      as (c1 & ag1 & Hstep & Hag1 & (l' & Hps')).
+    destruct (bf_prog _ _ Hfin (pa_st ag) (pc_dev c) Hbd)
+      as (l & p' & dd & Hps).
+    destruct (cstep_available i c ag l p' dd Hen Hi (Hb i ag Hag) Hag Hps)
+      as (c1 & ag1 & Hstep & Hag1 & (l' & d' & Hps')).
     have Hlt : (msr (pa_st ag1) < msr (pa_st ag))%nat
       by eapply (bf_meas _ _ Hfin).
     destruct (IH (msr (pa_st ag1)) ltac:(lia) c1 ag1 ltac:(lia))
@@ -657,19 +671,21 @@ Section complete.
 
 End complete.
 
-Global Arguments lts_enabled {P} _.
-Global Arguments blk_fin {P} _ _ _.
-Global Arguments cstep {P} _ _ _ _.
-Global Arguments cfg_bnd {P} _.
+Global Arguments lts_enabled {P D} _.
+Global Arguments blk_fin {P D} _ _ _.
+Global Arguments cstep {P D} _ _ _ _.
+Global Arguments cfg_bnd {P D} _.
 
 (* ================================================================== *)
 (** * §4  THE CONE-CUT THEOREM (obstacle 1) *)
 
 Section cone.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
+  Context (dflt : D).
 
-  Implicit Types TS : ptraces P.
+  Implicit Types TS : ptraces P D.
   Implicit Types e : gev.
 
   (** THE STRUCTURAL FACT.  Only [gpo] can leave a non-fulfil: [grf]
@@ -786,8 +802,9 @@ Section cone.
       by rewrite (lb_writes_ts_none _ _ _ _ _ _ _ Hok Hlw) in Htsev. }
     destruct (decide (ad (pa_st ag) (ae_lb ev))) as [Had|Had].
     - right. exists m, ag, ev. split_and!; [done|done|done|by exists ts| |done].
-      exact (bs_ad_rmw _ _ _ Hbs (pa_st ag) (ae_lb ev) st' Hps Had).
-    - left. eapply (blk_trace_boundary pstep at_boundary ad
+      apply (astep_prog_step pstep dflt) in Hps as (dd & dd' & Hps).
+      exact (bs_ad_rmw _ _ _ Hbs (pa_st ag) dd (ae_lb ev) st' dd' Hps Had).
+    - left. eapply (blk_trace_boundary pstep dflt at_boundary ad
                       (pt_img TS) (pt_log TS) j T m ev ag agn);
         [exact Hbs|exact Hatr|exact Hev|exact Hag| |exact Hw|exact Had].
       congruence.
@@ -813,27 +830,29 @@ Section cone.
     destruct (cone_boundary_thm at_boundary ad TS done r j T agn
                 Hwf Hbs Hinit Hq Hcone Hne HT Hagn)
       as [Hb|(m & ag & ev & Hn & Hag & Hev & _ & _ & Had)]; [by left|].
-    right. exists (pa_st ag), (ae_lb ev). split; [|exact Had].
     have Hatr : atrace_wf pstep (pt_img TS) (pt_log TS) j T by apply Hwf.
     destruct (asteps_wf_step pstep (pt_img TS) (pt_log TS) j
                 (at_ags T) (at_evs T) m ev Hatr Hev)
       as (ag0 & ag0' & st' & f & Hag0 & Hag0' & Hps & _ & ->).
+    apply (astep_prog_step pstep dflt) in Hps as (dd & dd' & Hps).
+    right. exists (pa_st ag), dd, (ae_lb ev), dd'. split; [|exact Had].
     have Heqag : ag0 = ag by congruence. subst ag0.
     rewrite Hn in Hagn. rewrite Hagn in Hag0'. by simplify_eq.
   Qed.
 
 End cone.
 
-Global Arguments cone_of {P} _ _ _.
+Global Arguments cone_of {P D} _ _ _.
 
 (* ================================================================== *)
 (** * §5  THE COMPLETION LEMMAS: THE VIOLATION SURVIVES (obstacle 2) *)
 
 Section persist.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types c : wpcfg P.
+  Implicit Types c : wpcfg P D.
 
   (** [WeakRobust.violation] with its witness NAMED: message [m] at log
       position [p], authored by [i], observed by [j] at byte [a]. *)
@@ -843,12 +862,12 @@ Section persist.
     (S p ≤ obs_flr c j a)%nat.
 
   Lemma violates_at_violation c p m i j a :
-    violates_at c p m i j a → violation cls_of (pub_of (P:=P)) c.
+    violates_at c p m i j a → violation cls_of (pub_of (P:=P) (D:=D)) c.
   Proof. intros (?&?&?&?&?&?&?). by exists p, m, i, j, a. Qed.
 
   (** Conversely, a violation always HAS such a witness. *)
   Lemma violation_violates_at c :
-    violation cls_of (pub_of (P:=P)) c →
+    violation cls_of (pub_of (P:=P) (D:=D)) c →
     ∃ p m i j a, violates_at c p m i j a.
   Proof. intros (p & m & i & j & a & ?). by exists p, m, i, j, a. Qed.
 
@@ -856,7 +875,7 @@ Section persist.
       the form [WeakRobustMain]'s exhibit produces and the one φ can
       refute) has such a witness with BOTH agent indices bounded. *)
   Lemma violation_hart_violates_at nh c :
-    violation_hart cls_of (pub_of (P:=P)) nh c →
+    violation_hart cls_of (pub_of (P:=P) (D:=D)) nh c →
     ∃ p m i j a, violates_at c p m i j a ∧ (i < nh)%nat ∧ (j < nh)%nat.
   Proof.
     intros (p & m & i & j & a &
@@ -1038,7 +1057,7 @@ Section persist.
 
 End persist.
 
-Global Arguments violates_at {P} _ _ _ _ _ _.
+Global Arguments violates_at {P D} _ _ _ _ _.
 
 (* ================================================================== *)
 (** * WHAT L3 CONSUMES, AND WHICH OBSTACLE EACH ITEM CLOSES

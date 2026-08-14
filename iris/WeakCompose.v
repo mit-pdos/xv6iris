@@ -172,14 +172,29 @@ Definition xv6_ps (d0 : dev_state) (hs : list psail) : list pxv6 :=
     Both are [WeakSailLTS]'s theorems on the hart arm plus a one-line
     refutation on the disk arm (which emits no load and no rmw at all). *)
 
+(** THE FABRIC MARKER OF THIS (ARCHIVED, per-hart-stream) INSTANCE: the
+    program never touches the shared fabric — [pstep_xv6] carries the
+    device state PER AGENT ([psail]'s [sp_dev]), which is exactly the
+    modelling debt the G-series fixes on the EVENT language.  So the
+    marker is constantly false and Layer 1's device machinery collapses:
+    the witness of every run is empty. *)
+Definition xv6_pdev : pxv6 → wlabel → pxv6 → bool := λ _ _ _, false.
+
+Lemma xv6_pdev_false : ∀ p l p', xv6_pdev p l p' = false.
+Proof. done. Qed.
+
+Lemma xv6_pdev_ok next :
+  pdev_ok (pstep_unit (pstep_xv6 next)) xv6_pdev.
+Proof. intros p d l p' d' Hs _. split; [by destruct d, d'|done]. Qed.
+
 (** LAT-FREEDOM — the hypothesis [WeakPromiseFact]'s front-loading
     factorization takes, and hence [robust_main]. *)
-Theorem xv6_lat_free next : lat_free_prog (pstep_xv6 next).
+Theorem xv6_lat_free next : lat_free_prog (pstep_unit (pstep_xv6 next)).
 Proof.
-  intros p aq base tvs p' H.
+  intros p d0 aq base tvs p' d0' H.
   destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H;
     try (exfalso; exact H).
-  - exact (sail_lat_free next _ _ _ _ _ H).
+  - exact (sail_lat_free next q d0 aq base tvs q' d0' H).
   - destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
 Qed.
 
@@ -188,15 +203,15 @@ Qed.
     that see VALUES and never timestamps.  [sail_ts_oblivious] and
     [sail_ts_oblivious_rmw] assemble LITERALLY into the conjunction
     [WeakRobustSim.ts_oblivious] asks for. *)
-Theorem xv6_ts_oblivious next : ts_oblivious (pstep_xv6 next).
+Theorem xv6_ts_oblivious next : ts_oblivious (pstep_unit (pstep_xv6 next)).
 Proof.
   split.
-  - intros p aq lat base tvs tvs' p' Heq H.
+  - intros p dv aq lat base tvs tvs' p' dv' Heq H.
     destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
     + exact (sail_ts_oblivious next q aq lat base tvs tvs' q' Heq H).
     + destruct H as [(Hc & _)|(? & ? & _ & _ & _ & Hc)]; discriminate.
-  - intros p aq rl base tvs tvs' data p' Heq H.
+  - intros p dv aq rl base tvs tvs' data p' dv' Heq H.
     destruct p as [q|d pend], p' as [q'|d' pend']; simpl in H |- *;
       try (exfalso; exact H).
     + exact (sail_ts_oblivious_rmw next q aq rl base tvs tvs' data q' Heq H).
@@ -247,12 +262,12 @@ Qed.
       form, because [bad] bounds both ends of its edge. *)
 Definition m6_side_conditions (next : bool → M unit) (img : image)
     (ps : list pxv6) : Prop :=
-  (∀ (c mid : wpcfg pxv6) (TS : ptraces pxv6),
-     wp_behavior (pstep_xv6 next) img ps c →
-     rtc (wp_promise_step (P := pxv6)) (wp_init img ps) mid →
-     ptraces_of (pstep_xv6 next) TS mid c →
+  (∀ (c mid : wpcfg pxv6 unit) (TS : ptraces pxv6 unit),
+     wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
+     rtc (wp_promise_step (P := pxv6) (D := unit)) (wp_init img tt ps) mid →
+     ptraces_of (pstep_unit (pstep_xv6 next)) TS mid c →
      main_premises n_disk TS)
-  ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_xv6 next) img ps.
+  ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_unit (pstep_xv6 next)) img tt ps.
 
 (* ====================================================================== *)
 (** ** 4. THE HEADLINE THEOREM
@@ -268,14 +283,15 @@ Definition m6_side_conditions (next : bool → M unit) (img : image)
     [m6_side_conditions], plus the D-M6-3 correspondence note at the PARM
     seam, plus the seams recorded in §6. *)
 Theorem xv6_weak_robust (next : bool → M unit) (img : image) (ps : list pxv6)
-    (c : wpcfg pxv6) :
+    (c : wpcfg pxv6 unit) :
   m6_side_conditions next img ps →
-  wp_behavior (pstep_xv6 next) img ps c →
-  ∃ cf, rtc (wp_pf_run (pstep_xv6 next)) (wp_init img ps) cf ∧
+  wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
+  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 next))) (wp_init img tt ps) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
   intros [Hprem Hvf] Hbeh.
-  apply (robust_main (pstep_xv6 next) n_disk img ps c
+  apply (robust_main (pstep_unit (pstep_xv6 next)) xv6_pdev n_disk img tt ps c
+           (xv6_pdev_ok next) xv6_pdev_false
            (xv6_lat_free next) (xv6_ts_oblivious next) Hbeh
            (λ mid TS, Hprem c mid TS Hbeh) Hvf).
 Qed.
@@ -285,16 +301,17 @@ Qed.
     can still drain its promises has a completion whose observables a
     promise-free run reproduces. *)
 Corollary xv6_weak_robust_prefix (next : bool → M unit) (img : image)
-    (ps : list pxv6) (c : wpcfg pxv6) :
+    (ps : list pxv6) (c : wpcfg pxv6 unit) :
   m6_side_conditions next img ps →
-  completable (pstep_xv6 next) img ps c →
+  completable (pstep_unit (pstep_xv6 next)) img tt ps c →
   ∃ cend cf,
-    rtc (wpstep (pstep_xv6 next)) c cend ∧ no_promises cend ∧
-    rtc (wp_pf_run (pstep_xv6 next)) (wp_init img ps) cf ∧
+    rtc (wpstep (pstep_unit (pstep_xv6 next))) c cend ∧ no_promises cend ∧
+    rtc (wp_pf_run (pstep_unit (pstep_xv6 next))) (wp_init img tt ps) cf ∧
     prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
 Proof.
   intros [Hprem Hvf] Hc.
-  apply (robust_transport (pstep_xv6 next) n_disk img ps c
+  apply (robust_transport (pstep_unit (pstep_xv6 next)) xv6_pdev n_disk img tt
+           ps c (xv6_pdev_ok next) xv6_pdev_false
            (xv6_lat_free next) (xv6_ts_oblivious next) Hc Hprem Hvf).
 Qed.
 
@@ -302,7 +319,7 @@ Qed.
 (** ** 5. The pf-side bridge to the real machine
 
     [WeakSailLTS.sail_instr_bracket] already brackets ONE [WeakInterp.wrun]
-    instruction of hart [i] into an [rtc (wp_pf_run (sail_step riscv_step))]
+    instruction of hart [i] into an [rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))]
     of the one stepping agent, with every OTHER agent of the list framed.  Two
     things are missing for the composition, and both are here:
 
@@ -324,8 +341,8 @@ Definition lift_ag (a : wpagent psail) : wpagent pxv6 :=
 
 (** The embedding: same image, same log, harts lifted at the same indices,
     [dks] appended (and framed). *)
-Definition lift_cfg (dks : list (wpagent pxv6)) (c : wpcfg psail) : wpcfg pxv6 :=
-  WPCfg (pc_img c) (pc_log c) ((lift_ag <$> pc_ags c) ++ dks).
+Definition lift_cfg (dks : list (wpagent pxv6)) (c : wpcfg psail unit) : wpcfg pxv6 unit :=
+  WPCfgU (pc_img c) (pc_log c) ((lift_ag <$> pc_ags c) ++ dks).
 
 Lemma lift_ags_lookup dks ags i ag :
   ags !! i = Some ag → ((lift_ag <$> ags) ++ dks) !! i = Some (lift_ag ag).
@@ -347,46 +364,46 @@ Qed.
 
 (** THE FRAME LEMMA, one pf step. *)
 Lemma pf_step_frame (next : bool → M unit) (dks : list (wpagent pxv6))
-    (i : agent) (l : wlabel) (c c' : wpcfg psail) :
-  wp_pf_step (sail_step next) i l c c' →
-  wp_pf_step (pstep_xv6 next) i l (lift_cfg dks c) (lift_cfg dks c').
+    (i : agent) (l : wlabel) (c c' : wpcfg psail unit) :
+  wp_pf_step (pstep_unit (sail_step next)) i l c c' →
+  wp_pf_step (pstep_unit (pstep_xv6 next)) i l (lift_cfg dks c) (lift_cfg dks c').
 Proof.
   intros Hst.
   destruct Hst as
-    [cfg ag st' Hag Hps
-    |cfg ag aq lat base tvs st' Hag Hps Hok
-    |cfg ag rl base data k st' Hag Hps Hne
-    |cfg ag aq rl base tvs data k st' Hag Hps Hne Hlen Hok Hex
-    |cfg ag pr pw sr sw st' Hag Hps];
+    [cfg ag st' dd Hag Hps
+    |cfg ag aq lat base tvs st' dd Hag Hps Hok
+    |cfg ag rl base data k st' dd Hag Hps Hne
+    |cfg ag aq rl base tvs data k st' dd Hag Hps Hne Hlen Hok Hex
+    |cfg ag pr pw sr sw st' dd Hag Hps]; destruct dd;
     (have Hlt : (i < length (pc_ags cfg))%nat
        by exact (lookup_lt_Some _ _ _ Hag));
     (have Hlk := lift_ags_lookup dks (pc_ags cfg) i ag Hag);
     rewrite /lift_cfg; cbn [pc_img pc_log pc_ags];
     rewrite (lift_ags_insert dks (pc_ags cfg) i _ Hlt).
-  - exact (PFSilent (pstep_xv6 next) i
-             (WPCfg (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) (PHart st') Hlk Hps).
-  - exact (PFLoad (pstep_xv6 next) i
-             (WPCfg (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) aq lat base tvs (PHart st') Hlk Hps Hok).
-  - exact (PFStore (pstep_xv6 next) i
-             (WPCfg (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) rl base data k (PHart st') Hlk Hps Hne).
-  - exact (PFRmw (pstep_xv6 next) i
-             (WPCfg (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) aq rl base tvs data k (PHart st')
+  - exact (PFSilent (pstep_unit (pstep_xv6 next)) i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) (PHart st') tt Hlk Hps).
+  - exact (PFLoad (pstep_unit (pstep_xv6 next)) i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) aq lat base tvs (PHart st') tt Hlk Hps Hok).
+  - exact (PFStore (pstep_unit (pstep_xv6 next)) i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) rl base data k (PHart st') tt Hlk Hps Hne).
+  - exact (PFRmw (pstep_unit (pstep_xv6 next)) i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) aq rl base tvs data k (PHart st') tt
              Hlk Hps Hne Hlen Hok Hex).
-  - exact (PFFence (pstep_xv6 next) i
-             (WPCfg (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
-             (lift_ag ag) pr pw sr sw (PHart st') Hlk Hps).
+  - exact (PFFence (pstep_unit (pstep_xv6 next)) i
+             (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
+             (lift_ag ag) pr pw sr sw (PHart st') tt Hlk Hps).
 Qed.
 
 (** …and the run-level form: a whole [psail] pf run embeds, the framed agents
     untouched throughout. *)
 Lemma pf_run_frame (next : bool → M unit) (dks : list (wpagent pxv6))
-    (c c' : wpcfg psail) :
-  rtc (wp_pf_run (sail_step next)) c c' →
-  rtc (wp_pf_run (pstep_xv6 next)) (lift_cfg dks c) (lift_cfg dks c').
+    (c c' : wpcfg psail unit) :
+  rtc (wp_pf_run (pstep_unit (sail_step next))) c c' →
+  rtc (wp_pf_run (pstep_unit (pstep_xv6 next))) (lift_cfg dks c) (lift_cfg dks c').
 Proof.
   induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
   destruct Hxy as (i & l & Hst).
@@ -400,8 +417,8 @@ Definition xv6_disk_agent (d0 : dev_state) : wpagent pxv6 :=
   WPAgent (PDisk d0 []) ws_init ∅.
 
 Lemma wp_init_xv6 img d0 hs :
-  wp_init img (xv6_ps d0 hs)
-  = lift_cfg [xv6_disk_agent d0] (wp_init (P := psail) img hs).
+  wp_init img tt (xv6_ps d0 hs)
+  = lift_cfg [xv6_disk_agent d0] (wp_init (P := psail) (D := unit) img tt hs).
 Proof.
   rewrite /xv6_ps /lift_cfg /wp_init /xv6_disk_agent.
   cbn [pc_img pc_log pc_ags]. f_equal.
@@ -432,9 +449,9 @@ Corollary xv6_pf_instr (i : agent) (tick : bool) (s : wmstate) (x : unit)
   ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
     ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                        (wm_ws s) prom) →
-    rtc (wp_pf_run (pstep_xv6 riscv_step))
-      (WPCfg (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
-      (WPCfg (wimg s) (wm_log s')
+    rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)))
+      (WPCfgU (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
+      (WPCfgU (wimg s) (wm_log s')
          (<[i := WPAgent (PHart (PSail None (wm_regs s') (wm_dev s') None iq))
                    (wm_ws s') prom]> ((lift_ag <$> ags) ++ dks))).
 Proof.
@@ -466,7 +483,7 @@ Qed.
     [WeakLang.weak_riscv_lang], whose state is a [wgstate] (a shared image, a
     shared log, a per-CPU [wstate] function, a [dev_state], a generation and a
     power bit) and whose steps are [wprim_step]'s five arms (hart / uart /
-    disk / plic / power).  [xv6_weak_robust] speaks about [wpcfg pxv6] (a
+    disk / plic / power).  [xv6_weak_robust] speaks about [wpcfg pxv6 unit] (a
     shared image, a shared log, a LIST of agents each carrying a [wstate], a
     program state and a promise set).
 

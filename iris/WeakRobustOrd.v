@@ -103,9 +103,9 @@ Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
 Section ord.
-  Context {P : Type}.
+  Context {P D : Type}.
 
-  Implicit Types TS : ptraces P.
+  Implicit Types TS : ptraces P D.
   Implicit Types e : gev.
 
   (* ---------------------------------------------------------------- *)
@@ -349,8 +349,8 @@ End ord.
     ever writes [S n] (the constructor is still reached through lemma
     names like [take_S_r]). *)
 Section subset.
-  Context {P : Type}.
-  Context (TS : ptraces P).
+  Context {P D : Type}.
+  Context (TS : ptraces P D).
   Context (S : gev → Prop).
   Context `{!∀ e, Decision (S e)}.
 
@@ -542,7 +542,7 @@ Section subset.
 
 End subset.
 
-Global Arguments gev_enum_S {P} _ _ {_}.
+Global Arguments gev_enum_S {P D} _ _ {_}.
 
 (* ------------------------------------------------------------------ *)
 (** ** THE FULL CASE, as ONE instantiation
@@ -551,7 +551,7 @@ Global Arguments gev_enum_S {P} _ _ {_}.
     instance is [WeakRobustLin.gev_wf_dec], so the whole-event-set sort
     and induction are corollaries — no separate development. *)
 
-Corollary gdep2_toposort_full {P} (TS : ptraces P) :
+Corollary gdep2_toposort_full {P D : Type} (TS : ptraces P D) :
   gdep2_acyclic TS →
   ∃ order : list gev,
     NoDup order ∧
@@ -565,7 +565,7 @@ Proof.
   intros e. rewrite Hmem. tauto.
 Qed.
 
-Corollary toposort_ind_full {P} (TS : ptraces P) (Q : list gev → Prop) :
+Corollary toposort_ind_full {P D : Type} (TS : ptraces P D) (Q : list gev → Prop) :
   gdep2_acyclic TS →
   Q [] →
   (∀ done e,
@@ -591,10 +591,11 @@ Qed.
 (** ** DELIVERABLE 1 (continued): the bridge to the real [wstate] *)
 
 Section ordwf.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types TS : ptraces P.
+  Implicit Types TS : ptraces P D.
   Implicit Types e : gev.
 
   (** Every trace of the bundle starts from [ws_init] — the state
@@ -650,7 +651,7 @@ Section ordwf.
 
 End ordwf.
 
-Global Arguments ptraces_ws_init {P} _.
+Global Arguments ptraces_ws_init {P D} _.
 
 (* ------------------------------------------------------------------ *)
 (** ** What W2b's simulation inherits from this file

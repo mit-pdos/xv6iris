@@ -90,7 +90,7 @@ Qed.
 (** ONE event's [wstate] update, with every leaf timestamp transported
     through σ.  The [None] arms of a store/rmw are junk (a wf trace
     never takes them — [astep_ok] forces [ae_ts] to be [Some] there). *)
-Definition aev_post (σ : nat → nat) (ev : aev) (w : wstate) : wstate :=
+Definition aev_post {D : Type} (σ : nat → nat) (ev : aev D) (w : wstate) : wstate :=
   match ae_lb ev with
   | LSilent => w
   | LLoad aq lat base tvs => load_post_run w aq base (σ <$> tvs.*1)
@@ -109,13 +109,13 @@ Definition aev_post (σ : nat → nat) (ev : aev) (w : wstate) : wstate :=
   | LFence pr pw sr sw => fence_post w pr pw sr sw
   end.
 
-Definition aevs_post (σ : nat → nat) (evs : list aev) (w : wstate) : wstate :=
+Definition aevs_post {D : Type} (σ : nat → nat) (evs : list (aev D)) (w : wstate) : wstate :=
   foldl (λ w ev, aev_post σ ev w) w evs.
 
-Lemma aevs_post_nil σ w : aevs_post σ [] w = w.
+Lemma aevs_post_nil {D : Type} σ w : aevs_post (D:=D) σ [] w = w.
 Proof. done. Qed.
 
-Lemma aevs_post_app σ evs ev w :
+Lemma aevs_post_app {D : Type} σ (evs : list (aev D)) ev w :
   aevs_post σ (evs ++ [ev]) w = aev_post σ ev (aevs_post σ evs w).
 Proof. by rewrite /aevs_post foldl_app. Qed.
 
@@ -124,16 +124,17 @@ Proof. by rewrite /aevs_post foldl_app. Qed.
        [id]-fold of its trace prefix *)
 
 Section fold.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
   (** [astep_ok] pins the step's [wstate] update to exactly [aev_post
       id] of the event. *)
-  Lemma astep_ok_aev_post img log i (ag : wpagent P) ev f :
+  Lemma astep_ok_aev_post img log i (ag : wpagent P) (ev : aev D) f :
     astep_ok img log i ag (ae_lb ev) f (ae_ts ev) →
     ∀ w, f w = aev_post id ev w.
   Proof.
-    destruct ev as [lb ts]. rewrite /aev_post /=.
+    destruct ev as [lb ts dd]. rewrite /aev_post /=.
     destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
     - by intros [-> _] w.
     - intros (_ & -> & _) w. by rewrite list_fmap_id.
@@ -168,8 +169,8 @@ Section fold.
 
 End fold.
 
-Global Arguments astep_ok_aev_post {P} _ _ _ _ _ _.
-Global Arguments asteps_ws_fold {P} _ _ _ _ _ _ _ _ _.
+Global Arguments astep_ok_aev_post {P D} _ _ _ _ _ _.
+Global Arguments asteps_ws_fold {P D} _ _ _ _ _ _ _ _ _.
 
 (* ------------------------------------------------------------------ *)
 (** ** C. The leaf-state mirror
@@ -328,7 +329,7 @@ Definition lstore_post_run (S : lstate) (rl : bool) (base : Z) (n : nat)
   lstore_post_bytes S rl (map (λ j : nat, base + Z.of_nat j) (seq 0 n)) t.
 
 (** The event fold, mirrored.  No σ: leaves are raw. *)
-Definition laev_post (ev : aev) (S : lstate) : lstate :=
+Definition laev_post {D : Type} (ev : aev D) (S : lstate) : lstate :=
   match ae_lb ev with
   | LSilent => S
   | LLoad aq lat base tvs => lload_post_run S aq base tvs.*1
@@ -347,13 +348,13 @@ Definition laev_post (ev : aev) (S : lstate) : lstate :=
   | LFence pr pw sr sw => lfence_post S pr pw sr sw
   end.
 
-Definition laevs_post (evs : list aev) (S : lstate) : lstate :=
+Definition laevs_post {D : Type} (evs : list (aev D)) (S : lstate) : lstate :=
   foldl (λ S ev, laev_post ev S) S evs.
 
-Lemma laevs_post_nil S : laevs_post [] S = S.
+Lemma laevs_post_nil {D : Type} S : laevs_post (D:=D) [] S = S.
 Proof. done. Qed.
 
-Lemma laevs_post_app evs ev S :
+Lemma laevs_post_app {D : Type} (evs : list (aev D)) ev S :
   laevs_post (evs ++ [ev]) S = laev_post ev (laevs_post evs S).
 Proof. by rewrite /laevs_post foldl_app. Qed.
 
@@ -537,10 +538,11 @@ Qed.
 
 (** *** THE TRANSPORT THEOREMS *)
 
-Theorem lrel_aev_post σ ev S w :
+Theorem lrel_aev_post {D : Type} σ (ev : aev D) S w :
   sigma_ok σ → lrel σ S w → lrel σ (laev_post ev S) (aev_post σ ev w).
 Proof.
-  intros [_ Hinj] Hrel. destruct ev as [lb ts]. rewrite /laev_post /aev_post /=.
+  intros [_ Hinj] Hrel. destruct ev as [lb ts dd].
+  rewrite /laev_post /aev_post /=.
   destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
   - exact Hrel.
   - by apply lrel_load_post_run.
@@ -550,7 +552,7 @@ Proof.
   - by apply lrel_fence_post.
 Qed.
 
-Theorem lrel_aevs_post σ evs S w :
+Theorem lrel_aevs_post {D : Type} σ (evs : list (aev D)) S w :
   sigma_ok σ → lrel σ S w → lrel σ (laevs_post evs S) (aevs_post σ evs w).
 Proof.
   intros Hσ. revert S w. induction evs as [|ev evs IH]; intros S w Hrel; [done|].
@@ -559,11 +561,11 @@ Qed.
 
 (** The two instances the simulation reads off: the behavior's own
     [wstate] fold (σ = [id]) and the promise-free run's (σ = π). *)
-Corollary lrel_aevs_post_init σ evs :
+Corollary lrel_aevs_post_init {D : Type} σ (evs : list (aev D)) :
   sigma_ok σ → lrel σ (laevs_post evs linit) (aevs_post σ evs ws_init).
 Proof. intros Hσ. apply lrel_aevs_post; [done|apply lrel_init]. Qed.
 
-Corollary lrel_aevs_post_id evs :
+Corollary lrel_aevs_post_id {D : Type} (evs : list (aev D)) :
   lrel id (laevs_post evs linit) (aevs_post id evs ws_init).
 Proof. apply lrel_aevs_post_init, sigma_ok_id. Qed.
 
@@ -572,13 +574,13 @@ Proof. apply lrel_aevs_post_init, sigma_ok_id. Qed.
 
 (** [t] occurs in [ev] — either as a timestamp the label reads, or as
     the timestamp the event fulfils. *)
-Definition aev_ts_occurs (ev : aev) (t : nat) : Prop :=
+Definition aev_ts_occurs {D : Type} (ev : aev D) (t : nat) : Prop :=
   (∃ a, (a, t) ∈ lb_reads (ae_lb ev)) ∨ ae_ts ev = Some t.
 
-Definition ev_ts_occurs (evs : list aev) (t : nat) : Prop :=
+Definition ev_ts_occurs {D : Type} (evs : list (aev D)) (t : nat) : Prop :=
   ∃ ev, ev ∈ evs ∧ aev_ts_occurs ev t.
 
-Lemma ev_ts_occurs_cons ev evs t :
+Lemma ev_ts_occurs_cons {D : Type} (ev : aev D) evs t :
   aev_ts_occurs ev t ∨ ev_ts_occurs evs t → ev_ts_occurs (ev :: evs) t.
 Proof.
   intros [H|(e & He & H)].
@@ -759,10 +761,10 @@ Proof.
   apply elem_of_tvs_reads. by exists j, v.
 Qed.
 
-Lemma laev_post_leaf ev S u :
+Lemma laev_post_leaf {D : Type} (ev : aev D) S u :
   lstate_leaf (laev_post ev S) u → lstate_leaf S u ∨ aev_ts_occurs ev u.
 Proof.
-  destruct ev as [lb ts]. rewrite /laev_post /aev_ts_occurs /=.
+  destruct ev as [lb ts dd]. rewrite /laev_post /aev_ts_occurs /=.
   destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw].
   - by left.
   - intros [Hu|(j & Hj)]%lload_post_run_leaf; [by left|].
@@ -776,7 +778,7 @@ Proof.
   - intros Hu%lfence_post_leaf. by left.
 Qed.
 
-Lemma laevs_post_leaf evs :
+Lemma laevs_post_leaf {D : Type} (evs : list (aev D)) :
   ∀ S u, lstate_leaf (laevs_post evs S) u →
          lstate_leaf S u ∨ ev_ts_occurs evs u.
 Proof.
@@ -789,7 +791,7 @@ Qed.
 
 (** THE PROVENANCE BOUND: every leaf of the whole fold from [linit] is a
     timestamp some event of the trace read or fulfilled. *)
-Theorem laevs_leaves_occur evs t :
+Theorem laevs_leaves_occur {D : Type} (evs : list (aev D)) t :
   lstate_leaf (laevs_post evs linit) t → ev_ts_occurs evs t.
 Proof.
   intros [Ht|Ht]%laevs_post_leaf; [|done]. by destruct (linit_no_leaf t).

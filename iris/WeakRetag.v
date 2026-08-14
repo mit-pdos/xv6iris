@@ -290,35 +290,37 @@ Proof. done. Qed.
 
 (** Agent records carry NO class ([wpagent] = program state + [wstate] +
     promise set), so a retag touches the log and nothing else. *)
-Definition retag_cfg {P : Type} (f : nat → wm_class) (c : wpcfg P) : wpcfg P :=
-  WPCfg (pc_img c) (retag_log f (pc_log c)) (pc_ags c).
+Definition retag_cfg {P D : Type} (f : nat → wm_class) (c : wpcfg P D)
+    : wpcfg P D :=
+  WPCfg (pc_img c) (retag_log f (pc_log c)) (pc_dev c) (pc_ags c).
 
-Lemma retag_cfg_img {P} f (c : wpcfg P) : pc_img (retag_cfg f c) = pc_img c.
+Lemma retag_cfg_img {P D} f (c : wpcfg P D) : pc_img (retag_cfg f c) = pc_img c.
 Proof. done. Qed.
 
-Lemma retag_cfg_log {P} f (c : wpcfg P) :
+Lemma retag_cfg_log {P D} f (c : wpcfg P D) :
   pc_log (retag_cfg f c) = retag_log f (pc_log c).
 Proof. done. Qed.
 
-Lemma retag_cfg_ags {P} f (c : wpcfg P) : pc_ags (retag_cfg f c) = pc_ags c.
+Lemma retag_cfg_ags {P D} f (c : wpcfg P D) : pc_ags (retag_cfg f c) = pc_ags c.
 Proof. done. Qed.
 
-Lemma retag_cfg_log_length {P} f (c : wpcfg P) :
+Lemma retag_cfg_log_length {P D} f (c : wpcfg P D) :
   length (pc_log (retag_cfg f c)) = length (pc_log c).
 Proof. apply retag_log_length. Qed.
 
-Lemma retag_cfg_retag {P} f g (c : wpcfg P) :
+Lemma retag_cfg_retag {P D} f g (c : wpcfg P D) :
   retag_cfg f (retag_cfg g c) = retag_cfg f c.
 Proof. rewrite /retag_cfg /= retag_log_retag //. Qed.
 
-Lemma retag_cfg_untag {P} (c : wpcfg P) : retag_cfg (untag_f (pc_log c)) c = c.
+Lemma retag_cfg_untag {P D} (c : wpcfg P D) : retag_cfg (untag_f (pc_log c)) c = c.
 Proof. rewrite /retag_cfg retag_log_untag. by destruct c. Qed.
 
 Section machine.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types c : wpcfg P.
+  Implicit Types c : wpcfg P D.
   Implicit Types f : nat → wm_class.
 
   (* ---------------------------------------------------------------- *)
@@ -330,45 +332,45 @@ Section machine.
     intros Hstep.
     destruct Hstep as
       [ cfg i ag base data k Hlk Hne
-      | cfg i ag st' Hlk Hps
-      | cfg i ag aq lat base tvs st' Hlk Hps Hr
-      | cfg i ag rl base data k ts st' Hlk Hps Hin Hm Hok
-      | cfg i ag aq rl base tvs data k ts st' Hlk Hps Hlen Hin Hm Hr He Hok
-      | cfg i ag pr pw sr sw st' Hlk Hps ].
+      | cfg i ag st' d' Hlk Hps
+      | cfg i ag aq lat base tvs st' d' Hlk Hps Hr
+      | cfg i ag rl base data k ts st' d' Hlk Hps Hin Hm Hok
+      | cfg i ag aq rl base tvs data k ts st' d' Hlk Hps Hlen Hin Hm Hr He Hok
+      | cfg i ag pr pw sr sw st' d' Hlk Hps ].
     - (* WPPromise: the appended class is the rule's free binder — take
          [f] at the OLD log length *)
-      pose proof (WPPromise (P:=P) pstep
-                    (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
+      pose proof (WPPromise (P:=P) (D:=D) pstep
+                    (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
                     i ag base data (f (length (pc_log cfg))) Hlk Hne) as Hs.
       simpl in Hs. rewrite retag_log_length in Hs.
       rewrite {2}/retag_cfg /= retag_log_app retag_msg_lit. exact Hs.
     - (* WPSilent *)
-      exact (WPSilent (P:=P) pstep
-               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
-               i ag st' Hlk Hps).
+      exact (WPSilent (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag st' d' Hlk Hps).
     - (* WPLoad *)
-      apply (WPLoad (P:=P) pstep
-               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
-               i ag aq lat base tvs st' Hlk Hps).
+      apply (WPLoad (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag aq lat base tvs st' d' Hlk Hps).
       simpl. by apply retag_read_ok_2.
     - (* WPFulfil: the matched entry's class is the rule's free binder *)
-      apply (WPFulfil (P:=P) pstep
-               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
-               i ag rl base data (f (ts - 1)%nat) ts st' Hlk Hps Hin);
+      apply (WPFulfil (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag rl base data (f (ts - 1)%nat) ts st' d' Hlk Hps Hin);
         [|exact Hok].
       simpl. by rewrite retag_log_lookup Hm.
     - (* WPRmw *)
-      apply (WPRmw (P:=P) pstep
-               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
-               i ag aq rl base tvs data (f (ts - 1)%nat) ts st'
+      apply (WPRmw (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag aq rl base tvs data (f (ts - 1)%nat) ts st' d'
                Hlk Hps Hlen Hin); [| | |exact Hok].
       + simpl. by rewrite retag_log_lookup Hm.
       + simpl. by apply retag_read_ok_2.
       + simpl. by apply retag_excl_ok_2.
     - (* WPFence *)
-      exact (WPFence (P:=P) pstep
-               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
-               i ag pr pw sr sw st' Hlk Hps).
+      exact (WPFence (P:=P) (D:=D) pstep
+               (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
+               i ag pr pw sr sw st' d' Hlk Hps).
   Qed.
 
   Lemma wpsteps_retag f c c' :
@@ -387,7 +389,7 @@ Section machine.
   Proof.
     intros Hstep. destruct Hstep as [cfg i ag base data k Hlk Hne].
     pose proof (WPPromStep (P:=P)
-                  (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_ags cfg))
+                  (WPCfg (pc_img cfg) (retag_log f (pc_log cfg)) (pc_dev cfg) (pc_ags cfg))
                   i ag base data (f (length (pc_log cfg))) Hlk Hne) as Hs.
     simpl in Hs. rewrite retag_log_length in Hs.
     rewrite {2}/retag_cfg /= retag_log_app retag_msg_lit. exact Hs.
@@ -404,17 +406,19 @@ Section machine.
   (* ---------------------------------------------------------------- *)
   (** ** Initial configurations, promise-freedom, behaviors *)
 
-  Lemma retag_wp_init f img ps : retag_cfg f (wp_init (P:=P) img ps) = wp_init img ps.
+  Lemma retag_wp_init f img d0 ps :
+    retag_cfg f (wp_init (P:=P) (D:=D) img d0 ps) = wp_init img d0 ps.
   Proof. done. Qed.
 
   Lemma no_promises_retag f c : no_promises c ↔ no_promises (retag_cfg f c).
   Proof. done. Qed.
 
-  Theorem wp_behavior_retag f img ps c :
-    wp_behavior pstep img ps c → wp_behavior pstep img ps (retag_cfg f c).
+  Theorem wp_behavior_retag f img d0 ps c :
+    wp_behavior pstep img d0 ps c →
+    wp_behavior pstep img d0 ps (retag_cfg f c).
   Proof.
     intros [Hrun Hnp]. split; [|by apply no_promises_retag].
-    rewrite -(retag_wp_init f img ps). by apply wpsteps_retag.
+    rewrite -(retag_wp_init f img d0 ps). by apply wpsteps_retag.
   Qed.
 
   (** Well-formedness survives too (nothing in [cfg_wf] reads a class);
@@ -453,7 +457,7 @@ Section machine.
 
   (** The capstone's plumbing: a promise-free witness run matched against
       the RETAGGED behavior matches the original behavior too. *)
-  Lemma retag_conclusion f c cf :
+  Lemma retag_conclusion f (c cf : wpcfg P D) :
     prog_of cf = prog_of (retag_cfg f c) →
     (∀ a, mem_of cf a = mem_of (retag_cfg f c) a) →
     prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
@@ -470,7 +474,7 @@ Section machine.
       timestamp, and [wpagent] has no class field.  So a retag moves only
       the [pt_log] component of a bundle. *)
 
-  Definition retag_traces f (TS : ptraces P) : ptraces P :=
+  Definition retag_traces f (TS : ptraces P D) : ptraces P D :=
     PTrs (pt_img TS) (retag_log f (pt_log TS)) (pt_trs TS).
 
   Lemma retag_traces_img f TS : pt_img (retag_traces f TS) = pt_img TS.
@@ -485,8 +489,8 @@ Section machine.
 
   (** [astep_ok]'s ONLY log-reading conjuncts are [read_ok], [excl_ok] and
       the fulfilled-entry match — whose class is an existential binder. *)
-  Lemma astep_ok_retag f img log i (ag : wpagent P) l g D :
-    astep_ok img log i ag l g D ↔ astep_ok img (retag_log f log) i ag l g D.
+  Lemma astep_ok_retag f img log i (ag : wpagent P) l g Dl :
+    astep_ok img log i ag l g Dl ↔ astep_ok img (retag_log f log) i ag l g Dl.
   Proof.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
       simpl.
@@ -560,7 +564,7 @@ Section machine.
       that definition is program-type-independent, so nothing is lost). *)
 
   Definition cls_canonical (clsf : wlabel → wstate → wm_class)
-      (TS : ptraces P) : Prop :=
+      (TS : ptraces P D) : Prop :=
     ∀ i T k ev ag ts m,
       pt_trs TS !! i = Some T →
       at_evs T !! k = Some ev → at_ags T !! k = Some ag →
@@ -571,10 +575,10 @@ Section machine.
       position is only known to EXIST — but the trace is a finite list, so
       the event is found by [list_find], not by choice.  Everything here is
       decidable ([option nat] equality), so no axiom enters. *)
-  Definition fulfil_at (T : atrace P) (p : nat) : option (nat * aev) :=
+  Definition fulfil_at (T : atrace P D) (p : nat) : option (nat * aev D) :=
     list_find (λ ev, ae_ts ev = Some (S p)) (at_evs T).
 
-  Definition canon_f (clsf : wlabel → wstate → wm_class) (TS : ptraces P)
+  Definition canon_f (clsf : wlabel → wstate → wm_class) (TS : ptraces P D)
       (p : nat) : wm_class :=
     match pt_log TS !! p with
     | None => WCplain
@@ -625,7 +629,7 @@ Section machine.
       from a fulfil of timestamp [1].  Promised timestamps are positive
       ([prom_wf]), so this never happens; it is a hypothesis of the
       canonicity lemma and is discharged in [behavior_canonical]. *)
-  Definition ts_pos (TS : ptraces P) : Prop :=
+  Definition ts_pos (TS : ptraces P D) : Prop :=
     ∀ i T k ev ts,
       pt_trs TS !! i = Some T → at_evs T !! k = Some ev →
       ae_ts ev = Some ts → (0 < ts)%nat.
@@ -665,7 +669,7 @@ Section machine.
       [done|done|done|done|by rewrite Hsp|done|].
     intros k1 k2 ev1 ev2 He1 Ht1 He2 Ht2.
     rewrite Hsp in Ht1 Ht2.
-    by eapply (asteps_fulfil_unique pstep (pt_img TS) (pt_log TS) i
+    by eapply (asteps_fulfil_unique pstep pdev (pt_img TS) (pt_log TS) i
                  (at_ags T) (at_evs T) ts).
   Qed.
 
@@ -679,7 +683,7 @@ Section machine.
       every promised timestamp is positive. *)
 
   Lemma cfg_wf_promise_run c c' :
-    cfg_wf c → rtc (wp_promise_step (P:=P)) c c' → cfg_wf c'.
+    cfg_wf c → rtc (wp_promise_step (P:=P) (D:=D)) c c' → cfg_wf c'.
   Proof.
     intros H0 Hr. induction Hr as [|??? Hs _ IH]; [done|].
     apply IH. by eapply (cfg_wf_promise_step pstep).
@@ -712,27 +716,29 @@ Section machine.
   (* ---------------------------------------------------------------- *)
   (** ** THE DELIVERABLE: every behavior retags to a CANONICAL one *)
 
-  Theorem behavior_canonical (clsf : wlabel → wstate → wm_class) img ps c :
+  Theorem behavior_canonical (clsf : wlabel → wstate → wm_class) img d0 ps c :
+    pdev_ok pstep pdev →
     lat_free_prog pstep →
-    wp_behavior pstep img ps c →
+    wp_behavior pstep img d0 ps c →
     ∃ (f : nat → wm_class) mid TS,
-      wp_behavior pstep img ps (retag_cfg f c) ∧
-      rtc (wp_promise_step (P:=P)) (wp_init img ps) (retag_cfg f mid) ∧
+      wp_behavior pstep img d0 ps (retag_cfg f c) ∧
+      rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps)
+        (retag_cfg f mid) ∧
       ptraces_of pstep (retag_traces f TS) (retag_cfg f mid) (retag_cfg f c) ∧
       cls_canonical clsf (retag_traces f TS) ∧
       prog_of (retag_cfg f c) = prog_of c ∧
       (∀ a, mem_of (retag_cfg f c) a = mem_of c a).
   Proof.
-    intros Hlfp Hb.
-    destruct (wp_behavior_traced pstep img ps c Hlfp Hb)
+    intros Hpok Hlfp Hb.
+    destruct (wp_behavior_traced pstep pdev img d0 ps c Hpok Hlfp Hb)
       as (mid & TS & Hprom & HTS & Hnp).
     exists (canon_f clsf TS), mid, TS.
     have Hcfg : cfg_wf mid.
-    { eapply cfg_wf_promise_run; [apply (cfg_wf_init (P:=P) img ps)|done]. }
+    { eapply cfg_wf_promise_run; [apply (cfg_wf_init (P:=P) img d0 ps)|done]. }
     have Hpos : ts_pos TS by eapply ts_pos_of_ptraces.
     split_and!.
     - by apply wp_behavior_retag.
-    - rewrite -(retag_wp_init (canon_f clsf TS) img ps).
+    - rewrite -(retag_wp_init (canon_f clsf TS) img d0 ps).
       by apply wp_promise_steps_retag.
     - by apply ptraces_of_retag.
     - apply cls_canonical_canon; [|done].
@@ -743,12 +749,12 @@ Section machine.
 
 End machine.
 
-Global Arguments retag_cfg {P} _ _.
-Global Arguments retag_traces {P} _ _.
-Global Arguments cls_canonical {P} _ _.
-Global Arguments canon_f {P} _ _ _.
-Global Arguments fulfil_at {P} _ _.
-Global Arguments ts_pos {P} _.
+Global Arguments retag_cfg {P D} _ _.
+Global Arguments retag_traces {P D} _ _.
+Global Arguments cls_canonical {P D} _ _.
+Global Arguments canon_f {P D} _ _ _.
+Global Arguments fulfil_at {P D} _ _.
+Global Arguments ts_pos {P D} _.
 
 (* ====================================================================== *)
 (** ** What stage B inherits

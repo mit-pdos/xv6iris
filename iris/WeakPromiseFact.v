@@ -27,7 +27,7 @@
     [wp_astep i l], indexed by the acting agent and the label, whose
     per-label side conditions are collected in [astep_ok] and whose
     effect on the agent record is a pair (a [wstate] function [f], a
-    promise to delete [D]).  That repackaging is the whole trick: the
+    promise to delete [Dl]).  That repackaging is the whole trick: the
     four structural lemmas the factorization needs — shape, log
     extension, other-agent framing, own-promise-set augmentation — then
     have ONE case each instead of five, and every per-rule fact is
@@ -63,15 +63,15 @@ Proof. done. Qed.
 
 (* ------------------------------------------------------------------ *)
 Section fact.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
 
-  Implicit Types cfg c : wpcfg P.
+  Implicit Types cfg c : wpcfg P D.
 
   (** [wpcfg] is not a primitive record, so its eta law is a lemma; the
       structural lemmas below produce configurations in projected form
       and this is what puts them back. *)
-  Lemma wpcfg_eta c : WPCfg (pc_img c) (pc_log c) (pc_ags c) = c.
+  Lemma wpcfg_eta c : WPCfg (pc_img c) (pc_log c) (pc_dev c) (pc_ags c) = c.
   Proof. by destruct c. Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -82,39 +82,40 @@ Section fact.
     WPAgent (pa_st ag) (pa_ws ag) ({[T]} ∪ pa_prom ag).
 
   (** [WPPromise] alone. *)
-  Inductive wp_promise_step : wpcfg P → wpcfg P → Prop :=
+  Inductive wp_promise_step : wpcfg P D → wpcfg P D → Prop :=
   | WPPromStep cfg i ag base data k :
       pc_ags cfg !! i = Some ag →
       data ≠ [] →
       wp_promise_step cfg
         (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+               (pc_dev cfg)
                (<[i := prom_add (S (length (pc_log cfg))) ag]> (pc_ags cfg))).
 
   (** A state step deletes at most one timestamp from its own promise
       set (the one it fulfils). *)
-  Definition prom_del (D : option nat) (pr : gset nat) : gset nat :=
-    match D with None => pr | Some ts => pr ∖ {[ts]} end.
+  Definition prom_del (Dl : option nat) (pr : gset nat) : gset nat :=
+    match Dl with None => pr | Some ts => pr ∖ {[ts]} end.
 
   (** The side conditions of the five non-promise rules, collected by
-      label.  [f] is the rule's [wstate] update and [D] its promise
+      label.  [f] is the rule's [wstate] update and [Dl] its promise
       deletion; both are PINNED by the label (the equations below), so
       [astep_ok] is a specification of a partial function of
       [(img, log, i, ag, l)] — that is what lets the structural lemmas
       have one case instead of five. *)
   Definition astep_ok (img : image) (log : list wmsg) (i : agent)
       (ag : wpagent P) (l : wlabel)
-      (f : wstate → wstate) (D : option nat) : Prop :=
+      (f : wstate → wstate) (Dl : option nat) : Prop :=
     match l with
-    | LSilent => f = id ∧ D = None
+    | LSilent => f = id ∧ Dl = None
     | LLoad aq lat base tvs =>
         read_ok img log (pa_ws ag) aq lat base tvs ∧
-        f = (λ w, load_post_run w aq base (tvs.*1)) ∧ D = None
+        f = (λ w, load_post_run w aq base (tvs.*1)) ∧ Dl = None
     | LStore rl base data =>
         ∃ ts k, ts ∈ pa_prom ag ∧
           log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
           fulfil_ok (pa_ws ag) rl base (length data) ts ∧
           f = (λ w, store_post_run w rl base (length data) ts) ∧
-          D = Some ts
+          Dl = Some ts
     | LRmw aq rl base tvs data =>
         ∃ ts k, length tvs = length data ∧ ts ∈ pa_prom ag ∧
           log !! (ts - 1)%nat = Some (WMsg base data (Some i) k) ∧
@@ -124,21 +125,21 @@ Section fact.
                     (length data) ts ∧
           f = (λ w, store_post_run (load_post_run w aq base (tvs.*1))
                       rl base (length data) ts) ∧
-          D = Some ts
-    | LFence pr pw sr sw => f = (λ w, fence_post w pr pw sr sw) ∧ D = None
+          Dl = Some ts
+    | LFence pr pw sr sw => f = (λ w, fence_post w pr pw sr sw) ∧ Dl = None
     end.
 
   (** The five non-promise rules of [wpstep], as ONE relation indexed by
       the acting agent and the label. *)
-  Inductive wp_astep (i : agent) (l : wlabel) : wpcfg P → wpcfg P → Prop :=
-  | WPAStep cfg ag st' f D :
+  Inductive wp_astep (i : agent) (l : wlabel) : wpcfg P D → wpcfg P D → Prop :=
+  | WPAStep cfg ag st' d' f Dl :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) l st' →
-      astep_ok (pc_img cfg) (pc_log cfg) i ag l f D →
+      pstep (pa_st ag) (pc_dev cfg) l st' d' →
+      astep_ok (pc_img cfg) (pc_log cfg) i ag l f Dl →
       wp_astep i l cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (f (pa_ws ag))
-                         (prom_del D (pa_prom ag))]> (pc_ags cfg))).
+                         (prom_del Dl (pa_prom ag))]> (pc_ags cfg))).
 
   Definition wp_state_step c c' : Prop := ∃ i l, wp_astep i l c c'.
 
@@ -159,7 +160,7 @@ Section fact.
   Lemma wp_astep_wpstep i l c c' :
     wp_astep i l c c' → wpstep pstep c c'.
   Proof.
-    destruct 1 as [cfg ag st' f D Hlk Hps Hok].
+    destruct 1 as [cfg ag st' d' f Dl Hlk Hps Hok].
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
       simpl in Hok.
     - destruct Hok as [-> ->]. by apply WPSilent.
@@ -192,21 +193,21 @@ Section fact.
     destruct 1.
     - left. by econstructor.
     - right. exists i, LSilent.
-      by apply (WPAStep i LSilent cfg ag st' id None).
+      by apply (WPAStep i LSilent cfg ag st' d' id None).
     - right. exists i, (LLoad aq lat base tvs).
-      apply (WPAStep i _ cfg ag st'
+      apply (WPAStep i _ cfg ag st' d'
                (λ w, load_post_run w aq base (tvs.*1)) None); done.
     - right. exists i, (LStore rl base data).
-      apply (WPAStep i _ cfg ag st'
+      apply (WPAStep i _ cfg ag st' d'
                (λ w, store_post_run w rl base (length data) ts) (Some ts));
         [done|done|]. by exists ts, k.
     - right. exists i, (LRmw aq rl base tvs data).
-      apply (WPAStep i _ cfg ag st'
+      apply (WPAStep i _ cfg ag st' d'
                (λ w, store_post_run (load_post_run w aq base (tvs.*1))
                        rl base (length data) ts) (Some ts));
         [done|done|]. exists ts, k. done.
     - right. exists i, (LFence pr pw sr sw).
-      by apply (WPAStep i _ cfg ag st' (λ w, fence_post w pr pw sr sw) None).
+      by apply (WPAStep i _ cfg ag st' d' (λ w, fence_post w pr pw sr sw) None).
   Qed.
 
   (** A LAT-FREE PROGRAM never emits a latest-kind load.  For the kernel
@@ -217,7 +218,7 @@ Section fact.
       walks only — precisely the surface W2's violation-freedom premise
       takes over. *)
   Definition lat_free_prog : Prop :=
-    ∀ p aq base tvs p', ¬ pstep p (LLoad aq true base tvs) p'.
+    ∀ p d aq base tvs p' d', ¬ pstep p d (LLoad aq true base tvs) p' d'.
 
   Lemma lat_free_prog_step c c' :
     lat_free_prog → wpstep pstep c c' → wp_lf_run c c'.
@@ -225,10 +226,10 @@ Section fact.
     intros Hlfp Hstep.
     apply wpstep_split in Hstep as [Hpr|(i & l & Hs)]; [by left|].
     right. exists i, l. split; [|done].
-    destruct Hs as [cfg ag st' f D Hlk Hps Hok].
+    destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok].
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
       simpl; [done| |done|done|done].
-    destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ Hps).
+    destruct lat; [|done]. by destruct (Hlfp _ _ _ _ _ _ _ Hps).
   Qed.
 
   Lemma lat_free_prog_run c c' :
@@ -268,6 +269,7 @@ Section fact.
     ∃ j agj base data k,
       pc_ags c !! j = Some agj ∧ data ≠ [] ∧
       c' = WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some j) k])
+             (pc_dev c)
              (<[j := prom_add (S (length (pc_log c))) agj]> (pc_ags c)).
   Proof. destruct 1. eexists _, _, _, _, _. done. Qed.
 
@@ -290,14 +292,14 @@ Section fact.
       from [WeakRobustTrace] by the W4 batch. *)
   Lemma wp_astep_inv i l c c' :
     wp_astep i l c c' →
-    ∃ ag st' f D,
+    ∃ ag st' d' f Dl,
       pc_ags c !! i = Some ag ∧
-      pstep (pa_st ag) l st' ∧
-      astep_ok (pc_img c) (pc_log c) i ag l f D ∧
-      c' = WPCfg (pc_img c) (pc_log c)
-             (<[i := WPAgent st' (f (pa_ws ag)) (prom_del D (pa_prom ag))]>
+      pstep (pa_st ag) (pc_dev c) l st' d' ∧
+      astep_ok (pc_img c) (pc_log c) i ag l f Dl ∧
+      c' = WPCfg (pc_img c) (pc_log c) d'
+             (<[i := WPAgent st' (f (pa_ws ag)) (prom_del Dl (pa_prom ag))]>
                 (pc_ags c)).
-  Proof. destruct 1. by eexists _, _, _, _. Qed.
+  Proof. destruct 1. by eexists _, _, _, _, _. Qed.
 
   (** The state phase runs against a FROZEN log — the property that makes
       PARM's [Machine.state_exec] framing available (see [wp_state_project]
@@ -314,11 +316,11 @@ Section fact.
       admissible verbatim after a message is appended.  [cfg_wf] is
       load-bearing here — it is what puts the reader's coherence window
       at or below the OLD log length. *)
-  Lemma astep_ok_app img log l' i ag lb f D :
+  Lemma astep_ok_app img log l' i ag lb f Dl :
     ws_bounded (pa_ws ag) (length log) →
     lat_free lb →
-    astep_ok img log i ag lb f D →
-    astep_ok img (log ++ l') i ag lb f D.
+    astep_ok img log i ag lb f Dl →
+    astep_ok img (log ++ l') i ag lb f Dl.
   Proof.
     intros Hb Hlf.
     destruct lb as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
@@ -340,14 +342,14 @@ Section fact.
 
   Lemma wp_astep_app i l c c' m :
     cfg_wf c → lat_free l → wp_astep i l c c' →
-    wp_astep i l (WPCfg (pc_img c) (pc_log c ++ [m]) (pc_ags c))
-                 (WPCfg (pc_img c) (pc_log c ++ [m]) (pc_ags c')).
+    wp_astep i l (WPCfg (pc_img c) (pc_log c ++ [m]) (pc_dev c) (pc_ags c))
+                 (WPCfg (pc_img c) (pc_log c ++ [m]) (pc_dev c') (pc_ags c')).
   Proof.
     intros Hwf Hlf Hs.
-    destruct Hs as [cfg ag st' f D Hlk Hps Hok]; simpl.
+    destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok]; simpl.
     destruct (Hwf i ag Hlk) as [Hb _].
-    apply (WPAStep i l (WPCfg (pc_img cfg) (pc_log cfg ++ [m]) (pc_ags cfg))
-             ag st' f D); [done|done|].
+    apply (WPAStep i l (WPCfg (pc_img cfg) (pc_log cfg ++ [m]) (pc_dev cfg)
+                          (pc_ags cfg)) ag st' d' f Dl); [done|done|].
     simpl. by eapply astep_ok_app.
   Qed.
 
@@ -355,14 +357,14 @@ Section fact.
       so an arbitrary rewrite of [j]'s slot passes through it. *)
   Lemma wp_astep_frame i l c c' j b :
     i ≠ j → wp_astep i l c c' →
-    wp_astep i l (WPCfg (pc_img c) (pc_log c) (<[j := b]> (pc_ags c)))
-                 (WPCfg (pc_img c) (pc_log c) (<[j := b]> (pc_ags c'))).
+    wp_astep i l (WPCfg (pc_img c) (pc_log c) (pc_dev c) (<[j := b]> (pc_ags c)))
+                 (WPCfg (pc_img c) (pc_log c) (pc_dev c') (<[j := b]> (pc_ags c'))).
   Proof.
     intros Hne Hs.
-    destruct Hs as [cfg ag st' f D Hlk Hps Hok]; simpl.
+    destruct Hs as [cfg ag st' d' f Dl Hlk Hps Hok]; simpl.
     rewrite -(list_insert_commute _ i j); [done|].
-    apply (WPAStep i l (WPCfg (pc_img cfg) (pc_log cfg)
-                          (<[j := b]> (pc_ags cfg))) ag st' f D);
+    apply (WPAStep i l (WPCfg (pc_img cfg) (pc_log cfg) (pc_dev cfg)
+                          (<[j := b]> (pc_ags cfg))) ag st' d' f Dl);
       [|done|done].
     simpl. by rewrite list_lookup_insert_ne.
   Qed.
@@ -371,19 +373,19 @@ Section fact.
       agent's own promise set passes through a state step — the fulfil's
       deletion targets a promise it already held, so the two set
       operations commute. *)
-  Lemma prom_del_add T D pr :
-    T ∉ pr → (∀ ts, D = Some ts → ts ∈ pr) →
-    prom_del D ({[T]} ∪ pr) = {[T]} ∪ prom_del D pr.
+  Lemma prom_del_add T Dl pr :
+    T ∉ pr → (∀ ts, Dl = Some ts → ts ∈ pr) →
+    prom_del Dl ({[T]} ∪ pr) = {[T]} ∪ prom_del Dl pr.
   Proof.
-    intros HT HD. destruct D as [ts|]; [|done].
+    intros HT HD. destruct Dl as [ts|]; [|done].
     specialize (HD ts eq_refl). simpl.
     have Hne : ts ≠ T by intros ->.
     set_solver.
   Qed.
 
-  Lemma astep_ok_prom img log i ag ag' l f D :
+  Lemma astep_ok_prom img log i ag ag' l f Dl :
     pa_ws ag' = pa_ws ag → pa_prom ag ⊆ pa_prom ag' →
-    astep_ok img log i ag l f D → astep_ok img log i ag' l f D.
+    astep_ok img log i ag l f Dl → astep_ok img log i ag' l f Dl.
   Proof.
     intros Hws Hpr.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
@@ -394,8 +396,8 @@ Section fact.
       split_and!; [done|by eapply elem_of_weaken|done|done|done|done|done|done].
   Qed.
 
-  Lemma astep_ok_del img log i ag l f D ts :
-    astep_ok img log i ag l f D → D = Some ts → ts ∈ pa_prom ag.
+  Lemma astep_ok_del img log i ag l f Dl ts :
+    astep_ok img log i ag l f Dl → Dl = Some ts → ts ∈ pa_prom ag.
   Proof.
     destruct l as [|aq lat base tvs|rl base data|aq rl base tvs data|pr pw sr sw];
       simpl.
@@ -411,37 +413,37 @@ Section fact.
     pc_ags c' !! i = Some ag' →
     T ∉ pa_prom ag →
     wp_astep i l c c' →
-    wp_astep i l (WPCfg (pc_img c) (pc_log c)
+    wp_astep i l (WPCfg (pc_img c) (pc_log c) (pc_dev c)
                     (<[i := prom_add T ag]> (pc_ags c)))
-                 (WPCfg (pc_img c) (pc_log c)
+                 (WPCfg (pc_img c) (pc_log c) (pc_dev c')
                     (<[i := prom_add T ag']> (pc_ags c))).
   Proof.
     intros Hlk0 Hlk1 HT Hs.
-    destruct Hs as [cfg ag0 st' f D Hlk Hps Hok]; simpl in *.
+    destruct Hs as [cfg ag0 st' d' f Dl Hlk Hps Hok]; simpl in *.
     have Hlt : (i < length (pc_ags cfg))%nat by eapply lookup_lt_Some.
     have Hag : ag0 = ag by congruence.
     subst ag0.
     rewrite list_lookup_insert in Hlk1; [done|].
-    have Hag' : ag' = WPAgent st' (f (pa_ws ag)) (prom_del D (pa_prom ag))
+    have Hag' : ag' = WPAgent st' (f (pa_ws ag)) (prom_del Dl (pa_prom ag))
       by congruence.
     subst ag'.
     have Hstep :
       wp_astep i l
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) (pc_dev cfg)
                (<[i := prom_add T ag]> (pc_ags cfg)))
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (f (pa_ws ag))
-                        (prom_del D ({[T]} ∪ pa_prom ag))]>
+                        (prom_del Dl ({[T]} ∪ pa_prom ag))]>
                   (<[i := prom_add T ag]> (pc_ags cfg)))).
-    { apply (WPAStep i l (WPCfg (pc_img cfg) (pc_log cfg)
+    { apply (WPAStep i l (WPCfg (pc_img cfg) (pc_log cfg) (pc_dev cfg)
                             (<[i := prom_add T ag]> (pc_ags cfg)))
-               (prom_add T ag) st' f D).
+               (prom_add T ag) st' d' f Dl).
       - simpl. rewrite list_lookup_insert //.
       - done.
-      - simpl. apply (astep_ok_prom _ _ _ ag (prom_add T ag) l f D);
+      - simpl. apply (astep_ok_prom _ _ _ ag (prom_add T ag) l f Dl);
           [done|by simpl; set_solver|done]. }
-    have Hpd : prom_del D ({[T]} ∪ pa_prom ag)
-               = {[T]} ∪ prom_del D (pa_prom ag).
+    have Hpd : prom_del Dl ({[T]} ∪ pa_prom ag)
+               = {[T]} ∪ prom_del Dl (pa_prom ag).
     { apply prom_del_add; [done|]. intros ts Hts. by eapply astep_ok_del. }
     rewrite Hpd list_insert_insert in Hstep. exact Hstep.
   Qed.
@@ -476,24 +478,26 @@ Section fact.
       have Hagj : agj = agn by congruence.
       subst agj.
       exists (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
+                (pc_dev c1)
                 (<[i := prom_add (S (length (pc_log c1))) ag]> (pc_ags c1))).
       split.
       { by apply (WPPromStep c1 i ag pb pd pk). }
       rewrite list_insert_insert.
       have Hlk2 : pc_ags (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
-                            (pc_ags c2)) !! i = Some agn.
+                            (pc_dev c2) (pc_ags c2)) !! i = Some agn.
       { simpl. rewrite Hags list_lookup_insert //. }
       pose proof (wp_astep_prom_add i l
                     (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
-                       (pc_ags c1))
+                       (pc_dev c1) (pc_ags c1))
                     (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some i) pk])
-                       (pc_ags c2))
+                       (pc_dev c2) (pc_ags c2))
                     (S (length (pc_log c1))) ag agn
                     Hlk Hlk2 HT Hs2) as Hs3.
       by simpl in Hs3.
     - (* DISTINCT agents: the two agent-list inserts commute *)
       rewrite Hags list_lookup_insert_ne in Hlkj; [done|].
       exists (WPCfg (pc_img c1) (pc_log c1 ++ [WMsg pb pd (Some j) pk])
+                (pc_dev c1)
                 (<[j := prom_add (S (length (pc_log c1))) agj]> (pc_ags c1))).
       split.
       { by apply (WPPromStep c1 j agj pb pd pk). }
@@ -551,15 +555,15 @@ Section fact.
   (** The behavior-level reading (PARM [Machine.pf_exec]): a lat-free
       behavior of the full machine is a promise phase followed by a
       promise-consuming state phase against the frozen log. *)
-  Corollary wp_behavior_front_load img ps c :
-    rtc wp_lf_run (wp_init img ps) c → no_promises c →
+  Corollary wp_behavior_front_load img d0 ps c :
+    rtc wp_lf_run (wp_init img d0 ps) c → no_promises c →
     ∃ mid,
-      rtc wp_promise_step (wp_init img ps) mid ∧
+      rtc wp_promise_step (wp_init img d0 ps) mid ∧
       rtc wp_lf_step mid c ∧
-      wp_behavior pstep img ps c.
+      wp_behavior pstep img d0 ps c.
   Proof.
     intros Hrun Hnp.
-    destruct (wp_front_load _ _ (cfg_wf_init img ps) Hrun)
+    destruct (wp_front_load _ _ (cfg_wf_init img d0 ps) Hrun)
       as (mid & Hprom & Hstate).
     exists mid. split_and!; [done|done|].
     split; [by apply wp_lf_run_rtc_wpstep|done].
@@ -569,55 +573,221 @@ Section fact.
       phase followed by a state phase — [wp_behavior]'s [no_promises]
       says the state phase discharges every promise the first phase
       made. *)
-  Corollary wp_behavior_factor img ps c :
-    lat_free_prog → wp_behavior pstep img ps c →
+  Corollary wp_behavior_factor img d0 ps c :
+    lat_free_prog → wp_behavior pstep img d0 ps c →
     ∃ mid,
-      rtc wp_promise_step (wp_init img ps) mid ∧ rtc wp_lf_step mid c ∧
+      rtc wp_promise_step (wp_init img d0 ps) mid ∧ rtc wp_lf_step mid c ∧
       no_promises c.
   Proof.
     intros Hlfp [Hrun Hnp].
-    destruct (wp_front_load_prog _ _ Hlfp (cfg_wf_init img ps) Hrun)
+    destruct (wp_front_load_prog _ _ Hlfp (cfg_wf_init img d0 ps) Hrun)
       as (mid & Hprom & Hstate).
     exists mid. split_and!; [done|done|done].
   Qed.
 
   (* ---------------------------------------------------------------- *)
-  (** ** (E) The state phase decomposes per agent
+  (** ** (E) DEV-FREE STATE STEPS, AND WHAT STILL COMMUTES
 
-      State steps of DISTINCT agents commute: both freeze the log and
-      rewrite disjoint slots of the agent list.  Iterating the extraction
-      over the agent indices turns the state phase into PARM's per-thread
-      [Machine.state_exec] ([wp_state_exec] below): a CONCATENATION of
-      per-agent [rtc]s, each against the same frozen log — after the
-      promise phase the agents are fully independent, which is the framing
-      W2's Layer-1 simulation is supposed to inherit. *)
+      Before the fabric, state steps of DISTINCT agents commuted outright:
+      both freeze the log and rewrite disjoint slots of the agent list, so
+      the state phase could be reordered agent-contiguous.  A SHARED
+      FABRIC BREAKS THAT — two device accesses of different agents do not
+      commute, because the second reads what the first left.  What
+      survives is the SCOPED law, and it is the exact scope: two state
+      steps of distinct agents commute UNLESS BOTH TOUCH THE FABRIC, i.e.
+      as soon as ONE of them is dev-free.
 
-  Lemma wp_astep_comm i1 l1 i2 l2 c1 c2 c3 :
+      [wp_afree i l] is the dev-free fragment of [wp_astep i l]: the same
+      rule with the program step demanded AT EVERY FABRIC (hence in
+      particular fabric-blind) and the fabric carried through unchanged.
+      [pdev_ok] is what turns the marker into membership of this
+      fragment, and it is the ONLY thing the factorization asks of
+      [pdev].
+
+      Everything the old development proved about the state phase —
+      per-agent extraction, grouping, [wp_state_exec] — is re-proved here
+      over [wp_afree], i.e. it now describes a phase BETWEEN two
+      consecutive device events rather than a whole state phase. *)
+
+  (** THE FABRIC-TOUCHING MARKER.  Whether a program step reads or moves the
+      shared fabric is NOT decidable from [pstep] (it is a statement about
+      [pstep] at every fabric), and the factorization has to CLASSIFY the
+      steps of a given run — so the marker is a parameter of the program,
+      alongside [pstep], exactly as the worklist's "decidable marker you add
+      to the step data" asks.  [pdev p l p' = false] claims the step is
+      FABRIC-BLIND AND FABRIC-PRESERVING, which is what [pdev_ok] just below
+      pins down and what the commutation lemma consumes.
+
+      Only the factorization needs it; the machine ([WeakPromise.wpstep])
+      does not, which is why it enters here and not there. *)
+  Context (pdev : P → wlabel → P → bool).
+
+  Definition pdev_ok : Prop :=
+    ∀ p d l p' d', pstep p d l p' d' → pdev p l p' = false →
+      d' = d ∧ ∀ d0, pstep p d0 l p' d0.
+
+  Inductive wp_afree (i : agent) (l : wlabel) : wpcfg P D → wpcfg P D → Prop :=
+  | WPAFree cfg ag st' f Dl :
+      pc_ags cfg !! i = Some ag →
+      (∀ d, pstep (pa_st ag) d l st' d) →
+      astep_ok (pc_img cfg) (pc_log cfg) i ag l f Dl →
+      wp_afree i l cfg
+        (WPCfg (pc_img cfg) (pc_log cfg) (pc_dev cfg)
+               (<[i := WPAgent st' (f (pa_ws ag))
+                         (prom_del Dl (pa_prom ag))]> (pc_ags cfg))).
+
+  Lemma wp_afree_astep i l c c' : wp_afree i l c c' → wp_astep i l c c'.
+  Proof.
+    destruct 1 as [cfg ag st' f Dl Hlk Hps Hok].
+    by apply (WPAStep i l cfg ag st' (pc_dev cfg) f Dl).
+  Qed.
+
+  Lemma wp_afree_dev i l c c' : wp_afree i l c c' → pc_dev c' = pc_dev c.
+  Proof. by destruct 1. Qed.
+
+  (** The MARKER puts a step in the fragment: this is the only place
+      [pdev]/[pdev_ok] is consumed. *)
+  Lemma wp_astep_afree i l c c' :
+    pdev_ok → wp_astep i l c c' →
+    (∀ ag ag', pc_ags c !! i = Some ag → pc_ags c' !! i = Some ag' →
+       pdev (pa_st ag) l (pa_st ag') = false) →
+    wp_afree i l c c'.
+  Proof.
+    intros Hpok Hs Hm.
+    destruct Hs as [cfg ag st' d' f Dl Hlk Hps Haok].
+    have Hlt : (i < length (pc_ags cfg))%nat by eapply lookup_lt_Some.
+    have Hm' : pdev (pa_st ag) l st' = false.
+    { apply (Hm ag (WPAgent st' (f (pa_ws ag)) (prom_del Dl (pa_prom ag))));
+        [done|]. simpl. by rewrite list_lookup_insert. }
+    destruct (Hpok _ _ _ _ _ Hps Hm') as [-> Hany].
+    by apply (WPAFree i l cfg ag st' f Dl).
+  Qed.
+
+  Lemma wp_afree_shape i l c c' :
+    wp_afree i l c c' →
+    ∃ ag ag',
+      pc_ags c !! i = Some ag ∧
+      pc_img c' = pc_img c ∧ pc_log c' = pc_log c ∧ pc_dev c' = pc_dev c ∧
+      pc_ags c' = <[i := ag']> (pc_ags c).
+  Proof. destruct 1. eexists _, _. done. Qed.
+
+  (** FRAMING for the dev-free fragment.  It frames the FABRIC as well as
+      another agent's slot — that is exactly what fabric-blindness buys,
+      and it is what the swap below needs (the commuted step runs at the
+      fabric the OTHER step left). *)
+  Lemma wp_afree_frame i l c c' j b d :
+    i ≠ j → wp_afree i l c c' →
+    wp_afree i l (WPCfg (pc_img c) (pc_log c) d (<[j := b]> (pc_ags c)))
+                 (WPCfg (pc_img c) (pc_log c) d (<[j := b]> (pc_ags c'))).
+  Proof.
+    intros Hne Hs.
+    destruct Hs as [cfg ag st' f Dl Hlk Hps Hok]; simpl.
+    rewrite -(list_insert_commute _ i j); [done|].
+    apply (WPAFree i l (WPCfg (pc_img cfg) (pc_log cfg) d
+                          (<[j := b]> (pc_ags cfg))) ag st' f Dl);
+      [|done|done].
+    simpl. by rewrite list_lookup_insert_ne.
+  Qed.
+
+  (** THE KEY LEMMA, in its two mixed forms: a dev-free step of agent
+      [i1] commutes past an ARBITRARY state step of any other agent [i2],
+      in either order.  (The one case NOT covered — both steps
+      fabric-touching — is the real obstruction; that is what the global
+      device-order witness of [WeakRobustTrace] records instead of
+      reordering.) *)
+  Lemma wp_afree_astep_comm i1 l1 i2 l2 c1 c2 c3 :
     i1 ≠ i2 →
-    wp_astep i1 l1 c1 c2 → wp_astep i2 l2 c2 c3 →
-    ∃ c2', wp_astep i2 l2 c1 c2' ∧ wp_astep i1 l1 c2' c3.
+    wp_afree i1 l1 c1 c2 → wp_astep i2 l2 c2 c3 →
+    ∃ c2', wp_astep i2 l2 c1 c2' ∧ wp_afree i1 l1 c2' c3.
   Proof.
     intros Hne Hs1 Hs2.
-    destruct (wp_astep_shape _ _ _ _ Hs1) as (ag1 & A1 & Hlk1 & Hi1 & Hl1 & Ha1).
+    destruct (wp_afree_shape _ _ _ _ Hs1)
+      as (ag1 & A1 & Hlk1 & Hi1 & Hl1 & Hd1 & Ha1).
     destruct (wp_astep_shape _ _ _ _ Hs2) as (ag2 & A2 & Hlk2 & Hi2 & Hl2 & Ha2).
     have Hne2 : i2 ≠ i1 by congruence.
-    (* strip agent [i1]'s update off the second step *)
     pose proof (wp_astep_frame i2 l2 c2 c3 i1 ag1 Hne2 Hs2) as Hf.
     rewrite Ha2 Ha1 in Hf.
     rewrite list_insert_insert (list_insert_id _ _ _ Hlk1) in Hf.
     rewrite (list_insert_commute _ i1 i2) in Hf; [done|].
     rewrite list_insert_insert (list_insert_id _ _ _ Hlk1) in Hf.
-    rewrite Hi1 Hl1 wpcfg_eta in Hf.
-    exists (WPCfg (pc_img c1) (pc_log c1) (<[i2 := A2]> (pc_ags c1))).
+    rewrite Hi1 Hl1 Hd1 wpcfg_eta in Hf.
+    exists (WPCfg (pc_img c1) (pc_log c1) (pc_dev c3) (<[i2 := A2]> (pc_ags c1))).
     split; [exact Hf|].
-    (* and frame agent [i2]'s update onto the first *)
-    pose proof (wp_astep_frame i1 l1 c1 c2 i2 A2 Hne Hs1) as Hg.
+    pose proof (wp_afree_frame i1 l1 c1 c2 i2 A2 (pc_dev c3) Hne Hs1) as Hg.
     rewrite Ha1 in Hg.
     rewrite -(wpcfg_eta c3) Hi2 Hl2 Ha2 Hi1 Hl1 Ha1.
     exact Hg.
   Qed.
 
-  (** One agent's steps, and the steps of a SET of agents. *)
+  Lemma wp_astep_afree_comm i1 l1 i2 l2 c1 c2 c3 :
+    i1 ≠ i2 →
+    wp_astep i1 l1 c1 c2 → wp_afree i2 l2 c2 c3 →
+    ∃ c2', wp_afree i2 l2 c1 c2' ∧ wp_astep i1 l1 c2' c3.
+  Proof.
+    intros Hne Hs1 Hs2.
+    destruct (wp_astep_shape _ _ _ _ Hs1) as (ag1 & A1 & Hlk1 & Hi1 & Hl1 & Ha1).
+    destruct (wp_afree_shape _ _ _ _ Hs2)
+      as (ag2 & A2 & Hlk2 & Hi2 & Hl2 & Hd2 & Ha2).
+    have Hne2 : i2 ≠ i1 by congruence.
+    pose proof (wp_afree_frame i2 l2 c2 c3 i1 ag1 (pc_dev c1) Hne2 Hs2) as Hf.
+    rewrite Ha2 Ha1 in Hf.
+    rewrite list_insert_insert (list_insert_id _ _ _ Hlk1) in Hf.
+    rewrite (list_insert_commute _ i1 i2) in Hf; [done|].
+    rewrite list_insert_insert (list_insert_id _ _ _ Hlk1) in Hf.
+    rewrite Hi1 Hl1 wpcfg_eta in Hf.
+    exists (WPCfg (pc_img c1) (pc_log c1) (pc_dev c1) (<[i2 := A2]> (pc_ags c1))).
+    split; [exact Hf|].
+    pose proof (wp_astep_frame i1 l1 c1 c2 i2 A2 Hne Hs1) as Hg.
+    rewrite Ha1 in Hg.
+    rewrite -(wpcfg_eta c3) Hd2 Hi2 Hl2 Ha2 Hi1 Hl1 Ha1.
+    exact Hg.
+  Qed.
+
+  (** THE KEY LEMMA, packaged as the worklist states it: distinct agents,
+      at least one step NOT fabric-touching. *)
+  Lemma wp_astep_comm i1 l1 i2 l2 c1 c2 c3 :
+    i1 ≠ i2 →
+    wp_astep i1 l1 c1 c2 → wp_astep i2 l2 c2 c3 →
+    wp_afree i1 l1 c1 c2 ∨ wp_afree i2 l2 c2 c3 →
+    ∃ c2', wp_astep i2 l2 c1 c2' ∧ wp_astep i1 l1 c2' c3.
+  Proof.
+    intros Hne Hs1 Hs2 [Hfr|Hfr].
+    - destruct (wp_afree_astep_comm i1 l1 i2 l2 c1 c2 c3 Hne Hfr Hs2)
+        as (d & ? & ?%wp_afree_astep). by exists d.
+    - destruct (wp_astep_afree_comm i1 l1 i2 l2 c1 c2 c3 Hne Hs1 Hfr)
+        as (d & ?%wp_afree_astep & ?). by exists d.
+  Qed.
+
+  (** Both dev-free: the fragment is closed under the swap, which is what
+      the per-agent grouping below iterates. *)
+  Lemma wp_afree_comm i1 l1 i2 l2 c1 c2 c3 :
+    i1 ≠ i2 →
+    wp_afree i1 l1 c1 c2 → wp_afree i2 l2 c2 c3 →
+    ∃ c2', wp_afree i2 l2 c1 c2' ∧ wp_afree i1 l1 c2' c3.
+  Proof.
+    intros Hne Hs1 Hs2.
+    destruct (wp_afree_shape _ _ _ _ Hs1)
+      as (ag1 & A1 & Hlk1 & Hi1 & Hl1 & Hd1 & Ha1).
+    destruct (wp_afree_shape _ _ _ _ Hs2)
+      as (ag2 & A2 & Hlk2 & Hi2 & Hl2 & Hd2 & Ha2).
+    have Hne2 : i2 ≠ i1 by congruence.
+    pose proof (wp_afree_frame i2 l2 c2 c3 i1 ag1 (pc_dev c1) Hne2 Hs2) as Hf.
+    rewrite Ha2 Ha1 in Hf.
+    rewrite list_insert_insert (list_insert_id _ _ _ Hlk1) in Hf.
+    rewrite (list_insert_commute _ i1 i2) in Hf; [done|].
+    rewrite list_insert_insert (list_insert_id _ _ _ Hlk1) in Hf.
+    rewrite Hi1 Hl1 wpcfg_eta in Hf.
+    exists (WPCfg (pc_img c1) (pc_log c1) (pc_dev c1) (<[i2 := A2]> (pc_ags c1))).
+    split; [exact Hf|].
+    pose proof (wp_afree_frame i1 l1 c1 c2 i2 A2 (pc_dev c1) Hne Hs1) as Hg.
+    rewrite Ha1 in Hg.
+    rewrite -(wpcfg_eta c3) Hd2 Hd1 Hi2 Hl2 Ha2 Hi1 Hl1 Ha1.
+    exact Hg.
+  Qed.
+
+  (** One agent's steps, and the steps of a SET of agents — in the
+      GENERAL fragment (this is what a per-agent TRACE is built out of;
+      no commutation is involved). *)
   Definition wp_astep_of (i : agent) c c' : Prop := ∃ l, wp_astep i l c c'.
 
   (** The frozen-log / framing facts of a whole phase (the [rtc] form of
@@ -675,26 +845,78 @@ Section fact.
     intros k Hk. rewrite (wp_astep_ags_length _ _ _ _ Hs) in Hk. done.
   Qed.
 
+  (* ---------------------------------------------------------------- *)
+  (** ** (E') The DEV-FREE phase decomposes per agent
+
+      The old [wp_state_exec] verbatim, with [wp_astep] replaced by
+      [wp_afree] throughout: a phase whose every step is dev-free
+      reorders agent-contiguous.  In the factorized picture such a phase
+      is exactly a SEGMENT BETWEEN two consecutive device events, which
+      is the successor of "the state phase is agent-contiguous". *)
+
+  Definition wp_afree_of (i : agent) c c' : Prop := ∃ l, wp_afree i l c c'.
+  Definition wp_afrees_of (Q : agent → Prop) c c' : Prop :=
+    ∃ i l, Q i ∧ wp_afree i l c c'.
+  Definition wp_free_step c c' : Prop := ∃ i l, wp_afree i l c c'.
+  Definition wp_afree_other (i : agent) c c' : Prop :=
+    wp_afrees_of (λ j, j ≠ i) c c'.
+
+  Lemma wp_afree_of_astep_of i c c' :
+    rtc (wp_afree_of i) c c' → rtc (wp_astep_of i) c c'.
+  Proof.
+    induction 1 as [|x y z (l & Hs) _ IH]; [done|].
+    eapply rtc_l; [by exists l; apply wp_afree_astep|done].
+  Qed.
+
+  Lemma wp_free_step_state_step c c' :
+    rtc wp_free_step c c' → rtc wp_state_step c c'.
+  Proof.
+    induction 1 as [|x y z (i & l & Hs) _ IH]; [done|].
+    eapply rtc_l; [by exists i, l; apply wp_afree_astep|done].
+  Qed.
+
+  Lemma wp_afrees_of_mono (Q Q' : agent → Prop) c c' :
+    (∀ i, Q i → Q' i) →
+    rtc (wp_afrees_of Q) c c' → rtc (wp_afrees_of Q') c c'.
+  Proof.
+    intros HQ. induction 1 as [|x y z (i & l & ? & ?) _ IH]; [done|].
+    eapply rtc_l; [|done]. exists i, l. split; [by apply HQ|done].
+  Qed.
+
+  Lemma wp_free_step_agents c c' :
+    rtc wp_free_step c c' →
+    rtc (wp_afrees_of (λ i, (i < length (pc_ags c))%nat)) c c'.
+  Proof.
+    induction 1 as [|x y z (i & l & Hs) _ IH]; [done|].
+    eapply rtc_l.
+    { exists i, l. split; [|done].
+      by eapply wp_astep_lt, wp_afree_astep. }
+    eapply wp_afrees_of_mono; [|done].
+    intros k Hk.
+    rewrite (wp_astep_ags_length _ _ _ _ (wp_afree_astep _ _ _ _ Hs)) in Hk.
+    done.
+  Qed.
+
   Lemma wp_astep_comm_rtc i c2 c3 :
-    rtc (wp_astep_of i) c2 c3 →
-    ∀ j l c1, j ≠ i → wp_astep j l c1 c2 →
-    ∃ c2', rtc (wp_astep_of i) c1 c2' ∧ wp_astep j l c2' c3.
+    rtc (wp_afree_of i) c2 c3 →
+    ∀ j l c1, j ≠ i → wp_afree j l c1 c2 →
+    ∃ c2', rtc (wp_afree_of i) c1 c2' ∧ wp_afree j l c2' c3.
   Proof.
     induction 1 as [c|c2 ca c3 (l2 & Hstep) _ IH]; intros j l c1 Hne Hs.
     - exists c1. split; [done|done].
-    - destruct (wp_astep_comm j l i l2 c1 c2 ca Hne Hs Hstep)
+    - destruct (wp_afree_comm j l i l2 c1 c2 ca Hne Hs Hstep)
         as (d & Hid & Hjd).
       destruct (IH j l d Hne Hjd) as (c2' & Hrun & Hfin).
       exists c2'. split; [|done]. eapply rtc_l; [by exists l2|done].
   Qed.
 
-  (** The per-agent EXTRACTION: any state phase reorders so that all of
-      agent [i]'s steps come first, followed by the steps of the other
+  (** The per-agent EXTRACTION: any dev-free phase reorders so that all
+      of agent [i]'s steps come first, followed by the steps of the other
       agents — same endpoint. *)
   Lemma wp_project_of Q i c c' :
-    rtc (wp_asteps_of Q) c c' →
-    ∃ mid, rtc (wp_astep_of i) c mid ∧
-           rtc (wp_asteps_of (λ j, Q j ∧ j ≠ i)) mid c'.
+    rtc (wp_afrees_of Q) c c' →
+    ∃ mid, rtc (wp_afree_of i) c mid ∧
+           rtc (wp_afrees_of (λ j, Q j ∧ j ≠ i)) mid c'.
   Proof.
     induction 1 as [c|c ca c' (k & l & HQ & Hstep) _ IH].
     - exists c. split; [done|done].
@@ -707,28 +929,28 @@ Section fact.
   Qed.
 
   Lemma wp_state_project i c c' :
-    rtc wp_state_step c c' →
-    ∃ mid, rtc (wp_astep_of i) c mid ∧ rtc (wp_astep_other i) mid c'.
+    rtc wp_free_step c c' →
+    ∃ mid, rtc (wp_afree_of i) c mid ∧ rtc (wp_afree_other i) mid c'.
   Proof.
     intros Hrun.
     destruct (wp_project_of (λ _, True) i c c') as (mid & Hi & Hoth).
-    { eapply wp_asteps_of_mono; [|by apply wp_state_step_agents]. done. }
+    { eapply wp_afrees_of_mono; [|by apply wp_free_step_agents]. done. }
     exists mid. split; [done|].
-    eapply wp_asteps_of_mono; [|done]. by intros ? [_ ?].
+    eapply wp_afrees_of_mono; [|done]. by intros ? [_ ?].
   Qed.
 
   (** The per-agent DECOMPOSITION.  [wp_phases js] is the concatenation,
       in the order of [js], of one [rtc] per agent — PARM's
       [Machine.state_exec] (Promising.v:1758), whose per-thread runs are
       likewise against a single frozen memory ([wp_state_step_log]). *)
-  Fixpoint wp_phases (js : list agent) (c c' : wpcfg P) : Prop :=
+  Fixpoint wp_phases (js : list agent) (c c' : wpcfg P D) : Prop :=
     match js with
     | [] => c = c'
-    | i :: js' => ∃ mid, rtc (wp_astep_of i) c mid ∧ wp_phases js' mid c'
+    | i :: js' => ∃ mid, rtc (wp_afree_of i) c mid ∧ wp_phases js' mid c'
     end.
 
   Lemma wp_asteps_of_none Q c c' :
-    (∀ i, ¬ Q i) → rtc (wp_asteps_of Q) c c' → c = c'.
+    (∀ i, ¬ Q i) → rtc (wp_afrees_of Q) c c' → c = c'.
   Proof.
     intros HQ. induction 1 as [|x y z (i & l & ? & _) _ IH]; [done|].
     by destruct (HQ i).
@@ -736,7 +958,7 @@ Section fact.
 
   Lemma wp_state_group js :
     ∀ Q c c', (∀ i, Q i → i ∈ js) →
-    rtc (wp_asteps_of Q) c c' → wp_phases js c c'.
+    rtc (wp_afrees_of Q) c c' → wp_phases js c c'.
   Proof.
     induction js as [|i js' IH]; intros Q c c' Hcov Hrun; simpl.
     - eapply wp_asteps_of_none; [|done]. intros k HQ.
@@ -749,32 +971,38 @@ Section fact.
       subst k. by destruct (Hne eq_refl).
   Qed.
 
-  (** THE STATE-PHASE FORM (the [Machine.state_exec] analog): a state
-      phase of a configuration with [n] agents is agent 0's whole run,
-      then agent 1's, …, then agent [n-1]'s. *)
+  (** THE DEV-FREE-PHASE FORM (the [Machine.state_exec] analog): a
+      dev-free phase of a configuration with [n] agents is agent 0's
+      whole run, then agent 1's, …, then agent [n-1]'s. *)
   Corollary wp_state_exec c c' :
-    rtc wp_state_step c c' →
+    rtc wp_free_step c c' →
     wp_phases (seq 0 (length (pc_ags c))) c c'.
   Proof.
     intros Hrun.
     apply (wp_state_group _ (λ i, (i < length (pc_ags c))%nat) c c').
     - intros k Hk. apply elem_of_seq. lia.
-    - by apply wp_state_step_agents.
+    - by apply wp_free_step_agents.
   Qed.
 
 End fact.
 
-Global Arguments wp_promise_step {P} _ _.
+Global Arguments wp_promise_step {P D} _ _.
 Global Arguments prom_add {P} _ _.
 Global Arguments astep_ok {P} _ _ _ _ _ _ _.
-Global Arguments wp_astep {P} _ _ _ _ _.
-Global Arguments wp_state_step {P} _ _ _.
-Global Arguments wp_lf_step {P} _ _ _.
-Global Arguments wp_lf_run {P} _ _ _.
-Global Arguments wp_astep_of {P} _ _ _ _.
-Global Arguments wp_asteps_of {P} _ _ _ _.
-Global Arguments wp_astep_other {P} _ _ _ _.
-Global Arguments wp_phases {P} _ _ _ _.
+Global Arguments wp_astep {P D} _ _ _ _ _.
+Global Arguments wp_afree {P D} _ _ _ _ _.
+Global Arguments pdev_ok {P D} _ _.
+Global Arguments wp_state_step {P D} _ _ _.
+Global Arguments wp_free_step {P D} _ _ _.
+Global Arguments wp_lf_step {P D} _ _ _.
+Global Arguments wp_lf_run {P D} _ _ _.
+Global Arguments wp_astep_of {P D} _ _ _ _.
+Global Arguments wp_asteps_of {P D} _ _ _ _.
+Global Arguments wp_astep_other {P D} _ _ _ _.
+Global Arguments wp_afree_of {P D} _ _ _ _.
+Global Arguments wp_afrees_of {P D} _ _ _ _.
+Global Arguments wp_afree_other {P D} _ _ _ _.
+Global Arguments wp_phases {P D} _ _ _ _.
 
 (* ------------------------------------------------------------------ *)
 (** ** What slice 3 / W2 inherits, and what is deliberately NOT here

@@ -236,16 +236,16 @@ End topo_generic.
 
 (* ------------------------------------------------------------------ *)
 Section lin.
-  Context {P : Type}.
+  Context {P D : Type}.
 
-  Implicit Types TS : ptraces P.
+  Implicit Types TS : ptraces P D.
   Implicit Types e : gev.
 
   (* ---------------------------------------------------------------- *)
   (** ** DELIVERABLE 1: THE EVENT ENUMERATION *)
 
   (** All events of the trace list [Ts], whose first trace is agent [i]. *)
-  Fixpoint gev_enum_from (i : nat) (Ts : list (atrace P)) : list gev :=
+  Fixpoint gev_enum_from (i : nat) (Ts : list (atrace P D)) : list gev :=
     match Ts with
     | [] => []
     | T :: Ts' =>

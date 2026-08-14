@@ -312,7 +312,7 @@ End astep.
     Event [k] of the trace reads with [aq = true], or a [pr ∧ sw] fence
     sits strictly between [k] and [k'].  [k'] is the reader's next fulfil
     on the cycle; the definition takes it as a bound. *)
-Definition disciplined {P : Type} (T : atrace P) (k k' : nat) : Prop :=
+Definition disciplined {P D : Type} (T : atrace P D) (k k' : nat) : Prop :=
   (∃ ev, at_evs T !! k = Some ev ∧ lb_aq (ae_lb ev) = true) ∨
   (∃ k0 ev0, (k < k0)%nat ∧ (k0 < k')%nat ∧
              at_evs T !! k0 = Some ev0 ∧ lb_fence_prsw (ae_lb ev0)).
@@ -332,28 +332,29 @@ Definition disciplined {P : Type} (T : atrace P) (k k' : nat) : Prop :=
     post-state.  That is exactly what makes this a statement about what
     the reader had already acquired, and not a tautology about the read
     itself. *)
-Definition covered {P : Type} (T : atrace P) (k : nat) (ts : nat) : Prop :=
+Definition covered {P D : Type} (T : atrace P D) (k : nat) (ts : nat) : Prop :=
   ∃ ag, at_ags T !! k = Some ag ∧ (ts ≤ w_vwNew (pa_ws ag))%nat.
 
 (** THE PER-EDGE OBLIGATION the measure actually consumes: the reader is
     disciplined, or the message was already covered when it read. *)
-Definition edge_ok {P : Type} (T : atrace P) (k k' : nat) (ts : nat) : Prop :=
+Definition edge_ok {P D : Type} (T : atrace P D) (k k' : nat) (ts : nat) : Prop :=
   disciplined T k k' ∨ covered T k ts.
 
-Lemma edge_ok_disciplined {P : Type} (T : atrace P) k k' ts :
+Lemma edge_ok_disciplined {P D : Type} (T : atrace P D) k k' ts :
   disciplined T k k' → edge_ok T k k' ts.
 Proof. by left. Qed.
 
-Lemma edge_ok_covered {P : Type} (T : atrace P) k k' ts :
+Lemma edge_ok_covered {P D : Type} (T : atrace P D) k k' ts :
   covered T k ts → edge_ok T k k' ts.
 Proof. by right. Qed.
 
 (* ------------------------------------------------------------------ *)
 Section trace.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types T : atrace P.
+  Implicit Types T : atrace P D.
 
   (* ---------------------------------------------------------------- *)
   (** ** [fwd_own] along a trace *)
@@ -518,7 +519,7 @@ End trace.
 
 (** Every wstate reachable in every trace of the bundle satisfies
     [fwd_own] for its own agent. *)
-Definition ptraces_fwd_own {P : Type} (TS : ptraces P) : Prop :=
+Definition ptraces_fwd_own {P D : Type} (TS : ptraces P D) : Prop :=
   ∀ i T k ag, pt_trs TS !! i = Some T → at_ags T !! k = Some ag →
     fwd_own (pt_log TS) i (pa_ws ag).
 
@@ -537,7 +538,7 @@ Definition ptraces_fwd_own {P : Type} (TS : ptraces P) : Prop :=
     before ANY subsequent store, and a critical-section reader's acquire
     floor covers EVERY later store of the section, not merely a
     distinguished one. *)
-Definition rf_edges_ok {P : Type} (TS : ptraces P) : Prop :=
+Definition rf_edges_ok {P D : Type} (TS : ptraces P D) : Prop :=
   ∀ e1 e2 T ts a k' ev',
     gev_ts TS e1 = Some ts → gev_reads TS e2 a ts → e1.1 ≠ e2.1 →
     pt_trs TS !! e2.1 = Some T →
@@ -547,7 +548,7 @@ Definition rf_edges_ok {P : Type} (TS : ptraces P) : Prop :=
 
 (** The ORIGINAL, discipline-only premise, kept because it is the shape
     the racy-read rules alone deliver — and it is strictly stronger. *)
-Definition rf_disciplined {P : Type} (TS : ptraces P) : Prop :=
+Definition rf_disciplined {P D : Type} (TS : ptraces P D) : Prop :=
   ∀ e1 e2 T k' ev',
     grf TS e1 e2 → e1.1 ≠ e2.1 →
     pt_trs TS !! e2.1 = Some T →
@@ -555,7 +556,7 @@ Definition rf_disciplined {P : Type} (TS : ptraces P) : Prop :=
     at_evs T !! k' = Some ev' → is_Some (ae_ts ev') →
     disciplined T e2.2 k'.
 
-Lemma rf_disciplined_edges_ok {P : Type} (TS : ptraces P) :
+Lemma rf_disciplined_edges_ok {P D : Type} (TS : ptraces P D) :
   rf_disciplined TS → rf_edges_ok TS.
 Proof.
   intros H e1 e2 T ts a k' ev' Hts Hrd Hne HT Hlt Hev' Hsome.
@@ -564,17 +565,18 @@ Proof.
 Qed.
 
 (** Every agent's wstate is [ws_init] — the promise phase's invariant. *)
-Definition cfg_ws_init {P : Type} (c : wpcfg P) : Prop :=
+Definition cfg_ws_init {P D : Type} (c : wpcfg P D) : Prop :=
   ∀ i ag, pc_ags c !! i = Some ag → pa_ws ag = ws_init.
 
 (* ------------------------------------------------------------------ *)
 Section acyc.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types TS : ptraces P.
+  Implicit Types TS : ptraces P D.
   Implicit Types e : gev.
-  Implicit Types c : wpcfg P.
+  Implicit Types c : wpcfg P D.
 
   (* ---------------------------------------------------------------- *)
   (** ** From the bundle to the traces *)
@@ -600,7 +602,8 @@ Section acyc.
   (* ---------------------------------------------------------------- *)
   (** ** [fwd_own] is DERIVED, not assumed *)
 
-  Lemma cfg_ws_init_init img ps : cfg_ws_init (wp_init (P:=P) img ps).
+  Lemma cfg_ws_init_init img d0 ps :
+    cfg_ws_init (wp_init (P:=P) (D:=D) img d0 ps).
   Proof.
     intros i ag Hlk. rewrite /wp_init /= in Hlk.
     rewrite list_lookup_fmap in Hlk.
@@ -623,7 +626,7 @@ Section acyc.
   Qed.
 
   Lemma cfg_ws_init_promise_run c c' :
-    cfg_ws_init c → rtc (wp_promise_step (P:=P)) c c' → cfg_ws_init c'.
+    cfg_ws_init c → rtc (wp_promise_step (P:=P) (D:=D)) c c' → cfg_ws_init c'.
   Proof.
     intros H0 Hr. induction Hr as [|??? Hs _ IH]; [done|].
     apply IH. by eapply cfg_ws_init_promise_step.
@@ -782,18 +785,19 @@ Section acyc.
   (** ... at the behavior level, with [fwd_own] DISCHARGED.  Only the
       per-edge obligation remains a premise (and the SCowned arm, which
       lives in W2b — see the header). *)
-  Theorem wp_behavior_gdep_acyclic img ps c :
-    lat_free_prog pstep → wp_behavior pstep img ps c →
+  Theorem wp_behavior_gdep_acyclic img d0 ps c :
+    pdev_ok pstep pdev →
+    lat_free_prog pstep → wp_behavior pstep img d0 ps c →
     ∃ mid TS,
-      rtc (wp_promise_step (P:=P)) (wp_init img ps) mid ∧
+      rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid ∧
       ptraces_of pstep TS mid c ∧
       no_promises c ∧
       ptraces_wf pstep TS ∧
       ptraces_fwd_own TS ∧
       (rf_edges_ok TS → gdep_acyclic TS).
   Proof.
-    intros Hlfp Hb.
-    destruct (wp_behavior_traced pstep img ps c Hlfp Hb)
+    intros Hpok Hlfp Hb.
+    destruct (wp_behavior_traced pstep pdev img d0 ps c Hpok Hlfp Hb)
       as (mid & TS & Hprom & HTS & Hnp).
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
     have Hinit : cfg_ws_init mid.

@@ -564,9 +564,9 @@ Definition sail_step (next : bool → M unit)
     fused arm's read half carries no [lat] at all.  So no latest-kind load is
     ever emitted — the hypothesis [WeakPromiseFact]'s front-loading theorem
     takes. *)
-Theorem sail_lat_free next : lat_free_prog (sail_step next).
+Theorem sail_lat_free next : lat_free_prog (pstep_unit (sail_step next)).
 Proof.
-  intros p aq base tvs p' H. rewrite /sail_step in H.
+  intros p d aq base tvs p' d' H. rewrite /pstep_unit /sail_step in H.
   destruct (sp_fence p) as [[[[pr pw] sr] sw]|]; [by destruct H as [? _]|].
   destruct H as [Hirq|H]; [by destruct Hirq as [? _]|].
   destruct (sp_m p) as [m|]; [|by destruct H as [? _]].
@@ -799,12 +799,12 @@ Section bracket.
   Lemma pf_silent ags ag p1 img log img' log' fin :
     ags !! i = Some ag →
     sail_step next (pa_st ag) WeakPromise.LSilent p1 →
-    rtc (wp_pf_run (sail_step next))
-        (WPCfg img log (<[i := WPAgent p1 (pa_ws ag) (pa_prom ag)]> ags))
-        (WPCfg img' log'
+    rtc (wp_pf_run (pstep_unit (sail_step next)))
+        (WPCfgU img log (<[i := WPAgent p1 (pa_ws ag) (pa_prom ag)]> ags))
+        (WPCfgU img' log'
            (<[i := fin]> (<[i := WPAgent p1 (pa_ws ag) (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (sail_step next)) (WPCfg img log ags)
-        (WPCfg img' log' (<[i := fin]> ags)).
+    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+        (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest]. exists i, WeakPromise.LSilent.
@@ -814,14 +814,14 @@ Section bracket.
   Lemma pf_fence ags ag pr pw sr sw p1 img log img' log' fin :
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LFence pr pw sr sw) p1 →
-    rtc (wp_pf_run (sail_step next))
-        (WPCfg img log
+    rtc (wp_pf_run (pstep_unit (sail_step next)))
+        (WPCfgU img log
            (<[i := WPAgent p1 (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)]> ags))
-        (WPCfg img' log'
+        (WPCfgU img' log'
            (<[i := fin]>
               (<[i := WPAgent p1 (fence_post (pa_ws ag) pr pw sr sw) (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (sail_step next)) (WPCfg img log ags)
-        (WPCfg img' log' (<[i := fin]> ags)).
+    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+        (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest]. exists i, (WeakPromise.LFence pr pw sr sw).
@@ -832,16 +832,16 @@ Section bracket.
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LLoad aq lat base tvs) p1 →
     read_ok img log (pa_ws ag) aq lat base tvs →
-    rtc (wp_pf_run (sail_step next))
-        (WPCfg img log
+    rtc (wp_pf_run (pstep_unit (sail_step next)))
+        (WPCfgU img log
            (<[i := WPAgent p1 (load_post_run (pa_ws ag) aq base tvs.*1)
                       (pa_prom ag)]> ags))
-        (WPCfg img' log'
+        (WPCfgU img' log'
            (<[i := fin]>
               (<[i := WPAgent p1 (load_post_run (pa_ws ag) aq base tvs.*1)
                          (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (sail_step next)) (WPCfg img log ags)
-        (WPCfg img' log' (<[i := fin]> ags)).
+    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+        (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hok Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
@@ -852,18 +852,18 @@ Section bracket.
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LStore rl base data) p1 →
     data ≠ [] →
-    rtc (wp_pf_run (sail_step next))
-        (WPCfg img (log ++ [WMsg base data (Some i) k])
+    rtc (wp_pf_run (pstep_unit (sail_step next)))
+        (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
                      (store_post_run (pa_ws ag) rl base (length data)
                         (S (length log))) (pa_prom ag)]> ags))
-        (WPCfg img' log'
+        (WPCfgU img' log'
            (<[i := fin]>
               (<[i := WPAgent p1
                         (store_post_run (pa_ws ag) rl base (length data)
                            (S (length log))) (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (sail_step next)) (WPCfg img log ags)
-        (WPCfg img' log' (<[i := fin]> ags)).
+    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+        (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hne Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
@@ -877,20 +877,20 @@ Section bracket.
     length tvs = length data →
     read_ok img log (pa_ws ag) aq false base tvs →
     excl_ok log i base tvs (S (length log)) →
-    rtc (wp_pf_run (sail_step next))
-        (WPCfg img (log ++ [WMsg base data (Some i) k])
+    rtc (wp_pf_run (pstep_unit (sail_step next)))
+        (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
                      (store_post_run (load_post_run (pa_ws ag) aq base tvs.*1)
                         rl base (length data) (S (length log)))
                      (pa_prom ag)]> ags))
-        (WPCfg img' log'
+        (WPCfgU img' log'
            (<[i := fin]>
               (<[i := WPAgent p1
                         (store_post_run (load_post_run (pa_ws ag) aq base tvs.*1)
                            rl base (length data) (S (length log)))
                         (pa_prom ag)]> ags))) →
-    rtc (wp_pf_run (sail_step next)) (WPCfg img log ags)
-        (WPCfg img' log' (<[i := fin]> ags)).
+    rtc (wp_pf_run (pstep_unit (sail_step next))) (WPCfgU img log ags)
+        (WPCfgU img' log' (<[i := fin]> ags)).
   Proof.
     intros Hlk Hst Hne Hlen Hok Hex Hrest. rewrite list_insert_insert in Hrest.
     eapply rtc_l; [|exact Hrest].
@@ -927,9 +927,9 @@ Section bracket.
       ∀ (iq : istream) (prom : gset nat) ags,
         ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
                            (wm_ws s) prom) →
-        rtc (wp_pf_run (sail_step next))
-          (WPCfg (wimg s) (wm_log s) ags)
-          (WPCfg (wimg s) (wm_log s')
+        rtc (wp_pf_run (pstep_unit (sail_step next)))
+          (WPCfgU (wimg s) (wm_log s) ags)
+          (WPCfgU (wimg s) (wm_log s')
              (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
                                 (wm_dev s') None iq)
                        (wm_ws s') prom]> ags)).
@@ -1043,9 +1043,9 @@ Section bracket.
     ∀ (iq : istream) (prom : gset nat) ags,
       ags !! i = Some (WPAgent (PSail (Some m) (wm_regs s) (wm_dev s) None iq)
                          (wm_ws s) prom) →
-      rtc (wp_pf_run (sail_step next))
-        (WPCfg (wimg s) (wm_log s) ags)
-        (WPCfg (wimg s) (wm_log s')
+      rtc (wp_pf_run (pstep_unit (sail_step next)))
+        (WPCfgU (wimg s) (wm_log s) ags)
+        (WPCfgU (wimg s) (wm_log s')
            (<[i := WPAgent (PSail (Some (Interface.Ret x)) (wm_regs s')
                               (wm_dev s') None iq)
                      (wm_ws s') prom]> ags)).
@@ -1076,17 +1076,17 @@ Section instr.
   Lemma pf_silent_last ags p0 p1 ws prom img log :
     (i < length ags)%nat →
     sail_step riscv_step p0 WeakPromise.LSilent p1 →
-    rtc (wp_pf_run (sail_step riscv_step))
-        (WPCfg img log (<[i := WPAgent p0 ws prom]> ags))
-        (WPCfg img log (<[i := WPAgent p1 ws prom]> ags)).
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+        (WPCfgU img log (<[i := WPAgent p0 ws prom]> ags))
+        (WPCfgU img log (<[i := WPAgent p1 ws prom]> ags)).
   Proof.
     intros Hlt Hst. eapply rtc_l; [|apply rtc_refl].
     exists i, WeakPromise.LSilent.
     have Hlk : (<[i := WPAgent p0 ws prom]> ags) !! i = Some (WPAgent p0 ws prom)
       by apply list_lookup_insert.
-    have Hstep := PFSilent (sail_step riscv_step) i
-        (WPCfg img log (<[i := WPAgent p0 ws prom]> ags))
-        (WPAgent p0 ws prom) p1 Hlk Hst.
+    have Hstep := PFSilent (pstep_unit (sail_step riscv_step)) i
+        (WPCfgU img log (<[i := WPAgent p0 ws prom]> ags))
+        (WPAgent p0 ws prom) p1 tt Hlk Hst.
     simpl in Hstep. rewrite list_insert_insert in Hstep. exact Hstep.
   Qed.
 
@@ -1097,9 +1097,9 @@ Section instr.
     ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
       ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                          (wm_ws s) prom) →
-      rtc (wp_pf_run (sail_step riscv_step))
-        (WPCfg (wimg s) (wm_log s) ags)
-        (WPCfg (wimg s) (wm_log s')
+      rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+        (WPCfgU (wimg s) (wm_log s) ags)
+        (WPCfgU (wimg s) (wm_log s')
            (<[i := WPAgent (PSail None (wm_regs s') (wm_dev s') None iq)
                      (wm_ws s') prom]> ags)).
   Proof.
@@ -1120,17 +1120,17 @@ Section instr.
 End instr.
 
 (** The ONE-AGENT instance: the configuration shape
-    [WPCfg img log [WPAgent p ws ∅]] the W5 composition starts from
+    [WPCfgU img log [WPAgent p ws ∅]] the W5 composition starts from
     ([<[0 := a]> [b]] reduces to [[a]], so this is [sail_instr_bracket] read
     at [i := 0] with a singleton agent list). *)
 Corollary sail_instr_bracket_single (tick : bool) s x s' :
   sail_shaped (riscv_step tick) →
   wrun (Some 0%nat) (riscv_step tick) s x s' →
   ∀ (iq : istream) (prom : gset nat),
-    rtc (wp_pf_run (sail_step riscv_step))
-      (WPCfg (wimg s) (wm_log s)
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)))
+      (WPCfgU (wimg s) (wm_log s)
          [WPAgent (PSail None (wm_regs s) (wm_dev s) None iq) (wm_ws s) prom])
-      (WPCfg (wimg s) (wm_log s')
+      (WPCfgU (wimg s) (wm_log s')
          [WPAgent (PSail None (wm_regs s') (wm_dev s') None iq) (wm_ws s') prom]).
 Proof.
   intros Hsh Hrun.

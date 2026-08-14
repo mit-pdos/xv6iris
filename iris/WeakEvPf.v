@@ -191,8 +191,12 @@ Definition eags (P : epool) (σ : wgstate) : list (wpagent pexv6) :=
 
 (** THE PROJECTION to a [WeakPromise] configuration — the fabric is dropped,
     which is exactly the information the pf machine cannot hold (§6). *)
-Definition ecfg_of (P : epool) (σ : wgstate) : wpcfg pexv6 :=
-  WPCfg (img_z (wgimg σ)) (wglog σ) (eags P σ).
+(** THE PROJECTION to a [WeakPromise] configuration.  Since the G-series
+    generalization the fabric is a configuration component, so it is no
+    longer forgotten: [D := DevModel.dev_state] and [pc_dev] IS the
+    language's own [wgdev]. *)
+Definition ecfg_of (P : epool) (σ : wgstate) : wpcfg pexv6 dev_state :=
+  WPCfg (img_z (wgimg σ)) (wglog σ) (wgdev σ) (eags P σ).
 
 Lemma eags_hart P σ (c : CPU) : eags P σ !! (fin_to_nat c) = Some (ehart_ag P σ c).
 Proof.
@@ -538,12 +542,30 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 6. THE PROJECTION TO [wpcfg], AND WHAT IT DOES NOT GIVE
+(** ** 6. THE PROJECTION TO [wpcfg] — AND WHAT THE G-SERIES CHANGED
 
-    [ecfg_of] forgets the fabric.  The two facts a consumer of Layer 1's
-    vocabulary needs are here: the observation floor of a hart agent IS that
-    hart's coherence floor, and the disk sits at [n_disk].  What is NOT here,
-    and cannot be, is the reverse containment — see the header. *)
+    THE OBSTRUCTION IN THE HEADER IS GONE AT LAYER 1.  [WeakPromise.wpcfg]
+    now has THREE shared components: the image, the log, and the DEVICE
+    FABRIC [pc_dev : D], with [D] an abstract type parameter and the program
+    step generalized to [P → D → wlabel → P → D → Prop].  So [ecfg_of] no
+    longer forgets anything: it instantiates [D := DevModel.dev_state] and
+    carries [wgdev] itself.
+
+    WHAT G5 STILL OWES (the instance, not the machine).  [epf_step]'s five
+    arms are the five [WeakPromiseBridge.wp_pf_step] arms at
+    [P := pexv6], [D := dev_state], with the marker
+    [pdev p l p' := true] exactly on the DEVICE-ACCESS steps — the
+    [dev_addr]-hit branches of [EPFCycle], and [EPFDisk]/[EPFUart]/[EPFPlic]
+    — every one of which carries [LSilent].  Every other arm is
+    fabric-blind and fabric-preserving, so [WeakPromiseFact.pdev_ok] holds
+    and [WeakRobustTrace]'s witness of an [epf_run] IS its device-access
+    order.  Exhibiting that instance (and reading the decomposition off
+    [WeakRobustTrace.state_ptraces]) is G5's job; nothing in this file needs
+    to change for it.
+
+    The two facts a consumer of Layer 1's vocabulary needs are below: the
+    observation floor of a hart agent IS that hart's coherence floor, and
+    the disk sits at [n_disk]. *)
 
 Lemma obs_flr_hart P σ (c : CPU) (a : Z) :
   obs_flr (ecfg_of P σ) (fin_to_nat c) a = coh (wgws σ c) a.

@@ -203,7 +203,7 @@ End astep.
     message at log position [t - 1] covers byte [a].  (The message's
     AUTHOR is [e.1], by [WeakRobustGraph.gev_ts_msg] — not restated
     here.) *)
-Definition writes_b {P : Type} (TS : ptraces P) (a : Z) (e : gev) (t : nat)
+Definition writes_b {P D : Type} (TS : ptraces P D) (a : Z) (e : gev) (t : nat)
     : Prop :=
   gev_ts TS e = Some t ∧
   ∃ m, pt_log TS !! (t - 1)%nat = Some m ∧ is_Some (msg_byte m a).
@@ -212,11 +212,11 @@ Definition writes_b {P : Type} (TS : ptraces P) (a : Z) (e : gev) (t : nat)
     Spelled on the LOG (not on the events) — see the header: stronger
     antecedent, hence weaker [handoff], and DECIDABLE via
     [WeakMem.writes_inb]. *)
-Definition co_consec {P : Type} (TS : ptraces P) (a : Z) (t1 t2 : nat) : Prop :=
+Definition co_consec {P D : Type} (TS : ptraces P D) (a : Z) (t1 t2 : nat) : Prop :=
   ¬ writes_in (pt_log TS) a t1 (t2 - 1)%nat.
 
 (** SINGLE WRITER: all writes of [a] come from one agent. *)
-Definition sw_byte {P : Type} (TS : ptraces P) (a : Z) : Prop :=
+Definition sw_byte {P D : Type} (TS : ptraces P D) (a : Z) : Prop :=
   ∀ e1 e2 t1 t2, writes_b TS a e1 t1 → writes_b TS a e2 t2 → e1.1 = e2.1.
 
 (** EXCLUSIVITY-CHAINED: every write of [a] either has ONLY same-author
@@ -224,7 +224,7 @@ Definition sw_byte {P : Type} (TS : ptraces P) (a : Z) : Prop :=
     read-half membership [gev_reads TS e a tr] is exactly what an [LRmw]
     label gives: its read range and its write range share [base] and
     length.  No further label inspection is asked of the caller.) *)
-Definition excl_byte {P : Type} (TS : ptraces P) (a : Z) : Prop :=
+Definition excl_byte {P D : Type} (TS : ptraces P D) (a : Z) : Prop :=
   ∀ e t, writes_b TS a e t →
     (∀ e' t', writes_b TS a e' t' → (t' < t)%nat → e'.1 = e.1) ∨
     (∃ tr, gev_reads TS e a tr).
@@ -237,7 +237,7 @@ Definition excl_byte {P : Type} (TS : ptraces P) (a : Z) : Prop :=
     The two edge cases are fine and need no special premise: [er = e1]
     (when [a] itself is sync) and [rr = e2] (when [e2] is the rmw that
     reads [b]). *)
-Definition handoff {P : Type} (TS : ptraces P) (sync : Z → Prop) (a : Z)
+Definition handoff {P D : Type} (TS : ptraces P D) (sync : Z → Prop) (a : Z)
     : Prop :=
   ∀ e1 e2 t1 t2,
     writes_b TS a e1 t1 → writes_b TS a e2 t2 →
@@ -249,14 +249,14 @@ Definition handoff {P : Type} (TS : ptraces P) (sync : Z → Prop) (a : Z)
       (tr ≤ t_star)%nat.
 
 (** THE PER-BYTE OBLIGATION. *)
-Definition byte_ok {P : Type} (TS : ptraces P) (sync : Z → Prop) (a : Z)
+Definition byte_ok {P D : Type} (TS : ptraces P D) (sync : Z → Prop) (a : Z)
     : Prop :=
   sw_byte TS a ∨ excl_byte TS a ∨ handoff TS sync a.
 
 (** THE BUNDLE-LEVEL PREMISE, packaged for the caller: sync bytes are
     closed FIRST (they may not use [handoff] — see the stratification note
     in the header), and every byte is [byte_ok]. *)
-Definition ptraces_bytes_ok {P : Type} (TS : ptraces P) (sync : Z → Prop)
+Definition ptraces_bytes_ok {P D : Type} (TS : ptraces P D) (sync : Z → Prop)
     : Prop :=
   (∀ b, sync b → sw_byte TS b ∨ excl_byte TS b) ∧ (∀ a, byte_ok TS sync a).
 
@@ -265,24 +265,25 @@ Definition ptraces_bytes_ok {P : Type} (TS : ptraces P) (sync : Z → Prop)
     replaces the rf-totality premise of the design note (see the header):
     it implies it, and it is what makes [co_consec] usable as an
     induction handle. *)
-Definition writes_fulfilled {P : Type} (TS : ptraces P) : Prop :=
+Definition writes_fulfilled {P D : Type} (TS : ptraces P D) : Prop :=
   ∀ (t : nat) m, (0 < t)%nat → pt_log TS !! (t - 1)%nat = Some m →
     ∃ e, gev_ts TS e = Some t.
 
 (** THE CONCLUSION, per byte: coherence order is contained in [tc gdep]. *)
-Definition co_tc {P : Type} (TS : ptraces P) (a : Z) : Prop :=
+Definition co_tc {P D : Type} (TS : ptraces P D) (a : Z) : Prop :=
   ∀ e1 e2 t1 t2, writes_b TS a e1 t1 → writes_b TS a e2 t2 → (t1 < t2)%nat →
     tc (gdep TS) e1 e2.
 
 (* ------------------------------------------------------------------ *)
 Section ser.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
+  Context (pdev : P → wlabel → P → bool).
 
-  Implicit Types TS : ptraces P.
-  Implicit Types T : atrace P.
+  Implicit Types TS : ptraces P D.
+  Implicit Types T : atrace P D.
   Implicit Types e : gev.
-  Implicit Types c : wpcfg P.
+  Implicit Types c : wpcfg P D.
 
   (* ---------------------------------------------------------------- *)
   (** ** [writes_b] basics *)
@@ -652,18 +653,19 @@ Section ser.
     exists (i, k). rewrite /gev_ts /gev_ev /= HT /= Hev /=. exact Hts.
   Qed.
 
-  Theorem wp_behavior_co_serialized img ps c :
-    lat_free_prog pstep → wp_behavior pstep img ps c →
+  Theorem wp_behavior_co_serialized img d0 ps c :
+    pdev_ok pstep pdev →
+    lat_free_prog pstep → wp_behavior pstep img d0 ps c →
     ∃ mid TS,
-      rtc (wp_promise_step (P:=P)) (wp_init img ps) mid ∧
+      rtc (wp_promise_step (P:=P) (D:=D)) (wp_init img d0 ps) mid ∧
       ptraces_of pstep TS mid c ∧
       no_promises c ∧
       ptraces_wf pstep TS ∧
       writes_fulfilled TS ∧
       (∀ sync, ptraces_bytes_ok TS sync → ∀ a, co_tc TS a).
   Proof.
-    intros Hlfp Hb.
-    destruct (wp_behavior_fulfil_once pstep img ps c Hlfp Hb)
+    intros Hpok Hlfp Hb.
+    destruct (wp_behavior_fulfil_once pstep pdev img d0 ps c Hpok Hlfp Hb)
       as (mid & TS & Hprom & HTS & Hnp & Hacct).
     have Hwf : ptraces_wf pstep TS by eapply ptraces_of_wf.
     have Hla : log_authored (pc_log mid).

@@ -60,12 +60,12 @@ Proof. solve_decision. Defined.
 (** ** The violation predicate *)
 
 Section violation.
-  Context {P : Type}.
+  Context {P D : Type}.
 
   (** The per-byte observation floor of agent [j] in configuration [c]:
       its coherence floor.  See the header for why [coh] and not a
       view component. *)
-  Definition obs_flr (c : wpcfg P) (j : agent) (a : Z) : nat :=
+  Definition obs_flr (c : wpcfg P D) (j : agent) (a : Z) : nat :=
     match pc_ags c !! j with
     | Some ag => coh (pa_ws ag) a
     | None => 0%nat
@@ -76,12 +76,12 @@ Section violation.
       published (its owner's release fence covered it).  Layer 1 needs
       only MONOTONICITY along runs, required where used (W2a); the Iris
       side derives it from the [w_pub] watermark (D-M6-6). *)
-  Context (pub : wpcfg P → nat → Prop).
+  Context (pub : wpcfg P D → nat → Prop).
 
   (** The violation (D-M6-2): an owned, unpublished message some FOREIGN
       agent's floor has reached.  [ts = S p] for log position [p], as
       everywhere in [WeakMem]. *)
-  Definition violation (c : wpcfg P) : Prop :=
+  Definition violation (c : wpcfg P D) : Prop :=
     ∃ (p : nat) (m : wmsg) (i j : agent) (a : Z),
       pc_log c !! p = Some m ∧ wm_tid m = Some i ∧
       cls m = SCowned ∧ ¬ pub c (S p) ∧
@@ -111,7 +111,7 @@ Section violation.
       [WeakRobustMain.bad] already carries the author's bound, and its
       [bad]/[edges_split] pair carries the reader's, so the exhibit
       produces exactly this form. *)
-  Definition violation_hart (nh : nat) (c : wpcfg P) : Prop :=
+  Definition violation_hart (nh : nat) (c : wpcfg P D) : Prop :=
     ∃ (p : nat) (m : wmsg) (i j : agent) (a : Z),
       pc_log c !! p = Some m ∧ wm_tid m = Some i ∧ tid_hart nh (wm_tid m) ∧
       cls m = SCowned ∧ ¬ pub c (S p) ∧
@@ -132,20 +132,23 @@ Section violation.
       [pf_violation_free] is the UNRESTRICTED form, kept for the goal
       statements below and in [WeakRobustGraph]; [pf_violation_free_hart]
       is what [WeakRobustMain] and [WeakCompose] actually consume. *)
-  Definition pf_violation_free (pstep : P → wlabel → P → Prop)
-      (img : image) (ps : list P) : Prop :=
-    ∀ c, rtc (wp_pf_run pstep) (wp_init img ps) c → ¬ violation c.
+  Definition pf_violation_free (pstep : P → D → wlabel → P → D → Prop)
+      (img : image) (d0 : D) (ps : list P) : Prop :=
+    ∀ c, rtc (wp_pf_run pstep) (wp_init img d0 ps) c → ¬ violation c.
 
   Definition pf_violation_free_hart (nh : nat)
-      (pstep : P → wlabel → P → Prop) (img : image) (ps : list P) : Prop :=
-    ∀ c, rtc (wp_pf_run pstep) (wp_init img ps) c → ¬ violation_hart nh c.
+      (pstep : P → D → wlabel → P → D → Prop) (img : image) (d0 : D)
+      (ps : list P) : Prop :=
+    ∀ c, rtc (wp_pf_run pstep) (wp_init img d0 ps) c → ¬ violation_hart nh c.
 
-  Lemma pf_violation_free_hart_weaken nh pstep img ps :
-    pf_violation_free pstep img ps → pf_violation_free_hart nh pstep img ps.
+  Lemma pf_violation_free_hart_weaken nh pstep img d0 ps :
+    pf_violation_free pstep img d0 ps →
+    pf_violation_free_hart nh pstep img d0 ps.
   Proof. intros H c Hrun Hv. by eapply H, violation_hart_violation. Qed.
 
   (** Sanity: the initial configuration violates nothing (empty log). *)
-  Lemma violation_init img ps : ¬ violation (wp_init (P := P) img ps).
+  Lemma violation_init img d0 ps :
+    ¬ violation (wp_init (P := P) (D := D) img d0 ps).
   Proof. intros (p & m & _ & _ & _ & Hm & _). by rewrite lookup_nil in Hm. Qed.
 
 End violation.
@@ -158,19 +161,19 @@ End violation.
     This is the observable the robustness conclusion preserves — the
     promise-free witness run ends with the SAME memory, at possibly
     different (π-permuted) timestamps. *)
-Definition mem_of {P : Type} (c : wpcfg P) (a : Z) : option (bv 8) :=
+Definition mem_of {P D : Type} (c : wpcfg P D) (a : Z) : option (bv 8) :=
   log_byte (pc_img c) (pc_log c) (latest_ts (pc_log c) a) a.
 
 (** The per-agent program observables. *)
-Definition prog_of {P : Type} (c : wpcfg P) : list P := pa_st <$> pc_ags c.
+Definition prog_of {P D : Type} (c : wpcfg P D) : list P := pa_st <$> pc_ags c.
 
 (* ------------------------------------------------------------------ *)
 (** ** The Layer-1 goal *)
 
 Section goal.
-  Context {P : Type} (pstep : P → wlabel → P → Prop).
+  Context {P D : Type} (pstep : P → D → wlabel → P → D → Prop).
   Context (cls : wmsg → store_class).
-  Context (pub : wpcfg P → nat → Prop).
+  Context (pub : wpcfg P D → nat → Prop).
 
   (** THE ROBUSTNESS GOAL (the theorem W2a+W2b prove; stated here so the
       target is fixed and compiling from day one):
@@ -186,11 +189,11 @@ Section goal.
       anything about incomplete prefixes (doomed runs are model
       artifacts — design doc §2 consequence (a)). *)
   Definition robust : Prop :=
-    ∀ img ps c,
+    ∀ img d0 ps c,
       lat_free_prog pstep →
-      pf_violation_free cls pub pstep img ps →
-      wp_behavior pstep img ps c →
-      ∃ c', rtc (wp_pf_run pstep) (wp_init img ps) c' ∧
+      pf_violation_free cls pub pstep img d0 ps →
+      wp_behavior pstep img d0 ps c →
+      ∃ c', rtc (wp_pf_run pstep) (wp_init img d0 ps) c' ∧
             prog_of c' = prog_of c ∧
             (∀ a : Z, mem_of c' a = mem_of c a).
 

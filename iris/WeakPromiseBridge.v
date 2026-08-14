@@ -78,10 +78,10 @@ Local Open Scope Z_scope.
 
 (* ================================================================== *)
 Section bridge.
-  Context {P : Type}.
-  Context (pstep : P → wlabel → P → Prop).
+  Context {P D : Type}.
+  Context (pstep : P → D → wlabel → P → D → Prop).
 
-  Implicit Types c cfg : wpcfg P.
+  Implicit Types c cfg : wpcfg P D.
 
   (* ---------------------------------------------------------------- *)
   (** ** (A) The promise-free fragment
@@ -93,51 +93,52 @@ Section bridge.
       and [EXT] hold by construction there (see [wpstep_store_now]).  The rmw
       keeps [read_ok] and [excl_ok] verbatim from [WPRmw]; the [excl_ok]
       window is the fused one, [(t, length log]]. *)
-  Inductive wp_pf_step (i : agent) : wlabel → wpcfg P → wpcfg P → Prop :=
-  | PFSilent cfg ag st' :
+  Inductive wp_pf_step (i : agent) : wlabel → wpcfg P D → wpcfg P D → Prop :=
+  | PFSilent cfg ag st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) LSilent st' →
+      pstep (pa_st ag) (pc_dev cfg) LSilent st' d' →
       wp_pf_step i LSilent cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags cfg)))
-  | PFLoad cfg ag aq lat base tvs st' :
+  | PFLoad cfg ag aq lat base tvs st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (WeakPromise.LLoad aq lat base tvs) st' →
+      pstep (pa_st ag) (pc_dev cfg) (WeakPromise.LLoad aq lat base tvs) st' d' →
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq lat base tvs →
       wp_pf_step i (WeakPromise.LLoad aq lat base tvs) cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st'
                          (load_post_run (pa_ws ag) aq base (tvs.*1))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | PFStore cfg ag rl base data k st' :
+  | PFStore cfg ag rl base data k st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (WeakPromise.LStore rl base data) st' →
+      pstep (pa_st ag) (pc_dev cfg) (WeakPromise.LStore rl base data) st' d' →
       data ≠ [] →
       wp_pf_step i (WeakPromise.LStore rl base data) cfg
-        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
                (<[i := WPAgent st'
                          (store_post_run (pa_ws ag) rl base (length data)
                             (S (length (pc_log cfg))))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | PFRmw cfg ag aq rl base tvs data k st' :
+  | PFRmw cfg ag aq rl base tvs data k st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) st' →
+      pstep (pa_st ag) (pc_dev cfg) (WeakPromise.LRmw aq rl base tvs data)
+            st' d' →
       data ≠ [] →
       length tvs = length data →
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
       wp_pf_step i (WeakPromise.LRmw aq rl base tvs data) cfg
-        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k])
+        (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
                (<[i := WPAgent st'
                          (store_post_run
                             (load_post_run (pa_ws ag) aq base (tvs.*1))
                             rl base (length data) (S (length (pc_log cfg))))
                          (pa_prom ag)]> (pc_ags cfg)))
-  | PFFence cfg ag pr pw sr sw st' :
+  | PFFence cfg ag pr pw sr sw st' d' :
       pc_ags cfg !! i = Some ag →
-      pstep (pa_st ag) (WeakPromise.LFence pr pw sr sw) st' →
+      pstep (pa_st ag) (pc_dev cfg) (WeakPromise.LFence pr pw sr sw) st' d' →
       wp_pf_step i (WeakPromise.LFence pr pw sr sw) cfg
-        (WPCfg (pc_img cfg) (pc_log cfg)
+        (WPCfg (pc_img cfg) (pc_log cfg) d'
                (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
                          (pa_prom ag)]> (pc_ags cfg))).
 
@@ -154,11 +155,11 @@ Section bridge.
     cfg_wf c → no_promises c → wp_pf_step i l c c' → rtc (wpstep pstep) c c'.
   Proof.
     intros Hwf Hnp Hstep. destruct Hstep as
-      [cfg ag st' Hlk Hps
-      |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data k st' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data k st' Hlk Hps Hnn Hlen Hr He
-      |cfg ag pr pw sr sw st' Hlk Hps].
+      [cfg ag st' d' Hlk Hps
+      |cfg ag aq lat base tvs st' d' Hlk Hps Hr
+      |cfg ag rl base data k st' d' Hlk Hps Hnn
+      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He
+      |cfg ag pr pw sr sw st' d' Hlk Hps].
     - apply rtc_once. by eapply WPSilent.
     - apply rtc_once. by eapply WPLoad.
     - eapply wpstep_store_now; [done|done|done| |].
@@ -170,9 +171,9 @@ Section bridge.
     - apply rtc_once. by eapply WPFence.
   Qed.
 
-  Lemma no_promises_upd c i ag st' w (lg : list wmsg) :
+  Lemma no_promises_upd c i ag st' w (lg : list wmsg) (dv : D) :
     no_promises c → pc_ags c !! i = Some ag →
-    no_promises (WPCfg (pc_img c) lg
+    no_promises (WPCfg (pc_img c) lg dv
                    (<[i := WPAgent st' w (pa_prom ag)]> (pc_ags c))).
   Proof.
     intros Hnp Hlk j agj Hj. simpl in *.
@@ -203,14 +204,14 @@ Section bridge.
   (** SANITY (the worklist's "every promise-free execution is a behavior"):
       a pf run from an initial configuration is a [wp_behavior] of the FULL
       machine. *)
-  Lemma wp_pf_behavior img ps c :
-    rtc wp_pf_run (wp_init img ps) c → wp_behavior pstep img ps c.
+  Lemma wp_pf_behavior img d0 ps c :
+    rtc wp_pf_run (wp_init img d0 ps) c → wp_behavior pstep img d0 ps c.
   Proof.
     intros Hrun.
-    have Hnp : no_promises (wp_init img ps).
+    have Hnp : no_promises (wp_init img d0 ps).
     { intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
       destruct (ps !! i) as [p|]; by simplify_eq/=. }
-    destruct (wp_pf_run_rtc_wpstep _ _ (cfg_wf_init img ps) Hnp Hrun)
+    destruct (wp_pf_run_rtc_wpstep _ _ (cfg_wf_init img d0 ps) Hnp Hrun)
       as (? & _ & ?).
     by split.
   Qed.
@@ -257,13 +258,13 @@ Section bridge.
   Lemma cfg_match_log c σ : cfg_match c σ → ms_log σ = pc_log c.
   Proof. by intros (_ & ? & _). Qed.
 
-  Lemma cfg_match_upd_gen (img : image) (lg : list wmsg)
+  Lemma cfg_match_upd_gen (img : image) (lg : list wmsg) (dv : D)
       (ags : list (wpagent P)) i ag st' w pr (f g : agent → wstate) :
     (∀ j agj, ags !! j = Some agj → f j = pa_ws agj) →
     ags !! i = Some ag →
     g i = w →
     (∀ j, j ≠ i → g j = f j) →
-    cfg_match (WPCfg img lg (<[i := WPAgent st' w pr]> ags)) (MSt img lg g).
+    cfg_match (WPCfg img lg dv (<[i := WPAgent st' w pr]> ags)) (MSt img lg g).
   Proof.
     intros Hf Hlk Hgi Hgne. split_and!; [done|done|].
     intros j agj Hj. simpl in *.
@@ -309,13 +310,13 @@ Section bridge.
       pc_ags c !! i = Some ag → is_Some (msg_byte m a) →
       (S p ≤ coh (pa_ws ag) a)%nat.
 
-  Lemma own_coh_init img ps : own_coh (wp_init img ps).
+  Lemma own_coh_init img d0 ps : own_coh (wp_init img d0 ps).
   Proof. intros p m i ag a Hm. by rewrite lookup_nil in Hm. Qed.
 
   (** The frozen-log arms (silent, load, fence). *)
-  Lemma own_coh_upd c i ag st' w pr :
+  Lemma own_coh_upd c i ag st' w pr (dv : D) :
     own_coh c → pc_ags c !! i = Some ag → ws_le (pa_ws ag) w →
-    own_coh (WPCfg (pc_img c) (pc_log c)
+    own_coh (WPCfg (pc_img c) (pc_log c) dv
                (<[i := WPAgent st' w pr]> (pc_ags c))).
   Proof.
     intros Hoc Hlk Hle p m j agj a Hm Htid Hj Hb. simpl in *.
@@ -327,11 +328,11 @@ Section bridge.
   Qed.
 
   (** The appending arms (store, rmw). *)
-  Lemma own_coh_append c i ag st' w pr base data kc :
+  Lemma own_coh_append c i ag st' w pr base data kc (dv : D) :
     own_coh c → pc_ags c !! i = Some ag → ws_le (pa_ws ag) w →
     (∀ j : nat, (j < length data)%nat →
        (S (length (pc_log c)) ≤ coh w (base + Z.of_nat j))%nat) →
-    own_coh (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i) kc])
+    own_coh (WPCfg (pc_img c) (pc_log c ++ [WMsg base data (Some i) kc]) dv
                (<[i := WPAgent st' w pr]> (pc_ags c))).
   Proof.
     intros Hoc Hlk Hle Hnew p m j agj a Hm Htid Hj Hb. simpl in *.
@@ -357,19 +358,20 @@ Section bridge.
     own_coh c → wp_pf_step i l c c' → own_coh c'.
   Proof.
     intros Hoc Hstep. destruct Hstep as
-      [cfg ag st' Hlk Hps
-      |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data k st' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data k st' Hlk Hps Hnn Hlen Hr He
-      |cfg ag pr pw sr sw st' Hlk Hps].
-    - eapply own_coh_upd; [done|done|reflexivity].
-    - eapply own_coh_upd; [done|done|apply load_post_run_le].
-    - eapply own_coh_append; [done|done|apply store_post_run_le|].
+      [cfg ag st' d' Hlk Hps
+      |cfg ag aq lat base tvs st' d' Hlk Hps Hr
+      |cfg ag rl base data k st' d' Hlk Hps Hnn
+      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He
+      |cfg ag pr pw sr sw st' d' Hlk Hps].
+    - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|reflexivity].
+    - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply load_post_run_le].
+    - eapply (own_coh_append _ _ _ _ _ _ _ _ _ d');
+        [done|done|apply store_post_run_le|].
       intros j Hj. by apply (store_post_run_coh _ rl base (length data) _ j).
-    - eapply own_coh_append; [done|done| |].
+    - eapply (own_coh_append _ _ _ _ _ _ _ _ _ d'); [done|done| |].
       + etrans; [apply load_post_run_le|apply store_post_run_le].
       + intros j Hj. by apply (store_post_run_coh _ rl base (length data) _ j).
-    - eapply own_coh_upd; [done|done|apply fence_post_le].
+    - eapply (own_coh_upd _ _ _ _ _ _ d'); [done|done|apply fence_post_le].
   Qed.
 
   Lemma own_coh_run c c' : own_coh c → rtc wp_pf_run c c' → own_coh c'.
@@ -419,26 +421,26 @@ Section bridge.
     intros Hoc Hm Hstep. destruct σ as [img lg f].
     destruct Hm as (Himg & Hlg & Hf). simpl in Himg, Hlg, Hf.
     destruct Hstep as
-      [cfg ag st' Hlk Hps
-      |cfg ag aq lat base tvs st' Hlk Hps Hr
-      |cfg ag rl base data k st' Hlk Hps Hnn
-      |cfg ag aq rl base tvs data k st' Hlk Hps Hnn Hlen Hr He
-      |cfg ag pr pw sr sw st' Hlk Hps]; subst img lg;
+      [cfg ag st' d' Hlk Hps
+      |cfg ag aq lat base tvs st' d' Hlk Hps Hr
+      |cfg ag rl base data k st' d' Hlk Hps Hnn
+      |cfg ag aq rl base tvs data k st' d' Hlk Hps Hnn Hlen Hr He
+      |cfg ag pr pw sr sw st' d' Hlk Hps]; subst img lg;
       [exists WCplain| exists WCplain| exists k| exists k| exists WCplain];
       simpl.
     - (* silent: the projected state does not move *)
-      eapply (cfg_match_upd_gen _ _ _ i ag st' (pa_ws ag) _ f f);
+      eapply (cfg_match_upd_gen _ _ _ _ i ag st' (pa_ws ag) _ f f);
         [done|done|by apply Hf|done].
     - (* load *)
       eexists. split.
       + apply MStepLoad. simpl. rewrite (Hf i ag Hlk). by eapply read_ok_rd_ok.
-      + simpl. eapply (cfg_match_upd_gen _ _ _ i ag st' _ _ f); [done|done| |].
+      + simpl. eapply (cfg_match_upd_gen _ _ _ _ i ag st' _ _ f); [done|done| |].
         * rewrite upd_ws_eq (Hf i ag Hlk) //.
         * intros j Hne. by rewrite upd_ws_ne.
     - (* store *)
       eexists. split.
       + by apply MStepStore.
-      + simpl. eapply (cfg_match_upd_gen _ _ _ i ag st' _ _ f); [done|done| |].
+      + simpl. eapply (cfg_match_upd_gen _ _ _ _ i ag st' _ _ f); [done|done| |].
         * rewrite upd_ws_eq (Hf i ag Hlk) //.
         * intros j Hne. by rewrite upd_ws_ne.
     - (* rmw: the dovetail supplies [rmw_latest] *)
@@ -448,13 +450,13 @@ Section bridge.
         * by rewrite length_fmap Hlen.
         * simpl. rewrite (Hf i ag Hlk). by eapply read_ok_rd_ok.
         * simpl. by eapply pf_rmw_latest.
-      + simpl. eapply (cfg_match_upd_gen _ _ _ i ag st' _ _ f); [done|done| |].
+      + simpl. eapply (cfg_match_upd_gen _ _ _ _ i ag st' _ _ f); [done|done| |].
         * rewrite upd_ws_eq (Hf i ag Hlk) //.
         * intros j Hne. by rewrite upd_ws_ne.
     - (* fence *)
       eexists. split.
       + apply MStepFence.
-      + simpl. eapply (cfg_match_upd_gen _ _ _ i ag st' _ _ f); [done|done| |].
+      + simpl. eapply (cfg_match_upd_gen _ _ _ _ i ag st' _ _ f); [done|done| |].
         * rewrite upd_ws_eq (Hf i ag Hlk) //.
         * intros j Hne. by rewrite upd_ws_ne.
   Qed.
@@ -504,28 +506,28 @@ Section bridge.
       final configuration's log and per-agent [wstate]s.  ([cfg_match]'s
       second conjunct at the final index is literally [ex_log E = pc_log c],
       by definition of [ex_log].) *)
-  Theorem wp_pf_bridge img ps c :
-    rtc wp_pf_run (wp_init img ps) c →
+  Theorem wp_pf_bridge img d0 ps c :
+    rtc wp_pf_run (wp_init img d0 ps) c →
     ∃ E, exec_wf E ∧ ex_img E = img ∧
          cfg_match c (stt E (length (ex_tr E))).
   Proof.
     intros Hrun.
     set σ0 := MSt img [] (λ _ : agent, ws_init).
     have HE : exec_wf (Exec [σ0] []) by apply exec_nil.
-    have Hm0 : cfg_match (wp_init img ps) (stt (Exec [σ0] []) 0%nat).
+    have Hm0 : cfg_match (wp_init img d0 ps) (stt (Exec [σ0] []) 0%nat).
     { split_and!; [done|done|].
       intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
       destruct (ps !! i) as [p|]; by simplify_eq/=. }
-    destruct (bridge_run _ _ Hrun (own_coh_init img ps) (Exec [σ0] []) HE Hm0)
+    destruct (bridge_run _ _ Hrun (own_coh_init img d0 ps) (Exec [σ0] []) HE Hm0)
       as (E & HE' & Himg & Hm).
     exists E. by split_and!.
   Qed.
 
-  Corollary wp_pf_bridge_log img ps c :
-    rtc wp_pf_run (wp_init img ps) c →
+  Corollary wp_pf_bridge_log img d0 ps c :
+    rtc wp_pf_run (wp_init img d0 ps) c →
     ∃ E, exec_wf E ∧ ex_img E = img ∧ ex_log E = pc_log c.
   Proof.
-    intros Hrun. destruct (wp_pf_bridge img ps c Hrun) as (E & ? & ? & Hm).
+    intros Hrun. destruct (wp_pf_bridge img d0 ps c Hrun) as (E & ? & ? & Hm).
     exists E. split_and!; [done|done|]. by apply cfg_match_log.
   Qed.
 
@@ -543,7 +545,11 @@ Section bridge.
       read has NO writes above it, in particular none by another agent —
       [writes_in_by_writes_in]), and a store's fresh top is where [mstep]
       appends anyway. *)
-  Definition prog_free : Prop := ∀ p l p', pstep p l p'.
+  (** "Programs are free" now also means FABRIC-BLIND: the LTS admits
+      every label at every fabric and leaves the fabric alone.  That is
+      the right generalization for the reverse bridge — the axiomatic
+      side has no fabric, so a run it dictates must not need one. *)
+  Definition prog_free : Prop := ∀ p d l p', pstep p d l p' d.
 
   Definition unproj_lbl (lb : WeakAxiomatic.lbl) : wlabel :=
     match lb with
@@ -595,11 +601,11 @@ Section bridge.
     subst img lg.
     (* the [cfg_match] obligation is the same three lines in every arm *)
     have Hmatch : ∀ (st' : P) (w : wstate) (pr : gset nat) (lg' : list wmsg),
-      cfg_match (WPCfg (pc_img c) lg'
+      cfg_match (WPCfg (pc_img c) lg' (pc_dev c)
                    (<[i := WPAgent st' w pr]> (pc_ags c)))
                 (MSt (pc_img c) lg' (upd_ws f i w)).
     { intros st' w pr lg'.
-      eapply (cfg_match_upd_gen _ _ _ i ag st' w pr f); [done|done| |].
+      eapply (cfg_match_upd_gen _ _ _ _ i ag st' w pr f); [done|done| |].
       - by rewrite upd_ws_eq.
       - intros j Hne. by rewrite upd_ws_ne. }
     inversion Hms as
@@ -610,23 +616,25 @@ Section bridge.
     - (* load *)
       pose proof Hrd as [Hlen _].
       eexists. split.
-      + apply (PFLoad i c ag aq false base (zip ts vs) (pa_st ag));
+      + apply (PFLoad i c ag aq false base (zip ts vs) (pa_st ag) (pc_dev c));
           [done|apply Hpf|].
         rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.
       + rewrite fst_zip; [lia|]. rewrite (Hf i ag Hlk). apply Hmatch.
     - (* store *)
       eexists. split.
-      + apply (PFStore i c ag rl base vs kc (pa_st ag));
+      + apply (PFStore i c ag rl base vs kc (pa_st ag) (pc_dev c));
           [done|apply Hpf|done].
       + rewrite (Hf i ag Hlk). apply Hmatch.
     - (* fence *)
       eexists. split.
-      + apply (PFFence i c ag pr pw sr sw (pa_st ag)); [done|apply Hpf].
+      + apply (PFFence i c ag pr pw sr sw (pa_st ag) (pc_dev c));
+          [done|apply Hpf].
       + rewrite (Hf i ag Hlk). apply Hmatch.
     - (* rmw *)
       pose proof Hrd as [Hlen' _].
       eexists. split.
-      + apply (PFRmw i c ag aq rl base (zip ts rvs) wvs kc (pa_st ag));
+      + apply (PFRmw i c ag aq rl base (zip ts rvs) wvs kc (pa_st ag)
+                 (pc_dev c));
           [done|apply Hpf|done| | |].
         * rewrite length_zip_with. lia.
         * rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.
@@ -634,15 +642,15 @@ Section bridge.
       + rewrite fst_zip; [lia|]. rewrite (Hf i ag Hlk). apply Hmatch.
   Qed.
 
-  Lemma exec_prefix_pf_run ps E n :
+  Lemma exec_prefix_pf_run ps d0 E n :
     prog_free → exec_wf E →
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
     (n ≤ length (ex_tr E))%nat →
-    ∃ c, rtc wp_pf_run (wp_init (ex_img E) ps) c ∧
+    ∃ c, rtc wp_pf_run (wp_init (ex_img E) d0 ps) c ∧
          length (pc_ags c) = length ps ∧ cfg_match c (stt E n).
   Proof.
     intros Hpf HE Hag. induction n as [|n IH]; intros Hn.
-    - exists (wp_init (ex_img E) ps). split_and!; [done| |].
+    - exists (wp_init (ex_img E) d0 ps). split_and!; [done| |].
       + by rewrite /= length_map.
       + split_and!.
         * done.
@@ -663,23 +671,23 @@ Section bridge.
   (** THE REVERSE BRIDGE.  With a program LTS that admits everything, every
       [exec_wf] execution over agents [0 .. length ps - 1] is the projection
       of a promise-free run of the full machine. *)
-  Theorem exec_wf_pf_run ps E :
+  Theorem exec_wf_pf_run ps d0 E :
     prog_free → exec_wf E →
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
-    ∃ c, rtc wp_pf_run (wp_init (ex_img E) ps) c ∧
+    ∃ c, rtc wp_pf_run (wp_init (ex_img E) d0 ps) c ∧
          cfg_match c (stt E (length (ex_tr E))).
   Proof.
     intros Hpf HE Hag.
-    destruct (exec_prefix_pf_run ps E (length (ex_tr E)) Hpf HE Hag
+    destruct (exec_prefix_pf_run ps d0 E (length (ex_tr E)) Hpf HE Hag
                 ltac:(lia)) as (c & ? & _ & ?).
     by exists c.
   Qed.
 
 End bridge.
 
-Global Arguments wp_pf_step {P} _ _ _ _ _.
-Global Arguments wp_pf_run {P} _ _ _.
-Global Arguments cfg_match {P} _ _.
-Global Arguments own_coh {P} _.
-Global Arguments proj_ws {P} _ _.
-Global Arguments proj_st {P} _.
+Global Arguments wp_pf_step {P D} _ _ _ _ _.
+Global Arguments wp_pf_run {P D} _ _ _.
+Global Arguments cfg_match {P D} _ _.
+Global Arguments own_coh {P D} _.
+Global Arguments proj_ws {P D} _ _.
+Global Arguments proj_st {P D} _.
