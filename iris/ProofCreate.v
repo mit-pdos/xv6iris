@@ -554,19 +554,33 @@ Proof. lia. Qed.
 (* the three slot figures the found half hands back, against [create_slots]:
    ARM N / ARM G return the ledger WHOLE, F-OK keeps one out for the inode
    it returns, F-BAD's second [iunlockput] gives that one back too. *)
-Lemma cr_slots_ns (ns : nat) : (create_slots <= ns)%nat ->
-  ((ns - create_slots)%nat <= ns)%nat /\ (ns <= ns)%nat.
-Proof. unfold create_slots. lia. Qed.
+Lemma cr_slots_ns (ok : bool) (ns : nat) :
+  ok = false -> (create_slots <= ns)%nat ->
+  ((ns - create_slots)%nat <= ns)%nat /\ (ns <= ns)%nat
+  /\ (ok = true -> (S ns <= ns)%nat).
+Proof.
+  intros -> Hns. unfold create_slots in *.
+  split_and!; [lia | lia | discriminate].
+Qed.
 
-Lemma cr_slots_1 (ns : nat) : (create_slots <= ns)%nat ->
+Lemma cr_slots_1 (ok : bool) (ns : nat) : (create_slots <= ns)%nat ->
   ((ns - create_slots)%nat <= (1 + (ns - 2))%nat)%nat
-  /\ ((1 + (ns - 2))%nat <= ns)%nat.
-Proof. unfold create_slots. lia. Qed.
+  /\ ((1 + (ns - 2))%nat <= ns)%nat
+  /\ (ok = true -> (S (1 + (ns - 2))%nat <= ns)%nat).
+Proof.
+  intro Hns. unfold create_slots in *.
+  split_and!; [lia | lia | intros _; lia].
+Qed.
 
-Lemma cr_slots_2 (ns : nat) : (create_slots <= ns)%nat ->
+Lemma cr_slots_2 (ok : bool) (ns : nat) :
+  ok = false -> (create_slots <= ns)%nat ->
   ((ns - create_slots)%nat <= (1 + (1 + (ns - 2)))%nat)%nat
-  /\ ((1 + (1 + (ns - 2)))%nat <= ns)%nat.
-Proof. unfold create_slots. lia. Qed.
+  /\ ((1 + (1 + (ns - 2)))%nat <= ns)%nat
+  /\ (ok = true -> (S (1 + (1 + (ns - 2)))%nat <= ns)%nat).
+Proof.
+  intros -> Hns. unfold create_slots in *.
+  split_and!; [lia | lia | discriminate].
+Qed.
 
 Lemma cr_ns_split (ns : nat) : (create_slots <= ns)%nat -> ns = (2 + (ns - 2))%nat.
 Proof. unfold create_slots. lia. Qed.
@@ -912,10 +926,14 @@ Qed.
    A-FAIL's (the gate hands the slot back and [iunlockput] returns one); ARM
    C-OK keeps the child's slot out and gets one back from [dirlink]'s net
    zero and one from its [iunlockput(dp)]. *)
-Lemma cr_slots_3 (ns : nat) : (create_slots <= ns)%nat ->
+Lemma cr_slots_3 (ok : bool) (ns : nat) : (create_slots <= ns)%nat ->
   ((ns - create_slots)%nat <= (1 + (1 + (ns - 3)))%nat)%nat
-  /\ ((1 + (1 + (ns - 3)))%nat <= ns)%nat.
-Proof. unfold create_slots. lia. Qed.
+  /\ ((1 + (1 + (ns - 3)))%nat <= ns)%nat
+  /\ (ok = true -> (S (1 + (1 + (ns - 3)))%nat <= ns)%nat).
+Proof.
+  intro Hns. unfold create_slots in *.
+  split_and!; [lia | lia | intros _; lia].
+Qed.
 
 Lemma cr_ns_2 (ns : nat) : (create_slots <= ns)%nat ->
   (1 + (ns - 3))%nat = (ns - 2)%nat.
@@ -1384,9 +1402,11 @@ Section ProofCreateMain.
        proc_priv γf (proc_addr j) pidv V -∗
        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
        bslots bn 3 -∗
-       ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
+       ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat
+         /\ (ok = true -> (S ns' <= ns)%nat)⌝ -∗
        iref_slots ns' -∗
-       ⌜Sb ⊆ Sb' /\ (u' <= u)%nat⌝ -∗
+       ⌜Sb ⊆ Sb' /\ (u' <= u)%nat
+         /\ (ok = true -> (iput_units <= u')%nat)⌝ -∗
        log_opS γ u' Sb' -∗
        (if ok
         then ⌜mf !!! Regidx Ra0 = ientry k
@@ -2864,9 +2884,10 @@ Section ProofCreateMain.
                   with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath
                         Hbsl [%] Hisl [%] Hop [%]").
         { exact Hcsf. }
-        { exact (cr_slots_ns ns Hns). }
-        { exact (conj (cr_sub2 _ _ _ Hsb1 Hsb2)
-                   (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))). }
+        { exact (cr_slots_ns _ ns eq_refl Hns). }
+        { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
+                      | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
+                      | discriminate]. }
         { rewrite Ha0f. exact HG3s2. }
       + (* ====== THE GUARD FALLS THROUGH: dp->nlink <> 0 ============== *)
         iApply (wp_cbeqz_fall_s_sconf (mword_of_int (CK + 0x2e))
@@ -3466,9 +3487,11 @@ Section ProofCreateMain.
                       with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv
                             Hpath Hbsl [%] Hisl [%] Hop [%]").
             { exact Hcsf. }
-            { exact (cr_slots_2 ns Hns). }
-            { exact (conj (cr_sub3 _ _ _ _ Hsb1 Hsb2 Hsb3)
-                       (cr_le3 _ _ _ _ (proj2 Hn3) (proj2 Hn2) (proj2 Hnp1))). }
+            { exact (cr_slots_2 _ ns eq_refl Hns). }
+            { split_and!;
+                [exact (cr_sub3 _ _ _ _ Hsb1 Hsb2 Hsb3)
+                | exact (cr_le3 _ _ _ _ (proj2 Hn3) (proj2 Hn2) (proj2 Hnp1))
+                | discriminate]. }
             { rewrite Ha0f. exact HB3s2. } }
           (* ===== +0x5a c.li a5,2 ===================================== *)
           iApply (wp_cli_s_sconf (mword_of_int (CK + 0x5a)) Ra5
@@ -3702,9 +3725,11 @@ Section ProofCreateMain.
                                 Hpath Hbsl [%] Hisl [%] Hop [Hcslkd Hcslpid Hcdep
                                 Hcidev Hciinum Hcivalid Hcload Hckeep]").
                 { exact Hcsf. }
-                { exact (cr_slots_1 ns Hns). }
-                { exact (conj (cr_sub2 _ _ _ Hsb1 Hsb2)
-                           (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))). }
+                { exact (cr_slots_1 _ ns Hns). }
+                { split_and!;
+                    [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
+                    | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
+                    | intros _; exact Hn2ip]. }
                 iSplitR.
                 { iPureIntro. split; [rewrite Ha0f; exact HFBs2 |].
                   split; [exact Hkslot |].
@@ -3951,9 +3976,10 @@ Section ProofCreateMain.
                   with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath
                         Hbsl [%] Hisl [%] Hop [%]").
         { exact Hcsf. }
-        { exact (cr_slots_ns ns Hns). }
-        { exact (conj (cr_sub2 _ _ _ Hsb1 Hsb2)
-                   (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))). }
+        { exact (cr_slots_ns _ ns eq_refl Hns). }
+        { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
+                      | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
+                      | discriminate]. }
         { rewrite Ha0f. exact HJ3s2. }
         }
         iPoseProof (cri_030 with "Htext") as "Hi030".
@@ -4179,8 +4205,8 @@ Section ProofCreateMain.
                 with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath
                       Hbsl [%] Hisl [%] Hop [%]").
       { exact Hcsf. }
-      { exact (cr_slots_ns ns Hns). }
-      { exact (conj Hsb1 (proj2 Hnp1)). }
+      { exact (cr_slots_ns _ ns eq_refl Hns). }
+      { split_and!; [exact Hsb1 | exact (proj2 Hnp1) | discriminate]. }
       { rewrite Ha0f. exact HN1s2. }
   Qed.
 
@@ -4822,7 +4848,7 @@ Section ProofCreateMain.
         all: try lkbelow.
         iIntros (CIDdl Hsdl mdl found bm' data' dn' dn0' n' used' Sb' tot)
           "%Hcsdl Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs
-           Hsbb Hbmr Hdiat Hppid Hbsl Hislk %Hn' %Hsb' %Hdl16 Hop %Hcapp
+           Hsbb Hbmr Hdiat Hppid Hbsl Hislk %Hn' %Hsb' %Hdl16 %Hfd0 Hop %Hcapp
            %Hsizedp %Harm".
         iEval (rewrite HX4a1) in "Hnb14".
         assert (Hpcdl : ret_pc (X4 !!! Regidx Rra : mword 64)
@@ -4895,6 +4921,19 @@ Section ProofCreateMain.
           -- (* ======================================================== *)
              (*  ARM C-OK-FILE: all sixteen bytes went in                 *)
              (* ======================================================== *)
+             (* THE PARENT'S INODE BLOCK IS LOGGED ON THIS ARM, and that is
+                what buys [cru := true] at the [iunlockput(dp)] below: the
+                append went in whole, so [dl16_post]'s membership trio fires
+                (it is guarded on [0 < tot], and the FAIL arms are exactly
+                the ones that cannot have it).  With [cru] the put's spend is
+                its bitmap report alone, and [cr_alloc_ip4]'s FOUR then
+                leaves [iput_units] behind it -- the floor create's
+                [ok = true] post now owes. *)
+             assert (Ht0lt : (0 < tot)%nat) by (clear -Ht16; lia).
+             assert (Hmemu : IBLOCK dind inodestart ∈ Sb')
+               by exact (proj1 (proj2 (Hmem Ht0lt))).
+             assert (Hcruu : true = true -> IBLOCK dind inodestart ∈ Sb')
+               by (intros _; exact Hmemu).
              iPoseProof (cri_0e0 with "Htext") as "Hi0e0".
              iPoseProof (cri_0e2 with "Htext") as "Hi0e2".
              iPoseProof (cri_0e6 with "Htext") as "Hi0e6".
@@ -5005,10 +5044,9 @@ Section ProofCreateMain.
              iApply (IUP.wp_iunlockput_gen γs j γl γu γd γk pd pav pu bn γ γfs
                        γi cn gtl γil γisl cov logstart bmapstart inodestart nib
                        size dev used' kd (qd/2)%Qp (qd/2)%Qp gd dind dn' bm'
-                       n' Sb' false false false e0 pidv (DfracOwn (1/4)) dqb dqs
+                       n' Sb' false true false e0 pidv (DfracOwn (1/4)) dqb dqs
                        Y2 (K - 10)%nat eb C b lks
-                       ltac:(exact HKiup) Hkdlt ltac:(discriminate)
-                       ltac:(discriminate)
+                       ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
                        with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitb2
@@ -5114,14 +5152,18 @@ Section ProofCreateMain.
                              Hcdep Hcidev Hciinum Hcivalid Hcdlnk Hcdiat Hcmeta
                              Hcmap Hcblocks Hckeep]").
              { exact Hcsf. }
-             { exact (cr_slots_3 ns Hns). }
-             { split.
+             { exact (cr_slots_3 _ ns Hns). }
+             { split_and!.
                - exact (cr_sub3 _ _ _ _ Hsb1
                           (cr_sub2 _ _ _ (cr_sub_union_sing Sb1 _)
                              (cr_sub_union_sing _ _))
                           (cr_sub2 _ _ _ Hsb' Hsb2)).
                - pose proof (proj2 Hn2) as HB1. pose proof (proj2 Hn') as HB2.
-                 lia. }
+                 lia.
+               - intros _.
+                 exact (cr_fail_ip_left n' n2 wf2
+                          (cr_alloc_ip4 (S q2) n' _ _ _ _ _ ltac:(lia) Hspend)
+                          (proj1 Hn2)). }
              iSplitR.
              { iPureIntro. split; [rewrite Ha0f; exact HY4s2 |].
                split; [exact Hkslt |].
@@ -5412,9 +5454,10 @@ Section ProofCreateMain.
                 with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath
                       Hbsl [%] Hisl [%] Hop [%]").
       { exact Hcsf. }
-      { exact (cr_slots_2 ns Hns). }
-      { exact (conj (cr_sub2 _ _ _ Hsb1 Hsb2)
-                 (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))). }
+      { exact (cr_slots_2 _ ns eq_refl Hns). }
+      { split_and!; [exact (cr_sub2 _ _ _ Hsb1 Hsb2)
+                    | exact (cr_le2 _ _ _ (proj2 Hn2) (proj2 Hnp1))
+                    | discriminate]. }
       { rewrite Ha0f. exact HZ4s2. }
   Qed.
 
@@ -5980,13 +6023,14 @@ Section ProofCreateMain.
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath
                     Hbsl [%] Hisl [%] Hop [%]").
     { exact Hcsf. }
-    { exact (cr_slots_2 ns Hns). }
-    { split.
+    { exact (cr_slots_2 _ ns eq_refl Hns). }
+    { split_and!.
       - exact (cr_sub3 _ _ _ _ Hsb4
                  (cr_sub_union_sing Sb4 (IBLOCK cinum inodestart))
                  (cr_sub2 _ _ _ Hsb5 Hsb6)).
       - pose proof (proj2 Hn6) as HB1. pose proof (proj2 Hn5) as HB2.
-        pose proof (proj2 Hn4) as HB3. lia. }
+        pose proof (proj2 Hn4) as HB3. lia.
+      - discriminate. }
     { rewrite Ha0f. exact HG7s2. }
   Qed.
 
@@ -6652,13 +6696,14 @@ Section ProofCreateMain.
               with "[%] Hcg Hcnt Hpc Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath
                     Hbsl [%] Hisl [%] Hop [%]").
     { exact Hcsf. }
-    { exact (cr_slots_2 ns Hns). }
-    { split.
+    { exact (cr_slots_2 _ ns eq_refl Hns). }
+    { split_and!.
       - exact (cr_sub3 _ _ _ _ Hsb4
                  (cr_sub_union_sing Sb4 (IBLOCK cinum inodestart))
                  (cr_sub2 _ _ _ Hsb5 Hsb6)).
       - pose proof (proj2 Hn6) as HB1. pose proof (proj2 Hn5) as HB2.
-        pose proof (proj2 Hn4) as HB3. lia. }
+        pose proof (proj2 Hn4) as HB3. lia.
+      - discriminate. }
     { rewrite Ha0f. exact HG7s2. }
   Qed.
 
@@ -7028,7 +7073,7 @@ Section ProofCreateMain.
     all: try lkbelow.
     iIntros (CIDd1 Hsd1 md1 found1 bm1 dat1 dc1 dc01 n4 usd1 Sb4 tot1)
       "%Hcsd1 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw1 Hsbi
-       Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk %Hn4c %Hsb4 %Hdlp1 Hop %Hcap1
+       Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk %Hn4c %Hsb4 %Hdlp1 %Hfd1 Hop %Hcap1
        %Hsizedp1 %Harm1".
     assert (Hpcd1 : ret_pc (Z5 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x10a)) by (rewrite HZ5ra; pcw).
@@ -7316,7 +7361,7 @@ Section ProofCreateMain.
       all: try lkbelow.
       iIntros (CIDd2 Hsd2 md2 found2 bm2 dat2 dc2 dc02 n5 usd2 Sb5 tot2)
         "%Hcsd2 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw2 Hsbi
-         Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk %Hn5c %Hsb5 %Hdlp2 Hop %Hcap2
+         Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk %Hn5c %Hsb5 %Hdlp2 %Hfd2 Hop %Hcap2
          %Hsizedp2 %Harm2".
       assert (Hpcd2 : ret_pc (Y5 !!! Regidx Rra : mword 64)
                       = mword_of_int (CK + 0x11e)) by (rewrite HY5ra; pcw).
@@ -7542,7 +7587,7 @@ Section ProofCreateMain.
         all: try lkbelow.
         iIntros (CIDd3 Hsd3 md3 found3 bm3 dat3 dp3 dp03 n6 usd3 Sb6 tot3)
           "%Hcsd3 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi
-           Hsbs Hsbb Hbmr Hdiat Hppid Hbsl Hislk %Hn6c %Hsb6 %Hdlp3 Hop %Hcap3
+           Hsbs Hsbb Hbmr Hdiat Hppid Hbsl Hislk %Hn6c %Hsb6 %Hdlp3 %Hfd3 Hop %Hcap3
            %Hsizedp3 %Harm3".
         iEval (rewrite HW4a1) in "Hnb14".
         assert (Hpcd3 : ret_pc (W4 !!! Regidx Rra : mword 64)
@@ -7951,6 +7996,24 @@ Section ProofCreateMain.
                     ty major minor T2)
             by (rewrite /T2; apply cr_regs3_caller;
                 [exact Hcsra | exact HT1regs]).
+          (* BOTH CREDITS ARE IN HAND HERE, which is why this arm's
+             [iunlockput(dp)] is FREE: the +0x140 flush unioned [IBLOCK dp]
+             in itself, and [bmapstart] has been in the set since the first
+             interior [dirlink] allocated the child's block 0.  [crb] pins
+             the report [w = false] and [cru] kills the remaining unit, so
+             the put spends nothing and [cr_budget_mkdir]'s ZERO-SLACK three
+             survives it -- which is the floor create's [ok = true] post
+             now owes, at the arm that has the least of it. *)
+          assert (Hbm6 : bmapstart ∈ Sb6) by exact (Hsb6 _ Hbmem5).
+          assert (Hcrbu : true = true
+                    -> bmapstart ∈ (Sb6 ∪ {[IBLOCK dind inodestart]}))
+            by (intros _;
+                exact (cr_sub_union_sing Sb6 (IBLOCK dind inodestart)
+                         bmapstart Hbm6)).
+          assert (Hcruu : true = true
+                    -> IBLOCK dind inodestart
+                       ∈ (Sb6 ∪ {[IBLOCK dind inodestart]}))
+            by (intros _; exact (cr_in_union_sing Sb6 (IBLOCK dind inodestart))).
           iDestruct (cpu_own_transport CIDh7 CIDT2 0%nat eb (proc_addr j) C b
                        ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
           iDestruct (log_opS_named with "Hop") as (e0) "Hop".
@@ -7961,10 +8024,9 @@ Section ProofCreateMain.
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
                     bm3 (S u6) (Sb6 ∪ {[IBLOCK dind inodestart]})
-                    false false false e0 pidv (DfracOwn (1/4)) dqb dqs
+                    true true false e0 pidv (DfracOwn (1/4)) dqb dqs
                     T2 (K - 10)%nat eb C b lks
-                    ltac:(exact HKiup) Hkdlt ltac:(discriminate)
-                    ltac:(discriminate)
+                    ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
                     with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitb2
@@ -8069,15 +8131,17 @@ Section ProofCreateMain.
                           Hcdep Hcidev Hciinum Hcivalid Hcdlnk2 Hcdiat Hcmeta
                           Hcmap Hcblocks Hckeep]").
           { exact Hcsf. }
-          { exact (cr_slots_3 ns Hns). }
-          { split.
+          { exact (cr_slots_3 _ ns Hns). }
+          { split_and!.
             - exact (cr_sub2 _ _ _
                        (cr_sub2 _ _ _
                           (cr_sub2 _ _ _ (cr_sub2 _ _ _ Hsb3 Hsb4) Hsb5)
                           (cr_sub2 _ _ _ Hsb6
                              (cr_sub_union_sing Sb6
                                 (IBLOCK dind inodestart)))) Hsb7).
-            - clear -Hn7 Hn6c Hn5c Hn4c Hn3u. lia. }
+            - clear -Hn7 Hn6c Hn5c Hn4c Hn3u. lia.
+            - intros _. rewrite (Hwf7c eq_refl) in Hn7.
+              exact (cr_fail_ip_right (S u6) n7 Hipn6 (proj1 Hn7)). }
           iEval (rewrite /inode_map) in "Hcmap".
           iDestruct "Hcmap" as "[Hcaddrs2 Hcind2]".
           iDestruct (ic_mk_loaded γfs γi cov logstart kslot cinum dc2 bm2 dat2

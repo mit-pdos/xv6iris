@@ -881,6 +881,20 @@ Definition wp_dirlink_gen_body
          [dirlink_units] clause above is untouched. *)
       ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
                  bm bm' Sb Sb'⌝ -∗
+      (* ...and the FOUND arm's OWN spend, which the counted
+         [dirlink_units] above does not price finely enough for a caller
+         that cannot REFUTE the arm.  create can (it holds [ilock(dp)]
+         across its own [dirlookup] miss and reads the miss back out of
+         [dir_first]); sys_link cannot -- it never looks the name up
+         before linking it -- and seven from the nine its two walks and
+         its mint can leave is two, against an [iput_units] of three
+         ([SysLinkBudget.sl_found_busts_by_one]).  ADDITIVE, and honest at
+         the constant: the found arm writes NOTHING, it is dirlookup's hit
+         plus the [iput] of the child, whose credited worst case is
+         exactly [iput_units] ([sl_found_honest]) -- and three is the
+         LARGEST constant that closes sys_link's arm
+         ([sl_found_at_four_busts] refutes four). *)
+      ⌜found = true -> ((ncount - iput_units)%nat <= n')%nat⌝ -∗
       log_opS γ n' Sb' -∗
       (* ---- THE TWO [inode_ok] CONJUNCTS A RE-PARKER NEEDS, AS
          PRESERVATIONS (fs-sysfile S5a finding 2; the cap, D₀-a repair 3b) --

@@ -1082,6 +1082,7 @@ Section ProofDirlinkMain.
              ⌜Sb ⊆ Sb'⌝ -∗
              ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
                         bm bm' Sb Sb'⌝ -∗
+             ⌜found = true -> ((ncount - iput_units)%nat <= n')%nat⌝ -∗
              log_opS g n' Sb' -∗
              ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
               bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
@@ -1194,6 +1195,7 @@ Section ProofDirlinkMain.
              ⌜Sb ⊆ Sb'⌝ -∗
              ⌜dl16_post bmapstart dinum inodestart ncount n' k0 tot found
                         bm bm' Sb Sb'⌝ -∗
+             ⌜found = true -> ((ncount - iput_units)%nat <= n')%nat⌝ -∗
              log_opS g n' Sb' -∗
              ⌜bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
               bv_unsigned (di_size dn') <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ -∗
@@ -1883,13 +1885,17 @@ Section ProofDirlinkMain.
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf true bm data dn dn0 nn uu Sbp 0%nat with
                 "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]
+                 Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] [%] Hop [%] [%]
                  [%]").
       { exact Hcsf. }
       { exact (dl_budget3 ncount nn ncount (proj1 Hnn) (proj2 Hnn)). }
       { exact Hsbp. }
       (* the sixteen-byte clause is guarded by the APPEND arm *)
       { intros Hc; discriminate Hc. }
+      (* ...and THIS arm's own clause, which is exactly the weakening the
+         walk already made: [Hnn] was re-stated at the constant [iput_units]
+         above, because the found arm's whole spend is its [iput]. *)
+      { intros _. exact (proj1 Hnn). }
       (* the found arm re-parks the IDENTICAL record and the IDENTICAL
          payload, so both preservations are the identity (S5a finding 2; the
          cap, D₀-a repair 3b) *)
@@ -2493,7 +2499,7 @@ Section ProofDirlinkMain.
         iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
         iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' Sbw tot with
                   "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
-                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]
+                   Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] [%] Hop [%] [%]
                    [%]").
         { exact Hcsf. }
         { rewrite (dl_wi_cost_bmonly k0) in Hbud. unfold dirlink_units.
@@ -2517,6 +2523,8 @@ Section ProofDirlinkMain.
                re-park of the parent exist at all (SpecDirlink's header). *)
             + exact (Hwiat (dl_wi_blocks k0)).
             + intros Htpos. exact (proj2 (Hwi16 Htpos (dl_wi_blocks k0))). }
+        (* the found-arm clause is vacuous here *)
+        { intros Hc; discriminate Hc. }
         (* writei's two preservations, forwarded (S5a finding 2; the cap,
            D₀-a repair 3b) *)
         { exact Hcap'. }
@@ -3446,7 +3454,7 @@ Section ProofDirlinkMain.
     iIntros (CIDf) "%Hchain".
     iIntros (mf found bm' data' dn' dn0' n' used' Sb' tot)
       "%E1 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb
-       Hbmr Hdat Hppid Hbsl Hislot %E2 %Esb %Ewi Hop %E3 %E4 %E5".
+       Hbmr Hdat Hppid Hbsl Hislot %E2 %Esb %Ewi %Efd Hop %E3 %E4 %E5".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
     iApply ("Hcont" $! mf found bm' data' dn' dn0' n' used' tot
               with "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi

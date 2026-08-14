@@ -250,9 +250,28 @@
    [Sb' ∖ Sb]: S3l's finding is that no obligation anywhere consumes a
    ceiling (callers claim MEMBERSHIPS), and a ceiling here would have to
    name loop-carried block maps.  Budget soundness rides the counter --
-   [LogInv.log_spend_step] refuses to grow [Sb] without spending.  No
-   lower bound on [u'] is offered either: create's caller runs [end_op],
-   which takes [log_op] at ANY count.
+   [LogInv.log_spend_step] refuses to grow [Sb] without spending.
+
+   THE FLOOR ON [u'] IS OFFERED ONLY AT [ok = true], AND THAT GUARD IS
+   FORCED.  The success arms hand back a LOCKED inode, so their caller
+   must run its own [iunlockput] before [end_op] -- sys_mkdir at +0x2e and
+   sys_mknod at +0x46 both do -- and [wp_iunlockput_*] wants [iput_units]
+   in hand.  Nothing between create's return and that call mints a unit,
+   so without this clause neither walk can reach its own [iunlockput].
+   (The superseded justification here read "create's caller runs [end_op],
+   which takes [log_op] at ANY count".  That describes the LAST call those
+   callers make, not the one before it.)
+
+   The failure arms owe nothing of the kind -- they hold no inode -- and
+   they could not pay it: create's [fail:] tail runs TWO [iunlockput]s and
+   the second, on the PARENT, is entered with neither [cru] nor [crz],
+   because no route into [fail:] has logged [IBLOCK dp].  [dl16_post]'s
+   membership trio is guarded on [0 < tot] and every route into [fail:]
+   has [tot = 0]; SpecDirlink's own header explains why that guard is
+   forced rather than inherited.  So the call spends one whatever it
+   reports, and [CreateBudget.cr_budget_fail_late] -- which prices the arm
+   at [ip_need <= u7 /\ u7 = 3] -- says that call can RUN, not that three
+   survive it.  Two survive, and an unconditional floor would be false.
 
    ==== THE ONE OPEN ITEM, STATED HONESTLY ================================
 
@@ -317,6 +336,10 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
+(* [iput_units]: the post's [ok = true] floor is stated at iput's own
+   constant, because what the floor exists for is the caller's
+   [iunlockput] of the inode create hands back. *)
+Require Import SpecIput.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -612,12 +635,22 @@ Definition wp_create_sconf_body
       proc_priv γf pj pidv V -∗
       ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
       bslots bn 3 -∗
-      (* at most [create_slots] of the ledger gone, and none gained *)
-      ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat⌝ -∗
+      (* at most [create_slots] of the ledger gone, and none gained --
+         AND, on the SUCCESS arms, one is still OUT.  The interval alone
+         cannot say that, and an [ok = true] caller needs it: it holds the
+         inode create returned and runs its own [iunlockput], which gives a
+         slot BACK, so without the strict decrement it cannot show it ends
+         no worse than it started.  Both success figures are [ns - 1] and
+         both failure figures are [ns], which is why the bound is guarded
+         on [ok] rather than folded into the interval. *)
+      ⌜((ns - create_slots)%nat <= ns')%nat /\ (ns' <= ns)%nat
+        /\ (ok = true -> (S ns' <= ns)%nat)⌝ -∗
       iref_slots ns' -∗
-      (* THE OP-WIDE SET GREW MONOTONICALLY AND THE COUNTER ONLY FELL.
-         No ceiling on [Sb' ∖ Sb] and no floor on [u'] -- see the header. *)
-      ⌜Sb ⊆ Sb' /\ (u' <= u)%nat⌝ -∗
+      (* THE OP-WIDE SET GREW MONOTONICALLY AND THE COUNTER ONLY FELL, AND
+         ON THE SUCCESS ARMS THE COUNTER STILL COVERS AN [iput].  No ceiling
+         on [Sb' ∖ Sb] -- see the header.  The floor is GUARDED ON [ok] and
+         that guard is forced, not a convenience: see the header. *)
+      ⌜Sb ⊆ Sb' /\ (u' <= u)%nat /\ (ok = true -> (iput_units <= u')%nat)⌝ -∗
       log_opS γ u' Sb' -∗
       (if ok
        then (* BOTH SUCCESS ARMS RETURN A LOCKED INODE *)
