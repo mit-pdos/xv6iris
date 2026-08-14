@@ -6893,3 +6893,39 @@ positive row.
 §20.10 stages C+D — is untouched and is still what gates the allocate half.
 This repair is the second of the two things that stood between D₀ and its
 first `dirlink`; the first is still standing.
+
+
+### The eleventh stop (D₀-a, 2026-08-14) — dirlink's append-fits premise is
+### unsuppliable, and §20.18 ruling 3 falls to the same objection
+
+RATIFIED in full.  `SpecDirlink`'s size-cap premise names a record (dp)
+that nothing in the chain can name — dp is found by nameiparent at run
+time, the caller's contract has no word for it, and the proposition is
+not even preservable (dirlink itself destroys it).  REPAIR 3b (ruled):
+delete the premise from both dirlink bodies; route writei's −1 return
+into the existing found = false / tot = 0 arm (dn' = dn since the
+append offset is in range; the a0 disjunct and 3a's spend clause already
+fit); relay writei's size-cap PRESERVATION clause so the re-park needs
+no cap premise and cr_size_cap retires.  Zero dirlink consumers, so
+cr_alloc_body stays byte-identical and D₀-a relaunches as briefed.
+
+ITEM-2 RULING: the dirent-halfword bound lands as the pure premise
+16 * Z.of_nat nib <= 2^16 on the alloc-half lemma (and eventually on
+wp_create_sconf_body beside the ialloc geometry trio) — it is mkfs's own
+ushort constraint; the slot-widening alternative is declined.
+
+§20.18 RULING 3 RE-OPENED: "a premise on wp_create_sconf_body about the
+dp record" dies to the same no-name objection.  The re-ruling (for
+D₀-b): kernel-defects.md CANDIDATE (xv6 never checks nlink saturation;
+at 65535 the ++ wraps and the flush contract is unsatisfiable — the
+ledger refuses a genuinely corrupting store) + the mkdir arm's nlink++
+step GATED on the visible walk-level hypothesis ⌜nlink dp < 65535⌝, the
+tree's gate convention, NOT a contract premise.
+
+Also banked from the pass: the funnel hoist (pure refactor inside
+ProofCreate, statement byte-stable), the two alignment facts and the
+halfword premise as alloc-half lemma premises, cr_regs3 confirmed with
+its reload story, the mint verified TO THE PREMISE with nothing to
+invent, the file-arm re-park simpler than briefed (dir_links_dirlink
+direct; the live/of_ilink round trip is mkdir-only), and A-FAIL supplied
+end to end.
