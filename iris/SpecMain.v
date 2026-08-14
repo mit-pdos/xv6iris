@@ -159,7 +159,7 @@ Require Import VirtioQueue VirtioProto DiskInv.
    named [lockG]/[fileG] instead, and [printk_env]/[procs_inv] then cannot
    resolve their [lockG] instance (spec-modules.md's Link-file gotcha, in a
    Spec file). *)
-Require Import WpLock TicksInv UartTxInv.
+Require Import WpLock TicksInv.
 Require Import FileInvDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.

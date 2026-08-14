@@ -65,7 +65,6 @@ Require Import UartTxInv.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl SpecUart.
 Require Import CodeUartPutcSync.
 Require Import WpSconfUartAccess.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.

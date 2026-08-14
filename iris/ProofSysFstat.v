@@ -43,35 +43,26 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText KernelDataInv.
+Require Import StackOwn CalleeSaved KernelText.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext WpLock.
-Require Import PanicStub.
 Require Import ProcGeom CpuOwn.
-Require Import SchedCtx.
-Require Import SleepLock.
+Require Import ProcInv.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import DinodeEnc.
-Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
-Require Import IcacheEscrow.
-Require Import IcacheBoot.
 Require Import SpecArgfd SpecArgaddr SpecFilestat.
 Require Import SpecSysFstat.
 Require Import CodeSysFstat.

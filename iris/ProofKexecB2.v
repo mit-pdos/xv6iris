@@ -99,7 +99,6 @@ Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -122,8 +121,6 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -135,15 +132,12 @@ Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.
 Require Import InodeLock.
-Require Import SchedCtx.
-Require Import DiskInv.
-Require Import PtTree.
-Require Import PtBuild.
-Require Import ProcPt.
+Require Import ProcInv.
+Require Import PtreeType.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
 Require Import SpecMyproc.
@@ -155,12 +149,10 @@ Require Import SpecIunlockput.
 Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcFreepagetable.
-Require Import SpecProcPagetable.
 Require Import SpecWalkaddr.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
-Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -58,8 +58,6 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
-Require Import UartTxInv.
-Require Import ConsoleInv.
 Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
 

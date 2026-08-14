@@ -69,7 +69,6 @@ Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import SpecIput.
-Require Import SpecDirlookup.
 Require Import SpecDirlink.
 (* [walk_spend] / [walk_need] and the two ties, from the walker itself *)
 Require Import SpecNamex.

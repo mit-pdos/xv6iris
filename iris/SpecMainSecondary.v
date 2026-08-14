@@ -78,7 +78,6 @@ Require Import WpLock.
 Require Import FileInvDefs.
 (* the boot-arm interface, for the per-hart bundle [main_hart_raw] (and the
    □-wand whose arguments [main_deposit] packages) *)
-Require Import ConsoleInv.
 Require Import SpecConsoleintr.
 Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

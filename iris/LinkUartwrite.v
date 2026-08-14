@@ -35,15 +35,10 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 From Stdlib Require Import String.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile.
 (* the classes the binder list generalizes over: [Require Import
    SpecUartwrite] does not put them in scope transitively, and backtick
    generalization then silently invents fresh binders with those names. *)
-Require Import WpLock FdSlots IrefSlots.
-Require Import DiskPtsto WpUart.
 Require Import LinkUart LinkAcquire LinkRelease LinkSleep LinkSleepPrepare.
 Require Import ProofUartwrite.
-Require Import SpecUartwrite.
 
 Module Uartwrite := UartwriteProof Acquire Release Sleep SleepPrepare Uart.

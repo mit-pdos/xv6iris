@@ -49,7 +49,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
-Require Import RegFile.
 Require Import KernelText.
 Require Import KernelDataInv.
 Require Import FsCrash.
@@ -58,7 +57,6 @@ Require Import DirentEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
-Require Import InodeRegion.
 Require Import SpecIalloc.
 Require Import SpecCreate.
 (* [nx_sext16_inj] -- the halfword-decision cluster B' hoisted out of

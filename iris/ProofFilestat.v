@@ -110,7 +110,6 @@ Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
    is meant here except through the two contracts. *)
 Require Import DinodeEnc.
 Require Import WpLock.
-Require Import SleepLock.
 Require Import SpecMyproc SpecIlock SpecStati SpecIunlock SpecCopyout.
 Require Import SpecFilestat.
 Require Import CodeFilestat ProofFilestatParts ProofBallocParts.

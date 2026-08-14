@@ -62,7 +62,7 @@ Require Import SpecCpuid SpecPrintk.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
 Require Import SpecDevintr SpecClockintr DiskInv TimerCap.
-Require Import ConsoleInv SpecConsoleintr.
+Require Import SpecConsoleintr.
 Require Import SpecMainSecondary.
 Require Import CodeMain.
 Require Import KernelRvcDecode.

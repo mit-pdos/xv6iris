@@ -64,7 +64,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto.
 Require Import DevModel DiskPtsto WpUart.
 Require Import WpLock.
-Require Import SleepLock.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

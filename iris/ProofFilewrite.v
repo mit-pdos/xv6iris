@@ -799,7 +799,6 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText.
-Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
@@ -809,7 +808,8 @@ Require Import KallocInv.
 Require Import SchedCtx.
 Require Import WpLock.
 Require Import PanicStub.
-Require Import FileInv FileOff.
+Require Import FileOff.
+Require Import FileInvDefs.
 (* THE FOUR CLASSES THAT ARE NOT WHERE THEY LOOK.  [diskGhostG],
    [uartGhostG], [fsLogG] and [iregG] live in [DiskPtsto], [WpUart],
    [FsBlocks] and [InodeRegion], and NONE of them is re-exported by the

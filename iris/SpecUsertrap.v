@@ -97,9 +97,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto.
 Require Import RegFile HartTp WpNext.
-Require Import MinstretInv InstrBytes WireInv.
+Require Import InstrBytes.
 Require Import WpGpr.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
@@ -111,17 +111,15 @@ Require Import FileInvDefs.
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
 Require Import BioInv.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import KallocInv.
 Require Import IrefSlots InodeRegion.
 Require Import ProcGeom.
-Require Import PtTree.
-Require Import TrampPt KptTree UptTree.
+Require Import TrampPt UptTree.
 Require Import UserPtTree UserExec.
-Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.

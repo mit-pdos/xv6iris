@@ -29,7 +29,7 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
-Require Import WpLock DiskPtsto WpUart UartTxInv PanicStub.
+Require Import WpLock DiskPtsto WpUart PanicStub.
 Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.
 Require Import LinkPanicStub.
 Require Import SpecPrintk.

@@ -29,7 +29,7 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import RiscvLang RiscvExtras.
+Require Import RiscvExtras.
 Require Import VcGen.
 Import Defs.
 Local Open Scope Z_scope.

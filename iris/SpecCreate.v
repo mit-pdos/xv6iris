@@ -297,15 +297,12 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import ByteBuf.
 Require Import DinodeEnc.
 Require Import DirentEnc.
-Require Import DirView.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -318,8 +315,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import SpecIput.
-Require Import SpecIalloc.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 From Kernel Require KernelSyms.

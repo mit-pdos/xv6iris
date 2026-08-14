@@ -141,7 +141,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SleepLock.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -150,7 +149,6 @@ Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
-Require Import DirView.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
@@ -161,14 +159,14 @@ Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PipeInv.
-Require Import FileInv FileOff ProcInv.
+Require Import PipeInvDefs.
+Require Import FileOff ProcInv.
+Require Import FileInvDefs.
 Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import SpecWritei.
 Require Import SpecFileread.
-Require Import SpecConsolewrite.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

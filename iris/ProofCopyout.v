@@ -118,10 +118,10 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import KallocInv.
-Require Import CommonWalk PtTree PtBuild PtAdBits.
+Require Import CommonWalk PtTree PtBuild.
 Require Import KptTree.
-Require Import UserPtTree UptTree.
-Require Import ProcGeom CpuOwn.
+Require Import UserPtTree.
+Require Import CpuOwn.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import ByteCursor ByteBuf.
