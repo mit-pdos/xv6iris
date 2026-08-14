@@ -259,11 +259,26 @@ Qed.
 Lemma dl_eqn (i n : nat) : (i < n)%nat -> (n <= S i)%nat -> S i = n.
 Proof. lia. Qed.
 
-Lemma dl_3le (n : nat) : (dirlink_units <= n)%nat -> (iput_units <= n)%nat.
-Proof. unfold dirlink_units, iput_units. lia. Qed.
+(* THE TWO READINGS OF THE SET-FORM BUDGET PREMISE (D0 pre-stage 1).  It
+   used to be the constant [dirlink_units <= n]; it is now
+   [dl_need crb ind <= n], and the two callees that want a number get it
+   from [SpecDirlink.dl_need_iput] (iput's three) and [dl_need_wi]
+   (writei's [wi_cost_bmonly (16*k0) 16] = four).  Both are ge-facts about
+   [dl_need], so both readings are one transitivity and neither mentions
+   the booleans -- which is what keeps the call sites free of the entry
+   set's [bool_decide]. *)
+Lemma dl_3le (crb ind : bool) (n : nat) :
+  (dl_need crb ind <= n)%nat -> (iput_units <= n)%nat.
+Proof. exact (fun H => Nat.le_trans _ _ _ (dl_need_iput crb ind) H). Qed.
 
+Lemma dl_4le (crb ind : bool) (n : nat) :
+  (dl_need crb ind <= n)%nat -> (4 <= n)%nat.
+Proof. exact (fun H => Nat.le_trans _ _ _ (dl_need_wi crb ind) H). Qed.
+
+(* the counted post's clause, which is UNCHANGED at [dirlink_units]: the
+   arm spends an iput and seven dominates three, so no premise is wanted. *)
 Lemma dl_budget3 (n n' nc : nat) :
-  (dirlink_units <= nc)%nat -> ((nc - iput_units)%nat <= n')%nat ->
+  ((nc - iput_units)%nat <= n')%nat ->
   (n' <= nc)%nat ->
   ((nc - dirlink_units)%nat <= n')%nat /\ (n' <= nc)%nat.
 Proof. unfold dirlink_units, iput_units. lia. Qed.
@@ -1770,7 +1785,7 @@ Section ProofDirlinkMain.
                 ltac:(intros Hc; discriminate Hc)
                 ltac:(intros Hc; discriminate Hc)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0
-                Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le ncount Hnc)) Hj Hgs
+                Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le _ _ ncount Hnc)) Hj Hgs
                 HE1a0
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
@@ -1839,7 +1854,7 @@ Section ProofDirlinkMain.
                 "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
                  Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] [%] [%] Hop [%] [%]").
       { exact Hcsf. }
-      { exact (dl_budget3 ncount nn ncount Hnc (proj1 Hnn) (proj2 Hnn)). }
+      { exact (dl_budget3 ncount nn ncount (proj1 Hnn) (proj2 Hnn)). }
       { exact Hsbp. }
       (* the sixteen-byte clause is guarded by the APPEND arm *)
       { intros Hc; discriminate Hc. }
@@ -2243,7 +2258,7 @@ Section ProofDirlinkMain.
                   pidv dq dqd dqf dqs dqb dqbs V6 (K - 10)%nat eb C b
                   ltac:(exact HKwi)
                   ltac:(rewrite (dl_wi_cost_bmonly k0);
-                        unfold dirlink_units in Hnc; lia)
+                        exact (dl_4le _ _ ncount Hnc))
                   Hlg Hist0 Hiblk Hiblog Hdinb Haddrs
                   ltac:(rewrite Htype; vm_compute; discriminate)
                   Hstab Hnlk
@@ -3313,13 +3328,19 @@ Section ProofDirlinkMain.
               #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hop Hcont".
     iDestruct "Hop" as (Sb0) "Hop".
+    (* THE COUNTED SEAL'S ONE NEW STEP (D0 pre-stage 1): the gen form asks
+       for the honest [dl_need], the counted form was given the constant,
+       and [dl_need_le] is the whole bridge -- six is the worst case and
+       seven dominates it at every pair of booleans. *)
+    assert (Hncg : forall crb ind : bool, (dl_need crb ind <= ncount)%nat)
+      by (intros crb ind; exact (Nat.le_trans _ _ _ (dl_need_le crb ind) Hnc)).
     iApply (wp_dirlink_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf gpr cov logstart inodestart nib bmapstart size dev used
               ip dinum bm data dn dn0 fn inum ncount Sb0
               pidv dq dqd dqn dqs dqb dqbs dqf m K eb C b
               HK Htype Hbmcov Hszb Hinums Hfit Hstab Hnlk Hlg Hbmwf Hholes
               Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
-              Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb
+              Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
                     Hiregi Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl

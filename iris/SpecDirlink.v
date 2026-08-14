@@ -128,7 +128,20 @@
    THE BUDGET.  writei's [wi_cost off 16] is SEVEN whenever [16 | off]: the
    sixteen bytes never straddle a block, because 1024 = 64*16.  iput wants
    three.  So one constant, [dirlink_units = 7], covers both arms, and the
-   postcondition is spend-at-most.                                        *)
+   postcondition is spend-at-most -- and that is what the COUNTED contract
+   takes.
+
+   THE SET-FORM CONTRACT TAKES [dl_need] INSTEAD, and it has to.  Seven is
+   not a bound create can meet: its mkdir chain runs its second and third
+   [dirlink]s with SIX and FIVE units in hand, so the constant makes the
+   whole allocate half unprovable at every path length.  [dl_need crb ind]
+   is what the call really wants -- the append arm's [wi16_need] or the
+   found arm's [iput_units], whichever is larger -- and it is FOUR wherever
+   the append stays inside the directory's direct blocks, which is every
+   dirlink create makes on the CHILD.  The two booleans are not new
+   parameters: they are [dl16_post]'s own [crb] and [ind], read off the
+   entry set and the append slot, so the premise says exactly what the
+   postcondition already accounts.                                        *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -176,6 +189,10 @@ Require Import FileInvDefs.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import SpecBmap.
+(* [iput_units], for [dl_need]: the found arm spends an iput and the set-form
+   premise has to dominate it.  SpecIput requires no Spec file, so this adds
+   no cycle. *)
+Require Import SpecIput.
 Require Import SpecWritei.
 Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
@@ -198,6 +215,49 @@ Definition K_dirlink : nat := 94%nat.
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)
 Definition dirlink_units : nat := 7%nat.
+
+(* ---- WHAT A dirlink ACTUALLY SPENDS, AND WHAT IT ACTUALLY NEEDS.
+   These two were [CreateBudget]'s, and they moved here for the reason
+   [SpecWritei.wi16_spend] / [wi16_need] moved to their own seam: the
+   contract now EXPOSES the figure, so the contract has to own it.
+   [dl_spend] IS [wi16_spend] -- dirlink's one writei is the sixteen-byte
+   window, and dirlookup, readi and the free-slot scan log nothing. *)
+Definition dl_spend (crb crd cru al ind : bool) : nat :=
+  wi16_spend crb crd cru al ind.
+
+Definition dl_need (crb ind : bool) : nat :=
+  Nat.max (wi16_need crb ind) iput_units.
+
+Lemma dl_need_values :
+  dl_need false false = 4%nat /\ dl_need true false = 4%nat /\
+  dl_need true true = 5%nat /\ dl_need false true = 6%nat.
+Proof. vm_compute. lia. Qed.
+
+(* THE THREE READINGS THE PROOF USES.  Its three callees want, in order:
+   dirlookup NOTHING, writei [wi_cost_bmonly (16*k0) 16] = four, and the
+   found arm's iput [iput_units] = three -- and [dl_need] dominates both
+   numbers at every pair of booleans, which is what makes the relaxed
+   premise still sufficient. *)
+Lemma dl_need_le (crb ind : bool) : (dl_need crb ind <= dirlink_units)%nat.
+Proof. destruct crb, ind; vm_compute; lia. Qed.
+
+Lemma dl_need_iput (crb ind : bool) : (iput_units <= dl_need crb ind)%nat.
+Proof. unfold dl_need. lia. Qed.
+
+Lemma dl_need_wi (crb ind : bool) : (4 <= dl_need crb ind)%nat.
+Proof. destruct crb, ind; vm_compute; lia. Qed.
+
+(* ...AND THE TWO MONOTONICITIES A CALLER DISCHARGES ITS PREMISE WITH.
+   The need FALLS when the bitmap block is already in the op's set and
+   RISES when the append runs through the indirect block, so a caller that
+   knows neither may always supply [dl_need false true] = six, and a
+   caller that knows the block is direct (create's links on the fresh
+   child, whose slot 0 and slot 1 are both in block 0) supplies four. *)
+Lemma dl_need_crb (crb ind : bool) : (dl_need crb ind <= dl_need false ind)%nat.
+Proof. destruct crb, ind; vm_compute; lia. Qed.
+
+Lemma dl_need_ind (crb ind : bool) : (dl_need crb ind <= dl_need crb true)%nat.
+Proof. destruct crb, ind; vm_compute; lia. Qed.
 
 (* ===================================================================== *)
 (*  THE SIXTEEN-BYTE SEAM AT dirlink's OWN WINDOW (GR-3 stage 3).         *)
@@ -579,8 +639,15 @@ Definition wp_dirlink_gen_body
   ~ (bmapstart ∈ log_region_set logstart) ->
   cov_below cov size ->
   ireg_blocks_ok inodestart nib cov logstart ->
-  (* ENOUGH BUDGET for either arm -- see the header *)
-  (dirlink_units <= ncount)%nat ->
+  (* ENOUGH BUDGET for either arm, AT THE HONEST FIGURE (see the header).
+     [crb] and [ind] are [dl16_post]'s own two booleans, read off the entry
+     set and the append slot -- so this premise is not a new interface, it
+     is the postcondition's accounting stated as an entry condition.  A
+     caller with nothing to claim supplies [dl_need_crb]/[dl_need_ind] and
+     is back at six; the COUNTED contract supplies [dl_need_le] and is back
+     at seven, which is why its own statement did not move. *)
+  (dl_need (bool_decide (bmapstart ∈ Sb))
+           (bmap_ind ((16 * k0) `div` BSIZE)%nat) <= ncount)%nat ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dp *)

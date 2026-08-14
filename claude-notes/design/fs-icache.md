@@ -5130,8 +5130,15 @@ against the tree at this revision:
   `c.addi16sp` encoded `0x715d`; decoding the RVC immediate
   (`nzimm[9]=inst[12]=1`, `nzimm[8:7]=inst[4:3]=11`, `nzimm[6]=inst[5]=0`,
   `nzimm[5]=inst[2]=1`, `nzimm[4]=inst[6]=1`) gives `-512 + 384 + 32 + 16 =
-  -80`.  The eight `c.sdsp`s still land at 72/64/56/48/40/32/24/16.  **10
-  slots**, unchanged by the guard.
+  -80`.  The saves still land at 72/64/56/48/40/32/24/16 — **10 slots**,
+  unchanged by the guard — but only **SEVEN of them are in the prologue**
+  (ra 72, s0 64, s1 56, s2 48, s4 32, s5 24, s6 16).  Slot 40 is `s3`'s and
+  the `c.sdsp s3,40(sp)` is at **+0x8a, on the ALLOCATE HALF only**,
+  reloaded per-arm (+0xd0 / +0xdc / +0x144) rather than by the shared
+  epilogue, which restores the same seven.  So `s3` is callee-saved on
+  ARMS N / G / F-BAD / F-OK because none of them writes it.  (D₀ caught
+  this against `CodeCreate.v`; both this section and `SpecCreate.v`'s
+  header said eight.)
 * **the callee list.**  `nameiparent` **98** (`SpecNameiparent.v:78`),
   `dirlink` **94** (`SpecDirlink.v:195`), `dirlookup` **84**
   (`SpecDirlookup.v:159`), `iunlockput` 64, `ialloc` 48, `ilock` 44,
@@ -5534,7 +5541,10 @@ What the walk consumes, in execution order, with the fixed binary's offsets:
   (bv_unsigned inum) dn data ∗ dinode_at γi inum dn ∗ inode_meta (ientry k) dn
   ∗ …` (`IcacheEscrow.v:487-499`) — plus `ity_shot g (di_type dn)`.  **All
   three of the guard's inputs are in this one payload, at the same `dn`.**
-* **+0x2a `lhu a5,74(s1)` / +0x2e `c.beqz`.**  `ProofNamex`'s +0xce/+0xd2
+* **+0x2a `lh a5,74(s1)` / +0x2e `c.beqz`.**  (`lh`, SIGNED — `CodeCreate`'s
+  `LOAD (74, s1, a5, false, 2)`; the unsigned flag is `false`.  The `lhu` in
+  create is the FOUND arm's `ip->type` at +0x52 and the `dp->nlink++`
+  reload at +0x11c.)  `ProofNamex`'s +0xce/+0xd2
   block transcribed: destruct `i_nlink` out of `inode_meta`, `wp_lh_s_sconf`,
   then `nx_nlz_eq` / `nx_nlz_ne` to decide the branch (`ProofNamex.v:485-495`).
   **Hoist those two lemmas out of `ProofNamex.v` rather than copying them** —

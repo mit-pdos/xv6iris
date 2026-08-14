@@ -97,17 +97,13 @@ Definition iu_spend (cru : bool) : nat := if cru then 0 else 1.
 
 
 (* ---- dirlink: dirlookup and readi log NOTHING, so a dirlink spends
-   either its writei (the append arm) or its iput (the found arm). *)
-Definition dl_spend (crb crd cru al ind : bool) : nat :=
-  wi16_spend crb crd cru al ind.
-
-Definition dl_need (crb ind : bool) : nat :=
-  Nat.max (wi16_need crb ind) iput_units.
-
-Lemma dl_need_values :
-  dl_need false false = 4 /\ dl_need true false = 4 /\
-  dl_need true true = 5 /\ dl_need false true = 6.
-Proof. vm_compute. lia. Qed.
+   either its writei (the append arm) or its iput (the found arm).
+   [dl_spend] / [dl_need] / [dl_need_values] MOVED to SpecDirlink.v (D₀
+   pre-stage 1) for the reason [wi16_spend] moved to SpecWritei.v: the
+   set-form contract's budget premise is now stated AT [dl_need], because
+   the constant [dirlink_units = 7] makes the mkdir chain below
+   unsatisfiable -- dirlinks #2 and #3 run with six and five in hand.  The
+   definitions live at the seam and this file uses them by import. *)
 
 (* ---- iput (through iunlockput): NOTHING unless it frees, and a free
    spends only what it cannot absorb -- itrunc's [bfree]s all hit THE
@@ -255,11 +251,57 @@ Theorem cr_budget_fail_early (w : bool) :
   ip_need <= u4 /\ ip_need <= u5.
 Proof. destruct w; vm_compute; lia. Qed.
 
+(* ---- ARM FAIL entered from the NON-DIRECTORY dirlink (+0xc4, the copy
+   gcc made for the [type != T_DIR] arm).  It is [cr_budget_file]'s chain
+   with the fail tail spliced onto it instead of [iunlockput(dp)]:
+
+     [+0x134] iupdate(ip)      -- IBLOCK(ip) has been in Sb since ialloc
+     [+0x13a] iunlockput(ip)   -- nlink was just zeroed and this is the
+                                  last reference, so iput FREES; the
+                                  bitmap and IBLOCK(ip) are both paid
+     [+0x140] iunlockput(dp)   -- dp has links, so iput frees NOTHING
+
+   Both tail claims are ZERO ([iu_spend true = 0] and
+   [ip_spend true true true = 0]), so the arm closes on
+   [cr_budget_file]'s last conjunct and nothing else -- which is why it
+   is strictly slacker than [cr_budget_fail_late], whose three dirlinks
+   ran first. *)
+Theorem cr_budget_fail_file (w : bool) :
+  let u1 := cr_uw w - ia_spend in
+  let u2 := u1 - iu_spend true in
+  let u3 := u2 - dl_spend w false false true true in
+  let u4 := u3 - iu_spend true in
+  let u5 := u4 - ip_spend true true true in
+  ia_spend <= cr_uw w /\
+  1 <= u1 /\
+  dl_need w true <= u2 /\
+  ip_need <= u3 /\ ip_need <= u4 /\ ip_need <= u5.
+Proof. destruct w; vm_compute; lia. Qed.
+
 (* ---- ARMS N / F-OK / F-BAD / A-FAIL: nothing is logged at all before
    them, so the two iunlockputs of F-BAD are the only requirement. *)
 Theorem cr_budget_found (w : bool) :
   ip_need <= cr_uw w /\ ip_need <= cr_uw w - ip_spend true true false.
 Proof. destruct w; vm_compute; lia. Qed.
+
+(* ...AND THE SAME ARMS AT THE FIGURE THEY CAN ACTUALLY CLAIM.
+   [cr_budget_found] above is stated at [ip_spend true true false], i.e.
+   with BOTH absorption credits in hand -- and on these arms create holds
+   NEITHER: nothing has been logged yet, so [crb] and [cru] are both
+   [false], and [crz] is out too (it is minted from a NONZERO nlink
+   observation, which ARM G is the negation of).  The honest per-call
+   figure is [SpecIput.ip_spend_w w false false], which is [ip_bm w + 1],
+   i.e. at most two.  The arms still close with room, and that -- not the
+   credited zero -- is what the walk cites. *)
+Theorem cr_budget_found_w (w wg wf : bool) :
+  let u1 := cr_uw w in
+  let u2 := u1 - ip_spend_w wg false false in
+  (* ARM N: nothing is called at all *)
+  (* ARM G / A-FAIL: ONE uncredited iunlockput *)
+  ip_need <= u1 /\
+  (* ARM F-BAD: iunlockput(dp) then iunlockput(ip), both uncredited *)
+  ip_need <= u2 /\ ip_need <= u2 - ip_spend_w wf false false.
+Proof. destruct w, wg, wf; vm_compute; lia. Qed.
 
 (* ===================================================================== *)
 (*  3. WHAT THE LANDED (UNCREDITED) CONTRACTS GIVE, AND WHY IT IS NOT     *)
