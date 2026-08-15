@@ -497,6 +497,28 @@ Section IcacheBootRegion.
     forall z : Z, z ∈ region_inums nib ->
       bv_unsigned (di_nlink (image_dinode dss z)) <= 32767.
 
+  (* ...AND SO IS THE ROOT CLAUSE ([InodeRegion.ireg_root_ok], design
+     fs-icache.md §20.4's "image-wf IOU" -- that section calls it (L4) too,
+     which is NOT the 32767 clause above), for the third time and for
+     exactly the same reason.
+     [ireg_slot] now says of the ROOT's record that its link count strictly
+     exceeds the ledger's -- and at boot the ledger is EMPTY, so the strict
+     clause is §20.4's chartered one verbatim: [1 <= di_nlink] at [ROOTINO].
+     True of every mkfs image (mkfs's [ialloc] writes [nlink = 1] into the
+     root and the ["."]/[".."] it appends are self-records that no
+     [dir_links] unit is ever filed against), false of nothing this kernel
+     can produce (the region itself now refutes the claim and the free at the
+     root, and the only lowering write pays with a fragment), and unprovable
+     here because the bytes are the boot client's.
+
+     It rides in the SAME ∀-over-decodings premise slot as (L3) and (L4), so
+     [ireg_alloc]'s arity does not move; and it is guarded by
+     [z ∈ region_inums nib] like its two neighbours, which makes it VACUOUS
+     at [nib = 0] -- an empty region has no root slot to constrain. *)
+  Definition image_root_alive (dss : list (list dinode)) (nib : nat) : Prop :=
+    forall z : Z, z ∈ region_inums nib -> z = ireg_root ->
+      1 <= bv_unsigned (di_nlink (image_dinode dss z)).
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
@@ -504,7 +526,8 @@ Section IcacheBootRegion.
     (forall dss : list (list dinode),
        length dss = nib -> Forall diblk_wf dss ->
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
-       image_free_nlink dss nib /\ image_nlink_short dss nib) ->
+       image_free_nlink dss nib /\ image_nlink_short dss nib /\
+       image_root_alive dss nib) ->
     ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
     (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
        zero: nobody has ever observed a nonzero nlink, which is exactly the
@@ -524,7 +547,7 @@ Section IcacheBootRegion.
   Proof.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
-    destruct (Himg dss Hl Hwf He) as [Hl3 Hl4].
+    destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0).
     iIntros "Hlk Hepa Hblks".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
@@ -550,14 +573,17 @@ Section IcacheBootRegion.
       iIntros "[[[Hfrag Hmk] Hla] Hep]".
       assert (Hok : ireg_link_ok (image_dinode dss z) 0).
       { split_and!; [lia | exact (Hl3 z Hz) | exact (Hl4 z Hz)]. }
+      (* the root clause at the EMPTY ledger, i.e. §20.4's own words *)
+      assert (Hrt : ireg_root_ok z (image_dinode dss z) 0)
+        by exact (ireg_root_ok_zero z (image_dinode dss z) (Hrt0 z Hz)).
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok Hrt
                   with "Hla Hep").
         iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok Hrt
                   with "Hla Hep").
         iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.

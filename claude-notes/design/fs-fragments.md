@@ -80,7 +80,7 @@ R7. **Staging** (§5.3 adopted with one amendment): F1a, F1b, F1.5b are
     QUEUED BEHIND the sysfile cone; they are the fragment queue's first
     three items, in that order.  **F1.5c does not start until F1.5d's
     gate has a door**: `isdirempty`'s invariant (S7, unwritten), the
-    root clause (owed, see R9), and SpecIget's licence enumeration (C′)
+    root clause (LANDED, see R9), and SpecIget's licence enumeration (C′)
     — or fs-icache §20.17.7's kernel fix (ialloc's brelse-after-iget;
     NOTE the name collision: that is fs-icache's "F2", unrelated to the
     staging table's F2 row).
@@ -100,8 +100,14 @@ R9. **Owed items registered**, each with its home:
       can land ahead of it.  Today insert has a full resource story and
       delete has only the refcount half (`ireg_write_unlink` consumes
       an `ilink` and has NO CALLER).
-    - the ROOT clause `di_nlink (ROOTINO) >= 1` in `ireg_body` — §20.4
-      chartered it, never landed; licence (f)'s refutation needs it.
+    - ~~the ROOT clause~~ — **LANDED**, in the preservable form the
+      charter's own does not have: `ireg_slot` (not `ireg_body`) carries
+      `ireg_root_ok z d w := z = ireg_root -> w < di_nlink d`, (L1) MADE
+      STRICT at the root, with §20.4's `di_nlink ≥ 1` as its projection
+      `ireg_root_ok_alive`.  The chartered form is unpreservable at
+      `ireg_write_unlink` and strictness is what the root's structural
+      slack of one (its `"."`/`".."` are self-records no `dir_links` unit
+      is filed against) buys; see the campaign ledger for the mover table.
     - `isdirempty`'s invariant goes into S7's brief as a PREREQUISITE
       of create_fresh_ty's retirement, not a local convenience.
     - the `".."`-location fact (`ents ip !! ".." = Some dp`) is F1b's
@@ -452,7 +458,7 @@ box with licence (d) **now founded** by §3.4:
 | (c) HELD `dinode_at` | **refuted** | a claim box's fragment is IN the region (`ireg_in`, :652, left arm; re-parked at :1536); `dinode_at_excl` (:567) |
 | (d) CLAIMED | **refuted** | `iclaim_excl` (IcacheRef.v:699) — create holds the unique token.  **Founded only under (L5).** |
 | (e) BUFFERED | **refuted** | §20.7 row 2 — demands a type-nonzero read through the block ialloc's `log_write` just committed |
-| (f) ROOT | **refuted** — *but the clause is not landed* | §20.4 charters `ireg_body` gaining `⌜di_nlink (m !!! ROOTINO) ≥ 1⌝` (fs-icache.md:4306-4307); `ireg_body` (InodeRegion.v:948-952) has no such conjunct.  **OWED.** |
+| (f) ROOT | **refuted**, and the clause is LANDED | `ireg_slot` carries `⌜ireg_root_ok z d w⌝` = (L1) strict at the root; a claim box has `di_nlink = 0` (`fresh_shape`), and `ireg_root_ok_ne` / `InodeRegion.ireg_root_ne` turn that into `z ≠ ROOTINO`.  The mover-level dividend is stronger than the row asks: `ireg_claim_au` and `ireg_free_au` REFUTE the root outright, so no claim box is ever at ROOTINO in the first place. |
 | **(b) ORPHAN `igrey i`** | **THE RESIDUE** | `igrey` concludes nothing by construction: `link_mint_grey` is mint-from-nothing (IcacheRef.v:812), and §20.18 ruling 2 (fs-icache.md:5638-5643) accepts permanently that `g` can never again carry information |
 
 Case (b) is closed only by §20.17.5's boxed enumeration

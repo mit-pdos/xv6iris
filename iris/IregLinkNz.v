@@ -95,7 +95,7 @@ Section IregLinkNz.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %gl & %rl & %cl & Hla & %Hlok) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %gl & %rl & %cl & Hla & %Hlok & %Hrt) [Hep Harm]]".
     iDestruct (link_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -117,9 +117,25 @@ Section IregLinkNz.
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl gl cl rl Hlok with "Hla Hep"). iExact "Harm". }
+                wl gl cl rl Hlok Hrt with "Hla Hep"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE ROOT INUM, ACROSS THE TWO SPELLINGS                             *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [InodeRegion.ireg_root] is the root clause's inum at the REGION's key
+     type -- a [Z] literal, stated there rather than imported so that a file
+     350 dependents deep does not acquire the whole in-core inode geometry
+     for one constant (the comment at [ireg_root] says so).  This is the
+     bridge, and it is the reason that choice costs nothing: [ROOTINO] is
+     [mword_of_int 1] and the two sides are convertible.
+
+     A consumer of [InodeRegion.ireg_root_ne] -- §20.4's licence (f), whose
+     arm is [⌜bv_unsigned z = ROOTINO⌝] -- rewrites with this and is done. *)
+  Lemma ireg_root_ROOTINO : bv_unsigned ROOTINO = ireg_root.
+  Proof. vm_compute. reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE PAYLOAD SURVIVES A COUNT CHANGE AT A LIVE RECORD                *)

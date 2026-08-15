@@ -94,6 +94,93 @@ convenience: a grey record's target already has `di_nlink = 0`, there is no
 count to lower, and the conversion S7 performs there is §20.17.4's different
 move. Zero consumers today (sys_unlink has only `CodeSysUnlink.v`).
 
+### The ROOT clause — `iris/InodeRegion.v`, `IcacheBoot.v`, `IregLinkNz.v`
+
+R9's third owed item, and one of F1.5d's three gate planks. No new file, no
+new ghost, no new premise on any of the six movers, no obligation threaded
+to any caller. `Print Assumptions` on all seventeen touched/new lemmas —
+the movers included — is **closed under the global context**.
+
+**THE STATEMENT DIVERGES FROM §20.4's CHARTER, and the arithmetic is why.**
+The charter is `ireg_body` gaining `⌜di_nlink (m !!! ROOTINO) ≥ 1⌝`. That
+form is **not preservable**, and `ireg_write_unlink` is where it dies: the
+kernel's one nlink-LOWERING region write knows `di_nlink dn = di_nlink dn' +
+1` and, from the `ilink` it spends, `1 ≤ w`; at the root it must produce
+`1 ≤ di_nlink dn'`, i.e. `2 ≤ di_nlink dn`, and the clause offers `1 ≤
+di_nlink dn`. Nothing on the mover closes that gap honestly — the mover
+cannot see that xv6 never unlinks the root, and the walk that can
+(`sys_unlink` refusing `"."`/`".."`) is three contracts away.
+
+What IS preservable is **(L1) made strict at the root**:
+
+```coq
+Definition ireg_root : Z := 1.
+Definition ireg_root_ok (z : Z) (d : dinode) (w : nat) : Prop :=
+  z = ireg_root -> (w < Z.to_nat (bv_unsigned (di_nlink d)))%nat.
+```
+
+— a conjunct of `ireg_slot`, beside `⌜ireg_link_ok d w⌝`. The charter's
+statement is its one-line projection (`ireg_root_ok_alive`), so §20.4's
+consumer gets exactly what it was promised.
+
+**The root's slack is structural, not a coincidence of reachability.**
+`dir_links` files one ledger unit per live NON-SELF record, so the root's
+own `"."` and `".."` (both naming the root) are filed by nobody, while
+every subdirectory's `".."` is filed against the root and is paid for by
+create's `dp->nlink++`. The root's count is therefore permanently one more
+than the number of records that can ever name it — the entry it does not
+have in a parent. Strictness is the ledger carrying that one, so the mover
+needs no premise.
+
+**Two homes were forced, not chosen.** The clause CANNOT live in
+`ireg_body`: strictness names `w`, which lives at the slot and nowhere else,
+and a body-level clause over `m` would face the identical `ireg_write_unlink`
+gap with less to work with. And it is a SEPARATE conjunct rather than a
+fourth conjunct of `ireg_link_ok`, because that predicate is read by
+projection all over the tree (`proj1 Hlok`, `ireg_link_ok_short`,
+IregLinkNz's `destruct Hlok as [Hle _]`) — the recorded "adding a conjunct
+to a Prop breaks every proj2" trap, dodged rather than paid for.
+
+Mover by mover, all six free or refuted:
+
+| mover | how the clause survives |
+|---|---|
+| `ireg_write_au` | `di_nlink_stable`'s first conjunct is an EQUALITY and `w` does not move — `ireg_root_ok_stable`, one rewrite |
+| `ireg_write_link` | `w -> S w` and `nlink -> nlink + 1` in ONE ghost step; strict is monotone under a simultaneous bump (`ireg_root_ok_bump`) |
+| `ireg_write_unlink` | the same step downwards (`ireg_root_ok_drop`) — the mover the chartered form could not survive, and it takes NO new premise |
+| `ireg_claim_au` | **refuted**: the caller's buffer shows `di_type = 0`, (L3) forces `di_nlink = 0`, and `w < 0` is absurd. **ialloc can never claim the root** |
+| `ireg_free_au` | **refuted** by the same two steps from its own `di_nlink dn = 0` (iput's `ip->nlink == 0` guard). **iput can never free the root** |
+| `ireg_withdraw` | record, count and authority all unchanged |
+
+**Licence (f)'s refutation** (§3.6's table row) lands in two forms:
+`ireg_root_ok_ne` (pure — a record with `di_nlink = 0` is not the root,
+which is a claim box by `fresh_shape_nlink` and iput's flush by its own
+guard) and `InodeRegion.ireg_root_ne`, the mask-preserving accessor for a
+caller holding `dinode_at γi inum dn` with `nlink dn = 0`. It gives back
+`⌜bv_unsigned inum ≠ ireg_root⌝` and the fragment untouched.
+`IregLinkNz.ireg_root_ROOTINO : bv_unsigned ROOTINO = ireg_root` is the
+one-`reflexivity` bridge to `InodeInv.ROOTINO` — the region states the inum
+as a `Z` literal for `ireg_link_ok`'s 32767's reason, so that a file 350
+dependents deep does not acquire the in-core inode geometry for one
+constant.
+
+**The boot obligation** rides in `ireg_alloc`'s existing ∀-over-decodings
+premise slot (its arity does not move), guarded by `z ∈ region_inums nib`
+like its two neighbours, hence vacuous at `nib = 0`:
+
+```coq
+Definition image_root_alive (dss : list (list dinode)) (nib : nat) : Prop :=
+  forall z : Z, z ∈ region_inums nib -> z = ireg_root ->
+    1 <= bv_unsigned (di_nlink (image_dinode dss z)).
+```
+
+At boot the ledger is EMPTY, so the strict clause *is* §20.4's chartered one
+verbatim (`ireg_root_ok_zero`) — one computational image obligation, true of
+every mkfs image (mkfs's `ialloc` writes `nlink = 1` into the root and the
+`"."`/`".."` it appends are self-records no `dir_links` unit is filed
+against). `ireg_alloc` has no caller yet, so the third conjunct costs
+nothing downstream.
+
 ## Divergences from the verification report's sketches
 
 The report (fs-fragments.md §1–§6) was written against the tree three merges
@@ -163,8 +250,6 @@ Compiles are mirror-only. Two things about that are worth keeping:
 
 Carried forward from R9; none of it is F1a/F1b/F1.5b's to discharge.
 
-- the ROOT clause `di_nlink ROOTINO >= 1` in `ireg_body` — §20.4 chartered
-  it, never landed; licence (f)'s refutation needs it.
 - `isdirempty`'s invariant — S7's brief, as a PREREQUISITE of
   `create_fresh_ty`'s retirement, not a local convenience.
 - `SpecIget`'s licence enumeration (C′), or fs-icache §20.17.7's kernel fix.
