@@ -1137,9 +1137,9 @@ Section ProofSyscall.
       by (rewrite /B1 upd_ne; [exact HB0sp | vm_compute; discriminate]).
     (* ---- +0x16: ld a5,168(s2) -- a5 := RAWNUM = trapframe->a7 ---- *)
     iDestruct (tf_page_length with "Htfp") as "%Htflen".
-    assert (Htf21 : exists RAWNUM : mword 64, pv_tf V !! 21%nat = Some RAWNUM).
+    assert (Htf21is : is_Some (pv_tf V !! 21%nat)).
     { apply lookup_lt_is_Some_2. rewrite Htflen. unfold TFWORDS. lia. }
-    destruct Htf21 as [RAWNUM Htf21].
+    destruct Htf21is as [RAWNUM Htf21].
     iDestruct (sysc_tfp_valid with "[Hpid Hf Hpg Htfc Hptt Htfp Hcwd Hof]") as "%Hpv".
     { iSplitL "Hpid Hf Hpg Htfc Hptt Htfp Hcwd"; [| iExact "Hof"].
       iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid Hf". iSplitL "Hpg Htfc Hptt"; [iFrame|iFrame]. }
