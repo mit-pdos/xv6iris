@@ -1668,7 +1668,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iApply (sp_close2 (CID0 := CID43)  γfl γf fn on us Y0 (av - 8)%nat eb p C sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2091990 : mword 21) (mword_of_int 2091982 : mword 21) b lks
+                (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
@@ -1891,7 +1891,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iApply (sp_close2 (CID0 := CID53)  γfl γf fn on us F2 (av - 8)%nat eb p C sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
-                (mword_of_int 2091990 : mword 21) (mword_of_int 2091982 : mword 21) b lks
+                (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
@@ -2390,7 +2390,7 @@ Section ProofSysPipe.
       iDestruct "Hfenv" as (us2) "Hfenv".
       iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 us2 E4 (av - 8)%nat eb p C sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
-                (mword_of_int 2092030 : mword 21) (mword_of_int 2092022 : mword 21) b lks
+                (mword_of_int 2092016 : mword 21) (mword_of_int 2092008 : mword 21) b lks
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
       iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
