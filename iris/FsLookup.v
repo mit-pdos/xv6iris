@@ -613,8 +613,8 @@ Definition wp_dirlookup_tree_body
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
-  let nb := m !!! Regidx (mword_of_int 11 : mword 5) in
-  let pf := m !!! Regidx (mword_of_int 12 : mword 5) in
+  let nb := (m !!! Regidx (mword_of_int 11 : mword 5) : mword 64) in
+  let pf := (m !!! Regidx (mword_of_int 12 : mword 5) : mword 64) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   let nrec := dir_nrec (bv_unsigned (di_size dn)) in
   let s := bname 14 fn in

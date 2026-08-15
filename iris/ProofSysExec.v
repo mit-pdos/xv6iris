@@ -4200,7 +4200,7 @@ Section SysExecBadTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (sx_free_loop (CID0 := CID1) γa sp0 (proc_addr jp) K eb b lks
               pg afun t 0x96 0xf4 (mword_of_int 46 : mword 8)
-              (mword_of_int 2078266 : mword 21)
+              (mword_of_int 2078252 : mword 21)
               HK Ht32 Hpgok Hlb ltac:(pcw) ltac:(pcw) ltac:(csf) ltac:(pcw)
               ltac:(pcw) ltac:(csf)
               sxi_096 sxi_098 sxi_09a sxi_09e sxi_0a0
@@ -4438,7 +4438,7 @@ Section SysExecSuccTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (sx_free_loop (CID0 := CID2) γa sp0 (proc_addr jp) K eb b lks
               pg afun t 0xd4 0xe2 (mword_of_int 6 : mword 8)
-              (mword_of_int 2078204 : mword 21)
+              (mword_of_int 2078190 : mword 21)
               HK Ht32 Hpgok Hlb ltac:(pcw) ltac:(pcw) ltac:(csf) ltac:(pcw)
               ltac:(pcw) ltac:(csf)
               sxi_0d4 sxi_0d6 sxi_0d8 sxi_0dc sxi_0de
