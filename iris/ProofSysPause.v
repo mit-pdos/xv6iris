@@ -129,6 +129,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import PageGeom.
 Require Import FdSlots ProcInv.
+Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import TicksInv.
@@ -1851,7 +1852,7 @@ Section ProofSysPause.
     : wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_pause_sconf_body].
-    intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb Hfresh.
+    intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb Hfresh Hpv.
     subst i.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hown #Htext #Hdata Hpc Htf Hpage #Hlkt #Hpinv #Hpanic Hcont".
@@ -2025,7 +2026,7 @@ Section ProofSysPause.
                  with "Hown") as "Hown".
     iApply (Argint.wp_argint_sconf R5 (av - 8)%nat 0%nat eb pj C
               0%nat tfp ws v (word_hi w7) dqt true lks
-              ltac:(unfold NARG; lia) HR5a0 Hws Hn0 ltac:(lia)
+              ltac:(unfold NARG; lia) HR5a0 Hws Hn0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hs7hi").
     iIntros (CID8 Hs8 A) "%HcsA Hcg Hown Hpc Htf Hpage Hs7hi".
     iEval (rewrite HR5a1) in "Hs7hi".

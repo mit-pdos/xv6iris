@@ -126,6 +126,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.
 Require Import ProcInv.
+Require Import ProofKforkParts.
 Require Import SpecPrintk.
 Require Import SpecArgstr.
 Require Import SpecFetchstr.
@@ -1248,6 +1249,7 @@ Section ProofSysMknodBody.
       exact (HM5thr c Hc N2 N8). }
     (* the trapframe quarter and its page, BORROWED out of the block for the
        call and put straight back -- ProofSysExit's move, twice over. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf gf pj pid V with "Hpriv") as "(Htf & Hpage & Hback1)".
     iEval (rewrite -HM6a1) in "Hmaj".
     iDestruct (cpu_own_transport CID6 CID9 0 eb pj C b ltac:(wp_next_chain)
@@ -1255,7 +1257,7 @@ Section ProofSysMknodBody.
     iApply (Argint.wp_argint_sconf (CID := CID9) M6 (K - 20)%nat 0%nat eb pj C
               1%nat (ud_tfp (pv_upt V)) (pv_tf V) v1 (word_hi w19)
               (DfracOwn (1/4)) b lks
-              mn_arg1_lt HM6a0 Hargv1 mn_noff0 ltac:(lia)
+              mn_arg1_lt HM6a0 Hargv1 mn_noff0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hmaj").
     iIntros (CID10 Hq10 mai1) "%Hcsai1 Hcg Hown Hpc Htf Hpage Hmaj".
     iEval (rewrite HM6a1) in "Hmaj".
@@ -1350,7 +1352,7 @@ Section ProofSysMknodBody.
     iApply (Argint.wp_argint_sconf (CID := CID13) M9 (K - 20)%nat 0%nat eb pj C
               2%nat (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_lo w19)
               (DfracOwn (1/4)) b lks
-              mn_arg2_lt HM9a0 Hargv2 mn_noff0 ltac:(lia)
+              mn_arg2_lt HM9a0 Hargv2 mn_noff0 ltac:(lia) Hpv
               with "Hcg Hown Htext Hdata Hpc Htf Hpage Hmin").
     iIntros (CID14 Hq14 mai2) "%Hcsai2 Hcg Hown Hpc Htf Hpage Hmin".
     iEval (rewrite HM9a1) in "Hmin".

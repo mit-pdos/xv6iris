@@ -56,6 +56,7 @@ Require Import UserPtTree.
 Require Import KallocInv.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
+Require Import ProofKforkParts.
 Require Import CodeArgstr.
 Require Import SpecArgraw SpecFetchstr.
 Require Import SpecArgstr.
@@ -292,12 +293,16 @@ Section ProofArgstr.
       rewrite /M3 upd_ne; [| congruence].
       rewrite /M2 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
+    (* what argraw's own load needs -- see SpecArgraw's matching premise --
+       non-destructively, off the SAME [proc_priv] the trapframe borrow
+       below comes from. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     (* ---- the FIRST borrow: argraw wants the trapframe page ---- *)
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Htfa & Hpbacktf)".
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argraw.wp_argraw_sconf M5 (av - 4)%nat n eb p C
               i (ud_tfp (pv_upt V)) (pv_tf V) v (DfracOwn (1/4)) b
-              _ Hi HM5a0 Hargs Hn ltac:(lia)
+              _ Hi HM5a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
     iIntros (CID10 Hk10 A) "[%HcsA %HAa0] Hcg Hcpu Hpc Htfp Htfa".
     iDestruct ("Hpbacktf" with "Htfp Htfa") as "Hpriv".

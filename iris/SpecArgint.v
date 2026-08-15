@@ -44,7 +44,7 @@ Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn.
+Require Import ProcPtOwn PageGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -68,6 +68,8 @@ Definition wp_argint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 14 for argraw's *)
   (18 <= av)%nat ->
+  (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
+  page_valid (page_base tfp) ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

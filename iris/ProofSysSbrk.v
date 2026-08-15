@@ -45,6 +45,7 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
+Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import CodeSysSbrk.
 Require Import SpecArgint SpecMyproc SpecGrowproc SpecSysSbrk.
@@ -705,11 +706,12 @@ Section ProofSysSbrk.
       rewrite /M3 upd_ne; [| congruence]. rewrite /M2 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     (* argint reads the trapframe pointer AND page out of [proc_priv] *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Hpage & Hpbacktf)".
     iDestruct (cpu_own_transport CID CIDs8 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf (CID := CIDs8) M5 (av - 6)%nat 0%nat eb p C 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (word_lo u5) (DfracOwn (1/4)) b lks
-              ltac:(vm_compute; lia) HM5a0 Harg0 ss_n0 ltac:(lia)
+              ltac:(vm_compute; lia) HM5a0 Harg0 ss_n0 ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage [Hs5lo]").
     { iEval (rewrite HM5a1). iExact "Hs5lo". }
     iIntros (CIDA HqA A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5lo".
@@ -795,7 +797,7 @@ Section ProofSysSbrk.
     iDestruct (cpu_own_transport CIDA CIDs11 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf (CID := CIDs11) A3 (av - 6)%nat 0%nat eb p C 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 (word_hi u5) (DfracOwn (1/4)) b lks
-              ltac:(vm_compute; lia) HA3a0 Harg1 ss_n0 ltac:(lia)
+              ltac:(vm_compute; lia) HA3a0 Harg1 ss_n0 ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage [Hs5hi]").
     { iEval (rewrite HA3a1). iExact "Hs5hi". }
     iIntros (CIDB HqB B) "%HcsB Hcg Hcpu Hpc Htfp Hpage Hs5hi".

@@ -90,7 +90,7 @@ Section ProofArgint.
     : wp_argint_sconf_body m av n eb p C i tfp ws v old dqt b lks.
   Proof.
     cbv beta delta [wp_argint_sconf_body].
-    intros pcE ip ret_tgt Hi Ha0 Hargs Hn Hav.
+    intros pcE ip ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Htfp Htfa Hip Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
@@ -219,7 +219,7 @@ Section ProofArgint.
        hart to the current chain hart [CID7] before the callee wants it. *)
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argraw.wp_argraw_sconf A3 (av - 4)%nat n eb p C i tfp ws v dqt b lks
-              Hi HA3a0 Hargs Hn ltac:(lia)
+              Hi HA3a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
     iIntros (CID8 Hs8 MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
     destruct HcsMF as [HcsMF HMFa0].

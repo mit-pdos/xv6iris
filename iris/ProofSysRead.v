@@ -57,6 +57,7 @@ Require Import IntrDefs HartTp WpNext WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import ProcInv.
 Require Import FdSlots ProcInv.
+Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import KallocInv.
 Require Import UserPtTree.
@@ -500,6 +501,7 @@ Section ProofSysRead.
       by (rewrite /M5 upd_eq; reflexivity).
     (* argaddr wants the trapframe pointer fraction and the page, out of the
        block; the wand puts both back the instant it returns. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
     iEval (rewrite -HM5a1) in "Hs5".
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
@@ -507,7 +509,7 @@ Section ProofSysRead.
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj C 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
-              ltac:(unfold argaddr_stack; lia)
+              ltac:(unfold argaddr_stack; lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
     iIntros (CID8 Hs8 A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs5".
     iEval (rewrite HM5a1) in "Hs5".
@@ -582,7 +584,7 @@ Section ProofSysRead.
                  with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf B3 (av - 6)%nat 0%nat eb pj C 2%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_hi w4) (DfracOwn (1/4)) b lks
-              ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia)
+              ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp [Hs4hi]").
     { iEval (rewrite HB3a1). iExact "Hs4hi". }
     iIntros (CID12 Hs12 A1) "%HcsA1 Hcg Hcpu Hpc Htfc Htfp Hs4hi".

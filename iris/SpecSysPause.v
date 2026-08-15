@@ -79,7 +79,7 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import SchedCtx.
-Require Import ProcPtOwn.
+Require Import ProcPtOwn PageGeom.
 Require Import TicksInv.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
@@ -112,6 +112,8 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      times, around each loop iteration's [sleep]) but is BALANCED overall,
      so [lks] is unchanged end to end. *)
   locks_below lks "time" ->
+  (* what argint's own load needs -- see SpecArgraw's matching premise. *)
+  page_valid (page_base tfp) ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b lks -∗

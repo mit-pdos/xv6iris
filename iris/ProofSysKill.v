@@ -34,6 +34,7 @@ Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import SpecArgint SpecKkill.
+Require Import ProofKforkParts.
 Require Import SpecSysKill.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -70,7 +71,7 @@ Section ProofSysKill.
     : wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_kill_sconf_body].
-    intros pcE ret_tgt Hlen Hws Hn Hav Hbelow.
+    intros pcE ret_tgt Hlen Hws Hn Hav Hbelow Hpv.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Htf Hpage #Hprocs Hpanic Hcont".
     iPoseProof (skli_00 with "Htext") as "Hi00".
@@ -219,7 +220,7 @@ Section ProofSysKill.
     iEval (rewrite -HA4a1) in "Hb3hi".
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p C 0%nat tfp ws v (word_hi w3) dqt b lks
-              ltac:(unfold NARG; lia) HA4a0 Hws Hn ltac:(lia)
+              ltac:(unfold NARG; lia) HA4a0 Hws Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
     iEval (rewrite HA4a1) in "Hb3hi".

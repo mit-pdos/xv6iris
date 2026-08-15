@@ -46,7 +46,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn.
+Require Import ProcPtOwn PageGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -68,6 +68,8 @@ Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   ws !! tf_arg_idx i = Some v ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (argaddr_stack <= av)%nat ->
+  (* what argraw's own load needs -- see SpecArgraw's matching premise. *)
+  page_valid (page_base tfp) ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

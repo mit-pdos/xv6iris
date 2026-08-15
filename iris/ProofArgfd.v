@@ -52,6 +52,7 @@ Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import UserPtTree.
 Require Import FdSlots ProcInv.
+Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import SpecMyproc SpecArgint.
 Require Import SpecArgfd.
@@ -698,6 +699,7 @@ Section ProofArgfd.
     iEval (rewrite -HM6a1) in "Hs5hi".
     (* argint reads the trapframe pointer AND page out of [proc_priv] *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Hpage & Hpback)".
     (* ---- argint(n, &fd) ---- *)
     (* [Hcpu] came in at the entry hart; nine leaf steps may have moved us, so
@@ -705,7 +707,7 @@ Section ProofArgfd.
     iDestruct (cpu_own_transport CID CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argint.wp_argint_sconf M6 (av - 6)%nat n eb p C i
               (ud_tfp (pv_upt V)) (pv_tf V) v (word_hi w5) (DfracOwn (1/4)) b
-              _ Hi HM6a0 Harg Hn ltac:(lia)
+              _ Hi HM6a0 Harg Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage Hs5hi").
     iIntros (CID11 Hk11 A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5hi".
     iDestruct ("Hpback" with "Htfp Hpage") as "Hpriv".

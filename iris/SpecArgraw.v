@@ -52,7 +52,7 @@ Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn.
+Require Import ProcPtOwn PageGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -71,6 +71,12 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for myproc's *)
   (14 <= av)%nat ->
+  (* the trapframe page's own well-formedness -- what the argument load's
+     physical-tier-to-mem-tier crossing needs (ProcInv.tf_page_word_mem),
+     since [tf_page] is physical-native and this load runs through the
+     kernel's own mapping. Not previously needed: before the physical-native
+     redesign, [tf_page]'s words WERE mem-tier already. *)
+  page_valid (page_base tfp) ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗

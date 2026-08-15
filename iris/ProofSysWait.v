@@ -43,6 +43,7 @@ Require Import UserPtTree.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
+Require Import ProofKforkParts.
 Require Import SpecArgaddr SpecKwait.
 Require Import SpecSysWait.
 From Kernel Require KernelInstrs KernelSyms.
@@ -238,6 +239,7 @@ Section ProofSysWait.
       rewrite /A3 upd_ne; [| vm_compute; discriminate].
       rewrite /A2 upd_ne; [| vm_compute; discriminate]. exact HA1sp. }
     (* ===================== argaddr(0, &p) ===================== *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     (* the trapframe fraction is BORROWED out of the private block: kwait
        wants the block back whole, so it goes straight back below. *)
     iDestruct (proc_priv_tf γf pj pid V with "Hpriv") as "(Htf & Hpage & Hback)".
@@ -245,7 +247,7 @@ Section ProofSysWait.
     iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Argaddr.wp_argaddr_sconf A4 (av - 4)%nat 0%nat eb pj C 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 w3 (DfracOwn (1/4)) b
-              _ sw_arg0 HA4a0 Hv0 sw_ilvl0 (sw_Kaa av Hav)
+              _ sw_arg0 HA4a0 Hv0 sw_ilvl0 (sw_Kaa av Hav) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3".
     iEval (rewrite HA4a1) in "Hb3".

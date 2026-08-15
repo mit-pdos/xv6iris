@@ -114,6 +114,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
+Require Import ProofKforkParts.
 Require Import PanicStub.
 Require Import WpUart.
 Require Import DiskPtsto.
@@ -1283,6 +1284,7 @@ Section ProofSysPipe.
       rewrite /P3 upd_ne; [| congruence].
       rewrite /P2 upd_ne; [| congruence]. apply HthrP1; assumption. }
     (* the trapframe word argaddr reads, borrowed out of [proc_priv] *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
     iEval (rewrite -HP4a1) in "Hb5".
     iDestruct (cpu_own_transport CID25 CID29 0%nat eb p C b ltac:(wp_next_chain)
@@ -1290,7 +1292,7 @@ Section ProofSysPipe.
     iApply (Argaddr.wp_argaddr_sconf P4 (av - 8)%nat 0%nat eb p C 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v u5 (DfracOwn (1/4)) b lks
               sp_arg0 HP4a0 Harg sp_noff0
-              Havaa with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hb5").
+              Havaa Hpv with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hb5").
     iIntros (CID30 Hcr30 Q0) "%HcsQ0 Hcg Hcpu Hpc Htfc Htfp Hb5".
     iEval (rewrite HP4a1) in "Hb5".
     iDestruct ("Hpback" with "Htfc Htfp") as "Hpriv".

@@ -43,7 +43,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn.
+Require Import ProcPtOwn PageGeom.
 Require Import SchedCtx.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
@@ -67,6 +67,8 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      (rank 11, LockRank.v) in turn.  argint exposes no locks_below premise
      of its own. *)
   locks_below lks "proc" ->
+  (* what argint's own load needs -- see SpecArgraw's matching premise. *)
+  page_valid (page_base tfp) ->
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
