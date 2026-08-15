@@ -14,7 +14,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - swtch spec
 - acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
 - kalloc/kfree separation-logic-style specs
-- kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None
+- kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None (same for allocproc)
 - re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
 - background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
