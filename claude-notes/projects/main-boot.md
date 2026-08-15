@@ -365,6 +365,35 @@ real proof will demand, replaces exactly this one file plus its Axiom.
 (Typeclass note: the context deliberately drops `SpecMain`'s `!fileG Σ` —
 nothing in the statement needs it.)
 
+**WHAT PROVING IT NOW NEEDS, and what is already built.** userinit's body is
+`allocproc(); initproc = p; p->cwd = namei("/"); p->state = RUNNABLE;
+release(&p->lock)`, and three of the five are ready:
+
+* `allocproc` is proven and takes the COUNTED regime
+  (`design/proc-struct.md`, "The proc table's two regimes"): with
+  `procs_avail (Some (S k))` its empty-table arm is refutable, which is what
+  a caller that does not check the result requires (kernel-defects.md).
+  `BootShared.boot_shared_alloc` already mints `procs_avail (Some NPROC)` —
+  it is DROPPED there today, and threading it to main is the wiring left.
+* `namei("/")` is proven at its ROOT CORNER (`SpecNamex.NAMEX_ROOT` /
+  `SpecNamei.NAMEI_ROOT`, `ProofNamexRoot.v` / `ProofNameiRoot.v`). The
+  general contract is unusable at boot and not for want of plumbing: it
+  names a running process, an OPEN `log_op`, and the whole block layer,
+  none of which exists before `fsinit`. For a path of one `/` the walk's
+  loop never runs, so the corner assumes only the ICACHE.
+* `release` at RUNNABLE is `SpecForkretPark.forkret_park` plus
+  `SchedCtx.proc_slots_park`, exactly as `ProofKforkB5` does it.
+
+So what userinit's contract must take, and main must therefore pay, is: the
+`nextpid` lock (`is_lock γp alp_pid_lock "nextpid" nextpid_res` — procinit
+returns the `lk_fresh`, and the `nextpid` cell has to join
+`main_globals_raw`), `procs_avail (Some (S k))`, and the icache bundle
+(`is_itable2` / `itable_inv` / `ic_escrows` / one `iref_slot`).
+**THE ICACHE IS THE ONE THAT IS NOT READY**: `IcacheBoot.icache_boot` needs
+the stocked inode pool, which needs the fs BLOCK layer wired into main
+(fs-icache.md C7 owed (ii)). That is the gate on userinit, and it is the
+same gate `procs_inv`'s `ientry_raw`s are already waiting on.
+
 ### G4 — the payload arrives under a `▷` and nothing on the loop-exit path strips it
 
 Opening any invariant yields its body under a later, and `P` is persistent but
