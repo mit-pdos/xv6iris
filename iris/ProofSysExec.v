@@ -2437,7 +2437,7 @@ Section SysExecFree.
     iApply (Kfree.wp_kfree_sconf ga γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) M2 None 0%nat eb pj
               (K - 60)%nat b lks K14 eq_refl eq_refl sx_noff0 Hlb
-              with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlk [Hpage] Hav").
     { rewrite /kfree_pre HM2a0. iSplitR; [iPureIntro; exact Hpgv |]. iExact "Hpage". }
     iIntros (CID4 Hq4 Mk) "Hcg Hcnt Hpc %Hcsk Hav2".
     iEval (rewrite HM2ra Hret) in "Hpc".
@@ -3341,7 +3341,7 @@ Section SysExecStep.
     iApply (Kalloc.wp_kalloc_sconf γa γk
               (mword_of_int (KernelSyms.kmem + 24)) Q2 None 0%nat eb
               (proc_addr jp) (K - 60)%nat b lks K14 eq_refl sx_noff0 Hlb
-              with "Hcg Hcnt Htext Hpc Hlk Hav Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlk Hav").
     iIntros (CID11 Hq11 mr) "Hcg Hcnt Hpc %Hcsr Hkp".
     iEval (rewrite HQ2ra) in "Hpc".
     assert (HRr : sx_regs sp0 m mr i)
