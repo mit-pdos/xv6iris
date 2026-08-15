@@ -100,8 +100,12 @@ R9. **Owed items registered**, each with its home:
       can land ahead of it.  Today insert has a full resource story and
       delete has only the refcount half (`ireg_write_unlink` consumes
       an `ilink` and has NO CALLER).
-    - ~~the ROOT clause~~ — **LANDED**, in the preservable form the
-      charter's own does not have: `ireg_slot` (not `ireg_body`) carries
+    - ~~the ROOT clause~~ — **LANDED and RATIFIED** (coordinator,
+      2026-08-15: the form and home moves are both forced — the
+      chartered body-form is unpreservable at `ireg_write_unlink`, and
+      strictness names `w`, which lives only at the slot; the
+      claim/free REFUTATIONS falling out as theorems exceed the
+      charter).  `ireg_slot` (not `ireg_body`) carries
       `ireg_root_ok z d w := z = ireg_root -> w < di_nlink d`, (L1) MADE
       STRICT at the root, with §20.4's `di_nlink ≥ 1` as its projection
       `ireg_root_ok_alive`.  The chartered form is unpreservable at
