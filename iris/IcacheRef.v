@@ -913,7 +913,7 @@ Section IcacheLink.
 End IcacheLink.
 
 Section IcacheRefGhost.
-  Context `{!icacheG Σ}.
+  Context `{!icacheG Σ, !lockG Σ}.
   Context `{ICFG : icfg}.
 
   (* HALF the authority.  The other half is the other one: the itable
@@ -1067,8 +1067,23 @@ Section IcacheRefGhost.
      parent keeps its whole count fragment while its liveness and identity
      slices shrink -- [inode_ref_short], and the reason iput's caller cannot
      be a parent with a share out. *)
+  (* THE COUNT FRAGMENT, and with it the SLEEPLOCK SHARE.
+
+     [slh_tok (icfg_isl k) q] is a q-share of "somebody may hold slot [k]'s
+     sleeplock" (SleepLock.v), and it rides HERE rather than beside
+     [live_frac] because the authority that counts it is the one this
+     fragment answers to: the total outstanding share is the [qt] of
+     [M !! k], so [IcacheInv.isl_slot] can couple the two definitionally and
+     REF-1 -- "your [q] is the whole outstanding share" -- becomes "no share
+     of the lock exists anywhere", which is the premise iput's non-blocking
+     [acquiresleep] takes (claude-notes/projects/iput-acquiresleep.md).
+
+     It rides at the SAME [q], which is what makes every existing step free:
+     [iref_dup_step]'s halving splits the share the same way, and the
+     carve/gather family does not move the count fragment at all, so a
+     carved-out [inode_shr] carries no share and the reference keeps it. *)
   Definition iref_frag (k : nat) (q : Qp) : iProp Σ :=
-    own icfg_iref (◯ {[ k := (q, 1%positive) ]}).
+    (own icfg_iref (◯ {[ k := (q, 1%positive) ]}) ∗ slh_tok (icfg_isl k) q)%I.
 
   (* ONE reference to slot [k], holding fraction [q] of its identity -- the
      count fragment AND the matching liveness slice, canonically paired (see
@@ -1093,7 +1108,7 @@ End IcacheRefGhost.
 (* ===================================================================== *)
 
 Section IcacheRef.
-  Context `{!riscvGS Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 
@@ -1381,7 +1396,7 @@ End IcacheRef.
 (* ===================================================================== *)
 
 Section IcacheHeld.
-  Context `{!riscvGS Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !icacheG Σ, !lockG Σ}.
   Context `{GEN : GenId}.
   Context `{ICFG : icfg}.
 

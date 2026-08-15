@@ -1259,13 +1259,14 @@ Section ProofIget.
                       with "Hcg Hpc Hi78 [Hhalf]").
             { rewrite Hpa78 Hsv78.
               iInv "Hinv" as ">Hbody" "Hclose2".
-              iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells & Hlpool)".
+              iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells & Hlpool & Hipool)".
               iDestruct (itable_half_agree with "Ha Hhalf") as %->.
               iDestruct (iref_cells_acc_upd M e He with "Hcells") as "[Hcell Hcback]".
               (* the recycled slot's liveness unit splits here, exactly as its
                  identity halves do below: 1/4 to the first reference, the rest
                  to the invariant's arm (design 14.6). *)
               iDestruct (live_pool_acc_upd M e He with "Hlpool") as "[Hlslot Hlback]".
+              iDestruct (isl_pool_acc_upd M e He with "Hipool") as "[Hislot Hiback]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
               (* THE GENERATION IS BORN HERE (design 17.2 piece 2 / 17.3 (B)):
@@ -1276,10 +1277,10 @@ Section ProofIget.
                  because at +0x72 the slot was not yet in [M] and no unit had
                  been split. *)
               iMod (iref_alloc_step M e (1/2/2)%Qp HMe ig_quarter_lt
-                      with "Hauth Hlslot")
-                as (gnew) "(Hauth & Hlslot & Htok2 & Hlvh & Hpend)".
+                      with "Hauth Hlslot Hislot")
+                as (gnew) "(Hauth & Hlslot & Hislot & Htok2 & Hlvh & Hpend)".
               iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-              iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback]") as "_".
+              iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback Hislot Hiback]") as "_".
               { iApply bi.later_intro. iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M). iFrame "Ha".
                 iSplitR.
                 { iPureIntro. destruct Hwf' as [Hdom Hcnt']. split.
@@ -1293,8 +1294,13 @@ Section ProofIget.
                 iSplitL "Hcell Hcback".
                 { iApply ("Hcback" $! ((1/2/2)%Qp, 1%positive)).
                   rewrite /iref_word lookup_insert. iExact "Hcell". }
-                iApply ("Hlback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
-                          with "[%] Hlslot").
+                iSplitL "Hlslot Hlback".
+                { iApply ("Hlback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
+                            with "[%] Hlslot").
+                  intros i Hi. rewrite lookup_insert_ne;
+                    [reflexivity | by apply not_eq_sym]. }
+                iApply ("Hiback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
+                          with "[%] Hislot").
                 intros i Hi. rewrite lookup_insert_ne;
                   [reflexivity | by apply not_eq_sym]. }
               iModIntro. iFrame "Hhalf Htok2". iExists gnew. iFrame. }

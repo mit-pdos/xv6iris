@@ -878,6 +878,14 @@ Section IcacheBootTable.
        mint it.  [IcacheRef.icfg_alloc] + [IcacheRef.live_boot_split] is
        what discharges it. *)
     ([∗ list] k ∈ seq 0 NINODE, live_frac k 1%Qp) -∗
+    (* THE PER-SLOT SLEEPLOCK GHOSTS, as [IcacheRef.icfg_alloc] hands them
+       over: an unbuilt lock's free arm, and the AUTHORITATIVE ZERO of its
+       outstanding-share count.  A PREMISE for the same reason the count
+       authority is one -- the gname is CANONICAL ([icfg_isl]), so this file
+       must be given it rather than allocate it and then claim to have built
+       THE itable's locks. *)
+    ([∗ list] k ∈ seq 0 NINODE,
+       sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) -∗
     itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name itable_lock "itable"%string -∗
     lock_cpu itable_lock ↦₈ (zero_reg : mword 64) -∗
@@ -890,11 +898,12 @@ Section IcacheBootTable.
       itable_inv ∗
       ic_escrows cn γfs γi cov logstart ∗
       ([∗ list] k ∈ seq 0 NINODE,
-         ∃ γil γisl : gname,
-           is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string
+         ∃ γil : gname,
+           is_sleeplock γil (icfg_isl k) (i_lock (ientry k)) "inode"%string
                         (ic_tok cn k)).
   Proof.
-    iIntros "Hauth Hlive Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlive Hislg Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iDestruct (big_sepL_sep with "Hislg") as "[Hislfree Hislauth]".
     (* ---- take the fifty entries apart, and name the identity values ---- *)
     iDestruct (ientry_raw_split with "Hraw")
       as "(Hdev & Hinum & Href & Hvalid & Hmirror)".
@@ -913,10 +922,11 @@ Section IcacheBootTable.
     iMod (ic_names_alloc dvs) as (cn) "(Htok & Hmid & Hgid)".
     (* ---- the [ref]-word invariant ---- *)
     iMod (inv_alloc icacheN E itable_body
-            with "[HhalfI Href Hlive]") as "#Hitinv".
+            with "[HhalfI Href Hlive Hislauth]") as "#Hitinv".
     { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitL "Href"; [iApply iref_cells_boot; iExact "Href" |].
-      iApply live_pool_empty. iExact "Hlive". }
+      iSplitL "Hlive"; [iApply live_pool_empty; iExact "Hlive" |].
+      iApply isl_pool_empty. iExact "Hislauth". }
     (* ---- the fifty escrows, at the EMPTY arm, and the table's shares ---- *)
     iDestruct (big_sepL_sep_2 with "Hid Hvalid") as "H1".
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".
@@ -954,12 +964,19 @@ Section IcacheBootTable.
             with "Hnm Hlkw Hcpu Hres") as (γl) "#Hlock".
     (* ---- the fifty inode sleeplocks, sealed over the checkout tokens ---- *)
     iDestruct (big_sepL_sep_2 with "Hsl Htok") as "Hsl".
+    iDestruct (big_sepL_sep_2 with "Hislfree Hsl") as "Hsl".
+    (* AT the canonical gname ([sl_fresh_new_gen_at]), not at one this step
+       allocates: [icfg_isl k] is what a reference's share names.  The
+       deposit is still [sl_untracked] -- flipping it to [slh_tok] is the
+       step that also moves ilock/iunlock/iput. *)
     iAssert ([∗ list] k ∈ seq 0 NINODE,
-               |={E}=> ∃ γil γisl : gname,
-                 is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string
+               |={E}=> ∃ γil : gname,
+                 is_sleeplock γil (icfg_isl k) (i_lock (ientry k)) "inode"%string
                               (ic_tok cn k))%I with "[Hsl]" as "Hsl".
     { iApply (big_sepL_mono with "Hsl"). intros idx k _.
-      iIntros "[Hf Ht]". iApply (sl_fresh_new with "Hf Ht"). }
+      iIntros "[Hfree [Hf Ht]]".
+      iApply (sl_fresh_new_gen_at E (icfg_isl k) _ _ _ sl_untracked
+                with "Hfree Hf Ht"). }
     iMod (big_sepL_fupd with "Hsl") as "Hsl".
     iModIntro. iExists γl, cn.
     (* structurally, NOT [iFrame "…"]: naming the four hypotheses fixes the
