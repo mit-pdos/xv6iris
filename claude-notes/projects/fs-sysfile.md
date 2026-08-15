@@ -8649,10 +8649,11 @@ When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
 ## S7-unlink — **STOPPED, AND WAITING ON THE PIN BUMP.**  The budget audit
-## LANDS and every arm closes; the success arm is blocked on TWO resource
-## facts, and the second of them is `sys_unlink`'s own owed invariant
-## turned round and pointed back at it.  No `Spec`/`Proof`/`Link` file was
-## written and nothing landed moved
+## LANDS and every arm closes.  The success arm was blocked on TWO resource
+## facts; the first is RULED and fixed in the C (`sys_link`'s missing
+## guard, xv6-riscv `verified` `f60ff58`), the second — §20.17.4's
+## `".."`-location fact — is the one open design item.  No
+## `Spec`/`Proof`/`Link` file was written and nothing landed moved
 
 `SysUnlinkBudget.v` (+ its `_CoqProject` row) is the whole of what landed.
 `Print Assumptions` on every headline theorem in it: **closed under the

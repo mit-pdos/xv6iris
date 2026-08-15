@@ -286,34 +286,28 @@ consumes one instruction group later.  `dir_link_at_zeroed` and
 `IregLinkNz.dir_links_nlink_drop` compose with no glue at all.  **Nothing
 in the constructor needs restating for the walk's shape.**
 
-### AMENDMENT ASKED FOR (1): the grey disjunct must carry the NAME
+### AMENDMENT (1) IS NOT NEEDED — the home-live premise comes from the
+### STRONG isdirempty invariant, which the KERNEL FIX makes true
 
 `dir_link_at_unlink` / `dir_links_unlink` take the HOME-LIVE premise
-`bv_unsigned (di_nlink dn) <> 0`, and **sys_unlink cannot supply it.**
-Every landed consumer of `dir_link_at_live` gets that premise from a
-kernel `nlink == 0` guard walked in the same critical section — create's
-at `sysfile.c:262` (→ `ProofCreate.v:7914`), namex's at `fs.c:693` (→
-`ProofNamex.v:3315`) — and **sys_unlink has no such guard**; the walker's
-guard does not cross its `iunlock`/re-`ilock` window.
+`bv_unsigned (di_nlink dn) <> 0`, and the landed sources of that fact are
+all kernel `nlink == 0` guards walked in the same critical section —
+create's at `sysfile.c:262` (→ `ProofCreate.v:7914`), namex's at
+`fs.c:693` (→ `ProofNamex.v:3315`).  `sys_unlink` has no such guard and
+the walker's does not cross its `iunlock`/re-`ilock` window, so the
+premise has to come from the invariant instead:
 
-What sys_unlink DOES hold is the two `namecmp` refusals, i.e. the matched
-record's name is neither `"."` nor `".."`.  A grey ticket is only ever
-§20.8's orphaned `".."`.  So the amendment is one pure conjunct inside
-`dir_link_at`'s grey disjunct — *the record's name is* `".."` — and
-`dir_links_unlink`'s home-live premise then becomes
-`dir_bname data k0 <> bname 14 ".."`, which the walk discharges from
-`SpecNamecmp`'s iff.
+> an orphaned directory holds only dot records; `sys_unlink`'s two
+> `namecmp` refusals say the matched record is not a dot record; so the
+> home is not orphaned.
 
-This reverses fs-icache.md §20.17.4 sharpening (b), which chose
-name-blindness on the grounds that it is "strictly better than the
-ruling's step 5 needs".  It is strictly WORSE for the first consumer, and
-§20.17.5's shelter (iii) — refuted for `dirlink`, because `skipelem` will
-hand it `".."` — **holds for `sys_unlink`**, whose guards are explicit.
-The clause is preservable by inspection: nothing landed produces a grey in
-a `dir_links` at all (boot mints `g = 0`; `link_grey_of_link` has no
-caller), the only future producer is S7's own conversion at `ip`'s `".."`,
-and every existing constructor's range clause already gives the
-name-agreement the untouched records need.
+That derivation is sound **only once the invariant is true**, which is
+what the kernel fix below buys.  A weaker route — putting the record's
+NAME into `dir_link_at`'s grey disjunct, so the `namecmp` refusals refute
+grey directly — was proposed and is **SUPERSEDED: do not pursue it.**  It
+bought only `sys_unlink`'s own zeroing and left §20.6's itrunc row open,
+whereas the strong invariant discharges both.  fs-icache.md §20.17.4
+sharpening (b)'s name-blindness therefore STANDS.
 
 ### AMENDMENT ASKED FOR (2): the `".."`-location fact needs a SUPPLIER,
 ### not just a reading
@@ -328,11 +322,11 @@ beside `dir_links`, established at create's `dirlink(ip, "..", dp->inum)`
 — is what is missing, and it is the same conjunct amendment (1) wants for
 the grey clause.  **Both blockers close in one place.**
 
-### THE isdirempty INVARIANT, stated — and REFUTED as an invariant of the
-### landed binary
+### THE isdirempty INVARIANT, stated — F1.5d's PLANK, and true of the
+### FIXED binary
 
 R9 registers it as a prerequisite of `create_fresh_ty`'s retirement.  The
-statement it wants is, over `DirView`'s record vocabulary,
+statement, over `DirView`'s record vocabulary, is
 
 ```
   bv_unsigned (di_type dn) = T_DIR_z -> bv_unsigned (di_nlink dn) = 0 ->
@@ -343,32 +337,25 @@ statement it wants is, over `DirView`'s record vocabulary,
 
 as a payload conjunct riding beside `dir_links` in `ic_loaded` /
 `ipool_alloc` — i.e. **an orphaned directory's live records are exactly
-`"."` and `".."`** — which is §20.6's itrunc-row obligation and §20.17.5's
-residue closure in one clause.
+`"."` and `".."`**.  It carries three loads at once: §20.6's itrunc-row
+obligation, §20.17.5's residue closure, and — the thing that was not
+noticed until S7 road-tested it — **`sys_unlink`'s own INPUT premise**,
+since a live non-dot record under it forces `di_nlink dp <> 0`, which is
+`dir_links_unlink`'s home-live premise.
 
-**It also turns out to be sys_unlink's own INPUT premise**, not merely its
-output obligation: under it, a live record whose name is neither dot
-forces `di_nlink dp <> 0`, which is amendment (1)'s premise by another
-route.
+**It is FALSE of the binary pinned by `XV6_REV` today**, and `sys_link` is
+why: `nameiparent(new, name)` → `ilock(dp)` → `dirlink(dp, name,
+ip->inum)` with **no `dp->nlink == 0` re-check** (contrast create's at
+`sysfile.c:262`).  namex's guard fires under the WALKER's lock and
+sys_link re-locks afterwards, so a concurrent `rmdir dp` in that window
+appends a non-dot record to an orphaned directory — a real leak, and in
+the model a stranded `ilink`, which is precisely what §20.6's itrunc row
+calls "a blocker on a reachable step".
 
-**But it is FALSE of the landed kernel, and `sys_link` is why.**
-`sys_link` does `nameiparent(new, name)` → `ilock(dp)` → `dirlink(dp,
-name, ip->inum)` with **no `dp->nlink == 0` re-check** (`sysfile.c`'s
-sys_link; contrast create's at `:262`).  namex's guard fires under the
-WALKER's lock and sys_link re-locks afterwards, so a concurrent `rmdir dp`
-in that window lets sys_link append a non-dot record to an orphaned
-directory.  The consequence is a real leak, and it is exactly the shape
-§20.6's itrunc row calls "a blocker on a reachable step": `dp` is later
-freed by `iput` → `itrunc`, which discards the record WITHOUT decrementing
-`ip->nlink`, so `ip` is never freed and its `ilink` is stranded.
-
-So F1.5d's gate needs a ruling: either the kernel gains sys_link's missing
-guard (the same one-line shape `117c0e7` gave create and `fs.c:693` gave
-namex — this is a kernel-defect candidate, filed in
-[`../kernel-defects.md`](../kernel-defects.md)), or the invariant is
-weakened to something sys_link's unguarded `dirlink` preserves.
-**Amendment (1)'s name-carrying grey clause is such a weakening** — it is
-preserved by sys_link (the record sys_link appends carries an `ilink`, not
-a grey) and it is all sys_unlink's own zeroing needs.  It does NOT
-discharge §20.6's itrunc row, which genuinely wants the full statement
-above.
+**RULED (user, 2026-08-15): real bug, kernel fix taken.**  create's guard
+verbatim, routed to `bad:`, on xv6-riscv's `verified` branch at `f60ff58`.
+The invariant becomes true of the new binary and needs no weakening; every
+sysfile walk WAITS on the upstream push and the `XV6_REV` pin bump, since
+`sys_link`'s bytes move and `sys_unlink`'s with them.  See
+[`../kernel-defects.md`](../kernel-defects.md) and
+[`../xv6-bump-playbook.md`](../xv6-bump-playbook.md).
