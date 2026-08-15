@@ -6,43 +6,23 @@
    path, the epilogue) is proved for real, and FOURTEEN of the twenty-two
    table entries are wired through it: fork, wait, kill, fstat, dup,
    getpid, sbrk, pause, uptime, write, sync, and the two axiom-backed
-   stand-ins (sys_open, sys_unlink, via SpecSyscallStubs.v).  EIGHT entries
-   are `Admitted`, in two genuinely different categories -- see the two
-   comment banners below ("GENUINE SPEC GAP" vs "NOT YET WIRED") before
-   touching either group:
-
-   - GENUINE SPEC GAP (exit, pipe, close, chdir, mknod, link, mkdir, exec):
-     each of these takes a `fn : fclose_names` (or, for exit, has its
-     `bslots`/`fileclose_bm`-shaped needs routed through `fn`) whose
-     filesystem-fabric fields (kmem lock, icache, bio_ctx/log_ctx, disk
-     geometry) this proof has NO way to produce resources for, because
-     [wp_syscall_sconf_body] (SpecSyscall.v) threads `bn`/`fn` in OPAQUELY
-     -- deliberately, per its own header, so the five shared families are
-     not double-funded against [syscall_env] -- but states NO premise
-     tying `fn`'s or `bn`'s internal fields to anything [syscall_env]
-     (whose signature is fixed at `gname -> mword 64 -> iProp Σ`, i.e.
-     `(γf, pj)` only) could supply.  Concretely: `SysChdir.wp_sys_chdir_sconf`
-     needs `bslots bn 3` AND `bio_ctx bn ...` for the SAME `bn`; the only
-     `bslots`-shaped resource this proof ever holds is the top-level
-     premise for the AMBIENT `bn`, which forces chdir's own `bn` parameter
-     to be that ambient value -- and nothing then supplies `bio_ctx` for
-     it, because `syscall_env` cannot reference an ambient `bn` it was
-     never handed.  `SysExit`'s case is the same fact wearing `fn`'s
-     record instead: its `fn = MkFCloseNames ...` premise needs the
-     AMBIENT `fn`'s own (opaque) fields, and nothing supplies bio_ctx /
-     is_lock(kmem) / is_itable2 for THOSE particular (unknown) ghost
-     names either.  `pipe`/`close` inherit the identical problem via
-     `fileclose_fs_env`/`fileclose_pipe_env`, which are `fn`-indexed the
-     same way.  Discharging any of these eight honestly requires WIDENING
-     [SpecSyscall.v]'s interface (either give [syscall_env] a `bn`
-     parameter, or add a premise relating `fn`/`bn`'s fields to something
-     [syscall_env] can produce) -- a real, if narrow, SpecSyscall.v gap,
-     not a proof-technique gap.  See claude-notes/projects/fs-sysfile.md.
-   - NOT YET WIRED (fork, pipe is above; here: none currently -- kept as a
-     placeholder category in case a future increment needs it).
-
-   The `syscall_env` this file defines therefore only needs to fund the
-   FOURTEEN entries above; see its own comment. *)
+   stand-ins (sys_open, sys_unlink, via SpecSysOpen.v/SpecSysUnlink.v).
+   EIGHT entries (exit, pipe, close, chdir, mknod, link, mkdir, exec) are
+   still `Admitted` -- but the SPEC GAP that blocked them is now CLOSED:
+   [SpecSyscall.v]'s `syscall_env`/`R` is indexed by `bn`/`fn` as well as
+   `(γf, pj)` (see that file's header), so this `Definition syscall_env`
+   below CAN now reference the ambient `fn`'s own fields for the
+   filesystem-fabric facts (bio_ctx, the kmem/itable locks, disk geometry)
+   those eight entries need -- `SysChdir`'s `bslots bn 3` and `bio_ctx bn
+   ...` can be proved for the SAME `bn` this proof already holds, instead of
+   an unreachable fresh existential.  What's LEFT for those eight is a
+   proof-technique task, not an interface one: replace this file's fresh
+   existentials (γics/cov/logstart/nib/... in the `syscall_env` below) with
+   direct references to `fn`'s own accessor fields (`FCloseNames`'s
+   projections) plus the `fn = MkFCloseNames ...`-style premise each entry's
+   own contract already states, then discharge each of the eight arms.  See
+   claude-notes/projects/fs-sysfile.md for what's independently still owed
+   upstream (sys_open/sys_unlink themselves have no real proof at all yet). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -163,11 +143,23 @@ Section ProofSyscall.
      otherwise narrow its inferred signature below what the [SYSCALL]
      Module Type's [syscall_env] Parameter fixes -- pin the full fifteen
      explicitly so the two signatures match exactly at [End]. *)
+  (* [bn]/[fn] are UNUSED by this body for now: the fourteen entries wired
+     below all take their icache/fs-fabric ghost names (cov/logstart/nib/...)
+     as free-standing parameters rather than bundled inside an opaque
+     [fclose_names], so a fresh existential here is exactly as good as one
+     tied to the ambient [fn] -- see SpecSyscall.v's header on why the two
+     extra indices exist at all.  The eight GENUINE SPEC GAP entries (still
+     [Admitted] below) are exactly the ones where that stops being true:
+     closing them means replacing some of this body's fresh existentials
+     with direct references to [fn]'s own fields (via [FCloseNames]'s
+     accessors) plus a premise tying the ambient [fn]/[bn] to them, not
+     changing this Definition's TYPE again. *)
   Definition syscall_env
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
-      (γf : gname) (pj : mword 64) : iProp Σ :=
+      (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+      : iProp Σ :=
     (∃ (γa γp γw γft γtk γil γpr : gname) (cn : ic_names) (γics : fs_names)
        (γic : gname) (cov : gset Z) (logstart : Z) (nib : nat)
        (γud : uart_names) (γvd : disk_names),

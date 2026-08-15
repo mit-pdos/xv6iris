@@ -58,7 +58,8 @@ Module Syscall : SYSCALL.
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId}
-    (γf : gname) (pj : mword 64) : iProp Σ := emp%I.
+    (γf : gname) (pj : mword 64) (bn : bio_names) (fn : fclose_names)
+    : iProp Σ := emp%I.
 
   Axiom wp_syscall_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,

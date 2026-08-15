@@ -55,7 +55,22 @@
    Everything else in the union genuinely has no competing outer copy
    ([UsertrapRes.v] never mentions the icache/inode-region invariants, the
    superblock cells, or [bitmap_res] at all), so it stays inside the
-   still-abstract [syscall_env].
+   still-abstract [syscall_env] -- but [syscall_env] is ALSO INDEXED BY
+   [bn]/[fn], not just [γf]/[pj], for a second reason discovered writing
+   [ProofSyscall.v]: eight entries (exit, pipe, close, chdir, mknod, link,
+   mkdir, exec) need filesystem-fabric facts -- [bio_ctx], the kmem/itable
+   locks, the icache invariants -- keyed to the SAME [bn]/[fn] the five
+   explicit families above already carry.  Without the extra indices,
+   [syscall_env]'s own internal existential witnesses for those facts could
+   never be shown equal to the AMBIENT [bn]/[fn] a caller already fixed --
+   not a competing-owner problem this time, but an unreachable-witness one,
+   and the fix is the same shape: widen the index rather than smuggle the
+   fact through an unrelated channel. [UsertrapRes.ut_own]'s own [Rsys]
+   slot widened to match (`Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N)`),
+   which every one of its ~25 mentions in that file threads opaquely --
+   NOTHING in [ProofUsertrapSys.v]'s call site needed to change, since it
+   never applies [Rsys]/[syscall_env] itself, only names the resource
+   `Rsys ...` produces.
 
    What the contract does say concretely is the part usertrap actually depends on:
 
@@ -134,7 +149,7 @@ Definition wp_syscall_sconf_body
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (R : gname -> mword 64 -> iProp Σ)
+    (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
     (bn : bio_names) (fn : fclose_names) (us : gset Z)
     (ip : mword 64) (dqi : dfrac)
@@ -165,8 +180,15 @@ Definition wp_syscall_sconf_body
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   fd_slots FDSPARE -∗
   iref_slots IREFSPARE -∗
-  (* everything else the twenty-two entries consume, abstractly -- header *)
-  R γf pj -∗
+  (* everything else the twenty-two entries consume, abstractly -- header.
+     Indexed by [bn]/[fn] too, not just [γf]/[pj]: eight of the entries need
+     filesystem-fabric facts (bio_ctx, the kmem/itable locks, icache
+     invariants) keyed to the SAME [bn]/[fn] the five explicit families
+     above already carry, and an [R] that could not reference them would
+     have no way to prove its own internal witnesses equal the ambient
+     ones -- the "two owners" trap in reverse: not a competing copy, but an
+     UNREACHABLE one. *)
+  R γf pj bn fn -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (V' : pprivate) (us' : gset Z),
@@ -185,7 +207,7 @@ Definition wp_syscall_sconf_body
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      R γf pj -∗
+      R γf pj bn fn -∗
       proc_priv γf pj pid V' -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -215,7 +237,7 @@ Module Type SYSCALL.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId},
-      gname -> mword 64 -> iProp Σ.
+      gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

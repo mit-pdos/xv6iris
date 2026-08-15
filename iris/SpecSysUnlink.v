@@ -57,7 +57,7 @@ Definition wp_sys_unlink_sconf_body
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (R : gname -> mword 64 -> iProp Σ)
+    (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
     (bn : bio_names) (fn : fclose_names) (us : gset Z)
     (ip : mword 64) (dqi : dfrac)
@@ -79,7 +79,7 @@ Definition wp_sys_unlink_sconf_body
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   fd_slots FDSPARE -∗
   iref_slots IREFSPARE -∗
-  R γf pj -∗
+  R γf pj bn fn -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (V' : pprivate) (us' : gset Z),
@@ -92,7 +92,7 @@ Definition wp_sys_unlink_sconf_body
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       fd_slots FDSPARE -∗
       iref_slots IREFSPARE -∗
-      R γf pj -∗
+      R γf pj bn fn -∗
       proc_priv γf pj pid V' -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -104,7 +104,7 @@ Module Type SYSUNLINK.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (R : gname -> mword 64 -> iProp Σ)
+      (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)

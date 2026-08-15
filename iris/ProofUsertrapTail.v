@@ -59,6 +59,7 @@ Require Import ProcPtOwn.
 Require Import KallocInv.
 Require Import PanicStub.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import SchedCtx PanicStub.
@@ -102,7 +103,7 @@ Section ProofUsertrapTail.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the syscall environment, an ordinary hart-free parameter here: the tail
      never touches it, it only hands it on.  See SpecSyscall's note. *)
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
 
   (* ==================================================================== *)
@@ -158,7 +159,7 @@ Section UtRet2.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xb2 .. +0xc6: MAKE_SATP, the epilogue, THE EXIT.                    *)
@@ -630,7 +631,7 @@ Section UtRet.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xae: jal prepare_return, then the second half at ITS hart.          *)
@@ -745,7 +746,7 @@ Section UtA6.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xa6:  if (killed(p)) { which_dev = 0; kexit(-1); }                  *)
@@ -987,7 +988,7 @@ Section UtFa.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xfc:  if (which_dev == 2) yield();   then +0xae                     *)

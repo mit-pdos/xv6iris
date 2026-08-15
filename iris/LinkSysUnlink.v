@@ -30,7 +30,7 @@ Module SysUnlinkAx : SYSUNLINK.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (R : gname -> mword 64 -> iProp Σ)
+      (R : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)
