@@ -46,11 +46,9 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* the physical address of the trapframe word at byte offset [off] *)
-Definition tf_pa (tfp : mword 44) (off : Z) : mword 64 :=
-  zero_extend' 64 (concat_vec tfp
-    (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + off))))
-       (Z.sub pagesize_bits 1) 0)).
+(* [tf_pa] itself now lives in TrampPt.v (re-exported below) so
+   [ProcInv.tf_page] -- below this file in the dependency order -- can
+   share the exact same address family. *)
 
 (* the register file after userret's 31 restores (insert order = execution
    order; a0 is loaded LAST -- it holds the TRAPFRAME base until then) *)

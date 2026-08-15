@@ -47,6 +47,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
+Require Import PtTree KptTree TrampPt.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -173,9 +174,9 @@ Section KforkTfLoop.
     page_valid (page_base tfdst) ->
     length ws = TFWORDS ->
     length cur0 = TFWORDS ->
-    M !!! Regidx Ra5 = a_tf_word tfsrc 0 ->
-    M !!! Regidx Ra4 = a_tf_word tfdst 0 ->
-    M !!! Regidx Ra3 = a_tf_word tfsrc 36 ->
+    M !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 0) ->
+    M !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 0) ->
+    M !!! Regidx Ra3 = tf_pa tfsrc (8 * Z.of_nat 36) ->
     (* NO premise tying [M] to kfork's ENTRY map: at +0x4a the frame is
        pushed, s0 is the frame pointer, s4 is the child and s5 is the parent,
        so "every callee-saved register still agrees with the entry map" is
@@ -191,8 +192,8 @@ Section KforkTfLoop.
     wp_next false p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved M mf /\
-         mf !!! Regidx Ra5 = a_tf_word tfsrc 36 /\
-         mf !!! Regidx Ra4 = a_tf_word tfdst 36⌝ -∗
+         mf !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 36) /\
+         mf !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 36)⌝ -∗
         sie_cap_gpr mf n false p -∗
         pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
         tf_page tfsrc ws -∗
@@ -202,6 +203,17 @@ Section KforkTfLoop.
   Proof.
     intros Hpvsrc Hpvdst Hwslen Hcur0len HM5 HM4 HM3.
     iIntros "Hcg #Htext Hpc Hsrcp Hdstp Hcont".
+    (* [pt_node_claim] for both pages, ONCE: [hw_config] peels off [Hcg]
+       persistently (no loss), and [page_valid] is [Hpvsrc]/[Hpvdst].  These
+       stay in the intuitionistic context for the whole fuel induction below
+       (like [Htext]/[Hi04a] etc.), so the loop body needs no extra threading. *)
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfsrc Hpvsrc with "Hkmapb") as "#Hptcsrc".
+    iPoseProof (pt_node_claim_from_static tfdst Hpvdst with "Hkmapb") as "#Hptcdst".
     assert (Hwslen36 : length ws = 36%nat) by (unfold TFWORDS in Hwslen; exact Hwslen).
     iPoseProof (kfk_04a with "Htext") as "Hi04a".
     iPoseProof (kfk_04c with "Htext") as "Hi04c".
@@ -225,9 +237,9 @@ Section KforkTfLoop.
       ⌜(k < 9)%nat⌝ -∗
       ⌜length cur = TFWORDS⌝ -∗
       ⌜forall i, (i < 4*k)%nat -> cur !! i = ws !! i⌝ -∗
-      ⌜Mk !!! Regidx Ra5 = a_tf_word tfsrc (4*k) /\
-       Mk !!! Regidx Ra4 = a_tf_word tfdst (4*k) /\
-       Mk !!! Regidx Ra3 = a_tf_word tfsrc 36 /\
+      ⌜Mk !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat (4*k)) /\
+       Mk !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat (4*k)) /\
+       Mk !!! Regidx Ra3 = tf_pa tfsrc (8 * Z.of_nat 36) /\
        (forall r : mword 5, is_cs_idx r = true -> Mk !!! Regidx r = M !!! Regidx r)⌝ -∗
       sie_cap_gpr Mk n false p -∗
       pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
@@ -236,8 +248,8 @@ Section KforkTfLoop.
       wp_next false p (fun (CID : CpuId) =>
         ∀ mf : regfile,
           ⌜callee_saved M mf /\
-           mf !!! Regidx Ra5 = a_tf_word tfsrc 36 /\
-           mf !!! Regidx Ra4 = a_tf_word tfdst 36⌝ -∗
+           mf !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat 36) /\
+           mf !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat 36)⌝ -∗
           sie_cap_gpr mf n false p -∗
           pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
           tf_page tfsrc ws -∗
@@ -263,41 +275,41 @@ Section KforkTfLoop.
       (* ---- the address arithmetic, all off Mk's a5/a4 (unchanged   ----
          ---- across the whole body until the two trailing addi's)     *)
       assert (Ha0 : add_vec (Mk !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
-                    = a_tf_word tfsrc ((4*k+0)%nat)).
-      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 0 0 ltac:(reflexivity)
+                    = tf_pa tfsrc (8 * Z.of_nat ((4*k+0)%nat))).
+      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 0 0 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Ha1 : add_vec (Mk !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
-                    = a_tf_word tfsrc ((4*k+1)%nat)).
-      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 1 8 ltac:(reflexivity)
+                    = tf_pa tfsrc (8 * Z.of_nat ((4*k+1)%nat))).
+      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 1 8 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Ha2 : add_vec (Mk !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 16 : mword 12))
-                    = a_tf_word tfsrc ((4*k+2)%nat)).
-      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 2 16 ltac:(reflexivity)
+                    = tf_pa tfsrc (8 * Z.of_nat ((4*k+2)%nat))).
+      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 2 16 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Ha3 : add_vec (Mk !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 24 : mword 12))
-                    = a_tf_word tfsrc ((4*k+3)%nat)).
-      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 3 24 ltac:(reflexivity)
+                    = tf_pa tfsrc (8 * Z.of_nat ((4*k+3)%nat))).
+      { rewrite HMka5. exact (kfk_tf_disp tfsrc k 3 24 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Hd0 : add_vec (Mk !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 0 : mword 12))
-                    = a_tf_word tfdst ((4*k+0)%nat)).
-      { rewrite HMka4. exact (kfk_tf_disp tfdst k 0 0 ltac:(reflexivity)
+                    = tf_pa tfdst (8 * Z.of_nat ((4*k+0)%nat))).
+      { rewrite HMka4. exact (kfk_tf_disp tfdst k 0 0 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Hd1 : add_vec (Mk !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 8 : mword 12))
-                    = a_tf_word tfdst ((4*k+1)%nat)).
-      { rewrite HMka4. exact (kfk_tf_disp tfdst k 1 8 ltac:(reflexivity)
+                    = tf_pa tfdst (8 * Z.of_nat ((4*k+1)%nat))).
+      { rewrite HMka4. exact (kfk_tf_disp tfdst k 1 8 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Hd2 : add_vec (Mk !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 16 : mword 12))
-                    = a_tf_word tfdst ((4*k+2)%nat)).
-      { rewrite HMka4. exact (kfk_tf_disp tfdst k 2 16 ltac:(reflexivity)
+                    = tf_pa tfdst (8 * Z.of_nat ((4*k+2)%nat))).
+      { rewrite HMka4. exact (kfk_tf_disp tfdst k 2 16 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (Hd3 : add_vec (Mk !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 24 : mword 12))
-                    = a_tf_word tfdst ((4*k+3)%nat)).
-      { rewrite HMka4. exact (kfk_tf_disp tfdst k 3 24 ltac:(reflexivity)
+                    = tf_pa tfdst (8 * Z.of_nat ((4*k+3)%nat))).
+      { rewrite HMka4. exact (kfk_tf_disp tfdst k 3 24 ltac:(lia) ltac:(lia) ltac:(reflexivity)
           ltac:(apply bv_eq; vm_compute; reflexivity)). }
       (* ================================================================ *)
       (*  +0x4a: c.ld a0,0(a5)                                             *)
       (* ================================================================ *)
-      iDestruct (tf_page_word tfsrc ws ((4*k+0)%nat) w0 Hw0 with "Hsrcp") as "[Hr0 Hsrcback0]".
+      iDestruct (tf_page_word_mem tfsrc ws ((4*k+0)%nat) w0 ltac:(lia) Hw0 with "Hptcsrc Hsrcp") as "[Hr0 Hsrcback0]".
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x4a) : mword 64) Ra0 Ra5 (mword_of_int 0 : mword 12)
                 Mk n w0 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -321,7 +333,7 @@ Section KforkTfLoop.
       (* ================================================================ *)
       (*  +0x4c: c.ld a1,8(a5)                                             *)
       (* ================================================================ *)
-      iDestruct (tf_page_word tfsrc ws ((4*k+1)%nat) w1 Hw1 with "Hsrcp") as "[Hr1 Hsrcback1]".
+      iDestruct (tf_page_word_mem tfsrc ws ((4*k+1)%nat) w1 ltac:(lia) Hw1 with "Hptcsrc Hsrcp") as "[Hr1 Hsrcback1]".
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x4c) : mword 64) Ra1 Ra5 (mword_of_int 8 : mword 12)
                 M1 n w1 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -347,7 +359,7 @@ Section KforkTfLoop.
       (* ================================================================ *)
       (*  +0x4e: c.ld a2,16(a5)                                            *)
       (* ================================================================ *)
-      iDestruct (tf_page_word tfsrc ws ((4*k+2)%nat) w2 Hw2 with "Hsrcp") as "[Hr2 Hsrcback2]".
+      iDestruct (tf_page_word_mem tfsrc ws ((4*k+2)%nat) w2 ltac:(lia) Hw2 with "Hptcsrc Hsrcp") as "[Hr2 Hsrcback2]".
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x4e) : mword 64) Ra2 Ra5 (mword_of_int 16 : mword 12)
                 M2 n w2 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -378,7 +390,7 @@ Section KforkTfLoop.
       (* ================================================================ *)
       assert (Hcb0 : ((4*k+0)%nat < length cur)%nat) by (rewrite Hcurlen36; exact (kfk_idx_lt36_0 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur ((4*k+0)%nat) Hcb0) as [c0 Hc0].
-      iDestruct (tf_page_word_upd tfdst cur ((4*k+0)%nat) c0 Hc0 with "Hdstp") as "[Hw0 Hback0]".
+      iDestruct (tf_page_word_upd_mem tfdst cur ((4*k+0)%nat) c0 ltac:(lia) Hc0 with "Hptcdst Hdstp") as "[Hw0 Hback0]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x50) : mword 64) Ra0 Ra4 (mword_of_int 0 : mword 12)
                 M3 n c0 false
                 with "Hcg Hpc Hi050 [Hw0]").
@@ -395,7 +407,7 @@ Section KforkTfLoop.
       assert (Hcb1 : ((4*k+1)%nat < length cur1)%nat)
         by (rewrite /cur1 length_insert Hcurlen36; exact (kfk_idx_lt36_1 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur1 ((4*k+1)%nat) Hcb1) as [c1 Hc1].
-      iDestruct (tf_page_word_upd tfdst cur1 ((4*k+1)%nat) c1 Hc1 with "Hdstp") as "[Hw1 Hback1]".
+      iDestruct (tf_page_word_upd_mem tfdst cur1 ((4*k+1)%nat) c1 ltac:(lia) Hc1 with "Hptcdst Hdstp") as "[Hw1 Hback1]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x52) : mword 64) Ra1 Ra4 (mword_of_int 8 : mword 12)
                 M3 n c1 false
                 with "Hcg Hpc Hi052 [Hw1]").
@@ -412,7 +424,7 @@ Section KforkTfLoop.
       assert (Hcb2 : ((4*k+2)%nat < length cur2)%nat)
         by (rewrite /cur2 length_insert /cur1 length_insert Hcurlen36; exact (kfk_idx_lt36_2 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur2 ((4*k+2)%nat) Hcb2) as [c2 Hc2].
-      iDestruct (tf_page_word_upd tfdst cur2 ((4*k+2)%nat) c2 Hc2 with "Hdstp") as "[Hw2 Hback2]".
+      iDestruct (tf_page_word_upd_mem tfdst cur2 ((4*k+2)%nat) c2 ltac:(lia) Hc2 with "Hptcdst Hdstp") as "[Hw2 Hback2]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x54) : mword 64) Ra2 Ra4 (mword_of_int 16 : mword 12)
                 M3 n c2 false
                 with "Hcg Hpc Hi054 [Hw2]").
@@ -429,7 +441,7 @@ Section KforkTfLoop.
       (* ================================================================ *)
       (*  +0x56: c.ld a2,24(a5) -- reloads a2, off the SAME map M3          *)
       (* ================================================================ *)
-      iDestruct (tf_page_word tfsrc ws ((4*k+3)%nat) w3 Hw3 with "Hsrcp") as "[Hr3 Hsrcback3]".
+      iDestruct (tf_page_word_mem tfsrc ws ((4*k+3)%nat) w3 ltac:(lia) Hw3 with "Hptcsrc Hsrcp") as "[Hr3 Hsrcback3]".
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x56) : mword 64) Ra2 Ra5 (mword_of_int 24 : mword 12)
                 M3 n w3 false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -457,7 +469,7 @@ Section KforkTfLoop.
         by (rewrite /cur3 length_insert /cur2 length_insert /cur1 length_insert Hcurlen36;
             exact (kfk_idx_lt36_3 k Hk9)).
       destruct (lookup_lt_is_Some_2 cur3 ((4*k+3)%nat) Hcb3) as [c3 Hc3].
-      iDestruct (tf_page_word_upd tfdst cur3 ((4*k+3)%nat) c3 Hc3 with "Hdstp") as "[Hw3 Hback3]".
+      iDestruct (tf_page_word_upd_mem tfdst cur3 ((4*k+3)%nat) c3 ltac:(lia) Hc3 with "Hptcdst Hdstp") as "[Hw3 Hback3]".
       iApply (wp_csd_s_sconf (mword_of_int (KF + 0x58) : mword 64) Ra2 Ra4 (mword_of_int 24 : mword 12)
                 M4 n c3 false
                 with "Hcg Hpc Hi058 [Hw3]").
@@ -495,9 +507,10 @@ Section KforkTfLoop.
       assert (Hp5e : add_vec_int (mword_of_int (KF + 0x5a) : mword 64) 4 = mword_of_int (KF + 0x5e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp5e) in "Hpc".
-      assert (HM5a5 : M5 !!! Regidx Ra5 = a_tf_word tfsrc (4 * S k)).
+      assert (HM5a5 : M5 !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat (4 * S k))).
       { rewrite /M5 upd_eq HM4a5 HMka5.
-        exact (kfk_tf_step tfsrc k ltac:(apply bv_eq; vm_compute; reflexivity)). }
+        exact (kfk_tf_step tfsrc k ltac:(lia) ltac:(lia)
+                 ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (HM5a3 : M5 !!! Regidx Ra3 = Mk !!! Regidx Ra3)
         by (rewrite /M5 upd_ne; [exact HM4a3 | vm_compute; discriminate]).
       assert (HM5a4 : M5 !!! Regidx Ra4 = Mk !!! Regidx Ra4)
@@ -519,12 +532,13 @@ Section KforkTfLoop.
       assert (Hp62 : add_vec_int (mword_of_int (KF + 0x5e) : mword 64) 4 = mword_of_int (KF + 0x62))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp62) in "Hpc".
-      assert (HM6a4 : M6 !!! Regidx Ra4 = a_tf_word tfdst (4 * S k)).
+      assert (HM6a4 : M6 !!! Regidx Ra4 = tf_pa tfdst (8 * Z.of_nat (4 * S k))).
       { rewrite /M6 upd_eq HM5a4 HMka4.
-        exact (kfk_tf_step tfdst k ltac:(apply bv_eq; vm_compute; reflexivity)). }
+        exact (kfk_tf_step tfdst k ltac:(lia) ltac:(lia)
+                 ltac:(apply bv_eq; vm_compute; reflexivity)). }
       assert (HM6a3 : M6 !!! Regidx Ra3 = Mk !!! Regidx Ra3)
         by (rewrite /M6 upd_ne; [exact HM5a3 | vm_compute; discriminate]).
-      assert (HM6a5 : M6 !!! Regidx Ra5 = a_tf_word tfsrc (4 * S k))
+      assert (HM6a5 : M6 !!! Regidx Ra5 = tf_pa tfsrc (8 * Z.of_nat (4 * S k)))
         by (rewrite /M6 upd_ne; [exact HM5a5 | vm_compute; discriminate]).
       assert (HM6cs : forall r : mword 5, is_cs_idx r = true -> M6 !!! Regidx r = M !!! Regidx r).
       { intros r Hr.
@@ -540,7 +554,7 @@ Section KforkTfLoop.
       (* ================================================================ *)
       destruct (decide (S k = 9)%nat) as [Hend | Hne].
       - (* ---- the array is done: the bne FALLS THROUGH to +0x66 ---- *)
-        assert (Haddreq : a_tf_word tfsrc (4 * S k) = a_tf_word tfsrc 36)
+        assert (Haddreq : tf_pa tfsrc (8 * Z.of_nat (4 * S k)) = tf_pa tfsrc (8 * Z.of_nat 36))
           by (rewrite (kfk_send9_mul k Hend); reflexivity).
         assert (Heqt : eq_vec (M6 !!! Regidx Ra5) (M6 !!! Regidx Ra3) = true).
         { rewrite HM6a5 HM6a3 HMka3.
@@ -584,7 +598,7 @@ Section KforkTfLoop.
           * rewrite HM6a5 (kfk_send9_mul k Hend). reflexivity.
           * rewrite HM6a4 (kfk_send9_mul k Hend). reflexivity.
       - (* ---- more words left: the bne is TAKEN, back to +0x4a ---- *)
-        assert (Hneq_addr : a_tf_word tfsrc (4 * S k) <> a_tf_word tfsrc 36).
+        assert (Hneq_addr : tf_pa tfsrc (8 * Z.of_nat (4 * S k)) <> tf_pa tfsrc (8 * Z.of_nat 36)).
         { intro Heq.
           apply Hne, (kfk_mul4_eq36 (S k)).
           exact (kfk_tf_inj tfsrc (4 * S k) 36 Hpvsrc

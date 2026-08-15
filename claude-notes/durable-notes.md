@@ -268,6 +268,23 @@ failure modes that produce errors naming something else entirely.
   (`ProcInv.v` exports `InodeRef.v` for exactly this), or `Require Import` it
   at each site. Verify with
   `grep -L 'Require .*\(ProcInv\|InodeRef\)' $(grep -l irefNameG *.v)`.
+  A second symptom of the SAME trap, easy to misdiagnose as a genuinely
+  hard unification failure: a Module Type `Parameter` that both re-states
+  a callee's full `` `{!ClassG Σ, ...}`` list (e.g. mirroring
+  `usertrap_res`'s 14-class signature to call it from a sibling spec, as
+  `SpecUservec.v`'s `USERVEC` does over `SpecUsertrap.USERTRAP_RES`) AND
+  is missing the direct `Require Import` for some of those classes'
+  home files — even though the file compiles clean on its own — reports
+  **`Could not find an instance for the following existential variables:
+  ?fooG0 : Real.fooG Σ`** for exactly the classes whose homes weren't
+  imported, while classes the file ALREADY needed for other reasons (here
+  `riscvGS`/`sieG`, pulled in via `RiscvPtsto`) resolve fine. This looks
+  like it must be about HOW the callee identifier is applied (bare vs.
+  `(ClassArg := ...)`-named vs. positional `@`) and burns real time chasing
+  that — it never is; reducing/renaming the call site changes nothing.
+  Check imports FIRST whenever the unresolved list is a strict subset of a
+  callee's own class list and lines up with classes this file has no other
+  reason to mention.
 - **A class that carries another class as a FIELD instance must not be
   bound alongside it.** `Class irefNameG Σ := { irefname_icacheG :: icacheG Σ;
   iref_name : gname }` means a context with BOTH `!icacheG Σ` and

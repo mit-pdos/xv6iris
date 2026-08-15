@@ -52,6 +52,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
+Require Import PtTree KptTree TrampPt.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -71,10 +72,11 @@ Notation KF := KernelSyms.kfork (only parsing).
 (* ===================================================================== *)
 Lemma kfkb7_tf14_addr (tfp : mword 44) :
   add_vec (page_base tfp) (sign_extend' 64 (mword_of_int 112 : mword 12))
-  = a_tf_word tfp 14.
+  = tf_pa tfp (8 * Z.of_nat 14).
 Proof.
   rewrite (kfk_avi (page_base tfp) 112 ltac:(apply bv_eq; vm_compute; reflexivity)).
-  rewrite /a_tf_word /pa_add. f_equal.
+  rewrite (tf_pa_eq_pa_add8 tfp 14 ltac:(vm_compute; lia)).
+  rewrite /pa_add. f_equal.
 Qed.
 
 Section KforkB7.
@@ -130,11 +132,23 @@ Section KforkB7.
     iPoseProof (kfk_076 with "Htext") as "Hi076".
     iPoseProof (kfk_07a with "Htext") as "Hi07a".
     (* ---- open the child's proc_priv for the read+write on its trapframe ---- *)
+    iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as %Hpv_valid.
     iDestruct (proc_priv_nocwd_tf_upd with "Hpv") as "(Htf & Htfp & Hclose)".
     iDestruct (kfkb7_tf_len with "Htfp") as %Hlen14.
     assert (Hidx14 : (14 < length (pv_tf V))%nat) by (rewrite Hlen14; unfold TFWORDS; lia).
     destruct (lookup_lt_is_Some_2 (pv_tf V) (14%nat) Hidx14) as [w14 Hw14].
-    iDestruct (tf_page_word_upd (ud_tfp (pv_upt V)) (pv_tf V) (14%nat) w14 Hw14 with "Htfp")
+    (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently) and
+       [Hpv_valid] -- the mem-tier convenience wrapper is what a VA-tier
+       [sd]/[ld] through the kernel identity map needs (ProcInv.v's header
+       on [tf_page_word_mem]). *)
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+    iDestruct (tf_page_word_upd_mem (ud_tfp (pv_upt V)) (pv_tf V) (14%nat) w14
+                 ltac:(vm_compute; lia) Hw14 with "Hptc Htfp")
       as "[Hcell Hback]".
     (* ---- +0x66: ld a5,88(s4) ---- *)
     assert (Htgt66 : add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
@@ -158,7 +172,7 @@ Section KforkB7.
     iEval (rewrite Hpp06a) in "Hpc".
     (* ---- +0x6a: sd zero,112(a5) ---- *)
     assert (Htgt6a : add_vec (T1 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 112 : mword 12))
-                     = a_tf_word (ud_tfp (pv_upt V)) 14)
+                     = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat 14))
       by (rewrite HT1a5; apply kfkb7_tf14_addr).
     iApply (wp_sd_zero_s_sconf (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
               T1 n w14 false

@@ -291,6 +291,21 @@ Section HwConfig.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.
+
+  (* [senvcfg] IS ALSO NEVER WRITTEN -- no [wp_csrw]-style lemma for it exists
+     anywhere in the tree -- but it is NOT a conjunct of [hw_config]: that
+     bundle is fully unpacked by name at ~50 leaf call sites across the tree,
+     and inserting a conjunct there either breaks their arity outright or
+     (appended last) silently widens whatever the final named piece captures
+     wherever it is later consumed as an exact proposition. [senvcfg_fixed] is
+     the same "boot-frozen register, held persistently" idea as a STANDALONE
+     fact instead, established the same way (see [senvcfg_fixed_intro] below)
+     but orthogonal to [hw_config]'s own shape -- a caller wanting both just
+     borrows each separately. *)
+  Definition senvcfg_fixed : iProp Σ := senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64).
+
+  Global Instance senvcfg_fixed_persistent : Persistent senvcfg_fixed.
+  Proof. apply _. Qed.
 End HwConfig.
 
 

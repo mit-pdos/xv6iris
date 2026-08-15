@@ -48,6 +48,17 @@ Definition TRAPFRAME  : Z := 0x3FFFFFE000.
 
 Definition tf_vpn    : mword 27 := mword_of_int 0x3FFFFFE.
 
+(* the physical address of the trapframe word at byte offset [off], for a
+   trapframe page rooted at ppn [tfp].  HOISTED HERE (from SpecUserret.v,
+   which now just re-exports it) so [ProcInv.tf_page] -- BELOW SpecUserret
+   in the dependency order -- can be stated over the exact same address
+   family uservec/userret's own low-level instruction lemmas already use,
+   rather than a differently-constructed one needing a bridging equality. *)
+Definition tf_pa (tfp : mword 44) (off : Z) : mword 64 :=
+  zero_extend' 64 (concat_vec tfp
+    (subrange_vec_dec (bits_of_virtaddr (Virtaddr (mword_of_int (TRAPFRAME + off))))
+       (Z.sub pagesize_bits 1) 0)).
+
 (* [tramp_vpn]/[tramp_ppn] now live in KptExecMap.v (re-exported below) so the
    region/exec-map layer sits below InstrBytes; consumers see them unchanged. *)
 
