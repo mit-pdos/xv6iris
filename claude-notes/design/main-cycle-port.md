@@ -207,6 +207,18 @@ proof interface is:
    `iApply` a kit rule at a composition-spelled cursor argument from a
    concrete call site — the unfold oracle can pick the resume-function
    side and force the scrutinee (4.5 s at depth 2, minutes at depth 3).
+   A fifth head, measured at the segment template: **vm is unusable past
+   a resume application even at a CONCRETE value** — the resume's
+   register-`decide` carries the Qed-opaque `register_encode_inj`, the
+   `eq_rect` sticks, and vm readback then normalizes the entire dead
+   instruction executor (>200 s).  vm facts are safe only where the fed
+   value is never consumed (closed prefix projections).  The working
+   incantation for stepping a resume-composition at a symbolic value is
+   recorded at `HartMCycle.mseg1_read3_at_local`: whitelisted
+   `cbn beta iota zeta delta [bind/returnm spine]` rounds (the dead
+   executor stays folded), `rewrite !hregread_resume_red` (rewrite's
+   unification beta-reduces `K v`, stepping every exposed read level in
+   one shot), and `rewrite Hbit` to resolve symbolic-bit ifs.
    THE SHAPE THAT MAKES ALL FOUR IMPOSSIBLE: prove a per-instruction-class
    SEQUENCE RULE once at ABSTRACT cursors (variables are rigid, so every
    unification is O(1)) taking the cursor equations as premises, and

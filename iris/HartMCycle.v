@@ -70,6 +70,227 @@ Definition mseg2_start : M unit :=
        (hregread_resume cur_privilege Machine (riscv_step false))).
 
 (* ====================================================================== *)
+(* 1b. Local helpers: classifier bridges and reduction equations.          *)
+(* ====================================================================== *)
+
+(* a RegRead head never stops a span, whatever [Drw] is -- the classifier
+   bridge reused at EVERY read node of every later segment *)
+Local Lemma hregread_at_stops_false_local (Drw : gset register)
+    (r : register) (m : M unit) :
+  hregread_at r m = true -> hspan_stops Drw m = false.
+Proof.
+  destruct m as [y|T oc k]; simpl; [discriminate|].
+  destruct oc; try discriminate; reflexivity.
+Qed.
+
+(* a RegWrite head OUT of [Drw] stops the span -- the landing classifier *)
+Local Lemma hregwrite_stops_true_local (Drw : gset register) (r : register)
+    (v : type_of_register r) (m : M unit) :
+  hregwrite_val_at r m = Some v -> r ∉ Drw -> hspan_stops Drw m = true.
+Proof.
+  intros Hat Hnin.
+  destruct (hregwrite_val_at_inv r m v Hat) as (ak & K & -> & _).
+  simpl. by apply bool_decide_eq_true_2.
+Qed.
+
+(* the missing sibling of [hregread_resume_red]: compute the write
+   projection on an exposed node (its [decide] does not cbn-reduce) *)
+Local Lemma hregwrite_val_at_red_local (r : register) (ak : option unit)
+    (v : type_of_register r) (K : unit -> M unit) :
+  hregwrite_val_at r (Interface.Next (Interface.RegWrite r ak v) K) = Some v.
+Proof.
+  simpl. destruct (decide _) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+(* ====================================================================== *)
+(* 1c. The projection facts.  The prefix up to the mcountinhibit read is   *)
+(* CLOSED: vm_cast projection facts are cheap (vm never enters the dead    *)
+(* continuation).  PAST that read the value [mc] is consumed, and vm is    *)
+(* UNUSABLE even at a concrete mc: the resume's [decide (r' = r)] carries  *)
+(* the OPAQUE [register_encode_inj] (a Qed), so the [eq_rect] sticks and    *)
+(* vm readback normalizes the whole dead instruction executor (measured:   *)
+(* >200 s).  Everything past the mc read therefore goes by THE            *)
+(* INCANTATION (see [mseg1_read3_at_local]).                                *)
+(* ====================================================================== *)
+
+Local Lemma mseg1_read1_at_local :
+  hregread_at cur_privilege (riscv_step false) = true.
+Proof. vm_cast_no_check (eq_refl true). Qed.
+
+Local Lemma mseg1_read2_at_local :
+  hregread_at (R_bitvector_32 mcountinhibit)
+    (hregread_resume cur_privilege Machine (riscv_step false)) = true.
+Proof. vm_cast_no_check (eq_refl true). Qed.
+
+(* THE INCANTATION for stepping a resume composition at a SYMBOLIC value
+   (the template's per-node recipe; every step below is < 0.1 s):
+     1. [unfold riscv_step, try_step] (+ the segment's model functions if
+        any), then ONE whitelisted
+          cbn beta iota zeta delta [Defs.bind Defs.bind0 Interface.iMon_bind
+              ext_pre_step_hook should_inc_minstret Defs.and_boolM
+              Defs.read_reg Defs.write_reg returnM Defs.returnm]
+        -- this normalizes the closed spine to explicit [Interface.Next]
+        nodes, leaving every un-whitelisted constant (run_hart_active,
+        handle_interrupt, ...) FOLDED, so the dead executor is never
+        entered.
+     2. [rewrite !hregread_resume_red] -- rewrite's unification itself
+        beta-reduces [K v], so ONE [!]-rewrite steps EVERY read level whose
+        node is exposed (here: cur_privilege AND mcountinhibit at once);
+        the resumes' [decide] never needs to reduce.
+     3. a cheap [cbn beta iota zeta delta [Defs.bind Defs.bind0
+        Interface.iMon_bind returnM Defs.returnm]] round to re-expose the
+        next head, then [rewrite Hb] to resolve the branch on the symbolic
+        bit (unification crosses the literal spelling: the model's
+        ['b"0"] converts to [N_to_word 1 0%N]), and repeat 2-3 until the
+        landing node is exposed. *)
+Local Lemma mseg1_read3_at_local (mc : SailStdpp.Values.mword 32) :
+  eq_vec (_get_Counterin_IR mc)
+    (MachineWord.MachineWord.N_to_word 1 0%N) = true ->
+  hregread_at (R_bitvector_64 minstretcfg)
+    (hregread_resume (R_bitvector_32 mcountinhibit) mc
+       (hregread_resume cur_privilege Machine (riscv_step false))) = true.
+Proof.
+  intros Hb.
+  unfold riscv_step, try_step.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
+     should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
+     returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite Hb.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  apply bool_decide_eq_true_2. reflexivity.
+Qed.
+
+(* the landing's write projection, IR-clear branch: the value is
+   [mseg1_b]'s then-arm *)
+Local Lemma mseg1_write_clear_local (mc : SailStdpp.Values.mword 32)
+    (mcfg : SailStdpp.Values.mword 64) :
+  eq_vec (_get_Counterin_IR mc)
+    (MachineWord.MachineWord.N_to_word 1 0%N) = true ->
+  hregwrite_val_at (R_bool minstret_increment)
+    (hregread_resume (R_bitvector_64 minstretcfg) mcfg
+       (hregread_resume (R_bitvector_32 mcountinhibit) mc
+          (hregread_resume cur_privilege Machine (riscv_step false))))
+  = Some (mseg1_b mc mcfg).
+Proof.
+  intros Hb.
+  unfold riscv_step, try_step.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
+     should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
+     returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite Hb.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregwrite_val_at_red_local.
+  unfold mseg1_b. rewrite Hb. reflexivity.
+Qed.
+
+(* the landing's write projection, IR-set branch: the value is [false];
+   [mcfg] is a phantom so both branches conclude at [mseg1_b mc mcfg] *)
+Local Lemma mseg1_write_set_local (mc : SailStdpp.Values.mword 32)
+    (mcfg : SailStdpp.Values.mword 64) :
+  eq_vec (_get_Counterin_IR mc)
+    (MachineWord.MachineWord.N_to_word 1 0%N) = false ->
+  hregwrite_val_at (R_bool minstret_increment)
+    (hregread_resume (R_bitvector_32 mcountinhibit) mc
+       (hregread_resume cur_privilege Machine (riscv_step false)))
+  = Some (mseg1_b mc mcfg).
+Proof.
+  intros Hb.
+  unfold riscv_step, try_step.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
+     should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
+     returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite Hb.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregwrite_val_at_red_local.
+  unfold mseg1_b. rewrite Hb. reflexivity.
+Qed.
+
+(* the landing's continuation IS [mseg2_start]: both sides reduce by the
+   same incantation to the SAME folded continuation -- the IR bit only
+   selects how many read nodes precede the write, never what follows it *)
+Local Lemma mseg1_resume_clear_local (mc : SailStdpp.Values.mword 32)
+    (mcfg : SailStdpp.Values.mword 64) :
+  eq_vec (_get_Counterin_IR mc)
+    (MachineWord.MachineWord.N_to_word 1 0%N) = true ->
+  hregwrite_resume
+    (hregread_resume (R_bitvector_64 minstretcfg) mcfg
+       (hregread_resume (R_bitvector_32 mcountinhibit) mc
+          (hregread_resume cur_privilege Machine (riscv_step false))))
+  = mseg2_start.
+Proof.
+  intros Hb.
+  unfold mseg2_start, riscv_step, try_step.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
+     should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
+     returnM Defs.returnm].
+  rewrite !hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite Hb. rewrite mseg1_mc1_ir.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite hregread_resume_red.
+  cbn beta iota zeta delta
+    [hregwrite_resume Defs.bind Defs.bind0 Interface.iMon_bind
+     returnM Defs.returnm].
+  reflexivity.
+Qed.
+
+Local Lemma mseg1_resume_set_local (mc : SailStdpp.Values.mword 32) :
+  eq_vec (_get_Counterin_IR mc)
+    (MachineWord.MachineWord.N_to_word 1 0%N) = false ->
+  hregwrite_resume
+    (hregread_resume (R_bitvector_32 mcountinhibit) mc
+       (hregread_resume cur_privilege Machine (riscv_step false)))
+  = mseg2_start.
+Proof.
+  intros Hb.
+  unfold mseg2_start, riscv_step, try_step.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
+     should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
+     returnM Defs.returnm].
+  rewrite !hregread_resume_red.
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind returnM Defs.returnm].
+  rewrite Hb. rewrite mseg1_mc1_ir.
+  cbn beta iota zeta delta
+    [hregwrite_resume Defs.bind Defs.bind0 Interface.iMon_bind
+     returnM Defs.returnm].
+  reflexivity.
+Qed.
+
+(* ====================================================================== *)
 (* 2. The characterization.                                                *)
 (* ====================================================================== *)
 
@@ -90,35 +311,52 @@ Lemma mseg1_char (D Drw : gset register) (rs rs0 : regstate)
   /\ hregwrite_resume l.1 = mseg2_start
   /\ reg_agree_on D l.2 rs.
 Proof.
-  (* TODO(agent): the peel chain.  Sketch:
-     - [hspan_peel] (the head [riscv_step false] is a cur_privilege read:
-       [hspan_stops = false] by vm_cast or reflexivity);
-       [hspani_read_D_inv] at cur_privilege ∈ D; rewrite the privilege pin
-       into the landing; the residual is
-       [hregread_resume cur_privilege Machine (riscv_step false)] -- step
-       its head with [hregread_resume_red] + [cbn beta iota] (the
-       underlying node is exposed because [riscv_step false] is a closed
-       term whose head unfolds; if cbn balks, [vm_cast]-style projection
-       facts at the CLOSED prefix are available since everything up to the
-       mc read is closed).
-     - [hspan_peel] + [hspani_read_D_inv] at mcountinhibit; pin [mc].
-     - destruct the IR bit ([destruct (eq_vec (_get_Counterin_IR mc) _)
-       eqn:Hb]); rewrite [Hb] in the residual so the spine reduces.
-       IR clear: one more peel at minstretcfg (pin [mcfg]); IR set: no
-       read.  In both branches the next node is the RegWrite of the
-       branch's arm of [mseg1_b] (rewrite [Hb] in [mseg1_b] to match).
-     - the write is OUT of Drw ([R_bool minstret_increment ∉ Drw]), so
-       [hspan_stops] at it is true: [hspan_stop_refl] ends the chain --
-       [l] IS the write node with the perturbed file.
-     - conclusions: the two projections compute on the landing (closed
-       modulo [mcfg]/branch, [cbn]/reflexivity; for [hregwrite_resume l.1
-       = mseg2_start] show both branches' continuations are the SAME term
-       as the composition -- by [hregread_resume_red]/[hregwrite_resume_red]
-       reduction of [mseg2_start] and reflexivity); the agreement composes
-       transitively through the peels' [reg_agree_on] facts (each rs1
-       agrees with its predecessor on D; conclude agree l.2 rs).
-     KEEP THE F8 RULES: never let a tactic normalize a residual into the
-     context as a named equation between big terms; goals may carry them.
-     If a [cbn] stalls, prefer [cbn beta iota] or a targeted
-     [rewrite hregread_resume_red]. *)
-Admitted.
+  intros HD1 HD2 HD3 Hnotin Hpriv Hmc Hmcfg Hag0 Hchain Hstop.
+  (* peel 1: the cur_privilege read (∈ D); pin Machine *)
+  apply hspan_peel in Hchain;
+    [ | exact (hregread_at_stops_false_local Drw _ _ mseg1_read1_at_local)
+      | exact Hstop ].
+  destruct Hchain as (c1 & Hstep1 & Hchain).
+  destruct (hspani_read_D_inv D Drw _ _ _ _ mseg1_read1_at_local HD1 Hstep1)
+    as (rs1 & Hag1 & ->).
+  rewrite (Hag0 _ HD1) Hpriv in Hchain.
+  (* peel 2: the mcountinhibit read (∈ D); pin mc *)
+  apply hspan_peel in Hchain;
+    [ | exact (hregread_at_stops_false_local Drw _ _ mseg1_read2_at_local)
+      | exact Hstop ].
+  destruct Hchain as (c2 & Hstep2 & Hchain).
+  destruct (hspani_read_D_inv D Drw _ _ _ _ mseg1_read2_at_local HD2 Hstep2)
+    as (rs2 & Hag2 & ->).
+  rewrite (Hag1 _ HD2) (Hag0 _ HD2) Hmc in Hchain.
+  (* branch on the IR bit BEFORE the peels that depend on it *)
+  destruct (eq_vec (_get_Counterin_IR mc)
+              (MachineWord.MachineWord.N_to_word 1 0%N)) eqn:Hb.
+  - (* IR clear: peel 3, the minstretcfg read (∈ D); pin mcfg *)
+    apply hspan_peel in Hchain;
+      [ | exact (hregread_at_stops_false_local Drw _ _
+                   (mseg1_read3_at_local mc Hb))
+        | exact Hstop ].
+    destruct Hchain as (c3 & Hstep3 & Hchain).
+    destruct (hspani_read_D_inv D Drw _ _ _ _
+                (mseg1_read3_at_local mc Hb) HD3 Hstep3)
+      as (rs3 & Hag3 & ->).
+    rewrite (Hag2 _ HD3) (Hag1 _ HD3) (Hag0 _ HD3) Hmcfg in Hchain.
+    (* the landing: the minstret_increment write is OUT of Drw *)
+    apply hspan_stop_refl in Hchain;
+      [ | exact (hregwrite_stops_true_local Drw _ _ _
+                   (mseg1_write_clear_local mc mcfg Hb) Hnotin) ].
+    rewrite Hchain. cbn [fst snd].
+    split; [exact (mseg1_write_clear_local mc mcfg Hb)|].
+    split; [exact (mseg1_resume_clear_local mc mcfg Hb)|].
+    intros r Hr.
+    rewrite (Hag3 _ Hr) (Hag2 _ Hr) (Hag1 _ Hr). exact (Hag0 _ Hr).
+  - (* IR set: the write is the very next node *)
+    apply hspan_stop_refl in Hchain;
+      [ | exact (hregwrite_stops_true_local Drw _ _ _
+                   (mseg1_write_set_local mc mcfg Hb) Hnotin) ].
+    rewrite Hchain. cbn [fst snd].
+    split; [exact (mseg1_write_set_local mc mcfg Hb)|].
+    split; [exact (mseg1_resume_set_local mc Hb)|].
+    intros r Hr.
+    rewrite (Hag2 _ Hr) (Hag1 _ Hr). exact (Hag0 _ Hr).
+Qed.

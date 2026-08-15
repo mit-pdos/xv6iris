@@ -50,6 +50,17 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    (span / chop(minstret_increment) / span-to-fetch / F7-fetch-event /
    decode+execute batches / tail chops / boundary, in the
    `wp_hart_rw_seq` rule/instance discipline).
+   **Implementation, measured (do not re-litigate): CHAIN-PEELING, not
+   tactic normalization.**  Walking the prelude at a symbolic base file
+   with pins as a `register_set` tower fails both ways: `cbn` stalls on
+   the tower lookups (heuristic refusal at ~30 s), `lazy` full-normalizes
+   dead branches under stuck scrutinees (>300 s).  Instead: per-node
+   INVERSION lemmas on `hspan` itself — a D-read peel taking the pinned
+   value as an EXPLICIT argument (no lookup term ever formed), an
+   off-D-read peel introducing a ∀-binder, a silent peel, a `Drw`-write
+   peel — chained ~106 times in the once-per-class lemma; the between-peel
+   monad reduction is pure spine β/ι, which the symbolic probe measured
+   at ~6 ms per 30 nodes.
 1. **The pinned-text fetch rule** (spike F7): derive from
    `wp_hart_ram_read` + `↦ₓ□` facts (`text_valid` per byte → `read_bytes`
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
