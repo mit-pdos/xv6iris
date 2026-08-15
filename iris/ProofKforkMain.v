@@ -465,6 +465,10 @@ Section KforkArms.
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv_nocwd γf npa pid_c Vc' -∗
+    (* the slot's ALLOCATION MARKER, minted by allocproc and carried to
+       whichever release finally parks the slot ([ProcAvail.v]).
+       Persistent. *)
+    ProcAvail.pslot_used_at npa -∗
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
     ProcGeom.hart_at_any npa -∗
     FdSlots.fd_slots FDSPARE -∗
@@ -493,7 +497,7 @@ Section KforkArms.
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull Hbelow.
     subst tfsrc tfdst.
-    iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv
+    iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
              Hitb Hitinv Hirs Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
@@ -607,6 +611,7 @@ Section KforkArms.
       iEval (rewrite Hnpa) in "Hks".
       iEval (rewrite Hnpa) in "Hkctx".
       iEval (rewrite Hnpa) in "Hpvcx4".
+      iEval (rewrite Hnpa) in "Hmk".
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
       (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
          own [b = match lvl ...] premise) rather than as the [match] itself:
@@ -616,7 +621,7 @@ Section KforkArms.
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
-                      Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx").
+                      Hheld Hhart Hpvcx4 Hmk Hfd Hirsp Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
@@ -698,7 +703,7 @@ Section KforkMain.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv Henv Hpv Hcont".
+             #Hitbl #Hitinv Henv #Hpav Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
@@ -716,7 +721,7 @@ Section KforkMain.
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Henv Hpv Hcont [] [] []").
+                    Hitbl Hitinv Henv Hpav Hpv Hcont [] [] []").
     all: try lkbelow.
     - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
       iIntros (CID1 Hx1 Mt) "%HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hke HR".
@@ -758,7 +763,7 @@ Section KforkMain.
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst).
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hirs Hctx Hpay Hcpu
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp #Hmk Hheld Hhart Hfd Hirs Hctx Hpay Hcpu
                Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
@@ -771,7 +776,7 @@ Section KforkMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
-                with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hheld Hhart
+                with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
                       Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hirs [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is

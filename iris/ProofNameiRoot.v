@@ -124,10 +124,10 @@ Section ProofNameiRoot.
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
-      (m : regfile) (n K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
     : wp_namei_root_body gtl cn gfs gi cov logstart nib dev dqp
-                         m n K eb p C b lks.
+                         m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namei_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Hbelow.
@@ -287,12 +287,12 @@ Section ProofNameiRoot.
     (* the two path bytes, re-addressed at namex's own a0 *)
     iEval (rewrite -HR5a0) in "Hp0".
     iEval (rewrite -HR5a0) in "Hp1".
-    iDestruct (cpu_own_transport CID CID7 n eb p C b
+    iDestruct (cpu_own_transport CID CID7 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID7)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (NX.wp_namex_root gtl cn gfs gi cov logstart nib dev dqp
-              R5 n (K - 4)%nat eb p C b lks
+              R5 n (K - 4)%nat eb p b lks
               Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
     iIntros (CID8 Hq8 mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
@@ -441,7 +441,7 @@ Section ProofNameiRoot.
     assert (Cs11 : (P3 !!! Regidx (mword_of_int 27 : mword 5) : mword 64)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; namidx).
-    iDestruct (cpu_own_transport CID8 CID12 n eb p C b
+    iDestruct (cpu_own_transport CID8 CID12 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P3 ipv with "[%] Hcg Hcnt Hpc Hp0 Hp1 Hip").

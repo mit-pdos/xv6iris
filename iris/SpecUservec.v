@@ -118,6 +118,7 @@ Require Import IrefSlots InodeRegion.
 Require Import SpecUsertrap.
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -304,7 +305,7 @@ Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64),

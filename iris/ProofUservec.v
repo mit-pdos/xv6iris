@@ -58,6 +58,7 @@ Require Import SpecUserret.
 Require Import SpecUservec.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -66,7 +67,7 @@ Module UservecProof (UT : SpecUsertrap.USERTRAP) (UR : SpecUserret.USERRET) : US
 Section UservecAllPt.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition usertrap_res := UT.usertrap_res.

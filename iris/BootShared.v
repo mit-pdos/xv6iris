@@ -739,7 +739,7 @@ Section BootAlloc.
      do not unify).  The itable's authority gname is CANONICAL, a field of
      that ambient [icfg], so unlike the fd- and iref-slot supplies there is
      nothing to mint here. *)
-  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ,
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !pavGpreS Σ,
             !uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
@@ -902,7 +902,7 @@ Section BootAlloc.
   Lemma boot_shared_alloc (g : gstate) (ndisk : nat) :
     boot_facts g ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
-    ={⊤}=∗ ∃ (_ : fdslotG Σ) (_ : irefslotG Σ)
+    ={⊤}=∗ ∃ (_ : fdslotG Σ) (_ : irefslotG Σ) (_ : pavG Σ)
              (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
@@ -968,6 +968,12 @@ Section BootAlloc.
                  entry_ld_ea_addr ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  entry_got_bytes with "Hcl Hkdata") as "#Hword".
     (* ---- the fd-slot supply (no memory footprint: a pure ghost) ---- *)
+    (* the proc table's COUNTED regime, at the whole table: every slot is
+       UNUSED at boot, so [userinit]'s allocproc cannot come back empty
+       ([ProcAvail.v]).  Minted here, with the ghost name handed out
+       existentially, for [InodeRef.iref_name_alloc]'s reason: a class that
+       carries a gname cannot be a functor constraint adequacy assumes. *)
+    iMod procs_avail_alloc as (Hpav) "Hprocsavail".
     iMod fd_slots_alloc as (Hfd) "[_ Hfdslots]".
     (* ---- the iref-slot supply, likewise a pure ghost ---- *)
     iMod iref_slots_alloc as (Hir) "[_ Hirslots]".
@@ -1045,7 +1051,11 @@ Section BootAlloc.
     iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
       as "#Hstarted".
     (* ================================================================ *)
-    iModIntro. iExists Hfd, Hir, γd, γv.
+    (* [Hprocsavail] -- [procs_avail (Some NPROC)] -- is deliberately NOT in
+       the postcondition yet: nothing consumes it until userinit is proved,
+       and Iris is affine so it is simply dropped here.  It is what the
+       counted regime will be threaded from ([ProcAvail.v]). *)
+    iModIntro. iExists Hfd, Hir, Hpav, γd, γv.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].

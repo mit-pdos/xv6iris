@@ -1271,6 +1271,10 @@ Section ProofKwait.
     proc_pub (proc_addr k) -∗
     proc_dormant (proc_addr k) ZOMBIE -∗
     hart_at_any (proc_addr k) -∗
+    (* the slot's ALLOCATION MARKER: a ZOMBIE is dormant but ALLOCATED, so
+       its lock invariant carries it and the rebuild below owes it back
+       ([ProcAvail.v]).  Persistent. *)
+    pslot_used_at (proc_addr k) -∗
     (* wait_lock, contents out *)
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     locked γw CIDp -∗
@@ -1296,7 +1300,7 @@ Section ProofKwait.
     { apply locks_below_union_singleton; [vm_compute; lia |].
       lkbelow. }
     iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
-             Hdorm Hpark #Hlk Htok Hps Hframe Hcont".
+             Hdorm Hpark #Hmk #Hlk Htok Hps Hframe Hcont".
     iPoseProof (kwi_60 with "Htext") as "Hi60".
     iPoseProof (kwi_64 with "Htext") as "Hi64".
     iPoseProof (kwi_66 with "Htext") as "Hi66".
@@ -1595,6 +1599,10 @@ Section ProofKwait.
     proc_pub (proc_addr k) -∗
     proc_dormant (proc_addr k) ZOMBIE -∗
     hart_at_any (proc_addr k) -∗
+    (* the slot's ALLOCATION MARKER: a ZOMBIE is dormant but ALLOCATED, so
+       its lock invariant carries it and the rebuild below owes it back
+       ([ProcAvail.v]).  Persistent. *)
+    pslot_used_at (proc_addr k) -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     locked γw CIDf -∗
     parents_own ps -∗
@@ -1614,7 +1622,7 @@ Section ProofKwait.
   Proof.
     intros sp0 spr HK Hk Hsp Hs1 Hs2 Hcs Hbelow.
     iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
-             Hdorm Hpark #Hlk Htok Hps Hpriv Hframe Hcont".
+             Hdorm Hpark #Hmk #Hlk Htok Hps Hpriv Hframe Hcont".
     iPoseProof (kwi_40 with "Htext") as "Hi40".
     iPoseProof (kwi_44 with "Htext") as "Hi44".
     iPoseProof (kwi_48 with "Htext") as "Hi48".
@@ -1669,7 +1677,7 @@ Section ProofKwait.
       iApply (kw_reap γs γa γw γk mm F0 pme k K eb pidc ch ps lks
                 HK Hk HF0sp HF0s1 HF0s3 HF0cs Hbelow
                 with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
-                      Hpub Hdorm Hpark Hlk Htok Hps Hframe [Hcont Hpriv]").
+                      Hpub Hdorm Hpark Hmk Hlk Htok Hps Hframe [Hcont Hpriv]").
       iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
       iApply ("Hcont" $! mf (pv_upt V) pidc with "[%] [%] [%] Hcg Hown Hpc [Hpriv]").
@@ -1935,7 +1943,7 @@ Section ProofKwait.
         iApply (kw_reap γs γa γw γk mm mco pme k K eb pidc ch ps lks
                   HK Hk Hcosp Hcos1 Hcos3 Hcocs Hbelow
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
-                        Hpub Hdorm Hpark Hlk Htok Hps Hframe [Hcont Hpriv]").
+                        Hpub Hdorm Hpark Hmk Hlk Htok Hps Hframe [Hcont Hpriv]").
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
         iApply ("Hcont" $! mf P' pidc with "[%] [%] [%] Hcg Hown Hpc Hpriv").
@@ -2310,7 +2318,7 @@ Section ProofKwait.
                     ({["proc"]} ∪ ({["wait_lock"]} ∪ lks))
                     HK Hk HS3sp HS3s1 HS3s2 HS3cs Hbelow
                     with "Hcg Hown Hpay1 Hpay Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
-                          Hpub Hdorm Hpark Hlk Htok Hps Hpriv Hframe Hqfn").
+                          Hpub Hdorm Hpark Hmk Hlk Htok Hps Hpriv Hframe Hqfn").
         * (* ===== not a ZOMBIE: release, set havekids, continue ===== *)
           iApply (wp_beq_fall_s_sconf (mword_of_int (KW + 0xc0))
                     (mword_of_int 8064 : mword 13) Rs4 Ra5 S3 (trap_res eb + (K - 10))%nat false

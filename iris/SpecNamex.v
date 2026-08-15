@@ -807,7 +807,7 @@ Definition wp_namex_root_body
     (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
     (dqp : dfrac)
-    (m : regfile) (n K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in    (* a0 = path *)
@@ -824,7 +824,7 @@ Definition wp_namex_root_body
   (* iget acquires and releases "itable" internally *)
   locks_below lks "itable" ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
@@ -839,7 +839,7 @@ Definition wp_namex_root_body
       ⌜ callee_saved m mr
         /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
       sie_cap_gpr mr K b p -∗
-      cpu_own n eb p C b lks -∗
+      cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       pa_add pv 0 ↦ₘ{dqp} SLASH -∗
       pa_add pv 1 ↦ₘ{dqp} NUL -∗
@@ -855,8 +855,8 @@ Module Type NAMEX_ROOT.
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
-      (m : regfile) (n K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
       wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
-                         m n K eb p C b lks.
+                         m n K eb p b lks.
 End NAMEX_ROOT.

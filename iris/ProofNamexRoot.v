@@ -130,10 +130,10 @@ Section ProofNamexRoot.
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
       (dqp : dfrac)
-      (m : regfile) (n K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string)
     : wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
-                         m n K eb p C b lks.
+                         m n K eb p b lks.
   Proof.
     cbv beta delta [wp_namex_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.
@@ -537,12 +537,12 @@ Section ProofNamexRoot.
       assert (Hu : bv_unsigned (mword_of_int 1 : mword 32) = 1)
         by (vm_compute; reflexivity).
       rewrite Hu. assert (Hnz : 1 <= Z.of_nat nib) by lia. lia. }
-    iDestruct (cpu_own_transport CID CID23 n eb p C b
+    iDestruct (cpu_own_transport CID CID23 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID23)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
-              A3 n eb p C (K - 12)%nat b lks
+              A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
               with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl").
     iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href".
@@ -1138,7 +1138,7 @@ Section ProofNamexRoot.
       rewrite /P1 upd_ne; [exact HP0a0 | nz]. }
     (* the two path bytes, back at the addresses the contract names *)
     iEval (rewrite -(pa_add_0 pv)) in "Hp0".
-    iDestruct (cpu_own_transport CIDig CIDT14 n eb p C b
+    iDestruct (cpu_own_transport CIDig CIDT14 n eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDT14 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P13 (ientry kig) with "[%] Hcg Hcnt Hpc Hp0 Hp1 Hip").
