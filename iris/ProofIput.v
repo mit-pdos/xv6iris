@@ -868,6 +868,7 @@ Section IputTail.
     locked gtl cpu_id -∗
     itable_half Mt -∗
     iref_slots_auth -∗
+    isl_pool Mt -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
     ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
     IcacheRef.inode_ref k q dev inum -∗
@@ -909,7 +910,7 @@ Section IputTail.
     pose proof Hregs as Hregs0.
     destruct Hregs as (HMs1 & HMsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hlock #Hinv #Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok
-             Hhalf Hiauth Hslots Hpool Href Hr24 Hr16 Hr8 Hg4
+             Hhalf Hiauth Hipool Hslots Hpool Href Hr24 Hr16 Hr8 Hg4
              Hppid Hbms Hins Hbm Hbslots Hop Hcont".
     iPoseProof (ipi_20 with "Htext") as "Hi20".
     iPoseProof (ipi_22 with "Htext") as "Hi22".
@@ -1017,13 +1018,15 @@ Section IputTail.
       { apply region_inums_spec. split; [apply bv_unsigned_in_range |].
         destruct Hciwf as (_ & _ & Hrange & _).
         exact (Hrange k (dev, inum) Hcik). }
+      (* the slot's share authority, out of the LOCK's resource *)
+      iDestruct (isl_pool_acc_upd Mt k Hk with "Hipool") as "[Hisl Hislback]".
       assert (Hincid : bv_unsigned inum ∈ ci_inums ci).
       { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik | reflexivity]. }
       iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) D2 (trap_res eb + (K - 4))%nat
-                (itable_half (delete k Mt))
+                (itable_half (delete k Mt) ∗ isl_slot (delete k Mt) k)%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [Hhalf Hrtok Hlvh]").
+                with "Hcg Hpc Hi24 [Hhalf Hrtok Hlvh Hisl]").
       { rewrite Hpa2 Hstv.
         replace (Z.pos 1 - 1)%Z with 0%Z by lia.
         (* THE RETIREMENT, under the restated ledger (design 17.3 (A)): the
@@ -1031,12 +1034,14 @@ Section IputTail.
            which the eviction has just taken out of PARKED -- are together
            the slot's whole unit. *)
         iMod (iref_close_last_store_au (⊤ ∖ ↑minstretN) Mt k qt
-                ltac:(solve_ndisj) HMk with "Hinv Hhalf Hrtok [Hlvh]")
+                ltac:(solve_ndisj) HMk with "Hinv Hhalf Hrtok [Hlvh] Hisl")
           as "[Hcell Hback2]".
         { iExists ga. iExact "Hlvh". }
         iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
-        iMod ("Hback2" with "Hcell") as "Hhalf". by iModIntro. }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc Hhalf".
+        iMod ("Hback2" with "Hcell") as "[Hhalf Hisl]". iModIntro. iFrame. }
+      iApply wp_next_off_intro. iIntros "Hcg Hpc [Hhalf Hisl]".
+      iDestruct ("Hislback" $! (delete k Mt) with "[%] Hisl") as "Hipool".
+      { intros i Hi. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
       iEval (rewrite Hpp26) in "Hpc".
       (* the table's slot re-forms as [islot_empty]; the unit the arm parked
          is the one the caller gets back *)
@@ -1063,7 +1068,8 @@ Section IputTail.
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hiu
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
-      iExists (delete k Mt), (delete k ci). iFrame "Hhalf Hiauth Hslots Hpool".
+      iExists (delete k Mt), (delete k ci).
+      iFrame "Hhalf Hiauth Hslots Hpool Hipool".
       iPureIntro. split.
       { destruct Hwf as [Hdom Hcnt']. split.
         - intros i Hi. apply Hdom. destruct Hi as [e He].
@@ -1088,17 +1094,22 @@ Section IputTail.
       assert (Hzs : (Z.pos cnt - 1)%Z = Z.pos npred).
       { rewrite /npred. rewrite <- Hsucc at 1. rewrite Pos2Z.inj_succ. lia. }
       pose proof Hqrest as Hqt'. apply Qp.sub_Some in Hqt'.  (* qt = q + qrest *)
+      iDestruct (isl_pool_acc_upd Mt k Hk with "Hipool") as "[Hisl Hislback]".
       iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) D2 (trap_res eb + (K - 4))%nat
-                (itable_half (<[k := (qrest, npred)]> Mt))
+                (itable_half (<[k := (qrest, npred)]> Mt) ∗
+                 isl_slot (<[k := (qrest, npred)]> Mt) k)%I
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                with "Hcg Hpc Hi24 [Hhalf Hrtok]").
+                with "Hcg Hpc Hi24 [Hhalf Hrtok Hisl]").
       { rewrite Hpa2 Hstv Hzs.
         iMod (iref_close_store_au (⊤ ∖ ↑minstretN) Mt k q qt qrest npred
-                ltac:(solve_ndisj) HMk' Hqrest with "Hinv Hhalf Hrtok") as "[Hcell Hback2]".
+                ltac:(solve_ndisj) HMk' Hqrest with "Hinv Hhalf Hrtok Hisl")
+          as "[Hcell Hback2]".
         iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
-        iMod ("Hback2" with "Hcell") as "Hhalf". by iModIntro. }
-      iApply wp_next_off_intro. iIntros "Hcg Hpc Hhalf".
+        iMod ("Hback2" with "Hcell") as "[Hhalf Hisl]". iModIntro. iFrame. }
+      iApply wp_next_off_intro. iIntros "Hcg Hpc [Hhalf Hisl]".
+      iDestruct ("Hislback" $! (<[k := (qrest, npred)]> Mt) with "[%] Hisl") as "Hipool".
+      { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
       iEval (rewrite Hpp26) in "Hpc".
       (* the departing fraction rejoins the table's retained share *)
       assert (Ert2 : (1/2 - qrest)%Qp = Some (q + qr)%Qp).
@@ -1124,7 +1135,8 @@ Section IputTail.
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hislot
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
-      iExists (<[k := (qrest, npred)]> Mt), ci. iFrame "Hhalf Hiauth Hslots Hpool".
+      iExists (<[k := (qrest, npred)]> Mt), ci.
+      iFrame "Hhalf Hiauth Hslots Hpool Hipool".
       iPureIntro. split.
       { destruct Hwf as [Hdom Hcnt']. split.
         - intros i Hi. destruct (decide (i = k)) as [->|Hne]; [exact Hk|].
@@ -1416,7 +1428,7 @@ Section ProofIput.
     iDestruct (cpu_claim_ext_transport CID CIDacq eb pj
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     (* ===== the critical section (literal [false]) ===== *)
-    iDestruct "HRres" as (Mt ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
+    iDestruct "HRres" as (Mt ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hipool & Hslots & Hpool)".
     iDestruct "Href" as "[Hrtok Hrident]".
     iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt1 & Hone & Hone').
     pose proof (icM_wf_count Mt k qt cnt Hwf HMk) as Hcntb.
@@ -1495,7 +1507,7 @@ Section ProofIput.
                 HK Hk ltac:(wp_next_chain) Hsp0eq HE2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
-                with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
+                with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hipool Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
       rewrite /IcacheRef.inode_ref. iFrame. }
@@ -1637,7 +1649,7 @@ Section ProofIput.
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF1regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
-                with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
+                with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hipool Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
       rewrite /IcacheRef.inode_ref. iFrame. }
@@ -1750,7 +1762,7 @@ Section ProofIput.
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
-                with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hslots
+                with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf Hiauth Hipool Hslots
                       Hpool [Hrtok Hrd Hrn] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
       rewrite /IcacheRef.inode_ref /IcacheRef.inode_ident. iFrame. }
@@ -2003,7 +2015,7 @@ Section ProofIput.
     { rewrite /islot2 HMk Hcik. rewrite /islot_rest_at Ert /IcacheRef.inode_ident.
       iFrame. }
     iAssert (itable_res2 cn gfs gi cov logstart nib dev)
-      with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
+      with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
     { iExists Mt, ci. iFrame. iPureIntro. split; assumption. }
     (* ===== +0x54 / +0x58 : a0 := &itable ; +0x5c jal release ===== *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.iput + 0x54)) Ra0
@@ -2610,7 +2622,7 @@ Section ProofIput.
                           (concat_vec (mword_of_int 1996 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.iput + 0x20)) by pcw.
     iEval (rewrite Hpp20d) in "Hpc".
-    iDestruct "HRres2" as (Mt2 ci2) "(Hhalf2 & %Hwf2 & %Hciwf2 & Hiauth2 & Hslots2 & Hpool2)".
+    iDestruct "HRres2" as (Mt2 ci2) "(Hhalf2 & %Hwf2 & %Hciwf2 & Hiauth2 & Hipool2 & Hslots2 & Hpool2)".
     (* the credited flush paid nothing, so the level that survives is [u']
        itself -- iupdate handed back [S (u' - 1)], which is the same nat *)
     iEval (rewrite Hu'1) in "Hop".
@@ -2637,7 +2649,7 @@ Section ProofIput.
               (m !!! Regidx Rs2) lks
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
               Hblo Hbhi Hdsub Hssub Hwbm2 Hwitc Hitbelow
-              with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf2 Hiauth2
+              with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok Hhalf2 Hiauth2 Hipool2
                     Hslots2 Hpool2 Href Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                     [Hbs2 Hbs1] Hop Hcont").
     iApply (bslots_op bn 2 1). iFrame.

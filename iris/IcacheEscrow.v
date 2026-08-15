@@ -1990,6 +1990,14 @@ Section IcacheEscrow.
        itable_half M ∗
        ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib dv⌝ ∗
        iref_slots_auth ∗
+       (* THE SLOTS' SHARE AUTHORITIES.  Under the LOCK, not in
+          [itable_body]'s invariant: every step that moves one runs while
+          holding itable.lock, and iput has to hold a slot's authoritative
+          zero across a whole [acquiresleep] call -- which it can, because
+          [release(&itable.lock)] comes AFTER that call in the C, but which no
+          invariant could survive
+          (claude-notes/projects/iput-acquiresleep.md). *)
+       isl_pool M ∗
        ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci))%I.
 

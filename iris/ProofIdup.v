@@ -305,7 +305,7 @@ Section ProofIdup.
     assert (Hms1 : macq !!! Regidx Rs1 = ientry k)
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 9) ltac:(vm_compute; reflexivity)); exact HmAs1).
     (* ===== the critical section (literal [false], no hart threading) ===== *)
-    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
+    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hipool & Hslots & Hpool)".
     (* THE SHARE FINDS THE SLOT.  [iref_lookup] read the entry off a COUNT
        fragment, which names its own slot in [dom M]; a share has none, and
        what stands in for it is the LIVENESS slice: the invariant holds a free
@@ -412,6 +412,9 @@ Section ProofIdup.
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.idup + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.idup + 0x1c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
+    (* the slot's share authority comes out of the LOCK's resource, which
+       this proof holds; it goes back at the grown map below. *)
+    iDestruct (isl_pool_acc_upd M k Hk with "Hipool") as "[Hisl Hislback]".
     (* +0x1c c.sw a5,8(s1) : ip->ref = ref+1.  The ghost step rides along
        inside the SAME invariant opening -- that is the atomicity. *)
     assert (Hpa2 : add_vec (rget D2 Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
@@ -420,17 +423,25 @@ Section ProofIdup.
     iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (trap_res b + (K - 4))%nat
               (itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
+               isl_slot (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k ∗
                iref_tok k (qr/2)%Qp ∗ live_frac k s)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hhalf Hrlive]").
+              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl]").
     { rewrite Hpa2 Hstv.
       iMod (iref_upgrade_store_au (⊤ ∖ ↑minstretN) M k qt (qr/2)%Qp s cnt
-              ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive")
+              ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive Hisl")
         as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Hlv)". iModIntro. iFrame. }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Ht1 & Hrlive)".
+      iMod ("Hback" with "Hcell") as "(Hhalf & Hisl & Ht1 & Hlv)".
+      iModIntro. iFrame. }
+    iApply wp_next_off_intro.
+    iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive)".
+    (* the slot's share authority goes back into the lock's resource at the
+       grown map *)
+    iDestruct ("Hislback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M)
+                 with "[%] Hisl") as "Hipool".
+    { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     (* rebuild the lock's resource at the new map.  The caller's SHARE rides
        straight through -- neither of its two slices moved -- and what does
        get split is the TABLE's retained identity: half to the new reference,
@@ -444,8 +455,9 @@ Section ProofIdup.
     { intros j Hj. reflexivity. }
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid".
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
-    iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
-    { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
+    iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
+    { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci.
+      iFrame "Hhalf Hiauth Hpool Hipool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
       2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
              already live, so §13.2/§13.9/§13.11's four clauses are

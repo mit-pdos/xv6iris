@@ -927,11 +927,10 @@ Section IcacheBootTable.
     iMod (ic_names_alloc dvs) as (cn) "(Htok & Hmid & Hgid)".
     (* ---- the [ref]-word invariant ---- *)
     iMod (inv_alloc icacheN E itable_body
-            with "[HhalfI Href Hlive Hislauth]") as "#Hitinv".
+            with "[HhalfI Href Hlive]") as "#Hitinv".
     { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitL "Href"; [iApply iref_cells_boot; iExact "Href" |].
-      iSplitL "Hlive"; [iApply live_pool_empty; iExact "Hlive" |].
-      iApply isl_pool_empty. iExact "Hislauth". }
+      iApply live_pool_empty. iExact "Hlive". }
     (* ---- the fifty escrows, at the EMPTY arm, and the table's shares ---- *)
     iDestruct (big_sepL_sep_2 with "Hid Hvalid") as "H1".
     iDestruct (big_sepL_sep_2 with "H1 Hmirror") as "H2".
@@ -955,11 +954,12 @@ Section IcacheBootTable.
     iDestruct "Hesc" as "[#Hescrows Hslots]".
     (* ---- the itable lock's resource, and the lock ---- *)
     iAssert (itable_res2 cn γfs γi cov logstart nib dv)%I
-      with "[HhalfL Hsupply Hslots Hpool]" as "Hres".
+      with "[HhalfL Hsupply Hslots Hpool Hislauth]" as "Hres".
     { iExists ∅, ∅. iFrame "HhalfL".
       iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitR; [iPureIntro; exact (ic_ci_wf_empty nib dv) |].
       iFrame "Hsupply".
+      iSplitL "Hislauth"; [iApply isl_pool_empty; iExact "Hislauth" |].
       iSplitL "Hslots".
       { iApply (big_sepL_mono with "Hslots"). intros idx k _.
         rewrite /islot2 !lookup_empty. done. }
