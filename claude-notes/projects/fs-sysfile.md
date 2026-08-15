@@ -9059,3 +9059,98 @@ xv6iris.InodeRegion"*, which is the stale-`.vo` trap wearing a sibling's
 clothes.  Waiting on `SpecCreate.vo -nt InodeRegion.vo` was the right probe
 and it cleared in one pass — cheaper than any `make -q`, which the
 durable notes already say lies here.
+
+### R-open-1 (the ruled repair) — **STOPPED ON EXECUTION.  The parked
+### `fref_tok` FRACTION IS NOT FUNGIBLE, so `off_checkin` cannot rebuild the
+### borrower's `file_ref` at its own `q`.  Zero `.v` files touched**
+
+The ruling's mechanism is sound for the REFUTATION and unsound for the
+RETURN, and the trap is the one `FileOff.v`'s own header already documents
+one component over.
+
+**THE REFUTATION HALF IS FINE.**  `fref_tok γ k q` is
+`fref_own γ (◯ {[k := (q, 1%positive)]})` (`FileInvDefs.v`:550) over
+`frefUR = authUR (gmapUR nat (prodR fracR positiveR))`
+(`FileInvDefs.v`:170), so `fref_tok γ k 1 ∗ fref_tok γ k q ⊢ False` by
+`fref_own_valid_2` (`FileInvDefs.v`:477) and `frac_valid` on the FRAGMENT
+alone — no authority, hence no lock.  That part works exactly as ruled.
+
+**THE RETURN HALF DOES NOT.**  A borrower must park a slice of its own
+`fref_tok γ k q` and get it back, and `off_body` can only hand it back
+EXISTENTIALLY (`∃ q', fref_tok γ k q'`) — nothing in the invariant records
+which fraction was parked.  The borrower then holds `q/2 + q'` where it
+needs `q`, and `file_ref γ k q C` (`FileInvDefs.v`:812) demands ONE common
+`q` across all four components, so it cannot rebuild.  It cannot shrink
+past the mismatch either: `file_fields` and `file_pay` split, but
+`flive_tok` does not (B2's finding — there is no lemma anywhere producing
+two `file_ref`s from one), so `file_ref` has no splitting law to shrink
+with.
+
+**AND THE FRACTION HAS TO COME BACK EXACTLY.**  `SpecFileread.v`:698/722
+takes and returns `file_ref γf k q Cf` at the SAME `q`; `SpecFilewrite` is
+the same shape.  So this is not a proof inconvenience — it moves both
+contracts.
+
+**THIS IS `FileOff.v`:48-53's OWN RULE, MET ONE COMPONENT OVER.**  "A slice
+of the borrower's own points-to fraction is NOT fungible (the invariant
+hands it back existentially quantified), which is why the marker cannot be
+one."  `off_mark` works because `i_valid ip ↦₄ 1` is CLOSED — value pinned,
+no fraction.  R-open-1 parked a fraction and inherited the refuted shape.
+
+**THE OBLIGATION, STATED EXACTLY.**  A parked witness `W γ k` must be
+simultaneously
+
+  (i) refutable by `fref_tok γ k 1` alone (no authority), and
+  (ii) CLOSED — no existential fraction — so the invariant returns
+       syntactically what was parked.
+
+(ii) forces `W` to be fraction-free; (i) forces it to conflict with a
+fractional token.  **Nothing in `fileUR` satisfies both**: `flive_tok` is
+fraction-free but over `positiveR`, whose fragments compose (`◯ {[k := 2]}`
+is valid), which is exactly why `off_acc_excl` needs the authority in the
+first place; `fref_tok` and `fpay_tok` are refutable but fractional.  A
+constant fraction is not available either — a borrower's `q` comes out of
+`ProcInv.ofile_slot`'s existential and can be arbitrarily small, so there is
+no fixed slice every borrower can spare.
+
+**AND THE OBSTRUCTION IS STRUCTURAL, NOT A MISSING TOKEN.**  `off_inv` is
+opened by two parties with DISJOINT credentials — a fractional borrower
+(which has `off_mark` and a small `q`) and the exclusive initializer (which
+has `fref_tok γ k 1` and no marker for the slot's OLD inode) — and every
+candidate arm-content is refutable by at most one of them.  Adding a third
+"initializing" arm does not help: whatever it parks, the BORROWER must then
+refute it, and a borrower holds nothing exclusive.
+
+**WHAT THE STAGE RECOMMENDS INSTEAD (R-open-1b, for ruling).**  Stop making
+the initializer open `off_inv` at all: the `a_fip` half and the `off` cell
+should not be in a permanent invariant *before the slot is initialized*.
+That is a **`cinv` per slot** whose name rides the ftable ghost —
+`filealloc` (inside the lock, count 1) hands the initializer the cancel
+token, sys_open writes both cells with the cinv cancelled, and re-allocates
+it before publishing the descriptor; `fileclose`'s last closer cancels it
+again, which is the move it already makes for `FileInvDefs.inode_pay`
+(`inode_pay_cancel` / `inode_pay_alloc`, `FileInvDefs.v`:651/696) — so the
+file layer already contains this exact pattern, one field over, and the
+`off` cell would simply follow the payload's discipline.  It is a real
+redesign of `FileOff.v` plus its boot wiring, and the file-table design note
+already flags that wiring as unwritten (`FileOff.v`:293-297: "Nothing calls
+this yet ... A resource nobody can MINT is a design hole that only surfaces
+when the wiring is written").  This is that surface.
+
+**TWO PIECES OF THE RULING THAT COST NOTHING, verified.**
+
+* **`off_acc_excl` HAS ZERO CONSUMERS.**  `grep -rn off_acc_excl *.v`
+  outside `FileOff.v` is EMPTY, and `ProofFileclose.v` /
+  `ProofFilecloseParts.v` / `SpecFileclose.v` do not `Require FileOff` at
+  all — gcc does not emit the `off` load of `ff = *f`, exactly as the
+  design note says.  So "re-thread `ProofFileclose`" is a no-op and
+  weakening `off_acc_excl` is free whichever repair lands.
+* The whole current consumer set of `FileOff.v` is four files —
+  `SpecFileread.v`, `SpecFilewrite.v`, `ProofFileread.v`,
+  `ProofFilewrite.v` — with six call sites (`ProofFileread.v`:1808/2075/2349,
+  `ProofFilewrite.v`:1906/2216).  That is the true blast radius of any
+  repair here, and it is smaller than the original sizing said.
+
+`SpecFilealloc.v`:18-21's stale sentence is left alone deliberately: it has
+to be rewritten to say what the ruled repair ends up being, and a
+comment-only edit would cost its cone twice.
