@@ -42,11 +42,11 @@ Definition entry_got : Z := 0x8000a288.
 
 (* kernelvec's [jal ra,kerneltrap]
    at [KernelSyms.kernelvec + 0x24]; consumed by CodeKernelvec.kv_dec19 *)
-Definition kernelvec_jal_word : Z := 0x95afd0ef.
+Definition kernelvec_jal_word : Z := 0x94afd0ef.
 
 (* ...and its decoded 21-bit immediate
    at [KernelSyms.kernelvec + 0x24]; consumed by CodeKernelvec.kv_i19 *)
-Definition kernelvec_jal_imm : Z := 0x1fd15a.
+Definition kernelvec_jal_imm : Z := 0x1fd14a.
 
 (* start's [addi a5,a5,<imm>] completing &main (auipc at +0x20)
    at [KernelSyms.start + 0x24]; consumed by CodeStartAux.si43 *)

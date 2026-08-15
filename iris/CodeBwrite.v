@@ -18,6 +18,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
+Require Import KernelDecode05.
 Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
@@ -83,9 +84,9 @@ Section CodeBwrite.
   Proof. mk_rvc (KernelSyms.bwrite + 0x16) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.bwrite + 0x16) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma bwi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64) false (JAL (mword_of_int 11268 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bwrite + 0x18) (mword_of_int 0x405020ef : mword 32)
-    (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64) (JAL (mword_of_int 11268 : mword 21, Regidx (mword_of_int 1))) kd_405020ef. Qed.
+  Lemma bwi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64) false (JAL (mword_of_int 11284 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bwrite + 0x18) (mword_of_int 0x415020ef : mword 32)
+    (mword_of_int (KernelSyms.bwrite + 0x18) : mword 64) (JAL (mword_of_int 11284 : mword 21, Regidx (mword_of_int 1))) kd_415020ef. Qed.
 
   Lemma bwi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0x1c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.bwrite + 0x1c) (mword_of_int 0x60e2 : mword 16)

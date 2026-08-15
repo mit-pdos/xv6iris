@@ -17,7 +17,9 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
+Require Import KernelDecode01.
 Require Import KernelDecode02.
+Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
@@ -25,10 +27,10 @@ Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
+Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode16.
-Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
@@ -69,17 +71,17 @@ Section CodeSysChdir.
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x8) (mword_of_int 0x1100 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 40 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1100 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma schdi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) false (JAL (mword_of_int 2082348 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0xa) (mword_of_int 0xe2cfc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) (JAL (mword_of_int 2082348 : mword 21, Regidx (mword_of_int 1))) kd_e2cfc0ef. Qed.
+  Lemma schdi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) false (JAL (mword_of_int 2082334 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0xa) (mword_of_int 0xe1efc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0xa) : mword 64) (JAL (mword_of_int 2082334 : mword 21, Regidx (mword_of_int 1))) kd_e1efc0ef. Qed.
 
   Lemma schdi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.sys_chdir + 0xe) (mword_of_int 0x892a : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)) kd_892a exec_execute_C_MV. Qed.
 
-  Lemma schdi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x10) : mword 64) false (JAL (mword_of_int 2091364 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x10) (mword_of_int 0x965fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x10) : mword 64) (JAL (mword_of_int 2091364 : mword 21, Regidx (mword_of_int 1))) kd_965fe0ef. Qed.
+  Lemma schdi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x10) : mword 64) false (JAL (mword_of_int 2091350 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x10) (mword_of_int 0x957fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x10) : mword 64) (JAL (mword_of_int 2091350 : mword 21, Regidx (mword_of_int 1))) kd_957fe0ef. Qed.
 
   Lemma schdi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x14) : mword 64) false (ITYPE (mword_of_int 128 : mword 12, zreg, Regidx (mword_of_int 12), ADDI)).
   Proof. mk_base (KernelSyms.sys_chdir + 0x14) (mword_of_int 0x08000613 : mword 32)
@@ -93,9 +95,9 @@ Section CodeSysChdir.
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x1c) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x1c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma schdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) false (JAL (mword_of_int 2086290 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x1e) (mword_of_int 0xd92fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) (JAL (mword_of_int 2086290 : mword 21, Regidx (mword_of_int 1))) kd_d92fd0ef. Qed.
+  Lemma schdi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) false (JAL (mword_of_int 2086276 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x1e) (mword_of_int 0xd84fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x1e) : mword 64) (JAL (mword_of_int 2086276 : mword 21, Regidx (mword_of_int 1))) kd_d84fd0ef. Qed.
 
   Lemma schdi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x22) : mword 64) false (BTYPE (mword_of_int 70 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof. mk_base (KernelSyms.sys_chdir + 0x22) (mword_of_int 0x04054363 : mword 32)
@@ -109,9 +111,9 @@ Section CodeSysChdir.
   Proof. mk_base (KernelSyms.sys_chdir + 0x28) (mword_of_int 0xf6040513 : mword 32)
     (mword_of_int (KernelSyms.sys_chdir + 0x28) : mword 64) (ITYPE (mword_of_int 3936 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), ADDI)) kd_f6040513. Qed.
 
-  Lemma schdi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x2c) : mword 64) false (JAL (mword_of_int 2090858 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x2c) (mword_of_int 0xf6afe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x2c) : mword 64) (JAL (mword_of_int 2090858 : mword 21, Regidx (mword_of_int 1))) kd_f6afe0ef. Qed.
+  Lemma schdi_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x2c) : mword 64) false (JAL (mword_of_int 2090844 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x2c) (mword_of_int 0xf5cfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x2c) : mword 64) (JAL (mword_of_int 2090844 : mword 21, Regidx (mword_of_int 1))) kd_f5cfe0ef. Qed.
 
   Lemma schdi_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x30) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x30) (mword_of_int 0x84aa : mword 16)
@@ -121,9 +123,9 @@ Section CodeSysChdir.
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x32) (mword_of_int 0xc915 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x32) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 26 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) kd_c915 exec_execute_C_BEQZ. Qed.
 
-  Lemma schdi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x34) : mword 64) false (JAL (mword_of_int 2088734 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x34) (mword_of_int 0xf1ffd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x34) : mword 64) (JAL (mword_of_int 2088734 : mword 21, Regidx (mword_of_int 1))) kd_f1ffd0ef. Qed.
+  Lemma schdi_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x34) : mword 64) false (JAL (mword_of_int 2088720 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x34) (mword_of_int 0xf11fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x34) : mword 64) (JAL (mword_of_int 2088720 : mword 21, Regidx (mword_of_int 1))) kd_f11fd0ef. Qed.
 
   Lemma schdi_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x38) : mword 64) false (LOAD (mword_of_int 68 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 14), false, 2)).
   Proof. mk_base (KernelSyms.sys_chdir + 0x38) (mword_of_int 0x04449703 : mword 32)
@@ -141,21 +143,21 @@ Section CodeSysChdir.
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x42) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x42) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma schdi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x44) : mword 64) false (JAL (mword_of_int 2088892 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x44) (mword_of_int 0xfbdfd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x44) : mword 64) (JAL (mword_of_int 2088892 : mword 21, Regidx (mword_of_int 1))) kd_fbdfd0ef. Qed.
+  Lemma schdi_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x44) : mword 64) false (JAL (mword_of_int 2088878 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x44) (mword_of_int 0xfaffd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x44) : mword 64) (JAL (mword_of_int 2088878 : mword 21, Regidx (mword_of_int 1))) kd_faffd0ef. Qed.
 
   Lemma schdi_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x48) : mword 64) false (LOAD (mword_of_int 336 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), false, 8)).
   Proof. mk_base (KernelSyms.sys_chdir + 0x48) (mword_of_int 0x15093503 : mword 32)
     (mword_of_int (KernelSyms.sys_chdir + 0x48) : mword 64) (LOAD (mword_of_int 336 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 10), false, 8)) kd_15093503. Qed.
 
-  Lemma schdi_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x4c) : mword 64) false (JAL (mword_of_int 2089096 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x4c) (mword_of_int 0x888fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x4c) : mword 64) (JAL (mword_of_int 2089096 : mword 21, Regidx (mword_of_int 1))) kd_888fe0ef. Qed.
+  Lemma schdi_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x4c) : mword 64) false (JAL (mword_of_int 2089082 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x4c) (mword_of_int 0x87afe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x4c) : mword 64) (JAL (mword_of_int 2089082 : mword 21, Regidx (mword_of_int 1))) kd_87afe0ef. Qed.
 
-  Lemma schdi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x50) : mword 64) false (JAL (mword_of_int 2091440 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x50) (mword_of_int 0x9b1fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x50) : mword 64) (JAL (mword_of_int 2091440 : mword 21, Regidx (mword_of_int 1))) kd_9b1fe0ef. Qed.
+  Lemma schdi_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x50) : mword 64) false (JAL (mword_of_int 2091426 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x50) (mword_of_int 0x9a3fe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x50) : mword 64) (JAL (mword_of_int 2091426 : mword 21, Regidx (mword_of_int 1))) kd_9a3fe0ef. Qed.
 
   Lemma schdi_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x54) : mword 64) false (STORE (mword_of_int 336 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 18), 8)).
   Proof. mk_base (KernelSyms.sys_chdir + 0x54) (mword_of_int 0x14993823 : mword 32)
@@ -193,9 +195,9 @@ Section CodeSysChdir.
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x66) (mword_of_int 0x64aa : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x66) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 17 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) kd_64aa exec_execute_C_LDSP. Qed.
 
-  Lemma schdi_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x68) : mword 64) false (JAL (mword_of_int 2091416 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x68) (mword_of_int 0x999fe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x68) : mword 64) (JAL (mword_of_int 2091416 : mword 21, Regidx (mword_of_int 1))) kd_999fe0ef. Qed.
+  Lemma schdi_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x68) : mword 64) false (JAL (mword_of_int 2091402 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x68) (mword_of_int 0x98bfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x68) : mword 64) (JAL (mword_of_int 2091402 : mword 21, Regidx (mword_of_int 1))) kd_98bfe0ef. Qed.
 
   Lemma schdi_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x6c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x6c) (mword_of_int 0x557d : mword 16)
@@ -209,13 +211,13 @@ Section CodeSysChdir.
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x70) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.sys_chdir + 0x70) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma schdi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x72) : mword 64) false (JAL (mword_of_int 2089196 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x72) (mword_of_int 0x8ecfe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x72) : mword 64) (JAL (mword_of_int 2089196 : mword 21, Regidx (mword_of_int 1))) kd_8ecfe0ef. Qed.
+  Lemma schdi_72 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x72) : mword 64) false (JAL (mword_of_int 2089182 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x72) (mword_of_int 0x8defe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x72) : mword 64) (JAL (mword_of_int 2089182 : mword 21, Regidx (mword_of_int 1))) kd_8defe0ef. Qed.
 
-  Lemma schdi_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x76) : mword 64) false (JAL (mword_of_int 2091402 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_chdir + 0x76) (mword_of_int 0x98bfe0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_chdir + 0x76) : mword 64) (JAL (mword_of_int 2091402 : mword 21, Regidx (mword_of_int 1))) kd_98bfe0ef. Qed.
+  Lemma schdi_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x76) : mword 64) false (JAL (mword_of_int 2091388 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_chdir + 0x76) (mword_of_int 0x97dfe0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_chdir + 0x76) : mword 64) (JAL (mword_of_int 2091388 : mword 21, Regidx (mword_of_int 1))) kd_97dfe0ef. Qed.
 
   Lemma schdi_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_chdir + 0x7a) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof. mk_rvc (KernelSyms.sys_chdir + 0x7a) (mword_of_int 0x557d : mword 16)

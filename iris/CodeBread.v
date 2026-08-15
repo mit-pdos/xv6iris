@@ -328,9 +328,9 @@ Section CodeBread.
   Proof. mk_rvc (KernelSyms.bread + 0xca) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.bread + 0xca) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma bdi_cc : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0xcc) : mword 64) false (JAL (mword_of_int 11302 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bread + 0xcc) (mword_of_int 0x427020ef : mword 32)
-    (mword_of_int (KernelSyms.bread + 0xcc) : mword 64) (JAL (mword_of_int 11302 : mword 21, Regidx (mword_of_int 1))) kd_427020ef. Qed.
+  Lemma bdi_cc : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0xcc) : mword 64) false (JAL (mword_of_int 11318 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bread + 0xcc) (mword_of_int 0x437020ef : mword 32)
+    (mword_of_int (KernelSyms.bread + 0xcc) : mword 64) (JAL (mword_of_int 11318 : mword 21, Regidx (mword_of_int 1))) kd_437020ef. Qed.
 
   Lemma bdi_d0 : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0xd0) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.bread + 0xd0) (mword_of_int 0x4785 : mword 16)
