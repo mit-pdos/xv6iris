@@ -557,6 +557,27 @@ Section ProcInv.
     f_equal. lia.
   Qed.
 
+  (* [a_tf_word]: the pre-physical-native WORD-INDEXED address helper, kept
+     as a plain arithmetic alias (not a resource predicate any more -- that
+     role is [tf_pa]'s, via [tf_words]) purely so callers stating a REGISTER
+     VALUE equals "the trapframe's i-th word's address" (kfork's copy loop,
+     kexec's argv walk) don't have to carry a [Z.of_nat]/[8 *] conversion at
+     every call site. Its VALUE is the same formula it always was, so a
+     caller that already unfolds it (as several do, for the arithmetic
+     underneath) is unaffected -- see [tf_pa_eq_pa_add8] for the bridge to
+     [tf_pa] when one is needed. *)
+  Definition a_tf_word (tfp : mword 44) (i : nat) : Arch.pa :=
+    pa_add (page_base tfp) (8 * i).
+
+  (* THE BRIDGE a caller needs when it has an [a_tf_word]-shaped fact (its
+     own premise, stated that way) but is calling into a [tf_pa]-shaped
+     lemma (every physical-native one now is) -- one [rewrite] instead of
+     re-deriving [tf_pa_eq_pa_add8] at the call site. *)
+  Lemma a_tf_word_eq_tf_pa (tfp : mword 44) (i : nat) :
+    (i < 512)%nat ->
+    a_tf_word tfp i = tf_pa tfp (8 * Z.of_nat i).
+  Proof. intro Hi. rewrite /a_tf_word (tf_pa_eq_pa_add8 tfp i Hi). reflexivity. Qed.
+
   (* CONSTRUCTION: what [kalloc] hands allocproc IS a trapframe page.  The 36
      struct words come out with EXISTENTIAL contents (a fresh page's bytes are
      arbitrary), and the 3808-byte tail is exactly the window [tf_tail] owns
