@@ -127,9 +127,11 @@
      is what makes every arm's own `av` premise dischargeable from
      `Hav : K_syscall <= av` by `lia` once the two nats are unfolded.
 
-   See claude-notes/projects/fs-sysfile.md for what's independently still
-   owed upstream (sys_open/sys_unlink themselves have no real proof at all
-   yet, only the axiom-backed stand-ins SpecSysOpen.v/SpecSysUnlink.v). *)
+   sys_open is PROVEN (SpecSysOpen.v / ProofSysOpen.v / LinkSysOpen.v), so
+   index 15 takes the real [SYSOPEN] like any other arm.  sys_unlink is the
+   one table entry with no proof anywhere in the tree; it keeps the
+   axiom-backed stand-in SpecSysUnlink.v -- see
+   claude-notes/projects/fs-sysfile.md for what is still owed there. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -178,7 +180,7 @@ Require Import SpecSysFork SpecSysExit SpecSysWait SpecSysPipe SpecSysRead SpecS
                SpecSysExec SpecSysFstat SpecSysChdir SpecSysDup SpecSysGetpid SpecSysSbrk
                SpecSysPause SpecSysUptime SpecSysWrite SpecSysMknod SpecSysLink SpecSysMkdir
                SpecSysClose SpecSysSync.
-Require Import SpecSysOpenStub SpecSysUnlink.
+Require Import SpecSysOpen SpecSysUnlink.
 Require Import SpecMyproc.
 Require Import SpecSyscall.
 From Kernel Require KernelSyms.
