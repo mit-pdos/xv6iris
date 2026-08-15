@@ -106,7 +106,7 @@ Section ProofSysFork.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
     set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv Henv Hpriv Hcont".
+             #Hitbl #Hitinv Henv #Hpav Hpriv Hcont".
     iPoseProof (sf_00 with "Htext") as "Hi00".
     iPoseProof (sf_02 with "Htext") as "Hi02".
     iPoseProof (sf_04 with "Htext") as "Hi04".
@@ -180,7 +180,7 @@ Section ProofSysFork.
               Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Henv Hpriv").
+                    Hitbl Hitinv Henv Hpav Hpriv").
     iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
     iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henv & %Hrv)".
     assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))

@@ -1296,7 +1296,7 @@ Section ProofScheduler.
         (* the RUNNABLE slot carries the parked context and the receipt; the
            running and dormant arms are both [emp]. *)
         iDestruct (proc_slots_dispatch _ (proc_addr jj) RUNNABLE needs_ctx_RUNNABLE
-                     with "Hslot") as "[Hvc Htag]".
+                     with "Hslot") as "(Hvc & Htag & #Hmk)".
         iDestruct (hart_at_any_elim jj Hjj with "Htag") as (hold) "Htag".
         (* RETAG: the tag came out of the not-running guard, where its value
            is meaningless.  Stamp this hart on it; it then crosses WHOLE to
@@ -1568,7 +1568,7 @@ Section ProofScheduler.
            [ElimModal] instance for a bare [WP] goal here. *)
         iApply fupd_wp.
         iMod (proc_slots_park_gen γs ⊤ (proc_addr jj) st' Hneeds'
-                with "[Hvc'] [Htag'] Hppay") as "Hsl".
+                with "[Hvc'] [Htag'] Hmk Hppay") as "Hsl".
         { iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'". }
         { iApply (hart_at_any_intro jj cpu_id Hjj with "Htag'"). }
         (* the park state is [unclaimed] ([park_ok_unclaimed]), so the whole

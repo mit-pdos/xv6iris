@@ -181,6 +181,10 @@ Section SleepJoin.
        RUNNING lock at the release below, which is where the NEXT park will
        find them. *)
     own_ctx (p_context pj) -∗
+    (* the slot's ALLOCATION MARKER: the RUNNING lock resource carries it
+       like every non-UNUSED arm, and the release below puts it back
+       ([ProcAvail.v]).  Persistent. *)
+    pslot_used_at pj -∗
     (* the hart tag, whole, at the hart the dispatch resumed us on: half goes
        back into [run_slot] at the release, half becomes this thread's own
        [cpu_claim]. *)
@@ -204,7 +208,7 @@ Section SleepJoin.
   Proof.
     intros pj Hav Hj Hno Hspd Hsp0 Hsp_mj Hs1_mj
            Hmj18 Hmj19 Hmj20 Hmj21 Hmj22 Hmj23 Hmj24 Hmj25 Hmj26 Hmj27.
-    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpu Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
+    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpu Hown' #Hmk Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(4-k)]. *)
     assert (Hspd4 : pa_stk sp0 4 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -282,7 +286,7 @@ Section SleepJoin.
        them without being handed them by a caller. *)
     iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown' Htaga Hvc']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, ch'. iFrame "Hstate Hpg Hchan Hpub".
-      iApply (proc_slots_running_intro γs j cpu_id Hj with "Htaga Hown' Hvc'"). }
+      iApply (proc_slots_running_intro γs j cpu_id Hj with "Htaga Hown' Hvc' Hmk"). }
     (* THE TRAP-CSR SPLIT.  release consumes [arm_pay 0 eb _] -- the set
        at [eb = true], nothing at [eb = false].  The complement is what this
        call was handed from outside and owes back to sleep's caller; exactly
@@ -694,7 +698,7 @@ Section ProofSleepBody.
        invariant: it takes all three from the lock it just took. *)
     iDestruct (proc_lock_res_elim γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
     iDestruct (proc_slots_running γs j CIDa st0 Hj with "Htag Hslot")
-      as "(-> & Htag & Hown & Hvc)".
+      as "(-> & Htag & Hown & Hvc & #Hmk)".
     (* the claim's half #2 joins the lock's tie into the WHOLE mirror, which
        is what the store to p->state below is allowed to move. *)
     iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
@@ -837,7 +841,7 @@ Section ProofSleepBody.
                 ltac:(lia) Hj Hno ltac:(reflexivity) ltac:(reflexivity)
                 Hsp_L0 Hs1_L0
                 HL18 HL19 HL20 HL21 HL22 HL23 HL24 HL25 HL26 HL27
-                with "Htext Hislock Hcg Hpc [Hlocked Hstate Hpg Hchan Hpub] Htc Hcpu Hown Htag Hvc
+                with "Htext Hislock Hcg Hpc [Hlocked Hstate Hpg Hchan Hpub] Htc Hcpu Hown Hmk Htag Hvc
                       Hr24 Hr16 Hr8 Hgap [Hcont]").
       { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
       iApply (wp_next_retarget _ _ _ _ _ (Hrt CIDa) with "Hcont").
@@ -986,7 +990,7 @@ Section ProofSleepBody.
                 ltac:(lia) Hj Hno ltac:(reflexivity) ltac:(reflexivity)
                 Hsp_msch Hs1_msch
                 Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
-                with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpu Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap
+                with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpu Hown' Hmk Htag' Hvc' Hr24 Hr16 Hr8 Hgap
                       [Hcont]").
       iApply (wp_next_retarget _ _ _ _ _ (Hrt CIDs) with "Hcont").
   Qed.

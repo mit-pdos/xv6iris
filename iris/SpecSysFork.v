@@ -114,6 +114,9 @@ Definition wp_sys_fork_sconf_body
   is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
   kalloc_env γa None -∗
+  (* the proc table's sealed regime, threaded to kfork's allocproc
+     ([ProcAvail.v]); persistent, so it costs nothing to carry *)
+  procs_avail None -∗
   proc_priv γf p pid V -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,

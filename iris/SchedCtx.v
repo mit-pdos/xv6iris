@@ -476,7 +476,7 @@ Section SchedCtx.
     rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED is_running_UNUSED
             is_unused_UNUSED.
     rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-    iIntros "[_ [_ [$ [$ _]]]]".
+    iIntros "(_ & _ & $ & $ & _)".
   Qed.
 
   (* the converse: putting a slot BACK at UNUSED.  freeproc's post is exactly

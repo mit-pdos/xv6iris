@@ -588,11 +588,13 @@ Section ProofKwait.
      kwait is its first (and so far only) consumer; it belongs beside
      [proc_slots_unused] the moment kexit wants it too. *)
   Lemma kw_slots_zombie `{GEN : GenId} `{CIDz : CpuId} (gs : list gname) (pa : mword 64) :
-    proc_slots gs pa ZOMBIE -∗ proc_dormant pa ZOMBIE ∗ hart_at_any pa.
+    proc_slots gs pa ZOMBIE -∗
+    proc_dormant pa ZOMBIE ∗ hart_at_any pa ∗ pslot_used_at pa.
   Proof.
-    rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE.
+    rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE
+            is_unused_ZOMBIE.
     rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
-    iIntros "[_ [_ [$ $]]]".
+    iIntros "(_ & _ & $ & $ & $)".
   Qed.
 
   (* ================================================================== *)
@@ -1904,9 +1906,10 @@ Section ProofKwait.
         iAssert (proc_lock_res γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
         { iApply (proc_lock_res_intro γs γk (proc_addr k) ZOMBIE ch
                     with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
-          rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE.
+          rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE
+                  is_unused_ZOMBIE.
           rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
-          iSplitR; [done |]. iSplitR; [done |]. iFrame "Hdorm Hpark". }
+          iSplitR; [done |]. iSplitR; [done |]. iFrame "Hdorm Hpark Hmk". }
         iApply (kw_exit_both γs γw γk mm mco pme k K eb lks
                   HK Hcosp Hcos1 Hcocs Hbelow
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Hlkk Htokk HRk Hlk Htok
@@ -2294,7 +2297,8 @@ Section ProofKwait.
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgt40) in "Hpc".
           rewrite Hstz.
-          iDestruct (kw_slots_zombie γs (proc_addr kk) with "Hslots") as "[Hdorm Hpark]".
+          iDestruct (kw_slots_zombie γs (proc_addr kk) with "Hslots")
+            as "(Hdorm & Hpark & #Hmk)".
           (* ZOMBIE is unclaimed, so the lock's share is the whole mirror --
              which is what [proc_held] wants for the freeproc call below. *)
           iDestruct (pstate_whole_split (proc_addr kk) ZOMBIE) as "[_ Hwz]".

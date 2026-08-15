@@ -128,6 +128,7 @@ Require Import SpecSysPipe.
 Require Import CodeSysPipe.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -386,7 +387,7 @@ Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC
 Section ProofSysPipe.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)
