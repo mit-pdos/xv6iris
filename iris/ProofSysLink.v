@@ -1080,6 +1080,8 @@ Section ProofSysLinkBody.
         iEval (cbn [upd_upt pv_cwd]) in "Hcwd".
         iEval (cbn [upd_upt pv_cwd]) in "Hcwdref".
         iDestruct (sl_ir3 with "Hir") as "[Hir2 Hir1]".
+        iClear "Hi00 Hi02 Hi04 Hi06 Hi08 Hi0c Hi10 Hi12 Hi16 Hi18 Hi1c Hi20
+                Hi24 Hi26 Hi2a Hi2c".
         iPoseProof (slki_30 with "Htext") as "Hi30".
         iPoseProof (slki_32 with "Htext") as "Hi32".
         iPoseProof (slki_36 with "Htext") as "Hi36".
@@ -1263,6 +1265,7 @@ Section ProofSysLinkBody.
             by (rewrite HQ3a0 Hnaip; exact Hipe).
           assert (Hiu1 : (iput_units <= n1)%nat)
             by exact (sl_bud_iput _ w1 true (proj1 Hn1)).
+          iClear "Hi30 Hi32 Hi36 Hi3a Hi3e Hi40".
           iPoseProof (slki_42 with "Htext") as "Hi42".
           iPoseProof (slki_46 with "Htext") as "Hi46".
           iPoseProof (slki_4a with "Htext") as "Hi4a".
@@ -1606,6 +1609,7 @@ Section ProofSysLinkBody.
                   [exfalso; unfold iput_units in Hiu1; lia |].
                 assert (Hu2 : (sl_u2 w1 <= c1)%nat)
                   by exact (sl_cnt_u1 w1 (S c1) c1 (proj1 Hn1) eq_refl).
+                iClear "Hi42 Hi46 Hi4a Hi4c Hi50 Hi54 Hi56 Hi58".
                 iPoseProof (slki_5c with "Htext") as "Hi5c".
                 iPoseProof (slki_5e with "Htext") as "Hi5e".
                 iPoseProof (slki_60 with "Htext") as "Hi60".
@@ -1995,6 +1999,8 @@ Section ProofSysLinkBody.
                    iDestruct (sl_slk_acc cn kd Hkd with "Hslks")
                      as (gild gisld) "#Hslkd0".
                    iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1d Hbs2d]".
+                   iClear "Hi5c Hi5e Hi60 Hi64 Hi66 Hi6a Hi6c Hi70 Hi74 Hi78
+                           Hi7c Hi7e".
                    iPoseProof (slki_80 with "Htext") as "Hi80".
                    iPoseProof (slki_84 with "Htext") as "Hi84".
                    iPoseProof (slki_86 with "Htext") as "Hi86".
