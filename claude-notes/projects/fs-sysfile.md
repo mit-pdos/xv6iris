@@ -8548,3 +8548,102 @@ Two smaller ones, both from generating a twin file mechanically:
    error is a bare *"u1 is already used"* at the `iIntros` 400 lines below
    the `iDestruct` that bound it.  Name callee-returned ledger counts
    `un1`/`n2`-style, never `u<k>`.
+
+## S7-link — DONE.  sys_link is proven, sealed and linked.
+
+`SpecSysLink.v` (the contract), `SysLinkBudget.v` (the op-wide log ledger),
+`ProofSysLinkParts.v` (the pure side conditions, the frame carve, the
+epilogue), `ProofSysLinkTails.v` (ARMs B/C/D and the whole `bad:` tail, a
+NON-ascribed parts functor), `ProofSysLink.v` (the walk and the seal),
+`LinkSysLink.v` (`SysLinkProof Argstr BeginOp Namei Nameiparent Ilock
+Iunlock Iupdate Dirlink Iput Iunlockput EndOp`), plus `IregLinkNz.v`.
+`Print Assumptions SysLink.wp_sys_link_sconf` is the standing six plus
+`ProofIput.iput_acquiresleep_order_ADMITTED` — and NOT `create_fresh_ty`:
+sys_link allocates no inode and never reaches create.  Coverage: sysfile.c
+12/16 -> 13/16, tree 181 -> 182 of 190.
+
+The arm graph, the frame map and the two ledgers are in `SpecSysLink.v`'s
+own header.  Four facts worth knowing outside those files:
+
+* **A REFERENCE IS THE IDENTITY CELLS, and sys_link is the first caller to
+  use that.**  `ip->dev` and `ip->inum` are read at +0x8a / +0x90 with NO
+  lock held — between `iunlock(ip)` at +0x6c and the `bad:` arm's
+  `ilock(ip)` at +0xe8 — and it needs no accessor and no invariant
+  opening: `IcacheRef.inode_ref` IS `inode_ident` at the holder's own
+  fraction, which is what that file's §4 comment always promised ("a
+  reference holder reads ip->dev / ip->inum with no lock at all").  The
+  walk keeps the shed pair across the window and lends the two halves.
+  **Before designing an accessor for an unlocked inode field, check
+  whether the reference already carries the cell.**
+* **A RE-`ilock` RETURNS A FRESH RECORD, AND THE LEDGER IS THE ONLY THING
+  THAT CROSSES.**  `wp_iupdate_unlink`'s Z premise is guarded on the count
+  being nonzero, and the plausible justification — "the walk incremented
+  it four calls earlier" — is WRONG, because another thread may hold the
+  sleeplock in the window.  The honest source is the `ilink` being spent:
+  (L1) says `w <= di_nlink` and the fragment says `1 <= w`.  That
+  accessor did not exist (`InodeRegion.ireg_link_alloc` reads (L1) at a
+  record the caller CANNOT name); `IregLinkNz.ireg_link_nz` is its shape
+  with the block half replaced by the caller's `dinode_at`.  Beside it,
+  `dir_links_nlink_drop`: `dir_link_at`'s grey disjunct carries
+  `di_nlink dn = 0` as its own home condition, so at a nonzero count every
+  ticket is `ilink` and the payload rides the change untouched.  **Both
+  belong in `InodeRegion.v` / `DirLinks.v` and are in a leaf file for the
+  rebuild-cone reason; sys_unlink wants exactly the same pair.**
+* **THE COUNTED `wp_iunlockput_sconf` IS ENOUGH IN THE `bad:` TAIL AND THE
+  CREDITED ONE IS NEEDED AT +0xe0, AND THAT ASYMMETRY IS THE LEDGER'S
+  SHAPE**, not an approximation: whether the PARENT's free absorbs the
+  bitmap block is exactly what decides whether the tail's own three units
+  are still there.  So the tail's entry lemma takes the CLOSURE as a
+  premise over the two figures the parent's free REPORTS, and the walk
+  discharges it with `SysLinkBudget`'s arm theorems.  The pattern
+  generalises: **a block lemma should take a ledger closure as a
+  `forall`-premise over the reported booleans rather than a count.**
+* **THE LEDGER FRAGMENT'S THREE COLOURS ARE THE WHOLE FUNCTION.**  Minted
+  UNCREDITED at `ip->nlink++` (forced: namei never locks the inode it
+  returns, so nothing puts `IBLOCK ip` in the op's set before that flush);
+  deposited caller-side into the parent's `dir_links` at the dirlink;
+  consumed back at `ip->nlink--`.  ARMs B/C/D branch above the mint, so no
+  fragment reaches them.
+
+### The rules this walk established, and the traps it paid for
+
+**A LEAF'S OWN OUTPUT VALUE IS AT `rget`, WHICH IS HART-INDEXED, so an ALU
+chain is built one `rewrite /X upd_eq. rgne. rewrite <the previous
+equation>.` at a time.**  Writing the bridge by hand instead produces two
+terms that print identically and do not rewrite — durable-notes' `rget`
+rule, met here three times over (`lh` -> `c.addiw` -> `sh`, twice, plus
+`c.lui` -> `c.addi`).
+
+**AN `ltac:` HOLE IN ARGUMENT POSITION CANNOT SEE ITS OWN GOAL, AND THE
+ERROR BLAMES THE REWRITE.**  `ltac:(rewrite -Hcnib; exact Hlow16)` passed
+positionally to `dir_ok_dirlink` fails with *"The RHS of Hcnib does not
+match any subterm of the goal"* on a goal that visibly contains it,
+because the argument's expected type is still an evar when the tactic
+runs.  Hoist it to a named `assert`.  Same family as durable-notes'
+diverging-`ltac:` trap, with a different symptom.
+
+**THE FRAME'S JUNK WORDS AND THE LOG COUNTS COMPETE FOR NAMES.**  The
+carve binds `u1..u4` for the four saved slots and the natural name for the
+count after the mint is `u1` again; Coq reports *"u1 is already used"* a
+thousand lines later, at the `destruct`.  Name the counts apart (`c1`,
+`c2`).
+
+**`proj`-CHAINS INTO `InodeLock.inode_ok` ARE OFF-BY-ONE BY
+CONSTRUCTION**: its seven conjuncts put the TYPE (4th) before the SIZE CAP
+(5th) and `blk_holes_zero` (6th), so a wrong depth reports as a type
+mismatch naming a premise two slots away.  Count them at the definition,
+not from the callee's premise order.
+
+**A CALLEE THAT DOES NOT TAKE THE TRAP-CSR COMPLEMENT STILL NEEDS ONE.**
+`wp_iupdate_link`, `wp_iunlock` and the two `wp_*_gen` walkers do not
+thread the pair; at ELEVEN callees, threading it would demand a transport
+across every park.  Drop it at the top (`eb = true` makes both `emp`) and
+re-mint per callee — sys_chdir's rule, and this is the walk that shows why
+it is the only workable one at this arity.
+
+**A `dfrac`/`hw_config` SWEEP DOES NOT MOVE A WALK.**  146688d4 added a
+sixth frozen cell to `hw_config` and fixed up ~120 leaf files; every edit
+is inside a leaf's PROOF BODY (one more slot in an intro pattern), so not
+one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
+When a sweep lands under an in-flight walk, diff the statements before
+budgeting a repair.
