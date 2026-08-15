@@ -14,7 +14,7 @@ diverged from the design's sketches, and what is left.
 | **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | **LANDED** |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
 | **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause is landed** — see below) | NOT STARTED |
-| **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | — | F1b | NOT STARTED |
+| **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
 landed contract and no landed proof moved.
@@ -180,6 +180,123 @@ every mkfs image (mkfs's `ialloc` writes `nlink = 1` into the root and the
 `"."`/`".."` it appends are self-records no `dir_links` unit is filed
 against). `ireg_alloc` has no caller yet, so the third conjunct costs
 nothing downstream.
+
+### F2 — `iris/FsLookup.v`
+
+R8's increment: ONE `dirlookup` under ONE lock, read at the tree, lifted
+CALLER-SIDE out of the landed `SpecDirlookup.wp_dirlookup_sconf`. Purely
+additive — `SpecDirlookup` does not move (R10, §20.18 ruling 1) and `FsRep`'s
+consumer set is unchanged (it had none). Requires `FsTree` + `FsRep` +
+`SpecDirlookup`.
+
+#### THE ATOMIC UPDATE OVER THE DIRECTORY'S OWN NODE IS UNSTATABLE, AND THAT IS A THEOREM
+
+**RATIFIED (coordinator) as R8's IMPLEMENTATION FORM.** The house AU idiom
+(`wp_log_write_au`, `ireg_write_au`) surrenders the caller's fragment through
+a fupd fired at ONE ghost step, so the fragment need never sit in the caller's
+hands across the call. It does not apply to a directory node, and it is
+REFUTED BY THE TREE'S OWN LOCK PLACEMENT, twice over:
+
+- `dirlookup`'s `readi` loop consumes `inode_blocks` from entry to return and
+  the call SLEEPS, so the bytes half cannot arrive at one point and leave at
+  another — a mask-changing fupd cannot be held open across a `WP Loop` step;
+- the record half cannot travel either: the caller ALREADY holds `dinode_at`
+  out of `ic_loaded`, so a second copy arriving through a client invariant
+  meets `dinode_at_excl`.
+
+So the node fragment is pinned in the caller's hands for the whole call — **by
+the lock, which is exactly what makes the call atomic in the first place.**
+This is §1.4's theorem (`fnode i n` is holdable only while `i` is locked)
+meeting its FIRST CONCRETE INSTANCE, and it is why the linearization point is
+not a ghost step to be chosen but the entire locked interval, during which the
+node cannot move. R8's "logically atomic" therefore has exactly two pieces of
+formal content and no third:
+
+> **(LP1)** the triple's pre and post name the SAME `ents`, so the answer read
+> out of the bytes IS the answer at the linearization point; and
+> **(LP2)** the triple claims NOTHING about any other node — a client that
+> wants a GLOBAL tree fact opens its own AMBIENT tree at that one instant.
+
+Anyone who proposes surrendering `fnode` through a fupd at a `dirlookup`,
+`readi` or `writei` boundary reads this first: the obstruction is the lock
+discipline, not the spec's shape, so no restatement escapes it.
+
+#### The lifting DISCHARGES a premise rather than adding one
+
+`di_type dn = T_DIR` — the premise that refutes `panic("dirlookup not DIR")` —
+falls out of `node_rep`'s NDir case (`node_rep_T_DIR`). What the triple still
+takes is byte-level well-formedness the tree layer deliberately does not carry
+(`inode_ok`, `dir_ok`) and that a caller holds beside the fragment in
+`ic_loaded`.
+
+#### What landed, by part
+
+- `node_lookup_first` — the whole of F2's pure content in ONE equation: under
+  `node_rep (NDir ents) dn data`, `ents !! s` IS the record inum of
+  `dir_first data (dnrec dn) s`. Both arms (`node_lookup_found` /
+  `node_lookup_none`) and both converses are read off it. It is
+  `FsTree.dir_view_lookup` at a NODE rather than at a byte view.
+- `fdir` — `fnode` with `dn`/`bm`/`data` NAMED. `fnode` hides them
+  existentially, which is right for a tree statement and wrong at a call
+  boundary: dirlookup's bundle (`inode_meta ip dn`, `inode_map γfs ip bm`)
+  names them and nothing would tie the two together otherwise.
+  `fdir_fnode` / `fnode_fdir` repack in both directions.
+- `wp_dirlookup_tree_body` + `Module FsLookupTree (DL : DIRLOOKUP)` — the
+  triple. Three differences from the landed body and no others: the type
+  premise is gone, `inode_blocks` becomes `fdir` in pre and post, and each arm
+  carries the tree answer BESIDE the byte one. The record index `k` survives
+  deliberately: sys_unlink names the offset `16k` with it and iget's reference
+  is at that record's inum.
+- `dl_au` / `dl_au_fire` / `dl_au_found` / `dl_au_miss` — (LP2) made
+  operational. The client's fupd surrenders `fs_rep t` for the tree WITHOUT
+  the locked directory (`fs_nodes t !! dpi = None` — the hole is FORCED by
+  `dinode_at_excl`, not a convenience) and takes it straight back, paying its
+  own receipt at `tree_ent (tree_ins t dpi (NDir ents)) dpi s`. It is a SHAPE
+  a client may choose, not a resource this file allocates (R3).
+
+#### `dir_view_write` is `dir_view_zero`'s missing twin, and F3 needs both
+
+F1a landed the tree delta of an UNLINK; this is the tree delta of a DIRLINK —
+writing name `s` at inum `z` into a free slot inserts exactly that binding and
+moves nothing else, and, like its twin, it is FALSE without `dir_names_unique`
+on the way in. ONE clause covers both of dirlink's arms: `dir_written_at`
+(stated over `DirView.dir_win_agree`, so a byte-range postcondition converts
+with `dir_win_agree_below`) plus separate `nrec`/`nrec'` counts, so the APPEND
+arm (`k0 = nrec`, count grows) and the REUSE arm (`k0 < nrec` at a free
+record) are one lemma rather than two. `node_rep_insert` / `node_rep_delete`
+lift them to a node, and `dir_first_after_write` / `dir_first_after_zero` are
+the OPERATIONAL forms — what the NEXT scan does: it finds the written record
+at exactly the slot dirlink used (uniqueness pins it to `k0`, which is what
+lets a caller name the offset), and it misses the zeroed name.
+
+#### §20.17.4's owed `".."` fact — CLOSED IN SUBSTANCE, ONE COMMIT BEHIND
+
+**The composition is written and verified green; it is held out of this commit
+only because its PAYLOAD half is not committed yet.** `DirView.dir_dotdot_ix`
+(the create owner's increment) lands separately, and `FsLookup.v` carries a
+placeholder §6 naming exactly what returns there. Landing it is a dozen lines
+and changes nothing else in the file.
+
+`node_dotdot_index` / `fdir_dotdot_index` compose the PAYLOAD half
+(`dir_dotdot_ix`: a directory's record 1 is live and named `".."`) with the
+TREE half (`ents !! ".." = Some dp`, a conjunct of `fnode`) and conclude they
+are the SAME NUMBER: `dp = bv_unsigned (dir_inum data 1)`, with
+`dir_first data nrec ".." = Some 1`. Neither half can state the other —
+"the parent" is a relation between two inodes and a conjunct on ONE payload
+cannot say it, while `dir_link_at` is keyed by record INDEX and is name-blind.
+**`dir_names_unique` is what joins them**, and this is the third place R2's
+amendment pays for itself: under the invariant any-match is first-match, so a
+live `".."` at index 1 is the ONLY live `".."`. Feed that number to
+`DirLinks.dir_links_dotdot_out` and the `ilink dp` S7 must convert is in hand.
+`DOTDOT_dotdot_name` bridges the tree layer's `mword` spelling of the name to
+the record view's `bv` one.
+
+#### A tactic trap worth keeping
+
+`FsTree.v` does not import the proofmode and `FsLookup.v` does, so its
+`rewrite` is **ssreflect's** — `rewrite lem by tac` is REJECTED (BvShift.v's
+note) even though the identical line compiles one file down. Side conditions
+go to `//` with the hypothesis already in context. `rewrite <- lem` is fine.
 
 ## Divergences from the verification report's sketches
 
