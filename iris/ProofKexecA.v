@@ -218,6 +218,9 @@ Require Import SpecReadi.
 Require Import SpecIunlockput.
 Require Import SpecDirlink.
 Require Import SpecNamei.
+(* [SpecNamex] for [walk_need]/[walk_spend]: the SET form's ledger clause is
+   namex's, and phase A prices its namei call through it. *)
+Require Import SpecNamex.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
@@ -304,7 +307,6 @@ Section KexecABody.
       (dqb dqs dqa : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
-    let L := length (path_elems (bview plen pfun)) in
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -324,7 +326,6 @@ Section KexecABody.
     ireg_blocks_ok inodestart nib cov logstart ->
     bb_cstr pfun plen ->
     (Z.of_nat plen < 2 ^ 31)%Z ->
-    ((L + 1) * iput_units + iput_units <= MAXOPBLOCKS)%nat ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     eb = true ->
@@ -413,8 +414,8 @@ Section KexecABody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros L HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
-           Hiregb Hcstr Hplen Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
+    intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+           Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     unfold K_kexec in HK.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont32".
@@ -552,18 +553,36 @@ Section KexecABody.
     iEval (rewrite /cwd_ref) in "Hcref".
     (* namei names the path buffer by ITS OWN a0; ours is [pv]. *)
     iEval (rewrite -HN5a0) in "Hpath".
-    iApply (Namei.wp_namei_sconf gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
+    (* ---- THE SET FORM, NOT THE COUNTED ONE, AND THAT IS WHAT LIFTS
+       KEXEC'S PATH-LENGTH CAP.  The counted contract prices the walk at
+       [(L+1) * iput_units] and spends the same, so at [L = 2] it hands back
+       one unit where the closing iunlockput needs three -- which is why
+       [SpecKexec] used to carry a premise admitting only one path element.
+       [wp_namei_gen] prices it at [SpecNamex.walk_need L <= 4] REGARDLESS OF
+       DEPTH and spends at most two, leaving eight.  [log_op] is literally
+       [∃ Sb, log_opS], so entering the set form is one [iDestruct] and
+       leaving it is [LogInv.log_opS_op]; nothing else in the phase moves.
+       (sys_chdir did this first -- SpecSysChdir.v's ledger section.) ---- *)
+    iDestruct "Hlog" as (Sb0) "Hlog".
+    iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used
-              (pv_cwd V) plen pfun MAXOPBLOCKS pidv (DfracOwn (1/4)) dqb dqs
+              (pv_cwd V) plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs
               (DfracOwn 1) N5 (K - 68)%nat true C true lks
               ltac:(unfold K_namei; lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
               Hbmc Hbml Hins0 Hcovb Hiregb Hcstr Hplen
-              ltac:(unfold iput_units, MAXOPBLOCKS in *; lia) Hjp Hgs eq_refl
+              ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
+                    destruct (length (path_elems (bview plen pfun))); lia)
+              Hjp Hgs eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcwd Hcref Hpath Hbs Hirs Hlog").
-    iIntros (CIDn Hsn M4 n1 used1 ok ipv) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
-             Hbits Hppid Hcwd Hcref Hpath Hbs %Hn1 Hlog Harm".
+    iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
+             Hbits Hppid Hcwd Hcref Hpath Hbs %HSbsub %Hwbm %Hn1 Hlog Harm".
+    iDestruct (log_opS_op with "Hlog") as "Hlog".
+    (* what the seam actually carries: the closing iunlockput's three units.
+       The walk spent at most two of the ten. *)
+    assert (Hiu1 : (iput_units <= n1)%nat).
+    { unfold walk_spend, iput_units, MAXOPBLOCKS in *. destruct w, ok; lia. }
     iEval (rewrite HN5a0) in "Hpath".
     assert (Hpc30 : ret_pc (N5 !!! Regidx Rra) = mword_of_int (KXA + 0x30))
       by (rewrite HN5ra; pcw).
@@ -645,7 +664,7 @@ Section KexecABody.
       iSplitL "Hpc"; [iExact "Hpc" |].
       iSplitL "Hcg"; [iExact "Hcg" |].
       iSplitL "Hcnt"; [iExact "Hcnt" |].
-      iSplitR; [iPureIntro; exact Hn1 |].
+      iSplitR; [iPureIntro; exact Hiu1 |].
       iSplitL "Hlog"; [iExact "Hlog" |].
       iSplitL "Hheld"; [iExact "Hheld" |].
       iSplitL "Hirs"; [iExact "Hirs" |].
@@ -809,7 +828,6 @@ Section KexecABody.
       (dqb dqs dqa : dfrac)
       (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (n1 : nat) :
-    let L := length (path_elems (bview plen pfun)) in
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -827,7 +845,6 @@ Section KexecABody.
     0 <= inodestart ->
     cov_below cov size ->
     ireg_blocks_ok inodestart nib cov logstart ->
-    ((L + 1) * iput_units + iput_units <= MAXOPBLOCKS)%nat ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     eb = true ->
@@ -935,8 +952,8 @@ Section KexecABody.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros L HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
-           Hiregb Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2.
+    intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+           Hiregb Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. unfold K_kexec in HK'.
     iIntros "#Htext #Hpanic #Hfab Hseam Hcont Hcont90".
     rewrite /kxc_at_a2.
@@ -1311,9 +1328,9 @@ Section KexecABody.
     assert (Hpp050 : add_vec_int (mword_of_int (KXA + 0x4c) : mword 64) 4
                      = mword_of_int (KXA + 0x50)) by pcw.
     iEval (rewrite Hpp050) in "Hpc".
-    (* ---- the budget arithmetic both exits need ---- *)
-    assert (Hiu : (iput_units <= n1)%nat).
-    { unfold iput_units, MAXOPBLOCKS in *. lia. }
+    (* ---- the budget both exits need: the seam carries it outright now,
+       rather than as an interval this block has to do arithmetic on ---- *)
+    assert (Hiu : (iput_units <= n1)%nat) by exact Hn1.
     (* ---- +0x050: bne a0,a5 -- a BLIND split ---- *)
     destruct (eq_vec (rget Q9 Ra0) (rget Q9 Ra5)) eqn:Ecmp.
     - (* the read was the full 64 bytes: fall through *)
@@ -1662,7 +1679,6 @@ Section KexecAMain.
       (dqb dqs dqa : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
-    let L := length (path_elems (bview plen pfun)) in
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
     nib = icfg_nib ->
@@ -1682,7 +1698,6 @@ Section KexecAMain.
     ireg_blocks_ok inodestart nib cov logstart ->
     bb_cstr pfun plen ->
     (Z.of_nat plen < 2 ^ 31)%Z ->
-    ((L + 1) * iput_units + iput_units <= MAXOPBLOCKS)%nat ->
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     eb = true ->
@@ -1806,8 +1821,8 @@ Section KexecAMain.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros L HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
-           Hiregb Hcstr Hplen Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
+    intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
+           Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont90".
     iApply (kxc_a1 (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
@@ -1815,7 +1830,7 @@ Section KexecAMain.
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
               m K eb C b lks sp0 ra0 s00 s10 s20 pv av
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
-              Hiregb Hcstr Hplen Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
+              Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
               with "Hcg Hcnt Htext Hpc Hpanic Hfab Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont [Hcont90]").
@@ -1828,7 +1843,7 @@ Section KexecAMain.
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
               m M32 K eb C b lks sp0 ra0 s00 s10 s20 pv av ipv n1
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
-              Hiregb Hbudget Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
+              Hiregb Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               with "Htext Hpanic Hfab Hseam Hexit Hcont90").
   Qed.
 

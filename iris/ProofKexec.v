@@ -545,7 +545,7 @@ Section KexecMain.
   Proof.
     rewrite /wp_kexec_sconf_body.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0
-           Hcovb Hiregb Hcstr Hplen Hbudget Havf_nz Havf_na Hnamax
+           Hcovb Hiregb Hcstr Hplen Havf_nz Havf_na Hnamax
            Halen_b Halen_c Halen_4 Hjp Hgs Hb Heb.
     subst b eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
@@ -563,7 +563,7 @@ Section KexecMain.
               (m !!! Regidx Rs1) (m !!! Regidx Rs2)
               (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
-              Hins0 Hcovb Hiregb Hcstr Hplen Hbudget Hjp Hgs eq_refl
+              Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs eq_refl
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hfab Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont []").

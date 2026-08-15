@@ -128,10 +128,75 @@ threaded: `ilock` spends the caller's `slh_tok (icfg_isl k) q` into the lock
 and returns `sleeplocked_q (icfg_isl k) q`; `iunlock` gives it back. Their
 callers see no new premise — the share was already inside `iref_tok`.
 
-**Order of work.** (1) SleepLock's `_at` constructors + `icfg_isl` + the
-`ic_sleeplocks` re-pin; (2) `iref_tok` and `isl_auths`, with the four ghost
-steps; (3) ilock/iunlock; (4) iput and the axiom; (5) step 5 below. Stages 1
-and 2 rebuild most of the tree, so batch them.
+**Order of work, and WHERE IT STANDS.**
+
+- **(1) LANDED** — SleepLock's `slh_ghost_alloc` + `_at` constructors, and
+  `icfg_isl : nat -> gname` with `isl_fun_alloc`, allocated in `icfg_alloc`
+  and handed to `icache_boot` as a premise. The locks are already built AT
+  `icfg_isl k` (`sl_fresh_new_gen_at`), so `icache_boot`'s postcondition pins
+  the gname; the deposit is still `sl_untracked`.
+- **(2) LANDED** — `isl_slot`/`isl_pool` in `itable_body`, the five ghost
+  steps moving the share, and the share itself riding on the SLICE axis
+  (`iref_tok`, `inode_shr`, `inode_ref_short` and the three `_gen` forms)
+  rather than on the count fragment. That placement is the load-bearing
+  choice: `inode_ref_carve` keeps the count fragment whole and splits the
+  slices, so only a slice-borne share reaches `inode_shr` — which is exactly
+  what `ilock` consumes.
+- **(3)–(6) NOT DONE.** What follows is the whole remaining path.
+
+### (3) The escrow arm and the sleeplock BOTH want the share — decompose it
+
+`ic_dep_own`'s `DepShr` arm holds the depositor's `inode_shr_gen k s`, which
+now includes `slh_tok (icfg_isl k) s`; but the sleeplock needs a deposit of
+its own, and there is only one `s`. **Do not split `s`** — that changes the
+`s` recorded in `ic_deposit`, which ilock returns and iunlock consumes, so it
+would ripple into every caller.
+
+Decompose instead: the escrow arm keeps the liveness+identity slice at `s`
+and the SLEEPLOCK keeps the `slh_tok` slice at the same `s`. Give `IcacheRef`
+the slh-free forms (`inode_shr_gen_bare`, `inode_ref_gen_bare` — exactly the
+pre-change definitions) with `inode_shr_gen k s … ⊣⊢ inode_shr_gen_bare k s …
+∗ slh_tok (icfg_isl k) s`, state `ic_dep_own`'s two arms over the `_bare`
+forms, and let ilock route the two halves to their two homes. No fraction
+moves and no contract changes; the destructuring patterns in `IcacheEscrow`
+revert to what they were before this stage.
+
+**Why the sleeplock cannot just rely on the escrow arm** (the tempting
+shortcut): between `acquiresleep` returning and the checkout ghost step, the
+lock is HELD while the escrow is still PARKED. iput's refutation reads the
+lock word, and another thread can be exactly in that window, so the deposit
+has to be in the lock.
+
+### (4) The holder token gains its fraction
+
+`iunlock` must rebuild the caller's share at `s`, so it needs the lock to hand
+back `slh_tok (icfg_isl k) s` — i.e. it needs the PRECISE holder token
+`sleeplocked_q gisl s`, not the fraction-free `sleeplocked gisl`. So the inode
+contracts that thread "the lock is held" (`SpecIlock`'s post, `SpecIunlock`'s
+and `SpecIput`'s pre, and the bundles in SpecCreate / SpecIunlockput /
+SpecFileclose that carry it) replace `sleeplocked gisl` with
+`sleeplocked_q gisl s`. Mechanical: `s` is already a parameter of every one
+of them.
+
+### (5) The flip itself
+
+`ic_sleeplocks` (three copies: IcacheBoot, SpecFileclose, SpecDirlink) becomes
+`∃ γil, is_sleeplock_gen γil (icfg_isl k) (i_lock (ientry k)) "inode"
+(ic_tok cn k) (slh_tok (icfg_isl k))`, its `_acc` lemmas drop the second
+binder, and the six consumers (ProofFileclose / ProofFilewrite / ProofFilestat
+/ ProofKexit / ProofDirlink / ProofIput) drop it too. `icache_boot` builds at
+`slh_tok (icfg_isl k)` instead of `sl_untracked`. ilock moves to
+`wp_acquiresleep_gen_sconf` (depositing the share it already consumes),
+iunlock to `wp_releasesleep_gen_sconf` + `wp_holdingsleep_gen_sconf`.
+
+### (6) iput, the axiom, and then step 5's deletion
+
+At `ip->ref == 1`, REF-1 gives `M !! k = Some (q, 1)` with `q` the thread's
+own; `isl_slot` says the authority is `Some q`; `slh_return_last` turns the
+pair into `slh_auth (icfg_isl k) None`; `wp_acquiresleep_nb_sconf` takes it.
+`iput_acquiresleep_order_ADMITTED` goes with the call it justified. Then the
+nested blocking contract has no consumer and step 5 below deletes it.
+
 
 **5. THE NESTED BLOCKING CONTRACT GOES, AND acquiresleep BECOMES noff = 0
 ONLY.** `NOT DONE`, and it falls out of step 4 rather than needing work of its
