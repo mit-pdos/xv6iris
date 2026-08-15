@@ -8817,18 +8817,22 @@ two things, in this order:
 The contract was deliberately not written first: fixing a postcondition
 around an arm nobody can reach is what the D₀ stops exist to prevent.
 
-## S7-open — **THE FILE-LAYER REPAIR IS LANDED (R-open-1b, below) AND THE
-## LEDGER CLOSES (`SysOpenBudget.v`).  WHAT IS LEFT IS THE WALK:**
-## `SpecSysOpen.v`, `ProofSysOpenParts.v`, `ProofSysOpen*.v`,
-## `LinkSysOpen.v`.  Both blockers are closed -- blocker 1 by the unarmed
-## per-slot cinv, blocker 2 by `create_locked`'s gen-named bundle -- so
-## sys_open may now write `f->ip` and `f->off` holding only its exclusive
-## reference, and the `+1` iref parks in `f->ip` via `inode_pay_alloc`
+## S7-open — **DONE.  sys_open is proven, sealed and linked.**
 
-`SysOpenBudget.v` (the machine-checked op-wide ledger) and R-open-1b (the
-file-layer repair, below) are what has landed.  The rest of this section is
-the derivation the walk will be written against: the arm graph, the frame
-map, `K = 138`, the ledger and the resource plan.
+`Print Assumptions SysOpen.wp_sys_open_sconf` = the standing six
+(`rv64d.valid_reservation`, `rv64d.plat_term_write`,
+`rv64d.match_reservation`, `rv64d.load_reservation`,
+`rv64d.cancel_reservation`, `functional_extensionality_dep`) plus
+`LinkCreateFreshTy.CreateFreshTy.create_fresh_ty`, which comes in through
+create's ialloc and through nothing else.  Coverage: **185/190 proven**,
+sysfile.c **15/16** — only sys_unlink is left, and it is STOPPED above.
+
+Six files: `SysOpenBudget.v` (the op-wide log ledger), `SpecSysOpen.v`,
+`ProofSysOpenParts.v`, `ProofSysOpenTails.v`, `ProofSysOpen.v` and
+`LinkSysOpen.v`.  What follows is the derivation the walk was written
+against — the arm graph, the frame map, `K = 138`, the ledger and the
+file-layer repair R-open-1b — then the walk's own shape and the rules it
+left behind.
 
 ### What sys_open IS (verified against the tracked `kernel.asm`)
 
@@ -8967,8 +8971,10 @@ either — `off_body`'s `∃ ip` is shared between the pointer cell and
 the opener would need the authority, so the premise would be unsatisfiable
 and the contract vacuous.
 
-### BLOCKER 2 (small, mechanical, sized and NOT started) — **`create_locked`
-### ERASES THE GENERATION THE FD's PAYLOAD MUST BE KEYED ON**
+### BLOCKER 2 — **CLOSED ON THE WALK SIDE, and the ruled three-file edit was
+### never made.**  `create_locked` erases the generation the fd's payload
+### must be keyed on; the ELSE arm names its own and the O_CREATE arm turns
+### out not to need one
 
 This is the ledger story of the walk, and it is otherwise fully designed:
 sys_open's `+1` inode reference never leaves — it is parked in `f->ip` as
@@ -8992,25 +8998,21 @@ then installs the names").  It needs `inode_shr_held_gen v Q g` AND
   links the two, and `SpecIunlock.v`:167 gives the share back erased as well
   (S3g's recorded finding).
 
-**THE FIX IS A DELETION.**  `ProofCreate` already holds the parent
-generation-named and throws the name away immediately before every
-`create_locked_mk`: `ProofCreate.v`:3846, 5334, 5954, 6699, 8424 each read
-`iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp"`.  So:
-
-1. `SpecCreate.v`: `create_locked`'s last conjunct becomes
-   `inode_ref_short_gen k (qi + s)%Qp qi dev inum g` (`g` is ALREADY a
-   parameter of `create_locked`), and `create_locked_mk`'s premise with it.
-2. `ProofCreate.v`: delete the five `inode_ref_short_gen_forget` lines and
-   pass `Hckeep` straight through.
-3. `ProofSysMkdir.v` / `ProofSysMknod.v`: one `inode_ref_short_gen_forget`
-   after the `iDestruct` of `create_locked`, before `wp_iunlockput_*`.
-
-The alternative — adding `g` to `SpecIunlock`'s postcondition, which S3g
-already flagged as "the cleaner long-term fix" — is ALSO true and ALSO
-provable (the share the escrow returns is literally
-`ic_dep_own k (DepShr s dev inum g)`'s, `IcacheEscrow.v`:762-775), but it
-touches five consumers' proof bodies where this touches three, and sys_open
-does not need it once the parent is named.
+**AND IT COST NOTHING, BECAUSE THE ARM THAT NEEDS THE NAME IS THE OTHER
+ONE.**  The ruled repair was a three-file deletion — un-forget the parent's
+generation in `create_locked` (`ProofCreate` already holds it named and
+throws the name away at `create_locked_mk`), then re-forget it in
+`ProofSysMkdir` / `ProofSysMknod`.  **It was never made.**  The O_CREATE arm
+of sys_open does not publish out of `create_locked` at all: `so_publish` runs
+in ARM S's continuation, past `iunlock`, where the arm holds `ity_shot g` and
+a returned share it can re-pin against the parent by
+`inode_ref_short_shr_gen_agree` exactly as the else arm does.  The generic
+lesson: **before paying for a contract change that names a ghost, check
+WHERE the consumer actually runs — a name that is erased at the callee's
+return may be recoverable at the point of use, from a fact the walk already
+holds.**  (Adding `g` to `SpecIunlock`'s postcondition — S3g's "cleaner
+long-term fix" — is still true and still provable, and still nobody needs
+it.)
 
 ### WHAT THE RESOURCE PLAN LOOKS LIKE, since it is otherwise settled
 
@@ -9286,249 +9288,136 @@ slot beside its `fpay_tok`, minted from the BSS's zeroed cells inside
 is, and not a family threaded through any environment.  The ftable lock is
 still unwired at boot, so nothing calls it yet.
 
-### S7-open STEP 2 — `SpecSysOpen.v` AND `ProofSysOpenParts.v` LAND.  The
-### contract needed nothing R-open-1b did not already give it, and the
-### frame carve is UNIFORM even though the register saves are shrink-wrapped
+### THE WALK, AS BUILT — five files, and the rules it left behind
 
-**THE CONTRACT IS `SpecSysMkdir`'s PLUS THE FILE LAYER.**  R-open-1b adds no
-premise (the two cells never leave the slot), so the additions are exactly
-`is_ftable γfl γf`, one `fd_slot`, argument 1 for `argint`, and a
-postcondition keyed on the returned descriptor —
-`sys_open_post`, whose failure arm hands `proc_priv` back unchanged and whose
-success arm is `fd_frees (pv_ofile W) = fd :: l` with the slot named
-existentially.  **One `fd_slot` in, one out, on every one of the eight arms**:
-filealloc consumes it, fdalloc hands it back, filealloc's failure arm hands it
-straight back, and ARM F-FAIL's `fileclose` hands it back after fdalloc
-refused.  No `fclose_names` and no closing environment, because that
-`fileclose` is at FD_NONE where `fileclose_env_none` gives the environment for
-free.
+`SpecSysOpen.v` (the contract), `ProofSysOpenParts.v` (the frame, the omode
+bit cluster, the epilogue, the publication), `ProofSysOpenTails.v` (the seven
+exit blocks, a functor over `Iunlock`/`Iunlockput`/`EndOp`/`Fileclose`),
+`ProofSysOpen.v` (the seven block lemmas and the seal, a functor over the
+thirteen callees) and `LinkSysOpen.v`.  The block decomposition, bottom-up:
 
-**THE SHRINK-WRAPPING DOES NOT REACH THE CARVE.**  `stack_own` is `∃ w`-shaped
-PER SLOT, so `so_frame_carve` / `so_frame_join` are uniform; what is
-arm-dependent is which of the five saved slots the WALK can still prove holds
-the entry value of its register, which is why `so_epilogue` takes slots 3, 4,
-5, 6 at existential contents and only ra and s0 by name.  The epilogue is four
-instructions and does NOT set `a0` (unlike sys_link's `c.mv a0,a5`): each arm
-writes its own return value, so the lemma reports `mf a0 = M a0` and the arms
-supply the literal.
+* `so_cont` / `so_cont0` — the exit continuation named ONCE.  `so_cont0` is
+  the SYSCALL's, at the process state argstr has already grown; `so_cont` is
+  that one strengthened with the join's two extra clauses (`used' ⊆ used`,
+  `nsj <= ns' <= S nsj`) and minus the two structural cells and the
+  page-table report the body below the join never touches.  The adapter
+  between them is six lines and it is not a convenience: without the
+  re-derived iref interval the syscall's `ns - sys_open_slots <= ns''` does
+  not survive the join's `+1`.
+* `so_tail_pub` (+0xb8, ARM S and the publication), `so_stores`
+  (+0x88..+0xb4 and the +0x14e itrunc block), `so_alloc` (+0x5e..+0x84 and
+  the +0x140 FD_DEVICE block), `so_join` (+0x4a..+0x5a and ARM D-FAIL),
+  `so_entry_c` (the O_CREATE arm, +0x38..+0x48 and ARM A-FAIL), `so_entry_n`
+  (the else arm, +0xdc..+0xfa and ARMs B-FAIL / C-FAIL), and
+  `wp_sys_open_sconf` (+0x00..+0x36, ARM 0 and the O_CREATE split).
 
-**THE OMODE CELL IS THE ONE 4-BYTE VIEW.**  `omode` is an `int` at `s0-180` =
-the UPPER word of slot 23, so `so_omode_split` / `so_omode_join` wrap
-`InstrBytes.word_pointsto_split4` at exactly one slot; the lower word is the
-`int fd` gcc never spilled and rides through arbitrary.  Every other narrow
-access is `lh`/`lhu` on inode fields (already `↦₂` in `inode_meta`) or the `sh`
-into `f->major` (already `↦₂` in `file_fields`), which is why the deferred
-hoist of `word4_pointsto_split2` out of `ProofSysMknod` STILL has no second
-consumer.
+**A PARKED REFERENCE AND ITS TRAVELLING SHARE ARE PINNED TO ONE FRACTION**
+by `inode_held_short`'s `qt = qi + Q`, so a publisher can only publish at a
+moment when it holds BOTH — i.e. never while a callee has the share checked
+out.  That is why `so_publish` runs in ARM S's CONTINUATION, after
+`so_tail_s`'s `iunlock` has handed the share back, and not at the
+`sd s1,24(s2)` where the pointer is stored.  **The instruction where a
+pointer is STORED and the moment its payload can be BUILT are different
+places, and only the second one is negotiable.**
 
-**THREE TRAPS, ALL OF WHICH READ AS SOMETHING ELSE.**
+**BLOCKER 2 COST FOUR LINES, NOT A SIGNATURE CHANGE.**  namei's `inode_held`
+is generation-FREE and `so_publish` needs the parent and the share at ONE
+named generation.  The else arm sheds the reference (`inode_ref_shed`), names
+the share's generation (`inode_shr_gen_intro`) and the retained parent's
+(`inode_ref_short_gen_intro`), and pins the two with
+`inode_ref_short_shr_gen_agree` — after which ilock reports `ity_shot` and
+its deposit at that same `g`.  The O_CREATE arm needs none of it:
+`create_locked` hands the parent back generation-NAMED already.  The ruled
+`SpecCreate` / `ProofCreate` / `ProofSysMkdir` / `ProofSysMknod` edit was
+therefore never made.
 
-* **`vm_compute` ON A GOAL WITH A FREE ADDRESS KILLS THE PROCESS WITH
-  "Fatal error: allocation failure during minor GC".**  `so_omode`'s goal is
-  `add_vec X <imm> = pa_add (pa_stk X 23) 4` with `X` free, and the bytecode
-  evaluator unfolds the whole 64-bit adder against it.  It reads as a memory
-  limit or a `-j` artefact and is neither; `coqc -time` names the sentence in
-  one run.  **Compose the shifts SYMBOLICALLY first** (`InstrBytes.avi_assoc`,
-  then `unfold add_vec_int; f_equal`) and what is left is CLOSED.  The
-  `stk_push` / `stk_pop` idiom already does this, which is why every other
-  frame lemma in the cluster is fine.
-* **`unfold` WALKS ITS ARGUMENT LIST ONCE, so a constant a LATER entry
-  EXPOSES stays folded.**  `SpecFileclose.fileclose_stack` is `8 + K_iput`, so
-  `unfold …, K_iput, …, fileclose_stack` leaves a folded `K_iput` behind and
-  the `lia` after it fails with **"Cannot find witness"** — which reads like an
-  arithmetic gap and is an unfolding-order one.  Put the composite BEFORE the
-  constant it names.
-* **`callee_saved` HAS THIRTEEN COMPONENTS AND s3 IS THE FIFTH.**  sys_open
-  moves one more callee-saved register than sys_link, so the handover's
-  `split_and!` bracket list needs `exact Cs3` in position five and one fewer
-  `apply Hfin`; getting it wrong reports **"No applicable tactic"** at the
+**THE T_DIR REFUSAL'S FALL-THROUGH LANDS AT +0x5e, NOT AT THE JOIN.**  The
+`c.beqz a5` at +0xfa targets **+0x5e**, skipping the T_DEVICE test entirely —
+gcc knows a T_DIR inode cannot be T_DEVICE.  So `so_entry_n` has TWO block
+exits, `so_join` at +0x4a and `so_alloc` at +0x5e, and both are ordinary
+lemma applications: a block lemma is APPLIED, not handed a second
+continuation, so the "chaining two halves" linear-exit problem never arises
+anywhere in this walk.
+
+**THE WITNESS IS EARNED, NOT ASSUMED.**  `so_pay_witness` is the theorem of
+the walk and both arms discharge it from the code: the O_CREATE arm passes
+T_FILE and `so_tdir_zne` refutes T_DIR at a literal; the else arm's `c.beqz`
+at +0xfa forces `omode = O_RDONLY = 0` on any T_DIR inode, which is
+`so_dir_forced`'s hypothesis.  That is where filewrite's `DirView.dir_ok`
+obligation, five frames up, is actually paid.
+
+**THE O_TRUNC BRIDGE IS sys_open's OWN.**  iput's itrunc is followed by
+`di_free`, so no landed proof ever states the TRUNCATED record's `inode_ok`
+or rebuilds `ic_loaded` after a truncate; `so_trunc_ok` / `so_loaded_open` /
+`so_trunc_loaded` do.  Both directory clauses are free because the guard at
++0xae is `ip->type == T_FILE`.
+
+**THE OMODE CELL IS THE ONE FOUR-BYTE VIEW.**  `omode` is an `int` at the
+UPPER word of slot 23, so `so_omode_split` / `so_omode_join` wrap
+`InstrBytes.word_pointsto_split4` at exactly one slot and the lower word (the
+`int fd` gcc never spilled) rides through arbitrary.  Every other narrow
+access is `lh`/`lhu` on inode fields or the `sh` into `f->major`, both
+already `↦₂`, which is why the deferred hoist of `word4_pointsto_split2` out
+of `ProofSysMknod` STILL has no second consumer.
+
+### THE TRAPS S7-open RECORDED (all of which read as something else)
+
+* **`vm_compute` ON A GOAL WITH A FREE ADDRESS KILLS THE PROCESS** with
+  *"Fatal error: allocation failure during minor GC"* — the bytecode
+  evaluator unfolds the whole 64-bit adder against the open term.  It reads
+  as a memory limit and is a proof-shape mistake: compose the shifts
+  SYMBOLICALLY first (`InstrBytes.avi_assoc`, then `unfold add_vec_int;
+  f_equal`), after which what is left is CLOSED.  `so_omode` carries the note.
+* **A BRANCH-TARGET ALIGNMENT PREMISE IS NOT A `bv_eq` GOAL.**  Every
+  `*_taken` leaf carries `eq_vec (access_vec_dec tgt 0) 'b"0" = true` beside
+  its comparison, and the `apply bv_eq; vm_compute; reflexivity` that every
+  other address goal takes fails there naming `bv_eq`'s own statement.  It is
+  a plain `vm_compute; reflexivity`.
+* **`unfold` WALKS ITS ARGUMENT LIST ONCE**, so a constant a LATER entry
+  exposes stays folded — `fileclose_stack` is `8 + K_iput`, and the `lia`
+  after it fails with "Cannot find witness", which reads as an arithmetic gap
+  and is an unfolding-order one.  Put the composite BEFORE the constant it
+  names.
+* **A `nat` PREMISE OF THE FORM `2 <= u` WANTS A `destruct`, NOT A REWRITE.**
+  `iEval (rewrite Hueq) in "Hop"` over a `set`-bound `u` silently no-ops and
+  the failure surfaces two hundred lines later as *"iSpecialize: cannot
+  instantiate … with (log_op g u)"*.  `destruct u as [| [| u2]]; [exfalso;
+  lia | exfalso; lia | ]` right after `intros` makes the shape syntactic.
+* **EVERY CALLEE NEEDS ITS `cpu_own` AT ITS OWN HART**, even one that does
+  not take the trap-CSR complement; the missing `cpu_own_transport` reports
+  *"cannot instantiate (cpu_own 0 eb … -∗ …) with (cpu_own 0 eb …)"*, the two
+  printing identically.
+* **A `true`-CROSSING CALLEE BREAKS THE trap-CSR TRANSPORT CHAIN, AND THE FIX
+  IS NOT A TRANSPORT.**  Past create / namei / ilock / itrunc / the two op
+  brackets the chain facts give only `p = zero_reg -> …`, so `wp_next_chain`
+  fails with "No applicable tactic" AT THE TRANSPORT, nowhere near the
+  callee.  At `eb = true` both complements are `emp`: hand them on as `[] []`
+  and discharge with `rewrite Heb /trap_csrs_ext; done`.
+* **AN UNUSED BINDER IN A BLOCK LEMMA IS NOT FREE.**  A `dq` the body never
+  used slid the caller's positional application by one and reported *"The
+  term V has type pprivate while it is expected to have type dfrac"*, three
+  hundred lines and two arguments away from the cause.
+* **`callee_saved` HAS THIRTEEN COMPONENTS AND s3 IS THE FIFTH**; getting the
+  `split_and!` bracket list wrong reports "No applicable tactic" at the
   bracket rather than a type error.
-
-### S7-open STEPS 3–5 — the omode BIT CLUSTER and **ALL SEVEN EXIT BLOCKS**
-### land.  What is left is the STRAIGHT-LINE BODY: `ProofSysOpen.v`,
-### `LinkSysOpen.v`, the `_CoqProject` row and the coverage flip
-
-**STEP 3 — the omode bit cluster, in `ProofSysOpenParts.v`.**  Seven
-instructions read `omode`, at four masks (+0x32 O_CREATE, +0xf6 the raw
-`beqz`, +0x90/+0x94 O_WRONLY and the `xori` that makes `f->readable`,
-+0x9c/+0xa0 the merged writable mask and its `snez`, +0xa8 O_TRUNC).  Three
-definitions over the STORED 32-bit word (`so_omv` / `so_and` / `so_rd_word`
-/ `so_wr_word`) plus the facts the walk consumes.
-
-* **gcc MERGED THE C's TWO WRITABLE DISJUNCTS INTO ONE MASK.**  The source
-  is `(omode & O_WRONLY) || (omode & O_RDWR)` and the code is a single
-  `andi 3` plus a branchless `snez` — so there is no short-circuit pair to
-  price here either, the same story as the `major` check.
-* `so_and_rdonly` is **uniform in the mask**: at `omode = 0` every mask is
-  empty, so one lemma serves all four and there is nothing mask-specific to
-  prove.
-* **THE CENTRAL THEOREM IS `so_pay_witness`**, stated in exactly
-  `FileInvDefs.inode_pay_alloc`'s shape: `fc_writable C = trunc8 (so_wr_word
-  om)` and `di_type = T_DIR -> om = 0` give `fc_wbool C = true -> ty <>
-  T_DIR`.  The else arm discharges it by one `apply`; the O_CREATE arm by
-  `so_tdir_zne` at a literal, create having been called with T_FILE.
-
-**STEPS 4+5 — `ProofSysOpenTails.v`, seven blocks, all green.**
-`so_tail_a` (+0xd2, create returned 0), `so_tail_b` (+0x10c, namei returned
-0), `so_tail_c` (+0xfc, T_DIR opened rw), `so_tail_d` (+0x116, `major` out
-of range), `so_tail_e` (+0x12e, filealloc refused), `so_tail_f` (+0x126,
-fdalloc refused), `so_tail_s` (+0xb8, the success tail).  The functor is
-`SysOpenTails (Iunlock) (Iunlockput) (EndOp) (Fileclose)`, unascribed —
-a parts layer, exactly `SysLinkTails`'s shape.
-
-* **ARM 0 IS NOT A TAIL.**  The `bltz a5` at +0x24 targets the EPILOGUE
-  directly (a0 was set to -1 at +0x22), so ARM 0 is `so_epilogue` applied in
-  the walk with no block of its own.
-* **THE SHRINK-WRAPPED SAVES ARE WHAT MAKE THESE SEVEN LEMMAS AND NOT ONE.**
-  Which of `M s1 = m s1` / `M s2 = m s2` / `M s3 = m s3` is a PREMISE and
-  which is EARNED by a `c.ldsp` differs per tail, and the slot a tail does
-  not reload rides through as the caller's junk.  E is the only failure arm
-  that earns s2; F is the only route that owns slot 5 at all — which is
-  exactly why `so_tail_e` takes the s3 agreement as a premise and F's
-  `c.ldsp s3` sits on the near side of the fall-through.
-* **TWO FALL-THROUGHS, AND THEY ARE WHY TWO LEMMAS APPLY ANOTHER.**  ARM
-  F-FAIL's block has no `c.j`: it runs off its end into +0x12e, so
-  `so_tail_f` ends by applying `so_tail_e`.  ARM S runs off its end into the
-  epilogue.
-* **ARM F's `fileclose` IS THREADED OPAQUELY** (`fileclose_env` in, its dual
-  out) rather than discharged here: `fileclose_env_none` needs the TYPE, and
-  the walk is where the type is known.  That keeps the tail free of the file
-  layer entirely.
-* **ARM S CALLS iunlock, NOT iunlockput, AND THAT IS THE LEDGER SENTENCE OF
-  THE SYSCALL.**  The `+1` is already parked in `f->ip` as `inode_pay`, so
-  what comes back is the generation-ERASED `inode_shr k s dev inum` and NOT
-  an `iref_slot`; the tail moves no bitmap, no buffer pool and no reference
-  ledger, and the retained `inode_ref_short` rides in the walk's closure.
-  a0 is a PARAMETER there (a `c.mv a0,s3` after end_op), not the failure
-  arms' `-1` literal.
-
-**WHAT IS LEFT, AND IT IS ONE FILE.**  `ProofSysOpen.v`: the straight-line
-body +0x00 → +0xb8, i.e. the prologue and frame carve, argint, argstr and
-ARM 0's branch, begin_op, the O_CREATE split (create | namei + ilock +
-the T_DIR/omode refusal), the join's T_DEVICE and `major` tests, filealloc,
-fdalloc, the FD_DEVICE / FD_INODE field stores with the R-open-1b publisher
-choreography (cancel the UNARMED cinv, write `a_fip` and `a_foff`,
-`off_hold_alloc` to re-arm, record the names in the same `fpay_tok_update`,
-`inode_pay_alloc` with `so_pay_witness`), the O_TRUNC tail, and
-`ProcInv.proc_ofiles_repay`.  Every one of its eight exits is now a single
-`iApply` of a proven block.  Then `LinkSysOpen.v`, the `_CoqProject` rows
-SAME-COMMIT, and the coverage flip (expect 185/190, sysfile.c 15/16).
-
-**Gate for steps 3–5.**  `coqc ProofSysOpenParts.v` and
-`coqc ProofSysOpenTails.v` on the mirror, `EXIT=0`, zero `Error`.
-`proof_coverage.py --check` exits 0 with the new `_CoqProject` row;
-`lemma_diff` CLEAN.  No `Link` file yet, so no `Print Assumptions` and the
-coverage count is unmoved at **184/190** (not the 183 the earlier entries
-record — the tree moved under this lane).
-
-### S7-open STEP 6 — the PUBLICATION is proven as one ghost step, and it
-### does **NOT** run at the field stores.  `so_open_slot` / `so_publish` land
-### in `ProofSysOpenParts.v`; what is left is the walk's two halves
-
-**THE FINDING, AND IT MOVES WHERE THE CHOREOGRAPHY GOES.**  Step 5's
-sketch put `inode_pay_alloc` at the `sd s1,24(s2)` at +0x88.  **It cannot
-run there.**  `inode_pay_alloc` wants the parent SHORT BY `Q` and a
-travelling share of EXACTLY `Q`, and between ilock and iunlock the share
-`s` is inside the escrow — so all the walk holds at the stores is
-`inode_ref_short_gen kk (qi + s) qi …`, the parent short by `s` with no
-`s` to pair it with.  **Shedding a fresh slice of the retained `qi` does
-not repair it**: the shed leaves the parent short by `qi/2 + s` while the
-new share is `qi/2`, and `IcacheRef.inode_held_short`'s `qt = qi' + Q`
-equation is exactly what refuses the mismatch.
-
-So **the publication runs in ARM S's CONTINUATION**, after `so_tail_s`'s
-`iunlock` has handed the share back, and what the walk carries across the
-tail is the six raw pieces (`fref_tok`, `flive_tok`, `file_fields` at the
-STORED content, `fpay_tok`, the `a_fip` half and the `a_foff` cell).  That
-also explains a clause step 5 recorded without a consumer: `so_tail_s`
-returns `IcacheRef.inode_shr kk s dev inum` **because it is the other half
-of the publication's input**, not as a courtesy.  The share comes back
-generation-ERASED (`SpecIunlock.v`:171), and
-`inode_ref_short_shr_gen_agree` against the parent the walk kept is what
-re-pins it — blocker 2's answer on the ELSE arm, the O_CREATE arm having
-been handed a generation-NAMED parent by `create_locked` already.
-
-**THE RULE.**  *A parked reference and its travelling share are pinned to
-ONE fraction by the `qt = qi + Q` equation, so a publisher can only publish
-at a moment when it holds BOTH — i.e. never while a callee has the share
-checked out.*  Check that before deciding where a payload is minted; the
-instruction where the pointer is STORED and the moment the payload can be
-BUILT are different places, and only the second one is negotiable.
-
-**WHAT LANDED** (`ProofSysOpenParts.v`, additive, both green):
-
-* `so_open_slot` — filealloc's whole reference on an untyped slot becomes
-  the six cells PLAIN, `f->ip` WHOLE.  The unarmed `off_hold_cancel_raw`
-  is what produces the invariant's half of `a_fip`, and there is nothing
-  to refute because an unarmed body carries no disjunction: blocker 1
-  spent in one line.
-* `so_publish` — the parent, the returned share, `ity_shot`, the four
-  ghost tokens and the two written cells become `file_ref gf kf 1 C`, in
-  one fupd: name the share's generation, pin it, `inode_pay_alloc` with
-  `so_pay_witness` (the walk's theorem, taken as the two premises
-  `fc_writable C = trunc8 (so_wr_word om)` and `di_type = T_DIR -> om = 0`),
-  `off_hold_alloc … true` to re-arm, and ONE `fpay_tok_update` installing
-  both cinv names.
-* a local `so_word_half_join`: the `1/2 + 1/2` join at `↦₈`, which the tree
-  has at `↦₄` (`RiscvPtsto.word4_pointsto_half`) and nowhere else.  `f->ip`
-  is the first 8-byte cell held in halves.
-* `so_trunc_ok` / `so_loaded_open` / `so_trunc_loaded` — **THE O_TRUNC
-  BRIDGE, AND sys_open IS THE FIRST CALLER THAT NEEDS IT.**  iput's itrunc
-  is followed by `di_free`, so no landed proof ever states the TRUNCATED
-  record's `inode_ok` and no landed proof rebuilds `ic_loaded` after a
-  truncate.  Both directory clauses are free because the guard at +0xae is
-  `ip->type == T_FILE` (`dir_ok_not_dir`, `dir_links_not_dir`), and the
-  rest is itrunc's own outputs (`bm_empty_wf`, `bm_empty_holes`,
-  `inode_sized_zero`, `bm_covers` vacuous at size 0).  `di_trunc` keeps
-  `type` and `nlink`, so the "type is live" clause is the caller's premise
-  verbatim.
-
-**THE TRAP THIS COST.**  `Context `{!lockG Σ}` in a file that does not
-`Require Import WpLock` is durable-notes' trap one verbatim: `lockG`
-becomes a fresh section VARIABLE (`lockG : gFunctors -> Type` printed in
-the context beside `lockG0`) and the error is a wall of `Could not find an
-instance for ?riscvGS0 / ?icacheG0 / ?lockG0` on constants that have
-nothing to do with locks.  `ProofSysOpenParts.v` reached the file layer
-without ever having needed `WpLock`; the import is now in it.
-
-**THE PLANNED SHAPE OF `ProofSysOpen.v`, and the seam.**  Two block lemmas
-plus the seal, because the JOIN AT +0x4a IS ENTERED FROM TWO PLACES and a
-single walk cannot be written straight through it:
-
-* `so_join` — +0x4a to every exit below it (ARMs D/E/F/S, the FD_DEVICE
-  block at +0x140 and the itrunc block at +0x14e).  It enters with `M s1 =
-  ientry kk`, `create_locked`'s ten conjuncts unfolded, `log_opS g u Sb`
-  at `iput_units <= u`, `iref_slots nsj`, one `fd_slot`, `proc_priv`, the
-  frame with slot 23 SPLIT (`lo` and the `omode` word), and the pure
-  premise `bv_unsigned (di_type dn) = T_DIR_z -> om = 0`.  Its exit
-  continuation is the syscall's, with `⌜used' ⊆ used⌝` (itrunc's
-  `used ∖ bm_blocks bm` is one) and `⌜nsj <= ns' <= S nsj⌝` — the failure
-  arms' `iunlockput` hands a slot BACK, the success arm parks it.
-* `so_entry` — +0x00 to the join, taking BOTH the syscall's exit
-  continuation (for ARM 0 and ARMs A/B/C) and `so_join`'s premises as a
-  second continuation.  The two are used on EXCLUSIVE branches, so one
-  linear copy of each is enough and the "chaining two halves" problem does
-  not arise.
-* `wp_sys_open_sconf` — `so_entry` with `so_join` supplied.
-
-The iref arithmetic of the seal, checked: the O_CREATE arm gets `ns'` with
-`ns - 3 <= ns' <= ns` and `S ns' <= ns` on `ok`, and the join adds at most
-one; the else arm splits `iref_slots ns` into namei's exact `2` and the
-rest, gets `1` back, so it reaches the join at `ns - 1` and leaves at
-`ns - 1` or `ns`.  Both sit inside `sys_open_post`'s
-`ns - sys_open_slots <= ns' <= ns`.
-
-**Gate for step 6.**  `coqc ProofSysOpenParts.v` and `coqc
-ProofSysOpenTails.v` on the mirror, `EXIT=0`, zero `Error`.  No `Link`
-file, so no `Print Assumptions`; coverage unmoved.
-
-**THE EXACT NEXT ACTION.**  Write `so_join` in `ProofSysOpen.v` (a functor
-over `Iunlock`, `Iunlockput`, `EndOp`, `Fileclose`, `Itrunc`, `Filealloc`,
-`Fdalloc`, instantiating `SysOpenTails` internally), statement as above;
-its body is the twenty instructions +0x4a..+0xb8 plus the two out-of-line
-blocks, `so_open_slot` right after fdalloc returns, the six stores,
-`ProcInv.proc_ofiles_repay` and `so_publish` in `so_tail_s`'s
-continuation.  Then `so_entry`, then the seal, then `LinkSysOpen.v`.
+* **A CONTRACT'S OWN `let pj := proc_addr j` DOES NOT UNIFY WITH
+  `proc_addr j` INSIDE THE PROOFMODE.**  `cbv beta delta [..._body]` followed
+  by `intros pcE pj ret_tgt …` leaves `pj` as a context definition, and Iris's
+  unifier will not see through it: a block lemma stated over `proc_addr jx`
+  then fails with two PRINTED-IDENTICAL `wp_next`s.  Reduce the lets away
+  instead — **`cbv beta zeta delta [..._body]`**, and intro no `pcE`/`pj`/
+  `ret_tgt` at all.
+* **A `wp_next` BUILT BY `iAssert` BEFORE A BRANCH IS ANCHORED AT THE
+  INNERMOST `CpuId`,** not at the section's `CID0` — durable-notes'
+  `wp_next_at` rule met in a new place.  `wp_next_shift (CIDa := CID0)` then
+  fails on two propositions that print character-for-character the same.
+  Annotate the assertion: `wp_next (CID0 := CIDn) true …`, and shift from
+  `CIDn`.
+* **`ud_tfp` NEEDS `UserPtTree` / `ProcPtOwn` IMPORTED DIRECTLY.**  A spec
+  file that Requires (rather than Exports) them lets its own statement
+  elaborate while a consumer writing `ud_tfp (pv_upt V)` gets *"The variable
+  ud_tfp was not found in the current environment"* — trap one of the
+  typeclass-sweep family, one identifier over.
 
 ### THE BUMP RE-DERIVATION (`XV6_REV` -> `f60ff58`) — **sys_open DID NOT
 ### RESHAPE.**  Every symbol-relative offset, the frame, and the register
@@ -9779,137 +9668,3 @@ free-slot home in `fslot`'s free arm (`FileInvDefs.v`:849) stands; and
 (B)'s two imports still close no cycle.  **The cone figures did not move at
 all**: 352 / 63 / 12, plus `SpecFilestat.vo` at 5.
 
-### S7-open STEP 7 — **THE JOIN AND EVERYTHING BELOW IT ARE PROVEN.**
-### `ProofSysOpen.v` carries four block lemmas; what is left is `so_entry`,
-### the seal, `LinkSysOpen.v` and the coverage flip
-
-`ProofSysOpen.v` is a functor over `Iunlock`, `Iunlockput`, `EndOp`,
-`Fileclose`, `Itrunc`, `Filealloc`, `Fdalloc`, instantiating `SysOpenTails`
-internally as `Tails`.  Four block lemmas, bottom-up, each taking the SAME
-exit continuation:
-
-* **`so_cont`** — the syscall's exit continuation, named ONCE as a
-  `CpuId -> iProp Σ`.  It is `SpecSysOpen`'s minus the two structural cells
-  the body below the join never touches (`sb_ninodes` / `sb_size`) and minus
-  the page-table report (argstr's, settled above the join), plus the join's
-  own two ledger clauses: `used' ⊆ used` and `nsj <= ns' <= S nsj`.
-* **`so_tail_pub`** (+0xb8) — ARM S, and the publication AFTER it.
-* **`so_stores`** (+0x88..+0xb4 and the +0x14e itrunc block).
-* **`so_alloc`** (+0x5e..+0x84 and the +0x140 FD_DEVICE block).
-* **`so_join`** (+0x4a..+0x5a and ARM D-FAIL).
-
-**THE T_DIR REFUSAL'S FALL-THROUGH LANDS AT +0x5e, NOT AT THE JOIN.**  The
-`c.beqz a5` at +0xfa (omode == O_RDONLY on a directory) targets **+0x5e**,
-i.e. it skips the T_DEVICE test entirely — gcc knows a T_DIR inode cannot be
-T_DEVICE.  So `so_entry` has TWO block exits below it, `so_join` at +0x4a and
-`so_alloc` at +0x5e, and both are ordinary lemma applications: the
-"chaining two halves" linear-exit problem never arises, because a block
-lemma is applied, not handed a second continuation.
-
-**FOUR TRAPS, all of which read as something else.**
-
-* **THE BRANCH-TARGET ALIGNMENT PREMISE IS NOT A `bv_eq` GOAL.**  Every
-  `*_taken` leaf carries `eq_vec (access_vec_dec tgt 0) 'b"0" = true` beside
-  its comparison, and the `pcw` (`apply bv_eq; vm_compute; reflexivity`)
-  that every other address goal in this tree takes fails there with a
-  unification error naming `bv_eq`'s own statement.  It is a plain
-  `vm_compute; reflexivity`.
-* **A `nat` PREMISE OF THE FORM `2 <= u` WANTS A `destruct`, NOT A REWRITE.**
-  itrunc's uncredited entry level is `it_entry false u2 = S (S u2)`, and
-  `iEval (rewrite Hueq) in "Hop"` over a `set`-bound `u2` leaves the
-  hypothesis at `log_op g u`; the failure surfaces two hundred lines later
-  as *"iSpecialize: cannot instantiate … with (log_op g u)"*.
-  `destruct u as [| [| u2]]; [exfalso; lia | exfalso; lia | ]` right after
-  `intros` makes the shape syntactic and costs nothing.  (`exfalso` works
-  because an Iris `Lemma`'s goal is `bi_emp_valid`-coerced, i.e. a `Prop`.)
-* **A CALLEE THAT DOES NOT TAKE THE TRAP-CSR COMPLEMENT STILL NEEDS ITS
-  `cpu_own` AT ITS OWN HART.**  filealloc and fdalloc take `cpu_own` without
-  `trap_csrs_ext` / `cpu_claim_ext`, and the missing `cpu_own_transport`
-  before the `iApply` reports *"iSpecialize: cannot instantiate
-  (cpu_own 0 eb … -∗ …) with (cpu_own 0 eb …)"* — the two print identically
-  and the only difference is the implicit hart.
-* **AN UNUSED BINDER IN A BLOCK LEMMA IS NOT FREE.**  `so_alloc` carried a
-  `dq` its body never used; the caller's positional application slid by one
-  and reported *"The term V has type pprivate while it is expected to have
-  type dfrac"*, three hundred lines and two arguments away from the cause.
-
-**WHAT IS LEFT.**  `so_entry` (+0x00 to the join: the prologue and frame
-carve, argint, argstr and ARM 0's branch to the epilogue, begin_op, the
-O_CREATE split, create | namei + ilock + the T_DIR/omode refusal, and ARMs
-A/B/C via `so_tail_a` / `so_tail_b` / `so_tail_c`), then
-`wp_sys_open_sconf` = `so_entry` sealed against `SYSOPEN`, then
-`LinkSysOpen.v`, the `_CoqProject` rows SAME-COMMIT and the coverage flip
-(expect 185/190, sysfile.c 15/16).  Gate for the seal: `Print Assumptions`
-= the standing six + `create_fresh_ty`, nothing else.
-
-### S7-open STEP 7d — the O_CREATE ARM LANDS, and with it the CONTINUATION
-### ADAPTER.  What is left is the ELSE arm, the prologue and the seal
-
-`so_cont0` names the SYSCALL's own exit continuation (at the process state
-argstr has already grown); `so_cont` is that one strengthened with the
-join's two extra clauses.  **The adapter between them is six lines inside
-`so_entry_c`** — `used'` is simply dropped (the syscall claims no bitmap
-ordering, because create allocates) and the iref interval is re-derived from
-create's `S ns' <= ns` plus the join's `ns1 <= ns'' <= S ns1`.  That guard
-is not a convenience: without it the syscall's `ns - sys_open_slots <= ns''`
-does not survive the join's `+1`.
-
-`so_entry_c` (+0x38 .. +0x48 and ARM A-FAIL) is `ProofSysMkdir`'s create
-call site with a different tail.  The T_DIR witness the join demands is
-FREE here — create was called with T_FILE and its report refutes T_DIR at a
-literal (`so_tdir_zne`).
-
-**TRAP: A `true`-CROSSING CALLEE BREAKS THE trap-CSR TRANSPORT CHAIN, AND
-THE FIX IS NOT A TRANSPORT.**  `trap_csrs_ext_transport` / `cpu_claim_ext_transport`
-need `eb = false ∨ p = zero_reg -> CIDb = CIDa`, and past a callee whose own
-`wp_next` index is the literal `true` (create, namei, ilock, itrunc, the two
-op brackets) the chain facts only give `p = zero_reg -> …`, so
-`wp_next_chain` fails with **"No applicable tactic" AT THE TRANSPORT** —
-nowhere near the callee.  At `eb = true` both complements are `emp`: hand
-them to the next block as `[] []` and discharge with
-`rewrite Heb /trap_csrs_ext; done`, exactly as `ProofSysMkdir` does across
-create.  (A `b`-crossing callee — filealloc, fdalloc — transports fine, which
-is why `so_alloc` needed no such thing.)
-
-### THE EXACT NEXT ACTION (S7-open)
-
-1. **`so_entry_n`** — the ELSE arm, +0xdc .. +0xfa, plus ARMs B-FAIL
-   (`so_tail_b`) and C-FAIL (`so_tail_c`).  Statement = `so_entry_c`'s with
-   `log_opS g MAXOPBLOCKS Sb` and `iref_slots ns` in and `so_cont0` out.
-   Its body:
-   * +0xdc `addi a0,s0,-176`; +0xe0 `jal namei` — `Namei.wp_namei_gen`, which
-     takes `iref_slots 2` EXACTLY, so split `iref_slots ns` into `2` and the
-     rest (`iref_slots_split`) and recombine after; it also takes
-     `p_cwd pj ↦₈{dqc} cwdv` + `inode_held cwdv`, i.e.
-     `ProcInv.proc_priv_split_cwd`'s payout, and the pid quarter.
-     `ProofSysLink.v`:1221 is the worked call site.
-   * +0xe4 `c.mv s1,a0`; +0xe6 `c.beqz a0 -> +0x10c` = ARM B-FAIL.
-   * +0xe8 `jal ilock` — a0 is STILL namei's return, so no reload.
-     **BLOCKER 2's ANSWER, and it is four lines:** shed namei's
-     `inode_held ipv` with `IcacheRef.inode_held_shed` (giving
-     `inode_held_short ipv s ∗ inode_shr_held ipv s` at a fresh `s`), name
-     the parent's generation with `inode_ref_short_gen_intro` and the
-     share's with `inode_shr_gen_intro`, and pin the two together with
-     `inode_ref_short_shr_gen_agree`.  ilock then takes
-     `inode_shr_gen k s dev inum g` and reports at that same `g`.
-   * +0xec `lh a4,68(s1)`; +0xf0 `c.li a5,1`; +0xf2 `bne -> +0x4a` (the
-     JOIN, via `so_join`, with the T_DIR premise discharged by
-     `so_tdir_zne`).
-   * +0xf6 `lw a5,-180(s0)`; +0xfa `c.beqz a5 -> +0x5e` — **note the
-     target: `so_alloc`, not `so_join`.**  The premise `so_join`/`so_alloc`
-     want (`di_type = T_DIR -> om = 0`) is EARNED here, by
-     `so_omode_eqz` + `so_dir_forced`.
-   * +0xfc = ARM C-FAIL (`so_tail_c`).
-2. **`so_entry`** — +0x00 .. +0x36: the prologue and `so_frame_carve`,
-   argint (`ProcInv.proc_priv_tf`, `ProofSysExit.v`:262 is the worked call
-   site — sys_exit writes the SAME shape, an `int` in a slot's upper word),
-   argstr, ARM 0's `bltz` straight to `so_epilogue`, begin_op, the
-   `lw`/`andi 512`/`c.beqz` O_CREATE split, then `so_entry_c` or `so_entry_n`.
-   The omode slot is SPLIT here (`so_omode_split`) and the split halves are
-   what every block below carries; `word_pointsto_aligned_p` takes the
-   slot-23 alignment BEFORE the split, which is the `Hal23` premise the
-   four blocks below already ask for.
-3. **`wp_sys_open_sconf`** = `so_entry` sealed against `SYSOPEN`, then
-   `LinkSysOpen.v`, the `_CoqProject` rows SAME-COMMIT and the coverage
-   flip (expect 185/190, sysfile.c 15/16).  Gate: `Print Assumptions` = the
-   standing six + `create_fresh_ty`, nothing else.
