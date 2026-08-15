@@ -13,7 +13,7 @@ diverged from the design's sketches, and what is left.
 | **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | **LANDED** |
 | **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | **LANDED** |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
-| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + the unlanded root clause + C′ | NOT STARTED |
+| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause is landed** — see below) | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | — | F1b | NOT STARTED |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
@@ -180,3 +180,110 @@ Carried forward from R9; none of it is F1a/F1b/F1.5b's to discharge.
   must stay clean. F1a and F1b introduce none.
 - `g` (the grey colour) is a discriminator NOWHERE (§4.2(c), foreclosed
   permanently by §20.18 ruling 2).
+
+## F1.5b's FIRST-CONSUMER VERDICT (S7-unlink's road test)
+
+**The constructor's SHAPE fits; its PREMISE SET does not.**  `sys_unlink`
+is F1.5b's designated first consumer and it stopped before writing a
+contract, on two facts the algebra cannot supply.  The full record is in
+[`fs-sysfile.md`](fs-sysfile.md), "S7-unlink — STOPPED"; what belongs here
+is what it asks of the campaign.
+
+### What fitted, verbatim
+
+`dir_links_unlink`'s statement is the walk's sequencing exactly:
+`memset(&de,0,16)` then `writei(dp,0,&de,off,16)` delivers the range
+clause as written (`2 <= tot <= 16`, `de_inum d = bv_0 16`, the type /
+nlink / size trio unmoved), `dirlookup`'s found arm supplies `k0` and its
+liveness (`SpecDirlookup.v:270`, `dir_first data nrec s = Some k0`), and
+the released `ilink` is precisely what `SpecIupdate.wp_iupdate_unlink`
+consumes one instruction group later.  `dir_link_at_zeroed` and
+`IregLinkNz.dir_links_nlink_drop` compose with no glue at all.  **Nothing
+in the constructor needs restating for the walk's shape.**
+
+### AMENDMENT ASKED FOR (1): the grey disjunct must carry the NAME
+
+`dir_link_at_unlink` / `dir_links_unlink` take the HOME-LIVE premise
+`bv_unsigned (di_nlink dn) <> 0`, and **sys_unlink cannot supply it.**
+Every landed consumer of `dir_link_at_live` gets that premise from a
+kernel `nlink == 0` guard walked in the same critical section — create's
+at `sysfile.c:262` (→ `ProofCreate.v:7914`), namex's at `fs.c:693` (→
+`ProofNamex.v:3315`) — and **sys_unlink has no such guard**; the walker's
+guard does not cross its `iunlock`/re-`ilock` window.
+
+What sys_unlink DOES hold is the two `namecmp` refusals, i.e. the matched
+record's name is neither `"."` nor `".."`.  A grey ticket is only ever
+§20.8's orphaned `".."`.  So the amendment is one pure conjunct inside
+`dir_link_at`'s grey disjunct — *the record's name is* `".."` — and
+`dir_links_unlink`'s home-live premise then becomes
+`dir_bname data k0 <> bname 14 ".."`, which the walk discharges from
+`SpecNamecmp`'s iff.
+
+This reverses fs-icache.md §20.17.4 sharpening (b), which chose
+name-blindness on the grounds that it is "strictly better than the
+ruling's step 5 needs".  It is strictly WORSE for the first consumer, and
+§20.17.5's shelter (iii) — refuted for `dirlink`, because `skipelem` will
+hand it `".."` — **holds for `sys_unlink`**, whose guards are explicit.
+The clause is preservable by inspection: nothing landed produces a grey in
+a `dir_links` at all (boot mints `g = 0`; `link_grey_of_link` has no
+caller), the only future producer is S7's own conversion at `ip`'s `".."`,
+and every existing constructor's range clause already gives the
+name-agreement the untouched records need.
+
+### AMENDMENT ASKED FOR (2): the `".."`-location fact needs a SUPPLIER,
+### not just a reading
+
+The T_DIR arm's `dp->nlink--` needs an `ilink dp`, whose only home is
+`ip`'s `".."` record — fs-icache.md §20.17.4's "S7's blocker", still open.
+`FsRep.fnode_dotdot` is the right READING but not a supplier: `fnode` is a
+derived predicate over client-held fragments (R3) and no payload hands one
+out, so nothing bridges "`ents ip !! ".."` is `dp`" to "record `k` of
+`ip`'s data names `dp`".  §20.17.4's own prescription — a payload conjunct
+beside `dir_links`, established at create's `dirlink(ip, "..", dp->inum)`
+— is what is missing, and it is the same conjunct amendment (1) wants for
+the grey clause.  **Both blockers close in one place.**
+
+### THE isdirempty INVARIANT, stated — and REFUTED as an invariant of the
+### landed binary
+
+R9 registers it as a prerequisite of `create_fresh_ty`'s retirement.  The
+statement it wants is, over `DirView`'s record vocabulary,
+
+```
+  bv_unsigned (di_type dn) = T_DIR_z -> bv_unsigned (di_nlink dn) = 0 ->
+    forall k, (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+      dir_live data k ->
+        dir_bname data k = bname 14 "." \/ dir_bname data k = bname 14 ".."
+```
+
+as a payload conjunct riding beside `dir_links` in `ic_loaded` /
+`ipool_alloc` — i.e. **an orphaned directory's live records are exactly
+`"."` and `".."`** — which is §20.6's itrunc-row obligation and §20.17.5's
+residue closure in one clause.
+
+**It also turns out to be sys_unlink's own INPUT premise**, not merely its
+output obligation: under it, a live record whose name is neither dot
+forces `di_nlink dp <> 0`, which is amendment (1)'s premise by another
+route.
+
+**But it is FALSE of the landed kernel, and `sys_link` is why.**
+`sys_link` does `nameiparent(new, name)` → `ilock(dp)` → `dirlink(dp,
+name, ip->inum)` with **no `dp->nlink == 0` re-check** (`sysfile.c`'s
+sys_link; contrast create's at `:262`).  namex's guard fires under the
+WALKER's lock and sys_link re-locks afterwards, so a concurrent `rmdir dp`
+in that window lets sys_link append a non-dot record to an orphaned
+directory.  The consequence is a real leak, and it is exactly the shape
+§20.6's itrunc row calls "a blocker on a reachable step": `dp` is later
+freed by `iput` → `itrunc`, which discards the record WITHOUT decrementing
+`ip->nlink`, so `ip` is never freed and its `ilink` is stranded.
+
+So F1.5d's gate needs a ruling: either the kernel gains sys_link's missing
+guard (the same one-line shape `117c0e7` gave create and `fs.c:693` gave
+namex — this is a kernel-defect candidate, filed in
+[`../kernel-defects.md`](../kernel-defects.md)), or the invariant is
+weakened to something sys_link's unguarded `dirlink` preserves.
+**Amendment (1)'s name-carrying grey clause is such a weakening** — it is
+preserved by sys_link (the record sys_link appends carries an `ilink`, not
+a grey) and it is all sys_unlink's own zeroing needs.  It does NOT
+discharge §20.6's itrunc row, which genuinely wants the full statement
+above.

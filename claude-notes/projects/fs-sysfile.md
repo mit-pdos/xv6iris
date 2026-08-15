@@ -8647,3 +8647,138 @@ is inside a leaf's PROOF BODY (one more slot in an intro pattern), so not
 one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
+
+## S7-unlink — **STOPPED BEFORE ANY WALK INSTRUCTION.**  The budget audit
+## LANDS and every arm closes; the success arm is blocked on TWO resource
+## facts, and the second of them is `sys_unlink`'s own owed invariant
+## turned round and pointed back at it.  No `Spec`/`Proof`/`Link` file was
+## written and nothing landed moved
+
+`SysUnlinkBudget.v` (+ its `_CoqProject` row) is the whole of what landed.
+`Print Assumptions` on every headline theorem in it: **closed under the
+global context**.
+
+### FINDING 0 — **`isdirempty` HAS NO SYMBOL.  It is inlined into
+### sys_unlink, so there is no `CodeIsdirempty.v`, no contract, no
+### coverage row, and never will be**
+
+`grep -i isdirempty kernel-rocq/*.v` is empty and `KernelSyms.v` names only
+`sys_unlink`.  gcc folded the whole loop into `sys_unlink+0x0f8..+0x12c`
+(`kernel.asm:11517-11540`), with its `de` buffer at `s0-232` — a DIFFERENT
+slot from the one `memset`/`writei` use at `s0-64`, because the two `de`s
+have disjoint live ranges.  So the brief's "isdirempty first, Spec/Proof/
+Link + rows" is not available: the loop is a BLOCK LEMMA inside
+`ProofSysUnlink`, its invariant is a fact about that block, and the
+coverage report cannot move for it.  **Check `KernelSyms.v` before
+budgeting a `static` helper as a function** — `isdirempty`, `skipelem` and
+`namecmp` read alike in the C and only one of them survived inlining.
+
+Two consequences worth carrying:
+
+* the loop **spends no log budget whatever**.  `readi`'s contract takes no
+  `log_op`, no `log_ctx` and no `γ : log_names` (`SpecReadi.v`'s "READI
+  MODIFIES NOTHING" banner), so however many records the directory has, no
+  arm's figure depends on its size.  That is what makes the whole ledger
+  parameter-free in the directory.
+* the loop's `readi` is EXACT (`SpecReadi`'s two-arm post), so the
+  `!= sizeof(de)` panic arm is reachable only where `16` does not divide
+  `di_size dn`.  It needs no multiple-of-16 invariant to discharge:
+  `panic_wp_any` closes it, and that arm never returns.
+
+### THE BUDGET AUDIT — every arm closes, and the corner is EXACT
+
+`SysUnlinkBudget.v`, `SysLinkBudget.v`'s style.  Ten units at `begin_op`,
+one walk, `walk_need L <= 4` at every depth.  The three things that make
+this ledger unlike sys_link's:
+
+* **ONE walk, and it runs first.**  Nothing is held while `nameiparent`
+  runs, so the ledger below it is parameterised by ONE boolean and enters
+  at nine or ten — never sys_link's seven.
+* **The zeroing pays for the whole tail.**  `wi16_post`'s membership trio
+  at `tot = 16` puts `IBLOCK dp` in the op's set, so both the T_DIR
+  `iupdate(dp)` and the `iunlockput(dp)` behind it run CREDITED.  Only
+  `ip`'s own flush is uncredited, and it has to be: `dirlookup` and the
+  isdirempty loop are pure reads, so nothing logs `IBLOCK ip` before it.
+  `su_ok_busts_without_the_membership_trio` is the refutation — relaying
+  `wi16_post`'s SPEND clause alone busts the worst corner by one.
+* **NO correlation clause is needed.**  `su_ok_uncorrelated` closes the
+  T_DIR arm at `crb = false` TOGETHER WITH `w1 = true` — the nine-unit
+  uncredited-bitmap corner `SysLinkBudget.sl_corr` exists to exclude — and
+  `su_ok_corner_is_exact` says it lands there at EXACTLY `iput_units`.
+  `su_corr` is stated anyway, and marked not-load-bearing, because a
+  tightening of `wi16_spend` would make it one.
+
+`sys_unlink_slots = 2`, not sys_link's three: sys_link's third slot is
+forced by a SECOND resolve that runs with `ip` already held, and
+sys_unlink has only one resolve, running with nothing held.
+
+### FINDING 1 — **THE ZEROING CANNOT PRODUCE ITS `ilink`.
+### `DirLinks.dir_links_unlink`'s HOME-LIVE PREMISE IS UNSUPPLIABLE, AND
+### THE ONLY LANDED SOURCE OF THAT PREMISE IS A KERNEL GUARD sys_unlink
+### DOES NOT HAVE**
+
+`dir_links_unlink` (`DirLinks.v:592`) takes
+`bv_unsigned (di_nlink dn) <> 0` of the HOME — here `dp` — and that is
+what turns the zeroed record's ticket into the `ilink ip` that
+`wp_iupdate_unlink` then consumes at `ip->nlink--`.  Without it the ticket
+is `DirLinks.dir_link_at`'s bare disjunction (`DirLinks.v:77-87`), and its
+grey branch hands back `igrey ip` plus `⌜di_nlink dp = 0⌝` — from which
+`ip->nlink--` is **unprovable**, because `SpecIupdate.wp_iupdate_unlink`
+(`SpecIupdate.v:937`) consumes an `ilink` unconditionally and nothing
+converts grey back.
+
+**Where every other consumer gets the premise: from a kernel `nlink == 0`
+guard walked in the SAME critical section.**  `ProofCreate.v:7914`'s
+`Hp3nlnz` is derived from `Hnl0`, create's own guard at
+`xv6-riscv/kernel/sysfile.c:262`; `ProofNamex.v:3315`'s `Hnl0` is namex's,
+at `xv6-riscv/kernel/fs.c:693`.  **`sys_unlink` has no such guard**
+(`sysfile.c:194-249`: `ilock(dp)` at +0x30 is followed by the two
+`namecmp`s and nothing else), and the walker's guard does not cross the
+window — namex `iunlock`s `dp` before returning it and sys_unlink re-locks
+it, so the record is a fresh existential.  This is sys_link's own recorded
+rule ("A RE-`ilock` RETURNS A FRESH RECORD, AND THE LEDGER IS THE ONLY
+THING THAT CROSSES") biting the one caller that has no ledger fragment to
+cross with.
+
+**The discriminator sys_unlink DOES have is the NAME.**  Both `namecmp`
+guards are walked before the zeroing, so the matched record's name is
+neither `"."` nor `".."` (`SpecNamecmp`'s post is an iff on
+`bname 14 f = bname 14 g`), and `dirlookup`'s found arm names the record
+(`SpecDirlookup.v:270`).  A grey ticket is only ever §20.8's orphaned
+`".."`.  So the fact that closes this is
+**"a grey record's name is `".."`"** — and `dir_link_at` is deliberately
+NAME-BLIND (fs-icache.md §20.17.4 sharpening (b) calls name-blindness
+"strictly better than the ruling's step 5 needs").  It is strictly WORSE
+for the first consumer.  See the fragment-campaign ledger for the
+amendment this asks for.
+
+### FINDING 2 — **THE T_DIR ARM'S `dp->nlink--` IS §20.17.4's RECORDED
+### "S7's BLOCKER", AND IT IS STILL OPEN**
+
+`dp->nlink--; iupdate(dp)` needs an `ilink dp`.  The only one in the
+system is inside `ip`'s `dir_links`, at the index of `ip`'s `".."`, and
+**the model has no fact placing it** — `dir_link_at` is keyed by index and
+nothing says record 1 of a directory is `".."`.  fs-icache.md §20.17.4
+files this verbatim as "S7's blocker"; `FsRep.fnode_dotdot` (F1b) is the
+fact's intended home, but `fnode` is a READING over client-held fragments
+and no payload hands one out, so the bridge from "`ents ip !! ".."` is
+`dp`" to "record `k` of `ip`'s data names `dp`" has no supplier.  The
+carrier §20.17.4 charters — a payload conjunct beside `dir_links`,
+established at create's `dirlink(ip, "..", dp->inum)` — is unwritten.
+
+Note that isdirempty NARROWS the search and does not close it: after the
+loop, `ip`'s live records are among indices 0 and 1, index 0's ticket is
+`emp` if it is the self-record — but the inum at index 1 is unconstrained
+by any landed statement, so the `ilink` it holds is for an unknown target.
+
+### WHAT IS PROVABLE TODAY, AND WHAT IS NOT
+
+Provable with what is landed: ARM A (`argstr < 0`), ARM B (`nameiparent`
+returns 0), ARMs C/D (the two `namecmp` guards and `dirlookup` returning
+0), ARM E (the `T_DIR && !isdirempty` refusal), and the whole isdirempty
+loop including its panic arm.  **Not provable: everything from the
+`writei` down, on BOTH the T_FILE and the T_DIR path** — finding 1 blocks
+the zeroing's ticket on every success arm and finding 2 blocks the T_DIR
+sub-arm on top of it.  Writing the contract before the two are ruled on
+would fix a postcondition around an arm nobody can reach, which is what
+the D₀ stops exist to prevent.

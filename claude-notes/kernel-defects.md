@@ -121,6 +121,38 @@ must be able to SAY this — the freeing-iput's iupdate is absorbed because
 logged set.  Recorded as the re-model direction in
 projects/fs-sysfile.md ("BLOCKER A, resolved").
 
+## CANDIDATE (2026-08-15, S7-unlink) — `sys_link` can append a link to an
+## ORPHANED directory, and the link is then leaked
+
+`sys_link` does `nameiparent(new, name)` -> `ilock(dp)` ->
+`dirlink(dp, name, ip->inum)` with **no `dp->nlink == 0` re-check**.
+`create` has exactly that check (`sysfile.c:262`) and `namex` has it too
+(`fs.c:693`), but namex's fires under the WALKER's lock and sys_link
+re-locks `dp` afterwards, so the guard does not cross the window:
+
+    proc A: link("/x", "f")   -- nameiparent returns dp, nlink != 0, unlocked
+    proc B: rmdir(dp's path)  -- dp is empty, so the rmdir succeeds;
+                                 dp->nlink -> 0, but proc A's reference
+                                 keeps it off the free list
+    proc A: ilock(dp); dirlink(dp, "f", ip->inum)   -- appends to an orphan
+
+`ip->nlink` was already incremented.  When `dp`'s last reference goes,
+`iput` sees `nlink == 0` and `itrunc`s it, DISCARDING the `"f"` record
+without decrementing `ip->nlink` — so `ip` is never freed.  A userspace
+loop leaks one inode per iteration.
+
+The fix is create's guard, verbatim, after sys_link's `ilock(dp)`:
+`if (dp->nlink == 0) { iunlockput(dp); goto bad; }`.
+
+**Why it matters to the proofs even though it is a leak and not a crash.**
+It is the one trace that refutes *"an orphaned directory has no live
+record but `"."` and `".."`"* — fs-icache.md §20.6's itrunc-row
+obligation, §20.17.5's residue closure, and F1.5d's gate (fs-fragments.md
+R9).  In the model the discarded record's `ilink ip` is STRANDED by
+`dir_links_size_zero`, which is precisely §20.6's "makes those unfreeable
+— a blocker on a reachable step".  Recorded with the amendment it forces
+in projects/fs-fragments-campaign.md, "F1.5b's FIRST-CONSUMER VERDICT".
+
 Fixing the C is never free: the image is pinned by `XV6_REV` in the top-level
 `Makefile` and the tracked `kernel-rocq/*.v` dumps come from that revision, so
 every proof naming an address moves. The procedure and the gate that must pass
