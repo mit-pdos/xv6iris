@@ -735,7 +735,7 @@ Section ProofFilestat.
       (* ---- PEEL the checked-out bundle for stati's metadata cells ---- *)
       rewrite /ic_loaded.
       iDestruct "Hlk" as (data)
-        "(%Hiok & %Hdok & Hdlk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+        "(%Hiok & %Hdok & %Hddix & Hdlk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
       iEval (rewrite -Hipk) in "Hmeta".
       iEval (rewrite -Hipk) in "Hidev".
       iEval (rewrite -Hipk) in "Hinum".
@@ -906,6 +906,7 @@ Section ProofFilestat.
       { rewrite /ic_loaded. iExists data.
         iSplitR; [iPureIntro; exact Hiok |].
         iSplitR; [iPureIntro; exact Hdok |].
+        iSplitR; [iPureIntro; exact Hddix |].
         iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
       (* +0x36 c.ld a0,24(s1) *)
       assert (Hpip3 : add_vec (rget mst Rs1)

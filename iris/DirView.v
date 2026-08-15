@@ -916,14 +916,14 @@ Proof. intros -> ->. exact id. Qed.
 (*  type-guarded clause is not vacuous there, it is false.  What discharges  *)
 (*  all three is the [sh zero,74(s3)] at +0x146: [ip->nlink = 0] is stored   *)
 (*  BEFORE the re-park, so what the walk rebuilds is an ORPHAN and           *)
-(*  [dir_dotdot_ix_orphan] closes it in one line at every entry, with no     *)
+(*  [dir_dots_ix_orphan] closes it in one line at every entry, with no     *)
 (*  premise threaded to the body.  The complement -- what an orphaned        *)
 (*  directory's records ARE -- is the [nlink = 0] clause riding beside this  *)
 (*  one; the two guards partition the directory case and neither weakens     *)
 (*  the other.                                                              *)
 (*                                                                          *)
 (*  IT COUNTS ITS OWN RECORDS, AND THAT IS WHAT MAKES THE PRESERVATION       *)
-(*  SELF-SUPPLYING.  [dir_dotdot_ix_dirlink] has to know the write window is *)
+(*  SELF-SUPPLYING.  [dir_dots_ix_dirlink] has to know the write window is *)
 (*  not index 1, i.e. that [dir_slot data nrec <> 1]: BELOW [nrec] the slot  *)
 (*  is free ([dir_slot_free]) while index 1 is live, and AT [nrec] the slot  *)
 (*  IS [nrec] -- which differs from 1 only because the clause carries        *)
@@ -938,18 +938,35 @@ Proof. intros -> ->. exact id. Qed.
 (*  [DirLinks.dir_links_live] -> write -> [dir_links_of_ilink] reconstructs  *)
 (*  at a [dn'] related to nothing, so every field the clause names must be   *)
 (*  one the RECONSTRUCTING caller knows of its own [dn'].  Type, nlink and   *)
-(*  size all are -- and [dir_dotdot_ix_eq] is the congruence that says so,   *)
+(*  size all are -- and [dir_dots_ix_eq] is the congruence that says so,   *)
 (*  in the form the re-parks need: nlink as an IMPLICATION and size as a     *)
 (*  BOUND, because create's [dp->nlink++] moves the first and every growing  *)
 (*  flush moves the second.                                                  *)
 (* ====================================================================== *)
 
+Definition dot_name    : list (bv 8) := [Z_to_bv 8 0x2e].
 Definition dotdot_name : list (bv 8) := [Z_to_bv 8 0x2e; Z_to_bv 8 0x2e].
 
-Definition dir_dotdot_ix (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+(*  IT PINS BOTH DOT RECORDS, AND THE SELF ONE IS NOT DECORATION.  The
+    ["."] half is what supplies the ONE fact create's [".."] establishment
+    cannot get anywhere else: [dirlink(ip, "..", dp->inum)] writes the
+    PARENT's inum into the child's record 1, and [dir_live] of that record
+    is exactly [dp->inum <> 0] -- which no landed statement provides
+    ([IcacheRef.inode_held] carries only the upper bound, and namex drops
+    [SpecDirlookup]'s own [0 < inum] when it returns an entry pointer).
+    Under this clause the parent supplies it about ITSELF: a live directory's
+    record 0 is a live ["."] naming its own inum, so [dir_dots_ix_self]
+    reads [dp->inum <> 0] straight off the payload the walk already holds.
+    That is why the clause takes [self] -- both payloads have the inum in
+    hand, so it costs no arity anywhere. *)
+Definition dir_dots_ix (self : Z) (dn : dinode)
+    (data : nat -> list (bv 8)) : Prop :=
   bv_unsigned (di_type dn) = T_DIR_z ->
   bv_unsigned (di_nlink dn) <> 0 ->
     (2 <= dir_nrec (bv_unsigned (di_size dn)))%nat
+    /\ dir_live data 0
+    /\ bv_unsigned (dir_inum data 0) = self
+    /\ bname 14 (dir_name data 0) = dot_name
     /\ dir_live data 1
     /\ bname 14 (dir_name data 1) = dotdot_name.
 
@@ -962,24 +979,163 @@ Proof.
   pose proof (Z.div_le_mono sz sz' 16 ltac:(lia) H) as Hd. lia.
 Qed.
 
-(* ---- the discharges: [dir_ok]'s four, plus the ORPHAN one the guard adds *)
+(* THE DIVIDEND, and the reason the ["."] half is carried: a live directory
+   has a NONZERO inum, said by the directory's own payload. *)
+Lemma dir_dots_ix_self (self : Z) (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = T_DIR_z -> bv_unsigned (di_nlink dn) <> 0 ->
+  dir_dots_ix self dn data -> self <> 0.
+Proof.
+  intros Hty Hnl Hd. destruct (Hd Hty Hnl) as (_ & Hlv & Hin & _).
+  rewrite <- Hin. unfold dir_live in Hlv. intro Hc. apply Hlv.
+  apply bv_eq. rewrite Hc. reflexivity.
+Qed.
 
-Lemma dir_dotdot_ix_not_dir (dn : dinode) (data : nat -> list (bv 8)) :
-  bv_unsigned (di_type dn) <> T_DIR_z -> dir_dotdot_ix dn data.
+(* ====================================================================== *)
+(*  THE COMPLEMENT CLAUSE: what an ORPHANED directory's records ARE.       *)
+(*                                                                        *)
+(*  [dir_dots_ix] speaks only under [nlink <> 0]; this one speaks only     *)
+(*  under [nlink = 0], and between them the directory case is partitioned  *)
+(*  with no overlap and no gap.  An orphaned directory holds nothing but   *)
+(*  its own two dot records -- true of THIS binary because sys_link's      *)
+(*  orphan guard (xv6 f60ff58, ARM E2) refuses to [dirlink] into a         *)
+(*  directory whose count has already fallen to zero.                      *)
+(*                                                                        *)
+(*  IT CARRIES THREE LOADS AT ONCE (fs-icache §20.6's itrunc row,          *)
+(*  §20.17.5's residue, and sys_unlink's own input premise): a live        *)
+(*  NON-dot record under it forces the home's count nonzero, which is      *)
+(*  exactly [DirLinks.dir_links_unlink]'s home-live premise -- the fact    *)
+(*  S7 could not otherwise supply, since its walker's guard does not cross *)
+(*  the [iunlock]/re-[ilock] window.                                       *)
+(*                                                                        *)
+(*  THE CONTENT IS SPLIT OUT AS [dir_dots_only] because that is the form   *)
+(*  a WALK carries: create's [fail:] twin takes the child at [nlink = 1]   *)
+(*  and parks it at [nlink = 0], so a guarded premise would be vacuous on  *)
+(*  the way in and demanded on the way out.  The bound is [dir_nrec], and  *)
+(*  it is what makes the three [fail:] entries discharge -- at nrec 0 and  *)
+(*  1 there is nothing or only [","]'s slot to check.                      *)
+(* ====================================================================== *)
+
+Definition dir_dots_only (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  forall k : nat, (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_live data k ->
+    bname 14 (dir_name data k) = dot_name
+    \/ bname 14 (dir_name data k) = dotdot_name.
+
+Definition dir_orphan_clean (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  bv_unsigned (di_nlink dn) = 0 ->
+    dir_dots_only dn data.
+
+(* ---- its discharges, the same shape as the sibling clause's ---------- *)
+
+Lemma dir_orphan_clean_not_dir (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z -> dir_orphan_clean dn data.
 Proof. intros H Hc _. exfalso. exact (H Hc). Qed.
 
-Lemma dir_dotdot_ix_free (dn : dinode) (data : nat -> list (bv 8)) :
-  bv_unsigned (di_type dn) = 0 -> dir_dotdot_ix dn data.
+Lemma dir_orphan_clean_free (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = 0 -> dir_orphan_clean dn data.
 Proof.
-  intros H. apply dir_dotdot_ix_not_dir. rewrite H. unfold T_DIR_z. lia.
+  intros H. apply dir_orphan_clean_not_dir. rewrite H. unfold T_DIR_z. lia.
+Qed.
+
+(* THE LIVE DISCHARGE, the exact mirror of [dir_dots_ix_orphan]: a
+   directory somebody still names says nothing here. *)
+Lemma dir_orphan_clean_live (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) <> 0 -> dir_orphan_clean dn data.
+Proof. intros H _ Hc. exfalso. exact (H Hc). Qed.
+
+(* ...and the size-zero one, which is what a truncated corpse and a claim
+   box both are ([fresh_shape]'s [di_size = 0]). *)
+Lemma dir_orphan_clean_size_zero (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_size dn) = 0 -> dir_orphan_clean dn data.
+Proof.
+  intros H _ _ k Hk. rewrite H in Hk.
+  change (dir_nrec 0) with 0%nat in Hk. lia.
+Qed.
+
+(* the CONTENT form is what walks carry, so it needs the same two movers *)
+Lemma dir_dots_only_of (dn dn' : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_size dn') = bv_unsigned (di_size dn) ->
+  dir_dots_only dn data -> dir_dots_only dn' data.
+Proof. intros Hsz Hd k Hk. rewrite Hsz in Hk. exact (Hd k Hk). Qed.
+
+Lemma dir_orphan_clean_of_only (dn : dinode) (data : nat -> list (bv 8)) :
+  dir_dots_only dn data -> dir_orphan_clean dn data.
+Proof. intros H _ _. exact H. Qed.
+
+(* the DIRLINK mover: a link into an orphan is what sys_link's guard makes
+   unreachable, so the clause only has to survive a link into a LIVE
+   directory -- where it is vacuous on both sides.  Stated over the content
+   for the walk that appends to a directory it is about to orphan (create's
+   [fail:] twin writes nothing after the store, so this is the shape the
+   three entries need): a new record at [k0] is one of the two dot names,
+   or the count did not reach it. *)
+Lemma dir_dots_only_dirlink (dn dn' : dinode)
+    (data data' : nat -> list (bv 8))
+    (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
+  nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+  k0 = dir_slot data nrec ->
+  (dir_nrec (bv_unsigned (di_size dn')) <= S k0)%nat ->
+  (s = dot_name \/ s = dotdot_name) ->
+  (length s <= 14)%nat -> nonul s ->
+  (16 <= tot)%nat ->
+  (forall x : nat,
+     file_byte data' x
+     = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+       then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+       else file_byte data x) ->
+  dir_dots_only dn data ->
+  dir_dots_only dn' data'.
+Proof.
+  intros Hnrec Hk0 Hle Hs Hlen Hnn Htot Hrng Hd k Hk Hlv.
+  destruct (decide (k = k0)) as [-> | Hne].
+  - (* the written record IS one of the two names *)
+    assert (Hb : forall j, (j < 16)%nat ->
+              file_byte data' (16 * k0 + j)%nat
+              = dirent_bytes (de_of_name inum s) !!! j).
+    { intros j Hj. rewrite (Hrng (16 * k0 + j)%nat).
+      rewrite decide_True; [| lia].
+      replace (16 * k0 + j - 16 * k0)%nat with j by (clear -j; lia).
+      reflexivity. }
+    destruct (dir_record_of_name data' k0 inum s Hlen Hnn Hb) as [_ Hn].
+    rewrite Hn. exact Hs.
+  - (* every other record is BELOW the old count and rode through *)
+    assert (Hwin : dir_win_agree data data' k).
+    { intros j Hj. rewrite (Hrng (16 * k + j)%nat).
+      rewrite decide_False; [reflexivity |]. intros [Hlo Hhi].
+      apply Hne. lia. }
+    (* [k <> k0] and [k] is below the new count, which reaches at most one
+       past the write -- so [k] is below the OLD count, where the incoming
+       clause speaks.  [dir_slot_le] is the only fact needed. *)
+    assert (Hlt : (k < nrec)%nat).
+    { pose proof (dir_slot_le data nrec) as Hsle.
+      rewrite <- Hk0 in Hsle. clear -Hk Hle Hne Hsle. lia. }
+    rewrite Hnrec in Hlt.
+    rewrite (dir_bname_agree data data' k Hwin).
+    apply (Hd k Hlt). unfold dir_live in Hlv |- *.
+    rewrite <- (dir_inum_agree data data' k Hwin). exact Hlv.
+Qed.
+
+(* ---- the discharges: [dir_ok]'s four, plus the ORPHAN one the guard adds *)
+
+Lemma dir_dots_ix_not_dir (self : Z) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z -> dir_dots_ix self dn data.
+Proof. intros H Hc _. exfalso. exact (H Hc). Qed.
+
+Lemma dir_dots_ix_free (self : Z) (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = 0 -> dir_dots_ix self dn data.
+Proof.
+  intros H. apply dir_dots_ix_not_dir. rewrite H. unfold T_DIR_z. lia.
 Qed.
 
 (* THE ORPHAN DISCHARGE -- create's three [fail:] entries, and iput's
    post-itrunc park.  A directory nobody names has nothing to say about its
-   [".."], which is exactly the state the [nlink = 0] sibling clause
+   dot records, which is exactly the state the [nlink = 0] sibling clause
    describes instead. *)
-Lemma dir_dotdot_ix_orphan (dn : dinode) (data : nat -> list (bv 8)) :
-  bv_unsigned (di_nlink dn) = 0 -> dir_dotdot_ix dn data.
+Lemma dir_dots_ix_orphan (self : Z) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) = 0 -> dir_dots_ix self dn data.
 Proof. intros H _ Hc. exfalso. exact (Hc H). Qed.
 
 (* THE CONGRUENCE over the three fields the clause names, and it takes the
@@ -991,30 +1147,30 @@ Proof. intros H _ Hc. exfalso. exact (Hc H). Qed.
    from its own [dp->nlink != 0] guard (sysfile.c:262) rather than from any
    equation, which an equality could not express.  All-equal is the
    degenerate case. *)
-Lemma dir_dotdot_ix_eq (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
+Lemma dir_dots_ix_eq (self : Z) (dn dn' : dinode)
+    (data data' : nat -> list (bv 8)) :
   di_type dn' = di_type dn ->
   (bv_unsigned (di_nlink dn') <> 0 -> bv_unsigned (di_nlink dn) <> 0) ->
   bv_unsigned (di_size dn) <= bv_unsigned (di_size dn') ->
   data = data' ->
-  dir_dotdot_ix dn data -> dir_dotdot_ix dn' data'.
+  dir_dots_ix self dn data -> dir_dots_ix self dn' data'.
 Proof.
   intros Hty Hnl Hsz <- Hd Hdir' Hnl'.
   assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z)
     by (rewrite <- Hty; exact Hdir').
-  destruct (Hd Hdir (Hnl Hnl')) as (Hnrec & Hlive & Hnm).
-  split; [| split; [exact Hlive | exact Hnm]].
-  pose proof (dir_nrec_mono _ _ Hsz). lia.
+  destruct (Hd Hdir (Hnl Hnl')) as (Hnrec & Hrest).
+  split; [| exact Hrest]. pose proof (dir_nrec_mono _ _ Hsz). lia.
 Qed.
 
 (* ...and the one that makes it FREE across every append, WITH NO COUNT
-   PREMISE.  [dir_slot] never returns a LIVE record ([dir_slot_free]) and the
-   conjunct's own second half says record 1 IS live, so below [nrec] the
-   window cannot be index 1; AT [nrec] it cannot be either, because the
-   conjunct's FIRST half says [2 <= nrec].  The record then rides on the
+   PREMISE.  [dir_slot] never returns a LIVE record ([dir_slot_free]) and
+   the clause's own halves say records 0 AND 1 are live, so below [nrec] the
+   window can be neither; AT [nrec] it cannot be either, because the
+   clause's FIRST half says [2 <= nrec].  Both records then ride on the
    range clause untouched and the count rides on the size, which a dirlink
-   only grows.  The conjunct preserves ITSELF -- every premise below is one
+   only grows.  The clause preserves ITSELF -- every premise below is one
    the writing caller already holds about its own two records. *)
-Lemma dir_dotdot_ix_dirlink (dn dn' : dinode)
+Lemma dir_dots_ix_dirlink (self : Z) (dn dn' : dinode)
     (data data' : nat -> list (bv 8))
     (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
   nrec = dir_nrec (bv_unsigned (di_size dn)) ->
@@ -1028,32 +1184,41 @@ Lemma dir_dotdot_ix_dirlink (dn dn' : dinode)
      = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
        then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
        else file_byte data x) ->
-  dir_dotdot_ix dn data ->
-  dir_dotdot_ix dn' data'.
+  dir_dots_ix self dn data ->
+  dir_dots_ix self dn' data'.
 Proof.
   intros Hnrec Hk0 Htot Hty Hnl Hsz Hrng Hd Hdir' Hnl'.
   assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z)
     by (rewrite <- Hty; exact Hdir').
   assert (Hnlz : bv_unsigned (di_nlink dn) <> 0)
     by (rewrite <- Hnl; exact Hnl').
-  destruct (Hd Hdir Hnlz) as (Hnrec2 & Hlive & Hnm).
+  destruct (Hd Hdir Hnlz) as (Hnrec2 & Hlv0 & Hin0 & Hnm0 & Hlv1 & Hnm1).
   rewrite <- Hnrec in Hnrec2.
-  (* THE WINDOW MISSES INDEX 1, and BOTH halves of the conjunct are what
-     make it: [dir_slot] never returns a LIVE record below [nrec], and at
-     [nrec] the count itself is what separates the slot from index 1. *)
-  assert (Hne : k0 <> 1%nat).
-  { intro Hc.
+  (* THE WINDOW MISSES BOTH DOT RECORDS, and every half of the clause is
+     what makes it: [dir_slot] never returns a LIVE record below [nrec], and
+     at [nrec] the count itself is what separates the slot from 0 and 1. *)
+  assert (Hne : forall k : nat, (k < 2)%nat -> k0 <> k).
+  { intros k Hk Hc.
     assert (Hlt : (dir_slot data nrec < nrec)%nat)
       by (rewrite <- Hk0; rewrite Hc; lia).
     pose proof (dir_slot_free data nrec Hlt) as Hfree.
-    rewrite <- Hk0 in Hfree. rewrite Hc in Hfree. exact (Hlive Hfree). }
-  assert (Hwin : dir_win_agree data data' 1).
-  { intros j Hj. rewrite (Hrng (16 * 1 + j)%nat).
-    rewrite decide_False; [reflexivity |]. intros [Hlo Hhi]. apply Hne. lia. }
-  split; [| split].
-  - pose proof (dir_nrec_mono _ _ Hsz). lia.
-  - unfold dir_live. rewrite (dir_inum_agree data data' 1 Hwin). exact Hlive.
-  - rewrite (dir_bname_agree data data' 1 Hwin). exact Hnm.
+    rewrite <- Hk0 in Hfree. rewrite Hc in Hfree.
+    destruct k as [| k]; [exact (Hlv0 Hfree) |].
+    destruct k as [| k]; [exact (Hlv1 Hfree) | lia]. }
+  assert (Hwin : forall k : nat, (k < 2)%nat -> dir_win_agree data data' k).
+  { intros k Hk j Hj. rewrite (Hrng (16 * k + j)%nat).
+    rewrite decide_False; [reflexivity |]. intros [Hlo Hhi].
+    apply (Hne k Hk). lia. }
+  pose proof (Hwin 0%nat ltac:(lia)) as Hw0.
+  pose proof (Hwin 1%nat ltac:(lia)) as Hw1.
+  split; [pose proof (dir_nrec_mono _ _ Hsz); lia |].
+  split; [unfold dir_live; rewrite (dir_inum_agree data data' 0 Hw0);
+          exact Hlv0 |].
+  split; [rewrite (dir_inum_agree data data' 0 Hw0); exact Hin0 |].
+  split; [rewrite (dir_bname_agree data data' 0 Hw0); exact Hnm0 |].
+  split; [unfold dir_live; rewrite (dir_inum_agree data data' 1 Hw1);
+          exact Hlv1 |].
+  rewrite (dir_bname_agree data data' 1 Hw1). exact Hnm1.
 Qed.
 
 (* ====================================================================== *)

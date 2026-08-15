@@ -3124,7 +3124,7 @@ Section ProofNamexMain.
                    destruct HmilR as (Y2 & Y8 & Y9 & Y19 & Y20 & Y21 & Y22
                                       & Y23 & Y24 & Y25 & Ythr).
                    iDestruct "Hload" as (datl)
-                     "(%Hiok & %Hdok & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
+                     "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
                        Hblocks)".
                    iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
                    iEval (rewrite /i_type) in "Hity".
@@ -3257,6 +3257,7 @@ Section ProofNamexMain.
                      { rewrite /ic_loaded. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
                        iSplitR; [iPureIntro; exact Hdok |].
+                       iSplitR; [iPureIntro; exact Hddix |].
                        iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                        iFrame "Hdiat".
                        iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -3589,6 +3590,7 @@ Section ProofNamexMain.
                        { rewrite /ic_loaded. iExists datl.
                          iSplitR; [iPureIntro; exact Hiok |].
                          iSplitR; [iPureIntro; exact Hdok |].
+                         iSplitR; [iPureIntro; exact Hddix |].
                          iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                          iFrame "Hdiat".
                          iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -3923,6 +3925,7 @@ Section ProofNamexMain.
                          { rewrite /ic_loaded. iExists datl.
                            iSplitR; [iPureIntro; exact Hiok |].
                            iSplitR; [iPureIntro; exact Hdok |].
+                           iSplitR; [iPureIntro; exact Hddix |].
                            iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                            iFrame "Hdiat Hmeta Haddrs Hind Hblocks". }
                          iDestruct (nx_bs3_join bn with "Hbs1 Hbs2") as "Hbslot".
@@ -4509,6 +4512,7 @@ Section ProofNamexMain.
                      { rewrite /ic_loaded. iExists datl.
                        iSplitR; [iPureIntro; exact Hiok |].
                        iSplitR; [iPureIntro; exact Hdok |].
+                       iSplitR; [iPureIntro; exact Hddix |].
                        iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                        iFrame "Hdiat".
                        iSplitL "Hity Himaj Himin Hinl Hisz".

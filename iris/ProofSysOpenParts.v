@@ -776,7 +776,8 @@ Section ProofSysOpenPublish.
       inode_map gfs (ientry k) bm ∗
       inode_blocks gfs bm data.
   Proof.
-    iIntros "(%data & %Hok & %Hdir & Hlnk & Hat & Hmeta & Haddr & Hind & Hblk)".
+    iIntros "(%data & %Hok & %Hdir & %Hddix & Hlnk & Hat & Hmeta & Haddr & Hind
+              & Hblk)".
     iExists data. iFrame "%". iFrame "Hlnk Hat Hmeta Hblk".
     rewrite /inode_map. iFrame "Haddr Hind".
   Qed.
@@ -798,6 +799,8 @@ Section ProofSysOpenPublish.
               (fun _ => replicate BSIZE (bv_0 8))
               (so_trunc_ok cov logstart dn Hnz)
               (dir_ok_not_dir icfg_nib (di_trunc dn) _
+                 ltac:(rewrite Hty; exact Hnd))
+              (dir_dots_ix_not_dir (bv_unsigned inum) (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
               with "[] Hat Hmeta Haddr Hind Hblk").
     iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).

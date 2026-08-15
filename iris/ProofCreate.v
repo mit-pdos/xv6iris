@@ -1074,6 +1074,22 @@ Proof.
   split; [exact Hi | rewrite Hn; exact cr_dot_name].
 Qed.
 
+(* the index-1 analogue, and what ESTABLISHES the [".."] half of
+   [DirView.dir_dots_ix]: [dirlink(ip, "..", dp->inum)] writes record 1
+   whole, so its inum is the parent's and its name is [".."]. *)
+Lemma cr_dotdot_record (data : nat -> list (bv 8)) (i : bv 16) :
+  (forall j, (j < 16)%nat ->
+     file_byte data (16 * 1 + j)%nat
+     = dirent_bytes (de_of_name i (bname 14 cr_dotdot_f)) !!! j) ->
+  dir_inum data 1 = i /\ bname 14 (dir_name data 1) = dotdot_name.
+Proof.
+  intro Hb.
+  destruct (dir_record_of_name data 1 i (bname 14 cr_dotdot_f)
+              (bname_length_le 14 cr_dotdot_f)
+              (cut_nul_nonul (bview 14 cr_dotdot_f)) Hb) as [Hi Hn].
+  split; [exact Hi | rewrite Hn; exact cr_dotdot_name].
+Qed.
+
 Lemma cr_first_miss_dotdot (data : nat -> list (bv 8)) (i : bv 16) :
   (forall j, (j < 16)%nat ->
      file_byte data (16 * 0 + j)%nat
@@ -1793,6 +1809,7 @@ Section ProofCreateMain.
           di_nlink dn <> (mword_of_int 32767 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dn bm data⌝ -∗
        ⌜dir_ok nib dn data⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned dind) dn data⌝ -∗
        ⌜exists es e, nameiparent_of (bview plen pfun) es e
                      /\ bname 14 nf = e⌝ -∗
        ⌜dir_first data (dir_nrec (bv_unsigned (di_size dn)))
@@ -1924,6 +1941,7 @@ Section ProofCreateMain.
        ⌜di_nlink dn <> (mword_of_int 32767 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dn bm data⌝ -∗
        ⌜dir_ok nib dn data⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned dind) dn data⌝ -∗
        ⌜exists es e, nameiparent_of (bview plen pfun) es e
                      /\ bname 14 nf = e⌝ -∗
        ⌜dir_first data (dir_nrec (bv_unsigned (di_size dn)))
@@ -2056,6 +2074,7 @@ Section ProofCreateMain.
        ⌜di_nlink dn <> (mword_of_int 0 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dn bm data⌝ -∗
        ⌜dir_ok nib dn data⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned dind) dn data⌝ -∗
        (* the child *)
        ⌜(kslot < NINODE)%nat⌝ -∗
        ⌜0 < bv_unsigned cinum < ninodes⌝ -∗
@@ -2754,7 +2773,8 @@ Section ProofCreateMain.
       iDestruct (ity_shot_agree with "Hshotd Hshotl") as %Htyd.
       assert (Htydir : di_type dnl = SpecDirlookup.T_DIR) by (symmetry; exact Htyd).
       iDestruct "Hload" as (datl)
-        "(%Hiok & %Hdok & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks)".
+        "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
+          Hblocks)".
       iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
       iEval (rewrite /i_nlink) in "Hinl".
       (* ===== +0x2a lh a5,74(s1) : dp->nlink -- THE GUARD (9da28f5) ==== *)
@@ -2808,7 +2828,7 @@ Section ProofCreateMain.
           with "[Hity Himaj Himin Hinl Hisz]" as "Hmetal".
         { rewrite /inode_meta /i_type /i_nlink. iFrame. }
         iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dnl bml datl
-                     Hiok Hdok
+                     Hiok Hdok Hddix
                      with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks")
           as "Hload".
         iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
@@ -3263,7 +3283,7 @@ Section ProofCreateMain.
             by (rewrite /F3; apply cr_regs_caller; [exact Hcsra | exact HF2regs]).
           iDestruct "Hmap" as "[Haddrs Hind]".
           iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dnl bml datl
-                       Hiok Hdok
+                       Hiok Hdok Hddix
                        with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks")
             as "Hload".
           iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
@@ -3619,7 +3639,8 @@ Section ProofCreateMain.
              iPoseProof (cri_06a with "Htext") as "Hi06a".
              iPoseProof (cri_06c with "Htext") as "Hi06c".
              iDestruct "Hcload" as (datc)
-               "(%Hciok & %Hcdok & Hcdlnk & Hcdiat & Hcmeta & Hcaddrs & Hcind &
+               "(%Hciok & %Hcdok & %Hcddix & Hcdlnk & Hcdiat & Hcmeta & Hcaddrs
+                 & Hcind &
                  Hcblocks)".
              iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
              iEval (rewrite /i_type) in "Hcity".
@@ -3774,7 +3795,7 @@ Section ProofCreateMain.
                with "[Hcity Hcimaj Hcimin Hcinl Hcisz]" as "Hcmetal".
              { rewrite /inode_meta /i_type. iFrame. }
              iDestruct (ic_mk_loaded γfs γi cov logstart kslot cinum dnc bmc
-                          datc Hciok Hcdok
+                          datc Hciok Hcdok Hcddix
                           with "Hcdlnk Hcdiat Hcmetal Hcaddrs Hcind Hcblocks")
                as "Hcload".
              destruct (zopz0zI_u (mword_of_int 1 : mword 64)
@@ -3918,7 +3939,7 @@ Section ProofCreateMain.
           iApply ("Ha" $! A1 u5 kd qd gd gild gisld dind dnl bml datl nfp nf0
                     n1 Sb1 used1 w
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                          [%]
+                          [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                           Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                           Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -3932,6 +3953,7 @@ Section ProofCreateMain.
           { exact Hnlmax. }
           { exact Hiok. }
           { rewrite Hnib. exact Hdok. }
+          { exact Hddix. }
           { exact Hnpname. }
           { exact Hnone. }
           { exact Hsb1. }
@@ -3959,7 +3981,7 @@ Section ProofCreateMain.
           with "[Hity Himaj Himin Hinl Hisz]" as "Hmetal".
         { rewrite /inode_meta /i_type /i_nlink. iFrame. }
         iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dnl bml datl
-                     Hiok Hdok
+                     Hiok Hdok Hddix
                      with "Hdlnk Hdiat Hmetal Haddrs Hind Hblocks")
           as "Hload".
         iDestruct (cr_bs3 bn with "[Hbs1 Hbs2]") as "Hbsl";
@@ -4473,7 +4495,7 @@ Section ProofCreateMain.
                  with "Htext") as "#Htail".
     iIntros (CIDa Hsa).
     iIntros (Ma w5 kd qd gd γil γisl dind dn bm data nf nsl n1 Sb1 used1 w).
-    iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok %Hnpname
+    iIntros "%HAregs %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok %Hddix %Hnpname
              %Hnone %Hsb1 %Hwmem %Hnp1 %Husd1".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
@@ -4551,7 +4573,8 @@ Section ProofCreateMain.
       pose proof HMoregs as HMoR.
       destruct HMoR as (M2 & M8 & M9 & M18 & M19 & M20 & M21 & M22 & Mthr).
       iDestruct "Hcload" as (datc)
-        "(%Hciok & %Hcdok & Hcdlnk & Hcdiat & Hcmeta & Hcaddrs & Hcind &
+        "(%Hciok & %Hcdok & %Hcddix & Hcdlnk & Hcdiat & Hcmeta & Hcaddrs
+          & Hcind &
           Hcblocks)".
       iDestruct "Hcmeta" as "(Hcity & Hcimaj & Hcimin & Hcinl & Hcisz)".
       iEval (rewrite /i_major) in "Hcimaj".
@@ -4772,7 +4795,7 @@ Section ProofCreateMain.
                   (S q2) (Sb1 ∪ {[IBLOCK cinum inodestart]}
                           ∪ {[IBLOCK cinum inodestart]}) used1
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                        [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+                        [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                         Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -4789,6 +4812,7 @@ Section ProofCreateMain.
         { exact (Hnlmax Htdir). }
         { exact Hiok. }
         { exact Hdok. }
+        { exact Hddix. }
         { exact Hnpname. }
         { exact Hnone. }
         { exact Hkslt. }
@@ -5124,6 +5148,16 @@ Section ProofCreateMain.
                by exact (dir_ok_dirlink nib dn dn' data data' (cr_low16 cinum)
                            (bname 14 nf) _ _ tot eq_refl eq_refl Htot16
                            Hcl16b Hty' Hszmax Hrng Hdok).
+             (* ...and the dot records across the same write: the window is
+                [dir_slot], which the clause's own liveness at 0 and 1 keeps
+                away from both, and the count rides on [Hszmax]. *)
+             assert (Hszle : bv_unsigned (di_size dn)
+                             <= bv_unsigned (di_size dn'))
+               by (clear -Hszmax; rewrite Hszmax; lia).
+             assert (Hddix' : dir_dots_ix (bv_unsigned dind) dn' data')
+               by exact (dir_dots_ix_dirlink (bv_unsigned dind) dn dn'
+                           data data' (cr_low16 cinum) (bname 14 nf) _ _ tot
+                           eq_refl eq_refl Htot16 Hty' Hnl' Hszle Hrng Hddix).
              (* NOT [ic_mk_loaded]: [Hdiat]/[Hmeta] are stated at [dn0'], one
                 rewrite short of the goal's [dn'], so the assembly stays
                 inline here.  Only the tail -- [inode_addrs]/[ind_res]/
@@ -5134,6 +5168,7 @@ Section ProofCreateMain.
              { rewrite /ic_loaded. iExists data'.
                iSplitR; [iPureIntro; exact Hiok' |].
                iSplitR; [iPureIntro; rewrite -Hnib; exact Hdok' |].
+               iSplitR; [iPureIntro; exact Hddix' |].
                iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                rewrite (Hdn0' eq_refl). iFrame "Hdiat Hmeta".
                iEval (rewrite /inode_map) in "Hmap".
@@ -5364,6 +5399,9 @@ Section ProofCreateMain.
                           (cr_setf_inode_ok cov logstart dnc bmc datc major minor
                              _ Hciok)
                           (cr_setf_dir_ok icfg_nib dnc datc major minor _ Hcdok)
+                          (dir_dots_ix_not_dir (bv_unsigned cinum)
+                             (cr_setf dnc major minor (mword_of_int 1 : mword 16))
+                             datc ltac:(rewrite cr_setf_type; exact Htdirz))
                           with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks")
                as "Hcload".
              iAssert (ity_shot g (di_type (cr_setf dnc major minor
@@ -5406,7 +5444,7 @@ Section ProofCreateMain.
                        bm' data' dn' dn0' tot n' Sb' used'
                        with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                              [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                             [%] [%] [%] [%] [%] [%]
+                             [%] [%] [%] [%] [%] [%] [%]
                              Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                              Hnb14 Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                              Hivalid Hdlnk Hdiat Hmeta Hmap Hblocks Hshotl
@@ -5422,6 +5460,7 @@ Section ProofCreateMain.
              { exact Hnl0. }
              { exact Hiok. }
              { exact Hdok. }
+             { exact Hddix. }
              { exact Hkslt. }
              { exact Hcpos. }
              { exact Hcinb. }
@@ -5515,8 +5554,9 @@ Section ProofCreateMain.
       iEval (rewrite /inode_map) in "Hmap".
       iDestruct "Hmap" as "[Haddrs Hind]".
       assert (Hdok2 : dir_ok icfg_nib dn data) by (rewrite -Hnib; exact Hdok).
+      pose proof Hddix as Hddix2.
       iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dn bm data
-                   Hiok Hdok2
+                   Hiok Hdok2 Hddix2
                    with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks")
         as "Hload".
       iDestruct (cpu_own_transport CIDo CIDF2 0%nat eb (proc_addr j) b
@@ -5751,7 +5791,7 @@ Section ProofCreateMain.
     iIntros (CIDf Hsf).
     iIntros (Mx kslot q g gil gisl cinum dnc bmc datc bm' data' dn' dn0'
              tot n4 Sb4 used4).
-    iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hkslt
+    iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hddix %Hkslt
              %Hcpos %Hcinb %Hfresh %Htyc %Hciok %Hcdok %Htot0 %Hwf' %Hholes'
              %Haddr' %Hsz31' %Hcov' %Hszcap' %Hsized' %Hdn' %Hdn0' %Hrng
              %Hsb4 %Hmem4 %Hn4 %Hledge".
@@ -5958,6 +5998,9 @@ Section ProofCreateMain.
                  (cr_setf_inode_ok cov logstart dnc bmc datc major minor
                     _ Hciok)
                  (cr_setf_dir_ok icfg_nib dnc datc major minor _ Hcdok')
+                 (dir_dots_ix_orphan (bv_unsigned cinum)
+                    (cr_setf dnc major minor (mword_of_int 0 : mword 16)) datc
+                    ltac:(rewrite cr_setf_nlink; vm_compute; reflexivity))
                  with "Hcdlnk1 Hcdiat Hcmeta Hca Hci Hcblocks")
       as "Hcload".
     iAssert (ity_shot g (di_type (cr_setf dnc major minor
@@ -6115,9 +6158,16 @@ Section ProofCreateMain.
       exact (dir_ok_dirlink nib dn dn' data data' (cr_low16 cinum)
                (bname 14 nf) _ _ 0%nat eq_refl eq_refl ltac:(lia) Hcl16b
                Hty' Hszmax Hrng Hdok). }
+    assert (Ht0le : (0 <= 16)%nat) by (clear; lia).
+    assert (Hszle : bv_unsigned (di_size dn) <= bv_unsigned (di_size dn'))
+      by (clear -Hszmax; rewrite Hszmax; lia).
+    assert (Hddix' : dir_dots_ix (bv_unsigned dind) dn' data')
+      by exact (dir_dots_ix_dirlink (bv_unsigned dind) dn dn' data data'
+                  (cr_low16 cinum) (bname 14 nf) _ _ 0%nat eq_refl eq_refl
+                  Ht0le Hty' Hnl' Hszle Hrng Hddix).
     iDestruct "Hmap" as "[Haddrs Hind]".
     iDestruct (ic_mk_loaded γfs γi cov logstart kd dind dn' bm' data'
-                 Hiok' Hdok'
+                 Hiok' Hdok' Hddix'
                  with "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks")
       as "Hload".
     iAssert (ity_shot gd (di_type dn')) as "#Hshotl'".
@@ -6335,6 +6385,7 @@ Section ProofCreateMain.
        ⌜di_nlink dp <> (mword_of_int 0 : mword 16)⌝ -∗
        ⌜inode_ok cov logstart dp bmp datap⌝ -∗
        ⌜dir_ok nib dp datap⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned dind) dp datap⌝ -∗
        (* THE CHILD, as an ABSTRACT record: what the three entries share is
           not its size (0, 1 or 2 records) but its FIELDS -- the three [sh]s
           at +0xb4/+0xb8/+0xbe put [major]/[minor]/1 there and no dirlink
@@ -6491,7 +6542,7 @@ Section ProofCreateMain.
     iIntros (CIDf Hsf).
     iIntros (Mx kslot q g gil gisl cinum dp bmp datap dc bmc datc
              n4 Sb4 used4).
-    iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hkslt
+    iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hiok %Hdok %Hddix %Hkslt
              %Hcpos %Hcinb %Htyc %Hcmaj %Hcmin %Hcnl1 %Hciok %Hcdok
              %Hsb4 %Hmem4 %Hn4 %Hledge".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
@@ -6701,6 +6752,14 @@ Section ProofCreateMain.
       iSplitR; [iPureIntro;
                 exact (cr_setf_dir_ok icfg_nib dc datc major minor
                          _ Hcdok') |].
+      (* the ["."]/[".."] clause needs no entry premise here, and that is
+         the whole reason the guard names [nlink]: the [sh zero,74(s3)] at
+         +0x146 has ALREADY zeroed the count, so whatever record the failing
+         link left, what this re-parks is an ORPHAN.  All three [fail:]
+         entries discharge through this one line -- at the first two the
+         child has no [".."] at all. *)
+      iSplitR; [iPureIntro;
+                exact (dir_dots_ix_orphan (bv_unsigned cinum) _ datc Hznl) |].
       iSplitL "Hcdlnk"; [iExact "Hcdlnk" |].
       iFrame "Hcdiat Hcmeta".
       iEval (rewrite /inode_map) in "Hcmap".
@@ -6805,6 +6864,7 @@ Section ProofCreateMain.
     { rewrite /ic_loaded. iExists datap.
       iSplitR; [iPureIntro; exact Hiok |].
       iSplitR; [iPureIntro; rewrite -Hnib; exact Hdok |].
+      iSplitR; [iPureIntro; exact Hddix |].
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta".
       iEval (rewrite /inode_map) in "Hmap".
@@ -7021,7 +7081,7 @@ Section ProofCreateMain.
     iIntros (CIDm Hsm).
     iIntros (Mx kslot q g gil gisl cinum dnc bmc datc n3 Sb3 used3).
     iIntros "%HXregs %Htdir %Hkdlt %Hdib %Htydir %Hnl0 %Hnlmax %Hiok %Hdok
-             %Hnpname %Hnone %Hkslt %Hcpos %Hcinb %Hfresh %Htyc %Hciok %Hcdok
+             %Hddix %Hnpname %Hnone %Hkslt %Hcpos %Hcinb %Hfresh %Htyc %Hciok %Hcdok
              %Hsb3 %Hmem3 %Hn3 %Hcorr %Husd3".
     iIntros "Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
              #Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk Hdiat
@@ -7690,6 +7750,58 @@ Section ProofCreateMain.
         by (rewrite Hc2nl; vm_compute; reflexivity).
       assert (Hc2dokn : dir_ok icfg_nib dc2 dat2)
         by (rewrite -Hnib; exact Hc2dok).
+      (* ================================================================ *)
+      (*  THE ESTABLISHMENT.  [DirView.dir_dots_ix] is minted exactly once  *)
+      (*  in this kernel and this is the site: the child's two interior     *)
+      (*  links have written record 0 = ["."] at its own inum and record    *)
+      (*  1 = [".."] at the PARENT's, and the second writei's size makes    *)
+      (*  the count two.  Record 1's LIVENESS is [dp->inum <> 0], which has *)
+      (*  no supplier anywhere in the tree -- [IcacheRef.inode_held] keeps  *)
+      (*  only the upper bound and namex drops [SpecDirlookup]'s own        *)
+      (*  [0 < inum] -- so it comes from the PARENT'S OWN copy of this      *)
+      (*  clause, whose ["."] half says the parent's record 0 names the     *)
+      (*  parent.  That is what the self half is carried for.               *)
+      (*                                                                    *)
+      (*  It is GUARDED on [tot2 = 16]: on the short arm the child keeps no  *)
+      (*  [".."] and goes to [fail:], where the count is zeroed and the      *)
+      (*  clause is vacuous.                                                *)
+      (* ================================================================ *)
+      assert (Hnl0z : bv_unsigned (di_nlink dn) <> 0).
+      { intro Hc. apply Hnl0. apply bv_eq. rewrite Hc. vm_compute. reflexivity. }
+      assert (Hdindnz : bv_unsigned dind <> 0)
+        by exact (dir_dots_ix_self (bv_unsigned dind) dn data
+                    ltac:(rewrite Htydir; vm_compute; reflexivity)
+                    Hnl0z Hddix).
+      assert (Hc2ddix : (tot2 = 16)%nat ->
+                        dir_dots_ix (bv_unsigned cinum) dc2 dat2).
+      { intro Ht16.
+        assert (Hw02 : dir_win_agree dat1 dat2 0).
+        { intros jj Hjj. rewrite (Hrng2 (16 * 0 + jj)%nat).
+          rewrite decide_False; [reflexivity |].
+          intros [Hlo Hhi]. clear -Hlo Hjj. lia. }
+        assert (Hwin2 : forall jj, (jj < 16)%nat ->
+                  file_byte dat2 (16 * 1 + jj)%nat
+                  = dirent_bytes (de_of_name (cr_low16 dind)
+                                    (bname 14 cr_dotdot_f)) !!! jj).
+        { intros jj Hjj. rewrite (Hrng2 (16 * 1 + jj)%nat).
+          rewrite decide_True; [| clear -Hjj Ht16; lia].
+          replace (16 * 1 + jj - 16 * 1)%nat with jj by (clear -jj; lia).
+          reflexivity. }
+        destruct (cr_dotdot_record dat2 (cr_low16 dind) Hwin2)
+          as [Hd2inum Hd2name].
+        assert (Hn32 : dir_nrec 32 = 2%nat) by (vm_compute; reflexivity).
+        assert (H32 : 32 <= bv_unsigned (di_size dc2))
+          by (rewrite Hc2szmax; clear -Ht16; lia).
+        pose proof (dir_nrec_mono 32 _ H32) as Hmono.
+        intros _ _. split_and!.
+        - clear -Hmono Hn32. lia.
+        - unfold dir_live. rewrite (dir_inum_agree dat1 dat2 0 Hw02).
+          exact Hd1live.
+        - rewrite (dir_inum_agree dat1 dat2 0 Hw02) Hd1inum. exact Hcl16.
+        - rewrite (dir_bname_agree dat1 dat2 0 Hw02) Hd1name. reflexivity.
+        - unfold dir_live. rewrite Hd2inum. intro Hc. apply Hdindnz.
+          rewrite <- Hdl16. rewrite Hc. reflexivity.
+        - exact Hd2name. }
       destruct Hbl2 as [[Ha0z2 Ht162] | [Ha0m2 Htlt2]].
       + (* ============================================================= *)
         (*  the [".."] link went in whole: on to [dirlink(dp, name)]      *)
@@ -7931,6 +8043,18 @@ Section ProofCreateMain.
           by exact (dir_ok_dirlink nib dn dp3 data dat3 (cr_low16 cinum)
                       (bname 14 nf) _ _ tot3 eq_refl eq_refl Htot163
                       Hcl16b Hp3ty Hp3szmax Hrng3 Hdok).
+        assert (Hp3szle : bv_unsigned (di_size dn)
+                          <= bv_unsigned (di_size dp3))
+          by (clear -Hp3szmax; rewrite Hp3szmax; lia).
+        assert (Hp3ddix : dir_dots_ix (bv_unsigned dind) dp3 dat3)
+          by exact (dir_dots_ix_dirlink (bv_unsigned dind) dn dp3 data dat3
+                      (cr_low16 cinum) (bname 14 nf) _ _ tot3 eq_refl eq_refl
+                      Htot163 Hp3ty Hp3nl Hp3szle Hrng3 Hddix).
+        assert (Hp3setfsz : bv_unsigned (di_size dp3)
+                  <= bv_unsigned (di_size (cr_setf dp3 (di_major dp3)
+                       (di_minor dp3) (add_vec (di_nlink dp3 : mword 16)
+                          (mword_of_int 1 : mword 16)))))
+          by (clear; rewrite cr_setf_size; lia).
         assert (Hp3nlnz : bv_unsigned (di_nlink dp3) <> 0).
         { rewrite Hp3nl. intro Hc. apply Hnl0. apply bv_eq. rewrite Hc.
           vm_compute. reflexivity. }
@@ -8231,6 +8355,10 @@ Section ProofCreateMain.
                           (di_major dp3) (di_minor dp3) _ Hp3iok)
                        (cr_setf_dir_ok icfg_nib dp3 dat3 (di_major dp3)
                           (di_minor dp3) _ Hp3dokn)
+                       (dir_dots_ix_eq (bv_unsigned dind) dp3 _ dat3 dat3
+                          (cr_setf_type _ _ _ _)
+                          (fun _ => Hp3nlnz)
+                          Hp3setfsz eq_refl Hp3ddix)
                        with "Hdlnk Hdiat Hmeta Hpaddrs Hpind Hblocks")
             as "Hload".
           (* ===== +0xe0 c.mv a0,s1 ==================================== *)
@@ -8436,7 +8564,7 @@ Section ProofCreateMain.
           iEval (rewrite /inode_map) in "Hcmap".
           iDestruct "Hcmap" as "[Hcaddrs2 Hcind2]".
           iDestruct (ic_mk_loaded γfs γi cov logstart kslot cinum dc2 bm2 dat2
-                       Hc2iok Hc2dokn
+                       Hc2iok Hc2dokn (Hc2ddix Ht162)
                        with "Hcdlnk2 Hcdiat Hcmeta Hcaddrs2 Hcind2 Hcblocks")
             as "Hcloadf".
           iAssert (ity_shot g (di_type dc2)) as "#Hcshot2".
@@ -8503,7 +8631,7 @@ Section ProofCreateMain.
           iApply ("Hf" $! md3 kslot q g gil gisl cinum dp3 bm3 dat3
                     dc2 bm2 dat2 n6 Sb6 usd3
                     with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                          [%] [%] [%] [%] [%] [%] [%] [%]
+                          [%] [%] [%] [%] [%] [%] [%] [%] [%]
                           Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14
                           Hnb2 Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid
                           Hdlnk Hdiat Hmeta Hmap Hblocks Hshotp3 Hkeep
@@ -8519,6 +8647,7 @@ Section ProofCreateMain.
           { rewrite Hp3nl. exact Hnl0. }
           { exact Hp3iok. }
           { exact Hp3dok. }
+          { exact Hp3ddix. }
           { exact Hkslt. }
           { exact Hcpos. }
           { exact Hcinb. }
@@ -8567,7 +8696,7 @@ Section ProofCreateMain.
         iApply ("Hf" $! md2 kslot q g gil gisl cinum dn bm data dc2 bm2 dat2
                   n5 Sb5 usd2
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                        [%] [%] [%] [%] [%] [%] [%]
+                        [%] [%] [%] [%] [%] [%] [%] [%]
                         Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
                         Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk
                         Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -8583,6 +8712,7 @@ Section ProofCreateMain.
         { exact Hnl0. }
         { exact Hiok. }
         { exact Hdok. }
+        { exact Hddix. }
         { exact Hkslt. }
         { exact Hcpos. }
         { exact Hcinb. }
@@ -8633,7 +8763,7 @@ Section ProofCreateMain.
       iApply ("Hf" $! md1 kslot q g gil gisl cinum dn bm data dc1 bm1 dat1
                 n4 Sb4 usd1
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                      [%] [%] [%] [%] [%] [%] [%]
+                      [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hnb14 Hnb2
                       Hslkd Hslkdd Hslpid Hdep Hidev Hiinum Hivalid Hdlnk
                       Hdiat Hmeta Hmap Hblocks Hshotl Hkeep
@@ -8649,6 +8779,7 @@ Section ProofCreateMain.
       { exact Hnl0. }
       { exact Hiok. }
       { exact Hdok. }
+      { exact Hddix. }
       { exact Hkslt. }
       { exact Hcpos. }
       { exact Hcinb. }

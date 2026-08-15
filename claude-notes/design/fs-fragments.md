@@ -150,7 +150,7 @@ R13 (2026-08-15, C′ RULINGS — the C′ verification report is the design
      (vi) The S7-PLANK (the strong isdirempty payload conjunct) is
      independently correct NOW (true of f60ff58) and is assigned to
      the in-flight payload-conjunct pass (same home, same movers as
-     dir_dotdot_ix).
+     dir_dots_ix).
 
 R10. **Byte-stability map accepted** (§5.1): the only moving seams in
      F1.5c are SpecIalloc (both forms) and SpecIlock (+9 callers, 8 at

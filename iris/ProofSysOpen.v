@@ -385,9 +385,10 @@ Section ProofSysOpenBody.
     inode_meta (ientry k) dn ∗
     (inode_meta (ientry k) dn -∗ ic_loaded gfs gi cov logstart k inum dn bm).
   Proof.
-    iIntros "(%data & %Hok & %Hdok & Hl & Hd & Hm & Ha & Hr & Hb)".
+    iIntros "(%data & %Hok & %Hdok & %Hddix & Hl & Hd & Hm & Ha & Hr &
+             Hb)".
     iFrame "Hm". iIntros "Hm".
-    iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data Hok Hdok
+    iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data Hok Hdok Hddix
               with "Hl Hd Hm Ha Hr Hb").
   Qed.
 

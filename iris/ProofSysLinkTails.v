@@ -1187,7 +1187,8 @@ Section ProofSysLinkTails.
     { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
       exact (HM2thr c Hc N2 N8 N9 N18). }
     iDestruct "Hload" as (dat)
-      "(%Hiok & %Hdok & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks)".
+      "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
+        Hblocks)".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_nlink) in "Hinl".
     (* THE LEDGER'S OWN FACT: the fragment forces (L1)'s lower bound at the
@@ -1369,6 +1370,7 @@ Section ProofSysLinkTails.
     { rewrite /ic_loaded. iExists dat.
       iSplitR; [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
       iSplitR; [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
+      iSplitR; [iPureIntro; exact (sl_setnl_ddix _ dn dat _ Hnz Hddix) |].
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.
       iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks". }

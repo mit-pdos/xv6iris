@@ -1358,7 +1358,8 @@ Section ProofSysLinkBody.
           assert (Hils1 : (mil !!! Regidx Rs1 : mword 64) = ientry kk)
             by exact (sl_regs_s1 _ _ _ _ _ Hilregs).
           iDestruct "Hload" as (dat)
-            "(%Hiok & %Hdok & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks)".
+            "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
+              Hblocks)".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_type) in "Hity".
           iEval (rewrite /i_nlink) in "Hinl".
@@ -1423,6 +1424,7 @@ Section ProofSysLinkBody.
              { rewrite /ic_loaded. iExists dat.
                iSplitR; [iPureIntro; exact Hiok |].
                iSplitR; [iPureIntro; exact Hdok |].
+               iSplitR; [iPureIntro; exact Hddix |].
                iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                iFrame "Hdiat".
                iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -1570,6 +1572,7 @@ Section ProofSysLinkBody.
                 { rewrite /ic_loaded. iExists dat.
                   iSplitR; [iPureIntro; exact Hiok |].
                   iSplitR; [iPureIntro; exact Hdok |].
+                  iSplitR; [iPureIntro; exact Hddix |].
                   iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                   iFrame "Hdiat".
                   iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -1809,6 +1812,10 @@ Section ProofSysLinkBody.
                     [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
                   iSplitR;
                     [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
+                  iSplitR;
+                    [iPureIntro; apply (dir_dots_ix_not_dir (bv_unsigned inum));
+                     rewrite /sl_incnl sl_setnl_type;
+                     exact (sl_tdir_zne _ Hty) |].
                   iSplitL "Hdlnk2"; [iExact "Hdlnk2" |].
                   iFrame "Hdiat Hmeta". rewrite /inode_map.
                   iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks". }
@@ -2125,8 +2132,8 @@ Section ProofSysLinkBody.
                    assert (Htyd : di_type dnd = SpecDirlookup.T_DIR)
                      by (symmetry; exact Htyd0).
                    iDestruct "Hloadd" as (datd)
-                     "(%Hdiok & %Hddok & Hdlnkd & Hdiatd & Hmetad & Haddrsd &
-                       Hindd & Hblocksd)".
+                     "(%Hdiok & %Hddok & %Hddixd & Hdlnkd & Hdiatd & Hmetad &
+                       Haddrsd & Hindd & Hblocksd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
                    (*                                                              *)
@@ -2197,7 +2204,7 @@ Section ProofSysLinkBody.
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)
                      iDestruct (ic_mk_loaded gfs gi cov logstart kd dinum dnd bmd
-                                  datd Hdiok Hddok
+                                  datd Hdiok Hddok Hddixd
                                   with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd")
                        as "Hloadd".
                      iDestruct (sl_bs3 bn with "[Hbs1d Hbs2d]") as "Hbsl";
@@ -2233,7 +2240,8 @@ Section ProofSysLinkBody.
                                ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
-                               Hbmlog Hist0 Hiblk Hiblog Hinb Hdiblk Hdiblog
+                               Hbmlog Hist0 Hiblk Hiblog Hinb
+                               Hdiblk Hdiblog
                                Hdinb Hcovb Hmem2'
                                ltac:(exact (sl_orphan_entry w1 w2 n2 Hu3))
                                ltac:(exact (fun w n' Hn' =>
@@ -2549,6 +2557,7 @@ Section ProofSysLinkBody.
                        { rewrite /ic_loaded. iExists datd.
                          iSplitR; [iPureIntro; exact Hdiok |].
                          iSplitR; [iPureIntro; exact Hddok |].
+                         iSplitR; [iPureIntro; exact Hddixd |].
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
                          iDestruct "Hmapd" as "[Ha Hi]". iFrame "Ha Hi Hblocksd". }
@@ -2583,7 +2592,8 @@ Section ProofSysLinkBody.
                                  ltac:(exact Kil) ltac:(exact Kiupd)
                                  ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                  Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
-                                 Hbmlog Hist0 Hiblk Hiblog Hinb Hdiblk Hdiblog
+                                 Hbmlog Hist0 Hiblk Hiblog Hinb
+                               Hdiblk Hdiblog
                                  Hdinb Hcovb
                                  ltac:(exact (proj1 (bool_decide_eq_true _)))
                                  ltac:(discriminate) Hmem3 Hiu3
@@ -2649,6 +2659,19 @@ Section ProofSysLinkBody.
                                  (dir_slot datd (dir_nrec (bv_unsigned (di_size dnd))))
                                  tot eq_refl eq_refl Htotle Hlow16i
                                  Htyeq Hszmax Hrng Hddok). }
+                       (* ...and the ".." index clause across the same write.
+                          The window is [dir_slot], which the clause's own
+                          liveness at index 1 keeps away from it, and the
+                          count rides on [Hszmax] -- a dirlink only grows
+                          the size. *)
+                       assert (Hddix' : dir_dots_ix (bv_unsigned dinum) dnd' datd').
+                       { apply (dir_dots_ix_dirlink (bv_unsigned dinum)
+                                 dnd dnd' datd datd'
+                                 (sl_low16 inum) (bname 14 nf)
+                                 (dir_nrec (bv_unsigned (di_size dnd)))
+                                 (dir_slot datd (dir_nrec (bv_unsigned (di_size dnd))))
+                                 tot eq_refl eq_refl Htotle Htyeq Hnleq
+                                 ltac:(rewrite Hszmax; lia) Hrng Hddixd). }
                        assert (Hdtynz : bv_unsigned (di_type dnd') <> 0)
                          by (rewrite Htyeq;
                              exact (proj1 (proj2 (proj2 (proj2 Hdiok))))).
@@ -2703,6 +2726,7 @@ Section ProofSysLinkBody.
                             { rewrite /ic_loaded. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
                               iSplitR; [iPureIntro; exact Hddok' |].
+                              iSplitR; [iPureIntro; exact Hddix' |].
                               iSplitL "Hdlnkd'"; [iExact "Hdlnkd'" |].
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
@@ -3087,6 +3111,7 @@ Section ProofSysLinkBody.
                             { rewrite /ic_loaded. iExists datd'.
                               iSplitR; [iPureIntro; exact Hdiok' |].
                               iSplitR; [iPureIntro; exact Hddok' |].
+                              iSplitR; [iPureIntro; exact Hddix' |].
                               iSplitL "Hdlnkd'"; [iExact "Hdlnkd'" |].
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
@@ -3128,7 +3153,8 @@ Section ProofSysLinkBody.
                                       ltac:(exact Kil) ltac:(exact Kiupd)
                                       ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                       Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov
-                                      Hbmlog Hist0 Hiblk Hiblog Hinb Hdiblk Hdiblog
+                                      Hbmlog Hist0 Hiblk Hiblog Hinb
+                               Hdiblk Hdiblog
                                       Hdinb Hcovb
                                       ltac:(exact (proj1 (bool_decide_eq_true _)))
                                       ltac:(discriminate) Hmem3 Hiu3

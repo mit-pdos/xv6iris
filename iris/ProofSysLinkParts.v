@@ -532,6 +532,25 @@ Lemma sl_setnl_dir_ok (nib : nat) (dn : dinode) (data : nat -> list (bv 8))
   dir_ok nib dn data -> dir_ok nib (sl_setnl dn nl) data.
 Proof. unfold dir_ok, sl_setnl. cbn. exact (fun H => H). Qed.
 
+(* ...and the ".." index clause across the same store.  [sl_setnl] moves only
+   the COUNT, and [dir_dots_ix] is guarded on it, so unlike [dir_ok] this
+   one is not a [cbn]: the congruence needs the home to be live, which both
+   sys_link re-parks have in hand -- the tail from the [ilink] it is about to
+   spend, ARM E from [ip] not being a directory at all. *)
+Lemma sl_setnl_ddix (self : Z) (dn : dinode) (data : nat -> list (bv 8))
+    (nl : mword 16) :
+  bv_unsigned (di_nlink dn) <> 0 ->
+  dir_dots_ix self dn data -> dir_dots_ix self (sl_setnl dn nl) data.
+Proof.
+  intros Hnz Hd.
+  apply (dir_dots_ix_eq self dn (sl_setnl dn nl) data data).
+  - exact (sl_setnl_type dn nl).
+  - intros _. exact Hnz.
+  - rewrite sl_setnl_size. lia.
+  - reflexivity.
+  - exact Hd.
+Qed.
+
 Lemma sl_setnl_type_stable (dn : dinode) (nl : mword 16) :
   di_type_stable (sl_setnl dn nl) dn.
 Proof. right. exact (sl_setnl_type dn nl). Qed.

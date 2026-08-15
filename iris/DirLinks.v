@@ -600,7 +600,7 @@ Section DirLinks.
     bv_unsigned (di_nlink dn) <> 0 ->
     dir_live data k0 ->
     bv_unsigned (dir_inum data k0) <> self ->
-    (* ...AND IT IS NOT THE [".."] SLOT.  [DirView.dir_dotdot_ix] pins index
+    (* ...AND IT IS NOT THE [".."] SLOT.  [DirView.dir_dots_ix] pins index
        1 as the parent entry, and S7 never zeroes it -- [namecmp] refuses
        [".."], so the record [sys_unlink] clears is always the one
        [dirlookup] matched on a caller-supplied name.  Additive: this lemma
@@ -669,13 +669,13 @@ Section DirLinks.
   (*                                                                      *)
   (*  IT DOES NOT NAME THE PARENT.  [dir_inum data 1] is whatever the      *)
   (*  child's [".."] holds; the tree layer supplies                        *)
-  (*  [ents ip !! ".." = Some dp] and [DirView.dir_dotdot_ix] says that    *)
+  (*  [ents ip !! ".." = Some dp] and [DirView.dir_dots_ix] says that      *)
   (*  entry is at index 1 -- under [dir_names_unique] (FsRep, R2's         *)
   (*  amendment) any-match is first-match, so the two compose to           *)
   (*  [dir_inum data 1 = dp].  That last step is the tree layer's, not     *)
   (*  this file's.                                                        *)
   (*                                                                      *)
-  (*  IT TAKES NO RECORD-COUNT PREMISE.  [dir_dotdot_ix] carries           *)
+  (*  IT TAKES NO RECORD-COUNT PREMISE.  [dir_dots_ix] carries             *)
   (*  [2 <= dir_nrec] itself, under the SAME two guards this lemma already *)
   (*  needs for the ticket ([T_DIR] to open the big-op, [nlink <> 0] to    *)
   (*  make index 1's ticket an [ilink] rather than a colour disjunction),  *)
@@ -687,14 +687,14 @@ Section DirLinks.
       (data : nat -> list (bv 8)) :
     bv_unsigned (di_type dn) = T_DIR_z ->
     bv_unsigned (di_nlink dn) <> 0 ->
-    dir_dotdot_ix dn data ->
+    dir_dots_ix self dn data ->
     bv_unsigned (dir_inum data 1) <> self ->
     dir_links self dn data -∗
       ilink (bv_unsigned (dir_inum data 1))
       ∗ (dir_link_at self dn data 1 -∗ dir_links self dn data).
   Proof.
     intros Hty Hnl Hdd Hself.
-    destruct (Hdd Hty Hnl) as (Hnrec & Hlive & _).
+    destruct (Hdd Hty Hnl) as (Hnrec & _ & _ & _ & Hlive & _).
     rewrite /dir_links decide_True; [| exact Hty].
     iIntros "H".
     iDestruct (big_sepL_lookup_acc _

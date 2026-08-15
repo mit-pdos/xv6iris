@@ -8797,7 +8797,7 @@ two things, in this order:
 1. **the pin bump** carrying `f60ff58`, after which finding 1's premise is
    derivable and the T_FILE success arm is unblocked;
 2. **finding 2's payload conjunct** — no longer a design item.  The FACT
-   and its extraction are landed (`DirView.dir_dotdot_ix`,
+   and its extraction are landed (`DirView.dir_dots_ix`,
    `DirLinks.dir_links_dotdot_out`); what is left is the mechanical pass
    that puts the conjunct into `IcacheEscrow.ipool_alloc` / `ic_loaded`,
    and that is SEQUENCED behind the FileOff/sys_open lane — see

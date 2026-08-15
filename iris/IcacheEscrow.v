@@ -433,12 +433,23 @@ Section IcacheEscrow.
      about another inum's REGION record and therefore cannot be a [Prop]
      over [data] (§20.1, §20.9(a)).  No arity moves -- the colour
      disjunction is inside [dir_link_at] -- and both fragments are timeless,
-     so the [Timeless] instance below survives verbatim. *)
+     so the [Timeless] instance below survives verbatim.
+
+     ...AND THE ".." INDEX CLAUSE (fs-icache §20.17.4, fs-fragments R9).
+     [DirView.dir_dots_ix]: a LIVE directory ([T_DIR] and [nlink <> 0]) has
+     at least two records and its record 1 is the live [".."].  It is what
+     lets S7 name the one [ilink dp] it must convert -- [dir_link_at] is
+     keyed by record INDEX and is name-blind, so without it nothing says
+     WHICH ticket in a child's [dir_links] is the parent's.  It rides HERE,
+     beside [dir_ok], for [dir_ok]'s own reason: it is a fact about this
+     payload's bytes that no contract in the tree wants to carry, and the
+     [Timeless] instances below are unaffected because it is pure. *)
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn0 bm0 data0⌝ ∗
        ⌜dir_ok icfg_nib dn0 data0⌝ ∗
+       ⌜dir_dots_ix (bv_unsigned inum) dn0 data0⌝ ∗
        dir_links (bv_unsigned inum) dn0 data0 ∗
        dinode_at γi inum dn0 ∗
        ind_res γfs bm0 ∗
@@ -483,13 +494,21 @@ Section IcacheEscrow.
      dirlookup will hand [iget] as licence (a)/(b) in stage C, borrowed out
      of this payload at the matched index and returned before the holder's
      iunlock.  Every re-park in the landed tree carries it unchanged
-     ([dir_links_eq]) because none of them changes a DIRECTORY's bytes. *)
+     ([dir_links_eq]) because none of them changes a DIRECTORY's bytes.
+
+     ...AND THE ".." INDEX CLAUSE, the twin of [ipool_alloc]'s: see there.
+     create is its sole PRODUCER (at [dirlink(ip, "..", dp->inum)]); every
+     other re-park in the tree transfers it, and the ones that move the
+     record discharge it from [DirView]'s five ways -- most often
+     [dir_dots_ix_orphan], since a walk that zeroes [nlink] before parking
+     is parking a directory the clause says nothing about. *)
   Definition ic_loaded (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ (data : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn bm data⌝ ∗
        ⌜dir_ok icfg_nib dn data⌝ ∗
+       ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        dir_links (bv_unsigned inum) dn data ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
@@ -1000,6 +1019,7 @@ Section IcacheEscrow.
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) :
     inode_ok cov logstart dn bm data ->
     dir_ok icfg_nib dn data ->
+    dir_dots_ix (bv_unsigned inum) dn data ->
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗
     inode_meta (ientry k) dn -∗
@@ -1008,8 +1028,8 @@ Section IcacheEscrow.
     inode_blocks γfs bm data -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
-    intros Hok Hdok. iIntros "Hl Hd Hm Ha Hr Hb". rewrite /ic_loaded.
-    iExists data. iSplitR; [done |]. iSplitR; [done |].
+    intros Hok Hdok Hddix. iIntros "Hl Hd Hm Ha Hr Hb". rewrite /ic_loaded.
+    iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
     iSplitL "Hl"; [iExact "Hl" |]. iSplitL "Hd"; [iExact "Hd" |].
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" | iExact "Hb"].
@@ -1425,7 +1445,8 @@ Section IcacheEscrow.
     { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & Hdlk & Hdat & Hmeta & Haddrs & Hind & Hblks)".
+        "(%Hok & %Hdok & %Hddix & Hdlk & Hdat & Hmeta & Haddrs & Hind &
+          Hblks)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
@@ -1437,6 +1458,9 @@ Section IcacheEscrow.
       rewrite /ipool_shape /ipool_alloc. iLeft. iExists dn, bm, data.
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
+      (* the eviction moves no byte and no field: the clause goes back to the
+         pool exactly as the loaded arm held it *)
+      iSplitR; [iPureIntro; exact Hddix |].
       iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
@@ -1633,7 +1657,7 @@ Section IcacheEscrow.
     rewrite /ic_payload. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").
