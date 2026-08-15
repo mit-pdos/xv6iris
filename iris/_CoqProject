@@ -25,6 +25,7 @@ HartAmo.v
 HartRegNode.v
 HartSpan.v
 HartSpanChar.v
+HartMCycle.v
 HartPilot.v
 RegFile.v
 HartTp.v

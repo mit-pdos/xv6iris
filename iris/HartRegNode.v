@@ -122,6 +122,26 @@ Proof.
   exists access_kind, k. split; reflexivity.
 Qed.
 
+(* THE REDUCTION EQUATIONS for chaining peels: a class-characterization
+   proof rewrites with these at each node (the resumes' [decide (r' = r)]
+   does not cbn-reduce mid-chain, and the [_at_inv] lemmas hide the
+   continuation behind an opaque existential, which would strand the NEXT
+   projection).  [K] is instantiated by matching the goal's own concrete
+   node, so nothing is ever read back. *)
+Lemma hregread_resume_red (r : register) (ak : option unit)
+    (K : type_of_register r -> M unit) (v : type_of_register r) :
+  hregread_resume r v (Interface.Next (Interface.RegRead r ak) K) = K v.
+Proof.
+  simpl. destruct (decide _) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Lemma hregwrite_resume_red (r : register) (ak : option unit)
+    (v : type_of_register r) (K : unit -> M unit) :
+  hregwrite_resume (Interface.Next (Interface.RegWrite r ak v) K) = K tt.
+Proof. reflexivity. Qed.
+
 (* ====================================================================== *)
 (* 2. The two fupd rules.                                                   *)
 (* ====================================================================== *)
