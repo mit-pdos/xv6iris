@@ -1378,7 +1378,7 @@ Section ProofSysLinkBody.
                              exact (sl_tdir_eq _ Hty))
                        ltac:(vm_compute; reflexivity)
                        with "Hcg Hpc Hi4c").
-             iIntros (CID31 Hq31). iNext. iIntros "Hcg Hpc".
+             iIntros (CID31 Hq31). iApply bi.later_intro. iIntros "Hcg Hpc".
              iEval (rewrite Htgc0) in "Hpc".
              iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
                with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks Hdlnk]"
@@ -1525,7 +1525,7 @@ Section ProofSysLinkBody.
                                 exact (sl_nmax_eq _ Hnl))
                           ltac:(vm_compute; reflexivity)
                           with "Hcg Hpc Hi58").
-                iIntros (CID35 Hq35). iNext. iIntros "Hcg Hpc".
+                iIntros (CID35 Hq35). iApply bi.later_intro. iIntros "Hcg Hpc".
                 iEval (rewrite Htgd0) in "Hpc".
                 iAssert (ic_loaded gfs gi cov logstart kk inum dn bm)
                   with "[Hdiat Hity Himaj Himin Hinl Hisz Haddrs Hind Hblocks
@@ -2343,7 +2343,7 @@ Section ProofSysLinkBody.
                                  ltac:(nz) ltac:(rgne; rewrite Ha0m; exact sl_m1_neg)
                                  ltac:(rewrite Htge0_9a; vm_compute; reflexivity)
                                  with "Hcg Hpc Hi9a").
-                       iIntros (CID61 Hq61). iNext. iIntros "Hcg Hpc".
+                       iIntros (CID61 Hq61). iApply bi.later_intro. iIntros "Hcg Hpc".
                        iEval (rewrite Htge0_9a) in "Hpc".
                        subst bmd' datd' dnd' dnd0'.
                        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
@@ -2805,7 +2805,7 @@ Section ProofSysLinkBody.
                                             ('b"0"))) W7 (K - 38)%nat b
                                       ltac:(vm_compute; reflexivity)
                                       with "Hcg Hpc Hib4").
-                            iIntros (CID73 Hq73). iNext. iIntros "Hcg Hpc".
+                            iIntros (CID73 Hq73). iApply bi.later_intro. iIntros "Hcg Hpc".
                             iEval (rewrite Htg10cb4) in "Hpc".
                             iDestruct (sl_nm_join (pa_stk sp0 6) bn0 nf
                                          with "Hnm14 Hnm2") as "HbN".
@@ -2871,7 +2871,7 @@ Section ProofSysLinkBody.
                                       ltac:(rgne; rewrite Ha0m; exact sl_m1_neg)
                                       ltac:(rewrite Htge0_9a; vm_compute; reflexivity)
                                       with "Hcg Hpc Hi9a").
-                            iIntros (CID61 Hq61). iNext. iIntros "Hcg Hpc".
+                            iIntros (CID61 Hq61). iApply bi.later_intro. iIntros "Hcg Hpc".
                             iEval (rewrite Htge0_9a) in "Hpc".
                             iDestruct (dir_links_dirlink_nop (bv_unsigned dinum)
                                          dnd dnd' datd datd' (sl_low16 inum)
@@ -2980,7 +2980,7 @@ Section ProofSysLinkBody.
                              ltac:(rgne; rewrite HT3a0 Hnpe; vm_compute; reflexivity)
                              ltac:(vm_compute; reflexivity)
                              with "Hcg Hpc Hi7e").
-                   iIntros (CID50 Hq50). iNext. iIntros "Hcg Hpc".
+                   iIntros (CID50 Hq50). iApply bi.later_intro. iIntros "Hcg Hpc".
                    iEval (rewrite Htge6) in "Hpc".
                    (* the two buffers, rejoined for the epilogue *)
                    iDestruct (sl_buf_join (pa_stk sp0 22) bw1 pk2 Hpk2
@@ -3054,7 +3054,7 @@ Section ProofSysLinkBody.
                     ltac:(rgne; rewrite HQ3a0 Hnaip; vm_compute; reflexivity)
                     ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi40").
-          iIntros (CID26 Hq26). iNext. iIntros "Hcg Hpc".
+          iIntros (CID26 Hq26). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgb6) in "Hpc".
           iDestruct (sl_buf_join (pa_stk sp0 38) bo1 pk1 Hpk1
                        with "Hbufk Hbufrest") as "HbO".
@@ -3101,7 +3101,7 @@ Section ProofSysLinkBody.
                   ltac:(nz) ltac:(rgne; rewrite HN4a0 Hpr2; exact sl_m1_neg)
                   ltac:(rewrite Htg10c2c; vm_compute; reflexivity)
                   with "Hcg Hpc Hi2c").
-        iIntros (CID18 Hq18). iNext. iIntros "Hcg Hpc".
+        iIntros (CID18 Hq18). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htg10c2c) in "Hpc".
         iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID18)
@@ -3131,7 +3131,7 @@ Section ProofSysLinkBody.
                 ltac:(nz) ltac:(rgne; rewrite HM7a0 Hpr1; exact sl_m1_neg)
                 ltac:(rewrite Htg10c18; vm_compute; reflexivity)
                 with "Hcg Hpc Hi18").
-      iIntros (CID11 Hq11). iNext. iIntros "Hcg Hpc".
+      iIntros (CID11 Hq11). iApply bi.later_intro. iIntros "Hcg Hpc".
       iEval (rewrite Htg10c18) in "Hpc".
       iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN") as (bn0) "HbN".
       iDestruct (sl_bytes_name (pa_stk sp0 22) 128 with "HbW") as (bw0) "HbW".
