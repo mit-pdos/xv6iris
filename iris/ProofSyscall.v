@@ -152,6 +152,7 @@ Require Import WpLock LockRank.
 Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
+Require Import KptTree TrampPt.
 Require Import KallocInv KvmSpec.
 Require Import DiskPtsto DiskInv.
 Require Import WpUart.
@@ -626,7 +627,7 @@ Section ProofSyscall.
   (* the state a RETURNING arm needs before it can start: [pc_is] at the
      table entry's own known address, plus every resource
      [wp_syscall_sconf_body] threads opaquely through the dispatch. *)
-  Definition sysc_arm_pre (γf : gname) (pj : mword 64) (bn : bio_names)
+  Definition sysc_arm_pre `{CIDh : CpuId} (γf : gname) (pj : mword 64) (bn : bio_names)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
       (tgt : mword 64) (us : gset Z) :=
@@ -646,7 +647,7 @@ Section ProofSyscall.
      arm/the epilogue can take it as an explicit parameter rather than
      restate it -- [V]/[m] here are the WHOLE FUNCTION's entry values,
      fixed for the whole proof; only [mf]/[V']/[us'] vary per return. *)
-  Definition sysc_hcont_ty (γf : gname) (pj : mword 64) (bn : bio_names)
+  Definition sysc_hcont_ty `{CIDh : CpuId} (γf : gname) (pj : mword 64) (bn : bio_names)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (V : pprivate) (lks : gset string) (av : nat) (m : regfile)
       (ret_tgt : mword 64) : iProp Σ :=
@@ -699,7 +700,7 @@ Section ProofSyscall.
      index 2)'s own contract DIVERGES (no continuation at all --
      SpecSysExit.v), so it does not fit this shape; it stays [Admitted]
      with the rest of the GAP entries, at a bespoke type. *)
-  Definition sysc_arm_goal (k : nat) (γf : gname) (pj : mword 64)
+  Definition sysc_arm_goal `{CIDh : CpuId} (k : nat) (γf : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) : Prop :=
@@ -940,7 +941,7 @@ Section ProofSyscall.
      ahead of this generic fallback -- see [wp_syscall_sconf]'s own use;
      each such branch shrinks what this placeholder is still standing in
      for, without touching the branches already replaced. *)
-  Lemma sysc_arm_placeholder (k : nat) (γf : gname) (pj : mword 64)
+  Lemma sysc_arm_placeholder `{CIDh : CpuId} (k : nat) (γf : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
@@ -953,7 +954,7 @@ Section ProofSyscall.
      fallback's own known entry [KernelSyms.syscall + 0x40] instead of a
      table target -- see the file header for what filling this in for real
      needs ([PROCNAME_OK]/[SpecPrintk]). *)
-  Lemma sysc_fallback_placeholder (γf : gname) (pj : mword 64)
+  Lemma sysc_fallback_placeholder `{CIDh : CpuId} (γf : gname) (pj : mword 64)
       (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
@@ -994,7 +995,7 @@ Section ProofSyscall.
     : wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
   Proof.
     cbv beta delta [wp_syscall_sconf_body].
-    intros pcE ret_tgt Hj Hgamma Hav.
+    intros pcE pj ret_tgt Hj Hgamma Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -1111,7 +1112,7 @@ Section ProofSyscall.
     change (<[Regidx Rs1 := regval_into_reg (add_vec zero_reg (MF !!! Regidx Ra0))]> MF) with B0.
     assert (Hp12 : add_vec_int (mword_of_int (KernelSyms.syscall + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.syscall + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
-    assert (HB0a0 : B0 !!! Regidx Ra0 = p)
+    assert (HB0a0 : B0 !!! Regidx Ra0 = pj)
       by (rewrite /B0 upd_ne; [exact HMFa0 | vm_compute; discriminate]).
     assert (HB0sp : B0 !!! Regidx csp_rs1 = spd)
       by (rewrite /B0 upd_ne; [exact HMFsp | vm_compute; discriminate]).
@@ -1119,7 +1120,7 @@ Section ProofSyscall.
     iDestruct "Hpriv" as "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hcwd) Hof]".
     rewrite {1}/proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iPoseProof (syci_12 with "Htext") as "Hi12".
-    assert (Ha12 : add_vec (B0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 88 : mword 12)) = p_trapframe p).
+    assert (Ha12 : add_vec (B0 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 88 : mword 12)) = p_trapframe pj).
     { rewrite HB0a0. reflexivity. }
     iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.syscall + 0x12)) Rs2 Ra0 (mword_of_int 88 : mword 12)
               B0 (av - 4)%nat (page_base (ud_tfp (pv_upt V))) true
@@ -1212,7 +1213,7 @@ Section ProofSyscall.
     iEval (rewrite Hp20) in "Hpc".
     assert (HB4a5 : B4 !!! Regidx Ra5
         = sign_extend' 64 (subrange_vec_dec (add_vec a3num (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)).
-    { rewrite /B4 upd_eq. rgne. rewrite HB3a5. unfold a3num.
+    { rewrite /B4 upd_eq. rgne. rewrite HB3a5. unfold a3num, regval_into_reg.
       f_equal. symmetry.
       exact (sysc_a3_bltu_bridge RAWNUM (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))). }
     assert (HB4sp : B4 !!! Regidx csp_rs1 = spd)
@@ -1301,14 +1302,18 @@ Section ProofSyscall.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e").
       iIntros (CID18 Hs18) "Hcg Hpc".
+      (* [rget], NOT [!!!]: [wp_addi4_s_sconf]'s continuation spells the written
+         value at the hart-indexed read, so a [set] written with [!!!] folds
+         NOTHING and the [change] behind it silently no-ops -- see the note at
+         [C3] below for what that costs. *)
       set (C2 := <[Regidx Ra5 := regval_into_reg
-          (add_vec (C1 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 3818 : mword 12)))]> C1).
+          (add_vec (rget C1 Ra5) (sign_extend' 64 (mword_of_int 3818 : mword 12)))]> C1).
       change (<[Regidx Ra5 := regval_into_reg
-          (add_vec (C1 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 3818 : mword 12)))]> C1) with C2.
+          (add_vec (rget C1 Ra5) (sign_extend' 64 (mword_of_int 3818 : mword 12)))]> C1) with C2.
       assert (Hp32 : add_vec_int (mword_of_int (KernelSyms.syscall + 0x2e) : mword 64) 4 = mword_of_int (KernelSyms.syscall + 0x32)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp32) in "Hpc".
       assert (HC2a5 : C2 !!! Regidx Ra5 = mword_of_int KernelSyms.syscalls).
-      { rewrite /C2 upd_eq /C1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
+      { rewrite /C2 upd_eq. rgne. rewrite /C1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
       assert (HC2a4 : C2 !!! Regidx Ra4 = C0 !!! Regidx Ra4)
         by (rewrite /C2 upd_ne; [rewrite /C1 upd_ne; [reflexivity|vm_compute;discriminate] | vm_compute; discriminate]).
       assert (HC2sp : C2 !!! Regidx csp_rs1 = spd)
@@ -1321,12 +1326,24 @@ Section ProofSyscall.
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi32").
       iIntros (CID19 Hs19) "Hcg Hpc".
-      set (C3 := <[Regidx Ra5 := regval_into_reg (add_vec (C2 !!! Regidx Ra5) (C2 !!! Regidx Ra4))]> C2).
-      change (<[Regidx Ra5 := regval_into_reg (add_vec (C2 !!! Regidx Ra5) (C2 !!! Regidx Ra4))]> C2) with C3.
+      (* [rget], NOT [!!!] -- THE MAP THE LEAF ACTUALLY HANDS BACK.
+         [wp_cadd_s_sconf]'s continuation is [<[rd := regval_into_reg (add_vec
+         (rget m rd) (rget m rs2))]> m], and [rget] is the HART-INDEXED read.
+         Spelled with [!!!] here, [set] finds no occurrence to fold and the
+         [change] behind it silently succeeds doing nothing, so "Hcg" keeps the
+         unfolded [rget]-spelled map while every later step passes [C3].  The
+         two are convertible ([regfile] is a FUNCTION and [rget] only reroutes
+         [tp]), but the conversion has to normalise the whole insert chain down
+         to the symbolic entry map at every nested read -- one level costs
+         ~0.1 s at +0x32, two levels never returns, and the [iApply] at +0x34
+         reads as an infinite loop with no error. *)
+      set (C3 := <[Regidx Ra5 := regval_into_reg (add_vec (rget C2 Ra5) (rget C2 Ra4))]> C2).
+      change (<[Regidx Ra5 := regval_into_reg (add_vec (rget C2 Ra5) (rget C2 Ra4))]> C2) with C3.
       assert (Hp34 : add_vec_int (mword_of_int (KernelSyms.syscall + 0x32) : mword 64) 2 = mword_of_int (KernelSyms.syscall + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp34) in "Hpc".
       assert (HC3a5 : C3 !!! Regidx Ra5 = mword_of_int (KernelSyms.syscalls + 8 * Z.of_nat k)).
-      { rewrite /C3 upd_eq HC2a5 HC2a4 HC0a4. exact (sysc_addr_word k Hk). }
+      { rewrite /C3 upd_eq. rgne. rgne. rewrite HC2a5 HC2a4 HC0a4.
+        exact (sysc_addr_word k Hk). }
       assert (HC3sp : C3 !!! Regidx csp_rs1 = spd)
         by (rewrite /C3 upd_ne; [exact HC2sp | vm_compute; discriminate]).
       assert (HC3s2 : C3 !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V)))
@@ -1338,7 +1355,8 @@ Section ProofSyscall.
                      = mword_of_int (KernelSyms.syscalls + 8 * Z.of_nat k)).
       { rewrite HC3a5. apply kv_addv_zero. }
       iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.syscall + 0x34)) Ra5 Ra5
-                (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) C3 (av - 4)%nat (mword_of_int (sysc_target k)) true
+                (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) C3 (av - 4)%nat
+                (mword_of_int (sysc_target k) : mword 64) true
                 (dqm := DfracDiscarded)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 []").
@@ -1414,22 +1432,43 @@ Section ProofSyscall.
         reflexivity. }
       iEval (rewrite HcspA0 -Hb1) in "Hr24". iEval (rewrite HcspA0 -Hb2) in "Hr16".
       iEval (rewrite HcspA0 -Hb3) in "Hr8".  iEval (rewrite HcspA0 -Hb4) in "Hr0".
-      iApply (sysc_arm_placeholder k γf pj bn fn dqi ip pid V lks av m D0 us Hk
+      (* THE ARM IS STATED AT THE HART THE DISPATCH LANDS ON, not at the
+         section's.  [Loop] names [cpu_id], so a section-level lemma's
+         conclusion is RIGID at the section [CID] and can never meet a goal
+         that this proof's own [wp_next] crossings have carried to [CID22]
+         (the failure is [iApply: cannot apply (WP Loop)], naming neither
+         hart).  Hence the [`{CIDh : CpuId}] on the arm vocabulary, exactly
+         as [ProofArgraw.ar_join] carries its own -- and the caller's
+         continuation, still anchored at [CID], is re-anchored here. *)
+      assert (Hcr22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID : CPU))
+        by wp_next_chain.
+      iDestruct (wp_next_retarget CID CID22 true pj _ Hcr22 with "Hcont") as "Hcont".
+      assert (Hcr8_22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID8 : CPU))
+        by wp_next_chain.
+      iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
+      iApply (sysc_arm_placeholder (CIDh := CID22) k γf pj bn fn dqi ip pid V lks av m D0 us Hk
                 HD0armsp HD0s2 HD0other HD0avb
                 with "[Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
+      { rewrite /sysc_arm_pre.
+        iFrame "Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv". }
     - (* ---------------- OUT OF RANGE: the printk fallback ---------------- *)
       (* [a3num]'s value fits in [mword 32]'s signed range by construction
          (it IS a sign-extended 32-bit value), so [sysc_bltu_taken]'s extra
          premise is free. *)
       assert (Ha3sig : (-2147483648 <= bv_signed a3num < 2147483648)%Z).
       { unfold a3num.
-        pose proof (bv_signed_in_range 32%N (subrange_vec_dec RAWNUM 31 0 : mword 32)) as Hr32.
+        pose proof (bv_signed_in_range 32%N (subrange_vec_dec RAWNUM 31 0 : mword 32)
+                      ltac:(done)) as Hr32.
         unfold bv_half_modulus, bv_modulus in Hr32.
-        change (2 ^ Z.of_N 32)%Z with 4294967296%Z in Hr32.
-        rewrite (sysc_sext_uint (subrange_vec_dec RAWNUM 31 0)).
-        rewrite (bv_wrap_small 64 (bv_signed (subrange_vec_dec RAWNUM 31 0))
-                   ltac:(unfold bv_modulus; change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z; lia)).
-        exact Hr32. }
+        change (2 ^ Z.of_N 32 `div` 2)%Z with 2147483648%Z in Hr32.
+        (* [a3num] is a SIGNED reading, so the bridge is [bv_sign_extend_signed]
+           (widening preserves the signed value), not [sysc_sext_uint] -- that
+           one is about [uint] and matches nothing here. *)
+        (* [exact], not [lia]: the two [bv_signed]s carry the SAME width by
+           conversion ([MachineWord.Z_idx (31 - 0 + 1)] vs [Z_idx 32]) but are
+           distinct ATOMS to [lia], which then reports "Cannot find witness". *)
+        rewrite bv_sign_extend_signed;
+          [ exact Hr32 | apply N.leb_le; vm_compute; reflexivity ]. }
       iPoseProof (syci_22 with "Htext") as "Hi22".
       iApply (wp_bltu_taken_s_sconf (mword_of_int (KernelSyms.syscall + 0x22)) (mword_of_int 30 : mword 13) Ra5 Ra4
                 B5 (av - 4)%nat true
@@ -1473,9 +1512,18 @@ Section ProofSyscall.
         reflexivity. }
       iEval (rewrite HcspA0 -Hb1) in "Hr24". iEval (rewrite HcspA0 -Hb2) in "Hr16".
       iEval (rewrite HcspA0 -Hb3) in "Hr8".  iEval (rewrite HcspA0 -Hb4) in "Hr0".
-      iApply (sysc_fallback_placeholder γf pj bn fn dqi ip pid V lks av m B5 us
+      (* the landing hart again -- see the note at [sysc_arm_placeholder]. *)
+      assert (Hcr15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID : CPU))
+        by wp_next_chain.
+      iDestruct (wp_next_retarget CID CID15 true pj _ Hcr15 with "Hcont") as "Hcont".
+      assert (Hcr8_15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID8 : CPU))
+        by wp_next_chain.
+      iDestruct (cpu_own_transport CID8 CID15 0%nat true pj true Hcr8_15 with "Hcpu") as "Hcpu".
+      iApply (sysc_fallback_placeholder (CIDh := CID15) γf pj bn fn dqi ip pid V lks av m B5 us
                 HB5armsp HB5s2 HB5other HB5avb
                 with "[Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
+      { rewrite /sysc_arm_pre.
+        iFrame "Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv". }
   Qed.
 
 End ProofSyscall.
