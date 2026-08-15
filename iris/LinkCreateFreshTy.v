@@ -45,12 +45,13 @@ Require Import InodeInv InodeLock InodeRegion.
 Require Import IrefSlots IcacheRef IcacheInv IcacheEscrow.
 Require Import SpecIalloc SpecIlock SpecDirlink SpecCreate.
 Require Import SpecCreateFreshTy.
+Require Import ProcAvail.
 
 Module CreateFreshTy : CREATE_FRESH_TY.
   Axiom create_fresh_ty :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

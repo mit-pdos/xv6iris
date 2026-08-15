@@ -131,6 +131,7 @@ Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -142,7 +143,7 @@ Definition K_kexit : nat := 74%nat.
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
@@ -262,7 +263,7 @@ Definition wp_kexit_sconf_body
 (* (SpecProcinit.proc_ready_lock_res is the same kind of check.)             *)
 (* ---------------------------------------------------------------------- *)
 Section KexitSeals.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (V : pprivate) :
@@ -284,7 +285,7 @@ Module Type KEXIT.
   Parameter wp_kexit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)

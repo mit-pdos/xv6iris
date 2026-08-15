@@ -50,6 +50,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSysFork.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -78,7 +79,7 @@ Module SysForkProof (Kfork : KFORK) : SYSFORK.
 
 Section ProofSysFork.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-            !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)

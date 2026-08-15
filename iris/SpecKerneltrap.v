@@ -53,6 +53,7 @@ Require Import DiskPtsto WpUart.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -238,7 +239,7 @@ Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
 Proof. unfold kerneltrap_stack, kv_frame_slots. lia. Qed.
 
 Definition wp_kerneltrap_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
@@ -325,7 +326,7 @@ Definition wp_kerneltrap_sconf_body
 
 Module Type KERNELTRAP.
   Parameter wp_kerneltrap_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)

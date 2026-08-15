@@ -87,6 +87,7 @@ Require Import SpecAcquire SpecRelease.
 Require Import SpecBrelse.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -112,7 +113,7 @@ Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
                    (Aq : ACQUIRE) (Rl : RELEASE) : BRELSE.
 
 Section ProofBrelse.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -73,6 +73,7 @@ Require Import SpecDirlink.
 Require Import SpecNamex.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -83,7 +84,7 @@ Definition K_nameiparent : nat := 104%nat.
 Definition wp_nameiparent_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -208,7 +209,7 @@ Definition wp_nameiparent_sconf_body
 Definition wp_nameiparent_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -343,7 +344,7 @@ Module Type NAMEIPARENT.
   Parameter wp_nameiparent_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -371,7 +372,7 @@ Module Type NAMEIPARENT.
   Parameter wp_nameiparent_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

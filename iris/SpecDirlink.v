@@ -212,6 +212,7 @@ Require Import SpecWritei.
 Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -435,7 +436,7 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
 Section DirlinkSpec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   (* Every entry's inode sleeplock, in the shape [IcacheBoot.icache_alloc]
      hands it out.  iput names ONE slot's lock; dirlink cannot know which
@@ -455,7 +456,7 @@ End DirlinkSpec.
 Definition wp_dirlink_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -701,7 +702,7 @@ Definition wp_dirlink_sconf_body
 Definition wp_dirlink_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -970,7 +971,7 @@ Module Type DIRLINK.
   Parameter wp_dirlink_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1003,7 +1004,7 @@ Module Type DIRLINK.
   Parameter wp_dirlink_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

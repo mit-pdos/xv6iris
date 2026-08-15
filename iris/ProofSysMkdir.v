@@ -132,6 +132,7 @@ Require Import SpecCreate.
 Require Import CodeSysMkdir.
 Require Import SpecSysMkdir.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -572,7 +573,7 @@ Module SysMkdirProof (BeginOp : BEGIN_OP) (Argstr : ARGSTR) (Create : CREATE)
 (*  beyond the two the epilogue below it wants.                           *)
 (* ===================================================================== *)
 Section ProofSysMkdirM1Tail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -738,7 +739,7 @@ End ProofSysMkdirM1Tail.
 Section ProofSysMkdirBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

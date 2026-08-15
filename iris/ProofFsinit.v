@@ -98,6 +98,7 @@ Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -182,7 +183,7 @@ Definition fsi_thr4 (m M : regfile) : Prop :=
 Section FsinitDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   (* ra@24 s0@16 s1@8 s2@0 off the pushed sp, i.e. slots 1..4 off the entry *)
   Definition fsi_frame (m : regfile) : iProp Σ :=
@@ -274,7 +275,7 @@ End FsinitDefs.
 Section FsinitEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   Local Lemma fsi_epilogue `{GEN : GenId} `{CID0 : CpuId}
       (j : nat) (bn : bio_names) (γfs : fs_names)
@@ -518,7 +519,7 @@ End FsinitEpilogue.
 Section FsinitMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   Lemma wp_fsinit_sconf `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

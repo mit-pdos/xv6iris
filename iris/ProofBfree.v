@@ -82,6 +82,7 @@ Require Import PanicStub.
 Require Import SpecBread SpecBrelse SpecLogWrite.
 Require Import SpecBfree.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -512,7 +513,7 @@ Local Ltac bfidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  Vocabulary: the frame, the byte accessor, the continuation.           *)
 (* ===================================================================== *)
 Section BfreeDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -597,7 +598,7 @@ Definition bf_sp (m M : regfile) : Prop :=
 (*  +0x4a .. +0x5e : log_write, brelse and the epilogue.                  *)
 (* ===================================================================== *)
 Section BfreeTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} 
@@ -1019,7 +1020,7 @@ End BfreeTail.
 (*  +0x00 .. +0x46 : the prologue, bread, the bit test and the clear.     *)
 (* ===================================================================== *)
 Section ProofBfreeMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -68,6 +68,7 @@ Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -88,7 +89,7 @@ Local Open Scope Z_scope.
    caller, is unproven. *)
 Definition uartwrite_stack : nat := 30%nat.
 
-Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
@@ -160,7 +161,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool)

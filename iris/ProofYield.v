@@ -55,6 +55,7 @@ Require Import KernelRvcDecode.
 Require Import CodeYield.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecYield.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -104,7 +105,7 @@ Module YieldProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release
 (* its last instruction, so even the epilogue is hart-generic.             *)
 (* ===================================================================== *)
 Section YieldPostSched.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)
   Local Ltac yd_peel :=
@@ -458,7 +459,7 @@ Section YieldPostSched.
 End YieldPostSched.
 
 Section ProofYield.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_yield_sconf 

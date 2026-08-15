@@ -56,6 +56,7 @@ Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -67,7 +68,7 @@ Local Open Scope Z_scope.
 Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_releasesleep_gen_sconf

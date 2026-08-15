@@ -139,6 +139,7 @@ Require Import SpecNamex.       (* [ROOTDEV] *)
 Require Import SpecCreate.      (* [create_slots], [create_units], [T_DEVICE] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -164,7 +165,7 @@ End SpecSysMknod.
 Definition wp_sys_mknod_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
@@ -299,7 +300,7 @@ Module Type SYSMKNOD.
   Parameter wp_sys_mknod_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)

@@ -142,6 +142,7 @@ Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecNamex.      (* [walk_need], [ROOTDEV] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -154,7 +155,7 @@ Definition K_sys_chdir : nat := 126%nat.
 
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ}.
+            !irefslotG Σ, !pavG Σ}.
 
   (* sys_chdir's result, keyed by the returned a0.  The -1 arm gives the
      process block back at the working directory it came in with; the 0 arm
@@ -173,7 +174,7 @@ End SpecSysChdir.
 Definition wp_sys_chdir_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname)                          (* ftable, kalloc      *)
@@ -293,7 +294,7 @@ Module Type SYSCHDIR.
   Parameter wp_sys_chdir_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)

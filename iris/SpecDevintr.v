@@ -79,6 +79,7 @@ Require Import SpecClockintr.
 Require Import SpecConsoleintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -109,7 +110,7 @@ Definition devintr_ret (sc : mword 64) : mword 64 :=
 (* ===================================================================== *)
 
 Section DevintrCaps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -167,7 +168,7 @@ End DevintrCaps.
 Definition devintr_stack : nat := 40%nat.
 
 Definition wp_devintr_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
@@ -205,7 +206,7 @@ Definition wp_devintr_sconf_body
 
 Module Type DEVINTR.
   Parameter wp_devintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)

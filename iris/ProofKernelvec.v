@@ -63,6 +63,7 @@ Require Import SpecKerneltrap SpecKernelvec.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
 Require Import KernelRvcDecode.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -1411,7 +1412,7 @@ Qed.
 (* through [kv_cfg_split], and comes back out for the sret.                  *)
 (* ===================================================================== *)
 Section KernelvecHandler.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

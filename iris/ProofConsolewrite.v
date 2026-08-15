@@ -70,6 +70,7 @@ Require Import CodeConsolewrite.
 Require Import SpecConsolewrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -117,7 +118,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section CwBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 

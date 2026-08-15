@@ -75,6 +75,7 @@ Require Import SpecVirtioDiskRw.
 Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRwD ProofVirtioDiskRwDSeam.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -188,7 +189,7 @@ Module VirtioDiskRwRestE (Acquire : ACQUIRE) (Release : RELEASE)
 Module P4 := VirtioDiskRwRestD Acquire Release SleepPrepare Sleep FreeDesc.
 
 Section ProofVirtioDiskRwE.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

@@ -133,6 +133,7 @@ Require Import IcacheEscrow.
 Require Import SleepLock.
 Require Import SpecIput.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
@@ -213,7 +214,7 @@ Section SpecFileclose.
      contract is applied at the one that comes with the file table. *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_PIPE arm's environment: pipeclose's ---- *)
@@ -611,7 +612,7 @@ End SpecFileclose.
 Definition wp_fileclose_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
@@ -670,7 +671,7 @@ Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)

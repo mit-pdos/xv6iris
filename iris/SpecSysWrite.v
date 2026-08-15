@@ -111,6 +111,7 @@ Require Import SpecSysRead.
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -131,7 +132,7 @@ Definition sys_write_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : 
 Section SpecSysWrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE ENVIRONMENT FILEWRITE'S [if] ACTUALLY ASKS FOR, out of the two
@@ -180,7 +181,7 @@ End SpecSysWrite.
 Definition wp_sys_write_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+      !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -248,7 +249,7 @@ Module Type SYSWRITE.
   Parameter wp_sys_write_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

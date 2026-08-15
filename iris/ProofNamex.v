@@ -154,6 +154,7 @@ Require Import CodeNamex.
 Require Import SpecNamex.
 Require Import ProofDirlookupParts ProofNamexParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -264,93 +265,6 @@ Proof.
   intro H. split_and!; lia.
 Qed.
 
-(* ---- the two BYTE TESTS namex performs, in both register orders ------
-   [lbu] leaves [zero_extend' 64 v]; the separator is compared against the
-   literal 47 (in [a5] at +0x26, in [s3] everywhere else) and the terminator
-   against [x0].  The family of [ProofNamecmp.nc_byte_of_zero]: bv_unsigned
-   arithmetic, no 256-way case split. *)
-Lemma nx_zext8_unsigned (x : mword 8) :
-  bv_unsigned (zero_extend' 64 x : mword 64) = bv_unsigned x.
-Proof.
-  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
-       to_word get_word MachineWord.MachineWord.zero_extend].
-  apply bv_zero_extend_unsigned. vm_compute. discriminate.
-Qed.
-
-Lemma nx_slash_eq (v : mword 8) : v = SLASH ->
-  eq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = true.
-Proof.
-  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma nx_slash_ne (v : mword 8) : v <> SLASH ->
-  eq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = false.
-Proof.
-  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
-  apply (f_equal bv_unsigned) in Hc. rewrite nx_zext8_unsigned in Hc.
-  apply bv_eq. rewrite Hc. vm_compute. reflexivity.
-Qed.
-
-Lemma nx_slash_eq' (v : mword 8) : v = SLASH ->
-  eq_vec (mword_of_int 47 : mword 64) (zero_extend' 64 v : mword 64) = true.
-Proof.
-  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma nx_slash_ne' (v : mword 8) : v <> SLASH ->
-  eq_vec (mword_of_int 47 : mword 64) (zero_extend' 64 v : mword 64) = false.
-Proof.
-  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
-  apply (f_equal bv_unsigned) in Hc. rewrite nx_zext8_unsigned in Hc.
-  apply bv_eq. rewrite -Hc. vm_compute. reflexivity.
-Qed.
-
-Lemma nx_nul_eq (v : mword 8) : v = NUL ->
-  eq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = true.
-Proof.
-  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
-  apply bv_eq; vm_compute; reflexivity.
-Qed.
-
-Lemma nx_nul_ne (v : mword 8) : v <> NUL ->
-  eq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = false.
-Proof.
-  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
-  apply (f_equal bv_unsigned) in Hc. rewrite nx_zext8_unsigned in Hc.
-  apply bv_eq. rewrite Hc. vm_compute. reflexivity.
-Qed.
-
-(* the [c.addi s1,s1,1] of all three separator skips, as an index step *)
-Lemma nx_addi1 (p : mword 64) (i : nat) :
-  add_vec (pa_add p i)
-    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))
-  = pa_add p (S i).
-Proof.
-  assert (H1 : (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))
-                : mword 64) = mword_of_int 1)
-    by (apply bv_eq; vm_compute; reflexivity).
-  rewrite H1. apply pa_add_S.
-Qed.
-
-(* ---- the same two tests in [bne]/[bnez] polarity.  [neq_vec] is
-   [negb (eq_vec ...)], so each is one [unfold] away from its sibling. *)
-Lemma nx_nslash_ne (v : mword 8) : v <> SLASH ->
-  neq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = true.
-Proof. intro H. unfold neq_vec. rewrite (nx_slash_ne v H). reflexivity. Qed.
-
-Lemma nx_nslash_eq (v : mword 8) : v = SLASH ->
-  neq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = false.
-Proof. intro H. unfold neq_vec. rewrite (nx_slash_eq v H). reflexivity. Qed.
-
-Lemma nx_nnul_ne (v : mword 8) : v <> NUL ->
-  neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = true.
-Proof. intro H. unfold neq_vec. rewrite (nx_nul_ne v H). reflexivity. Qed.
-
-Lemma nx_nnul_eq (v : mword 8) : v = NUL ->
-  neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = false.
-Proof. intro H. unfold neq_vec. rewrite (nx_nul_eq v H). reflexivity. Qed.
 
 (* ---- THE [addi a4,a5,-47] SLASH TEST at +0x10c and +0x11c (N4b trap 8).
    The immediate decodes as [4049 : mword 12] = -47, and [a4] is zero exactly
@@ -652,7 +566,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 Section ProofNamexMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.

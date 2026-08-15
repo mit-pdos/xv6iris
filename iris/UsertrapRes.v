@@ -79,6 +79,7 @@ Require Import SpecKernelvec.   (* the two kernelvec trap-vector facts *)
 Require Import SpecUsertrap.   (* USERTRAP_RES -- the fit is checked at the foot *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -106,7 +107,7 @@ Definition K_usertrap : nat := (4 + kv_frame_slots + K_syscall)%nat.
 Section UsertrapRes.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------- *)
@@ -1141,7 +1142,7 @@ Qed.
 Lemma ut_hold_transport
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId}
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> iProp Σ)
     (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
@@ -1179,7 +1180,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
   Definition usertrap_res
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !kallocG Σ, !irefslotG Σ, !iregG Σ}
+        !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
     ut_res SY.syscall_env.
 
@@ -1201,7 +1202,7 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
   Lemma usertrap_res_tlb_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-        !kallocG Σ, !irefslotG Σ, !iregG Σ}
+        !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
     usertrap_res pt ksp -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.

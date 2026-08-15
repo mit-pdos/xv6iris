@@ -83,6 +83,7 @@ Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TimerCap.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 (* the secondary arm's stack budget: see the header.  Like [SpecMain.K_main]
    this is set by the SCHEDULER's trap reserve rather than by the arm's own
@@ -92,7 +93,7 @@ From Kernel Require KernelSyms.
 Definition K_main_secondary : nat := 100%nat.
 
 Section SpecMainSecondary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -174,7 +175,7 @@ End SpecMainSecondary.
 
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (m : regfile) (K : nat)

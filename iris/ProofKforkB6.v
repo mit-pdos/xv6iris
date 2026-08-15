@@ -82,6 +82,7 @@ Require Import CodeKfork.
 Require Import ProofKforkParts.
 Require Import ProofKfork.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -93,7 +94,7 @@ Notation KF := KernelSyms.kfork (only parsing).
 Module KforkPrologue (Myproc : MYPROC) (Allocproc : ALLOCPROC_GEN) (Uvmcopy : UVMCOPY).
 
 Section KforkPrologue.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
@@ -258,6 +259,10 @@ Section KforkPrologue.
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
     kalloc_env γa on -∗
+    (* the proc table's sealed regime -- what allocproc mints the new slot's
+       marker out of.  Persistent, so it costs the three continuations
+       nothing. *)
+    procs_avail None -∗
     proc_priv γf pme pid_p Vp -∗
     (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
        continuations below are three DIFFERENT closures and exactly one of
@@ -391,6 +396,10 @@ Section KforkPrologue.
           (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
         proc_priv γf pme pid_p Vp -∗
         proc_priv_nocwd γf npa pid_c Vc' -∗
+        (* the new slot's ALLOCATION MARKER, minted by allocproc and needed
+           by whoever finally parks the slot at USED / RUNNABLE
+           ([SchedCtx.proc_slots_park]).  Persistent. *)
+        pslot_used_at npa -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
@@ -428,7 +437,7 @@ Section KforkPrologue.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
     unfold K_kfork in HK.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
-             #Hitinv Henv Hpv HR Hcont10a Hcont7c Hcont4a".
+             #Hitinv Henv #Hpav Hpv HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     iPoseProof (kfk_000 with "Htext") as "Hi000".
     iPoseProof (kfk_002 with "Htext") as "Hi002".
@@ -645,9 +654,9 @@ Section KforkPrologue.
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)
       by (rewrite /M5 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on b lks
+    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on None b lks
               ltac:(lia) ltac:(lia) Hbelow
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Henv").
+              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Henv Hpav").
     all: try lkbelow.
     iIntros (CID11 Hs11 mf6) "%HcsB Hpc Hpost".
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))
@@ -677,7 +686,7 @@ Section KforkPrologue.
     rewrite /allocproc_post.
     iDestruct "Hpost" as "[Hp1 | [Hp2 | Hp3]]".
     - (* ---- arm 1: no free slot, budget untouched ---- *)
-      iDestruct "Hp1" as "(%Hrv & Hcg & Hcpu & Henv')".
+      iDestruct "Hp1" as "(%Hrv & _ & Hcg & Hcpu & Henv' & _)".
       assert (HBa0 : mf6 !!! Regidx Ra0 = (zero_reg : mword 64)) by exact Hrv.
       iApply (wp_beqz_x0_taken_s_sconf (mword_of_int (KF + 0x16)) (mword_of_int 244 : mword 13)
                 Ra0 mf6 K1 b
@@ -706,7 +715,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & Hfdsp & Hirsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv')".
+        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
@@ -1262,7 +1271,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
-                        Hheld Hhart Hfdsp Hirsp [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
+                        Hmk Hheld Hhart Hfdsp Hirsp [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.
@@ -1278,7 +1287,7 @@ Section KforkPrologue.
           iFrame "Hks Hctx".
         * iExact "Henv'".
     - (* ---- arm 3: a failure tail ran, budget resealed ---- *)
-      iDestruct "Hp3" as "(%Hrv & %Hwit & Hcg & Hcpu & Henv')".
+      iDestruct "Hp3" as "(%Hrv & %Hwit & Hcg & Hcpu & Henv' & _)".
       assert (HBa0 : mf6 !!! Regidx Ra0 = (zero_reg : mword 64)) by exact Hrv.
       iApply (wp_beqz_x0_taken_s_sconf (mword_of_int (KF + 0x16)) (mword_of_int 244 : mword 13)
                 Ra0 mf6 K1 b

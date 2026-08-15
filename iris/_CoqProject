@@ -374,6 +374,7 @@ WpSwtchVc.v
 SpecSwtch.v
 ProofSwtch.v
 LinkSwtch.v
+ProcAvail.v
 SchedCtx.v
 SpecMyproc.v
 CodeMyproc.v
@@ -866,6 +867,7 @@ SpecSysSbrk.v
 CodeSysSbrk.v
 ProofSysSbrk.v
 LinkSysSbrk.v
+CodeUserinit.v
 SpecUserinit.v
 LinkUserinit.v
 StartedInv.v
@@ -1022,8 +1024,12 @@ SpecNamei.v
 SpecNameiparent.v
 ProofNamex.v
 LinkNamex.v
+ProofNamexRoot.v
+LinkNamexRoot.v
 ProofNamei.v
 LinkNamei.v
+ProofNameiRoot.v
+LinkNameiRoot.v
 ProofNameiparent.v
 LinkNameiparent.v
 WpIntrOff.v

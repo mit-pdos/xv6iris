@@ -313,6 +313,38 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma inv_dormant_RUNNING : inv_dormant RUNNING = false.
 Proof. vm_compute. reflexivity. Qed.
 
+(* ---- THE UNUSED CUT-OUT, the guard [ProcAvail]'s allocation marker sits
+   under.  [inv_dormant] is not it: a ZOMBIE slot is DORMANT but it is
+   ALLOCATED, and allocproc's scan walks straight past it.  Every derivation
+   below runs the other way -- from a guard that is already in a lemma's
+   premises to [is_unused st = false] -- so no call site ever has to state
+   this one. *)
+Definition is_unused (st : mword 32) : bool := bool_decide (st = UNUSED).
+
+Lemma is_unused_UNUSED   : is_unused UNUSED   = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_unused_USED     : is_unused USED     = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_unused_SLEEPING : is_unused SLEEPING = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_unused_RUNNABLE : is_unused RUNNABLE = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_unused_RUNNING  : is_unused RUNNING  = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_unused_ZOMBIE   : is_unused ZOMBIE   = false.
+Proof. vm_compute. reflexivity. Qed.
+
+(* UNUSED is dormant, so anything the invariant calls non-dormant is
+   allocated -- this is what keeps [proc_slots_recast] (both states
+   non-dormant) free of the marker on BOTH sides, and so keeps every
+   ordinary state change out of this story. *)
+Lemma is_unused_of_inv_dormant (st : mword 32) :
+  inv_dormant st = false -> is_unused st = false.
+Proof.
+  rewrite /inv_dormant /is_unused. intro H.
+  apply orb_false_iff in H as [H _]. exact H.
+Qed.
+
 (* USED IS IN HERE, and it is not a rounding error.  [USED] is a state a proc
    can be in with its lock RELEASED: kfork drops p->lock after allocproc so it
    can take wait_lock to set p->parent (taking wait_lock under p->lock inverts
@@ -463,6 +495,21 @@ Proof.
   exact (needs_ctx_not_RUNNING st Hn).
 Qed.
 
+(* the two remaining routes to [is_unused st = false] -- one per guard a
+   [proc_slots] lemma already carries. *)
+Lemma is_unused_of_needs_ctx (st : mword 32) :
+  needs_ctx st = true -> is_unused st = false.
+Proof.
+  intro H. exact (is_unused_of_inv_dormant st (inv_dormant_of_needs_ctx st H)).
+Qed.
+
+Lemma is_unused_of_is_running (st : mword 32) :
+  is_running st = true -> is_unused st = false.
+Proof.
+  rewrite /is_running /is_unused. intro H.
+  apply bool_decide_eq_true_1 in H. subst st. vm_compute. reflexivity.
+Qed.
+
 (* THE STATES A THREAD MAY PARK INTO -- what sched() demands of the state its
    caller has already stored.  Two of them are the resumable ones
    ([needs_ctx]: yield's RUNNABLE, sleep's SLEEPING); the third is ZOMBIE,
@@ -513,6 +560,14 @@ Proof.
   apply andb_true_iff in H as [H _]. apply orb_true_iff in H as [H|H].
   - by left.
   - right. by apply bool_decide_eq_true in H.
+Qed.
+
+Lemma is_unused_of_park_ok (st : mword 32) :
+  park_ok st = true -> is_unused st = false.
+Proof.
+  intro H. apply park_ok_cases in H as [H | ->].
+  - exact (is_unused_of_needs_ctx st H).
+  - exact is_unused_ZOMBIE.
 Qed.
 
 (* a parking state is not RUNNING (this is what refutes sched's

@@ -63,6 +63,7 @@ Require Import PanicStub.
 Require Import SpecKkill.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeKkill.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc invariant otherwise
@@ -169,7 +170,7 @@ Definition kk_exit_regs (M mb : regfile) (spd rv : mword 64) : Prop :=
 Module KkillProof (Acquire : ACQUIRE) (Release : RELEASE) : KKILL.
 
 Section ProofKkill.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* NO section [CpuId]: the loop lemma is applied at the hart the prologue
      hands back, which a section variable could not express. *)
 
@@ -848,7 +849,7 @@ End ProofKkill.
 (* The whole function: prologue -> scan (k = 0) -> epilogue.            *)
 (* ==================================================================== *)
 Section ProofKkillMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

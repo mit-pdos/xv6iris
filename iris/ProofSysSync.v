@@ -91,6 +91,7 @@ Require Import SpecSysSync.
 Require Import CodeSysSync.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -271,7 +272,7 @@ Qed.
 (* ===================================================================== *)
 
 Section SsProps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !fsLogG Σ, !logG Σ}.
 
   (* The log lock's resource, opened for exactly the three cells sys_sync
@@ -373,7 +374,7 @@ Local Ltac reg_neq :=
     tryif unify a b then fail else (vm_compute; discriminate) end.
 
 Section SsBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !fsLogG Σ, !logG Σ}.
 
   (* ---- THE SHARED TAIL: +0x5e (a0 := &log) .. +0x72 (c.ret) ---- *)
@@ -1134,7 +1135,7 @@ End SsBodies.
 (* ===================================================================== *)
 
 Section ProofSysSync.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

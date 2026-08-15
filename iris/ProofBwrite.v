@@ -81,6 +81,7 @@ Require Import SpecBwrite.
 Require Import CodeBwrite.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -118,7 +119,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac bwidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofBwrite.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bwrite_sconf 

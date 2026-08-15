@@ -80,6 +80,7 @@ Require Import KernelRvcDecode.
 Require Import CodeSleep.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecSleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -128,7 +129,7 @@ Module SleepProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release
 (* only thing that differs, and it is existential in the lock invariant.   *)
 (* ===================================================================== *)
 Section SleepJoin.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* extract the opaque context-slot payload, leaving the bundle at slot
      [emp] (what the sched call-site hands across the swtch).  It carries its
@@ -486,7 +487,7 @@ Section SleepJoin.
 End SleepJoin.
 
 Section ProofSleepBody.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sleep_sconf

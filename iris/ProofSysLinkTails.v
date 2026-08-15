@@ -97,6 +97,7 @@ Require Import CodeSysLink.
 Require Import SpecSysLink.
 Require Import ProofSysLinkParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -116,7 +117,7 @@ Module SysLinkTails (Ilock : ILOCK) (Iupdate : IUPDATE)
 Section ProofSysLinkTails.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

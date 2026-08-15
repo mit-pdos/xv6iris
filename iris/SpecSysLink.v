@@ -183,6 +183,7 @@ Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecNamex.      (* [walk_need], [ROOTDEV] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -206,7 +207,7 @@ Definition sys_link_ret (r : mword 64) : Prop :=
 Definition wp_sys_link_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname) (γpr : gname)      (* ftable, kalloc, printk   *)
@@ -340,7 +341,7 @@ Module Type SYSLINK.
   Parameter wp_sys_link_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)

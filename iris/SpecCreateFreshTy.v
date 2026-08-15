@@ -127,6 +127,7 @@ Require Import SpecDirlink.
 Require Import SpecCreate.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -146,7 +147,7 @@ Definition cr_cs_but_s3 (m mf : regfile) : Prop :=
 Definition create_fresh_ty_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)
@@ -305,7 +306,7 @@ Module Type CREATE_FRESH_TY.
   Parameter create_fresh_ty :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

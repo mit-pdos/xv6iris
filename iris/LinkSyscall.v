@@ -36,17 +36,18 @@ Require Import WpLock FdSlots IrefSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecSyscall.
+Require Import ProcAvail.
 
 Module Syscall : SYSCALL.
   (* hart-free, as the interface requires -- see SpecSyscall's note on
      [syscall_env]: usertrap frames this across [true]-indexed steps. *)
   Definition syscall_env
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId}
     (γf : gname) (pj : mword 64) : iProp Σ := emp%I.
 
   Axiom wp_syscall_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat)

@@ -24,10 +24,11 @@ Require Import RegFile.
 Require Import WpLock KallocInv FdSlots.
 Require Import SpecUserinit.
 Require Import IrefSlots.
+Require Import ProcAvail.
 
 Module Userinit : USERINIT.
   Axiom wp_userinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)

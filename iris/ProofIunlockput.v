@@ -49,6 +49,7 @@ Require Import CodeIunlockput.
 Require Import SpecIunlock SpecIput.
 Require Import SpecIunlockput.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -84,7 +85,7 @@ Definition iulp_sp (m M : regfile) : Prop :=
 Section ProofIunlockputMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  iunlockput is a wrapper,

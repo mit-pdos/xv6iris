@@ -68,6 +68,7 @@ Require Import CodeIunlock.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecIunlock.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -109,7 +110,7 @@ Definition iul_sp (m M : regfile) : Prop :=
 
 Section ProofIunlockMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-            !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)

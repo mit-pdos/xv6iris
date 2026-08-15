@@ -69,6 +69,7 @@ Require Import CodeKfork.
 Require Import ProofKforkParts.
 Require Import ProofKfork.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -93,7 +94,7 @@ Proof. lia. Qed.
 
 Module KforkB1 (FP : FREEPROC) (RL : RELEASE).
 Section KforkB1Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

@@ -198,6 +198,7 @@ Require Import SpecIput.
 Require Import SpecDirlink.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -340,7 +341,7 @@ Definition kexec_ok (V V' : pprivate) (r : mword 64)
 Definition fs_fabric
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (gs : list gname) (gu : uart_names) (gd : disk_names) (gk : gname)
     (pd pav pu : mword 64) (bn : bio_names)
@@ -364,7 +365,7 @@ Definition fs_fabric
 Global Instance fs_fabric_persistent
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     gs gu gd gk pd pav pu bn g gfs gi cn gtl cov logstart inodestart nib dev :
   Persistent (fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -377,7 +378,7 @@ Proof. apply _. Qed.
 Definition wp_kexec_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (jp : nat) (gl : gname)           (* the running process *)
@@ -545,7 +546,7 @@ Module Type KEXEC.
   Parameter wp_kexec_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

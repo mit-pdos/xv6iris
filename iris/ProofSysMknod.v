@@ -141,6 +141,7 @@ Require Import SpecCreate.
 Require Import CodeSysMknod.
 Require Import SpecSysMknod.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -804,7 +805,7 @@ Module SysMknodProof (BeginOp : BEGIN_OP) (Argint : ARGINT) (Argstr : ARGSTR)
 (*  beyond the two the epilogue below it wants.                           *)
 (* ===================================================================== *)
 Section ProofSysMknodM1Tail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -974,7 +975,7 @@ End ProofSysMknodM1Tail.
 Section ProofSysMknodBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).

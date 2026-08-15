@@ -50,6 +50,7 @@ Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -68,7 +69,7 @@ Local Open Scope Z_scope.
    `assert (trap_res true = 78%nat) as -> by reflexivity; lia`.)  *)
 Definition piperead_stack : nat := 62%nat.
 
-Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
@@ -122,7 +123,7 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 
 Module Type PIPEREAD.
   Parameter wp_piperead_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool)

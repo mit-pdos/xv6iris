@@ -56,6 +56,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* bread's own frame is 48 bytes (6 slots); its deepest callee is
@@ -63,7 +64,7 @@ Import Defs.
 Definition K_bread : nat := 40%nat.
 
 Definition wp_bread_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -156,7 +157,7 @@ Definition wp_bread_sconf_body
 
 Module Type BREAD.
   Parameter wp_bread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)

@@ -80,6 +80,7 @@ Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKexit.      (* [K_kexit] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -90,7 +91,7 @@ Definition K_sys_exit : nat := (4 + K_kexit)%nat.
 Definition wp_sys_exit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
@@ -174,7 +175,7 @@ Module Type SYSEXIT.
   Parameter wp_sys_exit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)

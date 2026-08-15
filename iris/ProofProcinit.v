@@ -71,6 +71,7 @@ Require Import CodeProcinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecProcinit.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -169,7 +170,7 @@ Section ProofProcinit.
   Context `{!sieG Σ}.
   Context `{!lockG Σ}.
   Context `{!fileG Σ}.
-  Context `{!fdslotG Σ, !irefslotG Σ}.
+  Context `{!fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]

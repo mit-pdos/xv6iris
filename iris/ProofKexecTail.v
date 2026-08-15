@@ -124,6 +124,7 @@ Require Import SpecProcFreepagetable.
 Require Import ProofKexecParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -905,7 +906,7 @@ End KexecA.
 Section KexecASeam.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -985,7 +986,7 @@ Module KexecTailProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
 Section KexecAExit.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1205,7 +1206,7 @@ End KexecAExit.
 Section KexecABad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -1587,7 +1588,7 @@ Module T := KexecTailProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp.
 Section KexecCBad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

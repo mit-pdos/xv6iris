@@ -94,6 +94,7 @@ Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -105,7 +106,7 @@ Local Open Scope Z_scope.
 Definition consoleread_stack : nat := 62%nat.
 
 Definition wp_consoleread_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
@@ -165,7 +166,7 @@ Definition wp_consoleread_sconf_body
 
 Module Type CONSOLEREAD.
   Parameter wp_consoleread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γc : gname)

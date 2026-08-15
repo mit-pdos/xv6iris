@@ -54,6 +54,7 @@ Require Import SpecArgint SpecKexit.
 Require Import SpecSysExit.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeSysExit.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a WP over [proc_priv] otherwise spends tens of
@@ -90,7 +91,7 @@ Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 Section ProofSysExit.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.

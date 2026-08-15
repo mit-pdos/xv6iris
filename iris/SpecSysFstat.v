@@ -137,6 +137,7 @@ Require Import SpecArgfd.
 Require Import SpecFilestat.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -158,7 +159,7 @@ Definition sys_fstat_ret (V : pprivate) (v : mword 64) (r : mword 64) : Prop :=
 Section SpecSysFstat.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE DESCRIPTOR ENVIRONMENT -- AND IT IS NO LONGER A WAND.
@@ -192,7 +193,7 @@ End SpecSysFstat.
 Definition wp_sys_fstat_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -255,7 +256,7 @@ Module Type SYSFSTAT.
   Parameter wp_sys_fstat_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)

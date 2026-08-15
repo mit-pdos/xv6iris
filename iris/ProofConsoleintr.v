@@ -91,6 +91,7 @@ Require Import CodeConsoleintr.
 Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -136,7 +137,7 @@ Notation Rs10 := (mword_of_int 26 : mword 5).
 Notation Rs11 := (mword_of_int 27 : mword 5).
 
 Section CtBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
@@ -518,7 +519,7 @@ Module ConsoleintrProof (Acquire : ACQUIRE) (Consputc : CONSPUTC)
                         : CONSOLEINTR.
 
 Section ProofConsoleintr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

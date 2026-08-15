@@ -65,6 +65,7 @@ Require Import IrefSlots InodeRegion.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
@@ -78,7 +79,7 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
 Section ProofPipealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

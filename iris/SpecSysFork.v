@@ -81,6 +81,7 @@ Require Import SpecAllocpid.
 Require Import SpecKfork.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -89,7 +90,7 @@ Definition K_sys_fork : nat := (K_kfork + 2)%nat.
 
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-      !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname) (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
@@ -134,7 +135,7 @@ Definition wp_sys_fork_sconf_body
 Module Type SYSFORK.
   Parameter wp_sys_fork_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-             !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)

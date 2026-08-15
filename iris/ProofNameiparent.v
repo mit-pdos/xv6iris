@@ -63,6 +63,7 @@ Require Import SpecDirlookup.
 Require Import SpecNamex.
 Require Import SpecNameiparent.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -148,7 +149,7 @@ Local Ltac npidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 Section ProofNameiparentMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WALK IS THE SET FORM; the counted seal follows it. *)

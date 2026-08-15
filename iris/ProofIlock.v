@@ -136,6 +136,7 @@ Require Import PanicStub.
 Require Import SpecAcquiresleep SpecBread SpecBrelse SpecMemmove.
 Require Import SpecIlock.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -302,7 +303,7 @@ Definition il_sp (m M : regfile) : Prop :=
 
 Section IlockDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
@@ -358,7 +359,7 @@ End IlockDefs.
 (* ===================================================================== *)
 Section IlockEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
@@ -608,7 +609,7 @@ End IlockEpilogue.
 (* ===================================================================== *)
 Section IlockLoad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   (* ------------------------------------------------------------------ *)
   (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
@@ -1942,7 +1943,7 @@ End IlockLoad.
 
 Section ProofIlockMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ilock_sconf 

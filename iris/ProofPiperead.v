@@ -86,6 +86,7 @@ Require Import CodePiperead.
 Require Import SpecPiperead.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -381,7 +382,7 @@ Module PipereadProof (Myproc : MYPROC) (AcquireGen : ACQUIRE_GEN)
                      (Copyout : COPYOUT) (ReleaseGen : RELEASE_GEN) : PIPEREAD.
 
 Section ProofPiperead.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register disequality guard (perf rule): [unify] settles convertibility

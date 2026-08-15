@@ -40,6 +40,7 @@ From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSysKill.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -57,7 +58,7 @@ Qed.
 Module SysKillProof (Argint : ARGINT) (Kkill : KKILL) : SYSKILL.
 
 Section ProofSysKill.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

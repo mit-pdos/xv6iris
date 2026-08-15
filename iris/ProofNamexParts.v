@@ -69,7 +69,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
-Require Import StackOwn.
+Require Import RiscvModelBytes.
+Require Import RiscvPtsto.
+Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import ByteBuf.
 Require Import DirentEnc.
@@ -542,3 +544,97 @@ Proof.
   intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
   apply nx_sext16_inj. rewrite Hc nx_sext_zero. reflexivity.
 Qed.
+
+(* ===================================================================== *)
+(*  7.  THE BYTE TESTS.  Pure [mword] facts about what [lbu] leaves and   *)
+(*      what the four branch polarities decide, moved here from the       *)
+(*      whole-function file so that BOTH namex proofs -- the walk and     *)
+(*      the root corner ([ProofNamexRoot.v]) -- read them from one place. *)
+(* ===================================================================== *)
+(* ---- the two BYTE TESTS namex performs, in both register orders ------
+   [lbu] leaves [zero_extend' 64 v]; the separator is compared against the
+   literal 47 (in [a5] at +0x26, in [s3] everywhere else) and the terminator
+   against [x0].  The family of [ProofNamecmp.nc_byte_of_zero]: bv_unsigned
+   arithmetic, no 256-way case split. *)
+Lemma nx_zext8_unsigned (x : mword 8) :
+  bv_unsigned (zero_extend' 64 x : mword 64) = bv_unsigned x.
+Proof.
+  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
+       to_word get_word MachineWord.MachineWord.zero_extend].
+  apply bv_zero_extend_unsigned. vm_compute. discriminate.
+Qed.
+
+Lemma nx_slash_eq (v : mword 8) : v = SLASH ->
+  eq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = true.
+Proof.
+  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma nx_slash_ne (v : mword 8) : v <> SLASH ->
+  eq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = false.
+Proof.
+  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
+  apply (f_equal bv_unsigned) in Hc. rewrite nx_zext8_unsigned in Hc.
+  apply bv_eq. rewrite Hc. vm_compute. reflexivity.
+Qed.
+
+Lemma nx_slash_eq' (v : mword 8) : v = SLASH ->
+  eq_vec (mword_of_int 47 : mword 64) (zero_extend' 64 v : mword 64) = true.
+Proof.
+  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma nx_slash_ne' (v : mword 8) : v <> SLASH ->
+  eq_vec (mword_of_int 47 : mword 64) (zero_extend' 64 v : mword 64) = false.
+Proof.
+  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
+  apply (f_equal bv_unsigned) in Hc. rewrite nx_zext8_unsigned in Hc.
+  apply bv_eq. rewrite -Hc. vm_compute. reflexivity.
+Qed.
+
+Lemma nx_nul_eq (v : mword 8) : v = NUL ->
+  eq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = true.
+Proof.
+  intros ->. apply (proj2 (eq_vec_true_iff _ _)).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma nx_nul_ne (v : mword 8) : v <> NUL ->
+  eq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = false.
+Proof.
+  intro Hne. apply (proj2 (eq_vec_false_iff _ _)). intro Hc. apply Hne.
+  apply (f_equal bv_unsigned) in Hc. rewrite nx_zext8_unsigned in Hc.
+  apply bv_eq. rewrite Hc. vm_compute. reflexivity.
+Qed.
+
+(* the [c.addi s1,s1,1] of all three separator skips, as an index step *)
+Lemma nx_addi1 (p : mword 64) (i : nat) :
+  add_vec (pa_add p i)
+    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))
+  = pa_add p (S i).
+Proof.
+  assert (H1 : (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))
+                : mword 64) = mword_of_int 1)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite H1. apply pa_add_S.
+Qed.
+
+(* ---- the same two tests in [bne]/[bnez] polarity.  [neq_vec] is
+   [negb (eq_vec ...)], so each is one [unfold] away from its sibling. *)
+Lemma nx_nslash_ne (v : mword 8) : v <> SLASH ->
+  neq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = true.
+Proof. intro H. unfold neq_vec. rewrite (nx_slash_ne v H). reflexivity. Qed.
+
+Lemma nx_nslash_eq (v : mword 8) : v = SLASH ->
+  neq_vec (zero_extend' 64 v : mword 64) (mword_of_int 47 : mword 64) = false.
+Proof. intro H. unfold neq_vec. rewrite (nx_slash_eq v H). reflexivity. Qed.
+
+Lemma nx_nnul_ne (v : mword 8) : v <> NUL ->
+  neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = true.
+Proof. intro H. unfold neq_vec. rewrite (nx_nul_ne v H). reflexivity. Qed.
+
+Lemma nx_nnul_eq (v : mword 8) : v = NUL ->
+  neq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = false.
+Proof. intro H. unfold neq_vec. rewrite (nx_nul_eq v H). reflexivity. Qed.

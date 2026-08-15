@@ -91,6 +91,7 @@ Require Import SpecBread SpecBwrite SpecBrelse.
 Require Import FsCrash.
 Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -378,7 +379,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac whidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section WriteHeadDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* ---------------------------------------------------------------- *)
@@ -513,7 +514,7 @@ End WriteHeadDefs.
 (*  actually starts on.                                                   *)
 (* ===================================================================== *)
 Section WriteHeadBlocks.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* ================================================================== *)
@@ -1323,7 +1324,7 @@ End WriteHeadBlocks.
 (* ===================================================================== *)
 
 Section ProofWriteHead.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

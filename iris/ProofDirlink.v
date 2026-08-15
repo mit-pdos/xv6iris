@@ -114,6 +114,7 @@ Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import ProofDirlookupParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -550,7 +551,7 @@ Qed.
 Section DlBuf.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the two frame slots the [de] occupies (10 and 9), carved into sixteen
@@ -947,7 +948,7 @@ Qed.
 Section ProofDirlinkMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.

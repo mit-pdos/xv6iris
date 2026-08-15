@@ -39,6 +39,7 @@ Require Import SpecKilled.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeKilled.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -62,7 +63,7 @@ Proof. rewrite /p_killed. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
 Section ProofKilled.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation kl_s0 := (mword_of_int 8 : mword 5).

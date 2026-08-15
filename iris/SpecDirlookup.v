@@ -143,6 +143,7 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -169,7 +170,7 @@ Definition T_DIR : mword 16 := mword_of_int 1.
 Definition wp_dirlookup_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -287,7 +288,7 @@ Module Type DIRLOOKUP.
   Parameter wp_dirlookup_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

@@ -57,6 +57,7 @@ Local Open Scope Z_scope.
 (* [rget m k] back to [m !!! Regidx k] across the whole proofmode goal. *)
 Ltac rgall := repeat (rewrite rget_ne; [| vm_compute; discriminate]).
 Require Import VirtioDiskRwDefs.
+Require Import ProcAvail.
 
 
 Module VirtioDiskRwRest (Acquire : ACQUIRE) (Release : RELEASE)
@@ -84,7 +85,7 @@ Notation Rs7 := (mword_of_int 23 : mword 5).
 Notation Rs8 := (mword_of_int 24 : mword 5).
 
 Section VdrwbFreeAt.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with
@@ -193,7 +194,7 @@ Section VdrwbFreeAt.
 End VdrwbFreeAt.
 
 Section ProofVirtioDiskRwB.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

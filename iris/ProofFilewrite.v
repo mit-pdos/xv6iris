@@ -758,7 +758,7 @@ Section FwWriteiSrc.
      context.  Qualifying rather than importing, because a new import here
      would also re-resolve every other unqualified name in the file -- see
      the header's [FW_MAX] warning. *)
-  Context `{!riscvGS Σ, !WpLock.lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !WpLock.lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* A BI-ENTAILMENT, so it covers both ends of the call at once: read left
      to right it is what the walk must SUPPLY at +0xa0, right to left what
@@ -836,6 +836,7 @@ Require Import DinodeEnc.
    device arm's four [Local Lemma]s cannot even be TYPED without this line. *)
 Require Import SpecFileread.
 Require Import CodeFilewrite ProofFilereadParts ProofFilewriteParts.
+Require Import ProcAvail.
 
 Set Printing Depth 40.
 
@@ -949,7 +950,7 @@ Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
 Section ProofFilewrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

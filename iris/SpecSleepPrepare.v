@@ -59,10 +59,11 @@ Require Import SchedCtx.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 
-Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (b : bool)
     (lks : gset string) :=
@@ -97,7 +98,7 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
 
 Module Type SLEEP_PREPARE.
   Parameter wp_sleep_prepare_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (b : bool)
       (lks : gset string),

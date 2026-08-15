@@ -49,6 +49,7 @@ Require Import SpecSleepPrepare.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSleepPrepare.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -65,7 +66,7 @@ Module SleepPrepareProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEAS
   : SLEEP_PREPARE.
 
 Section ProofSleepPrepare.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation spr_ra := (mword_of_int 1 : mword 5).

@@ -163,6 +163,7 @@ Require Import WpLock TicksInv.
 Require Import FileInvDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 
 (* main's stack budget: its own 16-byte / 2-slot frame over its deepest
@@ -184,7 +185,7 @@ From Kernel Require KernelSyms.
 Definition K_main : nat := 100%nat.
 
 Section SpecMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -448,7 +449,7 @@ End SpecMain.
 
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (m : regfile) (K : nat)

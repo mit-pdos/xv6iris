@@ -103,6 +103,7 @@ Require Import InodeInv.
 Require Import InodeRegion.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -116,7 +117,7 @@ Definition K_iupdate : nat := 44%nat.
    lives in InodeInv.v, where ilock's contract can also name it. *)
 
 Definition wp_iupdate_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -282,7 +283,7 @@ Definition wp_iupdate_sconf_body
 (*  the four files S3j sized.                                             *)
 (* ===================================================================== *)
 Definition wp_iupdate_gen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -442,7 +443,7 @@ Definition wp_iupdate_gen_body
 (*  [cru := false], so no existing caller moves.                          *)
 (* ===================================================================== *)
 Definition wp_iupdate_cred_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -621,7 +622,7 @@ Definition wp_iupdate_cred_body
 (*  [wp_iupdate_gen] positionally).                                        *)
 (* ===================================================================== *)
 Definition wp_iupdate_credgen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -780,7 +781,7 @@ Definition wp_iupdate_credgen_body
 (*  no nlink-raising flush in the kernel runs anywhere else.               *)
 (* ===================================================================== *)
 Definition wp_iupdate_link_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -935,7 +936,7 @@ Definition wp_iupdate_link_body
 (*  the fifth is.                                                         *)
 (* ===================================================================== *)
 Definition wp_iupdate_unlink_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -1041,7 +1042,7 @@ Definition wp_iupdate_unlink_body
 
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
@@ -1065,7 +1066,7 @@ Module Type IUPDATE.
      set forgotten, kept as its own parameter so that every existing caller
      is unchanged (wp_bmap_gen / wp_balloc_gen's pattern) *)
   Parameter wp_iupdate_gen :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
@@ -1088,7 +1089,7 @@ Module Type IUPDATE.
      unit returned when the op has already logged this inode's block.
      [wp_iupdate_gen] is its [cru := false] instance. *)
   Parameter wp_iupdate_cred :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
@@ -1115,7 +1116,7 @@ Module Type IUPDATE.
      are derived from it through [LogInv.log_credit_own]; it is stated
      separately so neither of their arities moves. *)
   Parameter wp_iupdate_credgen :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
@@ -1141,7 +1142,7 @@ Module Type IUPDATE.
      any of the four would move a landed caller's arity, and this one's
      postcondition differs, not just its premises. *)
   Parameter wp_iupdate_link :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 
@@ -1166,7 +1167,7 @@ Module Type IUPDATE.
      costs and carrying the zero-record receipt through log_write's own
      ghost step.  A sixth parameter for the fifth's reason. *)
   Parameter wp_iupdate_unlink :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 

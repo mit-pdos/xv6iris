@@ -72,6 +72,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -508,7 +509,7 @@ Section VdrwfP6.
      descend through [cpu_own]'s [if b then ⌜…⌝ else …] and strip a later
      that is not ours.  Keep the bundle opaque. *)
   Local Typeclasses Opaque cpu_own.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with
@@ -1822,7 +1823,7 @@ Section VdrwfP6.
 End VdrwfP6.
 
 Section ProofVirtioDiskRwF.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Typeclasses Opaque cpu_own.

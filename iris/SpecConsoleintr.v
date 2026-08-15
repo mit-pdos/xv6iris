@@ -81,6 +81,7 @@ Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 Require Import ConsoleInv.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
    (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
@@ -103,7 +104,7 @@ Section ConsoleCaps.
 
 End ConsoleCaps.
 
-Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
      (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
     (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
@@ -140,7 +141,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
        (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),

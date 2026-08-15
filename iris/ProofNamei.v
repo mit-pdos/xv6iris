@@ -66,6 +66,7 @@ Require Import CodeNamei.
 Require Import SpecNamex.
 Require Import SpecNamei.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -145,7 +146,7 @@ Local Ltac namidx := first [ vm_compute; reflexivity | vm_compute; discriminate 
 Section ProofNameiMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- THE FRAME CARVE: the two low slots ARE [name[14]] ---- *)

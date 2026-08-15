@@ -84,6 +84,9 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
+(* the proc table's two regimes -- the counted premise that refutes the
+   empty-table arm, and the marker the found slot is minted with *)
+Require Import ProcAvail.
 Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots.
@@ -96,6 +99,7 @@ Require Import PanicStub.
 Require Import LockRank.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
@@ -135,16 +139,29 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
    actually true, and it is what fork will need, since fork must [release] the
    proc it gets back and [release] demands [sie_cap_gpr … false …]. *)
 Definition allocproc_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
-    (pme : mword 64) (on : option nat) (b : bool) (lks : gset string)
+    (pme : mword 64) (on : option nat) (op : option nat)
+    (b : bool) (lks : gset string)
     (mr : regfile) (K : nat)
     (rv : mword 64) : iProp Σ :=
-  ( (* --- no free slot: a0 = 0, every lock released, budget untouched --- *)
+  ( (* --- no free slot: a0 = 0, every lock released, budget untouched.
+
+        AND THE ARM REPORTS WHY, exactly as the third one does and exactly
+        as [KallocInv]'s [kalloc_post] does for a null page: the scan
+        passed all [NPROC] slots, so the caller's PROC count -- if it has
+        one -- must be 0.  A caller in the counted regime ([userinit],
+        holding [procs_avail (Some (S k))]) refutes the whole arm from
+        that, which is the only way a function that does not check
+        allocproc's result can be proved at all; an uncounted one (kfork,
+        [procs_avail None]) reads it as no information and handles the
+        arm.  See [ProcAvail.v]'s header. --- *)
     (⌜ rv = (zero_reg : mword 64) ⌝ ∗
+     ⌜ avail_zero op ⌝ ∗
      sie_cap_gpr mr K b pme ∗
      cpu_own lvl eb pme b lks ∗
-     kalloc_env γa on)
+     kalloc_env γa on ∗
+     procs_avail op)
   ∨ (* --- found: a0 = &proc[j], j's lock HELD, the private block built --- *)
     (∃ (j : nat) (γl : gname) (ch : mword 64) (pid : mword 32)
        (V : pprivate) (root tfp : mword 44) (ks : mword 64)
@@ -168,6 +185,12 @@ Definition allocproc_post
           when it installs a working directory ([proc_priv_split_cwd]);
           kfork does it at its [sd a0,336(s4)]. *)
        proc_priv_nocwd γf (proc_addr j) pid V ∗
+       (* THE SLOT IS NOW ALLOCATED.  Persistent, minted here out of
+          [procs_avail]'s authority, and what the caller hands to
+          [SchedCtx.proc_slots_park] when it releases the slot at USED or
+          RUNNABLE -- a slot that has left UNUSED carries this on every arm
+          of its lock invariant ([ProcAvail.v]). *)
+       pslot_used_at (proc_addr j) ∗
        fd_slots FDSPARE ∗
        (* THE CWD'S UNIT AND THE IREF ALLOWANCE, out of the dormant block
           allocproc took the slot from.  The [1] is what kfork spends on
@@ -190,7 +213,9 @@ Definition allocproc_post
           without releasing everything it took. *)
        cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) ∗
        arm_pay lvl eb pme ∗
-       kalloc_env γa (avail_sub on nc))
+       kalloc_env γa (avail_sub on nc) ∗
+       (* one slot fewer, by the same [avail_dec] the page count uses *)
+       procs_avail (avail_dec op))
   ∨ (* --- a FAILURE TAIL ran: the slot was taken and then given back.  a0
         is 0 and every lock is released, exactly as in the first arm, but
         two things differ and both matter.
@@ -208,13 +233,15 @@ Definition allocproc_post
      ⌜ exists n : nat, (n <= K_allocproc)%nat /\ avail_zero (avail_sub on n) ⌝ ∗
      sie_cap_gpr mr K b pme ∗
      cpu_own lvl eb pme b lks ∗
-     kalloc_env γa None))%I.
+     kalloc_env γa None ∗
+     procs_avail op))%I.
 
 Definition wp_allocproc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-    (pme : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (pme : mword 64) (on : option nat) (op : option nat)
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* 4 slots for this frame, 44 for freeproc's -- the deepest callee now
@@ -238,11 +265,13 @@ Definition wp_allocproc_sconf_body
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
+  (* the proc table's regime, threaded exactly as [kalloc_env] is *)
+  procs_avail op -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      allocproc_post γa γf γs lvl eb pme on b lks mr K
+      allocproc_post γa γf γs lvl eb pme on op b lks mr K
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -253,10 +282,11 @@ Definition wp_allocproc_sconf_body
    calls allocproc with no page budget, and there the two freeproc tails are
    LIVE code. *)
 Definition wp_allocproc_core_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-    (pme : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
+    (pme : mword 64) (on : option nat) (op : option nat)
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (48 <= K)%nat ->
@@ -271,27 +301,31 @@ Definition wp_allocproc_core_body
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
+  (* the proc table's regime, threaded exactly as [kalloc_env] is *)
+  procs_avail op -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      allocproc_post γa γf γs lvl eb pme on b lks mr K
+      allocproc_post γa γf γs lvl eb pme on op b lks mr K
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type ALLOCPROC_GEN.
   Parameter wp_allocproc_core :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-      (pme : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_allocproc_core_body γa γp γf γs m lvl K eb pme on b lks.
+      (pme : mword 64) (on : option nat) (op : option nat)
+      (b : bool) (lks : gset string),
+      wp_allocproc_core_body γa γp γf γs m lvl K eb pme on op b lks.
 End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-      (pme : mword 64) (on : option nat) (b : bool) (lks : gset string),
-      wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme on b lks.
+      (pme : mword 64) (on : option nat) (op : option nat)
+      (b : bool) (lks : gset string),
+      wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme on op b lks.
 End ALLOCPROC.

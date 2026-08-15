@@ -97,6 +97,7 @@ Require Import PanicStub.
 Require Import SpecBread SpecBwrite SpecBunpin SpecBrelse SpecMemmove.
 Require Import SpecInstallTrans.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -560,7 +561,7 @@ Local Ltac rgne :=
 (*  invariant and the two big-op splits the loop carries.                 *)
 (* ===================================================================== *)
 Section InstallTransDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* install_trans's own [wp_next] obligation, NAMED and anchored at an
@@ -763,7 +764,7 @@ End InstallTransDefs.
 (*  The blocks.                                                          *)
 (* ===================================================================== *)
 Section InstallTransBlocks.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* ================================================================== *)
@@ -2172,7 +2173,7 @@ End InstallTransBlocks.
 (* ===================================================================== *)
 
 Section ProofInstallTrans.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

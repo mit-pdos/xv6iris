@@ -71,6 +71,7 @@ Require Import IrefSlots InodeRegion.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -81,7 +82,7 @@ Local Open Scope Z_scope.
 Definition sys_close_stack : nat := 72%nat.
 
 Section SpecSysClose.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* sys_close's result, keyed by the returned a0.  In the success case the
      descriptor named by the argument is null and one file reference is
@@ -99,7 +100,7 @@ End SpecSysClose.
 Definition wp_sys_close_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
+      !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
@@ -167,7 +168,7 @@ Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
+             !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),

@@ -73,6 +73,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* begin_op's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
@@ -81,7 +82,7 @@ Import Defs.
 Definition K_begin_op : nat := 26%nat.
 
 Definition wp_begin_op_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -141,7 +142,7 @@ Definition wp_begin_op_sconf_body
 
 Module Type BEGIN_OP.
   Parameter wp_begin_op_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

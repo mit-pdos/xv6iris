@@ -118,6 +118,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -147,7 +148,7 @@ Proof.
 Qed.
 
 Section ItruncSpec.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* "THE BITMAP BLOCK'S LOG SLOT IS PAID FOR, and u units remain for
@@ -301,7 +302,7 @@ Section ItruncSpec.
 End ItruncSpec.
 
 Definition wp_itrunc_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -514,7 +515,7 @@ Definition wp_itrunc_sconf_body
 (*  every counted caller unmoved.                                         *)
 (* ===================================================================== *)
 Definition wp_itrunc_gen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -654,7 +655,7 @@ Definition wp_itrunc_gen_body
 
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -681,7 +682,7 @@ Module Type ITRUNC.
      [crb := cru := false], derived at the [log_op] existential's own
      witness. *)
   Parameter wp_itrunc_gen :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}
       `{GEN : GenId} `{CID : CpuId}
 

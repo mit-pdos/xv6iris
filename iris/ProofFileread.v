@@ -99,6 +99,7 @@ Require Import SpecPiperead SpecIlock SpecReadi SpecIunlock SpecConsoleread.
 Require Import SpecFileread.
 Require Import CodeFileread ProofFilereadParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -242,7 +243,7 @@ Section ProofFileread.
      note). *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

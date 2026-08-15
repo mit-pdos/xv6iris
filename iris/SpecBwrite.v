@@ -52,6 +52,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* bwrite's own frame is 32 bytes (4 slots); its deepest callee is
@@ -59,7 +60,7 @@ Import Defs.
 Definition K_bwrite : nat := 38%nat.
 
 Definition wp_bwrite_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -153,7 +154,7 @@ Definition wp_bwrite_sconf_body
 
 Module Type BWRITE.
   Parameter wp_bwrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)

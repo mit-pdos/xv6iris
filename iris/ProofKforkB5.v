@@ -84,6 +84,7 @@ Require Import SpecAcquire SpecRelease.
 Require Import PanicStub.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -126,7 +127,7 @@ End PstateUsedHelper.
 Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (FP : FORKRET_PARK).
 
 Section ProofKforkB5.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -176,6 +177,11 @@ Section ProofKforkB5.
     SchedCtx.proc_held cpu_id j γl USED ch -∗
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
     ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Vc -∗
+    (* the slot's ALLOCATION MARKER, minted by allocproc and carried here
+       through kfork's body: every non-UNUSED arm of the lock invariant
+       holds it, so both releases below need it ([ProcAvail.v]).
+       Persistent, so it survives the first release and serves the second. *)
+    ProcAvail.pslot_used_at (ProcGeom.proc_addr j) -∗
     FdSlots.fd_slots FDSPARE -∗
     IrefSlots.iref_slots IREFSPARE -∗
     ProcInv.is_kstack (ProcGeom.proc_addr j) ks -∗
@@ -191,7 +197,7 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hwl Hheld Hhart Hpriv Hfd Hirsp Hks Hctx Hcont".
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hwl Hheld Hhart Hpriv #Hmk Hfd Hirsp Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
     (* on the raw context allocproc left, before releasing.               *)
@@ -201,8 +207,8 @@ Section ProofKforkB5.
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
     iDestruct "Hpwhole" as "[Hplock Hpclaim]".
-    iDestruct (SchedCtx.proc_slots_park γs (proc_addr j) USED needs_ctx_USED with "Hpctx Hhart")
-      as "Hslots".
+    iDestruct (SchedCtx.proc_slots_park γs (proc_addr j) USED needs_ctx_USED
+                 with "Hpctx Hhart Hmk") as "Hslots".
     iDestruct (SchedCtx.proc_lock_res_intro γs γl (proc_addr j) USED ch
                  with "Hpstcell Hplock Hpchan Hppub Hslots") as "HRused".
     iPoseProof (kfk_0c2 with "Htext") as "Hi_c2".

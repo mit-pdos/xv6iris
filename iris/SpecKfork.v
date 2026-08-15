@@ -174,6 +174,7 @@ Require Import SpecProcinit.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
@@ -184,7 +185,7 @@ Local Open Scope Z_scope.
 Definition K_kfork : nat := 56%nat.
 
 Definition kfork_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
     (pme : mword 64)
@@ -211,7 +212,7 @@ Definition kfork_post
       (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname)  (γs : list gname)
@@ -246,6 +247,12 @@ Definition wp_kfork_sconf_body
   is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
   kalloc_env γa None -∗
+  (* THE PROC TABLE'S SEALED REGIME.  kfork allocates a proc, so it needs
+     [ProcAvail]'s authority to mint the new slot's allocation marker -- and
+     it takes the count-free arm, which is persistent and says nothing, so
+     kfork keeps allocproc's empty-table disjunct and handles it (the
+     [return -1]).  Only [userinit] runs in the counted regime.  *)
+  procs_avail None -∗
   proc_priv γf pme pid_p Vp -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
@@ -258,7 +265,7 @@ Definition wp_kfork_sconf_body
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)

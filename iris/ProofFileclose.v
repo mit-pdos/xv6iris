@@ -73,6 +73,7 @@ Require Import IrefSlots InodeRegion.
 Require Import SpecFileclose.
 Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -83,7 +84,7 @@ Module FilecloseProof (Acquire : ACQUIRE) (Release : RELEASE)
 Section ProofFileclose.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

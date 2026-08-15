@@ -153,6 +153,7 @@ Require Import CreateBudget.
 Require Import CodeCreate.
 Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* claude-notes/optimization.md "Register maps": the leaves' premises are
@@ -1249,7 +1250,7 @@ Proof. unfold create_slots. lia. Qed.
 Section ProofCreateMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.

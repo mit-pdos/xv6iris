@@ -78,6 +78,7 @@ Require Import PanicStub.
 Require Import SpecSysExit.   (* [K_sys_exit]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -89,7 +90,7 @@ Import Defs.
 Definition K_syscall : nat := (4 + K_sys_exit)%nat.
 
 Definition wp_syscall_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (R : gname -> mword 64 -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
@@ -149,11 +150,11 @@ Module Type SYSCALL.
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId},
       gname -> mword 64 -> iProp Σ.
   Parameter wp_syscall_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat)

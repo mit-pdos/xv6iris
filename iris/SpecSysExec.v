@@ -154,6 +154,7 @@ Require Import SpecNamex.      (* [ROOTDEV] *)
 Require Import SpecKexec.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -167,7 +168,7 @@ Definition K_sys_exec : nat := 234%nat.
 
 Section SpecSysExec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ}.
+            !irefslotG Σ, !pavG Σ}.
 
   (* sys_exec's result, and it is [kexec_ok] verbatim: every path that never
      reaches kexec returns -1 with the block unchanged, which is that
@@ -185,7 +186,7 @@ End SpecSysExec.
 Definition wp_sys_exec_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname)                           (* ftable, kalloc      *)
@@ -292,7 +293,7 @@ Module Type SYSEXEC.
   Parameter wp_sys_exec_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)

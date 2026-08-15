@@ -98,6 +98,7 @@ Require Import SpecProcinit.
 Require Import SpecKwait.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeKwait.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over [proc_priv] otherwise spends
@@ -469,7 +470,7 @@ Module KwaitProof (Acquire : ACQUIRE) (Release : RELEASE) (Myproc : MYPROC)
                   (Copyout : COPYOUT) (Freeproc : FREEPROC) : KWAIT.
 
 Section ProofKwait.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   (* NO section [CpuId]: every block lemma is applied at the hart the block
      before it handed back, which a section variable could not express. *)
 
@@ -3005,7 +3006,7 @@ End ProofKwait.
 (*  THE WHOLE FUNCTION: the prologue, then the outer loop's Löb.          *)
 (* ===================================================================== *)
 Section ProofKwaitMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
 
   Local Ltac reg_neq :=
     lazymatch goal with

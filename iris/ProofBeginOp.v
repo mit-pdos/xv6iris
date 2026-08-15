@@ -91,6 +91,7 @@ Require Import SpecBeginOp.
 Require Import CodeBeginOp.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -362,7 +363,7 @@ Qed.
 (* ===================================================================== *)
 
 Section BoProps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !fsLogG Σ, !logG Σ}.
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
@@ -459,7 +460,7 @@ Local Ltac reg_neq :=
     tryif unify a b then fail else (vm_compute; discriminate) end.
 
 Section BoBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !fsLogG Σ, !logG Σ}.
 
   (* ---- the exit path: +0x58 (a0 := &log) .. +0x6e (c.ret) ---- *)
@@ -1783,7 +1784,7 @@ End BoBodies.
 (* ===================================================================== *)
 
 Section ProofBeginOp.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

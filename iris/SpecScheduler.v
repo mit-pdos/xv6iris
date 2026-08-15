@@ -45,10 +45,11 @@ Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 
-Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
@@ -92,7 +93,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
       wp_scheduler_sconf_body γs m av p0.

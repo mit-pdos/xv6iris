@@ -104,6 +104,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* initlog's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00); its
@@ -118,7 +119,7 @@ Definition K_initlog : nat := 56%nat.
 Definition log_name_str : Z := 0x80007518.
 
 Definition wp_initlog_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -248,7 +249,7 @@ Definition wp_initlog_sconf_body
 
 Module Type INITLOG.
   Parameter wp_initlog_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       

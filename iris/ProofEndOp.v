@@ -124,6 +124,7 @@ From Kernel Require KernelSyms.
 (* intermediate files use [Require Import], so nothing downstream inherits *)
 (* it.  See FastSetSolver.v.                                              *)
 Require Export FastSetSolver.
+Require Import ProcAvail.
 
 Local Open Scope Z_scope.
 
@@ -596,7 +597,7 @@ Local Ltac eoidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  invariants and the batch in its OPENED form.                          *)
 (* ===================================================================== *)
 Section EndOpDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
@@ -881,7 +882,7 @@ End EndOpDefs.
 (*  the hart it actually starts on.                                       *)
 (* ===================================================================== *)
 Section EndOpBlocks.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* ================================================================== *)
@@ -3690,7 +3691,7 @@ End EndOpBlocks.
 (* ===================================================================== *)
 
 Section ProofEndOp.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

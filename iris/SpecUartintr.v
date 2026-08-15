@@ -60,13 +60,14 @@ Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
 Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 
 (* uartintr's own frame is 4 slots; the deepest callee is consoleintr at 32
    (wakeup wants 18, acquire and release 10). *)
 Definition uartintr_stack : nat := 36%nat.
 
-Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names)
      (γs : list gname)
@@ -115,7 +116,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 
 Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names)
       (γs : list gname)

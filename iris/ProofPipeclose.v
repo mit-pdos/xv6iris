@@ -70,6 +70,7 @@ Require Import CodePipeclose.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPipeclose.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Import Defs.
 
 Local Ltac peel n := do n (rewrite upd_ne; [| vm_compute; discriminate]).
@@ -81,7 +82,7 @@ Module PipecloseProof (Acquire : ACQUIRE_GEN) (Wakeup : WAKEUP)
                       (Kfree : KFREE) : PIPECLOSE.
 
 Section ProofPipeclose.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pipeG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !pipeG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are

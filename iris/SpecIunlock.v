@@ -93,6 +93,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -103,7 +104,7 @@ Definition K_iunlock : nat := 26%nat.
 
 Definition wp_iunlock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-      !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname)
@@ -174,7 +175,7 @@ Definition wp_iunlock_sconf_body
 Module Type IUNLOCK.
   Parameter wp_iunlock_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-             !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname)
