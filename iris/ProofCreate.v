@@ -5031,8 +5031,8 @@ Section ProofCreateMain.
             by (vm_compute; reflexivity).
           assert (Hnatle : (16 * dir_slot data
                               (dir_nrec (bv_unsigned (di_size dn))) + tot
-                            <= 16 * dir_nrec (bv_unsigned (di_size dn)) + 16)%nat)
-            by lia.
+                            <= 16 * dir_nrec (bv_unsigned (di_size dn)) + 16)%nat).
+          { clear -Hk0le Htot16. lia. }
           assert (HzA : (Z.of_nat (16 * dir_slot data
                             (dir_nrec (bv_unsigned (di_size dn))) + tot)%nat
                          <= Z.of_nat (16 * dir_nrec
