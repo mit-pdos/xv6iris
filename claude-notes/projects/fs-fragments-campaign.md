@@ -325,46 +325,51 @@ the OPERATIONAL forms — what the NEXT scan does: it finds the written record
 at exactly the slot dirlink used (uniqueness pins it to `k0`, which is what
 lets a caller name the offset), and it misses the zeroed name.
 
-#### §20.17.4's owed `".."` fact — CLOSED IN SUBSTANCE, ONE COMMIT BEHIND
+#### §20.17.4's owed `".."` fact — **CLOSED**, both halves joined
 
-**The composition is written and verified green; it is held out of this commit
-only because its PAYLOAD half is not committed yet.** `DirView.dir_dots_ix`
-(the create owner's increment) lands separately, and `FsLookup.v` carries a
-placeholder §6 naming exactly what returns there. Landing it is a dozen lines
-and changes nothing else in the file.
-
-`node_dotdot_index` / `fdir_dotdot_index` compose the PAYLOAD half
-(`dir_dots_ix`: a live directory's records 0 and 1 are `"."` at its own inum
-and `".."`) with the
-TREE half (`ents !! ".." = Some dp`, a conjunct of `fnode`) and conclude they
-are the SAME NUMBER: `dp = bv_unsigned (dir_inum data 1)`, with
-`dir_first data nrec ".." = Some 1`. Neither half can state the other —
-"the parent" is a relation between two inodes and a conjunct on ONE payload
-cannot say it, while `dir_link_at` is keyed by record INDEX and is name-blind.
-**`dir_names_unique` is what joins them**, and this is the third place R2's
-amendment pays for itself: under the invariant any-match is first-match, so a
-live `".."` at index 1 is the ONLY live `".."`. Feed that number to
+`node_dots_first` / `node_dots_index` / `fdir_dots_index` compose the PAYLOAD
+half (`DirView.dir_dots_ix self dn data`: a LIVE directory's record 0 is a
+live `"."` naming `self` and its record 1 is a live `".."`) with the TREE half
+(`ents !! ".." = Some dp`, a conjunct of `fnode`) and conclude they are the
+SAME NUMBER: `dp = bv_unsigned (dir_inum data 1)`, with `dir_first data nrec
+".." = Some 1`. Neither half can state the other — "the parent" is a relation
+between two inodes and a conjunct on ONE payload cannot say it, while
+`dir_link_at` is keyed by record INDEX and is name-blind. Feed that number to
 `DirLinks.dir_links_dotdot_out` and the `ilink dp` S7 must convert is in hand.
-`DOTDOT_dotdot_name` bridges the tree layer's `mword` spelling of the name to
-the record view's `bv` one.
+`Print Assumptions` on all five: **closed under the global context.**
 
-**THE PASTE IS UNBLOCKED — the payload half is committed** (see "THE
-PAYLOAD-CONJUNCT PASS" below), so §6 can land whenever the F2 owner picks it
-up.
+**`dir_names_unique` IS WHAT JOINS THEM**, and this is the third place R2's
+amendment pays for itself: under the invariant any-match is first-match, so
+the live `".."` at index 1 is the ONLY live `".."`. Worth seeing exactly how
+the index-0 collision dies — **by UNIQUENESS, not by `dot_name <> dotdot_name`**:
+record 0 is a live `"."`, so if it also matched `".."` the invariant would
+force `0 = 1`. The composition never needs a name disequality.
 
-**ITS PREMISES MOVED WITH THE CLAUSE (for the F2 agent).**
-`dir_dots_ix` is now guarded by `T_DIR` **and** `di_nlink <> 0`, it takes the
-home's own inum as `self`, and it
-carries `2 <= dir_nrec (di_size dn)` as its first conjunct (see "The `".."`
-INDEX BRIDGE, amended" below). So §6's composition takes the home's
-liveness alongside its type — both of which a caller holding `fnode`/`fdir`
-already has, since `node_rep`'s NDir case is where the type comes from and
-S7 reads the liveness off the kernel's own `if(ip->nlink < 1) panic` — and
-in exchange the record-count side condition that fed `dir_first data nrec
-".." = Some 1` is a PROJECTION of the clause rather than an obligation.
-`dir_links_dotdot_out` lost its `1 < dir_nrec` premise for the same reason.
-Nothing else in the sketch moves: the tree half, `dir_names_unique`'s
-joining role and `DOTDOT_dotdot_name` are untouched.
+**THE CLAUSE'S GROWTH ALL PAID OUT HERE.** The payload pass gave
+`dir_dots_ix` a `"."` half, a `di_nlink <> 0` guard and a `self` parameter on
+its way into the escrow payloads. Three consequences at the tree, all
+favourable:
+
+- `2 <= dir_nrec (di_size dn)` is no longer a PREMISE this layer takes — it is
+  a PROJECTION of the clause, so the composition is self-supplying where the
+  earlier sketch made every caller carry the record count;
+- the record-0 facts come free, so the `"."` edge is readable at the tree too
+  (`ents !! DOT = Some self`) — the self-loop the ledger deliberately files no
+  `dir_links` unit against, now visible as an ordinary entry — and `self <> 0`
+  falls out of `dir_dots_ix_self`;
+- **the fragment is indexed at `self`, and that is the coupling**: the tree's
+  node key and the payload's `self` are the same number precisely because
+  record 0's `"."` names the node's own inum. It costs no arity anywhere,
+  because both payloads have the inum in hand.
+
+The `di_nlink <> 0` guard travels as a premise and is not a burden: every
+caller in the S7 walk holds it already (create's guard at `sysfile.c:262`,
+namex's at `fs.c:693`), and an ORPHANED directory is the complement clause's
+business. `fdir_dots_index` also discharges `dir_links_dotdot_out`'s own
+`bv_unsigned (dir_inum data 1) <> self` premise **at the tree**, from
+`dp <> self` — "the parent is not the child" is a statement the tree can make
+and the bytes cannot. `DOT_dot_name` / `DOTDOT_dotdot_name` bridge the tree
+layer's `mword` spelling of the two names to the record view's `bv` one.
 
 #### A tactic trap worth keeping
 

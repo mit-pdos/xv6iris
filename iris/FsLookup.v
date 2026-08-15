@@ -868,26 +868,180 @@ Section FsLookupAu.
 End FsLookupAu.
 
 (* ====================================================================== *)
-(*  6.  THE ".." COMPOSITION -- DEFERRED, ONE COMMIT BEHIND                *)
+(*  6.  THE DOT-RECORD COMPOSITION -- §20.17.4's OWED FACT, BOTH HALVES     *)
 (* ====================================================================== *)
 
-(*  §20.17.4's owed [".."] fact needs BOTH halves, and only one of them is
-    committed yet.  The TREE half is here already -- [ents !! DOTDOT = Some
-    dp] is a conjunct of [FsRep.fnode ip (NDir ents)], and [FsRep.fnode_dotdot]
-    converts it to the record index.  The PAYLOAD half is
-    [DirView.dir_dotdot_ix] ("a directory's record 1 is live and named
-    ['..']"), which lands with the create owner's increment.
+(*  THE SEAM, AND WHY IT TAKES TWO HALVES.
 
-    The composition -- [node_dotdot_index] / [fdir_dotdot_index], concluding
-    [dp = bv_unsigned (dir_inum data 1)] and [dir_first data nrec ".." = Some
-    1] -- is WRITTEN AND VERIFIED GREEN against that payload half, and lands
-    here the moment it is committed.  It is a dozen lines and it needs no
-    change to anything in this file.
+    S7's [dp->nlink--] must consume one [ilink dp], and the only one in the
+    system sits in the CHILD's [dir_links], at the index of the child's
+    [".."] record.  Two facts are needed and neither can state the other:
 
-    **[dir_names_unique] IS WHAT JOINS THE TWO HALVES**, and that is the third
-    place R2's amendment pays for itself: under the invariant any-match is
-    first-match, so a live [".."] at index 1 is the ONLY live [".."] and the
-    index [dirlookup] stops at IS index 1.  Neither half can state the other
-    -- "the parent" is a relation between two inodes and a conjunct on ONE
-    payload cannot say it, while [DirLinks.dir_link_at] is keyed by record
-    INDEX and is name-blind.                                                *)
+      the PAYLOAD half  [DirView.dir_dots_ix self dn data] -- a LIVE
+        directory's record 0 is a live ["."] naming [self] and its record 1
+        is a live [".."] -- says WHERE the parent entry is.  It cannot say
+        WHAT it names: "the parent" is a relation between two inodes and a
+        conjunct on ONE payload cannot state it (a parent parameter would
+        move every contract naming [ic_loaded]);
+
+      the TREE half  [ents !! DOTDOT = Some dp] -- a conjunct of
+        [FsRep.fnode ip (NDir ents)] -- says WHAT it names.  It cannot say
+        where: [DirLinks.dir_link_at] is keyed by record INDEX and is
+        name-blind (fs-icache.md §20.17.4(b)).
+
+    **[dir_names_unique] IS WHAT JOINS THEM**, and this is the third place
+    R2's amendment pays for itself.  Under the invariant any-match is
+    first-match, so the live [".."] at index 1 is the ONLY live [".."] and
+    the index [dirlookup] stops at IS index 1 -- which is what makes the
+    tree's [".."] edge and the payload's index-1 inum the same number.
+    Note that the collision is refuted by UNIQUENESS rather than by
+    [dot_name <> dotdot_name]: record 0 is a live ["."], so if it also
+    matched [".."] the invariant would force [0 = 1].
+
+    ---- WHAT THE LANDED CLAUSE CHANGED, AND IT ALL HELPS -----------------
+
+    The payload half grew a ["."] half and a [di_nlink <> 0] guard on its
+    way into the escrow payloads.  Three consequences here, all favourable:
+
+      - [(2 <= dir_nrec …)] is no longer a PREMISE this file must take --
+        it is a PROJECTION of the clause, so the composition below is
+        self-supplying where the earlier form made every caller carry the
+        record count;
+      - the record-0 facts come free, so the ["."] edge is readable at the
+        tree too ([node_dots_index]'s [ents !! DOT = Some self]) -- the
+        self-loop the ledger deliberately does not file a [dir_links] unit
+        against, now visible as an ordinary entry;
+      - [self <> 0] falls out ([DirView.dir_dots_ix_self]), which is the
+        fact create's [".."] establishment could not get anywhere else.
+
+    The [di_nlink <> 0] guard travels as a premise.  It is not a burden:
+    every caller in the S7 walk holds it already (create's guard at
+    sysfile.c:262, namex's at fs.c:693), and an ORPHANED directory is the
+    complement clause's business, not this one's.                          *)
+
+(* the two spellings of each dot name are one term: [FsTree]'s are stated in
+   the [mword] vocabulary the tree layer uses, [DirView]'s in the [bv]
+   vocabulary the record view does *)
+Lemma DOT_dot_name : DOT = dot_name.
+Proof.
+  unfold DOT, dot_name.
+  assert (Hd : (mword_of_int 46 : mword 8) = Z_to_bv 8 0x2e)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hd. reflexivity.
+Qed.
+
+Lemma DOTDOT_dotdot_name : DOTDOT = dotdot_name.
+Proof.
+  unfold DOTDOT, dotdot_name.
+  assert (Hd : (mword_of_int 46 : mword 8) = Z_to_bv 8 0x2e)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hd. reflexivity.
+Qed.
+
+(* **BOTH DOT RECORDS, AT THE INDEX [dirlookup] STOPS ON.**  Record 0 is
+   trivially first; record 1 needs the invariant to refute record 0, which
+   is the join described above. *)
+Lemma node_dots_first (self : Z) (ents : gmap fname Z) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  node_rep (NDir ents) dn data ->
+  dir_dots_ix self dn data ->
+  bv_unsigned (di_nlink dn) <> 0 ->
+  dir_first data (dnrec dn) DOT = Some 0%nat
+  /\ dir_first data (dnrec dn) DOTDOT = Some 1%nat.
+Proof.
+  unfold dnrec. intros Hrep Hix Hnl.
+  pose proof (node_rep_dir ents dn data Hrep) as Hty.
+  destruct (Hix Hty Hnl) as (Hnrec & Hl0 & _ & Hn0 & Hl1 & Hn1).
+  assert (Hu : dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))))
+    by (destruct Hrep as (_ & Hu & _); exact Hu).
+  assert (Hb0 : dir_bname data 0 = DOT).
+  { unfold dir_bname. rewrite Hn0. symmetry. exact DOT_dot_name. }
+  assert (Hb1 : dir_bname data 1 = DOTDOT).
+  { unfold dir_bname. rewrite Hn1. symmetry. exact DOTDOT_dotdot_name. }
+  split.
+  - apply dir_first_Some. split; [lia | split].
+    + split; [exact Hl0 | exact Hb0].
+    + intros q Hq. lia.
+  - apply dir_first_Some. split; [lia | split].
+    + split; [exact Hl1 | exact Hb1].
+    + intros q Hq [Hlq Hnq].
+      (* the only record below is 0, and it is the ["."]: uniqueness, not
+         a name disequality, is what refutes it *)
+      assert (Hq0 : q = 0%nat) by lia. subst q.
+      assert (H01 : (0%nat) = 1%nat).
+      { apply (Hu 0%nat 1%nat ltac:(lia) ltac:(lia) Hl0 Hl1).
+        rewrite Hb1. exact Hnq. }
+      discriminate.
+Qed.
+
+(* **THE COMPOSITION.**  The tree's parent edge IS the payload's index-1
+   inum, and the tree's ["."] edge IS the node's own inum. *)
+Lemma node_dots_index (self dp : Z) (ents : gmap fname Z) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  node_rep (NDir ents) dn data ->
+  dir_dots_ix self dn data ->
+  bv_unsigned (di_nlink dn) <> 0 ->
+  ents !! DOTDOT = Some dp ->
+  dir_first data (dnrec dn) DOTDOT = Some 1%nat
+  /\ dp = bv_unsigned (dir_inum data 1)
+  /\ ents !! DOT = Some self
+  /\ self <> 0
+  /\ (2 <= dnrec dn)%nat.
+Proof.
+  intros Hrep Hix Hnl Hdd.
+  pose proof (node_rep_dir ents dn data Hrep) as Hty.
+  destruct (node_dots_first self ents dn data Hrep Hix Hnl) as [Hf0 Hf1].
+  pose proof (Hix Hty Hnl) as Hproj.
+  destruct Hproj as (Hnrec & _ & Hin0 & _ & _ & _).
+  split; [exact Hf1 |].
+  split.
+  { pose proof (node_lookup_found ents dn data DOTDOT 1 Hrep Hf1) as H.
+    rewrite Hdd in H. injection H as H. exact H. }
+  split.
+  { pose proof (node_lookup_found ents dn data DOT 0 Hrep Hf0) as H.
+    rewrite Hin0 in H. exact H. }
+  split; [exact (dir_dots_ix_self self dn data Hty Hnl Hix) | exact Hnrec].
+Qed.
+
+(* ...and its resource form, straight off the node fragment: this is the
+   line S7 writes.  Nothing is consumed -- the fragment is only read.
+
+   THE FRAGMENT IS INDEXED AT [self], AND THAT IS THE COUPLING: the tree's
+   node key and the payload's [self] are the same number precisely because
+   record 0's ["."] names the node's own inum.  Both payloads have the inum
+   in hand, so it costs no arity at any call site.
+
+   THE LAST CONJUNCT IS [DirLinks.dir_links_dotdot_out]'s OWN PREMISE,
+   discharged AT THE TREE: the extraction refuses a node whose [".."] names
+   itself (the root), and "the parent is not the child" is a statement the
+   tree can make and the bytes cannot. *)
+Section FsLookupDots.
+  Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ, !icacheG Σ}.
+  Context `{ICFG : icfg}.
+
+  Lemma fdir_dots_index (γi : gname) (γfs : fs_names) (self dp : Z)
+      (ents : gmap fname Z) (dn : dinode) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    dir_dots_ix self dn data ->
+    bv_unsigned (di_nlink dn) <> 0 ->
+    ents !! DOTDOT = Some dp ->
+    dp <> self ->
+    fdir γi γfs self ents dn bm data -∗
+      ⌜dir_first data (dnrec dn) DOTDOT = Some 1%nat
+       /\ dp = bv_unsigned (dir_inum data 1)
+       /\ ents !! DOT = Some self
+       /\ self <> 0
+       /\ (2 <= dnrec dn)%nat
+       /\ bv_unsigned (di_type dn) = T_DIR_z
+       /\ bv_unsigned (dir_inum data 1) <> self⌝.
+  Proof.
+    intros Hix Hnl Hdd Hne. iIntros "(_ & _ & %Hrep)". iPureIntro.
+    destruct (node_dots_index self dp ents dn data Hrep Hix Hnl Hdd)
+      as (Hf1 & Hz & Hdot & Hs0 & Hnrec).
+    split; [exact Hf1 |]. split; [exact Hz |]. split; [exact Hdot |].
+    split; [exact Hs0 |]. split; [exact Hnrec |].
+    split; [exact (node_rep_dir ents dn data Hrep) |].
+    rewrite <- Hz. exact Hne.
+  Qed.
+
+End FsLookupDots.
