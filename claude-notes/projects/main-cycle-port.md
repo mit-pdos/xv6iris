@@ -155,7 +155,21 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
    against the pilot's real fetch plumbing (`instr`/`fetch_from_pts_*`),
    not speculatively.
-2. **The first converted leaf** — `wp_addi_gpr` re-derived spec-verbatim
+1a. **[DONE — `HartMLeaf.wp_word_main_b0`: the first per-word leaf,
+   boundary to boundary at both ticks, 5-axiom-clean.]**  What it
+   settled: (i) the leaf-side stretches are SPANS + pure characterizations
+   wherever PMP walks (symbolic pcfg) or `tick_clock` branches appear —
+   the two-footprint batch serves only pure ALU register stretches;
+   tick=true's tail reads mcyclecfg/menvcfg/sig_meip/sig_seip, unownable,
+   span-absorbed.  (ii) Two premises the draft missed and the old
+   hw_config always carried: misa.C (the Zca decode gate reads it) and
+   elp ≠ LP_EXPECTED (the landing-pad check).  (iii) THE PER-LEAF COST
+   MODEL: 13m16s, of which the exec characterization's Qed is 671 s (84%)
+   — the same goal-side walk-chain kernel cost as the mfetch debt, now
+   per leaf.  **The walk-batching fix is MANDATORY before the Phase C
+   sweep**; the rest (~2 min/leaf) scales.  (iv) `ext_decode_compressed`
+   is vm-opaque (Acc diverges under vm) — gate equations by reflexivity.
+2. **The next leaf** (was: the first converted leaf) — `wp_addi_gpr` re-derived spec-verbatim
    on 0b's cycle rule, timed against the original (the design doc's real
    Phase B gate), then:
    - ONE small whole-function proof re-established at parity (the pilot was
