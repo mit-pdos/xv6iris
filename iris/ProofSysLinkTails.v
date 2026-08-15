@@ -1912,8 +1912,8 @@ Section ProofSysLinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ic_escrow cn gfs gi cov logstart kd -∗
     ireg_inv gi gfs inodestart nib -∗
-    is_sleeplock gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) -∗
-    is_sleeplock gild gisld (i_lock (ientry kd)) "inode"%string (ic_tok cn kd) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
     (* ---- the CHILD, unlocked, its reference already shed ---- *)
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     inode_shr_gen kk s dev inum gy -∗
