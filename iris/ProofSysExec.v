@@ -905,7 +905,8 @@ End SysExecEpilogue.
 (* ===================================================================== *)
 Module SysExecProof (Argaddr : ARGADDR) (Argstr : ARGSTR) (Memset : MEMSET)
                     (Fetchaddr : FETCHADDR) (Kalloc : KALLOC)
-                    (Fetchstr : FETCHSTR) (Kexec : KEXEC) (Kfree : KFREE).
+                    (Fetchstr : FETCHSTR) (Kexec : KEXEC) (Kfree : KFREE)
+                    : SYSEXEC.
 
 (* ===================================================================== *)
 (*  +0x000 .. +0x026 -- THE PROLOGUE, argaddr and argstr.                 *)
@@ -4526,8 +4527,8 @@ End SysExecSuccTail.
 (*  [argv[i] = 0] is a no-op on the resource (memset already put it        *)
 (*  there); what the six instructions really do is compute the two         *)
 (*  pointers kexec is called with.  The work is the ARRAY'S CHANGE OF      *)
-(*  VIEW: the fill loop carries it as "filled below [i], memset's zero     *)
-(*  above", and kexec's contract wants "[S na] cells ending in a NULL"     *)
+(*  VIEW: the fill loop carries it as -- filled below [i], memset's zero   *)
+(*  above -- and kexec's contract wants [S na] cells ending in a NULL,     *)
 (*  plus whatever is left over.  [sx_argv_kx] is that one equivalence, and *)
 (*  it is what makes [avf := sx_avf pg i] -- the pointers with a zero      *)
 (*  written at [i] -- the vector kexec is handed.                          *)
@@ -4910,5 +4911,202 @@ Section SysExecBreak.
   Qed.
 
 End SysExecBreak.
+
+(* ===================================================================== *)
+(*  THE COMPOSITION.                                                      *)
+(*                                                                        *)
+(*  head -> setup -> the fill loop -> {break -> kexec -> the success tail  *)
+(*  | bad:}.  Every seam is a state predicate the two sides already agree  *)
+(*  on, so all this file does is pin the interrupt index, hand the frame   *)
+(*  from one block's spelling to the next's, and turn each of the two      *)
+(*  returns into the contract's [sys_exec_post].                          *)
+(*                                                                        *)
+(*  PINNING [b] IS THE FIRST STEP.  The contract takes [eb = true] and     *)
+(*  leaves [b] free; at depth 0 the SIE eighth in [sie_cap_gpr] and        *)
+(*  [cpu_own]'s own index agree, so [b = eb = true] -- and [cpu_own]'s     *)
+(*  depth then pins [lks = ∅], which is every lock-order goal the eight    *)
+(*  callees raise.  Do it before anything else or the FS layer's [wp_next  *)
+(*  true] contracts look unreachable.                                      *)
+(* ===================================================================== *)
+Section SysExecWhole.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Notation Rra := (mword_of_int 1 : mword 5).
+  Notation Rs0 := (mword_of_int 8 : mword 5).
+  Notation Rs1 := (mword_of_int 9 : mword 5).
+  Notation Rs2 := (mword_of_int 18 : mword 5).
+  Notation Rs3 := (mword_of_int 19 : mword 5).
+  Notation Rs4 := (mword_of_int 20 : mword 5).
+  Notation Rs5 := (mword_of_int 21 : mword 5).
+  Notation Rs6 := (mword_of_int 22 : mword 5).
+  Notation Rs7 := (mword_of_int 23 : mword 5).
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+
+  (* [ProofFiledup.sie_b_agree], restated: a whole-function proof file is
+     not a dependency any other one may take. *)
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
+      (p : mword 64) (C : iProp Σ) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+    ⌜ b = match n with O => eb | S _ => false end ⌝.
+  Proof.
+    iIntros "Hcg Hcnt". destruct b.
+    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - destruct n as [|n']; [ | done ].
+      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
+      iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
+      destruct eb; [ exfalso | done ].
+      apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
+  Qed.
+
+  Lemma wp_sys_exec_sconf
+      (γf : gname) (γa : gname)
+      (gs : list gname) (j : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (dqb dqs : dfrac)
+      (v0 v1 : mword 64)
+      (pid : mword 32) (V : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool) (lks : gset string) :
+      wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
+                             cn gtl cov logstart bmapstart inodestart nib
+                             size dev used dqb dqs v0 v1 pid V m K eb C b lks.
+  Proof.
+    cbv beta zeta delta [wp_sys_exec_sconf_body].
+    intros HK Hdev Hnib Hg Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
+           Hcb Hireg Hjp Hgl Hebt Harg0 Harg1.
+    subst eb.
+    iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hpanic #Hfab Hbmp Hisp Hbmr
+             Hbs #Hka Hir Hpriv Hcont".
+    (* ---- the interrupt index, and the held-lock set ---- *)
+    iDestruct (sie_b_agree m 0%nat K true b (proc_addr j) C lks
+                 with "Hcg Hcnt") as %Hb.
+    cbn in Hb. subst b.
+    iDestruct (cpu_own_zero_empty true (proc_addr j) C true lks
+                 with "Hcnt") as "[%Hlks Hcnt]".
+    subst lks.
+    pose proof (locks_below_empty "kmem") as Hlb.
+    set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
+    (* ===== +0x000 .. +0x026 : the prologue ===== *)
+    iApply (sx_head γf γa j pid V v0 v1 m K true C true ∅
+              HK Harg0 Harg1 Hlb with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka").
+    iIntros (CID1 Hq1 M P' plen pfun rst v59 v60) "[Hm1 | Hft]".
+    { (* ---- argstr failed: -1, and the block never moved ---- *)
+      iDestruct "Hm1" as "((%Hcs & %Hext & %Ha0) & Hcg & Hcnt & Hpc & Hpriv)".
+      iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain |].
+      iApply ("Hcont" $! M used P'
+               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp [%] Hbmr Hbs Hka
+                     Hir [Hpriv]").
+      { exact Hcs. }
+      { exact Hext. }
+      { reflexivity. }
+      { rewrite /sys_exec_post.
+        iExists (upd_upt V P'), 0%nat, (fun _ => 0%nat),
+                (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64),
+                (mword_of_int 0 : mword 64).
+        iSplitR; [iPureIntro; left; split; [exact Ha0 | reflexivity] |].
+        iExact "Hpriv". } }
+    (* ---- the path is in: run the rest of the function ---- *)
+    iDestruct "Hft" as "((%Hsp & %Hs0 & %Hthr2 & %Hext & %Hplen & %Hpcstr &
+                          %Halp & %Hala) & Hpc & Hcg & Hcnt & Hpriv & F1 & F2 &
+                         F3 & F4 & F5 & F6 & F7 & F8 & F9 & F10 & Hpre & Hsuf &
+                         Hab & F59 & F60)".
+    (* ===== +0x028 .. +0x054 : the lazy spills and memset ===== *)
+    iApply (sx_setup (CID0 := CID1) m M sp0 K true (proc_addr j)
+              HK eq_refl Hsp Hs0 Hthr2 Hala
+              with "Hcg Htext Hpc F3 F4 F5 F6 F7 F8 F9 Hab").
+    iIntros (CID2 Hq2 M2) "%Hst2 Hpc Hcg S3 S4 S5 S6 S7 S8 S9 Hargv".
+    destruct Hst2 as (H2sp & H2thr & H2s0 & H2s1 & H2s2 & H2s3 & H2s4 & H2s5 &
+                      H2s6 & H2s7).
+    iDestruct (cpu_own_transport CID1 CID2 0%nat true (proc_addr j) C true
+                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iAssert (sx_carry sp0 m plen pfun rst)
+      with "[F1 F2 S3 S4 S5 S6 S7 S8 S9 F10 Hpre Hsuf]" as "Hcarry".
+    { rewrite /sx_carry.
+      iSplitL "F1"; [iExact "F1" |]. iSplitL "F2"; [iExact "F2" |].
+      iSplitL "S3"; [iExact "S3" |]. iSplitL "S4"; [iExact "S4" |].
+      iSplitL "S5"; [iExact "S5" |]. iSplitL "S6"; [iExact "S6" |].
+      iSplitL "S7"; [iExact "S7" |]. iSplitL "S8"; [iExact "S8" |].
+      iSplitL "S9"; [iExact "S9" |]. iSplitL "F10"; [iExact "F10" |].
+      iSplitL "Hpre"; [iExact "Hpre" | iExact "Hsuf"]. }
+    (* the array is empty, so the three index-keyed functions are arbitrary *)
+    assert (HR0 : sx_regs sp0 m M2 0%nat).
+    { split_and!;
+        [ exact H2sp | exact H2thr | exact H2s0 | exact H2s1 | exact H2s2
+        | exact H2s3 | exact H2s4 | exact H2s5 | exact H2s6 | exact H2s7 ]. }
+    iAssert (sx_body γf j pid V C K true true ∅ sp0 m plen pfun rst v59
+               M2 P' 0%nat (fun _ => (mword_of_int 0 : mword 64))
+               (fun _ => 0%nat) (fun _ _ => (mword_of_int 0 : mword 8))
+               (mword_of_int (SX + 0x56) : mword 64))
+      with "[Hpc Hcg Hcnt Hpriv Hcarry F59 F60 Hargv]" as "Hbody".
+    { iApply (sx_body_intro (CID0 := CID2) γf j pid V C K true true ∅ sp0 m
+                plen pfun rst v59 M2 P' 0%nat
+                (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
+                (fun _ _ => (mword_of_int 0 : mword 8))
+                (mword_of_int (SX + 0x56) : mword 64)
+                ltac:(lia) Hext ltac:(intros q Hq; lia) HR0
+                with "Hpc Hcg Hcnt Hpriv Hcarry F59 [F60] [Hargv] []").
+      { iExists v60. iExact "F60". }
+      { rewrite /sx_argv0 sx_seq00 big_sepL_nil.
+        iSplitR; [done | iExact "Hargv"]. }
+      { rewrite /sx_pages sx_seq00 big_sepL_nil. done. } }
+    (* ===== +0x056 .. +0x090 : the fill loop ===== *)
+    iApply (sx_loop (CID0 := CID2) γf γa j pid V C K true true ∅ sp0 m plen
+              pfun rst v59 HK Hlb 32%nat M2 P' 0%nat
+              (fun _ => (mword_of_int 0 : mword 64)) (fun _ => 0%nat)
+              (fun _ _ => (mword_of_int 0 : mword 8)) ltac:(lia)
+              with "Htext Hka Hbody").
+    iIntros (CID3 Hq3 M3 P3 i3 pg3 al3 af3) "[Hbrk | Hbad]".
+    - (* ---- the break: argv[i] = 0, then kexec ---- *)
+      iApply (sx_break (CID0 := CID3) gs j gl gu gd gk pd pav pu bn g gfs gi
+                cn gtl γa γf cov logstart bmapstart inodestart nib size dev
+                used dqb dqs pid V C K true true ∅ sp0 m plen pfun rst v59
+                M3 P3 i3 pg3 al3 af3
+                HK Hlb eq_refl Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
+                Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
+                with "Htext Hpanic Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hbrk").
+      iIntros (CID4 Hq4 mf used' V' entry spv szv')
+        "%Hcs %Hkok %Husub %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbmr Hbs Hir Hpriv".
+      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+      iApply ("Hcont" $! mf used' P3
+               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp [%] Hbmr Hbs Hka
+                     Hir [Hpriv]").
+      { exact Hcs. }
+      { exact Hext3. }
+      { exact Husub. }
+      { rewrite /sys_exec_post.
+        iExists V', i3, al3, entry, spv, szv'.
+        iSplitR; [iPureIntro; exact Hkok |]. iExact "Hpriv". }
+    - (* ---- [bad:]: free what was allocated and return -1 ---- *)
+      iApply (sx_bad_tail (CID0 := CID3) γf γa j pid V C K true true ∅ sp0 m
+                plen pfun rst v59 M3 P3 i3 pg3 af3
+                HK Hlb eq_refl Hplen Halp with "Htext Hka Hbad").
+      iIntros (CID4 Hq4 mf) "%Hcs %Ha0 %Hext3 Hcg Hcnt Hpc Hpriv".
+      iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].
+      iApply ("Hcont" $! mf used P3
+               with "[%] [%] Hcg Hcnt Htcx Hccx Hpc Hbmp Hisp [%] Hbmr Hbs Hka
+                     Hir [Hpriv]").
+      { exact Hcs. }
+      { exact Hext3. }
+      { reflexivity. }
+      { rewrite /sys_exec_post.
+        iExists (upd_upt V P3), 0%nat, (fun _ => 0%nat),
+                (mword_of_int 0 : mword 64), (mword_of_int 0 : mword 64),
+                (mword_of_int 0 : mword 64).
+        iSplitR; [iPureIntro; left; split; [exact Ha0 | reflexivity] |].
+        iExact "Hpriv". }
+  Qed.
+
+End SysExecWhole.
 
 End SysExecProof.
