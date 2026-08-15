@@ -109,6 +109,21 @@ Theorem sl_bad1_closes (w1 w2 : bool) :
   (iput_units <= sl_u3f w1 w2 - sl_iu true)%nat.
 Proof. destruct w1, w2; vm_compute; lia. Qed.
 
+(* ---- ARM E2, THE ORPHAN GUARD (xv6 f60ff58): [dp->nlink == 0] tested
+   immediately after [ilock(dp)], routed to [bad:] through an
+   [iunlockput(dp)].  It is the ONE arm below the second walk that needs no
+   corner analysis at all: nothing has been logged since nameiparent
+   returned, so the count is [sl_u3] whole and the free runs UNCREDITED on
+   both blocks -- there is no dirlink to have claimed either.  The tail's
+   own flush is still credited by the [++], so the arm closes with room at
+   every corner of the two walks. *)
+Theorem sl_orphan_closes (w1 w2 wd : bool) :
+  let u4 := sl_u3 w1 w2 in
+  let u5 := (u4 - ip_spend_w wd false false)%nat in
+  (iput_units <= u4)%nat /\ (1 <= u5)%nat /\
+  (iput_units <= u5 - sl_iu true)%nat.
+Proof. destruct w1, w2, wd; vm_compute; lia. Qed.
+
 (* ---- dirlink's ENTRY requirement, at both corners of [sl_corr]. *)
 Theorem sl_dl_need_credited (w1 w2 ind : bool) :
   (dl_need true ind <= sl_u3 w1 w2)%nat.

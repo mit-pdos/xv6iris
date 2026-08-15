@@ -23,6 +23,8 @@
 
        if ((dp = nameiparent(new, name)) == 0) goto bad;
        ilock(dp);
+       // dp may have been unlinked while we resolved it
+       if (dp->nlink == 0) { iunlockput(dp); goto bad; }
        if (dp->dev != ip->dev || dirlink(dp, name, ip->inum) < 0) {
          iunlockput(dp); goto bad;
        }
@@ -40,7 +42,7 @@
        return -1;
      }
 
-   @ KernelSyms.sys_link, 278 bytes / 96 instructions (CodeSysLink.v).
+   @ KernelSyms.sys_link, 292 bytes / 101 instructions (CodeSysLink.v).
    A THIRTY-EIGHT slot frame ([c.addi16sp sp,-304] at +0x00), carved:
 
      slot  1  (sp+296)  ra
@@ -70,13 +72,20 @@
    * THE LEDGER FRAGMENT IS MINTED AND SETTLED INSIDE THIS FUNCTION.  The
      [ip->nlink++; iupdate(ip)] at +0x5e..+0x66 mints one
      [InodeRegion.ilink] against the count that pays for it; on the success
-     path the [dirlink] at +0x96 lets the caller DEPOSIT it into the
+     path the [dirlink] at +0x9c lets the caller DEPOSIT it into the
      parent's [DirLinks.dir_links] ([dir_links_dirlink], caller-side --
      design/fs-icache.md 20.18 ruling 1 keeps every ledger resource OUT of
      [SpecDirlink]); on every route to [bad:] the [ip->nlink--; iupdate(ip)]
-     at +0xec..+0xf8 CONSUMES it back.  Nothing colour-shaped crosses this
+     at +0xfa..+0x106 CONSUMES it back.  Nothing colour-shaped crosses this
      interface in either direction.
-   * THE GUARD IS WHAT MAKES THE MINT LEGAL.  [wp_iupdate_link]'s premise
+   * THE ORPHAN GUARD IS WHAT MAKES THE DEPOSIT LEGAL.  The [lh a5,74(s2)]
+     / [c.beqz] at +0x84..+0x88 -- create's re-check, given to sys_link at
+     f60ff58 -- refuses to [dirlink] into a parent a concurrent rmdir has
+     orphaned, which would strand the [ilink] above in a directory whose
+     [itrunc] discards records without dropping counts.  Its arm is ARM E2,
+     a plain [iunlockput(dp); goto bad;], so nothing about it reaches this
+     contract except that the [-1] disjunct now has one more way to happen.
+   * THE NLINK_MAX GUARD IS WHAT MAKES THE MINT LEGAL.  [wp_iupdate_link]'s premise
      [di_nlink dn0 <> mword_of_int 32767] is exactly the [beq a4,a5] at
      +0x58 falling through; the [lui a4,0x8 / addi a4,a4,-1] pair at
      +0x54/+0x56 is 32767,
@@ -198,8 +207,8 @@ Definition K_sys_link : nat := 144%nat.
 Definition sys_link_slots : nat := 3%nat.
 
 (* sys_link's result, as the honest disjunction on a0.  BOTH values come
-   out of the same [c.mv a0,a5] at +0x10c, whose a5 each arm set to its own
-   literal: 0 at +0xae on the success arm, -1 at every failure. *)
+   out of the same [c.mv a0,a5] at +0x11a, whose a5 each arm set to its own
+   literal: 0 at +0xb4 on the success arm, -1 at every failure. *)
 Definition sys_link_ret (r : mword 64) : Prop :=
   r = (mword_of_int (-1) : mword 64) \/ r = (zero_reg : mword 64).
 
@@ -250,7 +259,7 @@ Definition wp_sys_link_sconf_body
   bitmap_geom_ok cov logstart bmapstart size ->
   ireg_blocks_ok inodestart nib cov logstart ->
   (* mkfs's [ushort] geometry, create's premise verbatim and for the same
-     reason: it is what makes the [lw a2,4(s1)] at +0x90 -- which SIGN
+     reason: it is what makes the [lw a2,4(s1)] at +0x96 -- which SIGN
      extends the 32-bit [ip->inum] cell -- agree with [SpecDirlink]'s
      ZERO-extended halfword argument. *)
   16 * Z.of_nat nib <= 2 ^ 16 ->
