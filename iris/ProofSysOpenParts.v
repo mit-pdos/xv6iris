@@ -778,8 +778,20 @@ Section ProofSysOpenPublish.
   Proof.
     iIntros "(%data & %Hok & %Hdir & %Hddix & Hlnk & Hat & Hmeta & Haddr & Hind
               & Hblk)".
-    iExists data. iFrame "%". iFrame "Hlnk Hat Hmeta Hblk".
-    rewrite /inode_map. iFrame "Haddr Hind".
+    (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
+       [inode_blocks] tail is large (171 s at this site).  The arity sweep's
+       third pure conjunct [Hddix] is bound but NOT re-split: this lemma
+       WEAKENS [ic_loaded], and the goal above carries only [inode_ok] and
+       [dir_ok], so [dir_dots_ix] is discarded here. *)
+    iExists data.
+    iSplit; [iPureIntro; exact Hok |].
+    iSplit; [iPureIntro; exact Hdir |].
+    iSplitL "Hlnk"; [iExact "Hlnk" |].
+    iSplitL "Hat"; [iExact "Hat" |].
+    iSplitL "Hmeta"; [iExact "Hmeta" |].
+    iSplitL "Haddr Hind".
+    { rewrite /inode_map. iSplitL "Haddr"; [iExact "Haddr" | iExact "Hind"]. }
+    iExact "Hblk".
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)
