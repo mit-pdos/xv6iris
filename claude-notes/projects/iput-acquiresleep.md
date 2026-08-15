@@ -189,14 +189,40 @@ binder, and the six consumers (ProofFileclose / ProofFilewrite / ProofFilestat
 `wp_acquiresleep_gen_sconf` (depositing the share it already consumes),
 iunlock to `wp_releasesleep_gen_sconf` + `wp_holdingsleep_gen_sconf`.
 
-### (6) iput, the axiom, and then step 5's deletion
+### (6) iput, the axiom -- and the ONE thing still in the way
 
+**Stages 3-5 are LANDED.** The inode sleeplocks are tracked, the deposit is
+keyed by the slot (`slh_tok (icfg_isl k)`) while each lock keeps its own
+existential gname, the share decomposes into the arm's two slices and the
+lock's one, and `sleeplocked_q gisl s` carries the fraction so iunlock rebuilds
+its caller's share exactly. iput deposits its own reference's slice like every
+other holder and still takes the BLOCKING nested contract with its false axiom.
+
+**What is left is one swap, and it is blocked on WHERE THE AUTHORITY LIVES.**
 At `ip->ref == 1`, REF-1 gives `M !! k = Some (q, 1)` with `q` the thread's
-own; `isl_slot` says the authority is `Some q`; `slh_return_last` turns the
-pair into `slh_auth (icfg_isl k) None`; `wp_acquiresleep_nb_sconf` takes it.
-`iput_acquiresleep_order_ADMITTED` goes with the call it justified. Then the
-nested blocking contract has no consumer and step 5 below deletes it.
+own, so iput can return its share and hold `slh_auth (icfg_isl k) None` --
+which is `wp_acquiresleep_nb_sconf`'s premise. But the zero has to be held
+ACROSS the call, and `isl_pool` currently sits in `itable_body`, an Iris
+invariant. Opening it, taking `isl_slot M k = slh_auth (Some q)` and returning
+the share leaves the thread holding `slh_auth None` and **unable to close**:
+`itable_body` wants the slot's authority back at `Some q`. An invariant cannot
+be held open across a call, and no borrow marker exists.
 
+**The fix is to move `isl_pool M` out of `itable_body` and into
+`itable_res2`** -- the itable LOCK's resource, beside `itable_half M`. That is
+also where it belongs: all five ghost steps happen under `itable.lock`
+(`iget`'s alloc and incr, `idup`'s dup, `iput`'s close and close_last), and
+nothing ever peeks at the authority lock-free the way the `ref` words are
+peeked at. The work:
+
+- `IcacheEscrow.itable_res2` gains `isl_pool M`; `IcacheInv.itable_body` drops
+  it, and the eleven `iDestruct "Hbody" as (M) "(… & >Hipool)"` opens revert.
+- the five ghost steps keep their signatures (they already take `isl_slot M k`),
+  but the `_au` lemmas around them stop extracting it from the invariant and
+  take it as a parameter instead -- which moves it into ProofIget / ProofIdup /
+  ProofIput's argument lists, where the lock's resource has it.
+- then iput: return the share, swap the call for `wp_acquiresleep_nb_sconf`,
+  mint back at the release, and delete `iput_acquiresleep_order_ADMITTED`.
 
 **5. THE NESTED BLOCKING CONTRACT GOES, AND acquiresleep BECOMES noff = 0
 ONLY.** `NOT DONE`, and it falls out of step 4 rather than needing work of its
