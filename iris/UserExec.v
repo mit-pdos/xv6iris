@@ -248,7 +248,13 @@ Section UserExec.
      medeleg ↦ᵣ{ dqc } uc_medeleg C ∗
      mip ↦ᵣ{ dqc } uc_mip C ∗
      menvcfg ↦ᵣ{ dqc } MENVCFG_S ∗
-     senvcfg ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) ∗
+     (* [senvcfg] is NEVER WRITTEN -- no [wp_csrw]-style lemma for it exists
+        anywhere in the tree -- so unlike its neighbors above it needs no
+        fraction split with the kernel at all: state it directly at
+        [DfracDiscarded], decoupled from [dqc]. A discarded fraction is
+        freely duplicable, so this costs nothing to hold alongside every
+        other read of it (e.g. [hw_config]'s own copy, RiscvFetchExec.v). *)
+     senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
      mstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) ∗
      sstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 32))%I.
 

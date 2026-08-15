@@ -97,7 +97,7 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
   mie ↦ᵣ mie_v -∗
   mideleg ↦ᵣ mdv0 -∗
   menvcfg ↦ᵣ menvcfg0 -∗
-  senvcfg ↦ᵣ senvcfg0 -∗
+  senvcfg ↦ᵣ□ senvcfg0 -∗
   sepc ↦ᵣ sepc0 -∗
   (* the trampoline claim, threaded to the entry switch *)
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
@@ -142,7 +142,7 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    senvcfg ↦ᵣ senvcfg0 -∗
+    senvcfg ↦ᵣ□ senvcfg0 -∗
     sepc ↦ᵣ sepc0 -∗
     utlb_inv_pt uroot tfp um -∗
     pc_is (ret_pc sepc0) -∗
