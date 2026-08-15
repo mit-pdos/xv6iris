@@ -665,7 +665,6 @@ Section ProofPrintint.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.printint + 0x74) : mword 64) -∗
     bytes_own (DfracOwn 1) buf 24 -∗
-    panic_wp_any -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
@@ -690,7 +689,7 @@ Section ProofPrintint.
        loaded byte is put into the leaf's address form BEFORE the [iApply]
        (rather than framed in a bracket), which is what keeps it that way. *)
     induction j as [|j' IH]; intros CID0 bs mp Hj24 Hs1 Hs2 Hlkbelow;
-      iIntros "Hcg Hcnt #Htext Hpc Hbuf #Hpanic #Hdev #Htxl #Hsent Hcont";
+      iIntros "Hcg Hcnt #Htext Hpc Hbuf #Hdev #Htxl #Hsent Hcont";
       iPoseProof (pii_74 with "Htext") as "Hi74";
       iPoseProof (pii_78 with "Htext") as "Hi78";
       iPoseProof (pii_7c with "Htext") as "Hi7c";
@@ -724,7 +723,7 @@ Section ProofPrintint.
       iEval (rewrite Htgtc) in "Hpc";
       iDestruct (cpu_own_transport CID0 CIDj1 n eb pcur b ltac:(wp_next_chain) with "Hcnt") as "Hcnt";
       iApply (wp_consputc (CID0 := CIDj1) γl γd γv P2 (K - 8)%nat bs n eb b pcur lks HK16 Hn31 Hlkbelow
-                with "Hcg Hcnt Htext Hpc Hpanic Hdev Htxl Hsent");
+                with "Hcg Hcnt Htext Hpc Hdev Htxl Hsent");
       iIntros (CIDcp Hscp mc cs) "Hcg Hcnt Hpc %Hcs #Hsent2";
       destruct Hcs as [Hcs Hra];
       assert (Hretc : ret_pc (P2 !!! Regidx ra_idx) = mword_of_int (KernelSyms.printint + 0x7c))
@@ -795,7 +794,7 @@ Section ProofPrintint.
       iApply (IH CIDbn (bs ++ cs)%list P3 ltac:(lia)
                 ltac:(rewrite HP3s1; apply pa_add_back1; reflexivity)
                 HP3s2 Hlkbelow
-                with "Hcg Hcnt Htext Hpc Hbuf Hpanic Hdev Htxl Hsent2").
+                with "Hcg Hcnt Htext Hpc Hbuf Hdev Htxl Hsent2").
       iIntros (CIDf Hsf mf cs2) "%Hk2 Hcg Hcnt Hpc Hbuf #Hsent3".
       iEval (rewrite -app_assoc) in "Hsent3".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
@@ -837,7 +836,6 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 3) ↦₈ v) -∗
     (pa_stk sp0 4) ↦₈ (m !!! Regidx s2_idx) -∗
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
-    panic_wp_any -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
@@ -850,7 +848,7 @@ Section ProofPrintint.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spd buf HK Hn31 Hn1 Hn22 Ha4 Hsp Hs2 Hkept Hal7 Hal6 Hal5 Hlkbelow.
-    iIntros "Hcg Hcnt #Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hpanic #Hdev #Htxl #Hsent Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hdev #Htxl #Hsent Hcont".
     iPoseProof (pii_5c with "Htext") as "Hi5c".
     iPoseProof (pii_60 with "Htext") as "Hi60".
     iPoseProof (pii_62 with "Htext") as "Hi62".
@@ -989,7 +987,7 @@ Section ProofPrintint.
     iDestruct (cpu_own_transport CID0 CIDsu n eb pcur b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (wp_printint_ploop γl γd γv K buf n eb b pcur lks HK Hn31 (nd - 1)%nat CIDsu bs T7
               ltac:(lia) HT7s1 HT7s2 Hlkbelow
-              with "Hcg Hcnt Htext Hpc Hbuf Hpanic Hdev Htxl Hsent").
+              with "Hcg Hcnt Htext Hpc Hbuf Hdev Htxl Hsent").
     iIntros (CIDpl Hspl mf cs) "%Hk Hcg Hcnt Hpc Hbuf #Hsent2".
     (* +0x82 ld s1,40(sp) : undo the lazy save *)
     assert (Hmfsp : mf !!! Regidx csp_rs1 = spd).
@@ -1072,7 +1070,6 @@ Section ProofPrintint.
     (∃ v : mword 64, (pa_stk sp0 3) ↦₈ v) -∗
     (pa_stk sp0 4) ↦₈ (m !!! Regidx s2_idx) -∗
     (∃ v : mword 64, (pa_stk sp0 8) ↦₈ v) -∗
-    panic_wp_any -∗
     dev_inv γd γv -∗ is_txlock γl γd -∗ uart_sent_sub γd bs -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ (mf : regfile) (cs : list (bv 8)),
@@ -1085,7 +1082,7 @@ Section ProofPrintint.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spd buf HK Hn31 Hbase Ha0 Hsp Hs0 Hkept Hal7 Hal6 Hal5 Hlkbelow.
-    iIntros "Hcg Hcnt #Htext #Hdig Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hpanic #Hdev #Htxl #Hsent Hcont".
+    iIntros "Hcg Hcnt #Htext #Hdig Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 #Hdev #Htxl #Hsent Hcont".
     iPoseProof (pii_12 with "Htext") as "Hi12".
     iPoseProof (pii_16 with "Htext") as "Hi16".
     iPoseProof (pii_18 with "Htext") as "Hi18".
@@ -1223,7 +1220,7 @@ Section ProofPrintint.
       iDestruct (cpu_own_transport CID0 CIDtk n eb pcur b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (wp_printint_tail (CID0 := CIDtk) γl γd γv m mf K i' bs n eb b pcur lks HK Hn31
                 Hi1 ltac:(lia) Hf4 Hmfsp Hmfs2 Hmfcs Hal7 Hal6 Hal5 Hlkbelow
-                with "Hcg Hcnt Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanic Hdev Htxl Hsent Hcont").
+                with "Hcg Hcnt Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hdev Htxl Hsent Hcont").
     - (* a sign digit: buf[i'] = '-' , then the tail with n = i'+1 *)
       iApply (wp_beqz_x0_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x44)) (mword_of_int 24 : mword 13)
                 t1_idx mf (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rgne; exact Htf)
@@ -1324,7 +1321,7 @@ Section ProofPrintint.
                 ltac:(rewrite /S4 upd_ne; [| reg_neq]; rewrite /S3 upd_ne; [| reg_neq];
                       rewrite /S2 upd_ne; [| reg_neq]; rewrite /S1 upd_ne; [exact Hmfs2 | reg_neq])
                 HS4cs Hal7 Hal6 Hal5 Hlkbelow
-                with "Hcg Hcnt Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanic Hdev Htxl Hsent Hcont").
+                with "Hcg Hcnt Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hdev Htxl Hsent Hcont").
   Qed.
 
   (* ================================================================== *)
@@ -1371,7 +1368,7 @@ Section ProofPrintint.
     intros ra_i a1_i pcE ra0 ret_tgt HK Hbase Hn31 Hlkbelow.
     pose proof (pi_cap_bounds K HK) as (HK8 & HK16).
     assert (HK24 : (24 <= K)%nat) by (unfold printint_stack in HK; lia).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hdev #Htxl #Hsent Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hdev #Htxl #Hsent Hcont".
     iPoseProof (digits_from_data with "Hkdata") as "#Hdig".
     iPoseProof (pii_00 with "Htext") as "Hi00".
     iPoseProof (pii_02 with "Htext") as "Hi02".
@@ -1496,7 +1493,7 @@ Section ProofPrintint.
                       pose proof (is_cs_idx_true_neq t1_idx c ltac:(vm_compute; reflexivity) Hc) as Nt1;
                       rewrite /N1 upd_ne; [ exact (HW2cs c Hc Nsp N8 N18) | congruence ])
                 Hal7 Hal6 Hal5 Hlkbelow
-                with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hpanic Hdev Htxl Hsent Hcont").
+                with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hdev Htxl Hsent Hcont").
     - (* sign != 0: test the value *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x0a)) (mword_of_int 3 : mword 8)
                 (Cregidx (mword_of_int 4)) a2_idx W2 (K - 8)%nat b
@@ -1558,7 +1555,7 @@ Section ProofPrintint.
                         rewrite /G2 upd_ne; [| congruence];
                         rewrite /G1 upd_ne; [ exact (HW2cs c Hc Nsp N8 N18) | congruence ])
                   Hal7 Hal6 Hal5 Hlkbelow
-                  with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hpanic Hdev Htxl Hsent Hcont").
+                  with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hdev Htxl Hsent Hcont").
       + (* xx >= 0: the same [t1 := 0] path as the sign==0 case *)
         iApply (wp_blt_x0_fall_s_sconf (mword_of_int (KernelSyms.printint + 0x0c)) (mword_of_int 130 : mword 13)
                   a0_idx W2 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rgne; exact Hneg)
@@ -1587,7 +1584,7 @@ Section ProofPrintint.
                         pose proof (is_cs_idx_true_neq t1_idx c ltac:(vm_compute; reflexivity) Hc) as Nt1;
                         rewrite /N1 upd_ne; [ exact (HW2cs c Hc Nsp N8 N18) | congruence ])
                   Hal7 Hal6 Hal5 Hlkbelow
-                  with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hpanic Hdev Htxl Hsent Hcont").
+                  with "Hcg Hcnt Htext Hdig Hpc Hbuf Hc1 Hc2 S3 Hc4 S8 Hdev Htxl Hsent Hcont").
   Qed.
 
 End ProofPrintint.

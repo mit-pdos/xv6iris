@@ -703,7 +703,7 @@ Section ProofProcdumpLoop.
                   ltac:(rewrite pd_fmt_kinds; reflexivity)
                   ltac:(cbn [length]; lia)
                   Hfresh
-                  with "Hcg Hkt Hkd Hpc Hpanic3 Hown Hpenv [Hfmt] [Hnmc2]").
+                  with "Hcg Hkt Hkd Hpc Hown Hpenv [Hfmt] [Hnmc2]").
         all: try lkbelow.
         { rewrite Ha0_5c. iExact "Hfmt". }
         { iApply (pdl_descs_mk CIDq3 P5c sptr (pd_cur j) ss nm2 dq3
@@ -780,7 +780,7 @@ Section ProofProcdumpLoop.
                   ltac:(rewrite pd_nl_kinds; reflexivity)
                   ltac:(cbn [length]; lia)
                   Hfresh
-                  with "Hcg Hkt Hkd Hpc Hpanic6 Hown Hpenv [Hnlstr] []").
+                  with "Hcg Hkt Hkd Hpc Hown Hpenv [Hnlstr] []").
         all: try lkbelow.
         { rewrite Ha0_62. iExact "Hnlstr". }
         { done. }

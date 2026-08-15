@@ -581,7 +581,7 @@ Section ProofMain.
     iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv A3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
-              with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpenv [] [//]").
+              with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
     all: try lkbelow.
     { rewrite HA3a0. iExact "Hsnl". }
     iApply wp_next_off_intro.
@@ -639,7 +639,7 @@ Section ProofMain.
     iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv B3 n false p0
               mn_boot [] false ∅ ltac:(lia) Hlbt Hnbt ltac:(rewrite Hkbt; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
-              with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpenv [] [//]").
+              with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
     all: try lkbelow.
     { rewrite HB3a0. iExact "Hsbt". }
     iApply wp_next_off_intro.
@@ -697,7 +697,7 @@ Section ProofMain.
     iApply (PrintkGen.wp_printk_gen_sconf γpr γd γv D3 n false p0
               mn_nl [] false ∅ ltac:(lia) Hlnl Hnnl ltac:(rewrite Hknl; reflexivity)
               ltac:(cbn [length]; lia) (locks_below_empty "pr")
-              with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpenv [] [//]").
+              with "Hcg Htext Hkdata Hpc Hcpu Hpenv [] [//]").
     all: try lkbelow.
     { rewrite HD3a0. iExact "Hsnl". }
     iApply wp_next_off_intro.

@@ -61,7 +61,6 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk "kmem"%string (kmem_res γk fl) -∗
   ([∗ list] p ∈ ps, page_own p) -∗
-  panic_wp_any -∗
   kalloc_avail γk (Some 0%nat) -∗
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mr,

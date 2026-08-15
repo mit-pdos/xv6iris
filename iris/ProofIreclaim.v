@@ -1123,7 +1123,7 @@ Section IreclaimOrphan.
               DfracDiscarded irc_msg [PkANum] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
-              with "Hcg Htext Hkdata Hpc Hpanic3 Hcnt Hpenv [] []").
+              with "Hcg Htext Hkdata Hpc Hcnt Hpenv [] []").
     all: try lkbelow.
     { rewrite HO3a0. iExact "Hstr". }
     { simpl. iSplit; done. }

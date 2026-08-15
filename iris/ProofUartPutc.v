@@ -376,7 +376,7 @@ Section ProofUartPutc.
     assert (HK4 : (4 <= K)%nat) by lia.
     assert (Hav : (10 <= K - 4)%nat) by lia.
     pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Ht Hpc #Hpanic #Hdinv #Htxl #Hsubbs Hcont".
+    iIntros "Hcg Hcpu #Ht Hpc #Hdinv #Htxl #Hsubbs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iDestruct (is_txlock_lock with "Htxl") as "#Hlk".
     iDestruct (is_txlock_dlab with "Htxl") as "#Hoff".

@@ -137,7 +137,6 @@ Section ProofVirtioDiskRw.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x000) : mword 64) -∗
-    panic_wp_any -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     b_blockno bp ↦₄{DfracOwn (1/2)} bno -∗
     wp_next (CID0 := CID) true pj (fun (CID : CpuId) =>
@@ -168,7 +167,7 @@ Section ProofVirtioDiskRw.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 bp wr HK Hfresh.
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hlk Hbno Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlk Hbno Hcont".
     (* ---- the instruction facts ---- *)
     (* ---- +0x000  c.addi16sp sp,-96 : push the 12-slot frame ---- *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)

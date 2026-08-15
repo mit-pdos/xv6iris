@@ -900,7 +900,7 @@ Section BallocOut.
               DfracDiscarded ba_msg [] b _
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
-              with "Hcg Htext Hkdata Hpc Hpanic10 Hcnt Hpenv [] [//]").
+              with "Hcg Htext Hkdata Hpc Hcnt Hpenv [] [//]").
     all: try lkbelow.
     { rewrite HQAa0. iExact "Hstr". }
     iIntros (CID11 Hq11 mP) "Hcg Hpc %Hcsp Hcnt _ _".

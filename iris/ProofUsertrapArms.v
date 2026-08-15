@@ -401,7 +401,7 @@ Section Ut56.
     iApply (Hpk CID M5 nx false (un_pj N) DfracDiscarded ut_fmt1
               ut_fmt1_descs false lks ltac:(lia) ut_fmt1_len ut_fmt1_nonul
               ut_fmt1_kinds ut_fmt1_ndescs
-              with "Hcg Htext Hkd Hpc Hpw Hcpu Hpenv [Hf1] []").
+              with "Hcg Htext Hkd Hpc Hcpu Hpenv [Hf1] []").
     all: try lkbelow.
     { rewrite HM5a0. iExact "Hf1". }
     { iApply ut_fmt1_descs_res. }
@@ -507,7 +507,7 @@ Section Ut56.
     iApply (Hpk CID MA nx false (un_pj N) DfracDiscarded ut_fmt2
               ut_fmt2_descs false lks ltac:(lia) ut_fmt2_len ut_fmt2_nonul
               ut_fmt2_kinds ut_fmt2_ndescs
-              with "Hcg Htext Hkd Hpc Hpw Hcpu Hpenv [Hf2] []").
+              with "Hcg Htext Hkd Hpc Hcpu Hpenv [Hf2] []").
     all: try lkbelow.
     { rewrite HMAa0. iExact "Hf2". }
     { iApply ut_fmt2_descs_res. }

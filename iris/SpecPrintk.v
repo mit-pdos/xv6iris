@@ -138,7 +138,6 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
   sie_cap_gpr m0 K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   fmt ↦ₛ{ dqf } f -∗
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   (* pr.lock protects nothing at all now: the transmitter it used to own moved
@@ -258,7 +257,6 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   locks_below lks "pr" ->
   sie_cap_gpr m0 K b pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp -∗
   (* the interrupt level is left exactly as found: acquire/release pair *)
   cpu_own 0%nat eb pj b lks -∗
   (* the general path's whole credential (persistent) *)

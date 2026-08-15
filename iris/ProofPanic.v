@@ -198,7 +198,7 @@ Section ProofPanic.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31 Hbelow.
-    iIntros "#Hpan Hcg Hown #Htext #Hkdata Hpc #Henv #Hsub Hmsg".
+    iIntros "Hcg Hown #Htext #Hkdata Hpc #Henv #Hsub Hmsg".
     iDestruct "Henv" as "(#Hlk & #Hdev & #Htx)".
     iPoseProof (pni_00 with "Htext") as "Hi00".
     iPoseProof (pni_02 with "Htext") as "Hi02".
@@ -369,7 +369,7 @@ Section ProofPanic.
               (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
-              with "Hcg Hown Htext Hkdata Hpc Hpan [Hhdr] [] Hlk Hdev Htx Hsub").
+              with "Hcg Hown Htext Hkdata Hpc [Hhdr] [] Hlk Hdev Htx Hsub").
     all: try lkbelow.
     { rewrite HP5a0. iExact "Hhdr". }
     { done. }
@@ -459,7 +459,7 @@ Section ProofPanic.
               ltac:(rewrite pn_fmt_kinds; cbn [map pk_desc_kind];
                     rewrite Hdm; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
-              with "Hcg Hown Htext Hkdata Hpc Hpan [Hfmt] [Hmsg] Hlk Hdev Htx Hsub1").
+              with "Hcg Hown Htext Hkdata Hpc [Hfmt] [Hmsg] Hlk Hdev Htx Hsub1").
     all: try lkbelow.
     { rewrite HQ3a0. iExact "Hfmt". }
     { rewrite big_sepL_singleton Hva. iExact "Hmsg". }

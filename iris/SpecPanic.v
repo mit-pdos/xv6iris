@@ -41,14 +41,16 @@
       by the trace prefix, because printk threads that claim in as well as
       out.
 
-   THE ONE PREMISE THAT IS NOT ABOUT panic: [PanicStub.panic_wp_any].  printk's
-   own precondition asks for it (acquire's "already holding" arm), so panic has
+   AND THERE IS NO LONGER A PREMISE THAT IS NOT ABOUT panic.  This contract
+   used to ask for [PanicStub.panic_wp_any] as well, because printk's own
+   precondition asked for it (acquire's "already holding" arm) and panic had
    to hand printk one -- the C-level panic -> printk -> acquire -> panic cycle
-   showing through.  It is an assumption of THIS contract rather than of
-   panic's proof so that the shape of the eventual fix is visible: when the
-   call sites are spliced over to this contract, that premise becomes this
-   contract itself and closes by Löb (panic pushes its frame before it calls
-   printk, so there is a step to strip the later on).  See PanicStub.v. *)
+   showing through.  The plan of record was to close that cycle by Löb once
+   the call sites were spliced over.  IT DID NOT NEED TO BE CLOSED: acquire's
+   arm is refuted now (SpecAcquire.v), so the whole printk cone -- printk,
+   printint, consputc, uartputc_sync -- asks for no panic credential at all,
+   and panic's contract is self-contained.  What is left of the splice is the
+   18 functions that reach a [jal panic] of their own. *)
 From Stdlib Require Import ZArith Bool Lia List String Ascii.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import dfrac.
@@ -115,7 +117,6 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   locks_below lks "pr" ->
   (* NOT about panic -- printk's precondition for acquire's panic arm.  See
      the header and PanicStub.v. *)
-  panic_wp_any -∗
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗

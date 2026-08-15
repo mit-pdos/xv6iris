@@ -124,7 +124,6 @@ Section ProofFreerange.
     (∃ v : mword 64, (pa_stk sp0 4) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 5) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
-    panic_wp_any -∗
     kalloc_avail γk onf -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mr,
@@ -144,7 +143,7 @@ Section ProofFreerange.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb3 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 3).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 #Hqcpu Havail Hcont".
+    iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 Havail Hcont".
     iPoseProof (fri_3e with "Htext") as "Hi3e".
     iPoseProof (fri_40 with "Htext") as "Hi40".
     iPoseProof (fri_42 with "Htext") as "Hi42".
@@ -269,7 +268,7 @@ Section ProofFreerange.
       HK Hncnt Hlk Hfl Hprun Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages #Hqcpu Havail Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages Havail Hcont".
     assert (Hspr6 : spr = pa_stk sp0 6).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* the six frame-slot address bridges (spr-relative store offset -> pa_stk sp0 k) *)
@@ -493,7 +492,7 @@ Section ProofFreerange.
       iDestruct (cpu_own_transport CID CID12 ncnt eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (frepi (CID0 := CID12) m R8 K ncnt eb b pcur γl γk (Some 0%nat) lks ltac:(lia) ltac:(apply ret_pc_aligned) HR8sp HR8cs Hfresh
-                with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Hqcpu Havail Hcont").
+                with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Havail Hcont").
       { iExists vs20; iExact "Hslot4". }
       { iExists vs30; iExact "Hslot5". }
       { iExists vs40; iExact "Hslot6". }
@@ -813,7 +812,7 @@ Section ProofFreerange.
                        with "Hcnt") as "Hcnt".
           iApply (frepi (CID0 := CIDb7) m N3 K ncnt eb b pcur γl γk (Some (length (p0 :: rest))) lks ltac:(lia)
                     ltac:(apply ret_pc_aligned) HN3sp HN3cs Hfresh
-                    with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Hqcpu Havail Hcont").
+                    with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Havail Hcont").
           { iExists _; iExact "Hc4". }
           { iExists _; iExact "Hc5". }
           { iExists _; iExact "Hc6". }

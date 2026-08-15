@@ -123,7 +123,7 @@ Section ProofProcdumpMain.
               (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)
-              with "Hcg Htext Hkdata Hpc Hpanic2 Hcnt Hpenv [Hnlstr] []").
+              with "Hcg Htext Hkdata Hpc Hcnt Hpenv [Hnlstr] []").
     all: try lkbelow.
     { rewrite HM1a0. iExact "Hnlstr". }
     { done. }

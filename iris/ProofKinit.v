@@ -326,9 +326,8 @@ Section ProofKinit.
               ltac:(lia) Hncnt
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun) Hlkbelow
-              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hpanic] [Havail]").
+              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Havail]").
     all: try lkbelow.
-    { iExact "Hpanic". }
     { iExact "Havail". }
     iIntros (CIDfr Hsfr mfr) "Hcg Hcnt Hpc %Hfrcs Havail".
     assert (Hpcfr : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kinit + 0x2c)).

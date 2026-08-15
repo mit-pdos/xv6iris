@@ -80,7 +80,6 @@ Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   sie_cap_gpr m0 K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
   uart_sent_sub γd bs -∗

@@ -1897,7 +1897,7 @@ Section ProofVirtioDiskRwF.
     iEval (rewrite Hpc0) in "Hpc".
     (* ---- P1: prologue + acquire ---- *)
     iApply (P1.wp_vdrw_p1 γd γk pd pav pu m K eb (proc_addr j) bno lks HK Hbelow
-              with "Hcg Hown Hextc Hextm Htext Hpc Hpanic Hlk Hbno").
+              with "Hcg Hown Hextc Hextm Htext Hpc Hlk Hbno").
     iIntros (CIDa Hsa M) "%Hrh Hcg Hown Hpay Hextc Hextm Hpc Htok HR Hsaved Hscr Hbno".
     destruct Hrh as (Hregs & Hhi).
     (* JOIN AT THE INDEX: P1's own acquire freed the pair at [eb = true] and

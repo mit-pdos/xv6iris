@@ -1109,7 +1109,7 @@ Section ProofConsoleintr.
               (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
               [] (S lvl) eb false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
-              with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+              with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HL6ra) in "Hpc".
@@ -1279,7 +1279,7 @@ Section ProofConsoleintr.
     iApply (Consputc.wp_consputc_sconf γtx γu γv D2
               (trap_res b + (K - 6))%nat [] (S lvl) eb false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
-              with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+              with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HD2ra) in "Hpc".
@@ -1641,7 +1641,7 @@ Section ProofConsoleintr.
     iApply (Consputc.wp_consputc_sconf γtx γu γv B8
               (trap_res b + (K - 6))%nat [] (S lvl) eb false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
-              with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+              with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HB8ra) in "Hpc".
@@ -1968,7 +1968,7 @@ Section ProofConsoleintr.
     iApply (Consputc.wp_consputc_sconf γtx γu γv F2
               (trap_res b + (K - 6))%nat [] (S lvl) eb false pme ({["cons"]} ∪ lks)
               ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
-              with "Hcg Hcnt Ht Hpc Hpanic Hdev Htxl Hsub").
+              with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
     iEval (rewrite HF2ra) in "Hpc".
