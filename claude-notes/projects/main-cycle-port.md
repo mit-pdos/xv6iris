@@ -75,6 +75,15 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    characterized — it is the leaf's own functional-cursor batch, pilot
    style; the generic machinery covers boundary→fetch and the tail (whose
    start monad is one closed term, spellable from try_step's own source).
+0e. **The tick generalization pass** (mechanical, after `mfetch_char`
+   lands): `mseg1_char`/`mseg2_start`/`mfetch_char` are pinned at
+   `riscv_step false`, but the tick's `if` node sits BEYOND every
+   characterized stretch (in the tail), so the statements and proofs
+   generalize to a `tick : bool` parameter by substitution — the peel
+   proofs never reach the tick node.  Needed before the cycle rule
+   (`wp_hart_restart` hands out both ticks); the tick=true tail's extra
+   `tick_clock` stretch is leaf-side (three clock_inv chops + ∀-reads),
+   like the rest of the tail.
 1. **The pinned-text fetch rule** (spike F7): derive from
    `wp_hart_ram_read` + `↦ₓ□` facts (`text_valid` per byte → `read_bytes`
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
