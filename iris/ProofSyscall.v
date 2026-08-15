@@ -8,9 +8,14 @@
    the shared return tail (`sysc_ret_tail`: the `sd a0,112(s2)` store into
    `p->trapframe->a0` and the jump into the epilogue) and the epilogue
    (`sysc_epilogue_tail`: the four reloads, the frame pop, `c.ret`).
-   TWO of the 22 table entries are REAL, `Qed`'d arms calling their own
+   THREE of the 22 table entries are REAL, `Qed`'d arms calling their own
    whole-function contracts:
 
+     k =  3  sys_wait    (`sysc_arm_wait`)   -- the process triple, plus
+                                                `procs_inv`/`panic_wp_any`,
+                                                `kalloc_env` and the
+                                                "wait_lock" lock; it PARKS,
+                                                and it moves `pv_upt`;
      k = 11  sys_getpid  (`sysc_arm_getpid`) -- needs only `proc_priv`;
      k = 12  sys_sbrk    (`sysc_arm_sbrk`)   -- `proc_priv` + `kalloc_env`
                                                 (out of `syscall_env`) plus
@@ -18,26 +23,17 @@
                                                 words, whose EXISTENCE is all
                                                 the contract asks for.
 
-   Everything else is still an honest `Admitted` stand-in: the other twenty
-   entries via `sysc_arm_placeholder` (reached through `sysc_arm_dispatch`,
-   which is where a new arm is wired: one `decide (k = <literal>)` branch,
-   nothing already wired moves) and the unknown-syscall printk block via
-   `sysc_fallback_placeholder`.
+   Everything else is still an honest `Admitted` stand-in: the other
+   nineteen entries via `sysc_arm_placeholder` (reached through
+   `sysc_arm_dispatch`, which is where a new arm is wired: one
+   `decide (k = <literal>)` branch, nothing already wired moves) and the
+   unknown-syscall printk block via `sysc_fallback_placeholder`.
 
    WHAT BLOCKS THE REST -- measured against the actual `SpecSysXxx.v`
    premise lists, and NOT what this file's older EASY/GAP catalogue below
-   predicted.  Three obstacles, in increasing order of what they cost:
+   predicted.  Two obstacles, in increasing order of what they cost:
 
-   (1) `sysc_arm_pre` does not carry `procs_inv γs` / `panic_wp_any`, nor
-       the identifying triple `γs`/`j`/`γl` (with `j < NPROC`,
-       `γs !! j = Some γl`, `pj = proc_addr j`).  The capstone HOLDS all of
-       these -- `wp_syscall_sconf_body` takes them and they are persistent --
-       so this is a widening of the arm vocabulary, not a missing resource:
-       add them to `sysc_arm_pre`/`sysc_arm_goal` and pass them at the one
-       `sysc_arm_dispatch` call site.  It is what `sys_wait` (whose other
-       premises are all satisfiable today) is waiting on, and every one of
-       kill/fork/pause/fstat/read/write needs it too.
-   (2) `wp_syscall_sconf_body` (SpecSyscall.v) states NOTHING about `lks`,
+   (1) `wp_syscall_sconf_body` (SpecSyscall.v) states NOTHING about `lks`,
        while dup/fork/kill/pause/uptime/sync each demand
        `locks_below lks "<rank>"`.  No arm can invent it.  The fix belongs
        in syscall's own contract -- one `locks_below lks r0` premise at the
@@ -45,7 +41,7 @@
        -- and its only caller, usertrap, arrives holding nothing, so it
        discharges with `locks_below_empty`.  That is a SpecSyscall.v change
        and takes usertrap's cone with it, which is why it was not done here.
-   (3) Genuinely missing resources, i.e. real `syscall_env` gaps: the fs
+   (2) Genuinely missing resources, i.e. real `syscall_env` gaps: the fs
        fabric records that read/write/fstat take as their own
        `fread_names`/`fwrite_names`/`fstat_names`, `log_ctx` (sys_sync),
        and `trap_csrs_ext`/`cpu_claim_ext` (sys_sync again, which syscall
@@ -115,11 +111,13 @@
      fallback) can peel out whichever pieces it needs while the original
      hypothesis stays available, unchanged, to hand back verbatim as `R γf
      pj bn fn` in the continuation.
-   - The precondition catalogue (which of the 22 `SpecSysXxx.v` contracts
-     are satisfiable straight from `syscall_env` + the five explicit
-     families + `proc_priv`, vs which need a fact tied to the SAME `bn`/
-     `fn` this file's `fn`-indexing was added to reach) is, as of this
-     writing: EASY (14) -- fork, wait, read, kill, fstat, dup, getpid,
+   - The precondition catalogue below is the ORIGINAL, resource-only
+     reading, and wiring the first arms showed it is optimistic: it counts
+     only what `syscall_env` must SUPPLY and misses the PURE premises
+     (`locks_below`, and sys_uptime's `tp = cid_word`) that turn out to
+     block most of "EASY".  Read the STATUS block at the top of this file
+     first; what follows is kept for the resource half, which is accurate.
+     EASY (14) -- fork, wait, read, kill, fstat, dup, getpid,
      sbrk, pause, uptime, write, sync, open (axiom), unlink (axiom).  GAP
      (8, matching `SpecSyscall.v`'s own header exactly) -- exit, pipe,
      exec, chdir, mknod, link, mkdir, close.  `read`/`fstat`/`write` take
@@ -672,7 +670,8 @@ Section SyscallVocab.
   (* the state a RETURNING arm needs before it can start: [pc_is] at the
      table entry's own known address, plus every resource
      [wp_syscall_sconf_body] threads opaquely through the dispatch. *)
-  Definition sysc_arm_pre `{CIDh : CpuId} (γf : gname) (pj : mword 64) (bn : bio_names)
+  Definition sysc_arm_pre `{CIDh : CpuId} (γf : gname) (pj : mword 64) (γs : list gname)
+      (bn : bio_names)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
       (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
       (tgt : mword 64) (us : gset Z) :=
@@ -680,6 +679,11 @@ Section SyscallVocab.
      sie_cap_gpr M av true pj ∗
      cpu_own 0%nat true pj true lks ∗
      kernel_text ∗
+     (* the proc array and the panic arms every [acquire]/[release] in the
+        cone reaches -- both persistent, both already held by the capstone,
+        and between them what most table entries need beyond [proc_priv] *)
+     procs_inv γs ∗
+     panic_wp_any ∗
      syscall_env γf pj bn fn ∗
      bslots bn 3 ∗
      fileclose_bm fn us ∗
@@ -746,9 +750,18 @@ Section SyscallVocab.
      SpecSysExit.v), so it does not fit this shape; it stays [Admitted]
      with the rest of the GAP entries, at a bespoke type. *)
   Definition sysc_arm_goal `{CIDh : CpuId} (k : nat) (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) : Prop :=
+    (* WHICH process this is, in the vocabulary the per-process entries state
+       their own contracts in: [sys_wait]/[sys_kill]/[sys_pause]/... take the
+       proc array's ghost names and an INDEX, and address the running process
+       as [proc_addr j] rather than as an opaque pointer.  All three come
+       straight off [wp_syscall_sconf_body]'s own binder list. *)
+    (j < NPROC)%nat ->
+    γs !! j = Some γl ->
+    pj = proc_addr j ->
     M !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4 ->
     M !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V)) ->
     (* WHERE THE CALLEE RETURNS TO.  The [c.jalr] wrote [syscall + 0x3a] into
@@ -761,7 +774,7 @@ Section SyscallVocab.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        M !!! Regidx r = m !!! Regidx r) ->
     (K_syscall <= av)%nat ->
-    sysc_arm_pre γf pj bn fn dqi ip pid V lks (av - 4)%nat M (mword_of_int (sysc_target k)) us -∗
+    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M (mword_of_int (sysc_target k)) us -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
@@ -1124,11 +1137,11 @@ Section SyscallArms.
      each such branch shrinks what this placeholder is still standing in
      for, without touching the branches already replaced. *)
   Lemma sysc_arm_placeholder (k : nat) (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
     (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Admitted.
 
   (* ------------------------------------------------------------------- *)
@@ -1139,16 +1152,16 @@ Section SyscallArms.
      the two lines that call its contract and read [callee_saved] out of its
      post; the rest is [sysc_ret_tail], shared with every other entry. *)
   Lemma sysc_arm_getpid (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 11 γf pj bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal 11 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros HMsp HMs2 HMra HMother Hav.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     (* the table entry's address IS [sys_getpid]'s entry pc *)
     assert (Hpce : (mword_of_int (sysc_target 11) : mword 64)
@@ -1208,16 +1221,16 @@ Section SyscallArms.
   Qed.
 
   Lemma sysc_arm_sbrk (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 12 γf pj bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal 12 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros HMsp HMs2 HMra HMother Hav.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 12) : mword 64)
                    = mword_of_int KernelSyms.sys_sbrk) by reflexivity.
@@ -1268,24 +1281,93 @@ Section SyscallArms.
               with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
   Qed.
 
+  (* THE THIRD ARM: k = 3, [sys_wait].  The first entry that PARKS -- kwait
+     sleeps on the wait lock, so its own crossing may resume the process on
+     another hart -- and the first that needs the process TRIPLE ([γs]/[j]/
+     [γl], with the running process addressed as [proc_addr j]) plus
+     [procs_inv]/[panic_wp_any].  Everything else it wants is in
+     [syscall_env]: [kalloc_env] and the "wait_lock" lock.  It moves the
+     private block's page-table descriptor (the reaped child's pages are
+     freed through it), and [uptd_ext_sz] is what pins the trapframe page. *)
+  Lemma sysc_arm_wait (γf : gname) (pj : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (m M : regfile) (us : gset Z) :
+    sysc_arm_goal 3 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
+  Proof.
+    rewrite /sysc_arm_goal /sysc_arm_pre.
+    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
+    assert (Hav82 : (82 <= av)%nat)
+      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+    subst pj.
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
+    assert (Hpce : (mword_of_int (sysc_target 3) : mword 64)
+                   = mword_of_int KernelSyms.sys_wait) by reflexivity.
+    iEval (rewrite Hpce) in "Hpc".
+    (* argument 0 (the user's status pointer) exists because the trapframe
+       page has 36 words; sys_wait never inspects it here *)
+    iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpvback)".
+    iDestruct (tf_page_length with "Htfp") as "%Htflen".
+    iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
+    destruct (lookup_lt_is_Some_2 (pv_tf V) (tf_arg_idx 0)
+                ltac:(rewrite Htflen; unfold TFWORDS, tf_arg_idx; lia)) as [v0 Hv0].
+    iPoseProof "Henv" as "#Henvc".
+    iDestruct "Henvc" as (γa γp γw γft γtk γil γpr cn γics γic cov logstart nib γud γvd)
+      "(#Hkalloc & _ & _ & #Hwaitlk & _)".
+    (* ---- the call ---- *)
+    iApply (SysWait.wp_sys_wait_sconf γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
+              Hj Hgamma Hv0 ltac:(unfold sys_wait_stack, SpecKwait.K_kwait; lia) eq_refl
+              with "Hcg Hcpu Htext Hdata Hpc Hprocs Hpanic Hwaitlk Hkalloc Hpriv").
+    iIntros (CIDy Hsy mf P' rv) "%Hcs %Hext Hcg Hcpu Hpc Hpriv".
+    destruct Hcs as [Hcs _].
+    assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt V)).
+    { destruct (uptd_ext_sz_ext (pv_sz V) (pv_upt V) P' Hext) as (_ & Htf & _).
+      exact Htf. }
+    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
+    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
+    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (upd_upt V P')))).
+    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
+      cbn [pv_upt upd_upt]. rewrite Htfp'. exact HMs2. }
+    assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
+              r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
+              mf !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Ncsp N8 N9 N18.
+      rewrite (callee_saved_lookup Hcs r Hr). exact (HMother r Hr Ncsp N8 N9 N18). }
+    assert (Hret : ret_pc (M !!! Regidx Rra)
+                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
+      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hret) in "Hpc".
+    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
+      by wp_next_chain.
+    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
+    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V
+              (upd_upt V P') lks av us m mf
+              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv Hpriv Hpc Hcont").
+  Qed.
+
   (* THE COMBINATOR.  One [decide (k = <literal>)] branch per wired entry,
      ahead of the generic placeholder: adding an arm is adding a branch, and
      nothing already wired moves.  Kept in THIS section (rather than beside
      the capstone) because the capstone applies it AFTER the [c.jalr]'s own
      hart crossing. *)
   Lemma sysc_arm_dispatch (k : nat) (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
     (1 <= k <= 22)%nat ->
-    sysc_arm_goal k γf pj bn fn dqi ip pid V lks av m M us.
+    sysc_arm_goal k γf pj γs j γl bn fn dqi ip pid V lks av m M us.
   Proof.
     intro Hk.
+    destruct (decide (k = 3%nat)) as [-> | _].
+    { exact (sysc_arm_wait γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     destruct (decide (k = 11%nat)) as [-> | _].
-    - exact (sysc_arm_getpid γf pj bn fn dqi ip pid V lks av m M us).
-    - destruct (decide (k = 12%nat)) as [-> | _].
-      + exact (sysc_arm_sbrk γf pj bn fn dqi ip pid V lks av m M us).
-      + exact (sysc_arm_placeholder k γf pj bn fn dqi ip pid V lks av m M us Hk).
+    { exact (sysc_arm_getpid γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    destruct (decide (k = 12%nat)) as [-> | _].
+    { exact (sysc_arm_sbrk γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    exact (sysc_arm_placeholder k γf pj γs j γl bn fn dqi ip pid V lks av m M us Hk).
   Qed.
 
   (* PLACEHOLDER for the printk fallback (unknown syscall number): honest
@@ -1294,7 +1376,7 @@ Section SyscallArms.
      table target -- see the file header for what filling this in for real
      needs ([PROCNAME_OK]/[SpecPrintk]). *)
   Lemma sysc_fallback_placeholder (γf : gname) (pj : mword 64)
-      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (γs : list gname) (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
       (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
       (m M : regfile) (us : gset Z) :
     M !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4 ->
@@ -1303,7 +1385,7 @@ Section SyscallArms.
        r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
        M !!! Regidx r = m !!! Regidx r) ->
     (K_syscall <= av)%nat ->
-    sysc_arm_pre γf pj bn fn dqi ip pid V lks (av - 4)%nat M
+    sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M
       (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) us -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
     word_pointsto (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
@@ -1331,11 +1413,11 @@ Section SyscallMain.
      check driving the data-dependent `k`, the address computation, the
      table read, the redundant `beqz`, the `c.jalr`) into a full dispatch:
      every one of the 22 table entries reaches `sysc_arm_goal k` for its
-     own `k`, currently discharged by `sysc_arm_placeholder` -- an honest
-     `Admitted` stand-in -- for ALL 22.  Real arms replace it one at a time
-     via a `decide (k = <literal>)` branch ahead of the placeholder; see
-     the file header's EASY/GAP catalogue for which 14 are intended to get
-     one. *)
+     own `k`, discharged by `sysc_arm_dispatch` -- three real arms
+     (wait/getpid/sbrk) and, for the other nineteen, the honest `Admitted`
+     `sysc_arm_placeholder`.  A new arm is one more `decide (k = <literal>)`
+     branch inside that combinator and NOTHING here moves; see the file
+     header for what each remaining entry is still waiting on. *)
   Lemma wp_syscall_sconf (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)
@@ -1795,11 +1877,11 @@ Section SyscallMain.
       assert (Hcr8_22 : true = false \/ pj = zero_reg -> (CID22 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
-      iApply (sysc_arm_dispatch (CID := CID22) k γf pj bn fn dqi ip pid V lks av m D0 us Hk
-                HD0armsp HD0s2 HD0ra HD0other HD0avb
-                with "[Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
+      iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl bn fn dqi ip pid V lks av m D0 us Hk
+                Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb
+                with "[Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv". }
+        iFrame "Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv". }
     - (* ---------------- OUT OF RANGE: the printk fallback ---------------- *)
       (* [a3num]'s value fits in [mword 32]'s signed range by construction
          (it IS a sign-extended 32-bit value), so [sysc_bltu_taken]'s extra
@@ -1868,11 +1950,11 @@ Section SyscallMain.
       assert (Hcr8_15 : true = false \/ pj = zero_reg -> (CID15 : CPU) = (CID8 : CPU))
         by wp_next_chain.
       iDestruct (cpu_own_transport CID8 CID15 0%nat true pj true Hcr8_15 with "Hcpu") as "Hcpu".
-      iApply (sysc_fallback_placeholder (CID := CID15) γf pj bn fn dqi ip pid V lks av m B5 us
+      iApply (sysc_fallback_placeholder (CID := CID15) γf pj γs bn fn dqi ip pid V lks av m B5 us
                 HB5armsp HB5s2 HB5other HB5avb
-                with "[Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
+                with "[Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext HR Hbs Hfc Hip Hfd Hir Hpriv". }
+        iFrame "Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv". }
   Qed.
 
 End SyscallMain.
