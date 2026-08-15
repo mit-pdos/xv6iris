@@ -9421,6 +9421,105 @@ SAME-COMMIT, and the coverage flip (expect 185/190, sysfile.c 15/16).
 coverage count is unmoved at **184/190** (not the 183 the earlier entries
 record — the tree moved under this lane).
 
+### S7-open STEP 6 — the PUBLICATION is proven as one ghost step, and it
+### does **NOT** run at the field stores.  `so_open_slot` / `so_publish` land
+### in `ProofSysOpenParts.v`; what is left is the walk's two halves
+
+**THE FINDING, AND IT MOVES WHERE THE CHOREOGRAPHY GOES.**  Step 5's
+sketch put `inode_pay_alloc` at the `sd s1,24(s2)` at +0x88.  **It cannot
+run there.**  `inode_pay_alloc` wants the parent SHORT BY `Q` and a
+travelling share of EXACTLY `Q`, and between ilock and iunlock the share
+`s` is inside the escrow — so all the walk holds at the stores is
+`inode_ref_short_gen kk (qi + s) qi …`, the parent short by `s` with no
+`s` to pair it with.  **Shedding a fresh slice of the retained `qi` does
+not repair it**: the shed leaves the parent short by `qi/2 + s` while the
+new share is `qi/2`, and `IcacheRef.inode_held_short`'s `qt = qi' + Q`
+equation is exactly what refuses the mismatch.
+
+So **the publication runs in ARM S's CONTINUATION**, after `so_tail_s`'s
+`iunlock` has handed the share back, and what the walk carries across the
+tail is the six raw pieces (`fref_tok`, `flive_tok`, `file_fields` at the
+STORED content, `fpay_tok`, the `a_fip` half and the `a_foff` cell).  That
+also explains a clause step 5 recorded without a consumer: `so_tail_s`
+returns `IcacheRef.inode_shr kk s dev inum` **because it is the other half
+of the publication's input**, not as a courtesy.  The share comes back
+generation-ERASED (`SpecIunlock.v`:171), and
+`inode_ref_short_shr_gen_agree` against the parent the walk kept is what
+re-pins it — blocker 2's answer on the ELSE arm, the O_CREATE arm having
+been handed a generation-NAMED parent by `create_locked` already.
+
+**THE RULE.**  *A parked reference and its travelling share are pinned to
+ONE fraction by the `qt = qi + Q` equation, so a publisher can only publish
+at a moment when it holds BOTH — i.e. never while a callee has the share
+checked out.*  Check that before deciding where a payload is minted; the
+instruction where the pointer is STORED and the moment the payload can be
+BUILT are different places, and only the second one is negotiable.
+
+**WHAT LANDED** (`ProofSysOpenParts.v`, additive, both green):
+
+* `so_open_slot` — filealloc's whole reference on an untyped slot becomes
+  the six cells PLAIN, `f->ip` WHOLE.  The unarmed `off_hold_cancel_raw`
+  is what produces the invariant's half of `a_fip`, and there is nothing
+  to refute because an unarmed body carries no disjunction: blocker 1
+  spent in one line.
+* `so_publish` — the parent, the returned share, `ity_shot`, the four
+  ghost tokens and the two written cells become `file_ref gf kf 1 C`, in
+  one fupd: name the share's generation, pin it, `inode_pay_alloc` with
+  `so_pay_witness` (the walk's theorem, taken as the two premises
+  `fc_writable C = trunc8 (so_wr_word om)` and `di_type = T_DIR -> om = 0`),
+  `off_hold_alloc … true` to re-arm, and ONE `fpay_tok_update` installing
+  both cinv names.
+* a local `so_word_half_join`: the `1/2 + 1/2` join at `↦₈`, which the tree
+  has at `↦₄` (`RiscvPtsto.word4_pointsto_half`) and nowhere else.  `f->ip`
+  is the first 8-byte cell held in halves.
+
+**THE TRAP THIS COST.**  `Context `{!lockG Σ}` in a file that does not
+`Require Import WpLock` is durable-notes' trap one verbatim: `lockG`
+becomes a fresh section VARIABLE (`lockG : gFunctors -> Type` printed in
+the context beside `lockG0`) and the error is a wall of `Could not find an
+instance for ?riscvGS0 / ?icacheG0 / ?lockG0` on constants that have
+nothing to do with locks.  `ProofSysOpenParts.v` reached the file layer
+without ever having needed `WpLock`; the import is now in it.
+
+**THE PLANNED SHAPE OF `ProofSysOpen.v`, and the seam.**  Two block lemmas
+plus the seal, because the JOIN AT +0x4a IS ENTERED FROM TWO PLACES and a
+single walk cannot be written straight through it:
+
+* `so_join` — +0x4a to every exit below it (ARMs D/E/F/S, the FD_DEVICE
+  block at +0x140 and the itrunc block at +0x14e).  It enters with `M s1 =
+  ientry kk`, `create_locked`'s ten conjuncts unfolded, `log_opS g u Sb`
+  at `iput_units <= u`, `iref_slots nsj`, one `fd_slot`, `proc_priv`, the
+  frame with slot 23 SPLIT (`lo` and the `omode` word), and the pure
+  premise `bv_unsigned (di_type dn) = T_DIR_z -> om = 0`.  Its exit
+  continuation is the syscall's, with `⌜used' ⊆ used⌝` (itrunc's
+  `used ∖ bm_blocks bm` is one) and `⌜nsj <= ns' <= S nsj⌝` — the failure
+  arms' `iunlockput` hands a slot BACK, the success arm parks it.
+* `so_entry` — +0x00 to the join, taking BOTH the syscall's exit
+  continuation (for ARM 0 and ARMs A/B/C) and `so_join`'s premises as a
+  second continuation.  The two are used on EXCLUSIVE branches, so one
+  linear copy of each is enough and the "chaining two halves" problem does
+  not arise.
+* `wp_sys_open_sconf` — `so_entry` with `so_join` supplied.
+
+The iref arithmetic of the seal, checked: the O_CREATE arm gets `ns'` with
+`ns - 3 <= ns' <= ns` and `S ns' <= ns` on `ok`, and the join adds at most
+one; the else arm splits `iref_slots ns` into namei's exact `2` and the
+rest, gets `1` back, so it reaches the join at `ns - 1` and leaves at
+`ns - 1` or `ns`.  Both sit inside `sys_open_post`'s
+`ns - sys_open_slots <= ns' <= ns`.
+
+**Gate for step 6.**  `coqc ProofSysOpenParts.v` and `coqc
+ProofSysOpenTails.v` on the mirror, `EXIT=0`, zero `Error`.  No `Link`
+file, so no `Print Assumptions`; coverage unmoved.
+
+**THE EXACT NEXT ACTION.**  Write `so_join` in `ProofSysOpen.v` (a functor
+over `Iunlock`, `Iunlockput`, `EndOp`, `Fileclose`, `Itrunc`, `Filealloc`,
+`Fdalloc`, instantiating `SysOpenTails` internally), statement as above;
+its body is the twenty instructions +0x4a..+0xb8 plus the two out-of-line
+blocks, `so_open_slot` right after fdalloc returns, the six stores,
+`ProcInv.proc_ofiles_repay` and `so_publish` in `so_tail_s`'s
+continuation.  Then `so_entry`, then the seal, then `LinkSysOpen.v`.
+
 ### THE BUMP RE-DERIVATION (`XV6_REV` -> `f60ff58`) — **sys_open DID NOT
 ### RESHAPE.**  Every symbol-relative offset, the frame, and the register
 ### allocation are byte-identical; only the base moved, by `+0xe`

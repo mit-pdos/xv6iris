@@ -56,6 +56,9 @@ Require Import CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeHalf.
 Require Import IntrDefs.
+Require Import WpLock.                (* [lockG] -- bound in the publication's
+                                         section, and a class that is not
+                                         IMPORTED becomes a fresh VARIABLE *)
 Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import DinodeEnc.
@@ -63,6 +66,10 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheRef.             (* the reference algebra the publication
+                                         re-pins its generation in *)
+Require Import IcacheInv.
 Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode
                                          bit cluster's target *)
 Require Import SpecArgint.
@@ -547,6 +554,177 @@ Proof.
   rewrite /fc_wbool HC (Hdir Hty) so_wr_byte_rdonly in Hw.
   vm_compute in Hw. discriminate Hw.
 Qed.
+
+(* ===================================================================== *)
+(*  THE PUBLICATION -- R-open-1b's CHOREOGRAPHY, AS ONE GHOST STEP       *)
+(*                                                                        *)
+(*  Everything between the field stores and [ProcInv.proc_ofiles_repay]:  *)
+(*  the two cinvs, the payload names and the [+1] inode reference that    *)
+(*  never leaves.  It applies no callee contract and walks no             *)
+(*  instruction, so it belongs here and not in the functor.               *)
+(*                                                                        *)
+(*  ==== WHERE IT RUNS, AND WHY IT IS NOT AT THE STORES ================  *)
+(*                                                                        *)
+(*  THE PUBLICATION CANNOT HAPPEN AT THE [sd s1,24(s2)] AT +0x88.  It     *)
+(*  needs [FileInvDefs.inode_pay_alloc]'s two halves AT ONE FRACTION --   *)
+(*  the parent SHORT by [Q] and a travelling share of exactly [Q] -- and  *)
+(*  between ilock and iunlock the share [s] is inside the escrow, so all  *)
+(*  the walk holds there is [inode_ref_short_gen kk (qi + s) qi],         *)
+(*  i.e. the parent short by [s] with no [s] to pair it with.  Shedding   *)
+(*  a fresh slice of the RETAINED [qi] does not fix it: the shed leaves   *)
+(*  the parent short by [qi/2 + s] while the share is [qi/2], and         *)
+(*  [inode_held_short]'s [qt = qi' + Q] equation is what refuses the      *)
+(*  mismatch.  So the publication runs in ARM S's CONTINUATION -- after   *)
+(*  [so_tail_s]'s iunlock has handed the share back -- and what the walk  *)
+(*  carries across the tail is the six raw pieces below.  That is also    *)
+(*  why [so_tail_s] returns [IcacheRef.inode_shr] at all: it is not a     *)
+(*  courtesy, it is the other half of this lemma's input.                 *)
+(*                                                                        *)
+(*  THE SHARE COMES BACK GENERATION-ERASED ([SpecIunlock.v]:171), which   *)
+(*  is what the middle three lines of the proof repair: name it, pin it   *)
+(*  against the parent the walk kept with                                 *)
+(*  [inode_ref_short_shr_gen_agree], and the payload's [ity_shot] is at   *)
+(*  the generation ilock's postcondition spoke at.  (This is blocker 2's  *)
+(*  answer on the ELSE arm; on the O_CREATE arm [create_locked] already   *)
+(*  hands the parent over generation-NAMED.)                              *)
+(*                                                                        *)
+(*  THE OFF CINV IS RE-ARMED HERE TOO, and the names of BOTH cinvs go in  *)
+(*  with ONE [fpay_tok_update] -- the exclusive holder installs them with *)
+(*  no lock in hand, which is the whole point of the payload-names ghost. *)
+(* ===================================================================== *)
+
+Section ProofSysOpenPublish.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+
+  (* the 1/2 + 1/2 join at [↦₈], which the tree has at [↦₄]
+     ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
+     [f->ip] cell is the first 8-byte user of, the invariant's half and the
+     reference's half being exactly this shape. *)
+  Local Lemma so_word_half_join (a : mword 64) (w : mword 64) :
+    a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈{DfracOwn (1/2)} w -∗ a ↦₈ w.
+  Proof.
+    iIntros "H1 H2".
+    iDestruct (bi.equiv_entails_1_2 _ _
+                 (word_pointsto_frac_split a (1/2) (1/2) w) with "[H1 H2]")
+      as "H"; [iFrame "H1 H2" |].
+    iEval (rewrite Qp.div_2) in "H". iExact "H".
+  Qed.
+
+  (* ==== THE OTHER SIDE OF THE PUBLICATION: opening the fresh slot ======
+     What filealloc hands over is a whole reference on an UNTYPED slot, and
+     what the six field stores need is the six cells PLAIN -- [f->ip] WHOLE,
+     which is the one the reference alone cannot give (the invariant keeps
+     half of it, [FileInvDefs.file_fields]'s one asymmetry).  Cancelling the
+     UNARMED off-cinv is what produces the other half, and there is nothing
+     to refute because an unarmed body carries no disjunction: blocker 1's
+     whole answer, spent in one line. *)
+  Lemma so_open_slot (E : coPset) (gf : gname) (kf : nat) (Cf : fcontent) :
+    ↑(offN .@ kf) ⊆ E ->
+    fc_type Cf = FD_NONE ->
+    file_ref gf kf 1 Cf ={E}=∗
+    ∃ (pn : fpnames) (voff : mword 32),
+      ⌜off_wf voff⌝ ∗
+      fref_tok gf kf 1 ∗ flive_tok gf kf ∗ fpay_tok gf kf 1 pn ∗
+      a_ftype kf     ↦₄ fc_type Cf ∗
+      a_freadable kf ↦ₘ fc_readable Cf ∗
+      a_fwritable kf ↦ₘ fc_writable Cf ∗
+      a_fpipe kf     ↦₈ fc_pipe Cf ∗
+      a_fmajor kf    ↦₂ fc_major Cf ∗
+      a_fip kf       ↦₈ fc_ip Cf ∗
+      a_foff kf      ↦₄ voff.
+  Proof.
+    intros HE Ht.
+    iIntros "(Href & Hflds & (%pn & Hnames & Hcore & Hoff) & Hlive)".
+    rewrite (file_armed_none Cf Ht).
+    iMod (off_hold_cancel_raw E gf kf (fp_ocv pn) HE with "Hoff") as "Hraw".
+    iMod "Hraw" as "(%ipold & %voff & Hip2 & Hoffc & %Hwf)".
+    iDestruct "Hflds" as "(Hty & Hrd & Hwr & Hpip & Hip1 & Hmaj)".
+    iDestruct (word_pointsto_agree with "Hip2 Hip1") as %->.
+    iDestruct (so_word_half_join with "Hip1 Hip2") as "Hip".
+    iModIntro. iExists pn, voff.
+    iSplitR; [iPureIntro; exact Hwf |].
+    iFrame "Href Hlive Hnames Hty Hrd Hwr Hpip Hmaj Hip Hoffc".
+  Qed.
+
+  Lemma so_publish (E : coPset) (gf : gname) (kf kk : nat) (qi s : Qp)
+      (gy : gname) (inum : mword 32) (ty : bv 16) (C : fcontent)
+      (pn : fpnames) (om : mword 32) (voff : mword 32) :
+    ↑fileipN ⊆ E -> ↑(offN .@ kf) ⊆ E ->
+    (kk < NINODE)%nat ->
+    bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
+    fc_ip C = ientry kk ->
+    (fc_type C = FD_INODE \/ fc_type C = FD_DEVICE) ->
+    (* THE THEOREM OF THE WALK, in the form the two arms prove it: the
+       [snez] stored [f->writable], and a T_DIR inode forced [omode = 0]. *)
+    fc_writable C = trunc8 (so_wr_word om) ->
+    (bv_unsigned ty = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
+    off_wf voff ->
+    (* the parent the walk kept, short by the share it lent ilock ... *)
+    inode_ref_short_gen kk (qi + s)%Qp qi icfg_dev inum gy -∗
+    (* ... and that share, back from iunlock and generation-erased *)
+    inode_shr kk s icfg_dev inum -∗
+    ity_shot gy ty -∗
+    (* the exclusive reference filealloc handed over, with the field cells
+       already carrying the stored content *)
+    fref_tok gf kf 1 -∗
+    flive_tok gf kf -∗
+    file_fields kf 1 C -∗
+    fpay_tok gf kf 1 pn -∗
+    (* the two cells the publisher wrote with the UNARMED cinv cancelled *)
+    a_fip kf ↦₈{DfracOwn (1/2)} (ientry kk) -∗
+    a_foff kf ↦₄ voff -∗
+    |={E}=> file_ref gf kf 1 C.
+  Proof.
+    intros HEi HEo Hkk Hinb Hip Hty Hwrb Hdir Hwf.
+    iIntros "Hkeep Hshr #Hshot Href Hlive Hflds Hnames Hip Hoff".
+    (* ---- the generation: name the returned share and pin it ---- *)
+    rewrite inode_shr_gen_intro. iDestruct "Hshr" as (g2) "Hshr".
+    iDestruct (inode_ref_short_shr_gen_agree with "Hkeep Hshr") as %<-.
+    (* ---- the parked reference: the parent, short by exactly [s] ---- *)
+    iAssert (inode_held_short (ientry kk) s) with "[Hkeep]" as "Hsh".
+    { iExists kk, (qi + s)%Qp, qi, inum.
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; exact Hkk|].
+      iSplitR; [iPureIntro; exact Hinb|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iApply (inode_ref_short_gen_forget with "Hkeep"). }
+    iAssert (inode_shr_held_gen (ientry kk) s gy) with "[Hshr]" as "Hs".
+    { iExists kk, inum.
+      iSplitR; [iPureIntro; reflexivity|].
+      iSplitR; [iPureIntro; exact Hkk|].
+      iSplitR; [iPureIntro; exact Hinb|]. iExact "Hshr". }
+    (* ---- the FD-type witness, and it is [so_pay_witness] ---- *)
+    iMod (inode_pay_alloc E (ientry kk) s gy (fc_wbool C) ty
+            (so_pay_witness om ty C Hwrb Hdir) with "Hsh Hs Hshot")
+      as (gx) "Hpay".
+    (* ---- the off cinv, re-armed ---- *)
+    iMod (off_hold_alloc E gf kf true with "[Hip Hoff]") as (go) "Hoff".
+    { iExists (ientry kk), voff. iFrame "Hip Hoff". iPureIntro. exact Hwf. }
+    (* ---- ONE names update installs both ---- *)
+    iMod (fpay_tok_update gf kf pn
+            (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go) with "Hnames")
+      as "Hnames".
+    iModIntro.
+    (* ---- and that is [file_ref] ---- *)
+    assert (Harm : file_armed C = true).
+    { rewrite /file_armed. destruct Hty as [Ht | Ht]; rewrite Ht.
+      - rewrite bool_decide_true; [reflexivity | reflexivity].
+      - rewrite orb_true_r. reflexivity. }
+    assert (Hnp : bool_decide (fc_type C = FD_PIPE) = false).
+    { apply bool_decide_false. destruct Hty as [Ht | Ht]; rewrite Ht;
+        intro Hc; by vm_compute in Hc. }
+    rewrite /file_ref /file_pay /file_payload /file_core.
+    iFrame "Href Hflds Hlive".
+    iExists (MkFPNames (fp_lock pn) (fp_pipe pn) gx s gy go).
+    iFrame "Hnames". rewrite Harm Hnp.
+    assert (Hor : (bool_decide (fc_type C = FD_INODE)
+                   || bool_decide (fc_type C = FD_DEVICE))%bool = true)
+      by exact Harm.
+    rewrite Hor. cbn [fp_icv fp_iq fp_ig fp_ocv].
+    rewrite Hip. iFrame "Hpay Hoff".
+  Qed.
+
+End ProofSysOpenPublish.
 
 (* ===================================================================== *)
 (*  THE FRAME CARVE: 24 slots = FIVE saved words + ONE byte buffer +      *)
