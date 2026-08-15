@@ -1691,7 +1691,7 @@ Section UservecAllPt.
     iEval (rewrite /usertrap_post).
     iIntros (pt' mf ms' usatp uepc sc' stval' mdv0)
       "%Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
-       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 Hhw2 Hmin2 Hures2".
+       Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 #Hhw2 #Hmin2 Hures2".
     (* ============ open usertrap_res A SECOND TIME, for userret ========== *)
     (* userret's entry switch is about to install the USER table, so both
        borrows come back out, in the mirror order to the entry side: first
@@ -1811,7 +1811,7 @@ Section UservecAllPt.
                               u240 u248 u256 u264 u272 u280 u112)
              ms' usatp uepc sc' stval' mdv0
              with "[%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsc2 Hstval2 Hsepc3
-                    Hupt3 Hpc3 Hfile3 Hures3").
+                    Hupt3 Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - exact Hpttf.
     - exact Hmapwf.
     - split; [| split]; [exact HuMode | exact Huasid | exact Huppn].

@@ -715,12 +715,13 @@ and no `stvec_handler_wp`, entered where forkret enters the loop.
   is `wp_next true (proc_addr j)`, `j < NPROC`, so it is hart-generic and
   entry-hart `↦ᵣ` cells are useless. `uservec_post` is missing five, to
   rebuild `user_cfg` at `CID'`:
-  - `stvec`, plus the two per-hart PERSISTENT bundles `hw_config` (which
-    carries `senvcfg`) and `minstret_inv` — free, `usertrap_post` returns all
-    three at `CID'`; they just have to be added to the post. Both bundles are
-    ambient-hart (`inv minstretN` over THIS hart's cells), so a pre-crossing
-    copy is a different resource; `wire_inv` by contrast is all-harts and
-    rides for free.
+  - `stvec` is the one `user_cfg` cell still unrouted, and it is on its own
+    plan. The cell IS in hand at the resuming hart — `usertrap_post` returns
+    it at `TRAMPOLINE` and `ProofUservec` binds it as `Hstvec2` and currently
+    drops it — but unlike the four in `hart_csrs` it is WRITTEN during a trap
+    round (usertrap's `csrw stvec,kernelvec`, prepare_return's write back),
+    so it moves between `IntrDefs.intr_res` and the loose form rather than
+    parking anywhere.
   - `sscratch`/`medeleg`/`mstateen0`/`sstateen0` ride in
     `IntrDefs.hart_csrs`, a conjunct of `cpu_priv`: they cross a migration
     with `cpu_hart`, and `UsertrapRes.ut_trap` already carries
@@ -732,9 +733,13 @@ and no `stvec_handler_wp`, entered where forkret enters the loop.
     and its `csrw`/`csrr sscratch` pair overlap). `SpecUservec` no longer
     takes a `sscratch` cell: that premise was both unmintable and, once the
     residue owns the cell, unsatisfiable beside the residue premise.
-    What is left is `uservec_post` handing the three pinned cells (and
-    `hw_config`/`minstret_inv`) back at `CID'` so the next round can rebuild
-    `user_cfg`. `stvec` is on a separate plan.
+    `uservec_post` hands `hw_config` and `minstret_inv` back at `CID'` too --
+    both are ambient-hart (the cells of the one, the invariant body of the
+    other), so a pre-crossing copy is a different resource; `wire_inv` is
+    all-harts and needs no such treatment. The three pinned cells do NOT go
+    through the post: the loop opens them off the residue itself with
+    `usertrap_res_csrs_open` and parks the closer wand, so `Rut` carries the
+    wand plus the loose `sscratch` cell across user execution.
   - `mstateen0`/`sstateen0` are pinned at zero, which is what `user_cfg`
     wants: `reset_regs` carries both -- `mstateen0` derived from the spec's
     own `reset_stateen`, `sstateen0` from `ArchReset.board_regs`, that file's

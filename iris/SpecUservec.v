@@ -194,6 +194,17 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
        claude-notes/completed/usertrap.md.  Folding this bundle into the
        user-mode loop is USER-module work, not this spec's. *)
     URes pt' vksp -∗
+    (* THE TWO AMBIENT-HART PERSISTENT BUNDLES, AT THE RESUMING HART.  Both
+       are per-hart -- [hw_config]'s cells and the body of [minstret_inv]'s
+       invariant are this hart's -- so a caller's pre-crossing copy is a
+       DIFFERENT resource from the one it needs after usertrap's park, and
+       the two print identically.  [usertrap_post] hands them back for
+       exactly this reason (see its own note); passing them on costs nothing
+       to prove and is what lets the next round of the trap loop reach
+       [SpecUser.wp_user_exec_closed], which takes both.  [wire_inv] needs no
+       such treatment: it is all-harts (WireInv.v) and rides for free. *)
+    hw_config -∗
+    minstret_inv -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
