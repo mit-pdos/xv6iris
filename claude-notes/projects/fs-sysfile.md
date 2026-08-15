@@ -8183,8 +8183,10 @@ nothing to share — and routes the three `bltz` exits at +0x10a / +0x11e /
 +0x130 through `cr_fail_mkdir_half`.  `wp_create_sconf` is then
 `cr_found_half` fed `cr_alloc_half` fed the two parked bodies, and
 `CreateProof` is ascribed `: CREATE`.  `Print Assumptions` is the
-standing six plus `create_fresh_ty` plus the transient
-`iput_acquiresleep_order_ADMITTED`, and nothing else.
+standing six plus `create_fresh_ty`, and nothing else.  (It also carried
+the transient `iput_acquiresleep_order_ADMITTED` until GR-27 DELETED that
+admit upstream; the entries below and this arc's commit messages record
+the eight-element set, which was true at their base and is now seven.)
 
 **A CLOSER'S COST IS THE CONTEXT, SO DEPTH DECIDES WHETHER THE IDENTICAL
 SENTENCE TERMINATES.**  Three sentences of the `++`/mint block ran >10
