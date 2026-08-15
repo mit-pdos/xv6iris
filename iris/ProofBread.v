@@ -760,14 +760,14 @@ Section BreadBlocks.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hppcc) in "Hpc".
       (* ===== +0xcc jal ra,virtio_disk_rw ===== *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0xcc)) Rra (mword_of_int 11302 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.bread + 0xcc)) Rra (mword_of_int 11318 : mword 21)
                 T3 (K - 6)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hicc").
       iIntros (CIDt5 Hst5) "Hcg Hpc".
       set (T4 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.bread + 0xcc) : mword 64) 4)]> T3).
       assert (Htgtrw : add_vec (mword_of_int (KernelSyms.bread + 0xcc) : mword 64)
-                         (sign_extend' 64 (mword_of_int 11302 : mword 21))
+                         (sign_extend' 64 (mword_of_int 11318 : mword 21))
                        = mword_of_int KernelSyms.virtio_disk_rw)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrw) in "Hpc".

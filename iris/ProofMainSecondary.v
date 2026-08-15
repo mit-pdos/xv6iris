@@ -672,7 +672,7 @@ Section ProofMainSecondary.
     { iApply bi.later_intro. iExact "Hkvs". }
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 18222 : mword 21) mth n false
+              (mword_of_int 18238 : mword 21) mth n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3a").
     iApply wp_next_off_intro.
@@ -680,7 +680,7 @@ Section ProofMainSecondary.
     pose (Q3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x3a) : mword 64) 4)]> mth).
     assert (Htgtph : add_vec (mword_of_int (KernelSyms.main + 0x3a) : mword 64)
-              (sign_extend' 64 (mword_of_int 18222 : mword 21))
+              (sign_extend' 64 (mword_of_int 18238 : mword 21))
               = (mword_of_int KernelSyms.plicinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtph) in "Hpc".
