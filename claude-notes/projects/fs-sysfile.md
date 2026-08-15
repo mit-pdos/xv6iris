@@ -9482,3 +9482,22 @@ The rule this confirms, and it is the reason the record was written that way:
 not reshape the function, and the two-minute re-derivation is how you learn
 which case you are in.**  The bump playbook's "measure the shift from the
 SYMBOL TABLES, not by assumption" applied one level down.
+
+**THE CONE, MEASURED (not the hand-waved "~350").**  Reverse transitive
+closure over `iris/.CoqMakefile.d`, 1090 dependency lines:
+
+    FileInvDefs.vo   352 dependents      <- the whole cost, paid ONCE
+    FileInv.vo        63
+    FileOff.vo        12
+    SpecFileread.vo   11
+    SpecFilewrite.vo   5
+    SpecFilealloc.vo   5
+
+So the `FileInvDefs` / `FileInv` split is doing its job (352 vs 63), the
+protocol layer is genuinely cheap, and the one-commit-one-gate decision is
+confirmed by arithmetic rather than by feel: splitting R-open-1b in two would
+pay 352 twice for no green intermediate.  (Beware the obvious parse of
+`.CoqMakefile.d` — each rule lists FOUR targets before the colon
+(`X.vo X.glob X.v.beautified X.required_vo:`), so a script that takes only
+the first token still works but one that requires a single target silently
+builds an EMPTY reverse map and reports every cone as zero.  Mine did, twice.)
