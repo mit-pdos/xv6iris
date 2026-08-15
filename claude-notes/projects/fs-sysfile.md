@@ -9321,3 +9321,45 @@ bodies) and `FileInv.v` (`file_rest`, the alloc/close steps) are the
 expensive ones — everything with a `proc_priv` in scope recompiles.
 `FileOff.v` + four consumers + six call sites is the cheap half
 (`ProofFileread.v`:1808/2075/2349, `ProofFilewrite.v`:1906/2216).
+
+### R-open-1b LAYERING — **FEASIBLE IN ONE FILE, WITH ZERO NEW IMPORTS.**
+### The cinv redesign belongs in `FileInvDefs.v`, and `FileOff.v` becomes the
+### protocol layer over it (offset-independent; checked during the pin-bump
+### pause)
+
+The obvious objection to the shape — "`file_payload` would have to mention
+`off_cinv`, which lives in `FileOff.v`, which is ABOVE `FileInvDefs.v`" — does
+not bite.  Every ingredient of `off_body` is already in scope at
+`FileInvDefs.v`:
+
+* `a_fip` / `a_foff` are DEFINED there (`FileInvDefs.v`:117-118);
+* `flive_tok` is DEFINED there (`FileInvDefs.v`:538);
+* `i_valid` — `off_mark`'s cell — is `IcacheRef.v`:113, and `FileInvDefs.v`
+  already `Require Import IcacheRef` (line 77) for `inode_pay`;
+* `cancelable_invariants` is already imported (line 69), for the same reason.
+
+So `off_resident` / `off_mark` / `off_body` / `off_cinv` / `off_pay` all move
+DOWN into `FileInvDefs.v` beside `inode_pay`, which is where the discipline
+they are copying already lives, and `FileOff.v` keeps exactly what it should:
+the PROTOCOL — `off_checkout` / `off_checkin` (obligation (a)) and the
+exclusive accessor (obligation (b)) — over definitions it no longer owns.
+`off_wf` stays where it is (it is a pure bound on a `mword 32` and
+`SpecFileread` / `SpecFilewrite` name it).
+
+Two consequences worth having before the redesign starts:
+
+* **The expensive cone is paid ONCE, not twice.**  `FileInvDefs.v` recompiles
+  everything with a `proc_priv` in scope whichever way this is arranged; the
+  layering above means `FileOff.v`'s own four consumers are the only ADDITION
+  to that cone, rather than `FileInvDefs` and `FileOff` each dragging one.
+* **`FileOff.v`:293-297's flagged boot hole is not filled, it is DELETED.**
+  With the cinv minted by whoever publishes a payload (`sys_open`,
+  `pipealloc`) and cancelled by whoever retires one (`fileclose`'s
+  last-reference arm), there is nothing per-slot to mint at boot: the BSS's
+  zeroed cells go into `FileInv.file_rest` with the rest of a free slot, and
+  the first `filealloc` hands them out.  `off_inv_alloc` / `off_invs_alloc` /
+  `off_invs` / `off_invs_lookup` all retire together.
+
+Still STOPPED on the ruling's own condition (`off_invs` must leave
+`SpecFileread`'s and `SpecFilewrite`'s environments); the layering result
+above does not change that and is orthogonal to it.
