@@ -47,7 +47,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
-Require Import Pt4kWalk CommonWalk PtTree KptTree KptPt TrampPt KMap.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInvDefs.
@@ -493,132 +492,67 @@ Section ProcInv.
      userret).  Each access site converts with
      [RiscvPtsto.phys_to_mem_claim] / [mem_to_phys_claim], the same idiom
      the software page-table walks already use for PT slots. *)
+  Definition a_tf_word (tfp : mword 44) (i : nat) : Arch.pa :=
+    pa_add (page_base tfp) (8 * i).
+
   Definition tf_words (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
-    ([∗ list] i ↦ w ∈ ws, tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w)%I.
+    ([∗ list] i ↦ w ∈ ws, a_tf_word tfp i ↦₈ w)%I.
 
   (* the page beyond the struct: 288 .. 4095, contents irrelevant *)
   Definition tf_tail (tfp : mword 44) : iProp Σ :=
     ([∗ list] j ∈ seq (Z.to_nat TFBYTES) (4096 - Z.to_nat TFBYTES),
-       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₚ b)%I.
+       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₘ b)%I.
 
   Definition tf_page (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
     (⌜length ws = TFWORDS⌝ ∗ tf_words tfp ws ∗ tf_tail tfp)%I.
 
   Typeclasses Opaque tf_words tf_tail tf_page.
 
-  Lemma tf_page_length (tfp : mword 44) (ws : list (mword 64)) :
-    tf_page tfp ws -∗ ⌜length ws = TFWORDS⌝.
-  Proof. rewrite /tf_page. iIntros "(%Hlen & _ & _)". done. Qed.
-
-  (* [tf_pa]'s address IS [pa_add (page_base tfp) off] -- same value, built
-     via [bits_of_virtaddr]'s concat instead of [pa_add]'s addition -- so
-     [tf_words]/[tf_tail] (below, addressed the two different ways their
-     two construction paths need) still land on the same bytes.  Mirrors
-     [Pt4kWalk.pte_addr_at_unsigned]'s derivation. *)
-  Lemma tf_pa_unsigned (tfp : mword 44) (off : Z) :
-    0 <= off < 4096 ->
-    bv_unsigned (tf_pa tfp off) = bv_unsigned tfp * 4096 + off.
-  Proof.
-    intro Hoff. unfold tf_pa.
-    rewrite zext64_concat44_12_unsigned.
-    cbn [bits_of_virtaddr].
-    rewrite subrange64_unsigned_11_0. change (2 ^ 12) with 4096.
-    assert (Hmv : bv_unsigned (mword_of_int (TRAPFRAME + off) : mword 64) = TRAPFRAME + off).
-    { unfold mword_of_int, Values.to_word, get_word. cbn.
-      rewrite Z_to_bv_unsigned. apply bv_wrap_small.
-      unfold bv_modulus. cbn. unfold TRAPFRAME. lia. }
-    rewrite Hmv.
-    assert (Htmod : (TRAPFRAME + off) mod 4096 = off).
-    { unfold TRAPFRAME. rewrite <- Z.add_mod_idemp_l; [| lia].
-      replace (0x3FFFFFE000 mod 4096) with 0 by (vm_compute; reflexivity).
-      rewrite Z.add_0_l. apply Z.mod_small. lia. }
-    rewrite Htmod. reflexivity.
-  Qed.
-
-  Lemma tf_pa_eq_pa_add (tfp : mword 44) (off : nat) :
-    (off < 4096)%nat ->
-    tf_pa tfp (Z.of_nat off) = pa_add (page_base tfp) off.
-  Proof.
-    intro Hoff. apply bv_eq.
-    rewrite (tf_pa_unsigned tfp (Z.of_nat off) ltac:(lia)).
-    symmetry. exact (pa_add_page_unsigned tfp off ltac:(lia)).
-  Qed.
-
-  (* the [8 * Z.of_nat i] (Z-mult, [tf_words]'s own index shape) vs
-     [Z.of_nat (8 * i)] (nat-mult then cast, [tf_pa_eq_pa_add]'s own) forms
-     are propositionally but not syntactically equal, which defeats a bare
-     [rewrite] at either call site below -- fold that mismatch into ONE
-     lemma instead of chasing it at each one. *)
-  Lemma tf_pa_eq_pa_add8 (tfp : mword 44) (i : nat) :
-    (i < 512)%nat ->
-    tf_pa tfp (8 * Z.of_nat i) = pa_add (page_base tfp) (8 * i)%nat.
-  Proof.
-    intro Hi. rewrite <- (tf_pa_eq_pa_add tfp (8 * i) ltac:(lia)).
-    f_equal. lia.
-  Qed.
-
   (* CONSTRUCTION: what [kalloc] hands allocproc IS a trapframe page.  The 36
      struct words come out with EXISTENTIAL contents (a fresh page's bytes are
      arbitrary), and the 3808-byte tail is exactly the window [tf_tail] owns
-     anonymously.  Both cross to the physical tier ONCE, via the whole-page
-     [ProcPtOwn.page_own_to_phys] -- the same [kmap_static_claims] every
-     other kalloc'd page uses, no new per-page claim needed. *)
+     anonymously.  This is the one crossing the header above anticipates. *)
   Lemma tf_page_of_page_own (tfp : mword 44) :
     page_valid (page_base tfp) ->
-    kmap_static_claims -∗ page_own (page_base tfp) -∗ ∃ ws : list (mword 64), tf_page tfp ws.
+    page_own (page_base tfp) ⊢ ∃ ws : list (mword 64), tf_page tfp ws.
   Proof.
-    iIntros (Hpv) "#Hb Hp".
-    iDestruct (page_own_to_phys tfp Hpv with "Hb Hp") as "Hp".
-    rewrite /phys_page_own.
+    intro Hpv. rewrite /page_own.
     replace 4096%nat with (8 * TFWORDS + 3808)%nat by (vm_compute; reflexivity).
-    rewrite (phys_bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).
-    iDestruct "Hp" as "[Hpre Htail]".
-    iDestruct (phys_page_words8 (page_base tfp) TFWORDS Hpv ltac:(vm_compute; lia)
+    rewrite (bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).
+    iIntros "[Hpre Htail]".
+    iDestruct (page_words8 (page_base tfp) TFWORDS Hpv ltac:(vm_compute; lia)
                  with "Hpre") as (ws) "[%Hlen Hws]".
-    iExists ws. rewrite /tf_page /tf_words /tf_tail.
-    iSplit; [done|]. iSplitL "Hws".
-    - iApply (big_sepL_impl with "Hws"). iIntros "!>" (i w Hi) "Hw".
-      assert (Hilt : (i < TFWORDS)%nat) by (rewrite -Hlen; apply lookup_lt_is_Some_1; eauto).
-      rewrite (tf_pa_eq_pa_add8 tfp i ltac:(unfold TFWORDS in Hilt; lia)). iExact "Hw".
-    - rewrite Nat.add_0_l.
-      replace (Z.to_nat TFBYTES) with (8 * TFWORDS)%nat by (vm_compute; reflexivity).
-      replace (4096 - Z.to_nat TFBYTES)%nat with 3808%nat by (vm_compute; reflexivity).
-      rewrite /phys_byte_any. iExact "Htail".
+    iExists ws. rewrite /tf_page /tf_words /tf_tail /a_tf_word.
+    iSplit; [done|]. iFrame "Hws".
+    rewrite Nat.add_0_l.
+    replace (Z.to_nat TFBYTES) with (8 * TFWORDS)%nat by (vm_compute; reflexivity).
+    replace (4096 - Z.to_nat TFBYTES)%nat with 3808%nat by (vm_compute; reflexivity).
+    rewrite /byte_any. iExact "Htail".
   Qed.
 
   (* DESTRUCTION, the converse: freeproc hands the page back to kfree, which
      wants the 4096 anonymous bytes and nothing else.  The struct words and
-     the tail forget their contents and rejoin, then cross back mem-tier
-     once via [ProcPtOwn.phys_to_page_own]. *)
+     the tail forget their contents and rejoin. *)
   Lemma tf_page_to_page_own (tfp : mword 44) (ws : list (mword 64)) :
-    page_valid (page_base tfp) ->
-    kmap_static_claims -∗ tf_page tfp ws -∗ page_own (page_base tfp).
+    tf_page tfp ws ⊢ page_own (page_base tfp).
   Proof.
-    intro Hpv. rewrite /tf_page /tf_words /tf_tail.
-    iIntros "#Hb (%Hlen & Hws & Htail)".
-    iApply (phys_to_page_own tfp Hpv with "Hb").
-    rewrite /phys_page_own.
+    rewrite /tf_page /tf_words /tf_tail /a_tf_word /page_own.
+    iIntros "(%Hlen & Hws & Htail)".
     replace 4096%nat with (8 * TFWORDS + 3808)%nat by (vm_compute; reflexivity).
-    rewrite (phys_bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).
+    rewrite (bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).
     iSplitL "Hws".
-    - rewrite -Hlen. iApply (phys_page_words8_back (page_base tfp) ws).
-      iApply (big_sepL_impl with "Hws"). iIntros "!>" (i w Hi) "Hw".
-      assert (Hilt : (i < TFWORDS)%nat) by (rewrite -Hlen; apply lookup_lt_is_Some_1; eauto).
-      rewrite <- (tf_pa_eq_pa_add8 tfp i ltac:(unfold TFWORDS in Hilt; lia)). iExact "Hw".
+    - rewrite -Hlen. iApply (page_words8_back (page_base tfp) ws with "Hws").
     - rewrite Nat.add_0_l.
       replace (8 * TFWORDS)%nat with (Z.to_nat TFBYTES) by (vm_compute; reflexivity).
       replace 3808%nat with (4096 - Z.to_nat TFBYTES)%nat by (vm_compute; reflexivity).
-      rewrite /phys_byte_any. iExact "Htail".
+      rewrite /byte_any. iExact "Htail".
   Qed.
 
-  (* borrow one trapframe word, at the PHYSICAL tier -- the nth syscall
-     argument is [tf_arg_idx n].  No tier crossing: [tf_words] is already
-     physical, so this is a plain [big_sepL] borrow. *)
+  (* borrow one trapframe word -- the nth syscall argument is [tf_arg_idx n] *)
   Lemma tf_page_word (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->
     tf_page tfp ws -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w ∗
-    (tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w -∗ tf_page tfp ws).
+    a_tf_word tfp i ↦₈ w ∗ (a_tf_word tfp i ↦₈ w -∗ tf_page tfp ws).
   Proof.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_lookup_acc _ _ i w Hi with "Hws") as "[$ Hback]".
@@ -634,8 +568,8 @@ Section ProcInv.
   Lemma tf_page_word_upd (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->
     tf_page tfp ws -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w ∗
-    (∀ w' : mword 64, tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w' -∗ tf_page tfp (<[i := w']> ws)).
+    a_tf_word tfp i ↦₈ w ∗
+    (∀ w' : mword 64, a_tf_word tfp i ↦₈ w' -∗ tf_page tfp (<[i := w']> ws)).
   Proof.
     rewrite /tf_page. iIntros (Hi) "(%Hlen & Hws & Htail)".
     iDestruct (big_sepL_insert_acc _ _ i w Hi with "Hws") as "[$ Hback]".
@@ -644,177 +578,17 @@ Section ProcInv.
     iSplitL "Hc Hback"; [rewrite /tf_words; iApply ("Hback" with "Hc") | iExact "Htail"].
   Qed.
 
-  (* THE PHYSICAL<->MEM WORD BRIDGE for one trapframe slot -- the mirror of
-     [KptTree.pt_slot_phys_to_mem]/[pt_slot_mem_to_phys] for PT slots,
-     re-addressed at [tf_pa] instead of [u_pte_addr].  [pt_node_claim]
-     itself is fully generic over any identity-mapped kdata page (its own
-     [pt_page_vpn] is just [svpn_of (page_base _)]) -- the trapframe page IS
-     one (a kalloc'd page, per [tf_page_of_page_own]/[tf_page_to_page_own]
-     above), so [PtTree.pt_node_claim_from_static tfp] supplies it from the
-     same [kmap_static_claims] every other kalloc'd page uses, no new
-     per-page claim needed.  Used ONLY by the handful of KERNEL-SIDE
-     (identity-map) readers/writers that still want the mem tier --
-     prepare_return's four kernel-word writes and one epc read, the
-     syscall argument fetchers, kfork's copy loop -- composed with
-     [tf_page_word]/[tf_page_word_upd] below into
-     [tf_page_word_mem]/[tf_page_word_upd_mem].  Uservec/userret themselves
-     never need this: their own [tf_pa] cells already match [tf_words]
-     natively, so uservec's tail simply opens [usertrap_res]'s [tf_page]
-     (SpecUsertrap.usertrap_res_tf_open) straight into them and reseals
-     before handing off to usertrap -- see SpecUservec.v's header and
-     claude-notes/completed/usertrap.md. *)
-  Lemma tf_pa_aligned8 (tfp : mword 44) (i : nat) :
-    (i < 512)%nat ->
-    is_aligned_paddr (Physaddr (tf_pa tfp (8 * Z.of_nat i))) 8 = true.
-  Proof.
-    intro Hi. unfold is_aligned_paddr. apply Z.eqb_eq.
-    rewrite uint_unsigned (tf_pa_unsigned tfp (8 * Z.of_nat i) ltac:(lia)).
-    replace (bv_unsigned tfp * 4096 + 8 * Z.of_nat i)
-      with ((bv_unsigned tfp * 512 + Z.of_nat i) * 8) by lia.
-    apply Z.rem_mul. lia.
-  Qed.
-
-  (* the facts [phys_to_mem_claim]/[mem_to_phys_claim] need of a trapframe
-     slot -- the mirror of [KptTree.u_pte_slot_facts] *)
-  Lemma tf_pa_slot_facts (tfp : mword 44) (i j : nat) :
-    node_kdata tfp -> (i < 512)%nat -> (j < 8)%nat ->
-    pa_of tfp (pa_add (tf_pa tfp (8 * Z.of_nat i)) j) = pa_add (tf_pa tfp (8 * Z.of_nat i)) j /\
-    addr_is_ram (pa_add (tf_pa tfp (8 * Z.of_nat i)) j) /\
-    (uint (pa_add (tf_pa tfp (8 * Z.of_nat i)) j) < 274877906944)%Z /\
-    svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) j) = pt_page_vpn tfp.
-  Proof.
-    intros [Hklo Hkhi] Hi Hj.
-    pose proof (bv_unsigned_in_range _ tfp) as [Htlo Hthi].
-    assert (Hm : bv_modulus (MachineWord.MachineWord.Z_idx 44) = 17592186044416)
-      by (vm_compute; reflexivity).
-    rewrite Hm in Hthi.
-    assert (Hpaij : bv_unsigned (pa_add (tf_pa tfp (8 * Z.of_nat i)) j)
-                   = bv_unsigned tfp * 4096 + 8 * Z.of_nat i + Z.of_nat j).
-    { unfold pa_add. rewrite pt_add_vec_int_small.
-      - rewrite (tf_pa_unsigned tfp (8 * Z.of_nat i) ltac:(lia)). reflexivity.
-      - lia.
-      - rewrite (tf_pa_unsigned tfp (8 * Z.of_nat i) ltac:(lia)). lia. }
-    unfold node_kdata, ram_base, ram_size in Hklo, Hkhi.
-    assert (Hram : addr_is_ram (pa_add (tf_pa tfp (8 * Z.of_nat i)) j)).
-    { unfold addr_is_ram, ram_base, ram_size. rewrite uint_unsigned Hpaij. lia. }
-    assert (Hcanpa : (uint (pa_add (tf_pa tfp (8 * Z.of_nat i)) j) < 274877906944)%Z).
-    { rewrite uint_unsigned Hpaij. lia. }
-    assert (Ha0 : bv_unsigned (u_pte_addr tfp (mword_of_int 0)) = bv_unsigned tfp * 4096).
-    { rewrite (pte_addr_at_unsigned tfp (mword_of_int 0)).
-      replace (bv_unsigned (mword_of_int 0 : mword 9)) with 0 by (vm_compute; reflexivity). lia. }
-    assert (Hcana0 : (uint (u_pte_addr tfp (mword_of_int 0)) < 274877906944)%Z).
-    { rewrite uint_unsigned Ha0. lia. }
-    split; [| split; [exact Hram | split; [exact Hcanpa |]]].
-    - (* pa_of tfp (pa_add a j) = pa_add a j *)
-      apply bv_eq. unfold pa_of. rewrite zext64_concat44_12_unsigned.
-      rewrite subrange64_unsigned_11_0. change (2 ^ 12) with 4096.
-      rewrite Hpaij.
-      replace (bv_unsigned tfp * 4096 + 8 * Z.of_nat i + Z.of_nat j)
-        with ((8 * Z.of_nat i + Z.of_nat j) + bv_unsigned tfp * 4096) by lia.
-      rewrite Z_mod_plus_full.
-      rewrite (Z.mod_small (8 * Z.of_nat i + Z.of_nat j) 4096 ltac:(lia)). lia.
-    - (* svpn_of (pa_add a j) = pt_page_vpn tfp *)
-      apply bv_eq.
-      assert (Hlo1 : bv_unsigned (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) j))
-                    = Z.shiftr (bv_unsigned tfp * 4096 + 8 * Z.of_nat i + Z.of_nat j) 12).
-      { rewrite (svpn_of_unsigned_lo (pa_add (tf_pa tfp (8 * Z.of_nat i)) j) Hcanpa).
-        rewrite uint_unsigned. rewrite Hpaij. reflexivity. }
-      assert (Hlo2 : bv_unsigned (pt_page_vpn tfp) = Z.shiftr (bv_unsigned tfp * 4096) 12).
-      { unfold pt_page_vpn.
-        rewrite (svpn_of_unsigned_lo (u_pte_addr tfp (mword_of_int 0)) Hcana0).
-        rewrite uint_unsigned. rewrite Ha0. reflexivity. }
-      rewrite Hlo1 Hlo2.
-      rewrite !Z.shiftr_div_pow2; [| lia | lia]. change (2 ^ 12) with 4096.
-      assert (Hsmall : (bv_unsigned tfp * 4096 + 8 * Z.of_nat i + Z.of_nat j) / 4096 = bv_unsigned tfp).
-      { rewrite <- Z.add_assoc. rewrite Z.div_add_l; [| lia].
-        rewrite (Z.div_small (8 * Z.of_nat i + Z.of_nat j) 4096 ltac:(lia)). lia. }
-      rewrite Hsmall.
-      symmetry. apply Z.div_mul. lia.
-  Qed.
-
-  Lemma tf_word_phys_to_mem (tfp : mword 44) (i : nat) (dq : dfrac) (w : mword 64) :
-    (i < 512)%nat ->
-    pt_node_claim tfp -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈{dq} w -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w.
-  Proof.
-    iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
-    iApply word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
-    iDestruct (phys_word_pointsto_bytes with "Hw") as "Hbs".
-    iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (k j Hkj) "Hp".
-    apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
-    destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & Hram & Hcan & Hsvpn).
-    iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
-    { rewrite Hsvpn. iExact "Hk". }
-    iApply (phys_to_mem_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
-              Hid Hram Hcan with "Hk' Hp").
-  Qed.
-
-  Lemma tf_word_mem_to_phys (tfp : mword 44) (i : nat) (dq : dfrac) (w : mword 64) :
-    (i < 512)%nat ->
-    pt_node_claim tfp -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦₈{dq} w -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈{dq} w.
-  Proof.
-    iIntros (Hi) "(%Hkd & %Hpv & #Hk) Hw".
-    iApply phys_word_pointsto_intro; [exact (tf_pa_aligned8 tfp i Hi) |].
-    iDestruct (word_pointsto_bytes with "Hw") as "Hbs".
-    iApply (big_sepL_impl with "Hbs").
-    iIntros "!>" (k j Hkj) "Hp".
-    apply lookup_seq in Hkj. destruct Hkj as [-> Hjlt].
-    destruct (tf_pa_slot_facts tfp i (0 + k)%nat Hkd Hi ltac:(lia)) as (Hid & _ & _ & Hsvpn).
-    iAssert (kmap_at (svpn_of (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k))) tfp KP_rw) as "#Hk'".
-    { rewrite Hsvpn. iExact "Hk". }
-    iApply (mem_to_phys_claim (pa_add (tf_pa tfp (8 * Z.of_nat i)) (0 + k)) tfp dq (nth_byte w (0 + k))
-              Hid with "Hk' Hp").
-  Qed.
-
-  (* THE MEM-TIER CONVENIENCE PAIR: what prepare_return/the syscall argument
-     fetchers/kfork's copy loop actually call -- [tf_page_word]/
-     [tf_page_word_upd] (native physical) composed with the bridge above,
-     so their OWN call sites are unchanged from before this file went
-     physical-native (still borrow/return a [↦₈] cell). *)
-  Lemma tf_page_word_mem (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
-    (i < 512)%nat -> ws !! i = Some w ->
-    pt_node_claim tfp -∗
-    tf_page tfp ws -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦₈ w ∗ (tf_pa tfp (8 * Z.of_nat i) ↦₈ w -∗ tf_page tfp ws).
-  Proof.
-    iIntros (Hi Hlk) "#Hk Ht".
-    iDestruct (tf_page_word tfp ws i w Hlk with "Ht") as "[Hw Hback]".
-    iDestruct (tf_word_phys_to_mem tfp i (DfracOwn 1) w Hi with "Hk Hw") as "Hw".
-    iFrame "Hw". iIntros "Hw".
-    iDestruct (tf_word_mem_to_phys tfp i (DfracOwn 1) w Hi with "Hk Hw") as "Hw".
-    iApply ("Hback" with "Hw").
-  Qed.
-
-  Lemma tf_page_word_upd_mem (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
-    (i < 512)%nat -> ws !! i = Some w ->
-    pt_node_claim tfp -∗
-    tf_page tfp ws -∗
-    tf_pa tfp (8 * Z.of_nat i) ↦₈ w ∗
-    (∀ w' : mword 64, tf_pa tfp (8 * Z.of_nat i) ↦₈ w' -∗ tf_page tfp (<[i := w']> ws)).
-  Proof.
-    iIntros (Hi Hlk) "#Hk Ht".
-    iDestruct (tf_page_word_upd tfp ws i w Hlk with "Ht") as "[Hw Hback]".
-    iDestruct (tf_word_phys_to_mem tfp i (DfracOwn 1) w Hi with "Hk Hw") as "Hw".
-    iFrame "Hw". iIntros (w') "Hw".
-    iDestruct (tf_word_mem_to_phys tfp i (DfracOwn 1) w' Hi with "Hk Hw") as "Hw".
-    iApply ("Hback" with "Hw").
-  Qed.
-
-  (* STATED AT THE PHYSICAL TIER, so uservec/userret's OWN low-level
-     instruction lemmas (already physical, per [SpecUserret.tf_pa]) need no
-     crossing to touch it.  The ONE crossing at construction/destruction
-     (allocproc/freeproc, above) goes through the SAME whole-page
-     [kmap_static_claims] every other kalloc'd page already needs, not a
-     per-word one -- and the handful of kernel-side identity-map readers
-     that still want the mem tier pay it per-word, via
-     [tf_page_word_mem]/[tf_page_word_upd_mem] just above, using
-     [pt_node_claim_from_static]'s own persistent claim (no LEAF-only
-     [hw_config] opening needed at the read site: [pt_node_claim] is
-     obtained ONCE, from the same boot-time bundle, and threaded in). *)
+  (* STATED AT THE VA TIER.  Every kernel reader of this page -- argraw's
+     [ld a0,112(a5)], syscall.c's [p->trapframe->a0 = ...], usertrap's
+     [p->trapframe->epc] -- is an ordinary load/store through the identity
+     map, so putting the page at the VA tier costs those sites nothing.  The
+     ONE crossing that remains is at construction: allocproc gets physical
+     bytes from kalloc and converts once (ProcPtOwn.phys_to_page_own is the
+     page-level lemma for exactly that), and the trampoline side converts
+     back with [RiscvPtsto.mem_to_phys_claim].  The alternative -- a physical
+     [tf_page] with a per-read crossing -- needs [kmap_static_claims] at every
+     reader, and that bundle is only reachable by opening [hw_config] inside
+     a LEAF, so no whole-function caller can supply it. *)
 
   (* =================================================================== *)
   (* THE resource that rides alongside [cur_proc p].                      *)

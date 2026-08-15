@@ -160,32 +160,6 @@ Definition tf_khartid_idx : nat := 4%nat.
 (* the USER sp -- the one kexec points at the new stack.  Not [tf_arg_idx]'s
    range: sp is a saved register, not a syscall argument. *)
 Definition tf_sp_idx      : nat := 6%nat.
-
-(* THE CROSS-ROUND HISTORICAL FACT about the trapframe's four KERNEL words,
-   at the SAME hart-relative vocabulary [prepare_return_tf]'s own exit
-   already establishes ([SpecPrepareReturn.wp_prepare_return_sconf_body]'s
-   postcondition: the satp-decode facts over [ksat], plus [ktrap] pinned to
-   the constant [KernelSyms.usertrap] by [prepare_return_tf]'s own
-   definition) -- but NOT YET threaded across the full user-mode round trip
-   back into [usertrap_res]'s next open, the same gap
-   [SpecUsertrap.usertrap_entry_ms]'s SPIE=1 conjunct already documents for
-   mstatus.  [SpecUsertrap.usertrap_res_tf_open] takes it as a bare,
-   undischarged premise over the SAME [kroot]/[cid_word] vocabulary
-   [wp_uservec_pt_body] already has explicit parameters for, and the SAME
-   [ksp] its own [usertrap_res pt ksp] is keyed on (the fourth conjunct:
-   [usertrap_res]'s [ksp] is the process's kernel stack top by
-   construction, but nothing ties it to what the trapframe's OWN
-   [kernel_sp] slot holds -- uservec's [ld sp,8(a0)] needs that, since
-   [wp_usertrap_body]'s own entry premise is [m !!! sp = ksp]). *)
-Definition tf_kernel_words_ok `{CID : CpuId} (kroot : mword 44) (ksp : mword 64)
-    (ws : list (mword 64)) : Prop :=
-  (exists ksat : mword 64, ws !! tf_ksatp_idx = Some ksat /\
-     _get_Satp64_Mode (Mk_Satp64 ksat) = ('b"1000" : mword 4) /\
-     zero_extend' 16 (satp_to_asid (autocast (T := mword) ksat : mword 64)) = (mword_of_int 0 : mword 16) /\
-     autocast (T := mword) (satp_to_ppn (autocast (T := mword) ksat : mword 64)) = kroot) /\
-  ws !! tf_ksp_idx = Some ksp /\
-  ws !! tf_ktrap_idx = Some (mword_of_int KernelSyms.usertrap : mword 64) /\
-  ws !! tf_khartid_idx = Some cid_word.
 (* argraw serves a0..a5 *)
 Definition NARG : nat := 6%nat.
 

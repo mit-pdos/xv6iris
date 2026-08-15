@@ -10,48 +10,44 @@
    window, roles swapped relative to userret), and jalr's to usertrap with
    ra pointing at userret (uva 0x9c).
 
-   THIS SPEC CHAINS THROUGH usertrap AND userret DIRECTLY, the way any
-   function-calls-function edge in this project works: uservec's own proof
-   depends on USERTRAP's and USERRET's spec modules and invokes their WPs
-   at its own call sites (ProofUservec.v becomes a functor over both).
+   THE INTERFACE MATCHES THE USER-MODE WP.  [wp_user_exec_closed]
+   (SpecUser.v) assumes [stvec_handler_wp C pt Φ], which is by definition
+   [user_trap_frame C pt -∗ WP Loop {{ Φ }}].  This spec consumes exactly
+   [user_trap_frame C pt] -- the machine as the trap hands it over:
+   Supervisor, pc at [stvec_base (uc_stvec C)], mstatus with the
+   [trap_mstatus_ok] pins (SIE=0 SPP=User MPRV=0 MXR=0 SXL=64 TVM=0 TSR=0
+   -- the TVM/TSR pins are what license the sfence.vma / csrw satp here),
+   ARBITRARY register file / trap CSR values, the user page-table bundle
+   [user_pt_inv pt] and the config [user_cfg C].  So discharging
+   [stvec_handler_wp] is: apply [wp_uservec_pt] to the trap frame plus the
+   KERNEL-side resources below (which ride outside user execution), and
+   continue at usertrap.
 
-   THE TRAPFRAME IS OWNED THE SAME WAY THROUGHOUT.  [usertrap_res] is the
-   ONE owner of the trapframe page (UsertrapRes.v), stated at the PHYSICAL
-   tier ([ProcInv.tf_page], native [tf_pa]/[↦ₚ₈] cells -- the SAME tier
-   uservec/userret's own 44/31-instruction walks already use, so there is
-   no phys<->mem crossing at this boundary at all).  Consequently this
-   spec takes [usertrap_res pt vksp] as ITS OWN precondition (not raw
-   [tf_pa] cells): the proof opens it once (via
-   [SpecUsertrap.usertrap_res_tf_open]) for the SAVE walk's own cells,
-   reseals it before calling usertrap, and repeats the open/reseal once
-   more around the call into userret.  [uservec_post] therefore is NOT
-   userret's own exit shape (which exposes raw [tf_pa] cells) -- it is
-   that shape with the trapframe folded back into a fresh [usertrap_res
-   pt' vksp] instead, the ONE thing left over once userret's entry
-   consumes everything else, and nothing downstream of THIS spec asks for
-   more: folding THAT into the user-mode loop (the outer Löb that
-   discharges [UserExec.stvec_handler_wp]) is future work, once USER is
-   folded in too.
+   The kernel-side resources (owned by whoever parks the kernel while user
+   code runs -- they cannot live inside [user_inv], since user code must
+   not touch them):
+     - [sscratch]: written (user a0) then read back; full cell.
+     - the 31 trapframe SAVE slots [tf_pa tfp 40..280, 112]: WRITTEN with
+       the user registers, so owned at full fraction, old contents
+       forgotten (existential [w*] in, user values out).
+     - the 4 trapframe KERNEL words (offset 0 = kernel_satp, 8 =
+       kernel_sp, 16 = kernel_trap, 32 = kernel_hartid): only READ, so
+       dfrac-generic.  kernel_satp must be a Sv39/asid-0 value rooted at
+       [kroot] (the premises mirror userret's user-satp premises with the
+       roles swapped); the jalr target is [ret_pc vktr] (bit 0 cleared by
+       the hardware), which a consumer pins to KernelSyms.usertrap.
+     - [kpt_inv kroot]: the ambient, persistent shared-kernel-table
+       invariant (KptShare.v).  Nothing is threaded out on the far side:
+       the exit switch folds the table back into [kpt_inv] itself rather
+       than resealing an exclusive [tlb_inv_pt], so usertrap picks up the
+       kernel table the same ambient way every other kernel function does.
 
-   THE MSTATUS GAP.  [user_trap_frame]'s own pure content is only
-   [trap_mstatus_ok ms_v] (UserExec.v); [usertrap_entry_ms] additionally
-   needs [sconf_ms_facts ms_v] (IntrDefs.v: XS/FS/VS/SD/MPP pins) and
-   [SPIE = 1]. Neither is derivable from what a trap frame already carries
-   -- [SPIE = 1] in particular is a genuine cross-round historical fact
-   ("userret's sret set it, so it survived to this trap") that needs ghost
-   tracking through the full user-mode loop, out of scope here. So this
-   spec takes the gap as a BARE, EXPLICIT, undischarged premise instead of
-   silently assuming it -- a real proof obligation for whoever eventually
-   closes the loop, not a hole.
-
-   THE TRAPFRAME KERNEL-WORDS GAP is the SAME shape.  Nothing ties the
-   trapframe's four kernel words (inside [usertrap_res], opaque to this
-   spec) to [kroot]/[KernelSyms.usertrap]/[cid_word] -- that connection IS
-   established, but only at [prepare_return]'s own exit
-   (SpecPrepareReturn.v), one round before uservec next opens
-   [usertrap_res]; threading it forward is the same full-loop ghost
-   tracking the SPIE=1 gap needs.  See [ProcGeom.tf_kernel_words_ok] and
-   [usertrap_res_tf_open]'s own premise. *)
+   The continuation is universally quantified over the trap frame's
+   existentials (the user register file [g], the delivered mstatus and
+   trap-CSR values): uservec preserves them all -- the trap CSRs are
+   exactly what usertrap will read, the user registers are handed over
+   IN the trapframe words, and the register file it leaves is the
+   deterministic [uservec_gpr g ...] tower. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
@@ -61,7 +57,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import RegFile HartTp.
+Require Import RegFile.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import KernelText.
@@ -69,27 +65,6 @@ Require Import SmodeCore.
 Require Import PtTree.
 Require Import TrampPt KptTree UptTree TransPt KptShare UserretDefs.
 Require Import UserPtTree UserExec.
-Require Import IntrDefs.
-Require Import MstatusBits.
-Require Import ProcGeom.
-(* [usertrap_res]'s own signature (SpecUsertrap.v/USERTRAP_RES) is stated
-   over these fourteen classes; unqualified [lockG]/[fdslotG]/... below
-   only resolve to the CONCRETE classes (rather than each getting silently
-   auto-generalized as a fresh, unrelated abstract variable of type
-   [gFunctors -> Type] -- the same one-`Require`-isn't-enough trap as
-   everywhere else in this project) if their defining modules are directly
-   imported here too, not just transitively pulled in via SpecUsertrap. *)
-Require Import WpLock.
-Require Import FdSlots.
-Require Import FileInvDefs.
-Require Import BioInv.
-Require Import DiskPtsto.
-Require Import WpUart.
-Require Import FsBlocks LogInv.
-Require Import FsCrash.
-Require Import KallocInv.
-Require Import IrefSlots InodeRegion.
-Require Import SpecUsertrap.
 Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -109,62 +84,82 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
   (<[Regidx (mword_of_int 5) := regval_into_reg (g !!! Regidx (mword_of_int 10) : mword 64)]>
   (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> g)))))).
 
-(* THE CONTINUATION, NAMED for the same reason the old one was: a
-   whole-function WP carries its continuation as a spatial hypothesis
-   across every instruction step, so a spelled-out ~40-wand type would be
-   re-embedded in the proof term at every one of uservec's own steps.
-   [Typeclasses Opaque] stops instance search from descending into it; the
-   proof unfolds it exactly once, at the very end, after chaining through
-   usertrap and userret.  See claude-notes/optimization.md. *)
-(* Only [riscvGS]/[sieG]: this never opens [usertrap_res]'s own internals,
-   just holds [URes pt' vksp] opaquely -- the other twelve classes
-   [usertrap_res] itself needs are for its holder ([Module Type USERVEC]'s
-   [wp_uservec_pt], via [Include USERTRAP_RES]) to supply, not for this
-   definition to re-demand. *)
-Definition uservec_post `{!riscvGS Σ, !sieG Σ}
-    `{GEN : GenId} `{CID : CpuId}
-    (URes : uptd -> mword 64 -> iProp Σ)
-    (C : ucfg) (pt : uptd) (vksp : mword 64) : iProp Σ :=
-  ( ∀ (pt' : uptd) (mf : regfile) (ms' usatp uepc sc' stval' mdv0 : mword 64),
-    ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
-    ⌜upt_map_wf (ud_um pt')⌝ -∗
-    ⌜satp_rooted usatp (ud_root pt')⌝ -∗
-    ⌜and_vec MIE_S (not_vec mdv0) = zeros' 64⌝ -∗
+(* THE CONTINUATION, NAMED.  A whole-function WP carries its continuation as
+   a spatial hypothesis across every instruction step, so its TYPE is not only
+   re-traversed by every proofmode operation but re-embedded in the proof TERM
+   at every step.  Spelled out, this one is ~50 wands over 32 trapframe cells;
+   named, it is one constant applied to eight arguments.  [Typeclasses Opaque]
+   stops instance search from descending into it.  The proof unfolds it exactly
+   once, at the return.  See claude-notes/optimization.md. *)
+Definition uservec_post `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    (C : ucfg) (pt : uptd) (kroot : mword 44)
+    (vksat vksp vktr vkhart : bv 64) (dqk : dfrac) : iProp Σ :=
+  let uroot := ud_root pt in
+  let tfp := ud_tfp pt in
+  let um := ud_um pt in
+  ( ∀ (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
+    ⌜trap_mstatus_ok ms_v⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ User -∗
-    mstatus ↦ᵣ sret_ms5 ms' -∗
-    mie ↦ᵣ MIE_S -∗
-    mideleg ↦ᵣ mdv0 -∗
-    menvcfg ↦ᵣ MENVCFG_S -∗
-    senvcfg ↦ᵣ (mword_of_int 0 : mword 64) -∗
-    (* usertrap never touches these after its own return -- held loose,
-       framed the whole way through userret, and handed back unchanged *)
-    scause ↦ᵣ sc' -∗
-    stval ↦ᵣ stval' -∗
-    sepc ↦ᵣ uepc -∗
-    utlb_inv_pt (ud_root pt') (ud_tfp pt') (ud_um pt') -∗
-    pc_is (ret_pc uepc) -∗
-    gpr_file mf -∗
-    (* the leftover: usertrap's OWN kernel-internal bundle, RESEALED with
-       userret's own restored trapframe words folded back in (the proof's
-       tail does this fold once, right before userret's own return) -- at
-       the SAME [ksp] uservec loaded and handed in.  No raw [tf_pa] cells
-       here: [usertrap_res] is the ONE owner of the trapframe page
-       (UsertrapRes.v), so exposing them here TOO would double-claim it,
-       same as at entry -- see the header and
-       claude-notes/completed/usertrap.md.  Folding this bundle into the
-       user-mode loop is USER-module work, not this spec's. *)
-    URes pt' vksp -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    sscratch ↦ᵣ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
+    pt_frame (upt_tree_spec uroot tfp um) -∗
+    udata_own (ud_data pt) -∗
+    user_cfg C -∗
+    pc_is (ret_pc (vktr : mword 64)) -∗
+    gpr_file (uservec_gpr g vksp vkhart vktr vksat) -∗
+    tf_pa tfp 0 ↦ₚ₈{ dqk } vksat -∗
+    tf_pa tfp 8 ↦ₚ₈{ dqk } vksp -∗
+    tf_pa tfp 16 ↦ₚ₈{ dqk } vktr -∗
+    tf_pa tfp 32 ↦ₚ₈{ dqk } vkhart -∗
+    tf_pa tfp 40 ↦ₚ₈ (g !!! Regidx (mword_of_int 1) : mword 64) -∗
+    tf_pa tfp 48 ↦ₚ₈ (g !!! Regidx (mword_of_int 2) : mword 64) -∗
+    tf_pa tfp 56 ↦ₚ₈ (g !!! Regidx (mword_of_int 3) : mword 64) -∗
+    tf_pa tfp 64 ↦ₚ₈ (g !!! Regidx (mword_of_int 4) : mword 64) -∗
+    tf_pa tfp 72 ↦ₚ₈ (g !!! Regidx (mword_of_int 5) : mword 64) -∗
+    tf_pa tfp 80 ↦ₚ₈ (g !!! Regidx (mword_of_int 6) : mword 64) -∗
+    tf_pa tfp 88 ↦ₚ₈ (g !!! Regidx (mword_of_int 7) : mword 64) -∗
+    tf_pa tfp 96 ↦ₚ₈ (g !!! Regidx (mword_of_int 8) : mword 64) -∗
+    tf_pa tfp 104 ↦ₚ₈ (g !!! Regidx (mword_of_int 9) : mword 64) -∗
+    tf_pa tfp 120 ↦ₚ₈ (g !!! Regidx (mword_of_int 11) : mword 64) -∗
+    tf_pa tfp 128 ↦ₚ₈ (g !!! Regidx (mword_of_int 12) : mword 64) -∗
+    tf_pa tfp 136 ↦ₚ₈ (g !!! Regidx (mword_of_int 13) : mword 64) -∗
+    tf_pa tfp 144 ↦ₚ₈ (g !!! Regidx (mword_of_int 14) : mword 64) -∗
+    tf_pa tfp 152 ↦ₚ₈ (g !!! Regidx (mword_of_int 15) : mword 64) -∗
+    tf_pa tfp 160 ↦ₚ₈ (g !!! Regidx (mword_of_int 16) : mword 64) -∗
+    tf_pa tfp 168 ↦ₚ₈ (g !!! Regidx (mword_of_int 17) : mword 64) -∗
+    tf_pa tfp 176 ↦ₚ₈ (g !!! Regidx (mword_of_int 18) : mword 64) -∗
+    tf_pa tfp 184 ↦ₚ₈ (g !!! Regidx (mword_of_int 19) : mword 64) -∗
+    tf_pa tfp 192 ↦ₚ₈ (g !!! Regidx (mword_of_int 20) : mword 64) -∗
+    tf_pa tfp 200 ↦ₚ₈ (g !!! Regidx (mword_of_int 21) : mword 64) -∗
+    tf_pa tfp 208 ↦ₚ₈ (g !!! Regidx (mword_of_int 22) : mword 64) -∗
+    tf_pa tfp 216 ↦ₚ₈ (g !!! Regidx (mword_of_int 23) : mword 64) -∗
+    tf_pa tfp 224 ↦ₚ₈ (g !!! Regidx (mword_of_int 24) : mword 64) -∗
+    tf_pa tfp 232 ↦ₚ₈ (g !!! Regidx (mword_of_int 25) : mword 64) -∗
+    tf_pa tfp 240 ↦ₚ₈ (g !!! Regidx (mword_of_int 26) : mword 64) -∗
+    tf_pa tfp 248 ↦ₚ₈ (g !!! Regidx (mword_of_int 27) : mword 64) -∗
+    tf_pa tfp 256 ↦ₚ₈ (g !!! Regidx (mword_of_int 28) : mword 64) -∗
+    tf_pa tfp 264 ↦ₚ₈ (g !!! Regidx (mword_of_int 29) : mword 64) -∗
+    tf_pa tfp 272 ↦ₚ₈ (g !!! Regidx (mword_of_int 30) : mword 64) -∗
+    tf_pa tfp 280 ↦ₚ₈ (g !!! Regidx (mword_of_int 31) : mword 64) -∗
+    tf_pa tfp 112 ↦ₚ₈ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
-(* Same as [uservec_post]: only [riscvGS]/[sieG] -- [usertrap_res] is held
-   opaquely through [URes], never opened. *)
-Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
-    `{GEN : GenId} `{CID : CpuId}
-    (URes : uptd -> mword 64 -> iProp Σ)
+Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
-    (j : nat) (sscr0 : mword 64) (vksp : mword 64) :=
+    (sscr0 : mword 64)
+    (vksat vksp vktr vkhart : bv 64)
+    (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
+     w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
+     w272 w280 w112 : bv 64)
+    (dqk : dfrac) :=
+  let uroot := ud_root pt in
+  let tfp := ud_tfp pt in
+  let um := ud_um pt in
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
   (* the kernel owns the config cells outright at this join (same fact the
@@ -172,32 +167,10 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
      drive all six machine/config cells at ONE dfrac, and the trap frame
      holds hart_state/cur_privilege/mstatus at full *)
   uc_dqc C = DfracOwn 1 ->
-  (* [user_cfg]'s [mie] is a caller-chosen field of [C]; [sconf] (hence
-     usertrap's own borrowed-loose [mie]) pins it to the architectural
-     constant -- see UsertrapRes.v's header on the mie/mideleg/menvcfg
-     borrow. *)
-  uc_mie C = MIE_S ->
-  (* the process index usertrap needs, purely to prove [proc_addr j <>
-     zero_reg] via [j < NPROC] -- see UsertrapRes.v's note that usertrap's
-     OWN internal walk is not tied to it otherwise *)
-  (j < NPROC)%nat ->
-  (* THE MSTATUS GAP, stated as a bare, undischarged premise -- see the
-     header. *)
-  (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
-     sconf_ms_facts ms_v /\ _get_Mstatus_SPIE ms_v = ('b"1" : mword 1)) ->
-  (* THE TRAPFRAME KERNEL-WORDS GAP, the same shape -- see
-     [ProcGeom.tf_kernel_words_ok]'s own header.  [vksat]/[vktr]/[vkhart]
-     are no longer named parameters here: the four kernel words live
-     entirely inside [usertrap_res] now (this spec's own header), so their
-     values are discovered by OPENING it, not chosen by the caller -- this
-     premise is what the proof's tail uses to justify the switch/jalr once
-     it does.  HART-GENERIC: usertrap may PARK and resume on a different
-     hart (SpecUsertrap.v's [wp_next] crossing), and the proof opens
-     [usertrap_res] a second time there, at whichever hart that turns out
-     to be -- so this premise must hold at ALL of them, not just the one
-     uservec itself started on. *)
-  (forall (CID' : CpuId) (ws : list (mword 64)),
-     length ws = TFWORDS -> tf_kernel_words_ok (CID := CID') kroot vksp ws) ->
+  (* trapframe word 0 holds the KERNEL satp value, rooted at [kroot] *)
+  _get_Satp64_Mode (Mk_Satp64 (vksat : mword 64)) = ('b"1000" : mword 4) ->
+  zero_extend' 16 (satp_to_asid (autocast (T := mword) (vksat : mword 64) : mword 64)) = (mword_of_int 0 : mword 16) ->
+  autocast (T := mword) (satp_to_ppn (autocast (T := mword) (vksat : mword 64) : mword 64)) = kroot ->
   kernel_text -∗
   hw_config -∗
   minstret_inv -∗
@@ -210,27 +183,59 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
   (* the kernel-side resources parked while user code ran *)
   sscratch ↦ᵣ sscr0 -∗
   kpt_inv kroot -∗
-  (* usertrap's own kernel-internal bundle, for THIS trap round -- the ONE
-     owner of the trapframe (SpecUsertrap.v's header), opened once at the
-     top of the proof for the 44-instruction walk's own [tf_pa] cells and
-     resealed before the call into usertrap.  An ordinary premise,
-     unrelated to [Rut] (which stays fully abstract: uservec's own proof
-     never opens it, exactly like [mie]/[mideleg]/[menvcfg] ride through
-     [user_cfg] untouched). *)
-  URes pt vksp -∗
-  (* the continuation: userret's own exit shape, plus the leftover
-     [usertrap_res] -- see the header. *)
-  uservec_post URes C pt vksp -∗
+  tf_pa tfp 0 ↦ₚ₈{ dqk } vksat -∗
+  tf_pa tfp 8 ↦ₚ₈{ dqk } vksp -∗
+  tf_pa tfp 16 ↦ₚ₈{ dqk } vktr -∗
+  tf_pa tfp 32 ↦ₚ₈{ dqk } vkhart -∗
+  tf_pa tfp 40 ↦ₚ₈ w40 -∗
+  tf_pa tfp 48 ↦ₚ₈ w48 -∗
+  tf_pa tfp 56 ↦ₚ₈ w56 -∗
+  tf_pa tfp 64 ↦ₚ₈ w64 -∗
+  tf_pa tfp 72 ↦ₚ₈ w72 -∗
+  tf_pa tfp 80 ↦ₚ₈ w80 -∗
+  tf_pa tfp 88 ↦ₚ₈ w88 -∗
+  tf_pa tfp 96 ↦ₚ₈ w96 -∗
+  tf_pa tfp 104 ↦ₚ₈ w104 -∗
+  tf_pa tfp 120 ↦ₚ₈ w120 -∗
+  tf_pa tfp 128 ↦ₚ₈ w128 -∗
+  tf_pa tfp 136 ↦ₚ₈ w136 -∗
+  tf_pa tfp 144 ↦ₚ₈ w144 -∗
+  tf_pa tfp 152 ↦ₚ₈ w152 -∗
+  tf_pa tfp 160 ↦ₚ₈ w160 -∗
+  tf_pa tfp 168 ↦ₚ₈ w168 -∗
+  tf_pa tfp 176 ↦ₚ₈ w176 -∗
+  tf_pa tfp 184 ↦ₚ₈ w184 -∗
+  tf_pa tfp 192 ↦ₚ₈ w192 -∗
+  tf_pa tfp 200 ↦ₚ₈ w200 -∗
+  tf_pa tfp 208 ↦ₚ₈ w208 -∗
+  tf_pa tfp 216 ↦ₚ₈ w216 -∗
+  tf_pa tfp 224 ↦ₚ₈ w224 -∗
+  tf_pa tfp 232 ↦ₚ₈ w232 -∗
+  tf_pa tfp 240 ↦ₚ₈ w240 -∗
+  tf_pa tfp 248 ↦ₚ₈ w248 -∗
+  tf_pa tfp 256 ↦ₚ₈ w256 -∗
+  tf_pa tfp 264 ↦ₚ₈ w264 -∗
+  tf_pa tfp 272 ↦ₚ₈ w272 -∗
+  tf_pa tfp 280 ↦ₚ₈ w280 -∗
+  tf_pa tfp 112 ↦ₚ₈ w112 -∗
+  (* the continuation: at usertrap, on the kernel table, the user machine
+     fully banked into the trapframe.  Universally quantified over the trap
+     frame's existentials -- [g] is the interrupted USER register file. *)
+  uservec_post C pt kroot vksat vksp vktr vkhart dqk -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.
-  Include SpecUsertrap.USERTRAP_RES.
   Parameter wp_uservec_pt :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64),
-      wp_uservec_pt_body usertrap_res C pt Rut kroot j sscr0 vksp.
+      (kroot : mword 44) (sscr0 : mword 64)
+      (vksat vksp vktr vkhart : bv 64)
+      (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
+       w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
+       w272 w280 w112 : bv 64)
+      (dqk : dfrac),
+      wp_uservec_pt_body C pt Rut kroot sscr0 vksat vksp vktr vkhart
+        w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
+        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
+        w272 w280 w112 dqk.
 End USERVEC.

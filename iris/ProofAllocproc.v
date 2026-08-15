@@ -1545,13 +1545,7 @@ Section ProofAllocproc.
           iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
           iDestruct (proc_ofiles_null_split γf (proc_addr k) (pv_ofile V) Hof with "Hofiles")
             as "[Hofc Hofs]".
-          iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
-          iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-            "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-              %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-              %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-          iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
-                       with "Hkmapb [Hpgown]")
+          iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf) with "[Hpgown]")
             as (tfws) "Htfpage".
           { rewrite Hbasetf. iExact "Hpgown". }
           (* p->lock is still held: freeproc's own held set is
@@ -1956,13 +1950,7 @@ Section ProofAllocproc.
         assert (Hp78 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x76) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x78)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp78) in "Hpc".
         (* ---------- assemble the private block and hand it to the tail ------- *)
-        iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
-        iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-          "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-            %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-            %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-        iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
-                     with "Hkmapb [Hpgown]")
+        iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf) with "[Hpgown]")
           as (tfws) "Htfpage".
         { rewrite Hbasetf. iExact "Hpgown". }
         iDestruct (proc_pt_intro_ppt t tfp Hrep ltac:(rewrite Hbasetf; exact Hpvtf) with "Htree") as "Hpt".

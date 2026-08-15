@@ -170,10 +170,6 @@ Section UservecExitPt.
       mideleg ↦ᵣ{ dq } mdv0 -∗
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       pt_frame (upt_tree_spec uroot tfp um) -∗
-      (* STEP 4's own [tlb_res_pt kroot] -- KEPT, not [iClear]ed: a chained
-         caller that goes on to userret's own entry switch needs it as
-         ITS precondition (see SpecUserret.v's own header). *)
-      tlb_res_pt kroot -∗
       pc_is (ret_pc (m !!! Regidx (mword_of_int 5))) -∗
       gpr_file (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> m) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -452,7 +448,8 @@ Section UservecExitPt.
     { cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc4) in "Hpc".
     iNext.
-    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr Hkres
+    iClear "Hkres".
+    iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hufr
                           [$Hpc $Hnpc] Hfmap").
   Qed.
 

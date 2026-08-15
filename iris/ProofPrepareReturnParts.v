@@ -66,53 +66,46 @@ Proof. intro H. by rewrite H. Qed.
 
 (* ---- the four KERNEL slots, by byte displacement ---- *)
 (* kernel_satp 0, kernel_sp 8, kernel_trap 16, kernel_hartid 32; the epc the
-   last load READS sits at 24.  Each is [tf_pa tfp (8 * idx)] at the matching
-   index (the PHYSICAL address [ProcInv.tf_page]'s cells now live at -- see
-   [ProcInv.tf_pa_eq_pa_add8]), so [ProcInv.tf_page_word_upd_mem] applies
-   without further arithmetic. *)
+   last load READS sits at 24.  Each is [a_tf_word] at the matching index, so
+   [ProcInv.tf_page_word_upd] applies without further arithmetic. *)
 Lemma prr_tf_addr_00 (tfp : mword 44) :
   add_vec (page_base tfp) (sign_extend' 64 (mword_of_int 0 : mword 12))
-  = tf_pa tfp (8 * Z.of_nat tf_ksatp_idx).
+  = a_tf_word tfp tf_ksatp_idx.
 Proof.
   rewrite (prr_avi (page_base tfp) 0 ltac:(apply bv_eq; vm_compute; reflexivity)).
-  rewrite (tf_pa_eq_pa_add8 tfp tf_ksatp_idx ltac:(vm_compute; lia)).
-  rewrite /pa_add. f_equal.
+  rewrite /a_tf_word /pa_add. f_equal.
 Qed.
 
 Lemma prr_tf_addr_08 (tfp : mword 44) :
   add_vec (page_base tfp) (sign_extend' 64 (mword_of_int 8 : mword 12))
-  = tf_pa tfp (8 * Z.of_nat tf_ksp_idx).
+  = a_tf_word tfp tf_ksp_idx.
 Proof.
   rewrite (prr_avi (page_base tfp) 8 ltac:(apply bv_eq; vm_compute; reflexivity)).
-  rewrite (tf_pa_eq_pa_add8 tfp tf_ksp_idx ltac:(vm_compute; lia)).
-  rewrite /pa_add. f_equal.
+  rewrite /a_tf_word /pa_add. f_equal.
 Qed.
 
 Lemma prr_tf_addr_16 (tfp : mword 44) :
   add_vec (page_base tfp) (sign_extend' 64 (mword_of_int 16 : mword 12))
-  = tf_pa tfp (8 * Z.of_nat tf_ktrap_idx).
+  = a_tf_word tfp tf_ktrap_idx.
 Proof.
   rewrite (prr_avi (page_base tfp) 16 ltac:(apply bv_eq; vm_compute; reflexivity)).
-  rewrite (tf_pa_eq_pa_add8 tfp tf_ktrap_idx ltac:(vm_compute; lia)).
-  rewrite /pa_add. f_equal.
+  rewrite /a_tf_word /pa_add. f_equal.
 Qed.
 
 Lemma prr_tf_addr_24 (tfp : mword 44) :
   add_vec (page_base tfp) (sign_extend' 64 (mword_of_int 24 : mword 12))
-  = tf_pa tfp (8 * Z.of_nat tf_epc_idx).
+  = a_tf_word tfp tf_epc_idx.
 Proof.
   rewrite (prr_avi (page_base tfp) 24 ltac:(apply bv_eq; vm_compute; reflexivity)).
-  rewrite (tf_pa_eq_pa_add8 tfp tf_epc_idx ltac:(vm_compute; lia)).
-  rewrite /pa_add. f_equal.
+  rewrite /a_tf_word /pa_add. f_equal.
 Qed.
 
 Lemma prr_tf_addr_32 (tfp : mword 44) :
   add_vec (page_base tfp) (sign_extend' 64 (mword_of_int 32 : mword 12))
-  = tf_pa tfp (8 * Z.of_nat tf_khartid_idx).
+  = a_tf_word tfp tf_khartid_idx.
 Proof.
   rewrite (prr_avi (page_base tfp) 32 ltac:(apply bv_eq; vm_compute; reflexivity)).
-  rewrite (tf_pa_eq_pa_add8 tfp tf_khartid_idx ltac:(vm_compute; lia)).
-  rewrite /pa_add. f_equal.
+  rewrite /a_tf_word /pa_add. f_equal.
 Qed.
 
 (* the two [struct proc] fields the body reads off [a0] *)

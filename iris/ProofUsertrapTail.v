@@ -515,11 +515,8 @@ Section UtRet2.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     (* [sconf] is destructured DIRECTLY here -- not via [sconf_priv_open],
        whose closer would re-park [mie]/[mideleg]/[menvcfg] rather than
-       hand them out loose (see [ut_trap]'s header comment).  [hw_config]/
-       [minstret_inv] ride at the head, at THIS (the resuming) hart -- kept,
-       not discarded, since [usertrap_post] hands them back (see its
-       comment). *)
-    iDestruct "Hsc" as "(#Hhw & #Hmin & Hpriv & Hmsx & Hmiex & Hmenvx)".
+       hand them out loose (see [ut_trap]'s header comment). *)
+    iDestruct "Hsc" as "(_ & _ & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (msg) "Hmsown".
     iDestruct (ut_exit_ms_ok msg with "Hmsown Hsret Hq4") as %Hretms2.
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsg)".
@@ -581,7 +578,7 @@ Section UtRet2.
               (kvi_satp_word (ud_root (pv_upt V))) (mepc_val uepc) scv stv mdv0
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
-                    Hmie Hmdl Hmenv Hhw Hmin [-]").
+                    Hmie Hmdl Hmenv [-]").
     - exact Hmaskx.
     - exact Htfpe.
     - exact Haccwf.

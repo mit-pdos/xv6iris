@@ -51,8 +51,7 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UserPtTree ProcPtOwn.
-Require Import PtTree KptTree TrampPt.
+Require Import UserPtTree.
 Require Import KallocInv.
 Require Import PanicStub.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
@@ -97,19 +96,6 @@ Section UtSysBlock.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-
-  (* the trapframe page's own [page_valid], read off [proc_priv] without
-     consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
-     does not spend the resource (durable-notes.md), so [Hpv] is still
-     whole for [proc_priv_tf_upd] right afterward. *)
-  Local Lemma ut_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
-    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
-  Proof.
-    iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
-    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
-    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
-  Qed.
 
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
       (m0 m : regfile) (av nx : nat) (C : iProp Σ)
@@ -278,20 +264,8 @@ Section UtSysBlock.
          [proc_priv_tf_upd] below consumes the block. *)
       iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
       destruct Hepcx as [uepc Hepc].
-      iDestruct (ut_tfp_valid with "Hpv") as %Hpv_valid.
       iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hpvback)".
-      (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently)
-         and [Hpv_valid] -- the mem-tier convenience wrapper is what the
-         VA-tier [c.ld]/[c.sd] through the kernel identity map needs
-         (ProcInv.v's header on [tf_page_word_mem]). *)
-      iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
-      iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-      iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
-      iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx uepc ltac:(vm_compute; lia) Hepc
-                   with "Hptc Htfp")
+      iDestruct (tf_page_word_upd _ _ tf_epc_idx uepc Hepc with "Htfp")
         as "(Hword & Htfback)".
       (* ---- +0x96: c.ld a4,88(s1) -- a4 := p->trapframe ---- *)
       assert (Haddrtf : add_vec (rget mf Rs1)
@@ -317,7 +291,7 @@ Section UtSysBlock.
         by (rgne; rewrite /S1 upd_eq; reflexivity).
       assert (Haddrw : add_vec (rget S1 Ra4)
                          (sign_extend' 64 (mword_of_int 24 : mword 12))
-                       = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
+                       = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx)
         by (rewrite HS1a4; apply prr_tf_addr_24).
       (* ---- +0x98: c.ld a5,24(a4) -- a5 := epc ---- *)
       iEval (rewrite -Haddrw) in "Hword".
@@ -354,7 +328,7 @@ Section UtSysBlock.
         rewrite /S1 upd_eq. reflexivity. }
       assert (Haddrw3 : add_vec (rget S3 Ra4)
                           (sign_extend' 64 (mword_of_int 24 : mword 12))
-                        = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
+                        = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx)
         by (rewrite HS3a4; apply prr_tf_addr_24).
       iEval (rewrite -Haddrw3) in "Hword".
       iApply (wp_csd_s_sconf (mword_of_int (UT + 0x9c)) Ra5 Ra4

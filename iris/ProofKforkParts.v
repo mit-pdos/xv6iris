@@ -76,7 +76,6 @@ Require Import FileInvDefs.
 Require Import WpLock.
 Require Import SwtchCtx.
 Require Import ProcInv.
-Require Import TrampPt.
 Require Import KallocInv.
 Require Import SpecFreeproc.
 Require Import CodeKfork.
@@ -196,10 +195,8 @@ Qed.
 (*  The loop walks the SOURCE pointer a5 and the DESTINATION pointer a4  *)
 (*  in lockstep, four words at a time, and each iteration reaches its    *)
 (*  four words through the 12-bit displacements 0/8/16/24.  So every     *)
-(*  address in the body is [tf_pa tfp (8 * Z.of_nat (4*k + j))] (the     *)
-(*  PHYSICAL cell [ProcInv.tf_page] now lives at -- see                  *)
-(*  [ProcInv.tf_pa_eq_pa_add8]), and the bump at +0x5a/+0x5e is          *)
-(*  [tf_pa tfp (8 * Z.of_nat (4*(S k)))].                                *)
+(*  address in the body is [a_tf_word tfp (4*k + j)], and the bump at    *)
+(*  +0x5a/+0x5e is [a_tf_word tfp (4*(S k))].                            *)
 (* ------------------------------------------------------------------ *)
 Lemma kfk_avi (v : mword 64) (d : Z) :
   (sign_extend' 64 (mword_of_int d : mword 12) : mword 64) = (mword_of_int d : mword 64) ->
@@ -207,26 +204,22 @@ Lemma kfk_avi (v : mword 64) (d : Z) :
 Proof. intro H. by rewrite H. Qed.
 
 Lemma kfk_tf_disp (tfp : mword 44) (k j : nat) (d : Z) :
-  (8 * (4 * k) < 4096)%nat -> (8 * (4 * k + j) < 4096)%nat ->
   d = 8 * Z.of_nat j ->
   (sign_extend' 64 (mword_of_int d : mword 12) : mword 64) = (mword_of_int d : mword 64) ->
-  add_vec (tf_pa tfp (8 * Z.of_nat (4 * k))) (sign_extend' 64 (mword_of_int d : mword 12))
-  = tf_pa tfp (8 * Z.of_nat (4 * k + j)).
+  add_vec (a_tf_word tfp (4 * k)) (sign_extend' 64 (mword_of_int d : mword 12))
+  = a_tf_word tfp (4 * k + j).
 Proof.
-  intros Hb1 Hb2 Hd Hs. rewrite (kfk_avi _ d Hs).
-  rewrite (tf_pa_eq_pa_add8 tfp (4 * k) ltac:(lia)) (tf_pa_eq_pa_add8 tfp (4 * k + j) ltac:(lia)).
-  rewrite /pa_add avi_assoc. f_equal. lia.
+  intros Hd Hs. rewrite (kfk_avi _ d Hs).
+  rewrite /a_tf_word /pa_add avi_assoc. f_equal. lia.
 Qed.
 
 Lemma kfk_tf_step (tfp : mword 44) (k : nat) :
-  (8 * (4 * k) < 4096)%nat -> (8 * (4 * S k) < 4096)%nat ->
   (sign_extend' 64 (mword_of_int 32 : mword 12) : mword 64) = (mword_of_int 32 : mword 64) ->
-  add_vec (tf_pa tfp (8 * Z.of_nat (4 * k))) (sign_extend' 64 (mword_of_int 32 : mword 12))
-  = tf_pa tfp (8 * Z.of_nat (4 * S k)).
+  add_vec (a_tf_word tfp (4 * k)) (sign_extend' 64 (mword_of_int 32 : mword 12))
+  = a_tf_word tfp (4 * S k).
 Proof.
-  intros Hb1 Hb2 Hs. rewrite (kfk_avi _ 32 Hs).
-  rewrite (tf_pa_eq_pa_add8 tfp (4 * k) ltac:(lia)) (tf_pa_eq_pa_add8 tfp (4 * S k) ltac:(lia)).
-  rewrite /pa_add avi_assoc. f_equal. lia.
+  intro Hs. rewrite (kfk_avi _ 32 Hs).
+  rewrite /a_tf_word /pa_add avi_assoc. f_equal. lia.
 Qed.
 
 (* The [bne a5,a3] exit test.  The two addresses are offsets into ONE page,
@@ -236,10 +229,10 @@ Qed.
 Lemma kfk_tf_inj (tfp : mword 44) (i j : nat) :
   page_valid (page_base tfp) ->
   (8 * i < 4096)%nat -> (8 * j < 4096)%nat ->
-  tf_pa tfp (8 * Z.of_nat i) = tf_pa tfp (8 * Z.of_nat j) -> i = j.
+  a_tf_word tfp i = a_tf_word tfp j -> i = j.
 Proof.
   intros [_ [Hlo Hhi]] Hi Hj Heq.
-  rewrite (tf_pa_eq_pa_add8 tfp i ltac:(lia)) (tf_pa_eq_pa_add8 tfp j ltac:(lia)) /pa_add in Heq.
+  rewrite /a_tf_word /pa_add in Heq.
   pose proof (bv_unsigned_in_range 64 (page_base tfp)) as [Hnn _].
   rewrite uint_unsigned in Hhi.
   assert (Hbnd : (bv_unsigned (page_base tfp) < 2281701376)%Z)
