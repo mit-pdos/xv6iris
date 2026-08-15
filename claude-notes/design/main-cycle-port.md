@@ -191,10 +191,29 @@ proof interface is:
    takes NO equation:
    `ereg_frame … D -∗ (ereg_frame … (esil n D x).1 D -∗ WP (HartE …
    (esil n D x).2)) -∗ WP (HartE … x.2)`.
-   GOTCHA (measured): discharge any cursor equation with
-   `have H : … by reflexivity` and pass `H`; a bare `eq_refl` inside an
-   application hands the goal to the elaborator's unifier, which lazily
-   evaluates the stretch (5 s → unbounded).
+   GOTCHA (measured, on the spike AND re-measured on main's pilot —
+   the trap has FOUR heads, all the same lazy evaluation of a stretch):
+   (a) discharge any cursor equation with `have H : … by reflexivity` and
+   pass `H`; a bare `eq_refl` inside an application hands the goal to the
+   elaborator's unifier (5 s → unbounded).  (b) The equation's two sides
+   must be ONE δ-step from syntactic identity — `hp_x2 = hsil n D
+   (hcur_read v hp_x1)` in the definition's own spelling is milliseconds,
+   while the same fact against a pair-literal spelling re-enters lazy
+   evaluation (5.5 s at depth 2, 171 s at depth 3).  (c) Never leave a
+   cursor equation in the proof context across a hypothesis-scanning
+   tactic: `set_solver`'s `naive_solver` runs `simplify_eq` on every
+   hypothesis and whnf-evaluates both sides (57 s); clear it or avoid the
+   tactic (`apply empty_subseteq` for mask side conditions).  (d) Never
+   `iApply` a kit rule at a composition-spelled cursor argument from a
+   concrete call site — the unfold oracle can pick the resume-function
+   side and force the scrutinee (4.5 s at depth 2, minutes at depth 3).
+   THE SHAPE THAT MAKES ALL FOUR IMPOSSIBLE: prove a per-instruction-class
+   SEQUENCE RULE once at ABSTRACT cursors (variables are rigid, so every
+   unification is O(1)) taking the cursor equations as premises, and
+   instantiate it with `by reflexivity` equations in the definitions' own
+   spelling — `HartPilot.wp_hart_rw_seq` / `wp_pilot_started_store` is the
+   worked pair, mirroring the spike's `ewp_ev_started_set` / §5e split.
+   The adapter's per-class rules must be built this way from the start.
    **BATCH BREAKS (main-specific; the mechanics are the two bullets at the
    top of this section).**  A batch is sound only while the cursor's
    `regstate` is provably this hart's file, i.e. while the caller owns the

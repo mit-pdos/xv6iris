@@ -24,6 +24,13 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
   fupd; window data a function of `w`) + the pure window layer.
 - `iris/HartRegNode.v` — single-node RegRead/RegWrite fupd rules (the escape
   hatch for invariant-held cells and the wire).
+- `iris/HartPilot.v` — the Phase B pilot, DELIVERED at parity: `sw a4,0(a5)`
+  at `main+0xb0` on the cold-boot file (292 nodes, 2 memory events), through
+  `wp_hart_rw_seq` (the generic sequence rule at abstract cursors) — whole
+  file 3.6 s of sentence time, the instantiation itself 0.2 s.  **Read its
+  §6 header before writing any adapter rule**: it records the four measured
+  lazy-evaluation traps and the rule/instance split that makes them
+  impossible (also in the design doc §5's GOTCHA).
 
 ## Left
 
@@ -32,20 +39,39 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
    against the pilot's real fetch plumbing (`instr`/`fetch_from_pts_*`),
    not speculatively.
-2. **The certification adapter + pilot** (Phase B's gate):
-   - port `WeakEvStarted` §5a's measurement scaffolding: the footprint
-     collector (`erun_any`/`erun_regs` → computed `D : gset register`), the
-     cursor compositions, the `vm_cast_no_check` per-site facts;
-   - ONE pilot leaf + ONE small whole-function proof re-established at
-     parity; per-lemma `coqc -time` vs the originals (target ≤ ~1.2×).
+2. **The certification adapter** (Phase B's remaining gate; the pilot half
+   is delivered — `HartPilot.v`):
+   - ONE small whole-function proof re-established at parity (the pilot was
+     one instruction; a whole function exercises the boundary chaining and
+     the tick family).
    - The tick is a certification FAMILY uniform in `(w, tick)` — design doc
      §5's 5b; only reach for `hsil`-commutes-with-`bind` if measurement says.
-3. **Phase B′ — reconnect the tree** (971 files behind `MinstretInv.v`):
-   rebuild `wp_exec_step` / `_clock` / `_minstret` / `_hart_active(_inv)` /
-   `_decode_execute_inv` and `InstrBytes.wp_instr` on the adapter, statements
-   intact — the footprint argument lives at `wp_instr`, the first altitude
-   where the caller's ownership of the read set is known.  The clock/minstret
-   absorption rebuilds on `HartRegNode`'s single-node rules.
+   - Every adapter rule follows the `wp_hart_rw_seq` shape: generic rule at
+     abstract cursors + equations-as-premises, instance with reflexivity
+     equations in the definitions' own spelling.
+3. **Phase B′ — reconnect the tree** (971 files behind `MinstretInv.v`).
+   Surveyed against the real statements; the findings that set the plan:
+   - **Leaf SPECS are resource-shaped** (`wp_addi_gpr`: cells in, cells out —
+     no σ, no `exec`, no fupd), so "leaf specs verbatim" is achievable.  The
+     σ-callback currency (`∀ σ, mstate_interp σ ={..}=∗ ∃ σ', ⌜exec … = Some
+     …⌝ ∗ mstate_interp σ' ∗ …`) is INTERNAL to `wp_instr` and the mid-stack.
+   - **`wp_instr`'s exact statement is NOT re-derivable**: its callback hands
+     back `mstate_interp s_exec` inside one fupd — meaningful only when the
+     whole instruction is one atomic step.  Rebuild the same ALTITUDE with a
+     per-event internal currency; the leaf proofs above it are the Phase C
+     sweep (their statements stay).
+   - **The execute phase of the ALU/CSR class is all silent nodes**, and
+     branch-free in the data values (branches split into taken/not-taken
+     leaves already), so it batches at a SYMBOLIC register file — `hsil`
+     reduces by `cbn` when the node path is value-independent; `vm_compute`
+     is only for concrete instantiation.  The `exec_execute_*` catalogue
+     gets cursor-form twins in the sweep (mechanical, gen_code-style
+     tooling); decode (`kd_`) is consumed via `instr` unchanged.
+   - Memory-class leaves route their one/two data events through
+     `HartEvents`; MMIO leaves (uart/plic/virtio access paths) keep their
+     σ-shaped device reasoning via the MMIO event rules — enumerable, small.
+   - The clock/minstret absorption rebuilds on `HartRegNode`'s single-node
+     rules; `sr_absorb`/interrupt engines are audit item 6.
 4. **Phase C — the leaf sweep**, spec-identical; whole-function proofs must
    re-check unedited (a failure is a finding, not a patch).
 5. **Phase D — adequacy + capstones** (`RiscvAdequacy`/`SystemAdequacy`
