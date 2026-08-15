@@ -10,7 +10,7 @@ diverged from the design's sketches, and what is left.
 | stage | what lands | files | gate | state |
 |---|---|---|---|---|
 | **F1a** | the pure tree type, `dir_view` (first-match), `dir_names_unique`, `node_rep`, `node_rep_inj`, `path_at` | `FsTree.v` (new) | none | **LANDED** |
-| **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | IN FLIGHT |
+| **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | **LANDED** |
 | **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | QUEUED |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
 | **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + the unlanded root clause + C′ | NOT STARTED |
@@ -47,6 +47,33 @@ The shape, per R1/R2:
   one `foldl` over `path_step`; `path_chain` for `fslice`; `fs_wf` and
   `fs_dirs_acyclic` as separate derived predicates.
 
+### F1b — `iris/FsRep.v`
+
+`fnode`, `fedges`, `fslice`, `fs_rep`, the frame law, `fnode_excl`, and the
+`".."`-location lemma. Requires `InodeRegion` + `DirLinks` + `FsTree`.
+`Print Assumptions` on every lemma: **closed under the global context** —
+the standing six were not needed either.
+
+R3 holds by construction: no new ghost name, no new authority, no invariant.
+Every clause is a client-held fragment that already exists —
+`InodeRegion.dinode_at` + `InodeInv.inode_blocks` for the node, and
+`DirLinks.dir_links` VERBATIM for the edges (`fedges` is a name, not a
+resource).
+
+**The headline pair, §20.17.4's owed fact.** `fnode_dotdot` turns
+`ents !! ".." = Some dp` into the RECORD INDEX `dirlookup` stops at — live,
+naming `dp` — and `fedges_acc` hands out that index's `dir_link_at`. Between
+them, S7's grey conversion can finally say WHICH `ilink dp` it converts,
+which the model had no fact for: `dir_link_at` is keyed by record index and
+is name-blind, and nothing places `".."` at index 1. The tree names the
+record instead of positioning it, and `dir_view_lookup` turns the name back
+into the index.
+
+`fslice` is `fs_rep` restricted to `path_nodes t i p`; `fmap_rep_split` (the
+filter/complement carve) is what makes it a SLICE rather than a second
+predicate, and the whole frame law is `big_sepM_union` — free, exactly as
+§2(iv) promised.
+
 ## Divergences from the verification report's sketches
 
 The report (fs-fragments.md §1–§6) was written against the tree three merges
@@ -62,7 +89,31 @@ back. These differ at the code level; none moves a ruling.
    just smaller than the analogy suggested, because the relation was stated
    in the direction the design demands.
 
-2. **`node_rep`'s NFile case demands a NONZERO type.** The report's fsnode
+2. **`dinode_at` is keyed by `bv 32`, not `Z`.**
+   `InodeRegion.dinode_at (γi : gname) (inum : bv 32) (dn : dinode)`
+   (`iris/InodeRegion.v:560`) wraps a `ghost_map Z dinode` element at
+   `bv_unsigned inum`. R1's reason 1 still holds — the map underneath IS
+   `Z`-keyed — but the fragment's own signature is not, so `FsRep.inum_of`
+   is `Z_to_bv 32` and `FsTree.fs_inums_ok` carries `0 <= i < 2 ^ 32` to make
+   it round-trip (`inum_of_unsigned`). §2(i)'s `inum_of` was a placeholder;
+   this is what it has to be.
+
+3. **`inode_blocks` takes a `blkmap`, and `fnode` does NOT couple it to
+   `dn`.** `InodeInv.inode_blocks γfs bm data` (`iris/InodeInv.v:790`) is one
+   `blk_res` per file index of `bm`; the coupling to `di_addrs` lives in
+   `InodeLock.inode_ok cov logstart dn bm data`, which would put `cov` and
+   `logstart` on every `fnode` for a fact this layer never reads. `fnode`
+   existentially quantifies `bm` and states no `inode_ok`; a caller that
+   wants the coupling still has it in the escrow payload it carved the
+   `fnode` out of.
+
+4. **`fnode` has no `Timeless` instance.** `inode_blocks`'s own instance
+   lives in `IcacheEscrow.v:234`, ABOVE `FsRep.v`. Requiring the escrow to
+   get it would enlarge the cone for a property nothing needs — R3 forbids
+   the invariant that would be its only consumer. A file above IcacheEscrow
+   can declare it in one line.
+
+5. **`node_rep`'s NFile case demands a NONZERO type.** The report's fsnode
    has two constructors and says nothing about free inodes. A type-0 record
    would otherwise represent `NFile []`, i.e. the tree would silently contain
    free inodes and `fs_rep` would stop being a statement about the file
