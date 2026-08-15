@@ -110,6 +110,7 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
+Require Import ProcPtOwn.   (* [proc_pt] / [ud_norm] -- the bare residue's vocabulary *)
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
 Require Import BioInv.
@@ -420,6 +421,63 @@ Module Type USERTRAP_RES.
       usertrap_res pt ksp -∗
       ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
 
+  (* THE BARE FORM: the parked residue WITHOUT THE USER ADDRESS SPACE.
+     [usertrap_res_parked] fixed ONE of four overlaps with the user tier
+     (satp).  The other three are all [proc_pt], which rides inside
+     [usertrap_res] via [ProcInv.proc_priv]: the user page-table TREE
+     ([ptree_own 2 (DfracOwn 1)]) and the user DATA PAGES, which
+     [UserPtTree.user_pt_inv] carries too.  So the parked form is still
+     unsatisfiable beside a user-mode frame, and it is the BARE form that
+     parks across user execution.  Concrete: [UsertrapRes.ut_res_bare].
+
+     What the bare form still HAS is everything the kernel genuinely owns
+     while user code runs -- including [p->pagetable]/[p->trapframe] (cells
+     that merely name the table) and the trapframe page itself (physical
+     tier, U = 0 leaf, unreachable from user mode).  That is why
+     [usertrap_res_tf_open] below is stated on THIS form: the trapframe is
+     available in exactly the window the address space is not. *)
+  Parameter usertrap_res_bare :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId},
+      uptd -> mword 64 -> iProp Σ.
+
+  (* uservec's move, one tier under [_tlb_close]: its exit switch converted
+     the user table back to a [pt_frame], and the pages never moved, so
+     [ProcPtOwn.user_pt_inv_open] rebuilds [proc_pt] and this reseals it
+     into the residue. *)
+  Parameter usertrap_res_pt_close :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
+
+  (* userret's move: the address space is about to be installed again, so
+     it comes back out, to be split into the tree the entry switch consumes
+     and the pages [ProcPtOwn.user_pt_inv_close] hands the user tier. *)
+  Parameter usertrap_res_pt_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
+
+  (* THE FOOTPRINT RENORMALISATION.  The bare residue reads its descriptor
+     only through [ud_root]/[ud_tfp]/[ud_um] -- [proc_pt], the one conjunct
+     whose user-side partner names [ud_data], is what it just gave up -- so
+     it may be re-keyed on [ProcPtOwn.ud_norm].  That is what lets the trap
+     loop hand the user tier a descriptor whose [udata_cov] side condition
+     holds by construction, which is the fact this file's [usertrap_post]
+     explains it cannot ask usertrap for. *)
+  Parameter usertrap_res_bare_norm :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
+
   Parameter usertrap_res_tf_open :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -428,9 +486,9 @@ Module Type USERTRAP_RES.
       (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
          [ProcGeom.tf_kernel_words_ok]'s own header. *)
       (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
-      usertrap_res_parked pt ksp -∗
+      usertrap_res_bare pt ksp -∗
       ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_parked pt ksp).
+        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
 End USERTRAP_RES.
 
 Module Type USERTRAP.

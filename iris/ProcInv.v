@@ -962,6 +962,105 @@ Section ProcInv.
       iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
+  (* ---- THE ADDRESS-SPACE SPLIT --------------------------------------
+     THE BLOCK MINUS THE PAGE TABLE.  Split out for the reason the fd
+     table and the cwd reference above were, one tier further out: the
+     one window in which a live process's block is NOT complete is user
+     execution, where the address space is INSTALLED (satp points at it,
+     [UserPtTree.user_pt_inv] owns it) rather than parked.  A kernel-side
+     residue that must survive that window therefore cannot contain
+     [proc_pt] -- holding both is [ptree_own 2 (DfracOwn 1)] and the user
+     pages claimed TWICE, i.e. an unsatisfiable precondition and a vacuous
+     lemma, which is exactly the trap the uservec boundary fell into (see
+     claude-notes/projects/uservec.md).
+
+     The two [struct proc] CELLS stay: [p->pagetable] / [p->trapframe] are
+     ordinary kernel words that merely NAME the table, and the kernel owns
+     them straight through user execution.  So does the trapframe page --
+     [tf_page] is at the tier-neutral physical tier and user mode cannot
+     reach it (its leaf has U = 0), so it is residue, not address space.
+     What leaves is [proc_pt] and nothing else. *)
+  Definition proc_priv_nopt (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) : iProp Σ :=
+    (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+     ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+     proc_fields pa (DfracOwn 1) V ∗
+     proc_pt_cells pa (pv_upt V) ∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+     cwd_ref (pv_cwd V) ∗
+     proc_ofiles γf pa (pv_ofile V))%I.
+
+  Lemma proc_priv_split_pt (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V ⊣⊢ proc_priv_nopt γf pa pid V ∗ proc_pt (pv_upt V).
+  Proof.
+    rewrite /proc_priv /proc_priv_core /proc_priv_nopt proc_pt_at_split
+            /proc_pt_cells.
+    iSplit.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & ((Hc1 & Hc2) & Hpt) & Htfp & Hc) Ho]".
+      iFrame "Hpt". iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid Hf Hc1 Hc2 Htfp Hc Ho".
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & (Hc1 & Hc2) & Htfp & Hc & Ho) Hpt]".
+      iFrame "Ho". iSplitR; [done|]. iSplitR; [done|].
+      iFrame "Hpid Hf Hc1 Hc2 Hpt Htfp Hc".
+  Qed.
+
+  (* THE TRAPFRAME BORROW at the reduced block -- same statement as
+     [UsertrapRes.proc_priv_tf_open], which is where the complete block's
+     version lives; this one is what a residue that has already given up
+     its page table opens. *)
+  Lemma proc_priv_nopt_tf_open (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nopt γf pa pid V -∗
+    ∃ ws : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws ∗
+      (∀ ws' : list (mword 64), tf_page (ud_tfp (pv_upt V)) ws' -∗
+         proc_priv_nopt γf pa pid (upd_tf V ws')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hc & Htfp & Hcwd & Ho)".
+    iExists (pv_tf V). iFrame "Htfp".
+    iIntros (ws') "Htfp".
+    (* every field [upd_tf] does not touch is equal by a single iota step;
+       name them so the goal reduces by [rewrite] rather than by a blind
+       [iFrame] match against an opaque [upd_tf V ws'] -- the same hazard
+       [proc_priv_tf_open] documents. *)
+    assert (Heq1 : pv_sz (upd_tf V ws') = pv_sz V) by reflexivity.
+    assert (Heq2 : pv_upt (upd_tf V ws') = pv_upt V) by reflexivity.
+    assert (Heq3 : pv_ofile (upd_tf V ws') = pv_ofile V) by reflexivity.
+    assert (Heq4 : pv_cwd (upd_tf V ws') = pv_cwd V) by reflexivity.
+    assert (Heq6 : pv_tf (upd_tf V ws') = ws') by reflexivity.
+    assert (Heq7 : proc_fields pa (DfracOwn 1) (upd_tf V ws')
+                   = proc_fields pa (DfracOwn 1) V) by reflexivity.
+    rewrite /proc_priv_nopt Heq1 Heq2 Heq3 Heq4 Heq6 Heq7.
+    iSplitR; [done|]. iSplitR; [done|].
+    iFrame "Hpid Hf Hc Htfp Hcwd Ho".
+  Qed.
+
+  (* THE FOOTPRINT FIELD IS INVISIBLE HERE.  The reduced block reads
+     [pv_upt V] only through [ud_root] / [ud_tfp] / [ud_um]; [ud_data] is
+     the derived footprint ([ProcPtOwn.ud_pas]) that only the user tier
+     names.  So a residue keyed on a descriptor may be RENORMALISED
+     ([ProcPtOwn.ud_norm]) for free -- which is what lets the trap loop
+     hand the user tier a descriptor whose coverage side condition holds
+     by construction while the kernel side keeps the one it had. *)
+  Lemma proc_priv_nopt_upt_irrel (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (Q : uptd) :
+    ud_root (pv_upt V) = ud_root Q ->
+    ud_tfp (pv_upt V) = ud_tfp Q ->
+    ud_um (pv_upt V) = ud_um Q ->
+    proc_priv_nopt γf pa pid V ⊣⊢ proc_priv_nopt γf pa pid (upd_upt V Q).
+  Proof.
+    intros Hr Ht Hu.
+    assert (Heq1 : pv_sz (upd_upt V Q) = pv_sz V) by reflexivity.
+    assert (Heq2 : pv_upt (upd_upt V Q) = Q) by reflexivity.
+    assert (Heq3 : pv_ofile (upd_upt V Q) = pv_ofile V) by reflexivity.
+    assert (Heq4 : pv_cwd (upd_upt V Q) = pv_cwd V) by reflexivity.
+    assert (Heq6 : pv_tf (upd_upt V Q) = pv_tf V) by reflexivity.
+    assert (Heq7 : proc_fields pa (DfracOwn 1) (upd_upt V Q)
+                   = proc_fields pa (DfracOwn 1) V) by reflexivity.
+    rewrite /proc_priv_nopt Heq1 Heq2 Heq3 Heq4 Heq6 Heq7 /proc_pt_cells.
+    rewrite -Hr -Ht -Hu. reflexivity.
+  Qed.
+
   (* the deficit block's [p->cwd] CELL, borrowed and replaced -- what the
      [sd] that installs a working directory needs.  [proc_priv_cwd] cannot
      serve: it hands out the reference too, and during the window there is

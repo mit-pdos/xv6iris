@@ -15,23 +15,48 @@
    depends on USERTRAP's and USERRET's spec modules and invokes their WPs
    at its own call sites (ProofUservec.v becomes a functor over both).
 
-   THE TRAPFRAME IS OWNED THE SAME WAY THROUGHOUT.  [usertrap_res] is the
-   ONE owner of the trapframe page (UsertrapRes.v), stated at the PHYSICAL
-   tier ([ProcInv.tf_page], native [tf_pa]/[↦ₚ₈] cells -- the SAME tier
-   uservec/userret's own 44/31-instruction walks already use, so there is
-   no phys<->mem crossing at this boundary at all).  Consequently this
-   spec takes [usertrap_res pt vksp] as ITS OWN precondition (not raw
-   [tf_pa] cells): the proof opens it once (via
-   [SpecUsertrap.usertrap_res_tf_open]) for the SAVE walk's own cells,
-   reseals it before calling usertrap, and repeats the open/reseal once
-   more around the call into userret.  [uservec_post] therefore is NOT
-   userret's own exit shape (which exposes raw [tf_pa] cells) -- it is
-   that shape with the trapframe folded back into a fresh [usertrap_res
-   pt' vksp] instead, the ONE thing left over once userret's entry
-   consumes everything else, and nothing downstream of THIS spec asks for
-   more: folding THAT into the user-mode loop (the outer Löb that
+   ==== THE PRECONDITION IS THE *BARE* RESIDUE, AND THAT IS THE POINT ====
+
+   uservec IS THE VIEW CHANGE.  The user address space -- the page-table
+   tree, the data pages, and satp/tlb -- is ONE resource that the kernel
+   holds parked ([ProcPtOwn.proc_pt], inside [ProcInv.proc_priv], inside
+   [usertrap_res]) while the kernel runs, and that
+   [UserPtTree.user_pt_inv] holds installed while user code runs.  A spec
+   naming BOTH is claiming it twice, so its precondition is unsatisfiable
+   and the lemma is vacuous -- green, and applicable by nobody.  An earlier
+   draft of this file did exactly that and "proved" the 44-instruction walk
+   through it; see claude-notes/projects/uservec.md.
+
+   So this spec takes [SpecUsertrap.usertrap_res_bare pt vksp]: the kernel
+   residue with NO address space in it.  The two borrows close in one order
+   around the call into usertrap and reopen in the mirror order before
+   userret --
+
+     bare --[_pt_close]--> parked --[_tlb_close]--> usertrap_res
+
+   -- and both pieces are produced by the ONE instruction that changes the
+   view, the [csrw satp] of the exit switch: it converts the user table
+   from [utlb_inv_pt] back to a [pt_frame] and roots satp at the kernel
+   table.  The user PAGES do not move at all; [ProcPtOwn.proc_pt_own_udata]
+   is the whole of that conversion.
+
+   THE TRAPFRAME PAGE IS NOT PART OF THIS, and that is why the walks work.
+   [ProcInv.tf_page] is at the PHYSICAL tier (native [tf_pa]/[↦ₚ₈] cells --
+   the SAME tier uservec/userret's own 44/31-instruction walks use, so no
+   phys<->mem crossing at this boundary) and its leaf has U = 0, so user
+   mode cannot reach it and [user_pt_inv] never claims it.  It stays in the
+   BARE residue, available in exactly the window the address space is not,
+   which is why [usertrap_res_tf_open] is stated there: the proof opens it
+   for the SAVE walk's cells, reseals before calling usertrap, and repeats
+   the open/reseal around the call into userret.
+
+   [uservec_post] therefore is NOT userret's own exit shape (which exposes
+   raw [tf_pa] cells) -- it is that shape with the trapframe folded back
+   into a fresh bare residue and the address space handed back in the USER
+   view.  Folding THAT into the user-mode loop (the outer Löb that
    discharges [UserExec.stvec_handler_wp]) is future work, once USER is
-   folded in too.
+   folded in too; the [Rut] it will need is
+   [fun p => ∃ ksp, usertrap_res_bare p ksp].
 
    THE MSTATUS GAP.  [user_trap_frame]'s own pure content is only
    [trap_mstatus_ok ms_v] (UserExec.v); [usertrap_entry_ms] additionally
@@ -61,7 +86,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import RegFile HartTp.
+Require Import RegFile HartTp WpNext.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import KernelText.
@@ -72,6 +97,7 @@ Require Import UserPtTree UserExec.
 Require Import IntrDefs.
 Require Import MstatusBits.
 Require Import ProcGeom.
+Require Import ProcInv ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the address-space split *)
 (* [usertrap_res]'s own signature (SpecUsertrap.v/USERTRAP_RES) is stated
    over these fourteen classes; unqualified [lockG]/[fdslotG]/... below
    only resolve to the CONCRETE classes (rather than each getting silently
@@ -129,6 +155,12 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
     ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
     ⌜upt_map_wf (ud_um pt')⌝ -∗
     ⌜satp_rooted usatp (ud_root pt')⌝ -∗
+    (* THE DESCRIPTOR COMES BACK RENORMALISED -- see the entry premise of
+       [wp_uservec_pt_body].  Handed over so the next round's entry premise
+       is discharged by this round's exit, which is what makes the loop
+       closed under it. *)
+    ⌜ud_data pt' = ud_pas pt'⌝ -∗
+    ⌜proc_pt_wf pt'⌝ -∗
     ⌜and_vec MIE_S (not_vec mdv0) = zeros' 64⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗
@@ -142,10 +174,18 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
     scause ↦ᵣ sc' -∗
     stval ↦ᵣ stval' -∗
     sepc ↦ᵣ uepc -∗
-    utlb_inv_pt (ud_root pt') (ud_tfp pt') (ud_um pt') -∗
+    (* THE WHOLE ADDRESS SPACE, back in the USER view -- not just the
+       translation invariant.  The pages come with it: they are the same
+       resource [proc_pt_own] holds page-indexed while the kernel runs
+       ([ProcPtOwn.user_pt_inv_close] is the conversion), and if this post
+       handed back only [utlb_inv_pt] while the residue below still carried
+       [proc_pt], the two together would claim the tree and the pages twice
+       over -- the vacuity this whole boundary was restated to avoid. *)
+    user_pt_inv pt' -∗
     pc_is (ret_pc uepc) -∗
     gpr_file mf -∗
-    (* the leftover: usertrap's OWN kernel-internal bundle, RESEALED with
+    (* the leftover: usertrap's OWN kernel-internal BARE bundle (no address
+       space -- that is the conjunct above), RESEALED with
        userret's own restored trapframe words folded back in (the proof's
        tail does this fold once, right before userret's own return) -- at
        the SAME [ksp] uservec loaded and handed in.  No raw [tf_pa] cells
@@ -162,7 +202,11 @@ Global Typeclasses Opaque uservec_post.
    opaquely through [URes], never opened. *)
 Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (URes : uptd -> mword 64 -> iProp Σ)
+    (* A FAMILY, not one predicate: uservec calls usertrap, usertrap PARKS
+       (SpecUsertrap.v's own [wp_next true pj] crossing), so everything
+       after that call -- the residue included -- is a resource AT WHATEVER
+       HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
+    (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
     (j : nat) (sscr0 : mword 64) (vksp : mword 64) :=
   (* stvec points at the trampoline base *)
@@ -181,6 +225,28 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
      zero_reg] via [j < NPROC] -- see UsertrapRes.v's note that usertrap's
      OWN internal walk is not tied to it otherwise *)
   (j < NPROC)%nat ->
+  (* THE DESCRIPTOR IS RENORMALISED.  [user_pt_inv] owns the user pages at
+     the descriptor's [ud_data] field; the kernel tier owns the same pages
+     page-indexed, i.e. at the DERIVED footprint [ProcPtOwn.ud_pas], and
+     [proc_pt] says nothing about [ud_data] at all ([proc_pt_data_irrel]).
+     The satp switch converts between the two views, so it needs the two
+     footprints to be the same set.  This is not a restriction on which
+     tables can trap: [uservec_post] hands the descriptor back already
+     renormalised, so the loop is closed under it, and a first round can
+     normalise for free ([ProcPtOwn.ud_norm], [user_pt_inv]'s only reader
+     of the field). *)
+  ud_data pt = ud_pas pt ->
+  (* THE TABLE IS A KERNEL-TIER WELL-FORMED ONE.  [user_pt_inv] records only
+     two of [proc_pt_wf]'s five conjuncts ([upt_map_wf] inside
+     [utlb_inv_pt], [upt_acc_wf] beside it); the other three -- every user
+     page is a kalloc page, distinct vpns map distinct pages, and the
+     trapframe page is a kalloc page -- are facts the user-execution tier
+     never needs and so never carries.  The satp switch needs them, because
+     what it rebuilds is [proc_pt], and [proc_pt] is where a kernel that
+     will later free those pages reads them.  Like the renormalisation
+     above this is loop-closed: [uservec_post] hands it back for [pt'],
+     read straight out of the residue's own [proc_pt]. *)
+  proc_pt_wf pt ->
   (* THE MSTATUS GAP, stated as a bare, undischarged premise -- see the
      header. *)
   (forall ms_v : mword 64, trap_mstatus_ok ms_v ->
@@ -217,10 +283,20 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
      unrelated to [Rut] (which stays fully abstract: uservec's own proof
      never opens it, exactly like [mie]/[mideleg]/[menvcfg] ride through
      [user_cfg] untouched). *)
-  URes pt vksp -∗
-  (* the continuation: userret's own exit shape, plus the leftover
-     [usertrap_res] -- see the header. *)
-  uservec_post URes C pt vksp -∗
+  URes CID pt vksp -∗
+  (* THE CONTINUATION, ACROSS THE CROSSING.  userret's own exit shape plus
+     the leftover bare residue -- but at whatever hart usertrap resumed on,
+     not the one uservec entered at.  Everything in [uservec_post] is
+     hart-indexed (every [↦ᵣ] cell, the [satp]/[tlb] inside [user_pt_inv],
+     the residue), so a continuation stated at the entry hart alone would
+     be unusable at the point the proof actually needs it -- and would be
+     silently so, since the two print identically.  Same [wp_next true
+     (proc_addr j)] wrapper as [wp_usertrap_body]'s post, for the same
+     reason and with the same escape: at a REAL proc ([j < NPROC], hence
+     [proc_addr j <> zero_reg]) the pinning condition is vacuous, so the
+     caller owes the post at every hart. *)
+  wp_next true (proc_addr j) (fun CID' : CpuId =>
+    uservec_post (CID := CID') (URes CID') C pt vksp) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.
@@ -232,12 +308,19 @@ Module Type USERVEC.
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64),
-      (* THE PARKED RESIDUE, not [usertrap_res] itself: the latter owns
-         [satp] (its [strans_inv] sits in the KPT arm), and this spec's own
-         [user_trap_frame] premise owns [satp] too, at the USER root -- so
-         taking the complete form here would make the precondition
-         unsatisfiable and this whole lemma vacuous.  uservec's exit switch
-         produces the [tlb_res_pt] that completes it
-         ([usertrap_res_tlb_close]) just before it calls usertrap. *)
-      wp_uservec_pt_body usertrap_res_parked C pt Rut kroot j sscr0 vksp.
+      (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
+         [usertrap_res] and this spec's own [user_trap_frame] premise claim
+         THE SAME FOUR RESOURCES -- satp/tlb, the user page-table tree, the
+         user data pages, and (in the first draft of this file) the
+         trapframe page -- so taking either of the fuller forms here makes
+         the precondition unsatisfiable and this whole lemma vacuous.  The
+         bare form owns none of the address space; uservec's exit switch
+         produces both missing pieces at once (it converts the user table
+         back to a [pt_frame] and writes the kernel root into satp), which
+         [usertrap_res_pt_close] then [usertrap_res_tlb_close] fold back in
+         just before the call into usertrap.  userret's entry switch runs
+         the same two moves in reverse.  See
+         claude-notes/projects/uservec.md. *)
+      wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
+        C pt Rut kroot j sscr0 vksp.
 End USERVEC.

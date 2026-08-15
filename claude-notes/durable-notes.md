@@ -395,6 +395,16 @@ Hart-FREE, despite appearances: `stack_own` (physical stack memory),
 Annotating a hart-free term fails loudly — *"Wrong argument name CID (possible
 names: Σ riscvGS0)"* — so read the names before you annotate.
 
+**THE SAME ERROR ALSO MEANS "you are inside the section that fixes it".** A
+`Definition foo := M.foo.` written inside a `Section` with
+`Context `{CID : CpuId}` has *no* `CID` implicit yet — section variables are
+discharged only at `End`, so within the section `foo` simply mentions the
+section's hart. A statement in that section that needs the FAMILY
+(`fun h : CpuId => foo (CID := h)`, the shape `wp_usertrap_body`'s `R` and
+`wp_uservec_pt_body`'s `URes` take) must name the ORIGINAL — `M.foo (CID := h)`
+— whose module-type binder is still there. The two are convertible, so a
+`<: MODULE_TYPE` check phrased on the alias still accepts the qualified form.
+
 **`WP e` IS HART-FREE BUT `WP Loop` IS NOT.** `riscv_irisGS` takes no `CpuId`,
 so the WP FORMER is hart-free — but the EXPRESSION names the hart
 (`Notation Loop := (LoopE gen_id cpu_id)`, RiscvLang.v). So a statement that
@@ -598,6 +608,47 @@ would otherwise repeat.
 defences — write a one-line `Lemma foo_refl : P m m` and check it still
 applies where you expect, and grep for a caller that can supply the premise
 BEFORE building on top of it.
+
+### The RESOURCE form of the same trap: two owners of one address space
+
+The register version above is about a pure premise.  The resource version is
+worse, because the two claims are spelled in different vocabularies and look
+unrelated on the page.  It cost a session at the uservec boundary
+(`claude-notes/projects/uservec.md`): `wp_uservec_pt` took the kernel-side
+residue `usertrap_res pt vksp` BESIDE the user-mode frame
+`user_trap_frame C pt Rut`, and those two share **the entire user address
+space** — four separate overlaps, none of them syntactically visible:
+
+| resource | kernel-side spelling | user-side spelling |
+|---|---|---|
+| satp / tlb | `sie_cap` → `strans_inv` → KPT arm → `KptShare.tlb_res_pt` | `UptTree.utlb_inv_pt` |
+| page-table tree | `proc_priv` → `proc_pt_at` → `proc_pt` → `pt_frame` → `ptree_own 2 (DfracOwn 1)` | `utlb_inv_pt` → `ptree_own 2 (DfracOwn 1)` |
+| data pages | `proc_pt` → `proc_pt_own` = `upt_pages_own` | `user_pt_inv` → `udata_own` |
+
+The 44-instruction walk went through, the hart crossing went through, and the
+whole thing looked three plumbing bugs from done.  It was vacuous.
+
+**The diagnostic is one scratch lemma, and it takes minutes.** Pick the
+resource you suspect and try to prove `False` from the two premises:
+
+```coq
+Lemma satp_double_owned (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  strans_inv -∗ strans_bit strans_bit_kpt -∗ utlb_inv_pt uroot tfp um -∗ False.
+```
+
+If it compiles, the spec above it is dead.  **Do this whenever a new spec
+takes two bundles that were written by different tiers** — especially when one
+of them is a `_res`/`_inv` whose internals you have not read.  A bundle is a
+claim about a set you have to go and read, exactly like the register case.
+
+**And the fix is never per-resource accessors.**  Adding `_tf_open`, then
+`_tlb_open`/`_tlb_close`, then one for the tree, then one for the pages, is
+rediscovering the table one `False` at a time.  The fix is ONE split, at the
+boundary between what the two tiers genuinely own: name the reduced residue
+(`ut_res_bare` = everything the kernel still owns while user code runs) and
+prove `bare ∗ <address space> ⊣⊢ full` as an exact open/close pair.  Then the
+view conversion is a separate, already-existing lemma
+(`ProcPtOwn.proc_pt_own_udata`, the pt2 switch window) applied once.
 
 ## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
 

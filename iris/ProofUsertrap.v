@@ -93,6 +93,8 @@ Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
+Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
+Require Import ProcPtOwn.  (* [proc_pt] / [ud_norm] -- the bare residue drops the address space *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail ProofUsertrapArms ProofUsertrapSys.
 From Kernel Require KernelInstrs.
@@ -1144,16 +1146,47 @@ Lemma usertrap_res_tlb_open
   ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
 Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp). Qed.
 
+Definition usertrap_res_bare
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
+  ut_res_bare SY.syscall_env.
+
+Lemma usertrap_res_pt_close
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
+Proof. exact (ut_res_pt_close SY.syscall_env pt ksp). Qed.
+
+Lemma usertrap_res_pt_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
+Proof. exact (ut_res_pt_open SY.syscall_env pt ksp). Qed.
+
+Lemma usertrap_res_bare_norm
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
+Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp). Qed.
+
 Lemma usertrap_res_tf_open
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
   (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
-  usertrap_res_parked pt ksp -∗
+  usertrap_res_bare pt ksp -∗
   ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_parked pt ksp).
-Proof. exact (ut_res_tf_open SY.syscall_env pt ksp kroot). Qed.
+    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,

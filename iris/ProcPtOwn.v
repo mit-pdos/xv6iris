@@ -421,6 +421,29 @@ Qed.
 (* the descriptor-level footprint (the field [uptd] no longer needs) *)
 Definition ud_pas (P : uptd) : gset Arch.pa := um_pas P.(ud_um).
 
+(* THE DESCRIPTOR WITH ITS FOOTPRINT FIELD RENORMALISED to the derived one.
+   [proc_pt] never reads [ud_data] ([proc_pt_data_irrel] below), so the
+   kernel tier cannot say what it is; [UserPtTree.user_pt_inv] does read it,
+   and needs [udata_cov] beside it.  The satp-switch bridge therefore hands
+   the user tier THIS descriptor, whose coverage side condition is free
+   ([ud_pas_cov]) -- see [user_pt_inv_close].  Idempotent, and a no-op on
+   the three real fields, which is what makes it invisible to everything
+   kernel-side. *)
+Definition ud_norm (P : uptd) : uptd :=
+  UPTD P.(ud_root) P.(ud_tfp) P.(ud_um) (ud_pas P).
+
+Lemma ud_norm_pas (P : uptd) : ud_data (ud_norm P) = ud_pas (ud_norm P).
+Proof. reflexivity. Qed.
+
+Lemma ud_norm_idem (P : uptd) : ud_norm (ud_norm P) = ud_norm P.
+Proof. reflexivity. Qed.
+
+Lemma ud_norm_id (P : uptd) : ud_data P = ud_pas P -> ud_norm P = P.
+Proof.
+  destruct P as [r t u d]. unfold ud_norm, ud_pas. cbn [ud_root ud_tfp ud_um ud_data].
+  intros <-. reflexivity.
+Qed.
+
 (* a table with no user memory -- what proc_pagetable() delivers -- has an
    empty footprint *)
 Lemma not_elem_of_um_ppns_empty (ppn : mword 44) :
@@ -3121,6 +3144,24 @@ Section ProcPt.
      p_trapframe pa ↦₈ page_base P.(ud_tfp) ∗
      proc_pt P)%I.
 
+  (* JUST THE TWO CELLS.  They name the table but are not part of it: they
+     are ordinary [struct proc] words, owned by the kernel across user
+     execution, whereas [proc_pt] is the address space itself and must be
+     handed to the user tier at the satp switch (see [user_pt_inv_close]).
+     Splitting here is what lets a residue keep the cells and give up the
+     table. *)
+  Definition proc_pt_cells (pa : mword 64) (P : uptd) : iProp Σ :=
+    (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
+     p_trapframe pa ↦₈ page_base P.(ud_tfp))%I.
+
+  Lemma proc_pt_at_split (pa : mword 64) (P : uptd) :
+    proc_pt_at pa P ⊣⊢ proc_pt_cells pa P ∗ proc_pt P.
+  Proof.
+    rewrite /proc_pt_at /proc_pt_cells. iSplit.
+    - iIntros "(H1 & H2 & H3)". iFrame "H1 H2 H3".
+    - iIntros "((H1 & H2) & H3)". iFrame "H1 H2 H3".
+  Qed.
+
   (* [iFrame] must NOT search inside these.  [proc_pt] contains [pt_frame]
      and a big-op over the page footprint; letting the Frame instances unfold
      it turns a one-line projection into minutes and gigabytes (measured: a
@@ -3390,6 +3431,70 @@ Section ProcPt.
   Proof.
     intros Hr Ht Hu. rewrite /proc_pt /proc_pt_own /proc_pt_wf.
     rewrite Hr Ht Hu. reflexivity.
+  Qed.
+
+  Lemma proc_pt_norm (P : uptd) : proc_pt P ⊣⊢ proc_pt (ud_norm P).
+  Proof. apply proc_pt_data_irrel; reflexivity. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SATP-SWITCH DOVETAIL.  [proc_pt] (parked, kernel view) and       *)
+  (* [UserPtTree.user_pt_inv] (installed, user view) are THE SAME         *)
+  (* RESOURCE.  They differ in exactly one conjunct -- [pt_frame] vs      *)
+  (* [utlb_inv_pt], and the switch window (TransPt.v) is what converts    *)
+  (* that one -- so the bridge here is the REST: the two cell-free        *)
+  (* halves, plus the footprint renormalisation the user tier's           *)
+  (* [ud_data] field needs.                                              *)
+  (*                                                                      *)
+  (* WHY THIS EXISTS AT ALL: a spec that takes the kernel-side residue    *)
+  (* (which contains [proc_pt], via [proc_priv]) BESIDE the user-side     *)
+  (* frame (which contains [user_pt_inv]) is claiming the user address    *)
+  (* space TWICE -- [ptree_own 2 (DfracOwn 1)] on both sides, and the     *)
+  (* pages on both sides -- so its precondition is unsatisfiable and it   *)
+  (* is vacuous.  See claude-notes/projects/uservec.md.                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the parked bundle, split at the conjunct the switch converts *)
+  Lemma proc_pt_split (P : uptd) :
+    proc_pt P ⊣⊢
+    (⌜proc_pt_wf P⌝ ∗ pt_frame (upt_tree_spec P.(ud_root) P.(ud_tfp) P.(ud_um)))
+      ∗ proc_pt_own P.
+  Proof.
+    rewrite /proc_pt. iSplit.
+    - iIntros "(%Hwf & Htr & Hpg)". iFrame "Hpg". iSplitR; [done|]. iExact "Htr".
+    - iIntros "[(%Hwf & Htr) Hpg]". iSplitR; [done|]. iFrame "Htr Hpg".
+  Qed.
+
+  (* USER VIEW -> KERNEL VIEW.  The pages come back page-indexed; the tree
+     stays with the caller as [utlb_inv_pt] for the switch to consume.
+     The premise is the renormalisation: [user_pt_inv] owns its bytes at
+     the descriptor's [ud_data] field, and only at the DERIVED footprint
+     are they the pages [proc_pt_own] names. *)
+  Lemma user_pt_inv_open (P : uptd) :
+    ud_data P = ud_pas P ->
+    user_pt_inv P -∗
+    utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗ proc_pt_own P.
+  Proof.
+    intros Hnorm. rewrite /user_pt_inv proc_pt_own_udata Hnorm.
+    iIntros "(Htlb & Hdat & _ & _)". iFrame "Htlb Hdat".
+  Qed.
+
+  (* KERNEL VIEW -> USER VIEW.  The descriptor comes out RENORMALISED --
+     that is what makes [udata_cov] free ([ud_pas_cov]); [upt_acc_wf] is
+     already a conjunct of [proc_pt_wf], so the user tier's two pure side
+     conditions are both discharged here rather than demanded of a caller
+     (see SpecUsertrap.v's note on why usertrap cannot state them). *)
+  Lemma user_pt_inv_close (P : uptd) :
+    proc_pt_wf P ->
+    utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) -∗
+    proc_pt_own P -∗
+    user_pt_inv (ud_norm P).
+  Proof.
+    intros (_ & Hacc & _ & _ & _).
+    rewrite /user_pt_inv.
+    unfold ud_norm; cbn [ud_root ud_tfp ud_um ud_data].
+    rewrite proc_pt_own_udata.
+    iIntros "Htlb Hdat". iFrame "Htlb Hdat".
+    iPureIntro. split; [exact (ud_pas_cov P) | exact Hacc].
   Qed.
 
   (* ------------------------------------------------------------------ *)
