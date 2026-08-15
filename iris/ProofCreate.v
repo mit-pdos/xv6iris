@@ -5099,10 +5099,15 @@ Section ProofCreateMain.
              (* the PARENT'S RE-PARK: the [ilink] the mint made goes into
                 the record the append just wrote. *)
              iEval (rewrite -Hcl16) in "Hilink".
+             (* optimization.md: an inline [ltac:] in ARGUMENT POSITION is
+                re-elaborated against the call's still-open evars, priced by
+                the call site's depth -- hoist to a named fact, closed with
+                the one hypothesis ([Ht16], this arm's [tot = 16]) it needs. *)
+             assert (Htotge2 : (2 <= tot)%nat) by (clear -Ht16; lia).
              iDestruct (dir_link_at_dirlink (bv_unsigned dind) dn' data data'
                           (cr_low16 cinum) (bname 14 nf)
                           (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
-                          tot ltac:(lia) Hrng with "Hilink") as "Hk0".
+                          tot Htotge2 Hrng with "Hilink") as "Hk0".
              iDestruct (dir_links_dirlink (bv_unsigned dind) dn dn' data data'
                           (cr_low16 cinum) (bname 14 nf)
                           (dir_nrec (bv_unsigned (di_size dn)))
@@ -5316,7 +5321,15 @@ Section ProofCreateMain.
                              (cr_sub_union_sing _ _))
                           (cr_sub2 _ _ _ Hsb' Hsb2)).
                - pose proof (proj2 Hn2) as HB1. pose proof (proj2 Hn') as HB2.
-                 lia.
+                 (* optimization.md: [HB1]/[HB2] alone are not the whole
+                    chain -- the goal [n2 <= u] needs the bridge from
+                    [n' <= S q2] (HB2) back to [u] as well, which is
+                    [Hn1u : S (S q2) <= u], threaded from the walk's own
+                    budget call far above (found by a temporary
+                    [idtac]-dump of the goal + full context at this site,
+                    since the missing fact wasn't reachable by grepping
+                    sibling call sites the way [dl_need]'s was). *)
+                 clear -HB1 HB2 Hn1u. lia.
                - intros _.
                  exact (cr_fail_ip_left n' n2 wf2
                           (cr_alloc_ip4 (S q2) n' _ _ _ _ _ ltac:(lia) Hspend)
@@ -5422,7 +5435,8 @@ Section ProofCreateMain.
              { rewrite Hnib. exact Hcdok. }
              (* [tot < 16] AND dirlink's atomicity IS [tot = 0]: the shape
                 the fail body's re-park needs. *)
-             { destruct Hatom as [Hz | H16]; [exact Hz | exfalso; lia]. }
+             { destruct Hatom as [Hz | H16];
+                 [exact Hz | exfalso; clear -H16 Htlt; lia]. }
              { exact Hwf'. }
              { exact Hholes'. }
              { exact Haddr'. }
@@ -5439,7 +5453,11 @@ Section ProofCreateMain.
                               (cr_sub_union_sing _ _))) Hsb'). }
              { exact (Hsb' _ (cr_in_union_sing _ _)). }
              { split; [exact Hipn'' |].
-               pose proof (proj2 Hn') as HB2. lia. }
+               (* optimization.md: same bridge as the sibling bullet in
+                  [cr_found_half] above -- [HB2 : n' <= S q2] needs
+                  [Hn1u : S (S q2) <= u] to reach the goal [n' <= u]. *)
+               pose proof (proj2 Hn') as HB2.
+               clear -HB2 Hn1u. lia. }
              (* the LEFT disjunct, and this entry has it unconditionally:
                 eight into the dirlink and [wi16_spend <= 4] out. *)
              { left.
@@ -7382,9 +7400,12 @@ Section ProofCreateMain.
          once and needs nothing. *)
       iAssert (dir_link_at (bv_unsigned cinum) dc1 dat1 0)%I as "Hk0c".
       { rewrite -Hcl16.
+        (* optimization.md: same inline-[ltac:]-in-argument-position hoist
+           as above, one hypothesis ([Ht161], this arm's [tot1 = 16]). *)
+        assert (Htot1ge2 : (2 <= tot1)%nat) by (clear -Ht161; lia).
         iApply (dir_link_at_dirlink_self (bv_unsigned (cr_low16 cinum)) dc1
                   datc dat1 (cr_low16 cinum) (bname 14 cr_dot_f) 0%nat tot1
-                  ltac:(lia) eq_refl Hrng1). }
+                  Htot1ge2 eq_refl Hrng1). }
       (* the body hands the child's ledger at [dnc]; [cr_setf] moves only
          [nlink], and at a FRESH child the big-op is empty either way. *)
       iAssert (dir_links (bv_unsigned cinum)
@@ -7427,7 +7448,10 @@ Section ProofCreateMain.
                                   (bname 14 cr_dot_f)) !!! jj).
       { intros jj Hjj. rewrite (Hrng1 (16 * 0 + jj)%nat).
         rewrite decide_True; [| lia].
-        replace (16 * 0 + jj - 16 * 0)%nat with jj by lia. reflexivity. }
+        (* optimization.md: [replace ... by lia] pays the whole ambient
+           context in its side proof; the identity needs [jj] alone. *)
+        replace (16 * 0 + jj - 16 * 0)%nat with jj by (clear -jj; lia).
+        reflexivity. }
       destruct (cr_dot_record dat1 (cr_low16 cinum) Hwin1)
         as [Hd1inum Hd1name].
       assert (Hd1live : dir_inum dat1 0 <> bv_0 16).

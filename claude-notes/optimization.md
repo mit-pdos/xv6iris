@@ -35,6 +35,14 @@ so the last line in the log is the stalling sentence. If the slow line is a
   list every sentence ≥ 5 s across the tree and cross off the honest `Qed`s;
   what remains is the bug list. These sentences are exactly the ones a reader
   skips.
+- **When a `clear -H..` needs a hypothesis grepping sibling call sites won't
+  find, dump the goal and context instead of guessing.** A temporary
+  `match goal with |- ?G => idtac G end. repeat match goal with H : ?T |- _
+  => idtac H ":" T; fail end.` spliced in before the tactic (removed
+  afterward) prints the goal and every hypothesis to stdout on a plain
+  `coqc` run — no `-time`/`-async-proofs off`, no interactive `coqtop`. The
+  `repeat … fail` is what makes `match goal` enumerate every hypothesis
+  instead of stopping at the first.
 
 ## RULE ONE: the cost is `|Δ|`, the Iris context
 
@@ -355,20 +363,18 @@ worth 20× on individual files.
   restate it in the `rget` spelling via `rget_ne` (HartTp.v) before the `iApply`
   and the site goes syntactic. Audit: `-time` before and after; the regressing
   sites are the ones that got slower.
-  **Second confirmed instance, at a different scale: `ProofCreate.v`** (8500
-  lines, 101 `set`-built register-chain sites). Both fixes together, isolated
-  `coqc -time -async-proofs off`: 226.96 s → 204.69 s wall (~10%), RSS 4.09 GB
-  → 3.70 GB. One `iApply` (a `dl_need` bound closed by an inline `ltac:(…;
-  lia)`, three `dirlink`s deep) regressed 1.36 s → 8.26 s the same way — the
-  kind of site the rule above warns about. Hoisting it to a named `assert`
-  with an explicit `clear -H..` fixed it (190.38 s isolated, past both
-  prior fixes); the trap in doing so is that `clear -H..`'s keep-list must
-  include every hypothesis the final `lia` draws on, not just the ones the
-  `rewrite`/`pose proof` chain names textually — the first attempt dropped
-  exactly that one (a floor fact threaded in from three `dirlink`s up,
-  consumed by `lia` alone) and failed with "Cannot find witness". Find the
-  missing hypothesis by grepping for the same name at the OTHER call sites
-  that need the same derived bound.
+  **Sealing can regress a DIFFERENT, distant site.** `Strategy opaque` deepens
+  the unifier's walk at every `rget`-typed premise in the file, and an inline
+  general-purpose closer (the "Inline `ltac:`" rule below) is priced by
+  exactly that depth — measured, a `dl_need` bound three `dirlink`s deep
+  regressed 1.36 s → 8.26 s from a `Strategy opaque` elsewhere in the same
+  file with no textual connection to it. Audit `-time` across the WHOLE file
+  after sealing, not just the sites the seal touches directly; fix a
+  regressed site with the same inline-`ltac:` hoist as any other (`assert (H
+  : …) by (clear -H..; lia)`), whose keep-list must include every hypothesis
+  the final `lia` draws on — not just the ones the tactic script names
+  textually. Grep sibling call sites for the same derived bound, or dump the
+  goal and context at the failing site (above) if none exists.
 - **`reg_lookup` (RegFile.v) by default** — one `vm_compute` over the concrete-key
   if-chain. Where the target value is SYMBOLIC, `vm_compute` would try to reduce
   it and hang; use the lemma-based `peel_reg`, which peels via `upd_eq`/`upd_ne`
