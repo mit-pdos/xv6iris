@@ -171,8 +171,6 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -184,7 +182,6 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcInv.
 Require Import FileInvDefs.
-Require Import SpecIput.
 (* [SpecNamex] for [ROOTDEV] -- a param.h constant that happens to live in a
    Spec file.  It should be hoisted the way [tf_epc_idx] was (see ProcGeom.v):
    a Spec should not have to require another function's Spec to name a

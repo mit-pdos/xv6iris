@@ -52,7 +52,7 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
-Require Import PtTree KptTree TrampPt.
+Require Import KptTree TrampPt.
 Require Import KallocInv.
 Require Import PanicStub.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.

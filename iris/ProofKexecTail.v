@@ -91,8 +91,6 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -109,7 +107,7 @@ Require Import DiskInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
 Require Import SpecMyproc.

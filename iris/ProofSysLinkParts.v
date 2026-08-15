@@ -25,29 +25,23 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import BvShift.
 Require Import StackOwn StackBytes.
-Require Import CalleeSaved KernelText KernelDataInv.
-Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import CalleeSaved KernelText.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import WpSmodeHalf.
 Require Import IntrDefs.
-Require Import CpuOwn.
 Require Import ByteBuf.
 Require Import ProcGeom.
-Require Import PanicStub.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
-Require Import DirLinks.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.

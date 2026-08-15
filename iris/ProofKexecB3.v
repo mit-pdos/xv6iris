@@ -63,7 +63,6 @@ Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
-Require Import StackBytes.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import InstrBytes.
@@ -73,7 +72,6 @@ Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import SleepLock.
 Require Import WpLock.
 Require Import PanicStub.
 Require Import FdSlots.
@@ -82,8 +80,6 @@ Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
-Require Import ByteBuf.
-Require Import VcGen.
 Require Import W32Arith.
 Require Import ElfEnc.
 Require Import PageGeom.
@@ -93,8 +89,6 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -103,18 +97,12 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
-Require Import DirView.
-Require Import DirLinks.
-Require Import InodeLock.
 Require Import SchedCtx.
 Require Import DiskInv.
-Require Import PtTree.
-Require Import PtBuild.
-Require Import ProcPt.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
 Require Import SpecMyproc.
@@ -126,16 +114,13 @@ Require Import SpecIunlockput.
 Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcFreepagetable.
-Require Import SpecProcPagetable.
 Require Import SpecWalkaddr.
 Require Import SpecFlags2perm.
 Require Import SpecUvmalloc.
-Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 Require Import SpecKexecB2.
 Require Import SpecKexecB3.
-Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

@@ -35,8 +35,8 @@ Require Import RegFile.
 Require Import WpGpr WpGprCsrwB.
 Require Import WpSmodePtCtl.
 Require Import SmodePte PtTree.
-Require Import KMap KptExecMap.
-Require Import KptTree UptTree.
+Require Import KptExecMap.
+Require Import UptTree.
 Require Import TrampStepPt TransPt KptShare.
 Require Import UserretDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.

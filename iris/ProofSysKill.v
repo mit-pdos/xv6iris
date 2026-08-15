@@ -34,7 +34,6 @@ Require Import ProcGeom.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import SpecArgint SpecKkill.
-Require Import ProofKforkParts.
 Require Import SpecSysKill.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

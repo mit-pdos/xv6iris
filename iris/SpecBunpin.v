@@ -31,7 +31,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto.

@@ -66,7 +66,7 @@ Require Import HartTp WpNext CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
-Require Import PtTree KptTree.
+Require Import KptTree.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import CodePrepareReturn.

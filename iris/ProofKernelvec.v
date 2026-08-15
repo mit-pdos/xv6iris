@@ -50,7 +50,7 @@ Require Import WpGpr.
 Require Import RegFile.
 Require Import WpMmodeLeafBase StackOwn.
 Require Import SmodeCore KernelText CodeKernelvec.
-Require Import HartTp CalleeSaved CpuOwn WpSconfSret.
+Require Import HartTp CalleeSaved WpSconfSret.
 Require Import WpLock FdSlots IrefSlots DiskPtsto WpUart SpecDevintr.
 Require Import VcGen VcGenS.
 Require Import KptShare.

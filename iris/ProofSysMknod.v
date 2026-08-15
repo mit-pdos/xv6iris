@@ -94,7 +94,7 @@ Require Import SmodeCore.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import StackOwn StackBytes.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import CalleeSaved KernelText.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
 Require Import WpSmodeIntr WpSmodeHalf.
@@ -111,32 +111,21 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import DinodeEnc.
-Require Import InodeInv.
-Require Import InodeLock.
-Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
-Require Import KvmSpec.
+Require Import PanicStub.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import ProofKforkParts.
-Require Import SpecPrintk.
 Require Import SpecArgstr.
-Require Import SpecFetchstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
-Require Import SpecIput.
 Require Import SpecIunlockput.
 Require Import SpecArgint.
-Require Import SpecDirlookup.
-Require Import SpecDirlink.
 Require Import SpecCreate.
 Require Import CodeSysMknod.
 Require Import SpecSysMknod.

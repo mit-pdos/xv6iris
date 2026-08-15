@@ -52,7 +52,7 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import WpLock.
 Require Import ProcInv.
-Require Import PtTree KptTree TrampPt.
+Require Import KptTree TrampPt.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.

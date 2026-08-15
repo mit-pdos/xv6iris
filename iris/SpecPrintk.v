@@ -93,7 +93,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Export PrintkArgs.
 From Kernel Require KernelSyms.
 

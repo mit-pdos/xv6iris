@@ -69,7 +69,6 @@ Require Import IntrDefs HartTp WpNext WpSconfVc.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Import ByteCursor PrintintArith.
 Require Import CodePrintint.
 Require Import SpecConsputc SpecPrintint.

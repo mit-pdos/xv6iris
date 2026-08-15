@@ -86,13 +86,12 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import MinstretInv InstrBytes.
 Require Import WpGpr.
 Require Import KernelText.
 Require Import SmodeCore.
-Require Import PtTree.
-Require Import TrampPt KptTree UptTree TransPt KptShare UserretDefs.
+Require Import TrampPt UptTree KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import IntrDefs.
 Require Import MstatusBits.
@@ -116,7 +115,6 @@ Require Import FsCrash.
 Require Import KallocInv.
 Require Import IrefSlots InodeRegion.
 Require Import SpecUsertrap.
-Require Import SpecUserret.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Local Open Scope Z_scope.

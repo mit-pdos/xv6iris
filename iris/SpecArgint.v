@@ -44,7 +44,7 @@ Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn PageGeom.
+Require Import PageGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

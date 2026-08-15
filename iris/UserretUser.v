@@ -44,7 +44,7 @@ Require Import WpGpr.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import PtTree.
-Require Import KptTree UptTree UserretDefs.
+Require Import UptTree UserretDefs.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import KptShare.

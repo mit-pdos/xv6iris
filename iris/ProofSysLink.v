@@ -62,32 +62,24 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KernelRvcDecode.
-Require Import VcGen.
-Require Import StackOwn StackBytes.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import StackOwn.
+Require Import CalleeSaved.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import ByteBuf.
 Require Import FdSlots.
-Require Import ProcGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
-Require Import SpecPrintk.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import PathElems.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
@@ -96,20 +88,16 @@ Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.
 Require Import InodeRegion.
-Require Import IregLinkNz.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
-Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecArgstr.
-Require Import SpecFetchstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
 Require Import SpecIlock.
@@ -118,7 +106,6 @@ Require Import SpecIupdate.
 Require Import SpecIput.
 Require Import SpecIunlockput.
 Require Import SpecWritei.
-Require Import SpecBmap.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import SpecNamex.

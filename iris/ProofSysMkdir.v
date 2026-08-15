@@ -81,16 +81,15 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import StackOwn StackBytes.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import CalleeSaved KernelText.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ByteBuf.
@@ -104,30 +103,19 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import DinodeEnc.
-Require Import InodeInv.
-Require Import InodeLock.
-Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import KallocInv.
-Require Import KvmSpec.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
+Require Import PanicStub.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import SpecPrintk.
 Require Import SpecArgstr.
-Require Import SpecFetchstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
-Require Import SpecIput.
 Require Import SpecIunlockput.
 Require Import SpecDirlookup.
-Require Import SpecDirlink.
 Require Import SpecCreate.
 Require Import CodeSysMkdir.
 Require Import SpecSysMkdir.

@@ -43,7 +43,7 @@ Require Import DiskPtsto WpUart.
 Require Import IntrDefs HartTp WpNext WpSconfVc.
 Require Import PrintintArith StackBytes.
 Require Import CodePrintk.
-Require Import WpLock CpuOwn UartTxInv PanicStub.
+Require Import WpLock CpuOwn UartTxInv.
 Require Import SpecAcquire SpecRelease.
 Require Import PrintkFmt SpecConsputc SpecPrintint SpecPrintk.
 From Kernel Require KernelInstrs KernelData.

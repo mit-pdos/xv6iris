@@ -35,15 +35,17 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile CalleeSaved KernelText.
-Require Import WpNext WpLock CpuOwn PanicStub.
-Require Import ProcGeom FdSlots SchedCtx.
+Require Import RegFile.
+Require Import WpLock.
+Require Import FdSlots.
+Require Import IcacheRef.
+Require Import IrefSlots.
+Require Import ProcAvail.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv BioInv.
-Require Import FsBlocks LogInv KernelDataInv.
-Require Import InodeInv InodeLock InodeRegion.
-Require Import IrefSlots IcacheRef IcacheInv IcacheEscrow.
-Require Import SpecIalloc SpecIlock SpecDirlink SpecCreate.
+Require Import DiskPtsto BioInv.
+Require Import FsBlocks LogInv.
+Require Import InodeRegion.
+Require Import IrefSlots IcacheRef IcacheEscrow.
 Require Import SpecCreateFreshTy.
 Require Import ProcAvail.
 

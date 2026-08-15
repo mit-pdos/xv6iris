@@ -43,8 +43,8 @@ Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import ExecCommon WpDecode WpGpr WpGprCsrwB.
 Require Import SmodePte PtTree.
-Require Import KMap KptExecMap.
-Require Import KptTree UptTree.
+Require Import KptExecMap.
+Require Import UptTree.
 Require Import TrampStepPt TransPt KptShare.
 Require Import UserretDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d.

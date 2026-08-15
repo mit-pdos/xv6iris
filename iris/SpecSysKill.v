@@ -43,7 +43,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn PageGeom.
+Require Import PageGeom.
 Require Import SchedCtx.
 Require Import PanicStub.
 From Kernel Require KernelSyms.

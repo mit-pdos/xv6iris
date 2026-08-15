@@ -64,7 +64,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 
 

@@ -36,27 +36,20 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import SleepLock.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import IcacheEscrow.
 Require Import ByteBuf.
-Require Import VcGen.
 Require Import W32Arith.
-Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
@@ -64,29 +57,19 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import DirLinks.
-Require Import InodeLock.
 Require Import SchedCtx.
 Require Import DiskInv.
-Require Import PtTree.
 Require Import PtBuild.
 Require Import ProcPt.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
-Require Import FileInv.
-Require Import SpecIput.
+Require Import FileInvDefs.
 Require Import SpecKexec.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -94,10 +77,8 @@ Require Import SpecEndOp.
 Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
-Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcFreepagetable.
-Require Import SpecProcPagetable.
 Require Import SpecWalkaddr.
 Require Import SpecFlags2perm.
 Require Import SpecUvmalloc.
@@ -113,7 +94,6 @@ Require Import ProofKexecSeam.
    statements -- add a [(B3 : KEXECB3)] functor argument to [KexecCProof]
    the way ProofKexecB3.v itself takes [(B2 : KEXECB2)], never a
    [Require Import ProofKexecB3.]. *)
-Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -93,8 +93,6 @@ Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
-Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpLock.
@@ -149,7 +147,6 @@ Require Import SpecCreate.
    [Axiom] and [Print Assumptions] reports it only where the functor is
    instantiated -- exactly as it reports the other seven. *)
 Require Import SpecCreateFreshTy.
-Require Import CreateBudget.
 Require Import CodeCreate.
 Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
 From Kernel Require KernelSyms.

@@ -124,7 +124,6 @@ Require Import IcacheEscrow.
 Require Import SpecIalloc.
 Require Import SpecIlock.
 Require Import SpecDirlink.
-Require Import SpecCreate.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

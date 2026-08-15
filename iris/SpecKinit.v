@@ -16,7 +16,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import KernelText KernelDataInv.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KallocInv.
 Require Import IntrDefs WpNext.
 Require Import CpuOwn.

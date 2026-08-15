@@ -71,7 +71,6 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
 Require Import PrintkArgs.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.

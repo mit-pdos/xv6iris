@@ -72,7 +72,6 @@ Require Import RiscvPtsto.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
-Require Import DirentEnc.
 Require Import InodeInv.
 Require Import DirView.
 Require Import DirLinks.

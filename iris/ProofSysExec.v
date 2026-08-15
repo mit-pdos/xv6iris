@@ -77,7 +77,6 @@ Require Import InstrBytes.
 Require Import KernelText.
 Require Import KernelDataInv.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import LockRank.
@@ -95,11 +94,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import ByteBuf.
-Require Import PathElems.
-Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import InodeLock.
-Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -110,14 +105,10 @@ Require Import KvmSpec.
 Require Import PageGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import VcGen.
 Require Import W32Arith.
-Require Import SpecIput.
 Require Import SpecDirlink.
-Require Import SpecNamex.
 Require Import SpecArgaddr.
 Require Import SpecArgstr.
 (* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which

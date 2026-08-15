@@ -86,7 +86,6 @@ Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import InodeInv.
 Require Import DirView.
-Require Import PathElems.
 
 Local Open Scope Z_scope.
 

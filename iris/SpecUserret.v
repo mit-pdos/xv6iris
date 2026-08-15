@@ -41,7 +41,7 @@ Require Import WpGpr.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import PtTree.
-Require Import TrampPt KptTree UptTree TransPt KptShare UserretDefs.
+Require Import TrampPt UptTree KptShare UserretDefs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.

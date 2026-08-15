@@ -46,16 +46,13 @@ Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KernelRvcDecode.
-Require Import VcGen.
-Require Import StackOwn StackBytes.
-Require Import CalleeSaved KernelText KernelDataInv.
+Require Import StackOwn.
+Require Import CalleeSaved KernelText.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
@@ -66,7 +63,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import PathElems.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
@@ -78,23 +74,16 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
-Require Import KvmSpec.
-Require Import UserPtTree.
-Require Import ProcPtOwn.
+Require Import PanicStub.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import DirView.
-Require Import DirLinks.
 Require Import IregLinkNz.
 Require Import SpecEndOp.
 Require Import SpecIlock.
 Require Import SpecIupdate.
 Require Import SpecIput.
 Require Import SpecIunlockput.
-Require Import SpecDirlink.
-Require Import SpecNamex.
 Require Import CodeSysLink.
-Require Import SpecSysLink.
 Require Import ProofSysLinkParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.

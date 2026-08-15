@@ -51,18 +51,14 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
-Require Import HartTp.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
@@ -96,23 +92,13 @@ Require Import DirView.
 Require Import DirLinks.
 Require Import InodeLock.
 Require Import ProcInv.
-Require Import PtreeType.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
-Require Import SpecMyproc.
-Require Import SpecBeginOp.
-Require Import SpecEndOp.
-Require Import SpecIlock.
-Require Import SpecReadi.
-Require Import SpecIunlockput.
 Require Import SpecDirlink.
-Require Import SpecNamei.
-Require Import SpecProcFreepagetable.
-Require Import SpecWalkaddr.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.

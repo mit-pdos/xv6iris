@@ -56,7 +56,6 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
 Require Import SchedCtx.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.

@@ -47,7 +47,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
-Require Import Pt4kWalk CommonWalk PtTree KptTree KptPt TrampPt KMap.
+Require Import Pt4kWalk CommonWalk PtTree KptPt TrampPt KMap.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInvDefs.

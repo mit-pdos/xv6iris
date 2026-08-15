@@ -49,8 +49,6 @@ Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import DinodeEnc.
-Require Import DirentEnc.
-Require Import InodeInv.
 Require Import DirView.
 Require Import IcacheRef.
 Require Import DirLinks.

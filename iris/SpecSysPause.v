@@ -79,7 +79,7 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import SchedCtx.
-Require Import ProcPtOwn PageGeom.
+Require Import PageGeom.
 Require Import TicksInv.
 Require Import PanicStub.
 From Kernel Require KernelSyms.

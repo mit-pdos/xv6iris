@@ -55,11 +55,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
@@ -67,18 +65,15 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import ByteBuf.
 Require Import FsBlocks LogInv.
-Require Import DiskPtsto BioInv.
+Require Import DiskPtsto.
 Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import PanicStub.
 Require Import ProofDirlookupParts.
 Require Import ProofNamexParts.
 Require Import CodeNamex.

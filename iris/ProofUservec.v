@@ -38,7 +38,7 @@ Require Import WpIntrCore.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import ProcInv ProcGeom.
 Require Import ProcPtOwn.
-Require Import IntrDefs MstatusBits.
+Require Import WpNext.
 (* the classes [usertrap_res]'s own signature needs -- see SpecUservec.v's
    own note on the same trap (must Require directly, not just
    transitively, or unqualified names below auto-generalize as fresh,
