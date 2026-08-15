@@ -1,8 +1,6 @@
-(* SmodePte.v -- S-mode PMP grants, the checked 8-byte PTE read, TLB
-   lookup/consistency helpers, factored out of SmodeCore.v so the 4KB
-   page-walk layer (Pt4kWalk.v) can sit BELOW SmodeCore.  All lemmas are
-   verbatim moves; proofs here rely on the ssreflect rewrite (iris env),
-   matching their original home.  *)
+(* SmodePte.v -- the S-mode PMP configuration and grants, the checked 8-byte
+   PTE read, and TLB lookup/consistency helpers, factored out of SmodeCore.v
+   so the 4KB page-walk layer (Pt4kWalk.v) can sit BELOW SmodeCore. *)
 From Stdlib Require Import ZArith FunctionalExtensionality.
 From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -21,6 +19,39 @@ Import Defs.
 (* ===================================================================== *)
 (* 1. S-mode PMP: the TOR entry-0 grant (from SmodeCore).                 *)
 (* ===================================================================== *)
+
+Section SmodePmpConfig.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* The raw PMP cells together with the entry-0 facts needed by S-mode
+     instruction fetches and page-table walks.  [root_ppn] remains an index
+     for the translation-resource interfaces that package this predicate. *)
+  Definition pmp_config (root_ppn : mword 44) : iProp Σ :=
+    (∃ (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n),
+       pmpcfg_n ↦ᵣ pmpcfg0 ∗ pmpaddr_n ↦ᵣ pmpaddr00 ∗
+       ⌜ pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ⌝ ∗
+       ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
+       ⌜ (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ⌝)%I.
+
+  (* Re-seal [pmp_config] from the raw cells and ambient PMP facts. *)
+  Lemma pmp_config_intro (root_ppn : mword 44)
+      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n) :
+    pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
+    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
+    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
+    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
+    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pmp_config root_ppn.
+  Proof.
+    intros HA Hord HX HW HR Hcov. iIntros "Hc Ha".
+    iExists pmpcfg0, pmpaddr00. iFrame "Hc Ha". iPureIntro. tauto.
+  Qed.
+End SmodePmpConfig.
 
 Lemma exec_pmpMatchAddr_TOR_match (addr width : mword 64) (ent : mword 8)
     (pmpaddr prev : mword 64) s :
@@ -495,4 +526,3 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
   rewrite Htlb. rewrite Hvec. rewrite Hnm. apply exec_returnm.
 Qed.
-

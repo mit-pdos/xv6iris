@@ -564,26 +564,6 @@ Section WpSconfVc.
     ⊢ stack_own spN k.
   Proof. intro Hb. rewrite stack_own_base Hb. done. Qed.
 
-  (* [wp_next_shift]: re-anchor a [wp_next] obligation from the hart it was
-     stated at ([CID]) to a hart reached mid-block ([CID1]), given the
-     conditional equality a leaf's own crossing produced.  This is what makes
-     the [induction prog] proof below work: [IH], instantiated at the fresh
-     hart a leaf's [wp_next] introduces, wants its OWN final continuation
-     anchored there, while the caller's ["Hcont"] is still anchored at
-     whatever hart THIS invocation started at.  Both are the SAME [K] (the
-     block's final state [st']/[m0]/[n] never change across a step), so only
-     the anchor needs to move -- exactly the composition [wp_next_trans]
-     proves pointwise, here packaged as a proposition-level rewrite so it
-     can be applied to a live "Hcont" resource with [iDestruct ... as]. *)
-  Lemma wp_next_shift {K : CpuId -> iProp Σ} {b : bool} {CIDa CIDb : CpuId}
-      (Hs : b = false \/ p = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) :
-    wp_next (CID0 := CIDa) b p K -∗ wp_next (CID0 := CIDb) b p K.
-  Proof.
-    iEval (rewrite /wp_next). iIntros "H" (CID2 Hs2).
-    iEval (rewrite /wp_next) in "H". iApply "H". iPureIntro.
-    intro Hb. specialize (Hs2 Hb). specialize (Hs Hb). congruence.
-  Qed.
-
   (* ==================================================================== *)
   (* 4. THE block lemma: one symbolic run = one WP, sp moves included.     *)
   (* ==================================================================== *)

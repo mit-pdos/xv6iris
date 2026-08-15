@@ -52,7 +52,6 @@ Require Import KptPt.
 Require Import KptExecMap.
 Require Import KMap.
 Require Import Pt4kWalk.
-Require Import SmodeCore.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

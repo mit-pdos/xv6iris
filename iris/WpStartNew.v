@@ -702,7 +702,7 @@ Qed.
 
 (* The R/W/X bits of the entry start() wrote.  Together with
    [st_pmpcfg1_entry0]'s A = TOR and [st_pmpaddr1_cov]'s ordering and coverage
-   bounds these are exactly the six premises of [SmodeCore.pmp_config_intro],
+   bounds these are exactly the six premises of [SmodePte.pmp_config_intro],
    which is why [st_pmp_open] below bundles them as [MbootVocab.mb_pmp_open]:
    the boot contract hands that bundle over and its client never has to know
    which pmpcfg the machine powered up with. *)
