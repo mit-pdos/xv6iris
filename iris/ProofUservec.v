@@ -69,7 +69,10 @@ Section UservecAllPt.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition usertrap_res := UT.usertrap_res.
+  Definition usertrap_res_parked := UT.usertrap_res_parked.
   Definition usertrap_res_tf_open := UT.usertrap_res_tf_open.
+  Definition usertrap_res_tlb_close := UT.usertrap_res_tlb_close.
+  Definition usertrap_res_tlb_open := UT.usertrap_res_tlb_open.
 
   (* the user invariant already carries the map well-formedness the exit
      switch needs *)
@@ -230,7 +233,7 @@ Section UservecAllPt.
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64) :
-    wp_uservec_pt_body usertrap_res C pt Rut kroot j sscr0 vksp.
+    wp_uservec_pt_body usertrap_res_parked C pt Rut kroot j sscr0 vksp.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -1630,6 +1633,15 @@ Section UservecAllPt.
                        Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256
                        Htf264 Htf272 Htf280 Htail0") as "Htf0'".
     iDestruct ("Hclose0" with "Htf0'") as "Hures'".
+    (* THE TRANSLATION SLOT, INJECTED.  [Hkres] is the [tlb_res_pt kroot]
+       the exit switch just produced by writing the kernel root into satp --
+       and it is exactly the piece the PARKED residue is missing.  usertrap
+       runs on the completed form (its own [ut_trap_open] pulls satp back
+       out of it), which is why this is a close and not a frame: framing
+       [Hkres] across the call would leave usertrap's own [sie_cap_gpr]
+       without a translation slot on one side and double-own satp on the
+       other. *)
+    iDestruct (usertrap_res_tlb_close pt vksp kroot with "Hures' Hkres") as "Hures'".
     iEval (rewrite Hstvec) in "Hstvec".
     iApply (UT.wp_usertrap pt j (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
               ms_v sc_v stval_v sepc_v vksp (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1641,6 +1653,11 @@ Section UservecAllPt.
       "%Hmask %Hpttf %Haccwf %Hmapwf %Hretms %Hsconf2 %Hcalleesaved %Htpcid %Ha0usatp %Hsatprooted
        Hhs2 Hpriv2 Hms2 Hsc2 Hstval2 Hsepc2 Hstvec2 Hpc2 Hfile2 Hmie3 Hmdl3 Hmenv3 Hhw2 Hmin2 Hures2".
     (* ============ open usertrap_res A SECOND TIME, for userret ========== *)
+    (* userret's entry switch is about to install the USER table, so take
+       the kernel one back out first; the residue underneath is parked
+       again, which is the form [usertrap_res_tf_open] wants. *)
+    iDestruct (UT.usertrap_res_tlb_open (CID:=CID2) pt' vksp with "Hures2")
+      as (kroot2) "[Hkres2 Hures2]".
     iDestruct (UT.usertrap_res_tf_open (CID:=CID2) pt' vksp kroot (Hkwgap CID2) with "Hures2") as (ws1)
       "(%Hok1 & Htf1 & Hclose1)".
     iDestruct (tf_page_length with "Htf1") as %Hlen1.
@@ -1671,7 +1688,7 @@ Section UservecAllPt.
        this comment used to describe). A [iPoseProof] copy keeps [Hhw2]
        itself intact, whole, for [Hwup]'s own [hw_config] premise below. *)
     iPoseProof (hw_config_senvcfg with "Hhw2") as "#Hsenv2".
-    iPoseProof (UR.wp_userret_pt kroot (ud_root pt') (ud_tfp pt') (ud_um pt') mf usatp
+    iPoseProof (UR.wp_userret_pt kroot2 (ud_root pt') (ud_tfp pt') (ud_um pt') mf usatp
               ms' MIE_S mdv0 MENVCFG_S (mword_of_int 0 : mword 64) uepc
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160
               u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
@@ -1683,7 +1700,7 @@ Section UservecAllPt.
        name the ENTRY hart's resources and are a different (if
        identically-printed) proposition whenever usertrap crossed harts.
        See [SpecUsertrap.usertrap_post]'s comment. *)
-    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hkres Hufr Hpc2 Hfile2
+    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hkres2 Hufr Hpc2 Hfile2
                     Hutf40 Hutf48 Hutf56 Hutf64 Hutf72 Hutf80 Hutf88 Hutf96 Hutf104 Hutf112
                     Hutf120 Hutf128 Hutf136 Hutf144 Hutf152 Hutf160 Hutf168 Hutf176 Hutf184
                     Hutf192 Hutf200 Hutf208 Hutf216 Hutf224 Hutf232 Hutf240 Hutf248 Hutf256

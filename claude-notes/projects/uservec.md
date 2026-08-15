@@ -517,3 +517,75 @@ themselves**, not a value threaded alongside them. Concretely:
   target 'proofs'" — `proofs` is a ROOT-Makefile target (`Makefile:222`,
   `proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile`), not an
   `iris/CoqMakefile` one; run it from the repo root, not `iris/`.
+
+## THE CHAINING ATTEMPT WAS VACUOUS — `usertrap_res` and `user_trap_frame`
+## cannot both be preconditions, and this is the dovetail, not plumbing
+
+A session took "chain uservec to USERTRAP and USERRET" as a plumbing task:
+give `wp_uservec_pt_body` both `user_trap_frame C pt Rut` and a
+`usertrap_res pt vksp` premise, open the trapframe out of the latter for the
+save walk, call `UT.wp_usertrap`, chain into `UR.wp_userret_pt`. The 44
+instruction walk went through, the crossing went through, and the whole thing
+looked like it was three plumbing bugs from done.
+
+**It was vacuous.** Mechanically checked, not argued — this compiles:
+
+```coq
+Lemma satp_double_owned (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  strans_inv -∗ strans_bit strans_bit_kpt -∗ utlb_inv_pt uroot tfp um -∗ False.
+```
+
+`usertrap_res` → `ut_res` → `ut_trap` → `strans_inv`, and `ut_trap` holds
+`strans_bit strans_bit_kpt` right beside it, so `strans_bit_agree` pins
+`strans_inv` to its KPT arm = `KptShare.tlb_res_pt` ⊇ `satp ↦ᵣ` at full
+fraction. `user_trap_frame` ⊇ `user_pt_inv` ⊇ `utlb_inv_pt` ⊇ `satp ↦ᵣ`, also
+full. Two owners, so the precondition is unsatisfiable and NO caller can ever
+apply the lemma — `durable-notes.md`'s own trap, hit for real.
+
+**And it is not one overlap, it is four — the whole user address space:**
+
+| resource | in `usertrap_res` via | in `user_inv` via |
+|---|---|---|
+| trapframe page | `proc_priv_core` → `tf_page` | `user_trap_frame`'s walk cells |
+| user page-table tree | `proc_pt_at` → `proc_pt` → `pt_frame` → `ptree_own 2 (DfracOwn 1)` | `utlb_inv_pt` → `ptree_own 2 (DfracOwn 1)` |
+| user data pages | `proc_pt` → `proc_pt_own` (= `upt_pages_own`) | `user_pt_inv` → `udata_own` |
+| satp / tlb | `ut_trap` → `strans_inv` → `tlb_res_pt` | `utlb_inv_pt` |
+
+These are the same underlying resources in two VIEWS: inert inside
+`proc_priv` while the kernel runs, live inside `user_pt_inv` while the user
+runs. uservec/userret IS the conversion between the views. That is exactly
+what §"What remains after this project" above already calls the three owed
+conversions, and what `SpecUsertrap.v`'s own header says in as many words:
+*"composing uservec -> usertrap -> userret ... owes three conversions"*, and
+that usertrap's boundary was ALREADY restated once because the trampoline-side
+shape "together with the kernel cone's `sie_cap` are UNSATISFIABLE, so proving
+it would have been vacuous."
+
+**So the lesson is not "I mis-plumbed a hypothesis".** It is: this edge is the
+dovetail, the dovetail is those conversions, and any spec that takes the
+kernel-side residue and the user-side frame as sibling premises is vacuous
+before a single instruction is stepped. Adding per-resource accessors
+(`usertrap_res_tf_open`, then `_tlb_open`/`_tlb_close`, then one for
+`pt_frame`, then one for `udata_own`) is rediscovering the table above one
+`False` at a time; the decomposition has to be one split — kernel-side residue
+∗ address-space view — with `ProcPtOwn`'s existing dovetail lemmas
+(`proc_pt_acc_rep0` / `proc_pt_rebuild` / `phys_bytes_udata` / the `page_own`
+conversions) doing the view change.
+
+**Latent consequence for the landed `Rut` threading** (§ above): `Rut` is
+abstract in `UserExec.v`, so the `User*.v` tower is fine, but the INTENDED
+instantiation `Rut pt := ∃ ksp, UT.usertrap_res pt ksp` is unsatisfiable for
+the same four reasons — `usertrap_res` cannot ride inside `user_inv` as-is. It
+is the REDUCED residue (no address space) that can be parked across user
+execution. Nothing has been proven false by this: the threading compiles and
+`Rut` is never instantiated yet. But the closure step must use the reduced
+form, not `usertrap_res`.
+
+**What was salvaged from the attempt** (branch
+`uservec-usertrap-userret-chain`): `UsertrapRes.v` gained `ut_trap_parked` /
+`ut_res_parked` (residue minus the translation slot, holding both
+`strans_bit` halves loose — a `ghost_var` at 1/2 each, so together full
+ownership of the bit = "nobody is using the slot") plus `ut_res_tlb_close` /
+`ut_res_tlb_open`, all PROVEN and compiling. They are one of the four columns
+and remain correct as far as they go; whether they survive the real
+decomposition depends on its shape.

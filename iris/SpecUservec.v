@@ -232,5 +232,12 @@ Module Type USERVEC.
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64),
-      wp_uservec_pt_body usertrap_res C pt Rut kroot j sscr0 vksp.
+      (* THE PARKED RESIDUE, not [usertrap_res] itself: the latter owns
+         [satp] (its [strans_inv] sits in the KPT arm), and this spec's own
+         [user_trap_frame] premise owns [satp] too, at the USER root -- so
+         taking the complete form here would make the precondition
+         unsatisfiable and this whole lemma vacuous.  uservec's exit switch
+         produces the [tlb_res_pt] that completes it
+         ([usertrap_res_tlb_close]) just before it calls usertrap. *)
+      wp_uservec_pt_body usertrap_res_parked C pt Rut kroot j sscr0 vksp.
 End USERVEC.

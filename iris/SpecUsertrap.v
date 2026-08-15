@@ -121,6 +121,7 @@ Require Import KallocInv.
 Require Import IrefSlots InodeRegion.
 Require Import ProcGeom.
 Require Import TrampPt UptTree.
+Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import UserPtTree UserExec.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -381,6 +382,44 @@ Module Type USERTRAP_RES.
      tail needs: open, convert its own [tf_pa] cells in, close. Concrete
      proof: [UsertrapRes.usertrap_res_tf_open], via [proc_priv_split] +
      [ut_own_priv]. *)
+  (* THE PARKED FORM: [usertrap_res] WITHOUT THE TRANSLATION SLOT.
+     [usertrap_res] owns [satp] (its internal [strans_inv] sits in the KPT
+     arm, i.e. [KptShare.tlb_res_pt]) -- right for the state usertrap RUNS
+     in, and impossible for anything parked across user execution, where
+     [UptTree.utlb_inv_pt] owns [satp] at the USER root instead.  Holding
+     both is contradictory, so a consumer that took [usertrap_res] beside a
+     user-mode table would be vacuous rather than wrong-looking.  uservec
+     therefore takes the PARKED residue, and its exit switch's own
+     [tlb_res_pt] is exactly what completes it; userret's entry switch takes
+     that back out.  Concrete: [UsertrapRes.ut_res_parked]. *)
+  Parameter usertrap_res_parked :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId},
+      uptd -> mword 64 -> iProp Σ.
+
+  (* uservec's move: the switch just installed the kernel table, so the
+     residue can be completed into the state usertrap consumes. *)
+  Parameter usertrap_res_tlb_close :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
+      usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
+
+  (* userret's move: its entry switch is about to install the USER table, so
+     it needs the kernel one back out first.  The root is existential --
+     nothing outside pins which table the slot holds, and userret is
+     parametric in it. *)
+  Parameter usertrap_res_tlb_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res pt ksp -∗
+      ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
+
   Parameter usertrap_res_tf_open :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -389,9 +428,9 @@ Module Type USERTRAP_RES.
       (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
          [ProcGeom.tf_kernel_words_ok]'s own header. *)
       (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
-      usertrap_res pt ksp -∗
+      usertrap_res_parked pt ksp -∗
       ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_parked pt ksp).
 End USERTRAP_RES.
 
 Module Type USERTRAP.

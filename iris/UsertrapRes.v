@@ -57,6 +57,7 @@ Require Import WpMmodeLeafBase.   (* csp_rs1 -- sie_cap's stack key *)
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
+Require Import KptShare.   (* [tlb_res_pt] -- the parked residue drops it *)
 Require Import SchedCtx.
 Require Import KallocInv KvmSpec.
 Require Import IcacheEscrow IrefSlots InodeRegion.
@@ -157,6 +158,61 @@ Section UsertrapRes.
      (* the running claim.  It is what [SpecYield] / [SpecKexit] want as
         [cpu_claim_ext false pj], and the trap is where it comes from. *)
      cpu_claim pj)%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE PARKED FORM: [ut_trap] WITHOUT THE TRANSLATION SLOT.             *)
+  (*                                                                      *)
+  (* [ut_trap] owns [satp] -- its [strans_inv] is pinned to the KPT arm by *)
+  (* the [strans_bit strans_bit_kpt] beside it, and that arm IS            *)
+  (* [tlb_res_pt], whose [satp ↦ᵣ] is full.  That is correct for the state *)
+  (* usertrap RUNS in, and WRONG for anything parked across user           *)
+  (* execution: while the user runs, [UptTree.utlb_inv_pt] owns [satp] (at *)
+  (* the USER root), so a residue also holding [strans_inv] makes the pair *)
+  (* contradictory -- [strans_inv ∗ strans_bit strans_bit_kpt ∗            *)
+  (* utlb_inv_pt _ _ _ ⊢ False] is provable, which silently turns any      *)
+  (* consumer holding both into a vacuous lemma.                          *)
+  (*                                                                      *)
+  (* So the parked form drops [strans_inv] and keeps BOTH [strans_bit]     *)
+  (* halves loose (the slot's own and the client's -- [strans_bit] is a    *)
+  (* [ghost_var] at [1/2], so the two together are full ownership of the   *)
+  (* bit, which is exactly "nobody is using the translation slot right     *)
+  (* now").  uservec's exit switch produces the [tlb_res_pt] that          *)
+  (* completes it ([ut_trap_tlb_close]); userret's entry switch takes it   *)
+  (* back out ([ut_trap_tlb_open]).                                       *)
+  Definition ut_trap_parked (pj : mword 64) (ksp : mword 64) (av : nat)
+      (C : iProp Σ) (lks : gset string) : iProp Σ :=
+    (ut_stack ksp av ∗
+     sie_arm false pj ∗
+     strans_bit strans_bit_kpt ∗ strans_bit strans_bit_kpt ∗
+     ut_ghosts ∗
+     cpu_own 0%nat false pj C false lks ∗
+     cpu_claim pj)%I.
+
+  Lemma ut_trap_tlb_close (pj ksp : mword 64) (av : nat) (C : iProp Σ)
+      (lks : gset string) (kroot : mword 44) :
+    ut_trap_parked pj ksp av C lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av C lks.
+  Proof.
+    iIntros "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm) Hkres".
+    rewrite /ut_trap. iFrame "Hstk Harm Hb2 Hgh Hcpu Hclm".
+    rewrite /strans_bit_kpt.
+    iApply (strans_inv_intro kroot with "Hb1 Hkres").
+  Qed.
+
+  Lemma ut_trap_tlb_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
+      (lks : gset string) :
+    ut_trap pj ksp av C lks -∗
+    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av C lks.
+  Proof.
+    iIntros "(Hstk & Hstr & Harm & Hbit & Hgh & Hcpu & Hclm)".
+    (* the bit BESIDE the slot pins the slot's arm: at Bare the two would
+       disagree, so only the KPT arm survives. *)
+    iDestruct "Hstr" as "[(Hb0 & _ & _) | (Hb1 & Hkpt)]".
+    { iDestruct (strans_bit_agree with "Hb0 Hbit") as %He.
+      rewrite /strans_bit_kpt in He. discriminate He. }
+    iDestruct "Hkpt" as (kroot) "Hkres".
+    iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked /strans_bit_kpt.
+    iFrame "Hstk Harm Hb1 Hbit Hgh Hcpu Hclm".
+  Qed.
 
   (* NOT IN THE BUNDLE: [intr_handler_spec kernelvec], the contract the
      [csrw stvec] at +0x1e installs.  It is DERIVABLE from what [ut_env]
@@ -619,6 +675,46 @@ Section UsertrapRes.
        ut_trap (un_pj N) ksp av C ∅ ∗
        ut_env Rsys N V)%I.
 
+  (* [ut_res]'s parked twin -- see [ut_trap_parked]'s header.  This is what
+     survives user execution (no [satp]); [ut_res] itself is what usertrap
+     consumes. *)
+  Definition ut_res_parked (Rsys : gname -> mword 64 -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) : iProp Σ :=
+    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
+       ⌜ pv_upt V = pt ⌝ ∗
+       ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
+       ⌜ ut_wf N ⌝ ∗
+       ⌜ (K_usertrap <= av)%nat ⌝ ∗
+       ut_trap_parked (un_pj N) ksp av C ∅ ∗
+       ut_env Rsys N V)%I.
+
+  (* THE TRANSLATION BORROW, lifted to the residue.  [_close] is uservec's
+     move (its exit switch just produced [tlb_res_pt kroot]); [_open] is
+     userret's (its entry switch is about to consume it). *)
+  Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+    ut_res_parked Rsys pt ksp -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp.
+  Proof.
+    iIntros "H Hkres".
+    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct (ut_trap_tlb_close with "Htrap Hkres") as "Htrap".
+    iExists N, V, av, C. iFrame "Htrap Henv".
+    iPureIntro. split; [| split; [| split]]; assumption.
+  Qed.
+
+  Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) :
+    ut_res Rsys pt ksp -∗
+    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp.
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct (ut_trap_tlb_open with "Htrap") as (kroot) "[Hkres Htrap]".
+    iExists kroot. iFrame "Hkres".
+    iExists N, V, av, C. iFrame "Htrap Henv".
+    iPureIntro. split; [| split; [| split]]; assumption.
+  Qed.
+
   (* THE TRAPFRAME BORROW, lifted to [usertrap_res] -- the concrete proof
      of [SpecUsertrap.USERTRAP_RES.usertrap_res_tf_open].  Opens via
      [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
@@ -626,9 +722,9 @@ Section UsertrapRes.
   Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
-    ut_res Rsys pt ksp -∗
+    ut_res_parked Rsys pt ksp -∗
     ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-      (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res Rsys pt ksp).
+      (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res_parked Rsys pt ksp).
   Proof.
     iIntros (Hgap) "H".
     iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
@@ -915,15 +1011,39 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
     ut_res SY.syscall_env.
 
+  Definition usertrap_res_parked
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
+    ut_res_parked SY.syscall_env.
+
+  Lemma usertrap_res_tlb_close
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+    usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
+  Proof. exact (ut_res_tlb_close SY.syscall_env pt ksp kroot). Qed.
+
+  Lemma usertrap_res_tlb_open
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    usertrap_res pt ksp -∗
+    ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
+  Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp). Qed.
+
   Lemma usertrap_res_tf_open
       `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
         !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
         !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
-    usertrap_res pt ksp -∗
+    usertrap_res_parked pt ksp -∗
     ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
-      (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+      (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_parked pt ksp).
   Proof. exact (ut_res_tf_open SY.syscall_env pt ksp kroot). Qed.
 
 End UtResFits.
