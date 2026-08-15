@@ -161,6 +161,15 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
     ⌜ud_data pt' = ud_pas pt'⌝ -∗
     ⌜proc_pt_wf pt'⌝ -∗
     ⌜and_vec MIE_S (not_vec mdv0) = zeros' 64⌝ -∗
+    (* THE EXIT mstatus FACTS, straight off [usertrap_post].  Without them a
+       caller holds [mstatus ↦ᵣ sret_ms5 ms'] at a wholly abstract [ms'] and
+       cannot re-establish [UserExec.user_mstatus_ok] -- so it cannot rebuild
+       [user_inv] for the next round, which is the whole point of the post.
+       [usertrap_ret_ms] carries exactly the six pins
+       [user_mstatus_ok_sret_ms5] consumes (SXL / MXR / FS / VS / TVM / TSR),
+       plus the two the sret itself needs. *)
+    ⌜usertrap_ret_ms ms'⌝ -∗
+    ⌜upt_acc_wf (ud_um pt')⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗
     mstatus ↦ᵣ sret_ms5 ms' -∗

@@ -100,6 +100,53 @@ Section UservecAllPt.
      splits into all 36 cells AT ONCE, no wand-by-wand borrowing -- the
      [destruct]-per-index chain is the mechanical cost of that, paid once
      here instead of twice inline. *)
+  (* THE 36-WAY SHAPE, PROVED ONCE.  [tf_words] is a [big_sepL] whose
+     offsets reduce to [8 * Z.of_nat i], while every consumer names the
+     offsets as LITERALS -- so the two shapes are convertible but not
+     syntactically equal, and a bare [iFrame] across them pays a conversion
+     on each of its ~650 match attempts (19 s and 17.6 s at the two sites
+     below).  Doing the conversion once, structurally, is the whole fix. *)
+  Lemma tf_words36 (tfp : mword 44)
+      (w0 w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 w19 w20 w21 w22 w23 w24 w25 w26 w27 w28 w29 w30 w31 w32 w33 w34 w35 : mword 64) :
+    tf_words tfp [w0;w1;w2;w3;w4;w5;w6;w7;w8;w9;w10;w11;w12;w13;w14;w15;w16;w17;w18;w19;w20;w21;w22;w23;w24;w25;w26;w27;w28;w29;w30;w31;w32;w33;w34;w35] ⊣⊢
+    (tf_pa tfp 0 ↦ₚ₈ w0 ∗
+     tf_pa tfp 8 ↦ₚ₈ w1 ∗
+     tf_pa tfp 16 ↦ₚ₈ w2 ∗
+     tf_pa tfp 24 ↦ₚ₈ w3 ∗
+     tf_pa tfp 32 ↦ₚ₈ w4 ∗
+     tf_pa tfp 40 ↦ₚ₈ w5 ∗
+     tf_pa tfp 48 ↦ₚ₈ w6 ∗
+     tf_pa tfp 56 ↦ₚ₈ w7 ∗
+     tf_pa tfp 64 ↦ₚ₈ w8 ∗
+     tf_pa tfp 72 ↦ₚ₈ w9 ∗
+     tf_pa tfp 80 ↦ₚ₈ w10 ∗
+     tf_pa tfp 88 ↦ₚ₈ w11 ∗
+     tf_pa tfp 96 ↦ₚ₈ w12 ∗
+     tf_pa tfp 104 ↦ₚ₈ w13 ∗
+     tf_pa tfp 112 ↦ₚ₈ w14 ∗
+     tf_pa tfp 120 ↦ₚ₈ w15 ∗
+     tf_pa tfp 128 ↦ₚ₈ w16 ∗
+     tf_pa tfp 136 ↦ₚ₈ w17 ∗
+     tf_pa tfp 144 ↦ₚ₈ w18 ∗
+     tf_pa tfp 152 ↦ₚ₈ w19 ∗
+     tf_pa tfp 160 ↦ₚ₈ w20 ∗
+     tf_pa tfp 168 ↦ₚ₈ w21 ∗
+     tf_pa tfp 176 ↦ₚ₈ w22 ∗
+     tf_pa tfp 184 ↦ₚ₈ w23 ∗
+     tf_pa tfp 192 ↦ₚ₈ w24 ∗
+     tf_pa tfp 200 ↦ₚ₈ w25 ∗
+     tf_pa tfp 208 ↦ₚ₈ w26 ∗
+     tf_pa tfp 216 ↦ₚ₈ w27 ∗
+     tf_pa tfp 224 ↦ₚ₈ w28 ∗
+     tf_pa tfp 232 ↦ₚ₈ w29 ∗
+     tf_pa tfp 240 ↦ₚ₈ w30 ∗
+     tf_pa tfp 248 ↦ₚ₈ w31 ∗
+     tf_pa tfp 256 ↦ₚ₈ w32 ∗
+     tf_pa tfp 264 ↦ₚ₈ w33 ∗
+     tf_pa tfp 272 ↦ₚ₈ w34 ∗
+     tf_pa tfp 280 ↦ₚ₈ w35)%I.
+  Proof. rewrite /tf_words /= bi.sep_emp. reflexivity. Qed.
+
   Lemma tf_page_open36 (tfp : mword 44) (ws : list (mword 64)) :
     length ws = TFWORDS ->
     tf_page tfp ws -∗
@@ -183,9 +230,13 @@ Section UservecAllPt.
     destruct ws; [| discriminate Hlen].
     iExists w0, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16, w17, w18, w19, w20, w21, w22, w23, w24, w25, w26, w27, w28, w29, w30, w31, w32, w33, w34, w35.
     iSplitR; [done|].
-    rewrite /tf_words /=.
-    iDestruct "Hws" as "(Hw0 & Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9 & Hw10 & Hw11 & Hw12 & Hw13 & Hw14 & Hw15 & Hw16 & Hw17 & Hw18 & Hw19 & Hw20 & Hw21 & Hw22 & Hw23 & Hw24 & Hw25 & Hw26 & Hw27 & Hw28 & Hw29 & Hw30 & Hw31 & Hw32 & Hw33 & Hw34 & Hw35 & _)".
-    iFrame.
+    (* NO FRAMING HERE.  Unfolded, the hypothesis and the goal are the SAME
+       right-nested [∗] of 36 conjuncts, up to the [big_sepL]'s trailing
+       [emp] -- so this is one syntactic match, not 36 x 36 attempts to
+       unify [tf_pa tfp off ↦ₚ₈ _] pairs.  A bare [iFrame] here cost 19 s. *)
+    iEval (rewrite tf_words36) in "Hws".
+    iDestruct "Hws" as "(Hw0 & Hw1 & Hw2 & Hw3 & Hw4 & Hw5 & Hw6 & Hw7 & Hw8 & Hw9 & Hw10 & Hw11 & Hw12 & Hw13 & Hw14 & Hw15 & Hw16 & Hw17 & Hw18 & Hw19 & Hw20 & Hw21 & Hw22 & Hw23 & Hw24 & Hw25 & Hw26 & Hw27 & Hw28 & Hw29 & Hw30 & Hw31 & Hw32 & Hw33 & Hw34 & Hw35)".
+    iFrame "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35 Htail".
   Qed.
 
   (* the reverse of [tf_page_open36]: rebuild [tf_page] from the 36 cells,
@@ -237,7 +288,12 @@ Section UservecAllPt.
   Proof.
     iIntros "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35 Htail".
     rewrite /tf_page. iSplitR; [done|].
-    iSplitL "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35"; [rewrite /tf_words /=; iFrame | iFrame].
+    (* NAMED framing, in the goal's own order: a bare [iFrame] searches the
+       whole context for every one of the 36 conjuncts and cost 17.6 s. *)
+    iSplitL "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35";
+      [ rewrite tf_words36;
+        iFrame "Hw0 Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17 Hw18 Hw19 Hw20 Hw21 Hw22 Hw23 Hw24 Hw25 Hw26 Hw27 Hw28 Hw29 Hw30 Hw31 Hw32 Hw33 Hw34 Hw35"
+      | iExact "Htail" ].
   Qed.
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
@@ -1720,6 +1776,7 @@ Section UservecAllPt.
         Hutf192 & Hutf200 & Hutf208 & Hutf216 & Hutf224 & Hutf232 & Hutf240 & Hutf248 & Hutf256 &
         Hutf264 & Hutf272 & Hutf280 & Htail1)".
     destruct Hsatprooted as (HuMode & Huasid & Huppn).
+    pose proof Hretms as Hretms_keep.
     destruct Hretms as (HSIE2 & HMPRV2 & HSXL2 & HTVM2 & HMXR2 & HTSR2 & HFS2 & HVS2 & Hsretnp2).
     iEval (rewrite Hmie) in "Hmie3".
     assert (Hra9c : (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> M7)
@@ -1807,7 +1864,7 @@ Section UservecAllPt.
                               u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
                               u240 u248 u256 u264 u272 u280 u112)
              ms' usatp uepc sc' stval' mdv0
-             with "[%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
+             with "[%] [%] [%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     Hupt3 Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - exact Hpttf.
     - exact Hmapwf.
@@ -1815,6 +1872,8 @@ Section UservecAllPt.
     - exact (ud_norm_pas pt').
     - exact Hptwf'.
     - exact Hmask.
+    - exact Hretms_keep.
+    - exact Haccwf.
   Qed.
 
 End UservecAllPt.

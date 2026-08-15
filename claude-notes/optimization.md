@@ -257,6 +257,17 @@ worth 20× on individual files.
   "Hd Hn Hv Hp Hm Hg")`. Otherwise every user pays a search.
 - Where no constructor exists, close a seam by naming every conjunct
   (`iSplitL "H"; [iExact "H" |]` chains), never with `iFrame`.
+- **A SHAPE MISMATCH turns every match attempt into a CONVERSION, and that is
+  the expensive kind.** `ProcInv.tf_words` is a `big_sepL`, so its conjuncts
+  carry offsets `8 * Z.of_nat i` while every consumer names them as LITERALS
+  (`tf_pa tfp 40`): convertible, not syntactically equal. A bare `iFrame`
+  across that pays a conversion on each of its ~36×36 attempts — **19.1 s and
+  17.6 s** at the two sites in `ProofUservec.v`, over half the file. Fix:
+  factor the shape change into ONE `⊣⊢` lemma (`tf_words36`) proved by
+  `rewrite /tf_words /= bi.sep_emp; reflexivity`, so the conversion happens
+  once (1.7 s) and both directions then frame syntactically. File went
+  **66.6 s → 31.0 s** of statement time. The tell in the profile is a
+  one-token statement (`iFrame.`) costing tens of seconds.
 - **`proc_priv_core` IS THE WORST INSTANCE IN THE TREE, and it is reached by
   every syscall-altitude proof**: its last conjunct is `ProcInv.tf_page`, a
   **4096**-element big-op, so a bare `iFrame` rebuilding it does not
