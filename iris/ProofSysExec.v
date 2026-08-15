@@ -119,6 +119,10 @@ Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecArgaddr.
 Require Import SpecArgstr.
+(* [proc_priv_tfp_valid] -- [page_valid] of the trapframe page, which
+   argaddr's own load now takes as a premise (SpecArgraw's mem-tier fix).
+   It is a PROJECTION of [proc_priv], not an obligation on this caller. *)
+Require Import ProofKforkParts.
 Require Import SpecFetchaddr.
 Require Import SpecFetchstr.
 Require Import SpecKalloc.
@@ -1171,6 +1175,7 @@ Section SysExecHead.
       exact (HM4thr c Hc N2 N8). }
     (* argaddr wants the trapframe pointer quarter AND the page, as one
        accessor -- and its out-cell is slot 59, which the frame just gave us. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hprivback)".
     iEval (rewrite -HM5a1) in "F59".
     iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) C b
@@ -1178,6 +1183,7 @@ Section SysExecHead.
     iApply (Argaddr.wp_argaddr_sconf M5 (K - 60)%nat 0%nat eb (proc_addr jp) C
               1%nat (ud_tfp (pv_upt V)) (pv_tf V) v1 u59 (DfracOwn (1/4)) b lks
               sx_arg1_lt ltac:(rewrite HM5a0; reflexivity) Harg1 sx_noff0 Kaa
+              Hpv
               with "Hcg Hcnt Htext Hdata Hpc Htfc Htfp F59").
     iIntros (CID8 Hq8 M6) "%Hcs6 Hcg Hcnt Hpc Htfc Htfp F59".
     iEval (rewrite HM5a1) in "F59".
