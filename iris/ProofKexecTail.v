@@ -931,7 +931,6 @@ Section KexecASeam.
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64)
       (n1 : nat) : iProp Σ :=
     let pj := proc_addr jp in
-    let L := length (path_elems (bview plen pfun)) in
     (* ---- the register state at [pc_is (kexec + 0x32)] ---- *)
     (⌜ M32 !!! Regidx csp_rs1 = pa_stk sp0 68 /\
        M32 !!! Regidx Rs0 = sp0 /\
@@ -944,9 +943,14 @@ Section KexecASeam.
      pc_is (mword_of_int (KXA + 0x32) : mword 64) ∗
      sie_cap_gpr M32 (K - 68)%nat b pj ∗
      cpu_own 0 eb pj C b lks ∗
-     (* ---- the open log transaction, and what namei left of its budget ---- *)
-     ⌜ ((MAXOPBLOCKS - (L + 1) * iput_units)%nat <= n1)%nat /\
-       (n1 <= MAXOPBLOCKS)%nat ⌝ ∗
+     (* ---- the open log transaction, and what namei left of its budget.
+            [iput_units <= n1] AND NOT AN INTERVAL IN THE PATH LENGTH: the
+            walk is priced by [SpecNamex.walk_need], which is 4 whatever the
+            depth, so what crosses this seam is the one fact the closing
+            iunlockput needs.  Spelling it as the counted contract's
+            [MAXOPBLOCKS - (L+1)*iput_units <= n1] is what used to cap kexec
+            at one path element -- see SpecKexec.v's header. ---- *)
+     ⌜ (iput_units <= n1)%nat ⌝ ∗
      log_op g n1 ∗
      (* ---- the inode namei returned, and the slot it came out of ---- *)
      inode_held ipv ∗

@@ -84,26 +84,27 @@
    This is what makes exec's failure invisible to the caller, and it is the
    property sys_exec needs to keep its own [proc_priv] story straight.
 
-   ---- THE THREE PREMISES A CALLER MUST READ ---------------------------
+   ---- THERE IS NO LOG-BUDGET PREMISE, AND THERE USED TO BE ------------
 
-   * [kxc_log_budget]: the log ledger has to cover namei AND the closing
-     iunlockput out of ONE begin_op.  begin_op mints [MAXOPBLOCKS = 10];
-     SpecNamei charges [(L+1) * iput_units] and guarantees only
-     [n - (L+1)*iput_units] left; SpecIunlockput demands [iput_units].  With
-     [iput_units = 3] that is [3L + 6 <= 10], i.e. L <= 1 path elements --
-     enough for "/init" and "sh", not for "/bin/sh".  THAT IS A BOUND ON WHAT
-     THE THEOREM COVERS, NOT ON WHETHER IT CAN BE PROVED: the short-path case
-     is fully provable today and is the one every boot path takes.
-       The premise is stated in the CONSTANTS rather than as [L <= 1] so that
-     it stays readable against the fix it is waiting on -- tightening
-     SpecNamei's SUCCESS arm to charge [L * iput_units], since namex iputs the
-     parents and RETURNS the last inode.  Note the relaxation is NOT automatic:
-     after that fix this premise is merely STRONGER than the composition needs,
-     so the proof keeps working but still admits only L <= 1, and widening to
-     L <= 2 is a one-line edit here.  Making it automatic would mean naming
-     namei's charge in SpecNamei.v (a [namei_charge L] both its premise and its
-     postcondition are stated over) and quoting that name here; worth doing as
-     part of the fs-namei fix, not before it.
+   The log ledger has to cover namei AND the closing iunlockput out of ONE
+   begin_op, and begin_op mints only [MAXOPBLOCKS = 10].  Priced through
+   SpecNamei's COUNTED contract that is [(L+1) * iput_units + iput_units <=
+   MAXOPBLOCKS], i.e. [3L + 6 <= 10] -- one path element, enough for "/init"
+   and "sh" and not for "/bin/sh".  That premise stood here until sys_exec
+   needed it: sys_exec's path arrives through [argstr], so its contents are
+   EXISTENTIAL and no caller can ever discharge a claim about [L].  A
+   contract with a premise its only caller cannot pay is not a bound on what
+   the theorem covers -- it is an unusable contract.
+
+   The fix is not to tighten the charge but to take the SET form.
+   [SpecNamei.wp_namei_gen] over [LogInv.log_opS] prices the walk at
+   [SpecNamex.walk_need L], which is 4 WHATEVER THE DEPTH, and spends at most
+   two -- leaving eight for an iunlockput that needs three.  [log_op] is by
+   definition [∃ Sb, log_opS], so phase A enters the set form with one
+   [iDestruct] at the namei call and leaves it with [LogInv.log_opS_op]; the
+   only other change is that the +0x032 seam carries [iput_units <= n1]
+   rather than an interval in [L].  sys_chdir was the first syscall to need
+   this (SpecSysChdir.v's ledger section); kexec is the second.
 
    * [na <= MAXARG]: the argument-count bound the C enforces with its
      [bne s1,s8] against 32.  Above it the function takes [bad:], which is
@@ -402,8 +403,6 @@ Definition wp_kexec_sconf_body
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in   (* a0 = path *)
   let av := m !!! Regidx (mword_of_int 11 : mword 5) in   (* a1 = argv *)
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  let pl := bview plen pfun in
-  let L := length (path_elems pl) in
   (K_kexec <= K)%nat ->
   (* ---- the file system's geometry, verbatim from SpecNamei ---- *)
   dev = icfg_dev ->
@@ -428,9 +427,6 @@ Definition wp_kexec_sconf_body
   (* ---- the path ---- *)
   bb_cstr pfun plen ->
   (Z.of_nat plen < 2 ^ 31)%Z ->
-  (* ---- THE LOG BUDGET.  See the header: namei's charge plus the closing
-     iunlockput's must both come out of one begin_op. ---- *)
-  ((L + 1) * iput_units + iput_units <= MAXOPBLOCKS)%nat ->
   (* ---- the argument vector: [na] non-null pointers then a NULL ---- *)
   (forall i, (i < na)%nat -> avf i <> (mword_of_int 0 : mword 64)) ->
   avf na = (mword_of_int 0 : mword 64) ->

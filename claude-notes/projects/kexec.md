@@ -22,8 +22,10 @@ is the five platform axioms, `functional_extensionality_dep`, and the
 transient `ProofIput.iput_acquiresleep_order_ADMITTED` every `iput` client
 inherits — nothing kexec-specific, and no `PanicStub` credential.
 
-What is left in this project is `sys_exec` and four non-blocking cleanups;
-see the Worklist at the end.
+`sys_exec`, kexec's only caller, is SPECIFIED (`SpecSysExec.v`) and its
+frame algebra and epilogue are proven (`ProofSysExec.v`); its body is what is
+left, and the Worklist at the end has the block decomposition, the loop
+invariant and the callee inventory to write it from.
 
 ## The composition
 
@@ -803,14 +805,11 @@ pay it and move on; if no, the callee's contract is wrong and generalizing it
 is the work. Relaxing namei/namex/nameiparent and copyout's source to a
 fraction remains available and is nobody's blocker.
 
-## THE SEVEN BLOCKERS — SIX FIXED, ONE OPEN AND NOT GATING
+## THE SEVEN BLOCKERS — ALL SEVEN FIXED
 
 None of these is kexec's own design going wrong; each is a callee contract
-that was stated for the callers it had, and all five were found by trying to
-compose them. **§1 (copyout), §2 (safestrcpy), §4 (readi's `off`), §5
-(uvmalloc's freshness), §6 (uvmalloc's silent leaves) and §7 (kexec's own
-stack claim) are FIXED and the tree is green; §3 (the log budget) is open** and belongs to the fs-namei project — it does not gate the proof,
-it only bounds which pathnames the theorem covers.
+that was stated for the callers it had, and every one was found by trying to
+compose them. All seven are fixed and the tree is green.
 
 **THE RECURRING SHAPE, AND IT IS WORTH RECOGNISING ON SIGHT.** §4 and §5 are
 the same defect twice: a callee premise stated over a quantity the CALLEE
@@ -820,6 +819,11 @@ states the code actually reaches. Neither guard moves a postcondition, and
 every existing caller pays by ignoring it. When a premise looks unpayable,
 ask what the callee's own instruction order already guarantees before
 strengthening anything in the caller.
+
+**§3 IS THE THIRD MEMBER OF THAT FAMILY AND IT ANSWERS DIFFERENTLY** — a
+premise linear in something no caller can bound is fixed by re-PRICING the
+call, not by shrinking the coefficient. Read it: it is the one that stayed
+open longest because the obvious fix was the wrong one.
 
 ### 7. kexec's OWN success arm claimed something the `bltu`s do not check — **FIXED**
 
@@ -1056,41 +1060,44 @@ the exit, and no conjunct of `ssc_post` reaches an unowned byte. Keep it: it
 is the mechanized form of the header's soundness argument, and a caller that
 wants to read `f` up to `k` will want it.
 
-### 3. The log budget does not close for a two-element path
+### 3. The log budget capped kexec at one path element — **FIXED, and the
+first fix anyone proposes is the WRONG one**
 
-Arithmetic, not resources, and it is the sharpest edge:
+Priced through `SpecNamei`'s COUNTED contract the composition is
 
-- `begin_op` mints `log_op γ MAXOPBLOCKS`, `MAXOPBLOCKS = 10`.
+- `begin_op` mints `log_op γ MAXOPBLOCKS`, `MAXOPBLOCKS = 10`;
 - `SpecNamei` charges `(L + 1) * iput_units` and guarantees only
-  `n - (L+1)*iput_units ≤ n'`, with `iput_units = 3`.
-- `SpecIunlockput` demands `iput_units ≤ n'`.
+  `n - (L+1)*iput_units ≤ n'`, with `iput_units = 3`;
+- `SpecIunlockput` demands `iput_units ≤ n'`;
 
-So the composition needs `3(L+1) + 3 ≤ 10`, i.e. **`L ≤ 1` path elements** —
-`/init` and `sh` are fine, `/bin/sh` is not. (`L = 3` cannot even call namei:
-`3·4 > 10`.)
+i.e. `3(L+1) + 3 ≤ 10`, i.e. **`L ≤ 1` path elements** — `/init` and `sh`,
+not `/bin/sh`. That premise sat in `SpecKexec` and this file called it a
+bound on what the theorem covers rather than a blocker. **It was a blocker,
+and sys_exec is what proved it**: sys_exec's path arrives through `argstr`,
+so its contents — and hence `L` — are EXISTENTIAL, and no caller can ever
+discharge a claim about it. A contract with a premise its only caller cannot
+pay is not a bounded theorem, it is an unusable contract.
 
-*The fix, and it belongs to the fs-namei project*: namei's charge is one
-element too generous **on the success arm**. `namex` iputs the inodes it
-walks *past* and RETURNS the last one — so a successful lookup of an
-`L`-element path does at most `L` iputs, not `L+1`. Making the budget clause
-depend on the `ok` flag (`L * iput_units` on success, `(L+1) * iput_units` on
-failure) gives `n' ≥ 10 - 6 = 4 ≥ 3` at `L = 2` and the composition closes.
+**The obvious fix is wrong.** This file used to propose tightening namei's
+SUCCESS arm to `L * iput_units` (namex iputs the parents and RETURNS the
+last inode). That widens `L ≤ 1` to `L ≤ 2` and leaves the contract just as
+unpayable, because the bound is still linear in a quantity nobody knows.
 
-**This bounds what the theorem COVERS, not whether it can be proved.** The
-short-path case — `/init`, `sh` — is fully provable today, is what every boot
-path takes, and needs no change to anything. Do not treat blocker 3 as
-gating the `ProofKexec` work; it is not.
+**The right one already existed in the tree.** `SpecNamei.wp_namei_gen` over
+`LogInv.log_opS` prices the walk at `SpecNamex.walk_need L`, which is
+`iput_units` at `L = 0` and `S iput_units` otherwise — **4 whatever the
+depth** — and spends at most two, leaving eight for an iunlockput that needs
+three. `log_op γ u` is by definition `∃ Sb, log_opS γ u Sb`, so entering the
+set form is one `iDestruct` at the namei call and leaving it is
+`LogInv.log_opS_op`. The whole change is: phase A's namei call, the
+`kxc_at_a2` seam carrying `iput_units <= n1` instead of an interval in `L`,
+and the premise deleted from `SpecKexec`. Nothing else in kexec moved.
 
-`SpecKexec` states the premise in the CONSTANTS
-(`(L + 1) * iput_units + iput_units <= MAXOPBLOCKS`) rather than as `L ≤ 1`.
-**Do not** hard-code `L ≤ 1` — but note the relaxation is *not* automatic:
-after namei's success arm is tightened, that premise is merely *stronger* than
-the composition needs, so `ProofKexec` keeps compiling while still admitting
-only `L ≤ 1`, and widening to `L ≤ 2` is a one-line edit to it. To make it
-automatic, name namei's charge in `SpecNamei.v` — a `namei_charge L` that both
-its premise (`:136`) and its postcondition (`:182`) are stated over — and quote
-that name from `SpecKexec`. Worth folding into the fs-namei fix; not worth a
-separate sweep.
+**THE RULE, and it is why this sat here for a whole project:** when a
+callee's premise is linear in something the caller cannot bound, look for a
+DIFFERENT PRICING of the same call before trying to shrink the coefficient.
+`sys_chdir` had already met this (SpecSysChdir.v's ledger section says so in
+as many words) and its answer was sitting one `Require` away.
 
 ## THE SIZE BOUND IS THE COVERAGE INVARIANT
 
@@ -1305,14 +1312,123 @@ pin `ud_root`) plus three `tf_page_word_upd` at `tf_epc_idx` /
 
 ## Worklist
 
-### 1. `sys_exec`
+### 1. `sys_exec` — SPECIFIED, and the frame and epilogue are proven
 
-0/1, with `CodeSysExec.v` already generated upstream. It builds the argv
-array kexec's contract consumes (a kalloc'd page per argument via
-`fetchstr`), and it is what pays kexec's two argument premises for free:
-`fetchstr` passes `max = PGSIZE`, so every `alen i < 4096`, and it is
-`sys_exec` that guarantees the NULL is below `MAXARG`. Its spec and kexec's
-want designing against each other.
+`SpecSysExec.v` is landed and complete: `wp_sys_exec_sconf_body`, the module
+type `SYSEXEC`, and `sys_exec_post`, which is `kexec_ok` verbatim against the
+block the copy-ins leave behind. Read its header first — almost every premise
+is one of kexec's, paid here, and it says which.
+
+`ProofSysExec.v` holds the pure side conditions, the frame algebra and the
+epilogue, all `Qed`. What is left is the body, `+0x000 .. +0x102`.
+
+**THE FRAME, 480 bytes / 60 slots, `s0 = sp0` = the entry sp**
+(`pa_stk sp0 k` is `sp0 - 8k`):
+
+| slots | what |
+| --- | --- |
+| 1, 2 | `ra`, `s0` — spilled at +0x02/+0x04 |
+| 3 .. 9 | `s1 s2 s3 s4 s5 s6 s7` — spilled LAZILY at +0x28..+0x36 |
+| 10 | unused (alignment) |
+| 11 .. 26 | `char path[MAXPATH]`, base `pa_stk sp0 26`, 128 bytes |
+| 27 .. 58 | `char *argv[MAXARG]` — **`argv[i]` IS slot `58 - i`** |
+| 59 | `uint64 uargv` |
+| 60 | `uint64 uarg` |
+
+**THE CONTROL FLOW**, read off `CodeSysExec.v` (prefix `sxi_`), not the C:
+
+```
+  +0x000  push 60 ; sd ra,472 ; sd s0,464 ; addi s0,sp,480
+  +0x008  a1 = &uargv ; a0 = 1 ; jal argaddr
+  +0x012  a2 = 128 ; a1 = path ; a0 = 0 ; jal argstr
+  +0x020  mv a5,a0 ; li a0,-1 ; blt a5,zero,+0x104     the FIRST -1 exit,
+                                       and it reloads NOTHING: s1..s7 are
+                                       not spilled yet
+  +0x028  sd s1..s7 (slots 3..9) ; s4 = argv
+  +0x03a  a2 = 256 ; a1 = 0 ; a0 = s4 ; jal memset
+  +0x046  s1 = s4 ; s3 = s4 ; s2 = 0 ; s5 = &uarg ; s6 = 4096 ; s7 = 32
+  +0x056  THE FILL LOOP HEAD, index i in s2, cursor argv+8i in s3
+          a0 = uargv + 8i ; a1 = &uarg ; jal fetchaddr
+          blt a0,zero,+0x92                             -> bad
+          ld a5,uarg ; beqz a5,+0xb6                    -> the break
+          jal kalloc ; mv a1,a0 ; sd a0,0(s3)           argv[i] = page
+          beqz a0,+0x92                                 -> bad
+          a2 = 4096 ; a0 = uarg ; jal fetchstr
+          blt a0,zero,+0x92                             -> bad
+  +0x08a  i++ ; s3 += 8 ; bne s2,s7,+0x56               back edge; FALLS
+                                       THROUGH to bad at i = 32
+  +0x092  bad:  s4 = argv+256 ; THE FREE LOOP (+0x96..+0xa0)
+          li a0,-1 ; ld s1..s7 ; j +0x104
+  +0x0b6  break: argv[i] = 0 ; a1 = argv ; a0 = path ; jal kexec
+  +0x0ce  mv s2,a0 ; s4 = argv+256 ; THE FREE LOOP (+0xd4..+0xde)
+          mv a0,s2 ; ld s1..s7 ; j +0x104
+  +0x0f4  li a0,-1 ; ld s1..s7          (the free loop's own fallthrough)
+  +0x104  THE EPILOGUE: ld ra ; ld s0 ; pop 60 ; ret
+```
+
+**THE BLOCK DECOMPOSITION TO WRITE.** Each ends at a seam the next starts
+from; the two free loops are ONE lemma at two addresses, the way
+`ProofKexecC.kxc_c_exit_m1` factors kexec's three `-1` stubs.
+
+1. `sx_head` — `+0x000 .. +0x026`: the push, the two eager spills, argaddr,
+   argstr, the `blt`. Owns the first `-1` exit (straight into `sx_epilogue`,
+   with s1..s7 still at `m`'s values). Publishes `plen`/`pfun` with
+   `bb_cstr pfun plen` and `plen < 128` — kexec's path premises, paid.
+2. `sx_setup` — `+0x028 .. +0x054`: the seven lazy spills, memset, and the
+   six register initialisations. Ends at the loop head at `i = 0`.
+3. `sx_step` — one iteration, `+0x056 .. +0x090`. FOUR outputs: the back
+   edge at `S i`, the break at `+0x0b6`, `bad:` at `+0x092`, and the
+   `i = 32` fall-through (which is also `bad:`). Publish them as a
+   DISJUNCTION over one `wp_next`, not four — the caller's exit is linear
+   (kexec.md's block-interface rule).
+4. `sx_loop` — the fuel induction over `sx_step`, measure `32 - i`.
+5. `sx_free_loop` — `+0x096 .. +0x0a0` / `+0x0d4 .. +0x0de`, parameterised
+   by the block's base address and its two `instr` facts.
+6. `sx_bad`, `sx_break`, `sx_done`, `sx_m1tail` — the four tails.
+7. `wp_sys_exec_sconf` — the composition.
+
+**THE LOOP INVARIANT** at the head, index `i`:
+
+- `s1 = argv` (the free loop's cursor, NOT bumped by this loop),
+  `s2 = i`, `s3 = pa_add argv (8*i)`, `s4 = argv`, `s5 = &uarg`,
+  `s6 = 4096`, `s7 = 32`, `s0 = sp0`; `i <= 32`;
+- the argv array SPLIT at `i`: slots `58 - k` for `k < i` hold the pages
+  already filled, slot `58 - i` and above still hold memset's ZERO;
+- one `page_valid p_k ∗ (the page's 4096 bytes, NUL-terminated at `alen k`)`
+  per filled index, which is exactly what kexec's argument-string premise
+  wants and what the free loop gives back to kfree;
+- `proc_priv` at the page table the copy-ins have grown so far, and
+  `uptd_ext` from the entry one (transitive across the iterations).
+
+**TWO THINGS THE BODY NEEDS THAT ARE ALREADY PROVEN IN THE FILE:**
+
+- `sx_frame_carve` / `sx_frame_join` — sixty slots into ten spill words, the
+  path buffer and the argv array as BYTES, and the two out-parameter cells;
+  `sx_rest` bundles everything the epilogue does not touch.
+- `sx_zeros_slots` — **memset writes BYTES and the array is read as WORDS,
+  and the zero has to survive the round trip.** The `bad:` free loop stops
+  at the first NULL, and at a fetchaddr failure that NULL is memset's, not
+  one the code wrote; `bytes_own_slotsn` hands the words back
+  EXISTENTIALLY and loses exactly that. `sx_zeros_slots` reassembles each
+  eight zero bytes into a zero WORD instead. This is the one place the proof
+  cannot use the generic frame vocabulary, and it is worth checking for in
+  any future proof that memsets a pointer array.
+
+**THE CALLEES, and what each wants** (all eight have Spec and Link files):
+
+| callee | the resource that is not obvious |
+| --- | --- |
+| `argaddr` | `ProcInv.proc_priv_tf` — the trapframe pointer QUARTER plus the page, as ONE accessor; the out-cell is slot 59 |
+| `argstr` | `proc_priv` WHOLE (it splits inside), plus the 128 path bytes |
+| `memset` | the argv array as 256 named bytes; its `cbyte` at `cval = 0` is the zero byte |
+| `fetchaddr` | `proc_priv` whole, `kalloc_env γa None`, the out-cell at slot 60 |
+| `kalloc` | the `is_lock`/`kalloc_avail` pair INSIDE `kalloc_env γa None`; at `on = None` the bundle is persistent and `avail_dec`/`avail_inc` are the identity, so it survives the whole loop |
+| `fetchstr` | `maxn = 4096` named bytes out of `KallocInv.page_own` (`ByteBuf.bb_page_named` / `bb_page_of_named`) |
+| `kexec` | everything in `SpecSysExec`'s precondition, plus `fs_fabric` rebuilt from the thirteen |
+| `kfree` | `kfree_pre p = ⌜page_valid p⌝ ∗ page_own p` — so `page_valid` must be CARRIED per filled slot, not re-derived |
+
+`K_sys_exec = 234 = 60 + K_kexec`; every other callee's need is far below
+kexec's 174 (`sx_kb` turns the one premise into all eight bounds).
 
 ### 2. Optional, none blocking
 
