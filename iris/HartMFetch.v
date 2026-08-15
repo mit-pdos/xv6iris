@@ -771,16 +771,22 @@ Proof.
   (* -------------------------------------------------------------------- *)
   (* conclusion 1: THE WALK.  Reduce the walker application by the same
      staged rewrites; the landing is already normal for every constant the
-     incantation opens, so the passes are symmetric and reflexivity closes
-     the equality.  QED-COST SHAPE: the reduction runs under
-     [etransitivity] against an evar, so none of its ~60 rewrite motives
-     spells the giant landing (each eq_ind motive would otherwise carry
-     both sides of the equality, and the kernel's Qed walks are linear in
-     tree OCCURRENCES); the landing enters exactly one term -- the final
-     reflexivity between the two reduced forms.                            *)
+     incantation opens, so the passes are symmetric and the closing
+     [exact HLL] is a cheap conversion.  QED-COST NOTE (0e pass, measured
+     -- do not re-litigate): the ~665 s Qed is NOT the motives' spelling
+     of the landing.  [remember]ing it as the opaque [LL] (this shape) and
+     an evar-RHS [etransitivity] shape both land within noise of the
+     original symmetric-goal shape (681 / 669 / 665 s), while the WHOLE
+     chain side (~110 hypothesis-side rewrites + the loop induction,
+     cheat-bisected) is only 5.6 s of it.  The cost lives in the goal-side
+     rewrite chain over the evolving walker term itself, so a real fix
+     must shrink or batch THE WALK'S OWN steps (once-stated helper
+     equations per stretch), not the statement shape around them.  [LL]
+     is kept anyway: it is tactic-side cheaper (the do-16 block 14.9 s ->
+     11.8 s) and keeps the landing out of the walk's intermediate goals.  *)
   (* -------------------------------------------------------------------- *)
-  symmetry. etransitivity.
-  { unfold mseg2_startK, mwrap, try_step.
+  match goal with |- ?LHS = _ => remember LHS as LL eqn:HLL end.
+  unfold mseg2_startK, mwrap, try_step.
   cbn beta iota zeta delta
     [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
      should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
@@ -848,8 +854,7 @@ Proof.
   mf_red_g.
   rewrite Whtif.
   mf_red_g.
-  reflexivity. }
-  reflexivity.
+  exact HLL.
 Qed.
 
 (* the ORIGINAL statement, re-proven as the tick=false instance:
