@@ -9778,3 +9778,66 @@ free-slot home in `fslot`'s free arm (`FileInvDefs.v`:849) stands; and
 `InodeInv.v` / `FsCrash.v` still mention `FileInv` NOWHERE, so correction
 (B)'s two imports still close no cycle.  **The cone figures did not move at
 all**: 352 / 63 / 12, plus `SpecFilestat.vo` at 5.
+
+### S7-open STEP 7 — **THE JOIN AND EVERYTHING BELOW IT ARE PROVEN.**
+### `ProofSysOpen.v` carries four block lemmas; what is left is `so_entry`,
+### the seal, `LinkSysOpen.v` and the coverage flip
+
+`ProofSysOpen.v` is a functor over `Iunlock`, `Iunlockput`, `EndOp`,
+`Fileclose`, `Itrunc`, `Filealloc`, `Fdalloc`, instantiating `SysOpenTails`
+internally as `Tails`.  Four block lemmas, bottom-up, each taking the SAME
+exit continuation:
+
+* **`so_cont`** — the syscall's exit continuation, named ONCE as a
+  `CpuId -> iProp Σ`.  It is `SpecSysOpen`'s minus the two structural cells
+  the body below the join never touches (`sb_ninodes` / `sb_size`) and minus
+  the page-table report (argstr's, settled above the join), plus the join's
+  own two ledger clauses: `used' ⊆ used` and `nsj <= ns' <= S nsj`.
+* **`so_tail_pub`** (+0xb8) — ARM S, and the publication AFTER it.
+* **`so_stores`** (+0x88..+0xb4 and the +0x14e itrunc block).
+* **`so_alloc`** (+0x5e..+0x84 and the +0x140 FD_DEVICE block).
+* **`so_join`** (+0x4a..+0x5a and ARM D-FAIL).
+
+**THE T_DIR REFUSAL'S FALL-THROUGH LANDS AT +0x5e, NOT AT THE JOIN.**  The
+`c.beqz a5` at +0xfa (omode == O_RDONLY on a directory) targets **+0x5e**,
+i.e. it skips the T_DEVICE test entirely — gcc knows a T_DIR inode cannot be
+T_DEVICE.  So `so_entry` has TWO block exits below it, `so_join` at +0x4a and
+`so_alloc` at +0x5e, and both are ordinary lemma applications: the
+"chaining two halves" linear-exit problem never arises, because a block
+lemma is applied, not handed a second continuation.
+
+**FOUR TRAPS, all of which read as something else.**
+
+* **THE BRANCH-TARGET ALIGNMENT PREMISE IS NOT A `bv_eq` GOAL.**  Every
+  `*_taken` leaf carries `eq_vec (access_vec_dec tgt 0) 'b"0" = true` beside
+  its comparison, and the `pcw` (`apply bv_eq; vm_compute; reflexivity`)
+  that every other address goal in this tree takes fails there with a
+  unification error naming `bv_eq`'s own statement.  It is a plain
+  `vm_compute; reflexivity`.
+* **A `nat` PREMISE OF THE FORM `2 <= u` WANTS A `destruct`, NOT A REWRITE.**
+  itrunc's uncredited entry level is `it_entry false u2 = S (S u2)`, and
+  `iEval (rewrite Hueq) in "Hop"` over a `set`-bound `u2` leaves the
+  hypothesis at `log_op g u`; the failure surfaces two hundred lines later
+  as *"iSpecialize: cannot instantiate … with (log_op g u)"*.
+  `destruct u as [| [| u2]]; [exfalso; lia | exfalso; lia | ]` right after
+  `intros` makes the shape syntactic and costs nothing.  (`exfalso` works
+  because an Iris `Lemma`'s goal is `bi_emp_valid`-coerced, i.e. a `Prop`.)
+* **A CALLEE THAT DOES NOT TAKE THE TRAP-CSR COMPLEMENT STILL NEEDS ITS
+  `cpu_own` AT ITS OWN HART.**  filealloc and fdalloc take `cpu_own` without
+  `trap_csrs_ext` / `cpu_claim_ext`, and the missing `cpu_own_transport`
+  before the `iApply` reports *"iSpecialize: cannot instantiate
+  (cpu_own 0 eb … -∗ …) with (cpu_own 0 eb …)"* — the two print identically
+  and the only difference is the implicit hart.
+* **AN UNUSED BINDER IN A BLOCK LEMMA IS NOT FREE.**  `so_alloc` carried a
+  `dq` its body never used; the caller's positional application slid by one
+  and reported *"The term V has type pprivate while it is expected to have
+  type dfrac"*, three hundred lines and two arguments away from the cause.
+
+**WHAT IS LEFT.**  `so_entry` (+0x00 to the join: the prologue and frame
+carve, argint, argstr and ARM 0's branch to the epilogue, begin_op, the
+O_CREATE split, create | namei + ilock + the T_DIR/omode refusal, and ARMs
+A/B/C via `so_tail_a` / `so_tail_b` / `so_tail_c`), then
+`wp_sys_open_sconf` = `so_entry` sealed against `SYSOPEN`, then
+`LinkSysOpen.v`, the `_CoqProject` rows SAME-COMMIT and the coverage flip
+(expect 185/190, sysfile.c 15/16).  Gate for the seal: `Print Assumptions`
+= the standing six + `create_fresh_ty`, nothing else.
