@@ -88,8 +88,12 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    side ~55 s) — kernel rechecking of rewrite motives carrying the giant
    residuals.  Once-per-tree-build, tolerated; MUST be fixed before Phase
    C replays the pattern for the S-mode fetch (walk events multiply the
-   residuals).  Candidates: apply-transitivity chains instead of
-   rewrite-in-big-goal, or `abstract` on the heavy sub-goals.
+   residuals).  BISECTED (0e): the cost is the
+   goal-side walk chain itself (the chain side — ~110 hypothesis rewrites
+   + the loop induction — rechecks in 5.6 s); statement-shape tricks
+   (etransitivity evars, remember/exact) are measured dead ends.  The fix
+   is batching the walk's own reduction into once-stated per-stretch
+   helper equations — fewer, bigger conversion steps for the kernel.
 0e. **[DONE — `mseg1_charK`/`mfetch_charK` land tail-generic over `KT`,
    originals kept byte-identical as instances, 5-axiom-clean.]**
    Original entry: **The tick generalization pass** (mechanical, after `mfetch_char`
