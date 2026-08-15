@@ -580,6 +580,7 @@ LinkIinit.v
 InodeInv.v
 DirView.v
 DirLinks.v
+FsTree.v
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v

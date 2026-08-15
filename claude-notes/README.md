@@ -94,6 +94,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   bits-in-a-block vocabulary, the `bitmap_res` resource and the FREE POOL, why
   the pool token's exclusivity makes the alloc/free handshake sound, `bfree`'s
   contract, and the single-bitmap-block simplification.
+- **[`fs-friendly.md`](design/fs-friendly.md)** — the friendly, client-facing
+  file-system layer above the syscall proofs: what a caller should be able to
+  say, and the staging that gets there.
+- **[`fs-fragments.md`](design/fs-fragments.md)** — the fragment algebra and
+  the tree layer, the DESIGN OF RECORD for F1/F1.5: rulings R1–R12 (including
+  the standing constraint that (L6) must NEVER be stated) over a verification
+  report against the landed tree.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
@@ -102,6 +109,11 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   statement: the staged plan, and the three dead ends not to re-walk.
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
+- **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
+  fragment campaign's ledger (design in
+  [`design/fs-fragments.md`](design/fs-fragments.md)): the staged slate, what
+  each increment cost, where the landed tree diverged from the report's
+  sketches, and the standing constraints.
 - **[`fs-icache.md`](projects/fs-icache.md)** — the inode-cache implementation
   effort (design in [`design/fs-icache.md`](design/fs-icache.md)): the staged
   cycle plan, the branch-per-cycle strategy, the owed boot wiring.
