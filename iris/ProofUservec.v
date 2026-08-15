@@ -261,7 +261,8 @@ Section UservecAllPt.
     iEval (rewrite Hdqc) in "Hmedl".
     iEval (rewrite Hdqc) in "Hmip".
     iEval (rewrite Hdqc) in "Hmenv".
-    iEval (rewrite Hdqc) in "Hsenv".
+    (* [Hsenv] needs no [Hdqc] rewrite -- [user_cfg]'s senvcfg conjunct is
+       already [↦ᵣ□], decoupled from [dqc] entirely (UserExec.v). *)
     iEval (rewrite Hdqc) in "Hmse".
     iEval (rewrite Hdqc) in "Hsse".
     (* the pc: stvec's direct base is the trampoline base *)
