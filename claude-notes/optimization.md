@@ -355,6 +355,17 @@ worth 20× on individual files.
   restate it in the `rget` spelling via `rget_ne` (HartTp.v) before the `iApply`
   and the site goes syntactic. Audit: `-time` before and after; the regressing
   sites are the ones that got slower.
+  **Second confirmed instance, at a different scale: `ProofCreate.v`** (8500
+  lines, 101 `set`-built register-chain sites). Both fixes together, isolated
+  `coqc -time -async-proofs off`: 226.96 s → 204.69 s wall (~10%), RSS 4.09 GB
+  → 3.70 GB. One `iApply` (a `dl_need` bound closed by an inline `ltac:(…;
+  lia)`, three `dirlink`s deep) regressed 1.36 s → 8.26 s the same way, and is
+  the kind of site the rule above warns about — restating it costs a hand
+  edit, not a mechanical one (a first `clear -H..` attempt at it dropped a
+  hypothesis `lia` needed and failed with "Cannot find witness"), so it was
+  left as a documented follow-up rather than force-fit, same as
+  ProofPipewrite's own three recoveries were a separate pass from its
+  `Strategy opaque`.
 - **`reg_lookup` (RegFile.v) by default** — one `vm_compute` over the concrete-key
   if-chain. Where the target value is SYMBOLIC, `vm_compute` would try to reduce
   it and hang; use the lemma-based `peel_reg`, which peels via `upd_eq`/`upd_ne`

@@ -155,6 +155,21 @@ Require Import ProofDirlookupParts ProofNamexParts ProofCreateParts.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
+(* claude-notes/optimization.md "Register maps": the leaves' premises are
+   stated over [rget] (see e.g. [cri_*]'s consumers below), so with these
+   three transparent every register-chain [iApply]'s unifier walks
+   [rget -> tp_pin -> rf_upd] down the whole chain, and [Qed] re-walks it.
+   ProofPipewrite.v is the measured instance (its own header): sealing all
+   three is a net win on a file of this shape, PROVIDED no site hands a
+   leaf a premise spelled with [!!!] where the leaf's statement says
+   [rget] -- those used to bridge for free by delta and regress once the
+   three are opaque.  Re-measure after sealing; restate any regressed
+   premise in the [rget] spelling with [rget_ne] (HartTp.v) right before
+   its [iApply], as ProofPipewrite's own three recoveries did. *)
+Local Strategy opaque [rget].
+Local Strategy opaque [tp_pin].
+Local Strategy opaque [rf_upd].
+
 (* claude-notes/durable-notes.md: a syscall-altitude goal carries
    [ProcInv.tf_page]'s 4096-conjunct big-op, and printing it turns a
    one-line mistake into a forty-minute non-answer. *)
@@ -1498,8 +1513,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x70)) Ra0 Rs2 Mt
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj62").
     iIntros (CIDT0 HqT0) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (P0 := <[Regidx Ra0 := regval_into_reg
+    pose (P0 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs2))]> Mt).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (Mt !!! Regidx Rs2))]> Mt) with P0.
     assert (HP0sp : P0 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P0 upd_ne; [exact HTsp | nz]).
     assert (Hq072 : add_vec_int (mword_of_int (CK + 0x70) : mword 64) 2
@@ -1514,7 +1531,8 @@ Section ProofCreateMain.
               Rra P0 (K - 10)%nat (m !!! Regidx Rra : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj64 Hb1").
     iIntros (CIDT1 HqT1) "Hcg Hpc Hb1".
-    set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
+    pose (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0).
+    change (<[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> P0) with P1.
     assert (HP1sp : P1 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P1 upd_ne; [exact HP0sp | nz]).
     assert (Hq074 : add_vec_int (mword_of_int (CK + 0x72) : mword 64) 2
@@ -1528,7 +1546,8 @@ Section ProofCreateMain.
               Rs0 P1 (K - 10)%nat (m !!! Regidx Rs0 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj66 Hb2").
     iIntros (CIDT2 HqT2) "Hcg Hpc Hb2".
-    set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
+    pose (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
+    change (<[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1) with P2.
     assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P2 upd_ne; [exact HP1sp | nz]).
     assert (Hq076 : add_vec_int (mword_of_int (CK + 0x74) : mword 64) 2
@@ -1542,7 +1561,8 @@ Section ProofCreateMain.
               Rs1 P2 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj68 Hb3").
     iIntros (CIDT3 HqT3) "Hcg Hpc Hb3".
-    set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
+    pose (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
+    change (<[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2) with P3.
     assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P3 upd_ne; [exact HP2sp | nz]).
     assert (Hq078 : add_vec_int (mword_of_int (CK + 0x76) : mword 64) 2
@@ -1556,7 +1576,8 @@ Section ProofCreateMain.
               Rs2 P3 (K - 10)%nat (m !!! Regidx Rs2 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6a Hb4").
     iIntros (CIDT4 HqT4) "Hcg Hpc Hb4".
-    set (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
+    pose (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
+    change (<[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3) with P4.
     assert (HP4sp : P4 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P4 upd_ne; [exact HP3sp | nz]).
     assert (Hq07a : add_vec_int (mword_of_int (CK + 0x78) : mword 64) 2
@@ -1570,7 +1591,8 @@ Section ProofCreateMain.
               Rs4 P4 (K - 10)%nat (m !!! Regidx Rs4 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6c Hb6").
     iIntros (CIDT5 HqT5) "Hcg Hpc Hb6".
-    set (P5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4).
+    pose (P5 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4).
+    change (<[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P4) with P5.
     assert (HP5sp : P5 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P5 upd_ne; [exact HP4sp | nz]).
     assert (Hq07c : add_vec_int (mword_of_int (CK + 0x7a) : mword 64) 2
@@ -1584,7 +1606,8 @@ Section ProofCreateMain.
               Rs5 P5 (K - 10)%nat (m !!! Regidx Rs5 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj6e Hb7").
     iIntros (CIDT6 HqT6) "Hcg Hpc Hb7".
-    set (P6 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5).
+    pose (P6 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5).
+    change (<[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P5) with P6.
     assert (HP6sp : P6 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P6 upd_ne; [exact HP5sp | nz]).
     assert (Hq07e : add_vec_int (mword_of_int (CK + 0x7c) : mword 64) 2
@@ -1598,7 +1621,8 @@ Section ProofCreateMain.
               Rs6 P6 (K - 10)%nat (m !!! Regidx Rs6 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj70 Hb8").
     iIntros (CIDT7 HqT7) "Hcg Hpc Hb8".
-    set (P7 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6).
+    pose (P7 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6).
+    change (<[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P6) with P7.
     assert (HP7sp : P7 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /P7 upd_ne; [exact HP6sp | nz]).
     assert (Hq080 : add_vec_int (mword_of_int (CK + 0x7e) : mword 64) 2
@@ -1638,9 +1662,12 @@ Section ProofCreateMain.
               (mword_of_int 5 : mword 6) P7 (K - 10)%nat 10 b Hpop
               with "Hcg Hpc Hj72 Hstk").
     iIntros (CIDT8 HqT8) "Hcg Hpc".
-    set (P8 := <[Regidx csp_rs1 := regval_into_reg
+    pose (P8 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P7).
+    change (<[Regidx csp_rs1 := regval_into_reg
+                   (add_vec (P7 !!! Regidx csp_rs1 : mword 64)
+                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P7) with P8.
     iEval (rewrite HKsum) in "Hcg".
     assert (Hq082 : add_vec_int (mword_of_int (CK + 0x80) : mword 64) 2
                     = mword_of_int (CK + 0x82)) by pcw.
@@ -2323,9 +2350,12 @@ Section ProofCreateMain.
               (mword_of_int 59 : mword 6) m K 10 b
               ltac:(exact HK10) Hpush with "Hcg Hpc Hi000").
     iIntros (CID1 Hq1) "Hcg Hframe Hpc".
-    set (R1 := <[Regidx csp_rs1 := regval_into_reg
+    pose (R1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> m).
+    change (<[Regidx csp_rs1 := regval_into_reg
+                  (add_vec (m !!! Regidx csp_rs1 : mword 64)
+                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))))]> m) with R1.
     assert (HR1sp : R1 !!! Regidx csp_rs1 = pa_stk sp0 10)
       by (rewrite /R1 upd_eq; exact Hpush).
     assert (HR1o : forall c : mword 5, c <> csp_rs1 ->
@@ -2427,9 +2457,12 @@ Section ProofCreateMain.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi010").
     iIntros (CID9 Hq9) "Hcg Hpc".
-    set (R2 := <[Regidx Rs0 := regval_into_reg
+    pose (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8))))]> R1).
+    change (<[Regidx Rs0 := regval_into_reg
+                  (add_vec (R1 !!! Regidx csp_rs1)
+                     (sign_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8))))]> R1) with R2.
     assert (HR2s0 : R2 !!! Regidx Rs0 = sp0).
     { rewrite /R2 upd_eq. rewrite HR1sp. apply cr_fp. }
     assert (HR2sp : R2 !!! Regidx csp_rs1 = pa_stk sp0 10)
@@ -2447,8 +2480,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x12)) Rs4 Ra1 R2 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi012").
     iIntros (CID10 Hq10) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (R3 := <[Regidx Rs4 := regval_into_reg
+    pose (R3 := <[Regidx Rs4 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (R2 !!! Regidx Ra1))]> R2).
+    change (<[Regidx Rs4 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (R2 !!! Regidx Ra1))]> R2) with R3.
     assert (HR3s4 : R3 !!! Regidx Rs4 = (sign_extend' 64 ty : mword 64)).
     { rewrite /R3 upd_eq. rewrite (HR2o Ra1 ltac:(nz) ltac:(nz)) Ha1.
       apply add_vec_zero_l. }
@@ -2458,8 +2493,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x14)) Rs5 Ra2 R3 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi014").
     iIntros (CID11 Hq11) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (R4 := <[Regidx Rs5 := regval_into_reg
+    pose (R4 := <[Regidx Rs5 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (R3 !!! Regidx Ra2))]> R3).
+    change (<[Regidx Rs5 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (R3 !!! Regidx Ra2))]> R3) with R4.
     assert (HR4s5 : R4 !!! Regidx Rs5 = (sign_extend' 64 major : mword 64)).
     { rewrite /R4 upd_eq. rewrite /R3 upd_ne; [| nz].
       rewrite (HR2o Ra2 ltac:(nz) ltac:(nz)) Ha2. apply add_vec_zero_l. }
@@ -2469,8 +2506,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x16)) Rs6 Ra3 R4 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi016").
     iIntros (CID12 Hq12) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (R5 := <[Regidx Rs6 := regval_into_reg
+    pose (R5 := <[Regidx Rs6 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (R4 !!! Regidx Ra3))]> R4).
+    change (<[Regidx Rs6 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (R4 !!! Regidx Ra3))]> R4) with R5.
     assert (HR5s6 : R5 !!! Regidx Rs6 = (sign_extend' 64 minor : mword 64)).
     { rewrite /R5 upd_eq. rewrite /R4 upd_ne; [| nz]. rewrite /R3 upd_ne; [| nz].
       rewrite (HR2o Ra3 ltac:(nz) ltac:(nz)) Ha3. apply add_vec_zero_l. }
@@ -2485,9 +2524,12 @@ Section ProofCreateMain.
               (mword_of_int 4016 : mword 12) R5 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi018").
     iIntros (CID13 Hq13) "Hcg Hpc".
-    set (R6 := <[Regidx Ra1 := regval_into_reg
+    pose (R6 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (rget R5 Rs0)
                      (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> R5).
+    change (<[Regidx Ra1 := regval_into_reg
+                  (add_vec (rget R5 Rs0)
+                     (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> R5) with R6.
     assert (HR6a1 : R6 !!! Regidx Ra1 = pa_stk sp0 10).
     { rewrite /R6 upd_eq. rewrite rget_ne;
         [| intro Hq1'; injection Hq1' as Hq2'; vm_compute in Hq2'; congruence ].
@@ -2505,8 +2547,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi01c").
     iIntros (CID14 Hq14) "Hcg Hpc".
     iEval (rewrite Htgnp) in "Hpc".
-    set (R7 := <[Regidx Rra := regval_into_reg
+    pose (R7 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x1c) : mword 64) 4)]> R6).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x1c) : mword 64) 4)]> R6) with R7.
     assert (HR7ra : R7 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x1c) : mword 64) 4)
       by (rewrite /R7; apply upd_eq).
@@ -2593,8 +2637,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x20)) Rs1 Ra0 mnp (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi020").
     iIntros (CID15 Hq15) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (Q1 := <[Regidx Rs1 := regval_into_reg
+    pose (Q1 := <[Regidx Rs1 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mnp !!! Regidx Ra0))]> mnp).
+    change (<[Regidx Rs1 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (mnp !!! Regidx Ra0))]> mnp) with Q1.
     assert (HQ1s1 : Q1 !!! Regidx Rs1
                     = add_vec (zero_reg : mword 64) (mnp !!! Regidx Ra0))
       by (rewrite /Q1; apply upd_eq).
@@ -2671,8 +2717,10 @@ Section ProofCreateMain.
                 with "Hcg Hpc Hi026").
       iIntros (CID17 Hq17) "Hcg Hpc".
       iEval (rewrite Htgil) in "Hpc".
-      set (Q2 := <[Regidx Rra := regval_into_reg
+      pose (Q2 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (CK + 0x26) : mword 64) 4)]> Q1).
+      change (<[Regidx Rra := regval_into_reg
+                    (add_vec_int (mword_of_int (CK + 0x26) : mword 64) 4)]> Q1) with Q2.
       assert (HQ2ra : Q2 !!! Regidx Rra
                       = add_vec_int (mword_of_int (CK + 0x26) : mword 64) 4)
         by (rewrite /Q2; apply upd_eq).
@@ -2719,8 +2767,10 @@ Section ProofCreateMain.
       { iEval (rgne; rewrite Y9 Hie). iExact "Hinl". }
       iIntros (CID18 Hq18) "Hcg Hpc Hinl".
       iEval (rgne; rewrite Y9 Hie) in "Hinl".
-      set (Q3 := <[Regidx Ra5 := regval_into_reg
+      pose (Q3 := <[Regidx Ra5 := regval_into_reg
                     (sign_extend' 64 (di_nlink dnl : mword 16) : mword 64)]> mil).
+      change (<[Regidx Ra5 := regval_into_reg
+                    (sign_extend' 64 (di_nlink dnl : mword 16) : mword 64)]> mil) with Q3.
       assert (HQ3a5 : Q3 !!! Regidx Ra5
                       = (sign_extend' 64 (di_nlink dnl : mword 16) : mword 64))
         by (rewrite /Q3; apply upd_eq).
@@ -2769,8 +2819,10 @@ Section ProofCreateMain.
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x84)) Ra0 Rs1 Q3
                   (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi084").
         iIntros (CID20 Hq20) "Hcg Hpc". iEval (rgne) in "Hcg".
-        set (G1 := <[Regidx Ra0 := regval_into_reg
+        pose (G1 := <[Regidx Ra0 := regval_into_reg
                       (add_vec (zero_reg : mword 64) (Q3 !!! Regidx Rs1))]> Q3).
+        change (<[Regidx Ra0 := regval_into_reg
+                      (add_vec (zero_reg : mword 64) (Q3 !!! Regidx Rs1))]> Q3) with G1.
         assert (HG1a0 : G1 !!! Regidx Ra0 = ientry kd).
         { rewrite /G1 upd_eq. rewrite /Q3 upd_ne; [| nz].
           rewrite Y9 Hie. apply add_vec_zero_l. }
@@ -2793,8 +2845,10 @@ Section ProofCreateMain.
                   with "Hcg Hpc Hi086").
         iIntros (CID21 Hq21) "Hcg Hpc".
         iEval (rewrite Htgup) in "Hpc".
-        set (G2 := <[Regidx Rra := regval_into_reg
+        pose (G2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (CK + 0x86) : mword 64) 4)]> G1).
+        change (<[Regidx Rra := regval_into_reg
+                      (add_vec_int (mword_of_int (CK + 0x86) : mword 64) 4)]> G1) with G2.
         assert (HG2ra : G2 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CK + 0x86) : mword 64) 4)
           by (rewrite /G2; apply upd_eq).
@@ -2839,8 +2893,10 @@ Section ProofCreateMain.
                   mup (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                   with "Hcg Hpc Hi08a").
         iIntros (CID22 Hq22) "Hcg Hpc".
-        set (G3 := <[Regidx Rs2 := regval_into_reg
+        pose (G3 := <[Regidx Rs2 := regval_into_reg
                       (mword_of_int 0 : mword 64)]> mup).
+        change (<[Regidx Rs2 := regval_into_reg
+                      (mword_of_int 0 : mword 64)]> mup) with G3.
         assert (HG3s2 : G3 !!! Regidx Rs2 = (mword_of_int 0 : mword 64))
           by (rewrite /G3; apply upd_eq).
         assert (Hg2v : (mword_of_int 0 : mword 64) = (mword_of_int 0 : mword 64))
@@ -2978,8 +3034,10 @@ Section ProofCreateMain.
                   Mj (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                   with "Hcg Hpc Hi03e").
         iIntros (CID20 Hq20) "Hcg Hpc".
-        set (D1 := <[Regidx Ra2 := regval_into_reg
+        pose (D1 := <[Regidx Ra2 := regval_into_reg
                       (mword_of_int 0 : mword 64)]> Mj).
+        change (<[Regidx Ra2 := regval_into_reg
+                      (mword_of_int 0 : mword 64)]> Mj) with D1.
         assert (HD1a2 : D1 !!! Regidx Ra2 = (mword_of_int 0 : mword 64))
           by (rewrite /D1; apply upd_eq).
         assert (HD1s0 : D1 !!! Regidx Rs0 = sp0).
@@ -2997,9 +3055,12 @@ Section ProofCreateMain.
                   (mword_of_int 4016 : mword 12) D1 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi040").
         iIntros (CID21 Hq21) "Hcg Hpc".
-        set (D2 := <[Regidx Ra1 := regval_into_reg
+        pose (D2 := <[Regidx Ra1 := regval_into_reg
                       (add_vec (rget D1 Rs0)
                          (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> D1).
+        change (<[Regidx Ra1 := regval_into_reg
+                      (add_vec (rget D1 Rs0)
+                         (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> D1) with D2.
         assert (HD2a1 : D2 !!! Regidx Ra1 = pa_stk sp0 10).
         { rewrite /D2 upd_eq. rewrite rget_ne;
             [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].
@@ -3018,8 +3079,10 @@ Section ProofCreateMain.
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x44)) Ra0 Rs1 D2
                   (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi044").
         iIntros (CID22 Hq22) "Hcg Hpc". iEval (rgne) in "Hcg".
-        set (D3 := <[Regidx Ra0 := regval_into_reg
+        pose (D3 := <[Regidx Ra0 := regval_into_reg
                       (add_vec (zero_reg : mword 64) (D2 !!! Regidx Rs1))]> D2).
+        change (<[Regidx Ra0 := regval_into_reg
+                      (add_vec (zero_reg : mword 64) (D2 !!! Regidx Rs1))]> D2) with D3.
         assert (HD3a0 : D3 !!! Regidx Ra0 = ientry kd).
         { rewrite /D3 upd_eq. rewrite HD2s1 Hie. apply add_vec_zero_l. }
         assert (HD3a1 : D3 !!! Regidx Ra1 = pa_stk sp0 10)
@@ -3042,8 +3105,10 @@ Section ProofCreateMain.
                   with "Hcg Hpc Hi046").
         iIntros (CID23 Hq23) "Hcg Hpc".
         iEval (rewrite Htgdl) in "Hpc".
-        set (D4 := <[Regidx Rra := regval_into_reg
+        pose (D4 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (CK + 0x46) : mword 64) 4)]> D3).
+        change (<[Regidx Rra := regval_into_reg
+                      (add_vec_int (mword_of_int (CK + 0x46) : mword 64) 4)]> D3) with D4.
         assert (HD4ra : D4 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CK + 0x46) : mword 64) 4)
           by (rewrite /D4; apply upd_eq).
@@ -3127,9 +3192,12 @@ Section ProofCreateMain.
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x4a)) Rs2 Ra0 mdl
                     (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04a").
           iIntros (CID24 Hq24) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (F1 := <[Regidx Rs2 := regval_into_reg
+          pose (F1 := <[Regidx Rs2 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (mdl !!! Regidx Ra0))]> mdl).
+          change (<[Regidx Rs2 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (mdl !!! Regidx Ra0))]> mdl) with F1.
           assert (Hf1v : add_vec (zero_reg : mword 64) (mdl !!! Regidx Ra0)
                          = ientry kslot)
             by (rewrite Hdla0; apply add_vec_zero_l).
@@ -3159,9 +3227,12 @@ Section ProofCreateMain.
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x4e)) Ra0 Rs1 F1
                     (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04e").
           iIntros (CID26 Hq26) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (F2 := <[Regidx Ra0 := regval_into_reg
+          pose (F2 := <[Regidx Ra0 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (F1 !!! Regidx Rs1))]> F1).
+          change (<[Regidx Ra0 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (F1 !!! Regidx Rs1))]> F1) with F2.
           assert (HF2a0 : F2 !!! Regidx Ra0 = ientry kd).
           { rewrite /F2 upd_eq. rewrite /F1 upd_ne; [| nz].
             destruct Hmdlregs as (_ & _ & Hd9 & _). rewrite Hd9 Hie.
@@ -3181,8 +3252,10 @@ Section ProofCreateMain.
                     with "Hcg Hpc Hi050").
           iIntros (CID27 Hq27) "Hcg Hpc".
           iEval (rewrite Htgup1) in "Hpc".
-          set (F3 := <[Regidx Rra := regval_into_reg
+          pose (F3 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (CK + 0x50) : mword 64) 4)]> F2).
+          change (<[Regidx Rra := regval_into_reg
+                        (add_vec_int (mword_of_int (CK + 0x50) : mword 64) 4)]> F2) with F3.
           assert (HF3ra : F3 !!! Regidx Rra
                           = add_vec_int (mword_of_int (CK + 0x50) : mword 64) 4)
             by (rewrite /F3; apply upd_eq).
@@ -3232,9 +3305,12 @@ Section ProofCreateMain.
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x54)) Ra0 Rs2 mu1
                     (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi054").
           iIntros (CID28 Hq28) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (F4 := <[Regidx Ra0 := regval_into_reg
+          pose (F4 := <[Regidx Ra0 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (mu1 !!! Regidx Rs2))]> mu1).
+          change (<[Regidx Ra0 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (mu1 !!! Regidx Rs2))]> mu1) with F4.
           assert (HF4a0 : F4 !!! Regidx Ra0 = ientry kslot).
           { rewrite /F4 upd_eq.
             destruct Hmu1regs as (_ & _ & _ & Hd18 & _). rewrite Hd18.
@@ -3254,8 +3330,10 @@ Section ProofCreateMain.
                     with "Hcg Hpc Hi056").
           iIntros (CID29 Hq29) "Hcg Hpc".
           iEval (rewrite Htgil2) in "Hpc".
-          set (F5 := <[Regidx Rra := regval_into_reg
+          pose (F5 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (CK + 0x56) : mword 64) 4)]> F4).
+          change (<[Regidx Rra := regval_into_reg
+                        (add_vec_int (mword_of_int (CK + 0x56) : mword 64) 4)]> F4) with F5.
           assert (HF5ra : F5 !!! Regidx Rra
                           = add_vec_int (mword_of_int (CK + 0x56) : mword 64) 4)
             by (rewrite /F5; apply upd_eq).
@@ -3376,9 +3454,12 @@ Section ProofCreateMain.
             iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x98)) Ra0 Rs2 Mb
                       (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi098").
             iIntros (CIDB1 HqB1) "Hcg Hpc". iEval (rgne) in "Hcg".
-            set (B1 := <[Regidx Ra0 := regval_into_reg
+            pose (B1 := <[Regidx Ra0 := regval_into_reg
                           (add_vec (zero_reg : mword 64)
                              (Mb !!! Regidx Rs2))]> Mb).
+            change (<[Regidx Ra0 := regval_into_reg
+                          (add_vec (zero_reg : mword 64)
+                             (Mb !!! Regidx Rs2))]> Mb) with B1.
             assert (HB1a0 : B1 !!! Regidx Ra0 = ientry kslot).
             { rewrite /B1 upd_eq. rewrite X18. apply add_vec_zero_l. }
             assert (HB1regs : cr_regs m sp0 ipv (ientry kslot) ty major minor B1)
@@ -3396,8 +3477,10 @@ Section ProofCreateMain.
                       with "Hcg Hpc Hi09a").
             iIntros (CIDB2 HqB2) "Hcg Hpc".
             iEval (rewrite Htgup2) in "Hpc".
-            set (B2 := <[Regidx Rra := regval_into_reg
+            pose (B2 := <[Regidx Rra := regval_into_reg
                           (add_vec_int (mword_of_int (CK + 0x9a) : mword 64) 4)]> B1).
+            change (<[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (CK + 0x9a) : mword 64) 4)]> B1) with B2.
             assert (HB2ra : B2 !!! Regidx Rra
                             = add_vec_int (mword_of_int (CK + 0x9a) : mword 64) 4)
               by (rewrite /B2; apply upd_eq).
@@ -3442,8 +3525,10 @@ Section ProofCreateMain.
                       mu2 (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                       with "Hcg Hpc Hi09e").
             iIntros (CIDB3 HqB3) "Hcg Hpc".
-            set (B3 := <[Regidx Rs2 := regval_into_reg
+            pose (B3 := <[Regidx Rs2 := regval_into_reg
                           (mword_of_int 0 : mword 64)]> mu2).
+            change (<[Regidx Rs2 := regval_into_reg
+                          (mword_of_int 0 : mword 64)]> mu2) with B3.
             assert (HB3s2 : B3 !!! Regidx Rs2 = (mword_of_int 0 : mword 64))
               by (rewrite /B3; apply upd_eq).
             assert (Hb3v : (mword_of_int 0 : mword 64)
@@ -3499,8 +3584,10 @@ Section ProofCreateMain.
                     mic (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                     with "Hcg Hpc Hi05a").
           iIntros (CID30 Hq30) "Hcg Hpc".
-          set (F6 := <[Regidx Ra5 := regval_into_reg
+          pose (F6 := <[Regidx Ra5 := regval_into_reg
                         (mword_of_int 2 : mword 64)]> mic).
+          change (<[Regidx Ra5 := regval_into_reg
+                        (mword_of_int 2 : mword 64)]> mic) with F6.
           assert (HF6a5 : F6 !!! Regidx Ra5 = (mword_of_int 2 : mword 64))
             by (rewrite /F6; apply upd_eq).
           assert (HF6s4 : F6 !!! Regidx Rs4 = (sign_extend' 64 ty : mword 64))
@@ -3546,8 +3633,10 @@ Section ProofCreateMain.
              { iEval (rgne; rewrite HF6s2). iExact "Hcity". }
              iIntros (CID32 Hq32) "Hcg Hpc Hcity".
              iEval (rgne; rewrite HF6s2) in "Hcity".
-             set (F7 := <[Regidx Ra5 := regval_into_reg
+             pose (F7 := <[Regidx Ra5 := regval_into_reg
                            (zero_extend' 64 (di_type dnc : mword 16))]> F6).
+             change (<[Regidx Ra5 := regval_into_reg
+                           (zero_extend' 64 (di_type dnc : mword 16))]> F6) with F7.
              assert (HF7regs : cr_regs m sp0 ipv (ientry kslot) ty major minor F7)
                by (rewrite /F7; apply cr_regs_caller; [exact Hcsa5 | exact HF6regs]).
              assert (Hp064 : add_vec_int (mword_of_int (CK + 0x60) : mword 64) 4
@@ -3558,7 +3647,7 @@ Section ProofCreateMain.
                        (mword_of_int 62 : mword 6) F7 (K - 10)%nat b
                        ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi064").
              iIntros (CID33 Hq33) "Hcg Hpc".
-             set (F8 := <[Regidx Ra5 := regval_into_reg
+             pose (F8 := <[Regidx Ra5 := regval_into_reg
                            (sign_extend' 64
                               (subrange_vec_dec
                                  (add_vec (rget F7 Ra5)
@@ -3566,6 +3655,14 @@ Section ProofCreateMain.
                                        (sign_extend' 12
                                           (mword_of_int 62 : mword 6))))
                                  31 0))]> F7).
+             change (<[Regidx Ra5 := regval_into_reg
+                           (sign_extend' 64
+                              (subrange_vec_dec
+                                 (add_vec (rget F7 Ra5)
+                                    (sign_extend' 64
+                                       (sign_extend' 12
+                                          (mword_of_int 62 : mword 6))))
+                                 31 0))]> F7) with F8.
              assert (HF8regs : cr_regs m sp0 ipv (ientry kslot) ty major minor F8)
                by (rewrite /F8; apply cr_regs_caller; [exact Hcsa5 | exact HF7regs]).
              assert (Hp066 : add_vec_int (mword_of_int (CK + 0x64) : mword 64) 2
@@ -3577,10 +3674,14 @@ Section ProofCreateMain.
                        F8 (K - 10)%nat b eq_refl ltac:(nz) ltac:(rdok)
                        with "Hcg Hpc Hi066").
              iIntros (CID34 Hq34) "Hcg Hpc".
-             set (F9 := <[Regidx Ra5 := regval_into_reg
+             pose (F9 := <[Regidx Ra5 := regval_into_reg
                            (shift_bits_left (rget F8 Ra5)
                               (subrange_vec_dec (mword_of_int 48 : mword 6)
                                  (Z.sub log2_xlen 1) 0))]> F8).
+             change (<[Regidx Ra5 := regval_into_reg
+                           (shift_bits_left (rget F8 Ra5)
+                              (subrange_vec_dec (mword_of_int 48 : mword 6)
+                                 (Z.sub log2_xlen 1) 0))]> F8) with F9.
              assert (HF9regs : cr_regs m sp0 ipv (ientry kslot) ty major minor F9)
                by (rewrite /F9; apply cr_regs_caller; [exact Hcsa5 | exact HF8regs]).
              assert (Hp068 : add_vec_int (mword_of_int (CK + 0x66) : mword 64) 2
@@ -3591,10 +3692,14 @@ Section ProofCreateMain.
                        F9 (K - 10)%nat b ltac:(vm_compute; reflexivity)
                        ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi068").
              iIntros (CID35 Hq35) "Hcg Hpc".
-             set (FA := <[Regidx Ra5 := regval_into_reg
+             pose (FA := <[Regidx Ra5 := regval_into_reg
                            (shift_bits_right (rget F9 Ra5)
                               (subrange_vec_dec (mword_of_int 48 : mword 6)
                                  (Z.sub log2_xlen 1) 0))]> F9).
+             change (<[Regidx Ra5 := regval_into_reg
+                           (shift_bits_right (rget F9 Ra5)
+                              (subrange_vec_dec (mword_of_int 48 : mword 6)
+                                 (Z.sub log2_xlen 1) 0))]> F9) with FA.
              assert (HFAregs : cr_regs m sp0 ipv (ientry kslot) ty major minor FA)
                by (rewrite /FA; apply cr_regs_caller; [exact Hcsa5 | exact HF9regs]).
              (* THE THREE ALU LEAVES HAVE LEFT EXACTLY [cr_trange] IN a5.
@@ -3647,8 +3752,10 @@ Section ProofCreateMain.
                        FA (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                        with "Hcg Hpc Hi06a").
              iIntros (CID36 Hq36) "Hcg Hpc".
-             set (FB := <[Regidx Ra4 := regval_into_reg
+             pose (FB := <[Regidx Ra4 := regval_into_reg
                            (mword_of_int 1 : mword 64)]> FA).
+             change (<[Regidx Ra4 := regval_into_reg
+                           (mword_of_int 1 : mword 64)]> FA) with FB.
              assert (HFBa4 : FB !!! Regidx Ra4 = (mword_of_int 1 : mword 64))
                by (rewrite /FB; apply upd_eq).
              assert (HFBa5 : FB !!! Regidx Ra5 = cr_trange (di_type dnc))
@@ -3772,9 +3879,12 @@ Section ProofCreateMain.
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x4a)) Rs2 Ra0 mdl
                     (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi04a").
           iIntros (CID24 Hq24) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (A1 := <[Regidx Rs2 := regval_into_reg
+          pose (A1 := <[Regidx Rs2 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (mdl !!! Regidx Ra0))]> mdl).
+          change (<[Regidx Rs2 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (mdl !!! Regidx Ra0))]> mdl) with A1.
           assert (Ha1v : add_vec (zero_reg : mword 64) (mdl !!! Regidx Ra0)
                          = (mword_of_int 0 : mword 64))
             by (rewrite Hdla0; apply add_vec_zero_l).
@@ -3861,8 +3971,10 @@ Section ProofCreateMain.
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x8e)) Ra0 Rs1 Mg
                   (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi08e").
         iIntros (CID20 Hq20) "Hcg Hpc". iEval (rgne) in "Hcg".
-        set (J1 := <[Regidx Ra0 := regval_into_reg
+        pose (J1 := <[Regidx Ra0 := regval_into_reg
                       (add_vec (zero_reg : mword 64) (Mg !!! Regidx Rs1))]> Mg).
+        change (<[Regidx Ra0 := regval_into_reg
+                      (add_vec (zero_reg : mword 64) (Mg !!! Regidx Rs1))]> Mg) with J1.
         assert (HJ1a0 : J1 !!! Regidx Ra0 = ientry kd).
         { rewrite /J1 upd_eq.
           rewrite V9 Hie. apply add_vec_zero_l. }
@@ -3885,8 +3997,10 @@ Section ProofCreateMain.
                   with "Hcg Hpc Hi090").
         iIntros (CID21 Hq21) "Hcg Hpc".
         iEval (rewrite HtgupG) in "Hpc".
-        set (J2 := <[Regidx Rra := regval_into_reg
+        pose (J2 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (CK + 0x90) : mword 64) 4)]> J1).
+        change (<[Regidx Rra := regval_into_reg
+                      (add_vec_int (mword_of_int (CK + 0x90) : mword 64) 4)]> J1) with J2.
         assert (HJ2ra : J2 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CK + 0x90) : mword 64) 4)
           by (rewrite /J2; apply upd_eq).
@@ -3931,8 +4045,10 @@ Section ProofCreateMain.
                   mup (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                   with "Hcg Hpc Hi094").
         iIntros (CID22 Hq22) "Hcg Hpc".
-        set (J3 := <[Regidx Rs2 := regval_into_reg
+        pose (J3 := <[Regidx Rs2 := regval_into_reg
                       (mword_of_int 0 : mword 64)]> mup).
+        change (<[Regidx Rs2 := regval_into_reg
+                      (mword_of_int 0 : mword 64)]> mup) with J3.
         assert (HJ3s2 : J3 !!! Regidx Rs2 = (mword_of_int 0 : mword 64))
           by (rewrite /J3; apply upd_eq).
         assert (Hg2v : (mword_of_int 0 : mword 64) = (mword_of_int 0 : mword 64))
@@ -3995,8 +4111,10 @@ Section ProofCreateMain.
                   ltac:(nz) ltac:(rdok) ltac:(apply bv_eq; vm_compute; reflexivity)
                   with "Hcg Hpc Hi030").
         iIntros (CID20 Hq20) "Hcg Hpc".
-        set (N1 := <[Regidx Ra4 := regval_into_reg
+        pose (N1 := <[Regidx Ra4 := regval_into_reg
                       (mword_of_int (-32768) : mword 64)]> Q3).
+        change (<[Regidx Ra4 := regval_into_reg
+                      (mword_of_int (-32768) : mword 64)]> Q3) with N1.
         assert (HN1a4 : N1 !!! Regidx Ra4 = (mword_of_int (-32768) : mword 64))
           by (rewrite /N1; apply upd_eq).
         assert (HN1a5 : N1 !!! Regidx Ra5
@@ -4013,10 +4131,14 @@ Section ProofCreateMain.
                   (mword_of_int 1 : mword 6) N1 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi032").
         iIntros (CID21 Hq21) "Hcg Hpc". iEval (rgne) in "Hcg".
-        set (N2 := <[Regidx Ra4 := regval_into_reg
+        pose (N2 := <[Regidx Ra4 := regval_into_reg
                       (add_vec (N1 !!! Regidx Ra4)
                          (sign_extend' 64
                             (sign_extend' 12 (mword_of_int 1 : mword 6))))]> N1).
+        change (<[Regidx Ra4 := regval_into_reg
+                      (add_vec (N1 !!! Regidx Ra4)
+                         (sign_extend' 64
+                            (sign_extend' 12 (mword_of_int 1 : mword 6))))]> N1) with N2.
         assert (HN2a4 : N2 !!! Regidx Ra4 = (mword_of_int (-32767) : mword 64)).
         { rewrite /N2 upd_eq HN1a4. apply bv_eq; vm_compute; reflexivity. }
         assert (HN2a5 : N2 !!! Regidx Ra5
@@ -4032,8 +4154,10 @@ Section ProofCreateMain.
         iApply (wp_cadd_s_sconf (mword_of_int (CK + 0x34)) Ra5 Ra4
                   N2 (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi034").
         iIntros (CID22 Hq22) "Hcg Hpc". iEval (rgne; rgne) in "Hcg".
-        set (N3 := <[Regidx Ra5 := regval_into_reg
+        pose (N3 := <[Regidx Ra5 := regval_into_reg
                       (add_vec (N2 !!! Regidx Ra5) (N2 !!! Regidx Ra4))]> N2).
+        change (<[Regidx Ra5 := regval_into_reg
+                      (add_vec (N2 !!! Regidx Ra5) (N2 !!! Regidx Ra4))]> N2) with N3.
         assert (HN3a5 : N3 !!! Regidx Ra5
                         = add_vec
                             (sign_extend' 64 (di_nlink dnl : mword 16) : mword 64)
@@ -4069,9 +4193,12 @@ Section ProofCreateMain.
                     (mword_of_int 4095 : mword 12) N3 (K - 10)%nat b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi038").
           iIntros (CID24 Hq24) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (N4 := <[Regidx Ra5 := regval_into_reg
+          pose (N4 := <[Regidx Ra5 := regval_into_reg
                         (add_vec (N3 !!! Regidx Rs4)
                            (sign_extend' 64 (mword_of_int 4095 : mword 12)))]> N3).
+          change (<[Regidx Ra5 := regval_into_reg
+                        (add_vec (N3 !!! Regidx Rs4)
+                           (sign_extend' 64 (mword_of_int 4095 : mword 12)))]> N3) with N4.
           assert (HN4a5 : N4 !!! Regidx Ra5
                           = add_vec (sign_extend' 64 ty : mword 64)
                               (sign_extend' 64
@@ -4160,8 +4287,10 @@ Section ProofCreateMain.
       iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x160)) Rs2 Ra0 Q1
                 (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi160").
       iIntros (CID17 Hq17) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (N1 := <[Regidx Rs2 := regval_into_reg
+      pose (N1 := <[Regidx Rs2 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (Q1 !!! Regidx Ra0))]> Q1).
+      change (<[Regidx Rs2 := regval_into_reg
+                    (add_vec (zero_reg : mword 64) (Q1 !!! Regidx Ra0))]> Q1) with N1.
       assert (HN1s2 : N1 !!! Regidx Rs2 = (mword_of_int 0 : mword 64)).
       { rewrite /N1 upd_eq. rewrite HQ1a0 Hnpa0. apply add_vec_zero_l. }
       assert (Hs2v : add_vec (zero_reg : mword 64) (Q1 !!! Regidx Ra0)
@@ -4465,8 +4594,10 @@ Section ProofCreateMain.
                 Mo (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                 with "Hcg Hpc Hi0bc").
       iIntros (CIDB3 HqB3) "Hcg Hpc".
-      set (W1 := <[Regidx Ra4 := regval_into_reg
+      pose (W1 := <[Regidx Ra4 := regval_into_reg
                     (mword_of_int 1 : mword 64)]> Mo).
+      change (<[Regidx Ra4 := regval_into_reg
+                    (mword_of_int 1 : mword 64)]> Mo) with W1.
       assert (HW1a4 : W1 !!! Regidx Ra4 = (mword_of_int 1 : mword 64))
         by (rewrite /W1; apply upd_eq).
       assert (HW1s3 : W1 !!! Regidx Rs3 = ientry kslot)
@@ -4500,8 +4631,10 @@ Section ProofCreateMain.
       iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xc2)) Ra0 Rs3 W1
                 (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c2").
       iIntros (CIDB5 HqB5) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (W2 := <[Regidx Ra0 := regval_into_reg
+      pose (W2 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (W1 !!! Regidx Rs3))]> W1).
+      change (<[Regidx Ra0 := regval_into_reg
+                    (add_vec (zero_reg : mword 64) (W1 !!! Regidx Rs3))]> W1) with W2.
       assert (HW2a0 : W2 !!! Regidx Ra0 = ientry kslot).
       { rewrite /W2 upd_eq. rewrite HW1s3. apply add_vec_zero_l. }
       assert (HW2regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -4520,8 +4653,10 @@ Section ProofCreateMain.
                 with "Hcg Hpc Hi0c4").
       iIntros (CIDB6 HqB6) "Hcg Hpc".
       iEval (rewrite Htgiu) in "Hpc".
-      set (W3 := <[Regidx Rra := regval_into_reg
+      pose (W3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (CK + 0xc4) : mword 64) 4)]> W2).
+      change (<[Regidx Rra := regval_into_reg
+                    (add_vec_int (mword_of_int (CK + 0xc4) : mword 64) 4)]> W2) with W3.
       assert (HW3ra : W3 !!! Regidx Rra
                       = add_vec_int (mword_of_int (CK + 0xc4) : mword 64) 4)
         by (rewrite /W3; apply upd_eq).
@@ -4593,8 +4728,10 @@ Section ProofCreateMain.
                 miu (K - 10)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
                 with "Hcg Hpc Hi0c8").
       iIntros (CIDB7 HqB7) "Hcg Hpc".
-      set (W4 := <[Regidx Ra4 := regval_into_reg
+      pose (W4 := <[Regidx Ra4 := regval_into_reg
                     (mword_of_int 1 : mword 64)]> miu).
+      change (<[Regidx Ra4 := regval_into_reg
+                    (mword_of_int 1 : mword 64)]> miu) with W4.
       assert (HW4a4 : W4 !!! Regidx Ra4 = (mword_of_int 1 : mword 64))
         by (rewrite /W4; apply upd_eq).
       assert (HW4s4 : W4 !!! Regidx Rs4 = (sign_extend' 64 ty : mword 64))
@@ -4704,8 +4841,10 @@ Section ProofCreateMain.
         { iEval (rgne; rewrite HW4s3). iExact "Hciinum". }
         iIntros (CIDC1 HqC1) "Hcg Hpc Hciinum".
         iEval (rgne; rewrite HW4s3) in "Hciinum".
-        set (X1 := <[Regidx Ra2 := regval_into_reg
+        pose (X1 := <[Regidx Ra2 := regval_into_reg
                       (sign_extend' 64 cinum : mword 64)]> W4).
+        change (<[Regidx Ra2 := regval_into_reg
+                      (sign_extend' 64 cinum : mword 64)]> W4) with X1.
         assert (HX1a2 : X1 !!! Regidx Ra2 = (sign_extend' 64 cinum : mword 64))
           by (rewrite /X1; apply upd_eq).
         assert (HX1s0 : X1 !!! Regidx Rs0 = sp0)
@@ -4723,9 +4862,12 @@ Section ProofCreateMain.
                   (mword_of_int 4016 : mword 12) X1 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0d2").
         iIntros (CIDC2 HqC2) "Hcg Hpc".
-        set (X2 := <[Regidx Ra1 := regval_into_reg
+        pose (X2 := <[Regidx Ra1 := regval_into_reg
                       (add_vec (rget X1 Rs0)
                          (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> X1).
+        change (<[Regidx Ra1 := regval_into_reg
+                      (add_vec (rget X1 Rs0)
+                         (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> X1) with X2.
         assert (HX2a1 : X2 !!! Regidx Ra1 = pa_stk sp0 10).
         { rewrite /X2 upd_eq. rewrite rget_ne;
             [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].
@@ -4744,9 +4886,12 @@ Section ProofCreateMain.
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xd6)) Ra0 Rs1 X2
                   (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0d6").
         iIntros (CIDC3 HqC3) "Hcg Hpc". iEval (rgne) in "Hcg".
-        set (X3 := <[Regidx Ra0 := regval_into_reg
+        pose (X3 := <[Regidx Ra0 := regval_into_reg
                       (add_vec (zero_reg : mword 64)
                          (X2 !!! Regidx Rs1))]> X2).
+        change (<[Regidx Ra0 := regval_into_reg
+                      (add_vec (zero_reg : mword 64)
+                         (X2 !!! Regidx Rs1))]> X2) with X3.
         assert (HX3a0 : X3 !!! Regidx Ra0 = ientry kd).
         { rewrite /X3 upd_eq. rewrite HX2s1. apply add_vec_zero_l. }
         assert (HX3a1 : X3 !!! Regidx Ra1 = pa_stk sp0 10)
@@ -4777,8 +4922,10 @@ Section ProofCreateMain.
                   with "Hcg Hpc Hi0d8").
         iIntros (CIDC4 HqC4) "Hcg Hpc".
         iEval (rewrite Htgdlk) in "Hpc".
-        set (X4 := <[Regidx Rra := regval_into_reg
+        pose (X4 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (CK + 0xd8) : mword 64) 4)]> X3).
+        change (<[Regidx Rra := regval_into_reg
+                      (add_vec_int (mword_of_int (CK + 0xd8) : mword 64) 4)]> X3) with X4.
         assert (HX4ra : X4 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CK + 0xd8) : mword 64) 4)
           by (rewrite /X4; apply upd_eq).
@@ -4996,9 +5143,12 @@ Section ProofCreateMain.
                        (K - 10)%nat b ltac:(nz) ltac:(rdok)
                        with "Hcg Hpc Hi0e0").
              iIntros (CIDD2 HqD2) "Hcg Hpc". iEval (rgne) in "Hcg".
-             set (Y1 := <[Regidx Ra0 := regval_into_reg
+             pose (Y1 := <[Regidx Ra0 := regval_into_reg
                            (add_vec (zero_reg : mword 64)
                               (mdl !!! Regidx Rs1))]> mdl).
+             change (<[Regidx Ra0 := regval_into_reg
+                           (add_vec (zero_reg : mword 64)
+                              (mdl !!! Regidx Rs1))]> mdl) with Y1.
              assert (HY1a0 : Y1 !!! Regidx Ra0 = ientry kd).
              { rewrite /Y1 upd_eq.
                destruct Hmdlregs as (_ & _ & Hd9 & _). rewrite Hd9.
@@ -5021,8 +5171,10 @@ Section ProofCreateMain.
                        with "Hcg Hpc Hi0e2").
              iIntros (CIDD3 HqD3) "Hcg Hpc".
              iEval (rewrite Htgu2) in "Hpc".
-             set (Y2 := <[Regidx Rra := regval_into_reg
+             pose (Y2 := <[Regidx Rra := regval_into_reg
                            (add_vec_int (mword_of_int (CK + 0xe2) : mword 64) 4)]> Y1).
+             change (<[Regidx Rra := regval_into_reg
+                           (add_vec_int (mword_of_int (CK + 0xe2) : mword 64) 4)]> Y1) with Y2.
              assert (HY2ra : Y2 !!! Regidx Rra
                              = add_vec_int (mword_of_int (CK + 0xe2) : mword 64) 4)
                by (rewrite /Y2; apply upd_eq).
@@ -5078,9 +5230,12 @@ Section ProofCreateMain.
                             = ientry kslot).
              { destruct Hmu2regs as (_ & _ & _ & _ & Hd19 & _). rewrite Hd19.
                apply add_vec_zero_l. }
-             set (Y3 := <[Regidx Rs2 := regval_into_reg
+             pose (Y3 := <[Regidx Rs2 := regval_into_reg
                            (add_vec (zero_reg : mword 64)
                               (mu2 !!! Regidx Rs3))]> mu2).
+             change (<[Regidx Rs2 := regval_into_reg
+                           (add_vec (zero_reg : mword 64)
+                              (mu2 !!! Regidx Rs3))]> mu2) with Y3.
              assert (HY3s2 : Y3 !!! Regidx Rs2 = ientry kslot)
                by (rewrite /Y3 upd_eq; exact Hy2v).
              assert (HY3regs : cr_regs3 m sp0 (ientry kd) (ientry kslot)
@@ -5105,8 +5260,10 @@ Section ProofCreateMain.
                        with "Hcg Hpc Hi0e8 Hb5").
              iIntros (CIDD5 HqD5) "Hcg Hpc Hb5".
              iEval (rewrite HT5) in "Hb5".
-             set (Y4 := <[Regidx Rs3 := regval_into_reg
+             pose (Y4 := <[Regidx Rs3 := regval_into_reg
                            (m !!! Regidx Rs3 : mword 64)]> Y3).
+             change (<[Regidx Rs3 := regval_into_reg
+                           (m !!! Regidx Rs3 : mword 64)]> Y3) with Y4.
              assert (HY4regs : cr_regs3 m sp0 (ientry kd) (ientry kslot)
                        (m !!! Regidx Rs3 : mword 64) ty major minor Y4)
                by exact (cr_regs3_s3 m sp0 (ientry kd) (ientry kslot)
@@ -5305,8 +5462,10 @@ Section ProofCreateMain.
       iApply (wp_cmv_s_sconf (mword_of_int (CK + 0xec)) Ra0 Rs1 Mo
                 (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0ec").
       iIntros (CIDF1 HqF1) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (Z1 := <[Regidx Ra0 := regval_into_reg
+      pose (Z1 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (Mo !!! Regidx Rs1))]> Mo).
+      change (<[Regidx Ra0 := regval_into_reg
+                    (add_vec (zero_reg : mword 64) (Mo !!! Regidx Rs1))]> Mo) with Z1.
       assert (HZ1a0 : Z1 !!! Regidx Ra0 = ientry kd).
       { rewrite /Z1 upd_eq.
         destruct HMoregs as (_ & _ & Hd9 & _). rewrite Hd9.
@@ -5327,8 +5486,10 @@ Section ProofCreateMain.
                 with "Hcg Hpc Hi0ee").
       iIntros (CIDF2 HqF2) "Hcg Hpc".
       iEval (rewrite Htgu) in "Hpc".
-      set (Z2 := <[Regidx Rra := regval_into_reg
+      pose (Z2 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (CK + 0xee) : mword 64) 4)]> Z1).
+      change (<[Regidx Rra := regval_into_reg
+                    (add_vec_int (mword_of_int (CK + 0xee) : mword 64) 4)]> Z1) with Z2.
       assert (HZ2ra : Z2 !!! Regidx Rra
                       = add_vec_int (mword_of_int (CK + 0xee) : mword 64) 4)
         by (rewrite /Z2; apply upd_eq).
@@ -5384,8 +5545,10 @@ Section ProofCreateMain.
                      = (mword_of_int 0 : mword 64)).
       { destruct Hmuregs as (_ & _ & _ & _ & Hd19 & _). rewrite Hd19.
         apply add_vec_zero_l. }
-      set (Z3 := <[Regidx Rs2 := regval_into_reg
+      pose (Z3 := <[Regidx Rs2 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (mu !!! Regidx Rs3))]> mu).
+      change (<[Regidx Rs2 := regval_into_reg
+                    (add_vec (zero_reg : mword 64) (mu !!! Regidx Rs3))]> mu) with Z3.
       assert (HZ3s2 : Z3 !!! Regidx Rs2 = (mword_of_int 0 : mword 64))
         by (rewrite /Z3 upd_eq; exact Hz2v).
       assert (HZ3regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -5410,8 +5573,10 @@ Section ProofCreateMain.
                 with "Hcg Hpc Hi0f4 Hb5").
       iIntros (CIDF4 HqF4) "Hcg Hpc Hb5".
       iEval (rewrite HT5) in "Hb5".
-      set (Z4 := <[Regidx Rs3 := regval_into_reg
+      pose (Z4 := <[Regidx Rs3 := regval_into_reg
                     (m !!! Regidx Rs3 : mword 64)]> Z3).
+      change (<[Regidx Rs3 := regval_into_reg
+                    (m !!! Regidx Rs3 : mword 64)]> Z3) with Z4.
       assert (HZ4regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                           (m !!! Regidx Rs3 : mword 64) ty major minor Z4)
         by exact (cr_regs3_s3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -5640,8 +5805,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x14a)) Ra0 Rs3 Mx
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi14a").
     iIntros (CIDG2 HqG2) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (G1 := <[Regidx Ra0 := regval_into_reg
+    pose (G1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Mx !!! Regidx Rs3))]> Mx).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (Mx !!! Regidx Rs3))]> Mx) with G1.
     assert (HG1a0 : G1 !!! Regidx Ra0 = ientry kslot).
     { rewrite /G1 upd_eq. rewrite X19. apply add_vec_zero_l. }
     assert (HG1regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -5660,8 +5827,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi14c").
     iIntros (CIDG3 HqG3) "Hcg Hpc".
     iEval (rewrite Htgiu) in "Hpc".
-    set (G2 := <[Regidx Rra := regval_into_reg
+    pose (G2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)]> G1).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)]> G1) with G2.
     assert (HG2ra : G2 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)
       by (rewrite /G2; apply upd_eq).
@@ -5720,8 +5889,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x150)) Ra0 Rs3 mfl
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi150").
     iIntros (CIDG5 HqG5) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (G3 := <[Regidx Ra0 := regval_into_reg
+    pose (G3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mfl !!! Regidx Rs3))]> mfl).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (mfl !!! Regidx Rs3))]> mfl) with G3.
     assert (HG3a0 : G3 !!! Regidx Ra0 = ientry kslot).
     { rewrite /G3 upd_eq. rewrite F19. apply add_vec_zero_l. }
     assert (HG3regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -5740,8 +5911,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi152").
     iIntros (CIDG6 HqG6) "Hcg Hpc".
     iEval (rewrite Htgu1) in "Hpc".
-    set (G4 := <[Regidx Rra := regval_into_reg
+    pose (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3) with G4.
     assert (HG4ra : G4 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)
       by (rewrite /G4; apply upd_eq).
@@ -5832,8 +6005,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x156)) Ra0 Rs1 mu1
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi156").
     iIntros (CIDG8 HqG8) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (G5 := <[Regidx Ra0 := regval_into_reg
+    pose (G5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mu1 !!! Regidx Rs1))]> mu1).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (mu1 !!! Regidx Rs1))]> mu1) with G5.
     assert (HG5a0 : G5 !!! Regidx Ra0 = ientry kd).
     { rewrite /G5 upd_eq. rewrite U9. apply add_vec_zero_l. }
     assert (HG5regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -5852,8 +6027,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi158").
     iIntros (CIDG9 HqG9) "Hcg Hpc".
     iEval (rewrite Htgu2) in "Hpc".
-    set (G6 := <[Regidx Rra := regval_into_reg
+    pose (G6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)]> G5).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)]> G5) with G6.
     assert (HG6ra : G6 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)
       by (rewrite /G6; apply upd_eq).
@@ -5978,8 +6155,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi15c Hb5").
     iIntros (CIDGB HqGB) "Hcg Hpc Hb5".
     iEval (rewrite HT5) in "Hb5".
-    set (G7 := <[Regidx Rs3 := regval_into_reg
+    pose (G7 := <[Regidx Rs3 := regval_into_reg
                   (m !!! Regidx Rs3 : mword 64)]> mu2).
+    change (<[Regidx Rs3 := regval_into_reg
+                  (m !!! Regidx Rs3 : mword 64)]> mu2) with G7.
     assert (HG7regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (m !!! Regidx Rs3 : mword 64) ty major minor G7)
       by exact (cr_regs3_s3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6380,8 +6559,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x14a)) Ra0 Rs3 Mx
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi14a").
     iIntros (CIDG2 HqG2) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (G1 := <[Regidx Ra0 := regval_into_reg
+    pose (G1 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Mx !!! Regidx Rs3))]> Mx).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (Mx !!! Regidx Rs3))]> Mx) with G1.
     assert (HG1a0 : G1 !!! Regidx Ra0 = ientry kslot).
     { rewrite /G1 upd_eq. rewrite X19. apply add_vec_zero_l. }
     assert (HG1regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6400,8 +6581,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi14c").
     iIntros (CIDG3 HqG3) "Hcg Hpc".
     iEval (rewrite Htgiu) in "Hpc".
-    set (G2 := <[Regidx Rra := regval_into_reg
+    pose (G2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)]> G1).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)]> G1) with G2.
     assert (HG2ra : G2 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x14c) : mword 64) 4)
       by (rewrite /G2; apply upd_eq).
@@ -6460,8 +6643,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x150)) Ra0 Rs3 mfl
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi150").
     iIntros (CIDG5 HqG5) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (G3 := <[Regidx Ra0 := regval_into_reg
+    pose (G3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mfl !!! Regidx Rs3))]> mfl).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (mfl !!! Regidx Rs3))]> mfl) with G3.
     assert (HG3a0 : G3 !!! Regidx Ra0 = ientry kslot).
     { rewrite /G3 upd_eq. rewrite F19. apply add_vec_zero_l. }
     assert (HG3regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6480,8 +6665,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi152").
     iIntros (CIDG6 HqG6) "Hcg Hpc".
     iEval (rewrite Htgu1) in "Hpc".
-    set (G4 := <[Regidx Rra := regval_into_reg
+    pose (G4 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)]> G3) with G4.
     assert (HG4ra : G4 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x152) : mword 64) 4)
       by (rewrite /G4; apply upd_eq).
@@ -6562,8 +6749,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x156)) Ra0 Rs1 mu1
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi156").
     iIntros (CIDG8 HqG8) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (G5 := <[Regidx Ra0 := regval_into_reg
+    pose (G5 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (mu1 !!! Regidx Rs1))]> mu1).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (mu1 !!! Regidx Rs1))]> mu1) with G5.
     assert (HG5a0 : G5 !!! Regidx Ra0 = ientry kd).
     { rewrite /G5 upd_eq. rewrite U9. apply add_vec_zero_l. }
     assert (HG5regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6582,8 +6771,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi158").
     iIntros (CIDG9 HqG9) "Hcg Hpc".
     iEval (rewrite Htgu2) in "Hpc".
-    set (G6 := <[Regidx Rra := regval_into_reg
+    pose (G6 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)]> G5).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)]> G5) with G6.
     assert (HG6ra : G6 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x158) : mword 64) 4)
       by (rewrite /G6; apply upd_eq).
@@ -6651,8 +6842,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi15c Hb5").
     iIntros (CIDGB HqGB) "Hcg Hpc Hb5".
     iEval (rewrite HT5) in "Hb5".
-    set (G7 := <[Regidx Rs3 := regval_into_reg
+    pose (G7 := <[Regidx Rs3 := regval_into_reg
                   (m !!! Regidx Rs3 : mword 64)]> mu2).
+    change (<[Regidx Rs3 := regval_into_reg
+                  (m !!! Regidx Rs3 : mword 64)]> mu2) with G7.
     assert (HG7regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (m !!! Regidx Rs3 : mword 64) ty major minor G7)
       by exact (cr_regs3_s3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6944,8 +7137,10 @@ Section ProofCreateMain.
     { iEval (rgne; rewrite X19). iExact "Hciinum". }
     iIntros (CIDm1 Hqm1) "Hcg Hpc Hciinum".
     iEval (rgne; rewrite X19) in "Hciinum".
-    set (Z1 := <[Regidx Ra2 := regval_into_reg
+    pose (Z1 := <[Regidx Ra2 := regval_into_reg
                   (sign_extend' 64 cinum : mword 64)]> Mx).
+    change (<[Regidx Ra2 := regval_into_reg
+                  (sign_extend' 64 cinum : mword 64)]> Mx) with Z1.
     assert (HZ1a2 : Z1 !!! Regidx Ra2 = (sign_extend' 64 cinum : mword 64))
       by (rewrite /Z1; apply upd_eq).
     assert (HZ1regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -6959,9 +7154,12 @@ Section ProofCreateMain.
               (mword_of_int 3 : mword 20) Z1 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0fc").
     iIntros (CIDm2 Hqm2) "Hcg Hpc".
-    set (Z2 := <[Regidx Ra1 := regval_into_reg
+    pose (Z2 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (mword_of_int (CK + 0xfc) : mword 64)
                      (auipc_off (mword_of_int 3 : mword 20)))]> Z1).
+    change (<[Regidx Ra1 := regval_into_reg
+                  (add_vec (mword_of_int (CK + 0xfc) : mword 64)
+                     (auipc_off (mword_of_int 3 : mword 20)))]> Z1) with Z2.
     assert (HZ2regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (ientry kslot) ty major minor Z2)
       by (rewrite /Z2; apply cr_regs3_caller; [exact Hcsa1 | exact HZ1regs]).
@@ -6975,9 +7173,12 @@ Section ProofCreateMain.
               (mword_of_int 2450 : mword 12) Z2 (K - 10)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi100").
     iIntros (CIDm3 Hqm3) "Hcg Hpc".
-    set (Z3 := <[Regidx Ra1 := regval_into_reg
+    pose (Z3 := <[Regidx Ra1 := regval_into_reg
                   (add_vec (rget Z2 Ra1)
                      (sign_extend' 64 (mword_of_int 2450 : mword 12)))]> Z2).
+    change (<[Regidx Ra1 := regval_into_reg
+                  (add_vec (rget Z2 Ra1)
+                     (sign_extend' 64 (mword_of_int 2450 : mword 12)))]> Z2) with Z3.
     assert (HZ3a1 : Z3 !!! Regidx Ra1 = mword_of_int cr_dot_addr).
     { rewrite /Z3 upd_eq. rewrite rget_ne;
         [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].
@@ -6996,8 +7197,10 @@ Section ProofCreateMain.
     iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x104)) Ra0 Rs3 Z3
               (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi104").
     iIntros (CIDm4 Hqm4) "Hcg Hpc". iEval (rgne) in "Hcg".
-    set (Z4 := <[Regidx Ra0 := regval_into_reg
+    pose (Z4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (zero_reg : mword 64) (Z3 !!! Regidx Rs3))]> Z3).
+    change (<[Regidx Ra0 := regval_into_reg
+                  (add_vec (zero_reg : mword 64) (Z3 !!! Regidx Rs3))]> Z3) with Z4.
     assert (HZ4a0 : Z4 !!! Regidx Ra0 = ientry kslot).
     { rewrite /Z4 upd_eq. rewrite HZ3s3. apply add_vec_zero_l. }
     assert (HZ4a1 : Z4 !!! Regidx Ra1 = mword_of_int cr_dot_addr)
@@ -7020,8 +7223,10 @@ Section ProofCreateMain.
               with "Hcg Hpc Hi106").
     iIntros (CIDm5 Hqm5) "Hcg Hpc".
     iEval (rewrite Htgd1) in "Hpc".
-    set (Z5 := <[Regidx Rra := regval_into_reg
+    pose (Z5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (CK + 0x106) : mword 64) 4)]> Z4).
+    change (<[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (CK + 0x106) : mword 64) 4)]> Z4) with Z5.
     assert (HZ5ra : Z5 !!! Regidx Rra
                     = add_vec_int (mword_of_int (CK + 0x106) : mword 64) 4)
       by (rewrite /Z5; apply upd_eq).
@@ -7240,8 +7445,10 @@ Section ProofCreateMain.
       { iEval (rgne; rewrite (proj1 (proj2 (proj2 Hmd1regs)))). iExact "Hiinum". }
       iIntros (CIDe2 Hqe2) "Hcg Hpc Hiinum".
       iEval (rgne; rewrite (proj1 (proj2 (proj2 Hmd1regs)))) in "Hiinum".
-      set (Y1 := <[Regidx Ra2 := regval_into_reg
+      pose (Y1 := <[Regidx Ra2 := regval_into_reg
                     (sign_extend' 64 dind : mword 64)]> md1).
+      change (<[Regidx Ra2 := regval_into_reg
+                    (sign_extend' 64 dind : mword 64)]> md1) with Y1.
       assert (HY1a2 : Y1 !!! Regidx Ra2 = (sign_extend' 64 dind : mword 64))
         by (rewrite /Y1; apply upd_eq).
       assert (HY1regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -7255,9 +7462,12 @@ Section ProofCreateMain.
                 (mword_of_int 3 : mword 20) Y1 (K - 10)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi110").
       iIntros (CIDe3 Hqe3) "Hcg Hpc".
-      set (Y2 := <[Regidx Ra1 := regval_into_reg
+      pose (Y2 := <[Regidx Ra1 := regval_into_reg
                     (add_vec (mword_of_int (CK + 0x110) : mword 64)
                        (auipc_off (mword_of_int 3 : mword 20)))]> Y1).
+      change (<[Regidx Ra1 := regval_into_reg
+                    (add_vec (mword_of_int (CK + 0x110) : mword 64)
+                       (auipc_off (mword_of_int 3 : mword 20)))]> Y1) with Y2.
       assert (HY2a2 : Y2 !!! Regidx Ra2 = (sign_extend' 64 dind : mword 64))
         by (rewrite /Y2 upd_ne; [exact HY1a2 | nz]).
       assert (HY2regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
@@ -7271,9 +7481,12 @@ Section ProofCreateMain.
                 (mword_of_int 2438 : mword 12) Y2 (K - 10)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi114").
       iIntros (CIDe4 Hqe4) "Hcg Hpc".
-      set (Y3 := <[Regidx Ra1 := regval_into_reg
+      pose (Y3 := <[Regidx Ra1 := regval_into_reg
                     (add_vec (rget Y2 Ra1)
                        (sign_extend' 64 (mword_of_int 2438 : mword 12)))]> Y2).
+      change (<[Regidx Ra1 := regval_into_reg
+                    (add_vec (rget Y2 Ra1)
+                       (sign_extend' 64 (mword_of_int 2438 : mword 12)))]> Y2) with Y3.
       assert (HY3a1 : Y3 !!! Regidx Ra1 = mword_of_int cr_dotdot_addr).
       { rewrite /Y3 upd_eq. rewrite rget_ne;
           [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].
@@ -7292,8 +7505,10 @@ Section ProofCreateMain.
       iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x118)) Ra0 Rs3 Y3
                 (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi118").
       iIntros (CIDe5 Hqe5) "Hcg Hpc". iEval (rgne) in "Hcg".
-      set (Y4 := <[Regidx Ra0 := regval_into_reg
+      pose (Y4 := <[Regidx Ra0 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (Y3 !!! Regidx Rs3))]> Y3).
+      change (<[Regidx Ra0 := regval_into_reg
+                    (add_vec (zero_reg : mword 64) (Y3 !!! Regidx Rs3))]> Y3) with Y4.
       assert (HY4a0 : Y4 !!! Regidx Ra0 = ientry kslot).
       { rewrite /Y4 upd_eq. rewrite HY3s3. apply add_vec_zero_l. }
       assert (HY4a1 : Y4 !!! Regidx Ra1 = mword_of_int cr_dotdot_addr)
@@ -7316,8 +7531,10 @@ Section ProofCreateMain.
                 with "Hcg Hpc Hi11a").
       iIntros (CIDe6 Hqe6) "Hcg Hpc".
       iEval (rewrite Htgd2) in "Hpc".
-      set (Y5 := <[Regidx Rra := regval_into_reg
+      pose (Y5 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (CK + 0x11a) : mword 64) 4)]> Y4).
+      change (<[Regidx Rra := regval_into_reg
+                    (add_vec_int (mword_of_int (CK + 0x11a) : mword 64) 4)]> Y4) with Y5.
       assert (HY5ra : Y5 !!! Regidx Rra
                       = add_vec_int (mword_of_int (CK + 0x11a) : mword 64) 4)
         by (rewrite /Y5; apply upd_eq).
@@ -7350,6 +7567,18 @@ Section ProofCreateMain.
                 ltac:(exact (di_nlink_stable_refl _ Hc1tynz))
                 Hlg Hwf1 Hholes1 Haddr1 Hsz311 Hist0 Hcblk Hcblog Hcinb
                 Hdl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
+                (* claude-notes/optimization.md: an inline [ltac:] closer is
+                   priced by the DEPTH of its call site, and with [rget] /
+                   [tp_pin] / [rf_upd] sealed opaque above, this arm's
+                   ambient context is large enough that this ONE sentence
+                   regresses [1.36 s -> 8.26 s] (measured, isolated
+                   [coqc -time], 2026-08-15) -- ProofPipewrite.v's Strategy
+                   header documents the same shape.  Left as a follow-up
+                   (a [clear -H..] hoist here needs the exact set of
+                   hypotheses [lia] draws on beyond the five obvious ones;
+                   a first attempt dropped one and failed with "Cannot find
+                   witness"), same as ProofPipewrite's own three recoveries
+                   were not done in the same pass as its Strategy opaque. *)
                 ltac:(rewrite Hc1nrec Hc1k0 Hind1 Hcrb2
                               (proj1 (proj2 SpecDirlink.dl_need_values));
                       pose proof (cr_mkdir_dl1 n3 n4 _ _ _ Hspend1); lia)
@@ -7471,8 +7700,10 @@ Section ProofCreateMain.
         iIntros (CIDe8 Hqe8) "Hcg Hpc Hciinum".
         iEval (rgne; rewrite (proj1 (proj2 (proj2 (proj2 (proj2 Hmd2regs))))))
           in "Hciinum".
-        set (W1 := <[Regidx Ra2 := regval_into_reg
+        pose (W1 := <[Regidx Ra2 := regval_into_reg
                       (sign_extend' 64 cinum : mword 64)]> md2).
+        change (<[Regidx Ra2 := regval_into_reg
+                      (sign_extend' 64 cinum : mword 64)]> md2) with W1.
         assert (HW1a2 : W1 !!! Regidx Ra2 = (sign_extend' 64 cinum : mword 64))
           by (rewrite /W1; apply upd_eq).
         assert (HW1regs : cr_regs3 m sp0 (ientry kd)
@@ -7491,9 +7722,12 @@ Section ProofCreateMain.
                   (mword_of_int 4016 : mword 12) W1 (K - 10)%nat b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi126").
         iIntros (CIDe9 Hqe9) "Hcg Hpc".
-        set (W2 := <[Regidx Ra1 := regval_into_reg
+        pose (W2 := <[Regidx Ra1 := regval_into_reg
                       (add_vec (rget W1 Rs0)
                          (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> W1).
+        change (<[Regidx Ra1 := regval_into_reg
+                      (add_vec (rget W1 Rs0)
+                         (sign_extend' 64 (mword_of_int 4016 : mword 12)))]> W1) with W2.
         assert (HW2a1 : W2 !!! Regidx Ra1 = pa_stk sp0 10).
         { rewrite /W2 upd_eq. rewrite rget_ne;
             [| intro Hz1; injection Hz1 as Hz2; vm_compute in Hz2; congruence ].
@@ -7513,9 +7747,12 @@ Section ProofCreateMain.
         iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x12a)) Ra0 Rs1 W2
                   (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi12a").
         iIntros (CIDe10 Hqe10) "Hcg Hpc". iEval (rgne) in "Hcg".
-        set (W3 := <[Regidx Ra0 := regval_into_reg
+        pose (W3 := <[Regidx Ra0 := regval_into_reg
                       (add_vec (zero_reg : mword 64)
                          (W2 !!! Regidx Rs1))]> W2).
+        change (<[Regidx Ra0 := regval_into_reg
+                      (add_vec (zero_reg : mword 64)
+                         (W2 !!! Regidx Rs1))]> W2) with W3.
         assert (HW3a0 : W3 !!! Regidx Ra0 = ientry kd).
         { rewrite /W3 upd_eq. rewrite HW2s1. apply add_vec_zero_l. }
         assert (HW3a1 : W3 !!! Regidx Ra1 = pa_stk sp0 10)
@@ -7539,8 +7776,10 @@ Section ProofCreateMain.
                   with "Hcg Hpc Hi12c").
         iIntros (CIDe11 Hqe11) "Hcg Hpc".
         iEval (rewrite Htgd3) in "Hpc".
-        set (W4 := <[Regidx Rra := regval_into_reg
+        pose (W4 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (CK + 0x12c) : mword 64) 4)]> W3).
+        change (<[Regidx Rra := regval_into_reg
+                      (add_vec_int (mword_of_int (CK + 0x12c) : mword 64) 4)]> W3) with W4.
         assert (HW4ra : W4 !!! Regidx Rra
                         = add_vec_int (mword_of_int (CK + 0x12c) : mword 64) 4)
           by (rewrite /W4; apply upd_eq).
@@ -7727,8 +7966,10 @@ Section ProofCreateMain.
             iExact "Hinl". }
           iIntros (CIDh2 Hqh2) "Hcg Hpc Hinl".
           iEval (rgne; rewrite (proj1 (proj2 (proj2 Hmd3regs)))) in "Hinl".
-          set (V1 := <[Regidx Ra5 := regval_into_reg
+          pose (V1 := <[Regidx Ra5 := regval_into_reg
                         (zero_extend' 64 (di_nlink dp3 : mword 16) : mword 64)]> md3).
+          change (<[Regidx Ra5 := regval_into_reg
+                        (zero_extend' 64 (di_nlink dp3 : mword 16) : mword 64)]> md3) with V1.
           assert (HV1a5 : V1 !!! Regidx Ra5
                           = (zero_extend' 64 (di_nlink dp3 : mword 16) : mword 64))
             by (rewrite /V1; apply upd_eq).
@@ -7745,12 +7986,18 @@ Section ProofCreateMain.
                     (mword_of_int 1 : mword 6) V1 (K - 10)%nat b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi138").
           iIntros (CIDh3 Hqh3) "Hcg Hpc".
-          set (V2 := <[Regidx Ra5 := regval_into_reg
+          pose (V2 := <[Regidx Ra5 := regval_into_reg
                         (sign_extend' 64 (subrange_vec_dec
                            (add_vec (rget V1 Ra5)
                               (sign_extend' 64
                                  (sign_extend' 12 (mword_of_int 1 : mword 6))))
                            31 0))]> V1).
+          change (<[Regidx Ra5 := regval_into_reg
+                        (sign_extend' 64 (subrange_vec_dec
+                           (add_vec (rget V1 Ra5)
+                              (sign_extend' 64
+                                 (sign_extend' 12 (mword_of_int 1 : mword 6))))
+                           31 0))]> V1) with V2.
           assert (HV2regs : cr_regs3 m sp0 (ientry kd)
                               (mword_of_int 0 : mword 64) (ientry kslot)
                               ty major minor V2)
@@ -7794,9 +8041,12 @@ Section ProofCreateMain.
           iApply (wp_cmv_s_sconf (mword_of_int (CK + 0x13e)) Ra0 Rs1 V2
                     (K - 10)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi13e").
           iIntros (CIDh5 Hqh5) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (V3 := <[Regidx Ra0 := regval_into_reg
+          pose (V3 := <[Regidx Ra0 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (V2 !!! Regidx Rs1))]> V2).
+          change (<[Regidx Ra0 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (V2 !!! Regidx Rs1))]> V2) with V3.
           assert (HV3a0 : V3 !!! Regidx Ra0 = ientry kd).
           { rewrite /V3 upd_eq. rewrite HV2s1. apply add_vec_zero_l. }
           assert (HV3regs : cr_regs3 m sp0 (ientry kd)
@@ -7817,9 +8067,12 @@ Section ProofCreateMain.
                     with "Hcg Hpc Hi140").
           iIntros (CIDh6 Hqh6) "Hcg Hpc".
           iEval (rewrite Htgiu2) in "Hpc".
-          set (V4 := <[Regidx Rra := regval_into_reg
+          pose (V4 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (CK + 0x140) : mword 64) 4)]>
                        V3).
+          change (<[Regidx Rra := regval_into_reg
+                        (add_vec_int (mword_of_int (CK + 0x140) : mword 64) 4)]>
+                       V3) with V4.
           assert (HV4ra : V4 !!! Regidx Rra
                           = add_vec_int (mword_of_int (CK + 0x140) : mword 64) 4)
             by (rewrite /V4; apply upd_eq).
@@ -7958,9 +8211,12 @@ Section ProofCreateMain.
                     (K - 10)%nat b ltac:(nz) ltac:(rdok)
                     with "Hcg Hpc Hi0e0").
           iIntros (CIDT1 HqT1) "Hcg Hpc". iEval (rgne) in "Hcg".
-          set (T1 := <[Regidx Ra0 := regval_into_reg
+          pose (T1 := <[Regidx Ra0 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (mmt !!! Regidx Rs1))]> mmt).
+          change (<[Regidx Ra0 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (mmt !!! Regidx Rs1))]> mmt) with T1.
           assert (HT1a0 : T1 !!! Regidx Ra0 = ientry kd).
           { rewrite /T1 upd_eq.
             destruct Hmmtregs as (_ & _ & Hd9 & _). rewrite Hd9.
@@ -7983,9 +8239,12 @@ Section ProofCreateMain.
                     with "Hcg Hpc Hi0e2").
           iIntros (CIDT2 HqT2) "Hcg Hpc".
           iEval (rewrite Htgu2) in "Hpc".
-          set (T2 := <[Regidx Rra := regval_into_reg
+          pose (T2 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (CK + 0xe2) : mword 64) 4)]>
                        T1).
+          change (<[Regidx Rra := regval_into_reg
+                        (add_vec_int (mword_of_int (CK + 0xe2) : mword 64) 4)]>
+                       T1) with T2.
           assert (HT2ra : T2 !!! Regidx Rra
                           = add_vec_int (mword_of_int (CK + 0xe2) : mword 64) 4)
             by (rewrite /T2; apply upd_eq).
@@ -8058,9 +8317,12 @@ Section ProofCreateMain.
                          = ientry kslot).
           { destruct Hmu2regs as (_ & _ & _ & _ & Hd19 & _). rewrite Hd19.
             apply add_vec_zero_l. }
-          set (T3 := <[Regidx Rs2 := regval_into_reg
+          pose (T3 := <[Regidx Rs2 := regval_into_reg
                         (add_vec (zero_reg : mword 64)
                            (mu2 !!! Regidx Rs3))]> mu2).
+          change (<[Regidx Rs2 := regval_into_reg
+                        (add_vec (zero_reg : mword 64)
+                           (mu2 !!! Regidx Rs3))]> mu2) with T3.
           assert (HT3s2 : T3 !!! Regidx Rs2 = ientry kslot)
             by (rewrite /T3 upd_eq; exact Ht3v).
           assert (HT3regs : cr_regs3 m sp0 (ientry kd) (ientry kslot)
@@ -8085,8 +8347,10 @@ Section ProofCreateMain.
                     with "Hcg Hpc Hi0e8 Hb5").
           iIntros (CIDT5 HqT5) "Hcg Hpc Hb5".
           iEval (rewrite HT5) in "Hb5".
-          set (T4 := <[Regidx Rs3 := regval_into_reg
+          pose (T4 := <[Regidx Rs3 := regval_into_reg
                         (m !!! Regidx Rs3 : mword 64)]> T3).
+          change (<[Regidx Rs3 := regval_into_reg
+                        (m !!! Regidx Rs3 : mword 64)]> T3) with T4.
           assert (HT4regs : cr_regs3 m sp0 (ientry kd) (ientry kslot)
                     (m !!! Regidx Rs3 : mword 64) ty major minor T4)
             by exact (cr_regs3_s3 m sp0 (ientry kd) (ientry kslot)
