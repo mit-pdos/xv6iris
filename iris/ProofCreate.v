@@ -7553,6 +7553,27 @@ Section ProofCreateMain.
                     ltac:(exact HY5a1) with "Hkd") as "Hddw".
       iDestruct (cpu_own_transport CIDd1 CIDe6 0%nat eb (proc_addr j) C b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+      (* claude-notes/optimization.md: an inline [ltac:] closer is priced by
+         the DEPTH of its call site, and with [rget]/[tp_pin]/[rf_upd] sealed
+         opaque above, this arm's ambient context is large enough that the
+         inline form of this bound regressed [1.36 s -> 8.26 s] (measured,
+         isolated [coqc -time], 2026-08-15) -- ProofPipewrite.v's Strategy
+         header documents the same shape.  Hoisted to a named [assert] with
+         an explicit [clear] down to the six facts [lia] actually draws on
+         ([Hn3lo], the eighth-block floor threaded from three [dirlink]s up,
+         is the one a first [clear -H..] attempt here dropped -- it is not
+         mentioned by the rewrite/pose chain below, only by [lia] itself). *)
+      assert (Hdlneed4 :
+                (SpecDirlink.dl_need (bool_decide (bmapstart ∈ Sb4))
+                   (SpecBmap.bmap_ind
+                      ((16 * dir_slot dat1
+                              (dir_nrec (bv_unsigned (di_size dc1))))
+                       `div` BSIZE)%nat)
+                 <= n4)%nat).
+      { clear -Hc1nrec Hc1k0 Hind1 Hcrb2 Hspend1 Hn3lo.
+        rewrite Hc1nrec Hc1k0 Hind1 Hcrb2
+                (proj1 (proj2 SpecDirlink.dl_need_values)).
+        pose proof (cr_mkdir_dl1 n3 n4 _ _ _ Hspend1); lia. }
       iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
                 gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
                 usd1 (ientry kslot) cinum bm1 dat1 dc1 dc1
@@ -7567,21 +7588,7 @@ Section ProofCreateMain.
                 ltac:(exact (di_nlink_stable_refl _ Hc1tynz))
                 Hlg Hwf1 Hholes1 Haddr1 Hsz311 Hist0 Hcblk Hcblog Hcinb
                 Hdl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
-                (* claude-notes/optimization.md: an inline [ltac:] closer is
-                   priced by the DEPTH of its call site, and with [rget] /
-                   [tp_pin] / [rf_upd] sealed opaque above, this arm's
-                   ambient context is large enough that this ONE sentence
-                   regresses [1.36 s -> 8.26 s] (measured, isolated
-                   [coqc -time], 2026-08-15) -- ProofPipewrite.v's Strategy
-                   header documents the same shape.  Left as a follow-up
-                   (a [clear -H..] hoist here needs the exact set of
-                   hypotheses [lia] draws on beyond the five obvious ones;
-                   a first attempt dropped one and failed with "Cannot find
-                   witness"), same as ProofPipewrite's own three recoveries
-                   were not done in the same pass as its Strategy opaque. *)
-                ltac:(rewrite Hc1nrec Hc1k0 Hind1 Hcrb2
-                              (proj1 (proj2 SpecDirlink.dl_need_values));
-                      pose proof (cr_mkdir_dl1 n3 n4 _ _ _ Hspend1); lia)
+                Hdlneed4
                 Hj Hgs HY5a0 HY5a2 Heb
                 with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
                       Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw Hsbi Hsbs Hsbb

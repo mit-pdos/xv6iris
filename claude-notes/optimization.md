@@ -359,13 +359,16 @@ worth 20× on individual files.
   lines, 101 `set`-built register-chain sites). Both fixes together, isolated
   `coqc -time -async-proofs off`: 226.96 s → 204.69 s wall (~10%), RSS 4.09 GB
   → 3.70 GB. One `iApply` (a `dl_need` bound closed by an inline `ltac:(…;
-  lia)`, three `dirlink`s deep) regressed 1.36 s → 8.26 s the same way, and is
-  the kind of site the rule above warns about — restating it costs a hand
-  edit, not a mechanical one (a first `clear -H..` attempt at it dropped a
-  hypothesis `lia` needed and failed with "Cannot find witness"), so it was
-  left as a documented follow-up rather than force-fit, same as
-  ProofPipewrite's own three recoveries were a separate pass from its
-  `Strategy opaque`.
+  lia)`, three `dirlink`s deep) regressed 1.36 s → 8.26 s the same way — the
+  kind of site the rule above warns about. Hoisting it to a named `assert`
+  with an explicit `clear -H..` fixed it (190.38 s isolated, past both
+  prior fixes); the trap in doing so is that `clear -H..`'s keep-list must
+  include every hypothesis the final `lia` draws on, not just the ones the
+  `rewrite`/`pose proof` chain names textually — the first attempt dropped
+  exactly that one (a floor fact threaded in from three `dirlink`s up,
+  consumed by `lia` alone) and failed with "Cannot find witness". Find the
+  missing hypothesis by grepping for the same name at the OTHER call sites
+  that need the same derived bound.
 - **`reg_lookup` (RegFile.v) by default** — one `vm_compute` over the concrete-key
   if-chain. Where the target value is SYMBOLIC, `vm_compute` would try to reduce
   it and hang; use the lemma-based `peel_reg`, which peels via `upd_eq`/`upd_ne`
