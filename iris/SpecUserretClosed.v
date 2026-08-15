@@ -28,8 +28,18 @@
      ghost tracking that no tier carries yet.  Passing them through is the
      honest thing: they are the same obligation, not a new one.
    * The kernel-side residue, as [Rut_at]: the bundle usertrap hands the loop
-     and gets back unchanged on the next trap. *)
-From Stdlib Require Import ZArith.
+     and gets back unchanged on the next trap.
+
+   THE TRAPFRAME'S 31 SAVE SLOTS ARE NOT ON THIS BOUNDARY, and an earlier
+   statement of it that listed them beside the residue was UNSATISFIABLE:
+   the residue OWNS that page ([UsertrapRes.ut_res_bare] -> [proc_priv_nopt]
+   -> [ProcInv.tf_page], at full ownership), so
+   [tf_page tfp ws -∗ tf_pa tfp 40 ↦ₚ₈{dq} v -∗ False] refutes any caller
+   holding both.  userret only READS those words, and the proof opens them
+   out of the residue itself ([usertrap_res_tf_open]) and closes them back
+   before user mode -- which is also what every LOOP round already did.  A
+   caller therefore hands over the residue and nothing about the page. *)
+From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import bitvector.definitions gmap.
 From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
@@ -65,15 +75,60 @@ Definition loop_ok (C : ucfg) (pt : uptd) : Prop :=
   ud_data pt = ud_pas pt /\
   proc_pt_wf pt.
 
+(* ===================================================================== *)
+(* THE DELEGATION WORD DELEGATES EVERY USER EXCEPTION.                  *)
+(*                                                                         *)
+(* [IntrDefs.MEDELEG_S] is what [start()]'s [csrw medeleg, 0xffff] leaves   *)
+(* ([legalize_medeleg] ignores its old-value argument), so this is a closed *)
+(* computation over the twelve exception kinds [UserExec.user_exc] admits.  *)
+(* It is the [uc_del] field of every [ucfg] the loop builds.                *)
+(* ===================================================================== *)
+Lemma medeleg_S_delegates (e : ExceptionType) :
+  user_exc e = true ->
+  bit_to_bool (access_vec_dec MEDELEG_S
+    (uint (exceptionType_bits_forwards e))) = true.
+Proof.
+  (* the payload has to go first: [exceptionType_bits_forwards] MATCHES on
+     the constructor's unit argument, so with it a variable the whole
+     computation is stuck. *)
+  destruct e; intro He; try discriminate He;
+    repeat (match goal with
+            | u : unit |- _ => destruct u
+            | b : breakpoint_cause |- _ => destruct b
+            end);
+    vm_compute; reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* THE SHAPE OF THE CONFIG RECORD EVERY ROUND RUNS AT --- the one every
+   entrant into the loop has to build, so it belongs beside [loop_ok].                  *)
+(* ===================================================================== *)
+Definition loop_tvd :
+  trapVectorMode_forwards (_get_Mtvec_Mode (mword_of_int TRAMPOLINE : mword 64))
+    = TV_Direct.
+Proof. vm_compute. reflexivity. Defined.
+
+Definition loop_ucfg (mdv0 : mword 64)
+    (Hmm : and_vec MIE_S (not_vec mdv0) = zeros' 64) : ucfg :=
+  UCfg (mword_of_int TRAMPOLINE) MIE_S mdv0 MEDELEG_S (DfracOwn 1)
+       loop_tvd Hmm medeleg_S_delegates.
+
+Lemma loop_ok_loop_ucfg (mdv0 : mword 64)
+    (Hmm : and_vec MIE_S (not_vec mdv0) = zeros' 64) (pt : uptd) :
+  ud_data pt = ud_pas pt -> proc_pt_wf pt -> loop_ok (loop_ucfg mdv0 Hmm) pt.
+Proof.
+  intros H1 H2. rewrite /loop_ok /=.
+  split; [reflexivity | split; [reflexivity | split; [reflexivity |
+    split; [reflexivity | split; [exact H1 | exact H2]]]]].
+Qed.
+
 Definition wp_userret_closed_body `{!riscvGS Σ, !sieG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (* the kernel-side residue, abstract exactly as [SpecUservec] takes it *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd)
     (kroot : mword 44) (j : nat) (ksp : mword 64)
-    (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64)
-    (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-    (dqm : dfrac) :=
+    (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) :=
   (* ---- the loop's own shape, re-established every round ---- *)
   loop_ok C pt ->
   (j < NPROC)%nat ->
@@ -122,37 +177,6 @@ Definition wp_userret_closed_body `{!riscvGS Σ, !sieG Σ}
   udata_own (ud_data pt) -∗
   pc_is (uva 0x9c) -∗
   gpr_file m -∗
-  tf_pa (ud_tfp pt) 40 ↦ₚ₈{ dqm } vra -∗
-  tf_pa (ud_tfp pt) 48 ↦ₚ₈{ dqm } vsp -∗
-  tf_pa (ud_tfp pt) 56 ↦ₚ₈{ dqm } vgp -∗
-  tf_pa (ud_tfp pt) 64 ↦ₚ₈{ dqm } vtp -∗
-  tf_pa (ud_tfp pt) 72 ↦ₚ₈{ dqm } vt0 -∗
-  tf_pa (ud_tfp pt) 80 ↦ₚ₈{ dqm } vt1 -∗
-  tf_pa (ud_tfp pt) 88 ↦ₚ₈{ dqm } vt2 -∗
-  tf_pa (ud_tfp pt) 96 ↦ₚ₈{ dqm } vs0 -∗
-  tf_pa (ud_tfp pt) 104 ↦ₚ₈{ dqm } vs1 -∗
-  tf_pa (ud_tfp pt) 120 ↦ₚ₈{ dqm } va1 -∗
-  tf_pa (ud_tfp pt) 128 ↦ₚ₈{ dqm } va2 -∗
-  tf_pa (ud_tfp pt) 136 ↦ₚ₈{ dqm } va3 -∗
-  tf_pa (ud_tfp pt) 144 ↦ₚ₈{ dqm } va4 -∗
-  tf_pa (ud_tfp pt) 152 ↦ₚ₈{ dqm } va5 -∗
-  tf_pa (ud_tfp pt) 160 ↦ₚ₈{ dqm } va6 -∗
-  tf_pa (ud_tfp pt) 168 ↦ₚ₈{ dqm } va7 -∗
-  tf_pa (ud_tfp pt) 176 ↦ₚ₈{ dqm } vs2 -∗
-  tf_pa (ud_tfp pt) 184 ↦ₚ₈{ dqm } vs3 -∗
-  tf_pa (ud_tfp pt) 192 ↦ₚ₈{ dqm } vs4 -∗
-  tf_pa (ud_tfp pt) 200 ↦ₚ₈{ dqm } vs5 -∗
-  tf_pa (ud_tfp pt) 208 ↦ₚ₈{ dqm } vs6 -∗
-  tf_pa (ud_tfp pt) 216 ↦ₚ₈{ dqm } vs7 -∗
-  tf_pa (ud_tfp pt) 224 ↦ₚ₈{ dqm } vs8 -∗
-  tf_pa (ud_tfp pt) 232 ↦ₚ₈{ dqm } vs9 -∗
-  tf_pa (ud_tfp pt) 240 ↦ₚ₈{ dqm } vs10 -∗
-  tf_pa (ud_tfp pt) 248 ↦ₚ₈{ dqm } vs11 -∗
-  tf_pa (ud_tfp pt) 256 ↦ₚ₈{ dqm } vt3 -∗
-  tf_pa (ud_tfp pt) 264 ↦ₚ₈{ dqm } vt4 -∗
-  tf_pa (ud_tfp pt) 272 ↦ₚ₈{ dqm } vt5 -∗
-  tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
-  tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
   (* ---- the kernel-side bundle, at THIS hart ---- *)
   URes CID pt ksp -∗
   WP (Loop : expr riscv_lang).
@@ -167,10 +191,7 @@ Module Type USERRET_CLOSED.
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
-      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64)
-      (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-      (dqm : dfrac),
+      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64),
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v
-        vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v.
 End USERRET_CLOSED.

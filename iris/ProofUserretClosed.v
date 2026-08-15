@@ -36,7 +36,7 @@
    is.  [loop_ucfg] is that shape, and its three proof fields are what the
    round has to re-establish: [uc_tvd] from stvec's pinned value, [uc_mm]
    from the post's own mask fact, and [uc_del] from [medeleg = MEDELEG_S],
-   which is [medeleg_S_delegates] below -- a closed computation, because
+   which is [SpecUserretClosed.medeleg_S_delegates] -- a closed computation, because
    [start()] fixes the delegation word once and nothing writes it again. *)
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import bitvector.definitions gmap.
@@ -63,55 +63,10 @@ Require Import FsBlocks LogInv FsCrash KallocInv IrefSlots InodeRegion.
 Require Import ProcAvail.
 Require Import SpecUserret SpecUser SpecUsertrap SpecUservec SpecUserretClosed.
 Require Import UserretUser.
+Require Import TfPage36.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
-
-(* ===================================================================== *)
-(* §1 THE DELEGATION WORD DELEGATES EVERY USER EXCEPTION.                  *)
-(*                                                                         *)
-(* [IntrDefs.MEDELEG_S] is what [start()]'s [csrw medeleg, 0xffff] leaves   *)
-(* ([legalize_medeleg] ignores its old-value argument), so this is a closed *)
-(* computation over the twelve exception kinds [UserExec.user_exc] admits.  *)
-(* It is the [uc_del] field of every [ucfg] the loop builds.                *)
-(* ===================================================================== *)
-Lemma medeleg_S_delegates (e : ExceptionType) :
-  user_exc e = true ->
-  bit_to_bool (access_vec_dec MEDELEG_S
-    (uint (exceptionType_bits_forwards e))) = true.
-Proof.
-  (* the payload has to go first: [exceptionType_bits_forwards] MATCHES on
-     the constructor's unit argument, so with it a variable the whole
-     computation is stuck. *)
-  destruct e; intro He; try discriminate He;
-    repeat (match goal with
-            | u : unit |- _ => destruct u
-            | b : breakpoint_cause |- _ => destruct b
-            end);
-    vm_compute; reflexivity.
-Qed.
-
-(* ===================================================================== *)
-(* §2 THE SHAPE OF THE CONFIG RECORD EVERY ROUND RUNS AT.                  *)
-(* ===================================================================== *)
-Definition loop_tvd :
-  trapVectorMode_forwards (_get_Mtvec_Mode (mword_of_int TRAMPOLINE : mword 64))
-    = TV_Direct.
-Proof. vm_compute. reflexivity. Defined.
-
-Definition loop_ucfg (mdv0 : mword 64)
-    (Hmm : and_vec MIE_S (not_vec mdv0) = zeros' 64) : ucfg :=
-  UCfg (mword_of_int TRAMPOLINE) MIE_S mdv0 MEDELEG_S (DfracOwn 1)
-       loop_tvd Hmm medeleg_S_delegates.
-
-Lemma loop_ok_loop_ucfg (mdv0 : mword 64)
-    (Hmm : and_vec MIE_S (not_vec mdv0) = zeros' 64) (pt : uptd) :
-  ud_data pt = ud_pas pt -> proc_pt_wf pt -> loop_ok (loop_ucfg mdv0 Hmm) pt.
-Proof.
-  intros H1 H2. rewrite /loop_ok /=.
-  split; [reflexivity | split; [reflexivity | split; [reflexivity |
-    split; [reflexivity | split; [exact H1 | exact H2]]]]].
-Qed.
 
 (* ===================================================================== *)
 (* §3 THE LOOP.                                                            *)
@@ -253,12 +208,9 @@ End Res.
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd)
       (kroot : mword 44) (j : nat) (ksp : mword 64)
-      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64)
-      (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
-      (dqm : dfrac) :
+      (m : regfile) (usatp mstatus0 sepc0 sc_v stval_v : mword 64) :
       wp_userret_closed_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v
-        vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm.
+        C pt kroot j ksp m usatp mstatus0 sepc0 sc_v stval_v.
   Proof.
     cbv beta delta [wp_userret_closed_body].
     intros Hok Hj Hgap Hkw HSIE HMPRV HSXL HTVM HMXR HTSR HFS HVS Hsup Hwf
@@ -267,21 +219,39 @@ End Res.
     destruct Hsatpr as (HuMode & Huasid & Huppn).
     iIntros "#Hkt #Hhw #Hmin #Hwire #Hclaim #Hkpt Hhs Hpriv Hms Hmiec Hmdlc
              Hmenvc #Hsenvc Hsepc Hsc Hstval Hstvec #Hmedlc #Hmsec #Hssec
-             Hktlb Hufr Hdata Hpc Hfile Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112 Hures".
+             Hktlb Hufr Hdata Hpc Hfile Hures".
     (* the loop, once: it is [□], so one instance serves every round *)
     iDestruct (LP.stvec_handler_loop kroot j Hj Hgap Hkw
                  with "Hkt Hclaim Hkpt Hwire") as "#Hloop".
+    (* THE SAVE SLOTS COME OUT OF THE RESIDUE, not from the caller: the
+       residue owns the trapframe page, so a boundary that asked for both
+       would be unsatisfiable (SpecUserretClosed.v's header).  userret READS
+       the 31 words and hands them straight back, and the closer below is
+       what makes the bundle whole again before user mode -- the same
+       open/close every LOOP round already performs inside
+       [wp_uservec_pt]. *)
+    iDestruct (usertrap_res_tf_open pt ksp kroot
+                 (fun ws Hl => Hkw CID ksp ws Hl) with "Hures")
+      as (ws) "(%Hokws & Htfp & Hclose)".
+    iDestruct (tf_page_length with "Htfp") as %Hlenws.
+    iDestruct (tf_page_open36 (ud_tfp pt) ws Hlenws with "Htfp") as
+      (u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280) "(-> & Hu0 & Hu8 & Hu16 & Hu24 & Hu32 & Htf40 & Htf48 & Htf56 & Htf64 & Htf72 & Htf80 & Htf88 & Htf96 & Htf104 & Htf112 & Htf120 & Htf128 & Htf136 & Htf144 & Htf152 & Htf160 & Htf168 & Htf176 & Htf184 & Htf192 & Htf200 & Htf208 & Htf216 & Htf224 & Htf232 & Htf240 & Htf248 & Htf256 & Htf264 & Htf272 & Htf280 & Htail)".
     iApply (RU.wp_userret_user C pt (LP.Rut_at CID) kroot m usatp
               mstatus0 sepc0 sc_v stval_v
-              vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm
+              u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280 u112 (DfracOwn 1)
               HSIE HMPRV HSXL HTVM HMXR (uc_mm C) Hwf HTSR Hsup Ha0
               HuMode Huasid Huppn HFS HVS Hdqc Hcov Hacc
               with "Hkt Hhw Hmin Hwire Hhs Hpriv Hms Hmiec Hmdlc Hmenvc Hsenvc
                     Hsepc Hclaim Hktlb Hufr Hpc Hfile
                     Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96 Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272 Htf280 Htf112
-                    Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hdata [Hures] [-]").
-    - (* [Rut] at this hart: the residue, with its stack top hidden *)
-      iExists ksp. iExact "Hures".
+                    Hsc Hstval Hstvec Hmedlc Hmsec Hssec Hdata
+                    [Hclose Hu0 Hu8 Hu16 Hu24 Hu32 Htail] [-]").
+    - (* [Rut] at this hart, as a CLOSER: the residue minus the save slots,
+         completed by the words userret gives back *)
+      iIntros "K40 K48 K56 K64 K72 K80 K88 K96 K104 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 K112".
+      iExists ksp. iApply "Hclose".
+      iApply (tf_page_close36 (ud_tfp pt) u0 u1 u2 u3 u4 u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264 u272 u280
+                with "Hu0 Hu8 Hu16 Hu24 Hu32 K40 K48 K56 K64 K72 K80 K88 K96 K104 K112 K120 K128 K136 K144 K152 K160 K168 K176 K184 K192 K200 K208 K216 K224 K232 K240 K248 K256 K264 K272 K280 Htail").
     - (* the handler contract, under the later the user WP takes it at *)
       iNext. iIntros "Hframe".
       iApply ("Hloop" $! CID C pt with "[%] Hhw Hmin Hframe").

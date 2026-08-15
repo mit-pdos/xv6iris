@@ -267,6 +267,16 @@ Lemma kd_f862 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_SDSP (mword_of_int 6, Regidx (mword_of_int 24)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_fba8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xfba8 : mword 16)) s
+  = Some (C_SD (mword_of_int 14, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma ke_fba8 s :
+  exec (execute (C_SD (mword_of_int 14, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)), s).
+Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 Lemma kd_00010a17 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00010a17 : mword 32) : M instruction) s
   = Some (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 20), AUIPC), s).

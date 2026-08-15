@@ -729,3 +729,95 @@ usertrap's own).
   mstatus gap and the trapframe kernel-words gap) are passed through
   verbatim, and `loop_ok` is a premise of the entry. Both are the same
   obligations one level down, not new ones.
+
+## forkret: PROVEN on the already-booted path, and the entry to the loop
+
+`SpecForkret.v` / `ProofForkretParts.v` / `ProofForkret.v` / `LinkForkret.v`,
+with `CodeForkret.v` generated (forkret is a new row in
+`tools/code_manifest.json`, prefix `fkr_`).  24 of forkret's 45 instructions
+are on the covered path; the rest is the `if (first)` arm.
+
+**WHAT IS ASSUMED, AND WHY IT IS THE RIGHT THING TO ASSUME FIRST.**  The
+contract takes `first_addr ↦₄{DfracDiscarded} 0` -- what the second and every
+later process to be scheduled observes -- which refutes the `c.beqz` at +0x24
+and kills the fsinit/kexec arm outright.  DISCARDED rather than owned is not
+laziness: `first` is written once and read by every process forever, so the
+permanent form is the only one a caller can keep across the trap loop.
+Closing the arm for real needs a one-shot ghost nothing carries yet, and it is
+the BOOT client's obligation, not forkret's.
+
+**THE ENTRY IS `SwtchCtx.valid_context`'s RESUME PAYLOAD, spelled out.**
+p->lock is still held from scheduler(), so the contract starts at
+`cpu_own 1 eb p false {["proc"]}` with `sie_cap_gpr m av false p`, plus
+`SchedCtx.p_sched`'s own `trap_csrs`/`cpu_claim`.  `release` is the whole of
+the index bookkeeping: `IntrDefs.arm_pay_ext_split` turns the caller's
+`trap_csrs ∗ cpu_claim p` into release's `arm_pay 0 eb p` and
+prepare_return's `trap_csrs_ext eb ∗ cpu_claim_ext eb p`, which is what makes
+the contract generic in `eb` with no case split anywhere in the walk.
+
+**THE RESIDUE IS A WAND, NOT A PREMISE.**  forkret cannot BUILD
+`usertrap_res_bare` -- that bundle is the union of five cones' environments
+and forkret touches none of them -- and it cannot TAKE one either, because
+what it does hold (the stack, the per-cpu bundle, the trap ghosts, the process
+block) is the bundle's other half.  So `wp_forkret_body`'s last premise is
+
+```coq
+  (∀ (h : CpuId) (V' : pprivate),
+     ⌜pv_upt V' = pt⌝ -∗ forkret_yield (CID := h) γf p ksp pid av V' -∗
+     URes h pt ksp)
+```
+
+with `forkret_yield = ut_trap_parked p ksp av ∅ ∗ proc_priv_nopt γf p pid V'`
+-- quantified over the hart because prepare_return parks, and over the record
+because prepare_return moves the trapframe.  When `SpecForkretPark`'s Axiom is
+finally discharged, the caller that PARKS the process is the one that proves
+this wand; nothing else about `ProofForkret.v` changes.
+
+**Three things in the walk worth keeping.**
+
+- **The frame goes back into the free-stack claim.**  forkret never runs its
+  epilogue, and the residue claims the kernel stack WHOLE at `ksp` (which is
+  what uservec reloads sp to on the next trap).  So the exit rebundles the
+  three saved words and three scratch slots and merges them with
+  `stack_own_app`; `av` at the entry and `av` in the residue are the same
+  number, which is why the budget premise is stated as the equation
+  `(trap_res eb + av2)%nat = (av - 6)%nat`.
+- **`cpu_claim_ext` has to be transported ACROSS prepare_return.**  Its `_pay`
+  twin comes back at the resuming hart and the `_ext` half the caller carried
+  is at the pre-call one; the two print identically and the failure is an
+  `iExact` that says "does not match goal".
+- **The exit IS `ProofUsertrapTail.ut_ret2`'s**, and reusing it literally:
+  assemble `ut_trap` out of what prepare_return handed back, then
+  `ut_trap_tlb_open` -- which yields userret's `tlb_res_pt kroot` and the
+  PARKED residue in one step, at the existential kernel root.  Nothing in
+  forkret names that root, which is why the trapframe kernel-words gap is
+  quantified over it here.
+- `wp_userret_closed`'s premises are otherwise DERIVED, not assumed: the nine
+  mstatus facts from `UsertrapRes.ut_exit_ms_ok`, the satp facts from
+  `WpKvminithart.kvi_satp_word`'s three (forkret's MAKE_SATP is kvminithart's
+  five instructions over a different register pair), `udata_cov` from
+  `ProcPtOwn.ud_pas_cov` and the `ud_data pt = ud_pas pt` premise.
+
+**What is left**: the `if (first)` arm (fsinit + kexec + the panic tail), and
+the `SpecForkretPark` Axiom -- for which forkret's wand premise is now the
+exact obligation.
+
+## THE CLOSED LOOP'S ENTRY WAS VACUOUS, AND IS FIXED
+
+`SpecUserretClosed.wp_userret_closed_body` took `URes CID pt ksp` AND the 31
+trapframe save slots at `dqm`.  The residue owns that page at FULL ownership
+(`ut_res_bare` → `ut_env_nopt` → `ut_own_nopt` → `proc_priv_nopt` →
+`ProcInv.tf_page`), so `tf_page tfp ws -∗ tf_pa tfp 40 ↦ₚ₈{dq} v -∗ False`
+refutes any caller holding both -- checked mechanically before the fix.  Every
+LOOP round was already right (`ProofUservec`'s tail opens the page out of the
+residue, gives userret the slots and closes them back); only the ENTRY was
+wrong, and only a real caller could find it.
+
+The fix, landed: the 31 cells and `dqm` are GONE from the statement (32 fewer
+parameters), `ProofUserretClosed` opens them out of `URes` itself with
+`usertrap_res_tf_open`, and `UserretUser.wp_userret_user` takes a CLOSER
+(`31 cells -∗ Rut pt`) where its bare `Rut pt` premise used to be -- so the
+bundle is completed at the one point the slots are back in hand, which is
+after userret's continuation and before the user WP.  `tf_page_open36` /
+`tf_page_close36` / `tf_words36` moved out of `ProofUservec.v` into the new
+leaf `TfPage36.v`, which all three consumers share.

@@ -23,11 +23,11 @@
        S-mode config world carries).
 
    What is left over in userret's continuation -- the 31 trapframe words --
-   is exactly the kernel-side bundle uservec's spec (SpecUservec.v)
-   consumes on the NEXT trap; the eventual whole-loop theorem keeps them
-   inside its Löb invariant together with [stvec_handler_wp]'s discharge.
-   Here they are simply dropped (the WP does not need them).  The kernel
-   table itself needs no threading at all: both userret and uservec now
+   is exactly what the kernel-side residue [Rut] owns while user code runs,
+   and what uservec's save walk opens again on the NEXT trap.  They are
+   therefore NOT dropped here: [Rut pt] is taken as a CLOSER over them (see
+   the premise's own comment), and completed in the continuation.  The
+   kernel table itself needs no threading at all: both userret and uservec
    reach it through the ambient, persistent [KptShare.kpt_inv], not a
    parked [kpt_frame]. *)
 From Stdlib Require Import ZArith.
@@ -145,8 +145,51 @@ Section UserretUser.
     mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
     udata_own (ud_data pt) -∗
-    (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
-    Rut pt -∗
+    (* ---- THE RESIDUE, COMPLETED BY THE WORDS userret READS ----------------
+       The 31 save slots are OWNED BY the kernel-side bundle that parks
+       across user execution ([UsertrapRes.ut_res_bare]'s [tf_page], via
+       [ProcInv.proc_priv_nopt]), and userret only READS them -- its
+       continuation hands them straight back.  So [Rut pt] cannot be a
+       premise BESIDE those cells: the two would claim the same page twice
+       and the precondition would be unsatisfiable (mechanically:
+       [tf_page tfp ws -∗ tf_pa tfp 40 ↦ₚ₈{dq} v -∗ False]).  What the
+       caller brings instead is the CLOSER -- the residue minus the slots --
+       and this proof completes it at the one point where the slots are back
+       in hand, which is after userret's continuation and before the user
+       WP.  The values are userret's own, unchanged: it restores registers
+       FROM the trapframe and writes none of it. *)
+    (tf_pa (ud_tfp pt) 40 ↦ₚ₈{ dqm } vra -∗
+       tf_pa (ud_tfp pt) 48 ↦ₚ₈{ dqm } vsp -∗
+       tf_pa (ud_tfp pt) 56 ↦ₚ₈{ dqm } vgp -∗
+       tf_pa (ud_tfp pt) 64 ↦ₚ₈{ dqm } vtp -∗
+       tf_pa (ud_tfp pt) 72 ↦ₚ₈{ dqm } vt0 -∗
+       tf_pa (ud_tfp pt) 80 ↦ₚ₈{ dqm } vt1 -∗
+       tf_pa (ud_tfp pt) 88 ↦ₚ₈{ dqm } vt2 -∗
+       tf_pa (ud_tfp pt) 96 ↦ₚ₈{ dqm } vs0 -∗
+       tf_pa (ud_tfp pt) 104 ↦ₚ₈{ dqm } vs1 -∗
+       tf_pa (ud_tfp pt) 120 ↦ₚ₈{ dqm } va1 -∗
+       tf_pa (ud_tfp pt) 128 ↦ₚ₈{ dqm } va2 -∗
+       tf_pa (ud_tfp pt) 136 ↦ₚ₈{ dqm } va3 -∗
+       tf_pa (ud_tfp pt) 144 ↦ₚ₈{ dqm } va4 -∗
+       tf_pa (ud_tfp pt) 152 ↦ₚ₈{ dqm } va5 -∗
+       tf_pa (ud_tfp pt) 160 ↦ₚ₈{ dqm } va6 -∗
+       tf_pa (ud_tfp pt) 168 ↦ₚ₈{ dqm } va7 -∗
+       tf_pa (ud_tfp pt) 176 ↦ₚ₈{ dqm } vs2 -∗
+       tf_pa (ud_tfp pt) 184 ↦ₚ₈{ dqm } vs3 -∗
+       tf_pa (ud_tfp pt) 192 ↦ₚ₈{ dqm } vs4 -∗
+       tf_pa (ud_tfp pt) 200 ↦ₚ₈{ dqm } vs5 -∗
+       tf_pa (ud_tfp pt) 208 ↦ₚ₈{ dqm } vs6 -∗
+       tf_pa (ud_tfp pt) 216 ↦ₚ₈{ dqm } vs7 -∗
+       tf_pa (ud_tfp pt) 224 ↦ₚ₈{ dqm } vs8 -∗
+       tf_pa (ud_tfp pt) 232 ↦ₚ₈{ dqm } vs9 -∗
+       tf_pa (ud_tfp pt) 240 ↦ₚ₈{ dqm } vs10 -∗
+       tf_pa (ud_tfp pt) 248 ↦ₚ₈{ dqm } vs11 -∗
+       tf_pa (ud_tfp pt) 256 ↦ₚ₈{ dqm } vt3 -∗
+       tf_pa (ud_tfp pt) 264 ↦ₚ₈{ dqm } vt4 -∗
+       tf_pa (ud_tfp pt) 272 ↦ₚ₈{ dqm } vt5 -∗
+       tf_pa (ud_tfp pt) 280 ↦ₚ₈{ dqm } vt6 -∗
+       tf_pa (ud_tfp pt) 112 ↦ₚ₈{ dqm } va0f -∗
+     Rut pt) -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
     ▷ stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
@@ -159,7 +202,7 @@ Section UserretUser.
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
-             Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrut Hhandler".
+             Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrutw Hhandler".
     iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -179,6 +222,12 @@ Section UserretUser.
              Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184 Htf192
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112".
+    (* the residue is whole again, now that the save slots are back *)
+    iDestruct ("Hrutw" with "Htf40 Htf48 Htf56 Htf64 Htf72 Htf80 Htf88 Htf96
+                             Htf104 Htf120 Htf128 Htf136 Htf144 Htf152 Htf160
+                             Htf168 Htf176 Htf184 Htf192 Htf200 Htf208 Htf216
+                             Htf224 Htf232 Htf240 Htf248 Htf256 Htf264 Htf272
+                             Htf280 Htf112") as "Hrut".
     iDestruct (userret_to_user_inv C pt Rut mstatus0 sepc0 sc_v stval_v
                  (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0)
                  (uc_stvec C) (uc_medeleg C)
