@@ -63,6 +63,8 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode
+                                         bit cluster's target *)
 Require Import SpecArgint.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
@@ -393,6 +395,158 @@ Qed.
    IS "the major is a legal device index") and [so_major_out] on the arm.
    The disjunct's disappearance is a fact about the COMPILER, and it is
    discharged by there being one branch to walk. *)
+
+(* ===================================================================== *)
+(*  THE OMODE BIT CLUSTER -- AND THE THEOREM OF THIS WALK                 *)
+(*                                                                        *)
+(*  [omode] is an [int], so every read of it is an [lw] and what the ALU   *)
+(*  sees is the SIGN EXTENSION of the stored 32-bit word.  Seven           *)
+(*  instructions consume it, at four masks:                               *)
+(*                                                                        *)
+(*    +0x32  andi a5,a5,512     O_CREATE -- the entry split                *)
+(*    +0xf6  (lw a5) beqz a5    [omode == O_RDONLY] -- the T_DIR refusal    *)
+(*    +0x90  andi a4,a5,1       O_WRONLY        \  [f->readable] =          *)
+(*    +0x94  xori a4,a4,1                       /    !(omode & O_WRONLY)    *)
+(*    +0x9c  andi a4,a5,3       O_WRONLY|O_RDWR \  [f->writable] =          *)
+(*    +0xa0  sltu a4,zero,a4    ([snez a4,a4])  /    (omode & 3) != 0       *)
+(*    +0xa8  andi a5,a5,1024    O_TRUNC                                     *)
+(*                                                                        *)
+(*  gcc MERGED THE C's TWO WRITABLE DISJUNCTS INTO ONE MASK.  The source   *)
+(*  is [(omode & O_WRONLY) || (omode & O_RDWR)] = [(omode & 1) ||          *)
+(*  (omode & 2)], and the emitted code is a single [andi 3] plus a [snez]  *)
+(*  -- branchless, so there is no short-circuit pair to price here either  *)
+(*  (the [major] check above is the same story).                          *)
+(*                                                                        *)
+(*  THE CENTRAL THEOREM IS [so_pay_witness].  On any route that reaches    *)
+(*  the field stores holding a T_DIR inode, the test at +0xf6 has already  *)
+(*  forced [omode = O_RDONLY = 0]; at zero BOTH masks are empty, so the    *)
+(*  [snez] stores a ZERO byte and [FileInvDefs.fc_wbool] of the published  *)
+(*  content is [false].  That is precisely [inode_pay_alloc]'s             *)
+(*  [wr = true -> ty <> T_DIR] premise, and it is where filewrite's        *)
+(*  [DirView.dir_ok] obligation -- five frames up -- is actually paid.     *)
+(*  The O_CREATE arm never reaches it: create was called with T_FILE, so   *)
+(*  its witness is [so_tdir_zne] at a literal.                            *)
+(* ===================================================================== *)
+
+(* the word the [lw] delivers *)
+Definition so_omv (om : mword 32) : mword 64 := sign_extend' 64 om.
+
+(* what an [andi <mask>] leaves in its destination *)
+Definition so_and (om : mword 32) (n : Z) : mword 64 :=
+  and_vec (so_omv om) (sign_extend' 64 (mword_of_int n : mword 12)).
+
+(* +0x90 then +0x94: the register whose low byte [sb a4,8(s2)] stores into
+   [f->readable] *)
+Definition so_rd_word (om : mword 32) : mword 64 :=
+  xor_vec (so_and om 1) (sign_extend' 64 (mword_of_int 1 : mword 12)).
+
+(* +0x9c then +0xa0: the register whose low byte [sb a4,9(s2)] stores into
+   [f->writable].  [zero_reg] is the [snez]'s [rs1] -- the leaf reads it out
+   of the capability with [sie_cap_gpr_x0]. *)
+Definition so_wr_word (om : mword 32) : mword 64 :=
+  zero_extend' 64 (bool_to_bit (zopz0zI_u (zero_reg : mword 64) (so_and om 3))).
+
+(* the 32 -> 64 companion of [so_sext16_inj]: the [lw]'s extension is
+   injective, which is what turns the [beqz] at +0xf6 into a fact about the
+   STORED word rather than about the register. *)
+Lemma so_sext32_inj (x y : mword 32) :
+  (sign_extend' 64 x : mword 64) = (sign_extend' 64 y : mword 64) -> x = y.
+Proof.
+  intros H. apply (f_equal bv_signed) in H.
+  cbv [sign_extend' Operators_mwords.sign_extend Operators_mwords.exts_vec
+       to_word get_word MachineWord.MachineWord.sign_extend] in H.
+  rewrite !bv_sign_extend_signed in H;
+    [| apply N.leb_le; vm_compute; reflexivity ..].
+  apply bv_eq_signed. exact H.
+Qed.
+
+Lemma so_omv_zero : so_omv (mword_of_int 0 : mword 32) = (zero_reg : mword 64).
+Proof. unfold so_omv. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* the +0xf6 [beqz a5]: the branch is taken EXACTLY at [omode = O_RDONLY],
+   and that is the only thing the T_DIR route learns. *)
+Lemma so_omode_eqz (om : mword 32) :
+  eq_vec (so_omv om) (zero_reg : mword 64) = true ->
+  om = (mword_of_int 0 : mword 32).
+Proof.
+  unfold so_omv. intro H. apply eq_vec_true_iff in H.
+  apply so_sext32_inj. rewrite H. apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+(* AT O_RDONLY EVERY MASK IS EMPTY.  Uniform in the mask, so the same lemma
+   serves O_CREATE (512), O_WRONLY (1), the merged writable mask (3) and
+   O_TRUNC (1024) -- there is nothing mask-specific to prove. *)
+Lemma so_and_rdonly (n : Z) :
+  so_and (mword_of_int 0 : mword 32) n = (mword_of_int 0 : mword 64).
+Proof.
+  unfold so_and, so_omv. apply bv_eq. rewrite and_vec64_unsigned.
+  assert (Hz : bv_unsigned (sign_extend' 64 (mword_of_int 0 : mword 32) : mword 64)
+               = 0%Z) by (vm_compute; reflexivity).
+  rewrite Hz Z.land_0_l. vm_compute; reflexivity.
+Qed.
+
+(* an empty mask fails its [beqz], i.e. the O_CREATE split takes the [namei]
+   arm and the O_TRUNC tail is skipped *)
+Lemma so_eqz_zero : eq_vec (mword_of_int 0 : mword 64) (zero_reg : mword 64) = true.
+Proof. apply eq_vec_true_iff. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma so_wr_rdonly :
+  so_wr_word (mword_of_int 0 : mword 32) = (mword_of_int 0 : mword 64).
+Proof.
+  unfold so_wr_word. rewrite (so_and_rdonly 3).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma so_wr_byte_rdonly :
+  trunc8 (so_wr_word (mword_of_int 0 : mword 32)) = (mword_of_int 0 : mword 8).
+Proof. rewrite so_wr_rdonly. apply bv_eq; vm_compute; reflexivity. Qed.
+
+(* the readable byte at O_RDONLY, for completeness: [!(0 & 1)] is ONE.  The
+   walk never needs its value -- nothing in the file layer is keyed on
+   [f->readable] -- but it is the fact that says the published descriptor is
+   a legal read fd. *)
+Lemma so_rd_byte_rdonly :
+  trunc8 (so_rd_word (mword_of_int 0 : mword 32)) = (mword_of_int 1 : mword 8).
+Proof.
+  unfold so_rd_word. rewrite (so_and_rdonly 1).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+(* the sixteen-bit type test, read as the Z-level disequality [DirView] and
+   [FileInvDefs] state their T_DIR conditions at.  This is the O_CREATE
+   arm's whole witness: create was called with T_FILE. *)
+Lemma so_tdir_zne (t : mword 16) :
+  t <> (mword_of_int 1 : mword 16) -> bv_unsigned t <> T_DIR_z.
+Proof.
+  intros Hne Hc. apply Hne. apply bv_eq. rewrite Hc.
+  unfold T_DIR_z. vm_compute. reflexivity.
+Qed.
+
+(* ...and its converse direction, which is how the else arm's branch fact
+   ("the type test at +0xec fell through, so the +0xf6 test ran") reaches
+   [so_pay_witness] in the vocabulary [inode_pay_alloc] speaks. *)
+Lemma so_dir_forced (t : mword 16) (om : mword 32) :
+  (t = (mword_of_int 1 : mword 16) -> om = (mword_of_int 0 : mword 32)) ->
+  (bv_unsigned t = T_DIR_z -> om = (mword_of_int 0 : mword 32)).
+Proof.
+  intros H Hz. apply H. apply bv_eq. rewrite Hz.
+  unfold T_DIR_z. vm_compute. reflexivity.
+Qed.
+
+(* ===== THE THEOREM =====================================================
+   The published content's [f->writable] byte is the one the [snez] stored,
+   and on a T_DIR inode [omode] was forced to zero -- so a WRITABLE fd is
+   never a directory.  Stated in exactly [inode_pay_alloc]'s shape, so the
+   walk's discharge is one [apply]. *)
+Lemma so_pay_witness (om : mword 32) (ty : bv 16) (C : fcontent) :
+  fc_writable C = trunc8 (so_wr_word om) ->
+  (bv_unsigned ty = T_DIR_z -> om = (mword_of_int 0 : mword 32)) ->
+  (fc_wbool C = true -> bv_unsigned ty <> T_DIR_z).
+Proof.
+  intros HC Hdir Hw Hty.
+  rewrite /fc_wbool HC (Hdir Hty) so_wr_byte_rdonly in Hw.
+  vm_compute in Hw. discriminate Hw.
+Qed.
 
 (* ===================================================================== *)
 (*  THE FRAME CARVE: 24 slots = FIVE saved words + ONE byte buffer +      *)
