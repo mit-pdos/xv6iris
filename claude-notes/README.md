@@ -150,7 +150,8 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   the last open piece of the printk cone, whose wiring is main's.
 - **[`uservec.md`](projects/uservec.md)** — uservec, proven (trampoline.S is
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
-  proof's file split. Remaining: the whole-trap-loop Löb theorem.
+  proof's file split, and the scoped plan for the whole-trap-loop Löb
+  theorem, which is what remains.
 - **[`panic.md`](projects/panic.md)** — `panic()`, proven: the contract the two
   printk calls force, the Löb self-jump, and the one thing left — splicing it
   into the 169 files that still thread `PanicStub.v`'s placeholder credential.

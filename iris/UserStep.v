@@ -26,6 +26,7 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import invariants.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
@@ -370,26 +371,36 @@ Section UserStepIris.
   (* axiom -- both branches step, so the arm is total.  The continuation   *)
   (* is an ADDITIVE conjunction: stay / wake.                              *)
   (* ------------------------------------------------------------------- *)
+  (* [mip] IS NOT A PARAMETER: it is borrowed from [clock_inv] (which
+     [minstret_inv] bundles) for the duration of this step's own
+     σ-callback -- the cell cannot be held by a caller, see [UserExec.ucfg].
+     Its value is therefore discovered here rather than supplied, and the
+     wake/stay split is made on THAT value; the continuation is the same
+     additive conjunction as before, minus the mip cell. *)
   Lemma wp_user_step_waiting (wr : WaitReason) (ib : mword 32)
-      (mip_v mie_v : mword 64) (va va' : mword 64) {dqp dqi : dfrac} :
+      (mie_v : mword 64) (va va' : mword 64) {dqi : dfrac} :
     wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
     minstret_inv -∗
     hart_state ↦ᵣ HART_WAITING (wr, ib) -∗
     PC ↦ᵣ va -∗
     nextPC ↦ᵣ va' -∗
-    mip ↦ᵣ{ dqp } mip_v -∗
     mie ↦ᵣ{ dqi } mie_v -∗
     ▷ ((hart_state ↦ᵣ HART_WAITING (wr, ib) -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
-        mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
+        mie ↦ᵣ{ dqi } mie_v -∗
         WP (Loop : expr riscv_lang))
      ∧ (hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ va' -∗ nextPC ↦ᵣ va' -∗
-        mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
+        mie ↦ᵣ{ dqi } mie_v -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmip Hmie Hcont".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
+    iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmie Hcont".
+    iPoseProof "Hinv" as "#Hinv'".
+    iDestruct "Hinv'" as "#(_ & Hclock & _)".
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑clockN) with "Hinv").
     iIntros (σ) "[Hreg Hmd] Hbody".
+    (* borrow mip across this step and give it straight back *)
+    iMod (clock_mip_acc (⊤ ∖ ↑minstretN) ltac:(solve_ndisj) with "Hclock")
+      as (mip_v) "[Hmip Hclosec]".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hnpc") as %Lnpc.
@@ -436,23 +447,25 @@ Section UserStepIris.
         iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
         iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
+        iMod ("Hclosec" with "Hmip") as "_".
         iModIntro.
         unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmip Hmie").
+        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
       + iModIntro. iExists T1.
         iSplitR. { iPureIntro. exact Hstep. }
         iNext.
         iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
+        iMod ("Hclosec" with "Hmip") as "_".
         iModIntro.
         unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmip Hmie").
+        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
     - (* STAY: no interrupt pending, reservation (still) valid *)
       assert (Hrhw : exec (run_hart_waiting 0 wr ib false) s_a
                      = Some (Step_Waiting wr, s_a)).
@@ -461,12 +474,12 @@ Section UserStepIris.
       pose proof (exec_riscv_step_wait_stay σ wr ib b Hsi Lhs_a Hrhw) as Hstep.
       iModIntro. iExists s_a.
       iSplitR. { iPureIntro. exact Hstep. }
-      iNext. iModIntro.
+      iNext. iMod ("Hclosec" with "Hmip") as "_". iModIntro.
       unfold s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
       iFrame "Hreg Hmd".
       iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
       iDestruct "Hcont" as "[Hstay _]".
-      iApply ("Hstay" with "Hhs Hpc Hnpc Hmip Hmie").
+      iApply ("Hstay" with "Hhs Hpc Hnpc Hmie").
     - (* WAKE: the reservation is invalid *)
       assert (Hrhw : exec (run_hart_waiting 0 wr ib false) s_a
                      = Some (Step_Execute (Retire_Success tt, ib),
@@ -493,23 +506,25 @@ Section UserStepIris.
         iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
         iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
+        iMod ("Hclosec" with "Hmip") as "_".
         iModIntro.
         unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmip Hmie").
+        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
       + iModIntro. iExists T1.
         iSplitR. { iPureIntro. exact Hstep. }
         iNext.
         iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
+        iMod ("Hclosec" with "Hmip") as "_".
         iModIntro.
         unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
-        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmip Hmie").
+        iApply ("Hwake'" with "Hhs Hpc Hnpc Hmie").
   Qed.
 
 End UserStepIris.
@@ -544,26 +559,26 @@ Section UserStepObligation.
       simpl in Hhs.
       iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
                              Hpc & Hnpc & Hgpr)".
-      iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
-      iApply (wp_user_step_waiting wr ib (uc_mip C) (uc_mie C) va va' Hhs
-                with "Hminstret Hhs Hpc Hnpc Hmip Hmie [-]").
+      iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hcfgrest)".
+      iApply (wp_user_step_waiting wr ib (uc_mie C) va va' Hhs
+                with "Hminstret Hhs Hpc Hnpc Hmie [-]").
       iNext. iSplit.
       + (* STAY: re-enter [user_inv] with the same waiting machine *)
-        iIntros "Hhs Hpc Hnpc Hmip Hmie".
+        iIntros "Hhs Hpc Hnpc Hmie".
         iDestruct "Hk" as "[Hk _]".
         iApply "Hk".
         iExists (HART_WAITING (wr, ib)), ms_v, sc_v, stval_v, sepc_v, va, va', g.
         iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt".
-        iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+        iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest".
         iFrame "Hrut".
         iPureIntro. split; [exact Hhs | split; [exact Hms | intros u Hu; discriminate Hu]].
       + (* WAKE: re-enter [user_inv] ACTIVE, pc in lock-step at [va'] *)
-        iIntros "Hhs Hpc Hnpc Hmip Hmie".
+        iIntros "Hhs Hpc Hnpc Hmie".
         iDestruct "Hk" as "[Hk _]".
         iApply "Hk".
         iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g.
         iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt".
-        iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+        iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest".
         iFrame "Hrut".
         iPureIntro. split; [exact Hms | intros u _; reflexivity].
   Qed.

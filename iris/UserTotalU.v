@@ -109,7 +109,7 @@ Section UserTotalU.
   Proof.
     intros Lcp Lmenv.
     iIntros "Hreg #Hhw Hcfg".
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcmenv & Hsenv & Hms0 & Hss0)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hcmenv & Hsenv & Hms0 & Hss0)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hmisa0 & _)".
     iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv0.
@@ -389,7 +389,7 @@ Section UserTotalU.
     ⌜register_lookup senvcfg s.(sregs) = (mword_of_int 0 : mword 64)⌝.
   Proof.
     iIntros "Hreg Hcfg".
-    iDestruct "Hcfg" as "(_ & _ & _ & _ & _ & _ & Hsenv & _ & _)".
+    iDestruct "Hcfg" as "(_ & _ & _ & _ & _ & Hsenv & _ & _)".
     iApply (reg_valid_dq with "Hreg Hsenv").
   Qed.
 

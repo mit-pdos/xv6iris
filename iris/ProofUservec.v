@@ -259,7 +259,7 @@ Section UservecAllPt.
     (* ============ open the trapped machine ============ *)
     iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hfile &
-        Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmie & Hmdl & Hmedl & Hmip &
+        Hutlb & Hdata & %Hcov & %Hacc & Hstvec & Hmie & Hmdl & Hmedl &
         Hmenv & Hsenv & Hmse & Hsse & Hrut)".
     pose proof Hok as Hok2.
     destruct Hok2 as (HSXL & HMPRV & HMXR & HSPP & HSIE & HTVM & HTSR).
@@ -274,7 +274,6 @@ Section UservecAllPt.
     iEval (rewrite Hdqc) in "Hmie".
     iEval (rewrite Hdqc) in "Hmdl".
     iEval (rewrite Hdqc) in "Hmedl".
-    iEval (rewrite Hdqc) in "Hmip".
     iEval (rewrite Hdqc) in "Hmenv".
     (* [Hsenv] needs no [Hdqc] rewrite -- [user_cfg]'s senvcfg conjunct is
        already [↦ᵣ□], decoupled from [dqc] entirely (UserExec.v). *)

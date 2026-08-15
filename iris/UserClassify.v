@@ -77,7 +77,7 @@ Section UserClassify.
   Proof.
     intros Hmsok Lelp_x Help_ne Hstep.
     iIntros "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hrut Hcont".
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hcfgrest)".
     iMod (utrap_ghost s_x c info pcx ms_v sc_v stval_v sepc_v va va' elp0
             (uc_stvec C) Lelp_x Help_ne
             with "Hint Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc")
@@ -89,8 +89,8 @@ Section UserClassify.
     iApply ("Hcont" with "[-]").
     iApply (user_trap_frame_intro C pt Rut _ _ _ _ _ (utrap_ms_ok elp0 ms_v Hmsok)
              with "Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt
-                   [Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest] Hrut").
-    iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest".
+                   [Hstvec Hmie Hmdl Hmedl Hcfgrest] Hrut").
+    iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest".
   Qed.
 
   (* Non-consuming: read the two config regs the trap tower needs. *)

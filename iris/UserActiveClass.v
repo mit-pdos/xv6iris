@@ -250,7 +250,7 @@ Section UserActiveClass.
     iIntros "%Hmsok %Lpriv %Lms %Lpc %Hdisp Hregs Hupt Hcfg Hrut Hint Hbody Hcont".
     iDestruct "Hint" as "(Hreg & Hgh & Hdev)".
     iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpc & Hnpc & Hgpr)".
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmsten & Hssten)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmsten & Hssten)".
     iDestruct "Hupt" as "(Hutlb & Hudata & %Hcov & %Hwf)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & #Hpma & #Hhtif & #Help & _ & _ & _ & _ & _ & %Hpmaall & _ & _ & %Help_ne & _ & %Hmisa_eq & _)".
@@ -273,7 +273,7 @@ Section UserActiveClass.
     iAssert (mstate_interp σ) with "[Hreg Hgh Hdev]" as "Hint". { iFrame. }
     iAssert (user_pt_inv pt) with "[Hutlb Hudata]" as "Hupt".
     { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
-    iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmsten Hssten]"
+    iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmsten Hssten]"
       as "Hcfg". { iFrame. }
     iApply (active_step_branch C pt Rut Ei σ ms_v sc_v stval_v sepc_v va g mst mi
               Hmsok Lpriv Lms Lpc Hdisp
@@ -293,7 +293,7 @@ Section UserActiveClass.
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv".
     iApply (wp_user_step_active C pt Rut with "Hhw Hmin Hwinv").
-    iApply (active_class_intro (⊤ ∖ ↑minstretN ∖ ↑wireN) Hbase Hrvc with "Hhw").
+    iApply (active_class_intro (⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN) Hbase Hrvc with "Hhw").
   Qed.
 
   (* THE CAPSTONE: safety of arbitrary user-mode execution, parametrized on

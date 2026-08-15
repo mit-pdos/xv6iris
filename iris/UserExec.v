@@ -61,6 +61,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
 Require Import InstrBytes WpGpr.
 Require Import RegFile.
 Require Import WpIntrCore.
+Require Import MinstretInv.
 Require Import UserPtTree.
 Local Open Scope Z_scope.
 Import Defs.
@@ -90,11 +91,20 @@ Record ucfg := UCfg {
   uc_mie     : mword 64;
   uc_mideleg : mword 64;
   uc_medeleg : mword 64;
-  uc_mip     : mword 64;    (* the mip REGISTER: kernel-written only in this
-                               model (the device drives the sig_* WIRES, not
-                               mip; no timer device is modeled).  If a timer
-                               ever gets modeled, mip moves into a shared
-                               invariant exactly like the wires. *)
+  (* THERE IS NO [uc_mip] FIELD, AND THERE CANNOT BE ONE.  [mip] is written
+     by the CLOCK TICK ([tick_clock] sets MTIP/STIP from mtimecmp/stimecmp --
+     the Sstc branch is live), so it lives in [MinstretInv.clock_inv], owned
+     there at [DfracOwn 1].  A [ucfg] field would have to be backed by a
+     [mip ↦ᵣ{dqc}] conjunct of [user_cfg], and [DfracOwn 1] is Exclusive, so
+     ANY second fraction -- owned or discarded -- makes [user_inv] beside
+     [minstret_inv] UNSATISFIABLE, i.e. every user-tier theorem vacuous.
+     (That is exactly what this file's earlier "no timer device is modeled;
+     if a timer ever gets modeled, mip moves into a shared invariant like
+     the wires" note anticipated, and the timer IS modeled.)  So mip is
+     BORROWED across each step from [clock_inv] by [clock_mip_acc] below --
+     the same treatment the sig_* wires get from [wire_inv], and for the
+     same reason -- and its value is existential per step rather than a
+     loop constant. *)
   uc_dqc     : dfrac;       (* config-cell fraction *)
   (* stvec is DIRECT-mode: traps land exactly at its base *)
   uc_tvd : trapVectorMode_forwards (_get_Mtvec_Mode uc_stvec) = TV_Direct;
@@ -216,6 +226,43 @@ Definition post_fetch_cfg (σf : mstate) (va : mword 64) (miσ : bool) : Prop :=
   register_lookup (R_bool minstret_increment) σf.(sregs) = miσ.
 
 (* ===================================================================== *)
+(* §3' THE mip BORROW.                                                     *)
+(*                                                                         *)
+(* [mip] is written by the clock tick, so [MinstretInv.clock_inv] owns it   *)
+(* (at [DfracOwn 1], with mcycle/mtime) and NOTHING may hold a fraction of  *)
+(* it across a step -- see the note in [ucfg].  A step that needs mip's     *)
+(* VALUE (the interrupt dispatch does, and only that) borrows the cell for  *)
+(* the duration of its own σ-callback and hands it straight back, exactly   *)
+(* as [UserStepFull.wp_user_step_active] borrows the wires from            *)
+(* [wire_inv].  This is an ORDINARY invariant accessor; it is stated here   *)
+(* only so the four borrow sites (two tiers x interrupt-dispatch/WRS-wake)  *)
+(* share one spelling.                                                     *)
+(*                                                                         *)
+(* SAFE BESIDE [wp_exec_step_clock], which opens [clockN] itself: it does   *)
+(* so ONLY in the tick branch and STRICTLY AFTER the caller's continuation  *)
+(* has closed its own invariants (MinstretInv.v's header), so the borrow    *)
+(* and the tick's write never hold the invariant open at once.  The step    *)
+(* only READS mip, so the close returns the same witness.                   *)
+(* ===================================================================== *)
+Section MipBorrow.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma clock_mip_acc (E : coPset) :
+    ↑clockN ⊆ E ->
+    clock_inv -∗ |={E, E ∖ ↑clockN}=>
+      ∃ p : mword 64, mip ↦ᵣ p ∗ (mip ↦ᵣ p ={E ∖ ↑clockN, E}=∗ True).
+  Proof.
+    iIntros (HE) "#Hc".
+    iMod (inv_acc with "Hc") as "[>Hb Hclose]"; [ exact HE |].
+    iDestruct "Hb" as (c t p) "(Hcy & Hti & Hp)".
+    iModIntro. iExists p. iFrame "Hp".
+    iIntros "Hp". iApply "Hclose". iNext. iExists c, t, p. iFrame "Hcy Hti Hp".
+  Qed.
+
+End MipBorrow.
+
+(* ===================================================================== *)
 (* §4 The frames and the capstone.                                         *)
 (* ===================================================================== *)
 Section UserExec.
@@ -239,14 +286,16 @@ Section UserExec.
      satp / tlb / pmp cells live inside [user_pt_inv] (UserPtTree.v).  The
      external-interrupt WIRES sig_meip / sig_seip are deliberately ABSENT:
      the device loop writes them concurrently, so they cannot be pinned
-     here -- they will live in an invariant shared with the device WP,
-     and each step borrows their current values across the step. *)
+     here -- they live in the invariant shared with the device WP
+     ([WireInv.wire_inv]), and each step borrows their current values across
+     the step.  [mip] IS ABSENT FOR THE SAME REASON: the clock tick writes
+     it, so it lives in [MinstretInv.clock_inv] and is borrowed per step by
+     [clock_mip_acc] -- see the note in [ucfg] where its field used to be. *)
   Definition user_cfg : iProp Σ :=
     (stvec ↦ᵣ{ dqc } uc_stvec C ∗
      mie ↦ᵣ{ dqc } uc_mie C ∗
      mideleg ↦ᵣ{ dqc } uc_mideleg C ∗
      medeleg ↦ᵣ{ dqc } uc_medeleg C ∗
-     mip ↦ᵣ{ dqc } uc_mip C ∗
      menvcfg ↦ᵣ{ dqc } MENVCFG_S ∗
      (* [senvcfg] is NEVER WRITTEN -- no [wp_csrw]-style lemma for it exists
         anywhere in the tree -- so unlike its neighbors above it needs no

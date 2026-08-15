@@ -697,9 +697,34 @@ back, so the bare residue is satisfiable exactly when `ut_res` is — and
 vacuous version had two) is itself the check that every consumer now draws
 from the single owner.
 
-### Still open (unchanged by this)
+## The loop-closure plan (scoped, not built)
 
-The outer Löb over trap rounds that discharges `UserExec.stvec_handler_wp` —
-i.e. folding USER in.  The `Rut` instantiation for it is now available and is
-`fun pt => ∃ ksp, UT.usertrap_res_bare pt ksp`; the note above about
-`usertrap_res` being unsatisfiable there stands, and the bare form is the fix.
+Target: `SpecUserretClosed` — userret's spec with no user-mode-WP premise
+and no `stvec_handler_wp`, entered where forkret enters the loop.
+
+- **The `▷` costs nothing.** `wp_user_exec` already uses `Htrap` under the
+  step obligation's `▷`, so it can take `▷ stvec_handler_wp` (4 lines across
+  `UserExec`/`UserStep`/`UserActiveClass`/`SpecUser`). The Löb then goes on
+  `stvec_handler_wp` (∀ hart, `C`, `pt`) and uservec keeps chaining usertrap
+  and userret as it does. Splitting uservec at the userret point needs the
+  same `▷` and rewrites ProofUservec's tail, so it buys nothing.
+- **The back edge needs cells at the RESUMING hart.** uservec's continuation
+  is `wp_next true (proc_addr j)`, `j < NPROC`, so it is hart-generic and
+  entry-hart `↦ᵣ` cells are useless. `uservec_post` is missing five, to
+  rebuild `user_cfg` at `CID'`:
+  - `stvec` — free, `usertrap_post` returns it at `CID'`; add it to the post.
+  - `senvcfg` — free, rides in `hw_config`, which `usertrap_post` returns.
+  - `medeleg`/`mstateen0`/`sstateen0` — never written after M-mode boot:
+    freeze to `↦ᵣ□` and take the all-harts family (`∀ c : CPU,
+    reg_pointsto_at c …`) as a premise, established by boot. Also what makes
+    `uc_del` re-provable per round (the `ucfg` record is REBUILT each round;
+    `uc_mideleg` is the fresh `mdv0` from `uservec_post`).
+  - `sscratch` — owned and written every round (`csrw sscratch, a0`), so it
+    needs a value-agnostic all-harts invariant on the `clock_inv`/`wire_inv`
+    pattern, borrowed by uservec across its write. Cannot be caller-framed
+    and cannot be a `□` premise.
+- `Rut` is `fun p => ∃ ksp, usertrap_res_bare p ksp`.
+
+Order: (R1) the `▷`; (R2) `uservec_post` grows `stvec` + the frozen-cell
+premise + `sscratch_inv`; (R3) the Löb and
+`SpecUserretClosed`/`ProofUserretClosed`/`LinkUserretClosed`.
