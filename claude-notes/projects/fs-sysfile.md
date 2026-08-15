@@ -9472,6 +9472,16 @@ BUILT are different places, and only the second one is negotiable.
 * a local `so_word_half_join`: the `1/2 + 1/2` join at `↦₈`, which the tree
   has at `↦₄` (`RiscvPtsto.word4_pointsto_half`) and nowhere else.  `f->ip`
   is the first 8-byte cell held in halves.
+* `so_trunc_ok` / `so_loaded_open` / `so_trunc_loaded` — **THE O_TRUNC
+  BRIDGE, AND sys_open IS THE FIRST CALLER THAT NEEDS IT.**  iput's itrunc
+  is followed by `di_free`, so no landed proof ever states the TRUNCATED
+  record's `inode_ok` and no landed proof rebuilds `ic_loaded` after a
+  truncate.  Both directory clauses are free because the guard at +0xae is
+  `ip->type == T_FILE` (`dir_ok_not_dir`, `dir_links_not_dir`), and the
+  rest is itrunc's own outputs (`bm_empty_wf`, `bm_empty_holes`,
+  `inode_sized_zero`, `bm_covers` vacuous at size 0).  `di_trunc` keeps
+  `type` and `nlink`, so the "type is live" clause is the caller's premise
+  verbatim.
 
 **THE TRAP THIS COST.**  `Context `{!lockG Σ}` in a file that does not
 `Require Import WpLock` is durable-notes' trap one verbatim: `lockG`

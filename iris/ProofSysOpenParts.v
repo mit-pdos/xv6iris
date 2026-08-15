@@ -63,6 +63,9 @@ Require Import ByteBuf.
 Require Import ProcGeom.
 Require Import DinodeEnc.
 Require Import DirView.
+Require Import DirLinks.              (* [dir_links_not_dir] *)
+Require Import FsBlocks.              (* [fs_names] *)
+Require Import FsCrash.               (* [BSIZE] *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -70,6 +73,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.             (* the reference algebra the publication
                                          re-pins its generation in *)
 Require Import IcacheInv.
+Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
 Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode
                                          bit cluster's target *)
 Require Import SpecArgint.
@@ -594,7 +598,11 @@ Qed.
 (* ===================================================================== *)
 
 Section ProofSysOpenPublish.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  (* NO STANDALONE [!icacheG Σ]: [FileInvDefs.fileG] carries both it and the
+     [icfg] as field instances, and binding a second one gives two instances
+     that print identically and never unify -- SpecCreate.v's banner records
+     the same rule for the same reason. *)
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !fsLogG Σ, !iregG Σ}.
 
   (* the 1/2 + 1/2 join at [↦₈], which the tree has at [↦₄]
      ([RiscvPtsto.word4_pointsto_half]) and nowhere else -- and which the
@@ -722,6 +730,78 @@ Section ProofSysOpenPublish.
       by exact Harm.
     rewrite Hor. cbn [fp_icv fp_iq fp_ig fp_ocv].
     rewrite Hip. iFrame "Hpay Hoff".
+  Qed.
+
+  (* ==== THE O_TRUNC BRIDGE ============================================
+     sys_open is the FIRST caller that has to REBUILD [ic_loaded] after
+     itrunc: iput's itrunc is followed by [di_free], so no landed proof
+     ever states the truncated record's [inode_ok].  The two lemmas below
+     are that gap, and both halves of the record's own obligation are free
+     because the guard at +0xae is [ip->type == T_FILE]:
+     [DirView.dir_ok_not_dir] and [DirLinks.dir_links_not_dir] discharge
+     the directory clauses outright, and itrunc's own outputs
+     ([bm_empty], the all-zero data) discharge the rest.  [di_trunc] keeps
+     [type] and [nlink], so the type clause is the caller's premise
+     verbatim. *)
+  Lemma so_trunc_ok (cov : gset Z) (logstart : Z) (dn : dinode) :
+    bv_unsigned (di_type dn) <> 0 ->
+    inode_ok cov logstart (di_trunc dn) bm_empty
+             (fun _ => replicate BSIZE (bv_0 8)).
+  Proof.
+    intro Hty. rewrite /inode_ok /di_trunc. cbn [di_type di_size di_addrs].
+    split_and!.
+    - apply bm_empty_wf.
+    - intros i _ Hlt. exfalso.
+      assert (Hz : bv_unsigned (bv_0 32) = 0) by reflexivity.
+      revert Hlt. cbn [di_size]. rewrite Hz.
+      assert (Hb : (0 <= Z.of_nat i * Z.of_nat BSIZE)%Z) by lia. lia.
+    - reflexivity.
+    - exact Hty.
+    - assert (Hz : bv_unsigned (bv_0 32) = 0) by reflexivity. rewrite Hz.
+      unfold MAXFILE, BSIZE. lia.
+    - apply bm_empty_holes. reflexivity.
+    - apply inode_sized_zero.
+  Qed.
+
+  (* the open direction, one unfolding: [ic_loaded]'s [inode_addrs ∗
+     ind_res] is itrunc's [inode_map]. *)
+  Lemma so_loaded_open (gfs : fs_names) (gi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
+    ic_loaded gfs gi cov logstart k inum dn bm -∗
+    ∃ data : nat -> list (bv 8),
+      ⌜inode_ok cov logstart dn bm data⌝ ∗ ⌜dir_ok icfg_nib dn data⌝ ∗
+      dir_links (bv_unsigned inum) dn data ∗
+      dinode_at gi inum dn ∗
+      inode_meta (ientry k) dn ∗
+      inode_map gfs (ientry k) bm ∗
+      inode_blocks gfs bm data.
+  Proof.
+    iIntros "(%data & %Hok & %Hdir & Hlnk & Hat & Hmeta & Haddr & Hind & Hblk)".
+    iExists data. iFrame "%". iFrame "Hlnk Hat Hmeta Hblk".
+    rewrite /inode_map. iFrame "Haddr Hind".
+  Qed.
+
+  (* ...and the close direction at itrunc's outputs. *)
+  Lemma so_trunc_loaded (gfs : fs_names) (gi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) :
+    bv_unsigned (di_type dn) <> 0 ->
+    bv_unsigned (di_type dn) <> T_DIR_z ->
+    dinode_at gi inum (di_trunc dn) -∗
+    inode_meta (ientry k) (di_trunc dn) -∗
+    inode_map gfs (ientry k) bm_empty -∗
+    inode_blocks gfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+    ic_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty.
+  Proof.
+    intros Hnz Hnd. iIntros "Hat Hmeta [Haddr Hind] Hblk".
+    assert (Hty : di_type (di_trunc dn) = di_type dn) by reflexivity.
+    iApply (ic_mk_loaded gfs gi cov logstart k inum (di_trunc dn) bm_empty
+              (fun _ => replicate BSIZE (bv_0 8))
+              (so_trunc_ok cov logstart dn Hnz)
+              (dir_ok_not_dir icfg_nib (di_trunc dn) _
+                 ltac:(rewrite Hty; exact Hnd))
+              with "[] Hat Hmeta Haddr Hind Hblk").
+    iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).
+    rewrite Hty. exact Hnd.
   Qed.
 
 End ProofSysOpenPublish.
