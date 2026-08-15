@@ -136,7 +136,7 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
     mie ↦ᵣ MIE_S -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
-    senvcfg ↦ᵣ (mword_of_int 0 : mword 64) -∗
+    senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     (* usertrap never touches these after its own return -- held loose,
        framed the whole way through userret, and handed back unchanged *)
     scause ↦ᵣ sc' -∗

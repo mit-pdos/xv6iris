@@ -1661,11 +1661,17 @@ Section UservecAllPt.
     iEval (rewrite Hra9c Hpc9c) in "Hpc2".
     (* ============ call userret ============ *)
     rewrite Hmie in Hmask.
-    (* [set (dqk := DfracOwn 1)] back at the walk's start folded EVERY
-       [DfracOwn 1] then in scope, including [Hsenv]'s -- so it now reads
-       [senvcfg ↦ᵣ{dqk} ...] rather than the literal [DfracOwn 1] the call
-       below supplies for [dqm].  Unfold it back so the two match. *)
-    iEval (unfold dqk) in "Hsenv".
+    (* [senvcfg]'s persistent fact, AT THE RESUMING HART -- [Hhw2] is
+       [usertrap_post]'s own copy of [hw_config], which now carries senvcfg
+       as one of its conjuncts (RiscvFetchExec.v). [Hwup]'s own senvcfg
+       premise wants exactly this persistent form, not the stale entry-hart
+       [Hsenv] the walk's own frame still holds (a full-ownership fact at
+       the WRONG hart once usertrap migrates -- the earlier "Hsenv" plan
+       this comment used to describe). A [iPoseProof] copy keeps [Hhw2]
+       itself intact, whole, for [Hwup]'s own [hw_config] premise below. *)
+    iPoseProof "Hhw2" as "#Hhw2c".
+    iDestruct "Hhw2c" as (misa0' mseccfg0' pmar0' elp0')
+      "(_ & _ & _ & _ & _ & #Hsenv2 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _)".
     iPoseProof (UR.wp_userret_pt kroot (ud_root pt') (ud_tfp pt') (ud_um pt') mf usatp
               ms' MIE_S mdv0 MENVCFG_S (mword_of_int 0 : mword 64) uepc
               u40 u48 u56 u64 u72 u80 u88 u96 u104 u112 u120 u128 u136 u144 u152 u160
@@ -1678,7 +1684,7 @@ Section UservecAllPt.
        name the ENTRY hart's resources and are a different (if
        identically-printed) proposition whenever usertrap crossed harts.
        See [SpecUsertrap.usertrap_post]'s comment. *)
-    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv Hsepc2 Hclaim Hkres Hufr Hpc2 Hfile2
+    iApply ("Hwup" with "Hkt Hhw2 Hmin2 Hhs2 Hpriv2 Hms2 Hmie3 Hmdl3 Hmenv3 Hsenv2 Hsepc2 Hclaim Hkres Hufr Hpc2 Hfile2
                     Hutf40 Hutf48 Hutf56 Hutf64 Hutf72 Hutf80 Hutf88 Hutf96 Hutf104 Hutf112
                     Hutf120 Hutf128 Hutf136 Hutf144 Hutf152 Hutf160 Hutf168 Hutf176 Hutf184
                     Hutf192 Hutf200 Hutf208 Hutf216 Hutf224 Hutf232 Hutf240 Hutf248 Hutf256
