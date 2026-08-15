@@ -9363,3 +9363,84 @@ Two consequences worth having before the redesign starts:
 Still STOPPED on the ruling's own condition (`off_invs` must leave
 `SpecFileread`'s and `SpecFilewrite`'s environments); the layering result
 above does not change that and is orthogonal to it.
+
+### R-open-1b — THE FULL SITE LIST AND THE TWO SHAPE CORRECTIONS.  The
+### `file_ref` unfold check is IN, the free-slot home is settled, and the
+### "zero new imports" claim was WRONG BY ONE.  Nothing edited
+
+**1. THE `file_ref` UNFOLD CHECK (ruling item 3): 21 SITES, AND 19 OF THEM
+ARE BYTE-STABLE ANYWAY.**  `file_ref`'s ARITY does not move (the cinv share
+goes inside `file_pay`, inside its existing `∃ pn`), so a site that unfolds
+`file_ref` and reassembles it while framing `file_pay` WHOLE does not move.
+Sorted by how deep they reach:
+
+* `/file_ref` + `/file_fields` only, `file_pay` framed opaquely — **byte
+  stable**: `ProofFiledup.v`:382; `ProofFilestat.v`:1298, 1377;
+  `ProofFileclose.v`:473, 628; `ProofFileread.v`:577, 1312, 1479, 1550,
+  2231, 2506; `ProofFilewrite.v`:2378, 2795, 3390, 3530, 3592, 3791, 4165.
+* reach into `/file_pay` — **2 sites move**: `ProofFileread.v`:920,
+  `ProofFilewrite.v`:3104.
+* reach into `/file_payload` — **8 sites move**: `ProofFileclose.v`:833,
+  1109, 1298; `ProofFileread.v`:745, 923; `ProofFilewrite.v`:2978, 3107;
+  and one in a SPEC, `SpecFileread.v`:637.
+* construct `fpnames` — **4 sites, all in one proof body**:
+  `ProofPipealloc.v`:1578, 1579, 1585, 1596, plus the `Inhabited` populate
+  at `FileInvDefs.v`:247.  **NO Spec names an `fpnames` literal and no Spec
+  signature mentions the record**, so adding `fp_ocv` moves no contract.
+
+**2. SHAPE CORRECTION A — `file_payload`'s FD_NONE ARM CANNOT HOLD THE
+CELLS, BECAUSE IT MUST SPLIT.**  The natural reading of "a free slot has no
+payload and no off-cinv, so put its cells where the payload would be" is
+wrong: `file_payload_split` (`FileInvDefs.v`:772) is a `⊣⊢` at every arm,
+and two full points-tos do not split.  The cells' home is the FREE-SLOT arm
+of `FileInv.fslot` (`FileInvDefs.v`:845-856), which is the ftable lock's own
+per-slot shape, is not required to split, and is exactly where both parties
+that touch it already stand — `filealloc` when it hands them out and
+`fileclose`'s last closer when it puts them back:
+
+```coq
+  Definition fslot (γ : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+    match M !! k with
+    | None =>
+        (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
+         ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗ file_pay γ k 1 C ∗
+              (* R-open-1b: between the fileclose that cancelled the cinv and
+                 the filealloc that hands them to the next initializer, the
+                 off cell and the ip half live HERE. *)
+              ∃ (ip : mword 64) (v : mword 32),
+                a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗ a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I
+    | Some (q, n) => (* unchanged *)
+    end.
+```
+
+So the cinv exists **only while a slot is typed**, which is the exact
+lifetime `inode_pay`'s already has — the parallel is tighter than the first
+sketch, not looser.
+
+**3. SHAPE CORRECTION B — "ZERO NEW IMPORTS" WAS WRONG BY ONE, AND THE ONE
+IS SAFE.**  `off_body`'s ingredients are all in scope at `FileInvDefs.v` as
+recorded.  **`off_wf` is not**: it is `bv_unsigned v <= MAXFILE * BSIZE`,
+`MAXFILE` is `InodeInv.v`:75 and `BSIZE` is `FsCrash.v`:77, and
+`FileInvDefs.v` reaches NEITHER transitively.  The free-slot shape above
+needs the bound, so `off_wf` must come down with the rest.
+
+Checked, and it is safe: `InodeInv.v` and `FsCrash.v` sit BELOW the file
+table and mention `FileInv` nowhere (`grep -c FileInv` is 0 in both), so
+`Require Import InodeInv FsCrash` in `FileInvDefs.v` closes no cycle —
+`FileOff.v` already requires both, which is the standing evidence.  Do NOT
+take the alternative of inlining `268 * 1024`: it duplicates a constant the
+inode layer owns, and the guiding principle is explicit about that.
+
+**4. THE EXECUTION ORDER, so the tree is green at every commit.**  The
+`FileInvDefs.v` cone is the whole cost and must be paid ONCE, so the
+definitional move, the record field, the `fslot` arm, the `FileOff.v`
+protocol restatement, the two Spec premise deletions and the ten moving
+proof sites are **one commit, one gate** — there is no green intermediate
+that splits them, because the moment `file_pay` gains a conjunct every site
+in list 1's second and third groups fails together.  Order within it:
+`FileInvDefs.v` (record + `off_*` definitions + `file_payload`/`file_pay` +
+`fslot`) -> `FileInv.v` (the alloc/close steps) -> `FileOff.v` (protocol
+only; `off_invs`/`off_invs_lookup`/`off_inv_alloc`/`off_invs_alloc` deleted)
+-> `SpecFileread.v`/`SpecFilewrite.v` (premise deletion) -> the ten proof
+sites -> `ProofPipealloc.v` (mint) -> `ProofFileclose.v` (cancel) -> the
+sys_read/sys_write application sites.
