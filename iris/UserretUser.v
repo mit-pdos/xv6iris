@@ -148,7 +148,7 @@ Section UserretUser.
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
     Rut pt -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
-    stvec_handler_wp C pt Rut -∗
+    ▷ stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn

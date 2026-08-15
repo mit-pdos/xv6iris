@@ -589,7 +589,7 @@ Section UserStepObligation.
     minstret_inv -∗
     user_step_obligation_active C pt Rut -∗
     user_inv C pt Rut -∗
-    stvec_handler_wp C pt Rut -∗
+    ▷ stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hminstret #Hactive Hinv Htrap".

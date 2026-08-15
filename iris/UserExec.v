@@ -430,10 +430,19 @@ Section UserExec.
   (* ------------------------------------------------------------------- *)
   (* The capstone: safety of arbitrary user-mode execution, by Löb.        *)
   (* ------------------------------------------------------------------- *)
+  (* THE HANDLER CONTRACT IS TAKEN UNDER A LATER, and it costs nothing to
+     prove: the trap frame only ever reaches the handler THROUGH the step
+     obligation, whose two continuations are both under a `▷` (at least one
+     user instruction executes before any trap), so `Htrap` is used only
+     after that `▷` is stripped.  Taking `▷ stvec_handler_wp` is therefore
+     the strictly stronger statement, and it is what lets a caller close the
+     userret -> user -> uservec -> usertrap -> userret cycle: the Löb
+     hypothesis for the next trap round is available only under a later, and
+     this is the premise it feeds. *)
   Theorem wp_user_exec  :
     user_step_obligation -∗
     user_inv -∗
-    stvec_handler_wp -∗
+    ▷ stvec_handler_wp -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hstep".
@@ -441,7 +450,7 @@ Section UserExec.
     iIntros "HP Htrap".
     iApply ("Hstep" with "HP").
     iNext. iSplit.
-    - iIntros "HP". iApply ("IH" with "HP Htrap").
+    - iIntros "HP". iApply ("IH" with "HP [$Htrap]").
     - iExact "Htrap".
   Qed.
 

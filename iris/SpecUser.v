@@ -31,7 +31,11 @@
 (*                   written, the same page table and config) the kernel   *)
 (*                   handler runs safely.  Still ASSUMED by every caller;  *)
 (*                   uservec's own proof (E-uservec) is what will discharge*)
-(*                   it.                                                   *)
+(*                   it.  Taken UNDER A LATER: the trap frame reaches the  *)
+(*                   handler only through the step obligation, whose       *)
+(*                   continuations are already under a `▷`, and a caller   *)
+(*                   closing the trap loop has its Löb hypothesis for the  *)
+(*                   next round only under one.                            *)
 (*                                                                         *)
 (* There are NO totality hypotheses: the base and compressed execute       *)
 (* totalities are discharged inside the proof, so this WP is closed.       *)
@@ -53,7 +57,7 @@ Import Defs.
 Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) :=
   hw_config -∗ minstret_inv -∗ wire_inv -∗
-  user_inv C pt Rut -∗ stvec_handler_wp C pt Rut -∗
+  user_inv C pt Rut -∗ ▷ stvec_handler_wp C pt Rut -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USER.

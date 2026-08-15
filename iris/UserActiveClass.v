@@ -302,7 +302,7 @@ Section UserActiveClass.
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
     hw_config -∗ minstret_inv -∗ wire_inv -∗
-    user_inv C pt Rut -∗ stvec_handler_wp C pt Rut -∗
+    user_inv C pt Rut -∗ ▷ stvec_handler_wp C pt Rut -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv Hinv Htrap".
