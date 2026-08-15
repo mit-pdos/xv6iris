@@ -1047,6 +1047,11 @@ ProofUsertrapTail.v
 ProofUsertrapArms.v
 ProofUsertrapSys.v
 SpecSyscall.v
+SpecSysOpen.v
+LinkSysOpen.v
+SpecSysUnlink.v
+LinkSysUnlink.v
+ProofSyscall.v
 LinkSyscall.v
 ProofUsertrap.v
 LinkUsertrap.v
