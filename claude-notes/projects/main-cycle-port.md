@@ -61,6 +61,20 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    peel — chained ~106 times in the once-per-class lemma; the between-peel
    monad reduction is pure spine β/ι, which the symbolic probe measured
    at ~6 ms per 30 nodes.
+0c. **The landing-naming resolution (settled; use it for every remaining
+   characterization): NESTED-IMPLICATION STATEMENTS.**  A segment's landing
+   monad must never be spelled as a Definition (the composition would be a
+   ~200-application literal; a functional walk at a witness file either
+   re-enters the tower-lookup stall or loses the parameters).  Instead the
+   characterization is ONE lemma whose conclusion conjoins, per stage,
+   projection facts about the current landing AND a ∀-quantified
+   implication about chains from that landing's resume — the landing rides
+   through as a BOUND VARIABLE, and the cycle rule consumes the conjuncts
+   in step order, instantiating each at the landing its previous stage
+   produced.  Post-fetch (decode+execute at the leaf's known word) is NOT
+   characterized — it is the leaf's own functional-cursor batch, pilot
+   style; the generic machinery covers boundary→fetch and the tail (whose
+   start monad is one closed term, spellable from try_step's own source).
 1. **The pinned-text fetch rule** (spike F7): derive from
    `wp_hart_ram_read` + `↦ₓ□` facts (`text_valid` per byte → `read_bytes`
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
