@@ -1869,6 +1869,12 @@ Section ProofSysLinkBody.
                                 Hslkd Hslpid Hpidq Hprocs Hdep Hidev Hiinum
                                 Hivalid Hload Hshot2").
                 iIntros (CID44 Hq44 mul) "%Hcsul Hcg Hown Hpc Hpidq Hshr".
+                (* THE GENERATION SURVIVES THE WINDOW, and sys_link is the
+                   caller that needs it: the share it still holds denies the
+                   recycler [live_gen_bump]'s whole unit, so the [ity_shot]
+                   minted before this [iunlock] still names the record the
+                   [bad:] tail will re-[ilock].  Kept BOUND rather than
+                   forgotten -- everything else in the tree forgets here. *)
                 assert (Hpc70 : ret_pc (S4 !!! Regidx Rra : mword 64)
                                 = mword_of_int (SL + 0x70)) by (rewrite HS4ra; pcw).
                 iEval (rewrite Hpc70) in "Hpc".
@@ -2222,8 +2228,9 @@ Section ProofSysLinkBody.
                                   with "Hbufk Hbufrest") as "HbO".
                      iDestruct (sl_bytes_name (pa_stk sp0 38) 128 with "HbO")
                        as (bo2) "HbO".
-                     iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                     iDestruct "Hshr" as (gsh2) "Hshr".
+                     (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
+                        (SpecIunlock's amended post), so the tail re-[ilock]s under the
+                        very generation the [ity_shot] above names. *)
                      iDestruct (log_opS_named with "HopS") as (e0) "HopE".
                      iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                   (CIDb := CIDg1) ltac:(wp_next_chain)
@@ -2233,7 +2240,7 @@ Section ProofSysLinkBody.
                      iApply (Tails.sl_tail_e2 (CID0 := CIDg1) gs j gl gu gd gk pd
                                pav pu bn g gfs gi cn gtl gil gisl gild gisld cov
                                logstart bmapstart inodestart nib size dev used2
-                               kk (qq/2)%Qp (qq/2)%Qp gsh2 inum
+                               kk (qq/2)%Qp (qq/2)%Qp gsh inum
                                kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                n2 Sb2 e0 pid (DfracOwn (1/4)) dqb dqs
                                m Ug sp0 K eb b lks bn1 bw2 bo2
@@ -2561,8 +2568,9 @@ Section ProofSysLinkBody.
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
                          iDestruct "Hmapd" as "[Ha Hi]". iFrame "Ha Hi Hblocksd". }
-                       iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                       iDestruct "Hshr" as (gsh2) "Hshr".
+                       (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
+                          (SpecIunlock's amended post), so the tail re-[ilock]s under the
+                          very generation the [ity_shot] above names. *)
                        iDestruct (sl_nm_join (pa_stk sp0 6) bn0 nf
                                     with "Hnm14 Hnm2") as "HbN".
                        iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN")
@@ -2584,7 +2592,7 @@ Section ProofSysLinkBody.
                        iApply (Tails.sl_tail_f (CID0 := CID61) gs j gl gu gd gk pd
                                  pav pu bn g gfs gi cn gtl gil gisl gild gisld cov
                                  logstart bmapstart inodestart nib size dev used3
-                                 kk (qq/2)%Qp (qq/2)%Qp gsh2 inum
+                                 kk (qq/2)%Qp (qq/2)%Qp gsh inum
                                  kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                  n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
                                  pid (DfracOwn (1/4)) dqb dqs
@@ -2867,6 +2875,10 @@ Section ProofSysLinkBody.
                             assert (HW3regs : sl_regs m sp0 (ientry kk) (ientry kd) W3)
                               by (rewrite /W3; apply sl_regs_caller;
                                   [exact Hcsra | exact HW2regs]).
+                            (* this arm hands the reference to [iput] and
+                               wants nothing from the name: forget here. *)
+                            iDestruct (inode_shr_gen_forget with "Hshr")
+                              as "Hshr".
                             iDestruct (inode_ref_gather with "Hkeep Hshr") as "Hrefip".
                             iDestruct (cpu_own_transport CID64 CID66 0 eb pj b
                                          ltac:(wp_next_chain) with "Hown") as "Hown".
@@ -3122,8 +3134,9 @@ Section ProofSysLinkBody.
                             assert (Hiu3 : (iput_units <= n3)%nat)
                               by exact (sl_fail0_entry _ _ _ _ _ w1 w2 n2 n3
                                           Hcrok2 Hu3 Hspend).
-                            iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                            iDestruct "Hshr" as (gsh2) "Hshr".
+                            (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
+                               (SpecIunlock's amended post), so the tail re-[ilock]s under the
+                               very generation the [ity_shot] above names. *)
                             iDestruct (sl_nm_join (pa_stk sp0 6) bn0 nf
                                          with "Hnm14 Hnm2") as "HbN".
                             iDestruct (sl_bytes_name (pa_stk sp0 6) 16 with "HbN")
@@ -3145,7 +3158,7 @@ Section ProofSysLinkBody.
                             iApply (Tails.sl_tail_f (CID0 := CID61) gs j gl gu gd gk
                                       pd pav pu bn g gfs gi cn gtl gil gisl gild
                                       gisld cov logstart bmapstart inodestart nib
-                                      size dev used3 kk (qq/2)%Qp (qq/2)%Qp gsh2
+                                      size dev used3 kk (qq/2)%Qp (qq/2)%Qp gsh
                                       inum kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd' bmd'
                                       n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
                                       pid (DfracOwn (1/4)) dqb dqs
@@ -3219,8 +3232,9 @@ Section ProofSysLinkBody.
                                 with "Hbufk Hbufrest") as "HbO".
                    iDestruct (sl_bytes_name (pa_stk sp0 38) 128 with "HbO")
                      as (bo2) "HbO".
-                   iEval (rewrite inode_shr_gen_intro) in "Hshr".
-                   iDestruct "Hshr" as (gsh2) "Hshr".
+                   (* the generation is ALREADY in hand: [iunlock] hands [gsh] back
+                      (SpecIunlock's amended post), so the tail re-[ilock]s under the
+                      very generation the [ity_shot] above names. *)
                    iDestruct (wp_next_shift (b := true) (CIDa := CID0)
                                 (CIDb := CID50) ltac:(wp_next_chain)
                                 with "Hcont") as "Hcont".
@@ -3235,7 +3249,7 @@ Section ProofSysLinkBody.
                    iApply (Tails.sl_tail_bad (CID0 := CID50) gs j gl gu gd gk pd
                              pav pu bn g gfs gi cn gtl gil gisl cov logstart
                              bmapstart inodestart nib size dev used2 kk
-                             (qq/2)%Qp (qq/2)%Qp gsh2 inum c2 Sb2
+                             (qq/2)%Qp (qq/2)%Qp gsh inum c2 Sb2
                              pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
                              ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)

@@ -167,8 +167,15 @@ Definition wp_iunlock_sconf_body
       cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
-      (* the caller's share, back whole, at ITS OWN fraction and device *)
-      inode_shr k s dev inum -∗
+      (* the caller's share, back whole, at ITS OWN fraction and device --
+         AND AT THE GENERATION IT CAME IN ON.  The share the caller still
+         holds is what denies [IcacheRef.live_gen_bump] the slot's whole
+         unit, so no recycler can move the generation under it; the erased
+         form was a deliberate forget at this boundary and it cost every
+         caller the ability to carry an [ity_shot] across its own
+         [iunlock]/re-[ilock] window.  A consumer that does not want the
+         name applies [IcacheRef.inode_shr_gen_forget] here. *)
+      inode_shr_gen k s dev inum g -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

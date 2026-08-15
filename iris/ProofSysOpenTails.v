@@ -2058,6 +2058,7 @@ Section ProofSysOpenTails.
               with "Hcg Hown Htext Hpc Hpanic Hitinv Hesck Hslkk Hslkd Hslpid
                     Hpid Hprocs Hdep Hidev Hiinum Hivalid Hload Hshot").
     iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr".
+    iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
                    = mword_of_int (SO + 0xbe)) by (rewrite HM2ra; pcw).
     iEval (rewrite Hpc2) in "Hpc".

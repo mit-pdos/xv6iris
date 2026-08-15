@@ -530,6 +530,47 @@ discharges are landed in `DirView.v`** (`dir_dots_only`, `dir_orphan_clean`,
 `dir_dots_only_dirlink`), so the design step has its vocabulary and the
 arity sweep is the only part that must be paid twice.
 
+## `iunlock` STOPS ERASING THE GENERATION — the carrier PASS 2 needed
+
+`SpecIunlock`'s post returns `inode_shr_gen k s dev inum g` at the generation
+the caller handed in, not the erased `inode_shr`. One line of `ProofIunlock`
+changed: it was already building the erased form as
+`rewrite inode_shr_gen_intro. iExists g.` off that very `g`
+(`ProofIunlock.v`:542-544) — **a deliberate forget at the boundary, and the
+model was holding the witness the whole time.**
+
+**WHY THE NAME IS SOUND TO KEEP, and it is not a reachability argument.**
+`IcacheRef.live_gen_bump` consumes `live_gen k 1%Qp g` — the slot's WHOLE
+unit — so while any caller holds a share, no recycler can move the
+generation under it. The generation is therefore stable across a holder's
+own `iunlock`/re-`ilock` window *by the resource*, which is exactly the
+window `ity_shot` could not cross before.
+
+**WHAT IT BUYS.** A caller can now carry a type witness across its own
+unlock. `sys_link`'s `bad:` tail is the first consumer: the walk mints
+`ity_shot gsh (di_type (sl_incnl dn))` before `iunlock` and the tail
+re-`ilock`s under that same `gsh`, so `ity_shot_agree` pins the re-locked
+record's type and PASS 2's obligation becomes dischargeable at the walk from
+the `+0x4a` `T_DIR` refusal. Before the amendment the walk had to
+`rewrite inode_shr_gen_intro` and destruct a FRESH existential one line
+before applying the tail — it named the generation no better than the tail
+did, which is what stopped the first attempt.
+
+**THE SHIM IS THE FORGET ITSELF.** `IcacheRef.inode_shr_gen_forget` is one
+line off the existential; a consumer that does not want the name applies it
+at its own call site. **Nine call sites, eight forget and one binds**
+(`ProofFilestat`, `ProofIreclaim`, `ProofFileread` ×2, `ProofFilewrite`,
+`ProofNamex`, `ProofIunlockput`, `ProofSysChdir`, `ProofSysOpenTails` forget;
+`ProofSysLink` binds). `ProofSysLink` also drops four now-redundant
+`inode_shr_gen_intro` re-introductions and forgets once, at the arm that
+hands the reference to `iput` and wants nothing from the name.
+
+**The sys_open collision did not materialise.** GR-27 DELTA 3 recorded that
+lane's reliance on the erasure, but its final seal re-pins through the
+RETAINED gen-named parent, so a gen-indexed return is strictly more
+information at that site: `ProofSysOpenTails` takes the forget branch in one
+line and `ProofSysOpen`/`ProofSysOpenParts` are untouched.
+
 ## THE PAYLOAD SWEEP'S SITE COUNT, and the two traps in measuring it
 
 **A `∗`-conjunct in `ic_loaded` costs ~45 sites, not the six the constructor

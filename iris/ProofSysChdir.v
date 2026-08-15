@@ -1729,6 +1729,7 @@ Section ProofSysChdirBody.
                           Hslpid Hpidq Hprocs Hdep Hidev Hiinum Hivalid Hload
                           Hshot").
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpidq Hshr".
+          iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
           assert (Hpc48 : ret_pc (P4 !!! Regidx Rra : mword 64)
                           = mword_of_int (SC + 0x48)) by (rewrite HP4ra; pcw).
           iEval (rewrite Hpc48) in "Hpc".

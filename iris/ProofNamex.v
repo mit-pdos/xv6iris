@@ -3610,6 +3610,8 @@ Section ProofNamexMain.
                        all: try lkbelow.
                        iIntros (CIDiu Hqiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid
                                                   Hshr".
+                       iDestruct (inode_shr_gen_forget with "Hshr")
+                         as "Hshr".
                        assert (Hpc80 : ret_pc (NP3 !!! Regidx Rra)
                                 = mword_of_int (NX + 0x8a)).
                        { rewrite HP3ra. pcw. }

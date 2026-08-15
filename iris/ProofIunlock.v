@@ -132,7 +132,7 @@ Section ProofIunlockMain.
         cpu_own 0 eb p b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid p ↦₄{dq} pidv -∗
-        inode_shr k s dev inum -∗
+        inode_shr_gen k s dev inum g -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_iunlock_sconf 
@@ -539,9 +539,10 @@ Section ProofIunlockMain.
     (* the lock hands the deposit back at the holder's OWN fraction, which is
        what rebuilds the caller's share: the arm kept the other two slices. *)
     iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
-    iAssert (inode_shr k s dev inum) with "[Href Hslh]" as "Href".
-    { rewrite inode_shr_gen_intro. iExists g.
-      rewrite inode_shr_gen_bare_split. iFrame. }
+    (* the generation is NOT forgotten here any more -- see [SpecIunlock]'s
+       post.  What the arm handed back is already at [g]. *)
+    iAssert (inode_shr_gen k s dev inum g) with "[Href Hslh]" as "Href".
+    { rewrite inode_shr_gen_bare_split. iFrame. }
     assert (Hpc28 : ret_pc (R9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlock + 0x28)) by (rewrite HR9ra; pcw).
     iEval (rewrite Hpc28) in "Hpc".

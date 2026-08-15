@@ -2293,6 +2293,7 @@ Section ProofFilewrite.
     all: try lkbelow.
     { rewrite Htyq. iExact "Hshot". }
     iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshrb".
+    iDestruct (inode_shr_gen_forget with "Hshrb") as "Hshrb".
     iDestruct ("Hpbk3" with "Hppid") as "Hpriv".
     assert (Hpcbc : ret_pc (X2 !!! Regidx Rra) = mword_of_int (FW + 0xbc)).
     { rewrite HX2ra. apply bv_eq; vm_compute; reflexivity. }

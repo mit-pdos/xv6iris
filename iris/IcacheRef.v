@@ -1310,6 +1310,17 @@ Section IcacheRef.
     - iIntros "[%g ($ & Hg & $)]". iExists g. iFrame.
   Qed.
 
+  (* THE FORGET, and it is now a CHOICE rather than a boundary.  [iunlock]
+     hands its caller the generation it was handed ([SpecIunlock]'s post),
+     because the caller's own share is what forbids the recycler's
+     [live_gen_bump] (it wants the slot's WHOLE unit) -- so the generation
+     under a held reference cannot move, and erasing it at the return threw
+     away a witness the model was holding.  A consumer that does not want
+     the name applies this at its own call site. *)
+  Lemma inode_shr_gen_forget k s dev inum g :
+    inode_shr_gen k s dev inum g -∗ inode_shr k s dev inum.
+  Proof. rewrite inode_shr_gen_intro. iIntros "H". iExists g. iExact "H". Qed.
+
   Lemma inode_ref_short_gen_forget k qt qi dev inum g :
     inode_ref_short_gen k qt qi dev inum g -∗ inode_ref_short k qt qi dev inum.
   Proof.

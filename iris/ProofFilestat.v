@@ -983,6 +983,7 @@ Section ProofFilestat.
                       Hdep Hidev Hinum Hvalid Hlk Hshot").
       all: try lkbelow.
       iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
+      iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
       iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
       (* THE GATHER: iunlock gives the half back WITHOUT its generation; the
          half that never left pins it, and the payload takes the whole slice

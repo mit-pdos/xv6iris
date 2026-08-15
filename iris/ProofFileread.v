@@ -2162,6 +2162,7 @@ Section ProofFileread.
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
+                iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER: iunlock gives the half back WITHOUT its
                    generation; the half that never left pins it
@@ -2438,6 +2439,7 @@ Section ProofFileread.
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
                 all: try lkbelow.
                 iIntros (CIDiu Hsiu miu) "%Hcsiu Hcg Hcnt Hpc Hppid Hrefout".
+                iDestruct (inode_shr_gen_forget with "Hrefout") as "Hrefout".
                 iDestruct ("Hpivbk2" with "Hppid") as "Hpriv".
                 (* THE GATHER: iunlock gives the half back WITHOUT its
                    generation; the half that never left pins it

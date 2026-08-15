@@ -1705,6 +1705,7 @@ Section IreclaimOrphan.
                     Hppid Hprocs Hdep Hidev Hiinum Hvalid Hloaded Hshot").
     all: try lkbelow.
     iIntros (CID21 Hq21 mU) "%Hcsiu Hcg Hcnt Hpc Hppid Hshr".
+    iDestruct (inode_shr_gen_forget with "Hshr") as "Hshr".
     assert (Hpc64 : ret_pc (OE !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x64))
       by (rewrite HOEra; pcw).
