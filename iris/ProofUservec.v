@@ -1670,8 +1670,8 @@ Section UservecAllPt.
        the WRONG hart once usertrap migrates -- the earlier "Hsenv" plan
        this comment used to describe). A [iPoseProof] copy keeps [Hhw2]
        itself intact, whole, for [Hwup]'s own [hw_config] premise below. *)
-    iPoseProof "Hhw2" as "#Hhw2c".
-    iDestruct "Hhw2c" as (misa0' mseccfg0' pmar0' elp0')
+    iDestruct "Hhw2" as "#Hhw2".
+    iDestruct "Hhw2" as (misa0' mseccfg0' pmar0' elp0')
       "(_ & _ & _ & _ & _ & #Hsenv2 & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _)".
     iPoseProof (UR.wp_userret_pt kroot (ud_root pt') (ud_tfp pt') (ud_um pt') mf usatp
               ms' MIE_S mdv0 MENVCFG_S (mword_of_int 0 : mword 64) uepc
