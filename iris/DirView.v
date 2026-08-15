@@ -888,6 +888,102 @@ Lemma dir_ok_eq (nib : nat) (dn dn' : dinode) (data data' : nat -> list (bv 8)) 
 Proof. intros -> ->. exact id. Qed.
 
 (* ====================================================================== *)
+(*  8a'.  THE ".." INDEX BRIDGE (fs-icache §20.17.4's owed fact,            *)
+(*        fs-fragments R9).                                                 *)
+(*                                                                          *)
+(*  S7's [dp->nlink--] must consume one [ilink dp], and the only [ilink dp]  *)
+(*  in the system sits in the CHILD's [dir_links], at the index of the       *)
+(*  child's [".."].  [dir_ok] says only that live records COVER; nothing     *)
+(*  said WHICH index carries the parent, so S7 could not name the fragment   *)
+(*  it had to convert.  This is that fact.                                   *)
+(*                                                                          *)
+(*  IT IS THE INDEX HALF ONLY, AND DELIBERATELY SO.  "The parent" is a       *)
+(*  relation between two inodes; a conjunct on ONE payload cannot state it,  *)
+(*  and a parent parameter on the payload would move every contract that     *)
+(*  names [ic_loaded].  So this says only WHERE the [".."] entry is; the     *)
+(*  tree layer's [ents ip !! ".." = Some dp] says WHAT it names, and the     *)
+(*  two compose because [dir_names_unique] (FsRep, R2's amendment) makes     *)
+(*  any-match = first-match -- a live [".."] at index 1 is the ONLY live     *)
+(*  [".."].  That is why no [dir_first] clause is needed here.               *)
+(*                                                                          *)
+(*  ITS CONTENT IS OVER [data] ALONE, and that is forced: the round trip     *)
+(*  [DirLinks.dir_links_live] -> write -> [dir_links_of_ilink] reconstructs  *)
+(*  at a [dn'] related to nothing, so a clause mentioning [di_size dn] would *)
+(*  not survive it.  The TYPE guard is fine -- a reconstructing caller knows *)
+(*  its own [dn'].                                                          *)
+(* ====================================================================== *)
+
+Definition dotdot_name : list (bv 8) := [Z_to_bv 8 0x2e; Z_to_bv 8 0x2e].
+
+Definition dir_dotdot_ix (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+    dir_live data 1 /\ bname 14 (dir_name data 1) = dotdot_name.
+
+(* ---- the same four discharges [dir_ok] has ---------------------------- *)
+
+Lemma dir_dotdot_ix_not_dir (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z -> dir_dotdot_ix dn data.
+Proof. intros H Hc. exfalso. exact (H Hc). Qed.
+
+Lemma dir_dotdot_ix_free (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = 0 -> dir_dotdot_ix dn data.
+Proof.
+  intros H. apply dir_dotdot_ix_not_dir. rewrite H. unfold T_DIR_z. lia.
+Qed.
+
+Lemma dir_dotdot_ix_eq (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
+  di_type dn' = di_type dn -> data = data' ->
+  dir_dotdot_ix dn data -> dir_dotdot_ix dn' data'.
+Proof. intros Hty <- Hd Hdir'. apply Hd. rewrite <- Hty. exact Hdir'. Qed.
+
+(* ...and the one that makes it FREE across every append.  [dir_slot] never
+   returns a LIVE record ([dir_slot_free]), and this conjunct's own first
+   half says record 1 IS live -- so a dirlink's write window can never be
+   index 1, and the record rides on the range clause untouched.  The
+   conjunct preserves ITSELF -- the only added premise is the home's record
+   COUNT, which the caller reads off its own size. *)
+Lemma dir_dotdot_ix_dirlink (dn dn' : dinode)
+    (data data' : nat -> list (bv 8))
+    (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
+  nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+  k0 = dir_slot data nrec ->
+  (* the home already HAS its two self-records; every directory a dirlink
+     appends to does, and the caller reads it off its own size.  It cannot
+     live in the conjunct: [dir_links_of_ilink] reconstructs at a [dn']
+     related to nothing, so a [di_size]-dependent CONTENT clause would not
+     survive the live/write/re-park round trip. *)
+  (2 <= nrec)%nat ->
+  (tot <= 16)%nat ->
+  di_type dn' = di_type dn ->
+  (forall x : nat,
+     file_byte data' x
+     = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+       then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+       else file_byte data x) ->
+  dir_dotdot_ix dn data ->
+  dir_dotdot_ix dn' data'.
+Proof.
+  intros Hnrec Hk0 Hnrec2 Htot Hty Hrng Hd Hdir'.
+  assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z)
+    by (rewrite <- Hty; exact Hdir').
+  destruct (Hd Hdir) as [Hlive Hnm].
+  (* THE WINDOW MISSES INDEX 1, and the conjunct's own first half is what
+     makes it: [dir_slot] never returns a LIVE record. *)
+  assert (Hne : k0 <> 1%nat).
+  { intro Hc.
+    assert (Hlt : (dir_slot data nrec < nrec)%nat)
+      by (rewrite <- Hk0; rewrite Hc; lia).
+    pose proof (dir_slot_free data nrec Hlt) as Hfree.
+    rewrite <- Hk0 in Hfree. rewrite Hc in Hfree. exact (Hlive Hfree). }
+  assert (Hwin : dir_win_agree data data' 1).
+  { intros j Hj. rewrite (Hrng (16 * 1 + j)%nat).
+    rewrite decide_False; [reflexivity |]. intros [Hlo Hhi]. apply Hne. lia. }
+  split.
+  - unfold dir_live. rewrite (dir_inum_agree data data' 1 Hwin). exact Hlive.
+  - rewrite (dir_bname_agree data data' 1 Hwin). exact Hnm.
+Qed.
+
+(* ====================================================================== *)
 (*  8b.  (v) THE WRITER'S CASE: the directory a dirlink just wrote into.    *)
 (*       fs-icache.md §15.1(i), discharged by the fs-sysfile S2 retrofit.   *)
 (* ====================================================================== *)

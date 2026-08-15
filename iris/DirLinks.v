@@ -600,6 +600,13 @@ Section DirLinks.
     bv_unsigned (di_nlink dn) <> 0 ->
     dir_live data k0 ->
     bv_unsigned (dir_inum data k0) <> self ->
+    (* ...AND IT IS NOT THE [".."] SLOT.  [DirView.dir_dotdot_ix] pins index
+       1 as the parent entry, and S7 never zeroes it -- [namecmp] refuses
+       [".."], so the record [sys_unlink] clears is always the one
+       [dirlookup] matched on a caller-supplied name.  Additive: this lemma
+       has no consumers yet, and the premise is what keeps the index bridge
+       alive across the delete. *)
+    k0 <> 1%nat ->
     di_type dn' = di_type dn ->
     di_nlink dn' = di_nlink dn ->
     di_size dn' = di_size dn ->
@@ -611,7 +618,7 @@ Section DirLinks.
     dir_links self dn data -∗
       dir_links self dn' data' ∗ ilink (bv_unsigned (dir_inum data k0)).
   Proof.
-    intros Hty Hnrec Hk0 Htot2 Htot16 Hde Hnl Hlv Hself Hty' Hnl' Hsz' Hrng.
+    intros Hty Hnrec Hk0 Htot2 Htot16 Hde Hnl Hlv Hself Hdd Hty' Hnl' Hsz' Hrng.
     (* the written slot is dead: its two inum bytes came out of [d] *)
     assert (Hz : dir_inum data' k0 = bv_0 16).
     { rewrite (dir_inum_of_two data' k0 d); [exact Hde |].
@@ -649,6 +656,46 @@ Section DirLinks.
         iIntros "Hx".
         iApply (dir_link_at_agree self dn dn' data data' k Hnl' Heq with "Hx").
     - iApply (dir_link_at_unlink self dn data k0 Hnl Hlv Hself with "Hk0").
+  Qed.
+
+  (* ==================================================================== *)
+  (*  THE ".." EXTRACTION (fs-icache §20.17.4's owed fact, consumer side). *)
+  (*                                                                      *)
+  (*  S7's [dp->nlink--] must consume one [ilink dp].  This hands out the  *)
+  (*  fragment at index 1 and takes the payload back, borrowing rather     *)
+  (*  than destroying -- which is what the caller needs, since the record  *)
+  (*  itself is NOT zeroed (namecmp refuses [".."]); only its colour       *)
+  (*  changes, and that is §20.17.4's own conversion.                      *)
+  (*                                                                      *)
+  (*  IT DOES NOT NAME THE PARENT.  [dir_inum data 1] is whatever the      *)
+  (*  child's [".."] holds; the tree layer supplies                        *)
+  (*  [ents ip !! ".." = Some dp] and [DirView.dir_dotdot_ix] says that    *)
+  (*  entry is at index 1 -- under [dir_names_unique] (FsRep, R2's         *)
+  (*  amendment) any-match is first-match, so the two compose to           *)
+  (*  [dir_inum data 1 = dp].  That last step is the tree layer's, not     *)
+  (*  this file's.                                                        *)
+  (* ==================================================================== *)
+  Lemma dir_links_dotdot_out (self : Z) (dn : dinode)
+      (data : nat -> list (bv 8)) :
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    bv_unsigned (di_nlink dn) <> 0 ->
+    (1 < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_dotdot_ix dn data ->
+    bv_unsigned (dir_inum data 1) <> self ->
+    dir_links self dn data -∗
+      ilink (bv_unsigned (dir_inum data 1))
+      ∗ (dir_link_at self dn data 1 -∗ dir_links self dn data).
+  Proof.
+    intros Hty Hnl Hnrec Hdd Hself.
+    rewrite /dir_links decide_True; [| exact Hty].
+    iIntros "H".
+    iDestruct (big_sepL_lookup_acc _
+                 (seq 0 (dir_nrec (bv_unsigned (di_size dn)))) 1%nat 1%nat
+                 with "H") as "[H1 Hback]".
+    { apply lookup_seq. lia. }
+    iSplitL "H1"; [| iExact "Hback"].
+    iApply (dir_link_at_unlink self dn data 1 Hnl (proj1 (Hdd Hty)) Hself
+              with "H1").
   Qed.
 
 End DirLinks.
