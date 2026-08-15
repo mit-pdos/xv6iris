@@ -122,6 +122,7 @@ Definition wp_iunlock_sconf_body
   (K_iunlock <= K)%nat ->
   (* the entry is slot [k]: a0 = ip, and the null test dies here *)
   (k < NINODE)%nat ->
+
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   (* THE FRESHNESS PREMISE: iunlock's own [holdingsleep] acquires and
      releases the sleeplock's inner "sleep lock" spinlock internally, so
@@ -134,9 +135,10 @@ Definition wp_iunlock_sconf_body
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
-  sleeplocked gisl -∗
+  sleeplocked_q gisl s -∗
   sl_pid (i_lock ip) ↦₄ pidv -∗
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)

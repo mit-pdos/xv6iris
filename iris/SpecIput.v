@@ -197,7 +197,12 @@ Definition wp_iput_sconf_body
   (* the inode region *)
   ireg_inv gi gfs inodestart nib -∗
   (* the entry's sleeplock, over the CHECKOUT TOKEN alone *)
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
+     the slot, keyed by the slot rather than by the lock -- which is what
+     lets iput, at [ip->ref == 1], prove the lock free instead of blocking
+     on it (claude-notes/projects/iput-acquiresleep.md). *)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   (* ---- THE REFERENCE BEING DESTROYED ---- *)
   inode_ref k q dev inum -∗
   (* ---- itrunc / iupdate's own resources ---- *)
@@ -367,7 +372,12 @@ Definition wp_iput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
+     the slot, keyed by the slot rather than by the lock -- which is what
+     lets iput, at [ip->ref == 1], prove the lock free instead of blocking
+     on it (claude-notes/projects/iput-acquiresleep.md). *)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   inode_ref k q dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗

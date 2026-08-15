@@ -217,6 +217,7 @@ Definition wp_ilock_sconf_body
   (K_ilock <= K)%nat ->
   (* THE ENTRY IS SLOT [k]; this is also the null test's refutation *)
   (k < NINODE)%nat ->
+
   (* the covered range's block-number bounds: bread's 2^31 arithmetic
      premise, and 0 is never a client block *)
   log_geom_ok cov logstart ->
@@ -256,7 +257,15 @@ Definition wp_ilock_sconf_body
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  (* THE ENTRY'S SLEEPLOCK -- TRACKED, and at the cache's canonical gname
+     for the slot: what a holder deposits in it is a share of somebody's
+     REFERENCE ([SleepLock.slh_tok]), which is what lets iput -- holding the
+     only reference -- prove the lock free rather than block on it
+     (claude-notes/projects/iput-acquiresleep.md).  The deposit ilock leaves
+     is the [slh_tok] slice of the very share it consumes below, so no
+     caller pays anything new. *)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   (* THE CALLER'S SHARE (v3) -- consumed; deposited whole at the checkout.
      GENERATION-NAMED (design 17.3, ratified 17.4): the share's liveness
      slice belongs to slot [k]'s current generation [g], and naming it is
@@ -295,7 +304,7 @@ Definition wp_ilock_sconf_body
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       bslot bn -∗
       (* THE LOCK IS HELD ... *)
-      sleeplocked gisl -∗
+      sleeplocked_q gisl s -∗
       sl_pid (i_lock ip) ↦₄ pidv -∗
       (* ... and the entry is CHECKED OUT and LOADED: the checkout
          descriptor's other half (§14.8 -- what the parker selects its arm

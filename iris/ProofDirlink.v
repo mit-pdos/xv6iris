@@ -620,7 +620,8 @@ Section DlBuf.
     (k < NINODE)%nat ->
     (SpecDirlink.ic_sleeplocks cn -∗
      ∃ γil γisl : gname,
-       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
+                        (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /SpecDirlink.ic_sleeplocks.

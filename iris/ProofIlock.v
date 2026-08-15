@@ -337,7 +337,7 @@ Section IlockDefs.
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bslot bn -∗
-        sleeplocked gisl -∗
+        sleeplocked_q gisl s -∗
         sl_pid (i_lock ip) ↦₄ pidv -∗
         ic_deposit cn k (DepShr s dev inum g) -∗
         i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -382,7 +382,7 @@ Section IlockEpilogue.
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot bn -∗
-    sleeplocked gisl -∗
+    sleeplocked_q gisl s -∗
     sl_pid (i_lock ip) ↦₄ pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -688,7 +688,7 @@ Section IlockLoad.
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot bn -∗
-    sleeplocked gisl -∗
+    sleeplocked_q gisl s -∗
     sl_pid (i_lock ip) ↦₄ pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_valid ip ↦₄ (mword_of_int 0 : mword 32) -∗
@@ -2118,6 +2118,8 @@ Section ProofIlockMain.
        bounds are the same ones, and whose [k < NINODE] premise this proof has
        had since its first line (§14.6/§14.8). *)
     iDestruct "Href" as "(Hrid & Hrt & Hrs)".
+    (* the share's SLEEPLOCK slice is what the lock will hold while ilock has
+       the entry checked out; the arm keeps the other two slices. *)
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.ilock + 0x0e)) Ra5 Ra0
               (mword_of_int 8 : mword 12) R3 (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
@@ -2131,8 +2133,8 @@ Section ProofIlockMain.
       iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback" with "Hcell") as "[%Hb Hrt]". iModIntro. by iFrame. }
     iIntros (refv CID8 Hq8) "Hcg Hpc [%Hrefp Hrt]".
-    iAssert (inode_shr_gen k s dev inum g) with "[Hrt Hrid Hrs]" as "Href".
-    { rewrite /inode_shr_gen. iFrame. }
+    iAssert (inode_shr_gen_bare k s dev inum g) with "[Hrt Hrid]" as "Href".
+    { rewrite /inode_shr_gen_bare. iFrame. }
     set (R4 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> R3).
     assert (HR4a5 : R4 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))
       by (rewrite /R4; apply upd_eq).
@@ -2212,13 +2214,13 @@ Section ProofIlockMain.
     (* acquiresleep is index-generic now and takes the trap-CSR complement
        as a genuine pass-through: ilock's own (untouched since entry) is
        exactly what its wait loop's interior [sleep] needs. *)
-    iApply (ASL.wp_acquiresleep_sconf (dq := dq)  gs j gil gisl "inode"%string
-              (ic_tok cn k) R6 pidv (K - 4)%nat eb C b lks
+    iApply (ASL.wp_acquiresleep_gen_sconf (dq := dq) gs j gil gisl "inode"%string
+              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 pidv (K - 4)%nat eb C b lks
               Hj ltac:(lia)
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hrs Hpanic Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa], handing the complement

@@ -428,8 +428,8 @@ Section KexecB2Res.
       (cov : gset Z) (logstart : Z) (dev pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
-    is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) -∗
-    sleeplocked gislf -∗
+    is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+    sleeplocked_q gislf sf -∗
     sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
     ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗

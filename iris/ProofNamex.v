@@ -688,7 +688,8 @@ Section ProofNamexMain.
   Lemma nx_slk_acc (cn : ic_names) (k : nat) : (k < NINODE)%nat ->
     (SpecDirlink.ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
-       is_sleeplock gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string
+                        (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /SpecDirlink.ic_sleeplocks.

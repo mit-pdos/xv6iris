@@ -38,6 +38,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import WpLock SleepLock.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
@@ -370,8 +371,8 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (HS.wp_holdingsleep_sconf (dq := dq) gil gisl "inode"%string
-              (ic_tok cn k) R6 p pidv (K - 4)%nat eb C b lks
+    iApply (HS.wp_holdingsleep_gen_sconf (dq := dq) gil gisl "inode"%string
+              (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb C b lks
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
@@ -526,19 +527,20 @@ Section ProofIunlockMain.
     (* the descriptor pins the fraction and the identity: the share comes back
        at exactly [s], with no existential (§14.8) *)
     iDestruct "Hrefout" as "[_ Href]".
-    (* the descriptor's share comes back generation-named; the contract
-       returns it in the arity-preserving form (design §17.3 (A)) *)
-    iAssert (inode_shr k s dev inum) with "[Href]" as "Href".
-    { rewrite inode_shr_gen_intro. iExists g. iExact "Href". }
-    iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
-              (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b lks
+    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string
+              (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb C b lks
               ltac:(lia)
               Hfresh
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hpanic Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR9a0). iExact "Hslk". }
     { iEval (rewrite HR9a0). iExact "Hpid". }
-    iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc".
+    (* the lock hands the deposit back at the holder's OWN fraction, which is
+       what rebuilds the caller's share: the arm kept the other two slices. *)
+    iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc Hslh".
+    iAssert (inode_shr k s dev inum) with "[Href Hslh]" as "Href".
+    { rewrite inode_shr_gen_intro. iExists g.
+      rewrite inode_shr_gen_bare_split. iFrame. }
     assert (Hpc28 : ret_pc (R9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlock + 0x28)) by (rewrite HR9ra; pcw).
     iEval (rewrite Hpc28) in "Hpc".

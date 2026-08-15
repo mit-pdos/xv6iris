@@ -901,9 +901,9 @@ Section KexecABody.
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
         sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) C b lks -∗
-        is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) -∗
-        sleeplocked gislf -∗
+        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+        sleeplocked_q gislf sf -∗
         sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
         ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
@@ -1766,9 +1766,9 @@ Section KexecAMain.
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
         sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
         cpu_own 0 eb (proc_addr jp) C b lks -∗
-        is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) -∗
-        sleeplocked gislf -∗
+        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+        sleeplocked_q gislf sf -∗
         sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
         ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗

@@ -247,8 +247,8 @@ Section SpecFileclose.
   Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
     ([∗ list] k ∈ seq 0 NINODE,
        ∃ γil γisl : gname,
-         is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string
-                      (ic_tok cn k))%I.
+         is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
+                          (ic_tok cn k) (slh_tok (icfg_isl k)))%I.
 
   Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
   Proof. apply _. Qed.
@@ -257,7 +257,8 @@ Section SpecFileclose.
     (k < NINODE)%nat ->
     (ic_sleeplocks cn -∗
      ∃ γil γisl : gname,
-       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string
+                        (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /ic_sleeplocks.

@@ -1354,7 +1354,7 @@ Section ProofCreateMain.
     (k < NINODE)%nat ->
     (SpecDirlink.ic_sleeplocks cn -∗
      ∃ γil γisl : gname,
-       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /SpecDirlink.ic_sleeplocks.
@@ -1819,9 +1819,9 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ nsl jj) -∗
        (* THE LOCKED PARENT, in pieces *)
-       is_sleeplock γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) -∗
-       sleeplocked γisl -∗
+       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q γisl (qd/2)%Qp -∗
        sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
@@ -1969,9 +1969,9 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ nsl jj) -∗
        (* THE LOCKED PARENT, in pieces *)
-       is_sleeplock γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) -∗
-       sleeplocked γisl -∗
+       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q γisl (qd/2)%Qp -∗
        sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
@@ -1985,9 +1985,9 @@ Section ProofCreateMain.
        ity_shot gd (di_type dn) -∗
        inode_ref_short_gen kd (qd/2 + qd/2)%Qp (qd/2)%Qp dev dind gd -∗
        (* THE LOCKED CHILD, in pieces, at the FLUSHED record *)
-       is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
-                    (ic_tok cn kslot) -∗
-       sleeplocked gisl -∗
+       is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
+       sleeplocked_q gisl (q/2)%Qp -∗
        sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
        ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
@@ -2143,9 +2143,9 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ nsl jj) -∗
        (* THE LOCKED PARENT, in pieces, at the POST-dirlink indices --
           with [dir_links] still at the ENTRY ones and the ticket in hand *)
-       is_sleeplock γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) -∗
-       sleeplocked γisl -∗
+       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q γisl (qd/2)%Qp -∗
        sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
@@ -2159,9 +2159,9 @@ Section ProofCreateMain.
        ity_shot gd (di_type dn) -∗
        inode_ref_short_gen kd (qd/2 + qd/2)%Qp (qd/2)%Qp dev dind gd -∗
        (* THE LOCKED CHILD, at the flushed record *)
-       is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
-                    (ic_tok cn kslot) -∗
-       sleeplocked gisl -∗
+       is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
+       sleeplocked_q gisl (q/2)%Qp -∗
        sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
        ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
@@ -3406,7 +3406,7 @@ Section ProofCreateMain.
                           pa_add (pa_stk sp0 10) jj ↦ₘ nfp jj) -∗
                        ([∗ list] jj ∈ seq 14 2,
                           pa_add (pa_stk sp0 10) jj ↦ₘ nf0 jj) -∗
-                       sleeplocked gislc -∗
+                       sleeplocked_q gislc (qq/2)%Qp -∗
                        sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
                        ic_deposit cn kslot (DepShr (qq/2)%Qp dev cinum gc) -∗
                        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗
@@ -6355,9 +6355,9 @@ Section ProofCreateMain.
        ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
        ([∗ list] jj ∈ seq 14 2, pa_add (pa_stk sp0 10) jj ↦ₘ nsl jj) -∗
        (* THE LOCKED PARENT *)
-       is_sleeplock γil γisl (i_lock (ientry kd)) "inode"%string
-                    (ic_tok cn kd) -∗
-       sleeplocked γisl -∗
+       is_sleeplock_gen γil γisl (i_lock (ientry kd)) "inode"%string
+                    (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q γisl (qd/2)%Qp -∗
        sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
        ic_deposit cn kd (DepShr (qd/2)%Qp dev dind gd) -∗
        i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
@@ -6371,9 +6371,9 @@ Section ProofCreateMain.
        ity_shot gd (di_type dp) -∗
        inode_ref_short_gen kd (qd/2 + qd/2)%Qp (qd/2)%Qp dev dind gd -∗
        (* THE LOCKED CHILD -- WITHOUT its [dir_links] (see the header) *)
-       is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
-                    (ic_tok cn kslot) -∗
-       sleeplocked gisl -∗
+       is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
+                    (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) -∗
+       sleeplocked_q gisl (q/2)%Qp -∗
        sl_pid (i_lock (ientry kslot)) ↦₄ pidv -∗
        ic_deposit cn kslot (DepShr (q/2)%Qp dev cinum g) -∗
        i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev -∗

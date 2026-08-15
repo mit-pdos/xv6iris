@@ -277,9 +277,9 @@ Definition create_fresh_ty_body
              NOT assumed -- see the header. *)
           /\ fresh_shape dn⌝ ∗
          pc_is (mword_of_int (KernelSyms.create + 0xb4) : mword 64) ∗
-         is_sleeplock gil gisl (i_lock (ientry kslot)) "inode"%string
-                      (ic_tok cn kslot) ∗
-         sleeplocked gisl ∗
+         is_sleeplock_gen gil gisl (i_lock (ientry kslot)) "inode"%string
+                          (ic_tok cn kslot) (slh_tok (icfg_isl kslot)) ∗
+         sleeplocked_q gisl (q/2)%Qp ∗
          sl_pid (i_lock (ientry kslot)) ↦₄ pidv ∗
          ic_deposit cn kslot (DepShr (q/2)%Qp dev inum g) ∗
          i_dev (ientry kslot) ↦₄{DfracOwn (1/2)} dev ∗

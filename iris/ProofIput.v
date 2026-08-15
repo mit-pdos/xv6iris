@@ -85,6 +85,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+Require Import WpLock SleepLock.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes.
@@ -1714,10 +1715,13 @@ Section ProofIput.
         iSplitR; [iPureIntro; exact Hok |].
         iSplitR; [iPureIntro; exact Hdok |].
         iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
+      iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
               Mt q ga ga dev inum dn bm ltac:(solve_ndisj) HMk
-              with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
-        as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+              with "Hinv Hbody Hhalf Hrfrg Hrlv Hlvh Hgid Hpayl")
+        as "(Hhalf & Hrfrg & Hrlv & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt & Hgida)".
+      iAssert (iref_tok k q) with "[Hrfrg Hrlv Hrslh]" as "Hrtok".
+      { rewrite /iref_tok. iFrame. }
       iDestruct (ic_payload_at_pack with "Hpayl") as "Hpayl".
       iDestruct "Hvldx" as (w0) "Hva".
       iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
@@ -1879,11 +1883,18 @@ Section ProofIput.
        no ranking can license this edge, why xv6 is nonetheless correct, and
        what everything downstream of this line is (and is not) worth. *)
     pose proof (iput_acquiresleep_order_ADMITTED lks Hitbelow) as Hslbelow.
-    iApply (ASL.wp_acquiresleep_nested_sconf (dq := dq) gs j gil gisl "inode"%string
-              (ic_tok cn k) G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
+    (* the deposit is this reference's OWN sleeplock slice.  It is what the
+       entry's lock holds while iput has it, and it is what comes back at the
+       [releasesleep] below -- the escrow arm keeps the other two slices.
+       (When the non-blocking contract replaces this call, the same slice is
+       returned to the slot's authority FIRST, which is what makes the zero;
+       see claude-notes/projects/iput-acquiresleep.md.) *)
+    iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
+    iApply (ASL.wp_acquiresleep_nested_gen_sconf (dq := dq) gs j gil gisl "inode"%string
+              (ic_tok cn k) (slh_tok (icfg_isl k)) q G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
               ({["itable"]} ∪ lks)
               Hj ltac:(lia) ltac:(cbn; lia) Hslbelow
-              with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs").
+              with "Hcg Hcnt Htext Hpc [] Hrslh Hpanic Hppid Hprocs").
     { iEval (rewrite HG4a0). iExact "Hslk". }
     iApply wp_next_off_intro.
     iIntros (mfa) "%Hcsa Hcg Hcnt Hpc Hstok Hspid Hictok Hppid".
@@ -1931,12 +1942,10 @@ Section ProofIput.
        before is refuted by REF-1.  The count [1] is a parameter
        [live_slot_regen] never reads.
        ================================================================ *)
-    iDestruct "Hrtok" as "(Hfrg & Hlvq & Hslh)".
+    iRename "Hrfrg" into "Hfrg". iRename "Hrlv" into "Hlvq".
     iMod (live_slot_regen ⊤ Mt k q 1%positive ltac:(solve_ndisj) HMk
             with "Hinv Hhalf Hlvq [Hlvh]") as (ga') "(Hhalf & Hlvq & Hlvh & Hpend)";
       [iExists ga; iExact "Hlvh" |].
-    iAssert (iref_tok k q) with "[Hfrg Hlvq Hslh]" as "Hrtok".
-    { rewrite /iref_tok. iFrame "Hfrg Hslh". iExists ga'. iExact "Hlvq". }
     iInv "Hesc" as ">Hbody" "Hclose".
     (* the payload in hand is still the LOADED one at the OLD generation, and
        it must stay there: restating it at [ga'] would spend the fresh
@@ -1948,10 +1957,13 @@ Section ProofIput.
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
       iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
+    (* [live_slot_regen] hands back the slice GENERATION-NAMED; [ic_open_held]
+       takes the ∃-form, and the destruct below re-opens it. *)
+    iAssert (live_frac k q) with "[Hlvq]" as "Hlvqf"; [ iExists ga'; iExact "Hlvq" |].
     iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
             Mt q ga' ga dev inum dn bm ltac:(solve_ndisj) HMk
-            with "Hinv Hbody Hhalf Hrtok Hlvh Hgid Hpayl")
-      as "(Hhalf & Hrtok & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt
+            with "Hinv Hbody Hhalf Hfrg Hlvqf Hlvh Hgid Hpayl")
+      as "(Hhalf & Hfrg & Hlvq & Hlvh & Hgid & Hpayl & Hidv & Hnfull & Hvldx & Hmt
            & Hgida)".
     iDestruct "Hvldx" as (w0) "Hva".
     iDestruct (word4_pointsto_agree with "Hvb Hva") as %<-.
@@ -1971,20 +1983,19 @@ Section ProofIput.
        arm's own 1/2 goes back into the arm beside the deposit.  The
        depositor's slice is generation-named by [live_gen_agree] against
        that 1/2 -- two slices of one slot always name one generation. *)
-    iDestruct "Hrtok" as "(Hfrg & Hlvr & Hslh)".
-    iDestruct "Hlvr" as (gr) "Hlvr".
+    iDestruct "Hlvq" as (gr) "Hlvr".
     iDestruct (live_gen_agree with "Hlvr Hlvh") as %->.
     iMod (ic_dep_checkout cn k (DepRef q dev inum ga') with "Hictok")
       as "[Hdepa Hdepk]".
-    iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hslh Hlvh Hrd Hrn Hmt Hgida]") as "_".
+    iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hlvh Hrd Hrn Hmt Hgida]") as "_".
     { iApply bi.later_intro. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum ga')
-                       dev inum with "Hdepa [Hfrg Hlvr Hslh Hlvh Hrd Hrn] Hmt Hgida").
+                       dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].
       (* [ic_dep_own]'s pure conjunct is [dev = dev /\ inum = inum]: give the
          proof term.  [done] on it costs 5.4 s at this altitude. *)
       iSplitR; [iPureIntro; exact (conj eq_refl eq_refl) |].
-      rewrite /IcacheRef.inode_ref_gen /IcacheRef.inode_ident. iFrame. }
+      rewrite /IcacheRef.inode_ref_gen_bare /IcacheRef.inode_ident. iFrame. }
     iModIntro.
     (* the lock's resource re-forms, unchanged, and is released at +0x5c *)
     iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid]") as "Hslots";
@@ -2421,8 +2432,6 @@ Section ProofIput.
        liveness slice comes back generation-named (§17.3 (A)), which the
        contract states in the arity-preserving form. *)
     iDestruct "Hrefo" as "[_ Href]".
-    iAssert (inode_ref k q dev inum) with "[Href]" as "Href".
-    { rewrite inode_ref_gen_intro. iExists ga'. iExact "Href". }
     (* ===== +0x74 c.mv a0,s2 ; +0x76 jal releasesleep ===== *)
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iput + 0x74)) Ra0 Rs2
               mfu (K - 4)%nat eb ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi74").
@@ -2458,7 +2467,8 @@ Section ProofIput.
     { intros c Hcs. rewrite /J6 upd_ne; [| regne]. exact (HJ5c c Hcs). }
     iDestruct (cpu_own_transport CIDiu CIDm6 0%nat eb pj C eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string (ic_tok cn k)
+    iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string (ic_tok cn k)
+              (slh_tok (icfg_isl k)) q
               J6 pidv pj (K - 4)%nat eb C eb lks ltac:(lia)
               (* releasesleep's bound is "sleep lock"(6); iput's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2467,7 +2477,12 @@ Section ProofIput.
     all: try lkbelow.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
     { iEval (rewrite HJ6a0). iExact "Hspid". }
-    iIntros (CIDrs Hsrs mrs) "%Hcsr Hcg Hcnt Hpc".
+    (* the lock hands the deposit back, and the reference re-forms: the arm
+       kept the other two slices, the lock kept this one. *)
+    iIntros (CIDrs Hsrs mrs) "%Hcsr Hcg Hcnt Hpc Hrslh".
+    iAssert (inode_ref k q dev inum) with "[Href Hrslh]" as "Href".
+    { rewrite inode_ref_gen_intro. iExists ga'.
+      rewrite inode_ref_gen_bare_split. iFrame. }
     assert (Hpc7a : ret_pc (J6 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x7a))
       by (rewrite HJ6ra; pcw).
     iEval (rewrite Hpc7a) in "Hpc".

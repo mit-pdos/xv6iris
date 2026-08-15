@@ -67,9 +67,9 @@ Section ProofHoldingsleep.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
   Lemma wp_holdingsleep_gen_sconf
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_gen_sconf_body γl γsl s R H m p pidv av eb C dq b lks.
+    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb C dq b lks.
   Proof.
     cbv beta delta [wp_holdingsleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
@@ -246,7 +246,9 @@ Section ProofHoldingsleep.
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     (* open sl_res with the caller's token: refute the free arm. *)
-    iDestruct (sl_res_open_held γsl slk R H with "HR Hsl") as "(Hsl & Hdep & Hcellex)".
+    iDestruct (sl_res_open_held_q γsl slk R H q with "HR Hsl")
+      as "(Hsl & Hha & HHq & Hcellex)".
+    iAssert (sl_dep γsl H) with "[Hha HHq]" as "Hdep"; [ iExists q; iFrame |].
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
     (* +0x18 c.lw a5,0(s1) : a5 := sext v *)
     iPoseProof (hsl_18 with "Htext") as "Hi18".
@@ -716,7 +718,18 @@ Section ProofHoldingsleep.
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
     : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
-  Proof. exact (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked m p pidv av eb C dq b lks). Qed.
+  Proof.
+    cbv beta delta [wp_holdingsleep_sconf_body].
+    intros pcE slk ret_tgt Hav Hbelow.
+    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidfield #Hpanic Hpidproc Hcont".
+    iDestruct "Hsl" as (q) "Hsl".
+    iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb C dq b lks
+              Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidfield Hpanic Hpidproc").
+    iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidfield Hpidproc".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidfield Hpidproc"); [ exact Hcs |].
+    iExists q. iExact "Hsl".
+  Qed.
 
 End ProofHoldingsleep.
 

@@ -445,8 +445,8 @@ Section CreateSpec.
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
-       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) ∗
-       sleeplocked γisl ∗
+       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
+       sleeplocked_q γisl s ∗
        sl_pid (i_lock (ientry k)) ↦₄ pidv ∗
        ic_deposit cn k (DepShr s dev inum g) ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
@@ -464,8 +464,8 @@ Section CreateSpec.
      "Framing"). *)
   Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
       γil γisl :
-    is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) -∗
-    sleeplocked γisl -∗
+    is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+    sleeplocked_q γisl s -∗
     sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗

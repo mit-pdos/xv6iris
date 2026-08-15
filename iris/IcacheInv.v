@@ -731,6 +731,35 @@ Section IcacheGhost.
      any second one -- which is how iput's authority-side opening of the
      escrow kills the checked-out arm.  The count component's inclusion is
      the whole content: [(q1,1) ⋅ (q2,1) = (q1+q2, 2)]. *)
+  (* the same at the bare COUNT FRAGMENTS, which is all the proof reads.  An
+     opener that meets an escrow arm's reference cannot use the [iref_tok]
+     form any more: the arm holds [inode_ref_gen_bare], whose sleeplock slice
+     is in the entry's lock rather than in the arm
+     (claude-notes/projects/iput-acquiresleep.md). *)
+  Lemma iref_frag_two_lookup M k q1 q2 :
+    itable_half M -∗ iref_frag k q1 -∗ iref_frag k q2 -∗
+    ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.
+  Proof.
+    rewrite /itable_half /iref_frag. iIntros "Ha H1 H2".
+    assert (Hop : (◯ {[ k := (q1, 1%positive) ]} ⋅ ◯ {[ k := (q2, 1%positive) ]}
+                   : icacheUR)
+                  = ◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]}).
+    { rewrite -auth_frag_op singleton_op -pair_op frac_op. reflexivity. }
+    iAssert (own icfg_iref (◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]})) with "[H1 H2]" as "Hf".
+    { rewrite -Hop own_op. iFrame. }
+    iDestruct (own_valid_2 with "Ha Hf")
+      as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
+    iPureIntro.
+    apply singleton_included_l in Hincl as [y [Hy Hle]].
+    apply leibniz_equiv in Hy. destruct y as [qt n]. exists qt, n.
+    split; [exact Hy|].
+    apply Some_included in Hle as [Heq | Hlt].
+    - destruct Heq as [_ Hn]; cbn in Hn.
+      assert (Hn' : (2%positive : positive) = n) by exact Hn. lia.
+    - apply pair_included in Hlt as [_ Hn]; cbn in Hn.
+      apply pos_included in Hn. lia.
+  Qed.
+
   Lemma iref_tok_two_lookup M k q1 q2 :
     itable_half M -∗ iref_tok k q1 -∗ iref_tok k q2 -∗
     ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.

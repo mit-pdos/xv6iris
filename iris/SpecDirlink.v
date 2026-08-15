@@ -445,8 +445,8 @@ Section DirlinkSpec.
   Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
     ([∗ list] kk ∈ seq 0 NINODE,
        ∃ γil γisl : gname,
-         is_sleeplock γil γisl (i_lock (ientry kk)) "inode"%string
-                      (ic_tok cn kk))%I.
+         is_sleeplock_gen γil γisl (i_lock (ientry kk)) "inode"%string
+                          (ic_tok cn kk) (slh_tok (icfg_isl kk)))%I.
 
   Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
   Proof. apply _. Qed.

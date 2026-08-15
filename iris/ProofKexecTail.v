@@ -1025,7 +1025,7 @@ Section KexecAExit.
   Lemma kxa_slk_acc (cn : ic_names) (k : nat) : (k < NINODE)%nat ->
     (SpecDirlink.ic_sleeplocks cn -∗
      ∃ gil gisl : gname,
-       is_sleeplock gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+       is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k))
      : iProp Σ).
   Proof.
     iIntros (Hk) "H". rewrite /SpecDirlink.ic_sleeplocks.
@@ -1292,9 +1292,9 @@ Section KexecABad.
     pc_is (mword_of_int (KXA + 0x64) : mword 64) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
-    is_sleeplock gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
     (* ---- the open inode: exactly SpecIunlockput's input ---- *)
-    sleeplocked gisl -∗
+    sleeplocked_q gisl sq -∗
     sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
     ic_deposit cn k (DepShr sq dev inum gy) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗

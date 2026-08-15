@@ -390,8 +390,8 @@ Section ProofSysLinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
-    is_sleeplock gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) -∗
-    sleeplocked gisl -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    sleeplocked_q gisl s -∗
     sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
@@ -709,8 +709,8 @@ Section ProofSysLinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
-    is_sleeplock gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) -∗
-    sleeplocked gisl -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    sleeplocked_q gisl s -∗
     sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
     ic_deposit cn kk (DepShr s dev inum gy) -∗
     i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
@@ -1059,7 +1059,7 @@ Section ProofSysLinkTails.
     itable_inv -∗
     ic_escrow cn gfs gi cov logstart kk -∗
     ireg_inv gi gfs inodestart nib -∗
-    is_sleeplock gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
     (* THE REFERENCE, ALREADY SHED: the keep half is what iunlockput spends,
        the generation-named share is what this arm's own [ilock] consumes. *)
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
@@ -1660,14 +1660,14 @@ Section ProofSysLinkTails.
     ic_escrow cn gfs gi cov logstart kk -∗
     ic_escrow cn gfs gi cov logstart kd -∗
     ireg_inv gi gfs inodestart nib -∗
-    is_sleeplock gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) -∗
-    is_sleeplock gild gisld (i_lock (ientry kd)) "inode"%string (ic_tok cn kd) -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
     (* ---- the CHILD, unlocked, its reference already shed ---- *)
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     inode_shr_gen kk s dev inum gy -∗
     ilink (bv_unsigned inum) -∗
     (* ---- the PARENT, still locked ---- *)
-    sleeplocked gisld -∗
+    sleeplocked_q gisld sd -∗
     sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
     ic_deposit cn kd (DepShr sd dev dinum gyd) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
