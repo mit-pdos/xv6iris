@@ -135,9 +135,11 @@ Section UserKernelBridge.
     scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗
     stvec ↦ᵣ stv -∗
-    medeleg ↦ᵣ medeleg_v -∗
-    mstateen0 ↦ᵣ mstateen0v -∗
-    sstateen0 ↦ᵣ sstateen0v -∗
+    (* PERSISTENT: never written after M-mode boot, and the kernel residue
+       ([IntrDefs.hart_csrs]) holds the same three -- see [user_cfg]. *)
+    medeleg ↦ᵣ□ medeleg_v -∗
+    mstateen0 ↦ᵣ□ mstateen0v -∗
+    sstateen0 ↦ᵣ□ sstateen0v -∗
     (* ---- the user data pages ---- *)
     udata_own pt.(ud_data) -∗
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
@@ -214,11 +216,11 @@ Section UserKernelBridge.
       stvec ↦ᵣ{ uc_dqc C } uc_stvec C ∗
       mie ↦ᵣ{ uc_dqc C } uc_mie C ∗
       mideleg ↦ᵣ{ uc_dqc C } uc_mideleg C ∗
-      medeleg ↦ᵣ{ uc_dqc C } uc_medeleg C ∗
+      medeleg ↦ᵣ□ uc_medeleg C ∗
       menvcfg ↦ᵣ{ uc_dqc C } MENVCFG_S ∗
       senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
-      mstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 64) ∗
-      sstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 32) ∗
+      mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
+      sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
       Rut pt.
   Proof.
     iIntros "H".

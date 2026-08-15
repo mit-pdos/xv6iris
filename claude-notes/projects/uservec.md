@@ -715,13 +715,14 @@ and no `stvec_handler_wp`, entered where forkret enters the loop.
   is `wp_next true (proc_addr j)`, `j < NPROC`, so it is hart-generic and
   entry-hart `↦ᵣ` cells are useless. `uservec_post` is missing five, to
   rebuild `user_cfg` at `CID'`:
-  - `stvec` is the one `user_cfg` cell still unrouted, and it is on its own
-    plan. The cell IS in hand at the resuming hart — `usertrap_post` returns
-    it at `TRAMPOLINE` and `ProofUservec` binds it as `Hstvec2` and currently
-    drops it — but unlike the four in `hart_csrs` it is WRITTEN during a trap
-    round (usertrap's `csrw stvec,kernelvec`, prepare_return's write back),
-    so it moves between `IntrDefs.intr_res` and the loose form rather than
-    parking anywhere.
+  - `stvec` is a ROUND TRIP, not a parked cell: it is not free, since while
+    the kernel runs it must point at kernelvec to take interrupts, and it is
+    owned there by `sie_cap` (inside `intr_res`, folded by usertrap's `csrw
+    stvec,kernelvec` and unfolded by prepare_return). uservec therefore may
+    NOT hold it across its call — usertrap needs it, loose, as its own
+    premise — so `uservec_post` hands back what `usertrap_post` returns at
+    the resuming hart, and the loop puts that into the next round's
+    `user_cfg`.
   - `sscratch`/`medeleg`/`mstateen0`/`sstateen0` ride in
     `IntrDefs.hart_csrs`, a conjunct of `cpu_priv`: they cross a migration
     with `cpu_hart`, and `UsertrapRes.ut_trap` already carries

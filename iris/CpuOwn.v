@@ -197,9 +197,9 @@ Section CpuOwn.
     cur_proc p -∗
     lk_auth cpu_id ∅ -∗
     sscratch ↦ᵣ sscr -∗
-    medeleg ↦ᵣ mdl -∗
-    mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) -∗
-    sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) -∗
+    medeleg ↦ᵣ□ mdl -∗
+    mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
+    sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
     cpu_own 0 false p false ∅.
   Proof.
     intros -> ->. iIntros "Hnoff Hint Htok Hproc Hlk Hssc Hmdl Hmse Hsse".

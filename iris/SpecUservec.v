@@ -167,6 +167,16 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
     mie ↦ᵣ MIE_S -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
+    (* THE VECTOR, and it is a ROUND TRIP rather than a parked cell.  [stvec]
+       is not free: while the kernel runs it must point at kernelvec to take
+       interrupts, so it is owned there by [IntrDefs.sie_cap] (inside
+       [intr_res], which usertrap's [csrw stvec,kernelvec] at +0x1e folds and
+       prepare_return's [csrci] unfolds).  uservec therefore may NOT hold the
+       cell back across its call -- usertrap NEEDS it, loose, and takes it as
+       its own premise -- so what comes back here is what [usertrap_post]
+       hands over at the resuming hart, at [TRAMPOLINE] again.  From there
+       the trap loop puts it into the next round's [UserExec.user_cfg]. *)
+    stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
     senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     (* usertrap never touches these after its own return -- held loose,
        framed the whole way through userret, and handed back unchanged *)

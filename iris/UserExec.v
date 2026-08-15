@@ -295,7 +295,13 @@ Section UserExec.
     (stvec ↦ᵣ{ dqc } uc_stvec C ∗
      mie ↦ᵣ{ dqc } uc_mie C ∗
      mideleg ↦ᵣ{ dqc } uc_mideleg C ∗
-     medeleg ↦ᵣ{ dqc } uc_medeleg C ∗
+     (* [medeleg] and the two state-enable pins below are [↦ᵣ□] for the
+        same reason [senvcfg] is, plus one more: nothing writes them after
+        M-mode boot, AND [IntrDefs.hart_csrs] -- inside the kernel residue
+        that [wp_uservec_pt] takes BESIDE the trap frame -- holds them too.
+        At an owned fraction the two bundles would claim the same cells and
+        uservec's precondition would be unsatisfiable. *)
+     medeleg ↦ᵣ□ uc_medeleg C ∗
      menvcfg ↦ᵣ{ dqc } MENVCFG_S ∗
      (* [senvcfg] is NEVER WRITTEN -- no [wp_csrw]-style lemma for it exists
         anywhere in the tree -- so unlike its neighbors above it needs no
@@ -304,8 +310,8 @@ Section UserExec.
         freely duplicable, so this costs nothing to hold alongside every
         other read of it (e.g. [hw_config]'s own copy, RiscvFetchExec.v). *)
      senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
-     mstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 64) ∗
-     sstateen0 ↦ᵣ{ dqc } (mword_of_int 0 : mword 32))%I.
+     mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
+     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The loop invariant: A VALID USER-MODE EXECUTION STATE.  Everything an *)

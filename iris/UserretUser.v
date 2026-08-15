@@ -141,9 +141,9 @@ Section UserretUser.
     scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗
     stvec ↦ᵣ uc_stvec C -∗
-    medeleg ↦ᵣ uc_medeleg C -∗
-    mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) -∗
-    sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) -∗
+    medeleg ↦ᵣ□ uc_medeleg C -∗
+    mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
+    sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
     udata_own (ud_data pt) -∗
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
     Rut pt -∗

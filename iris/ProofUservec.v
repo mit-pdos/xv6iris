@@ -276,12 +276,9 @@ Section UservecAllPt.
     iEval (rewrite Hdqc) in "Hstvec".
     iEval (rewrite Hdqc) in "Hmie".
     iEval (rewrite Hdqc) in "Hmdl".
-    iEval (rewrite Hdqc) in "Hmedl".
     iEval (rewrite Hdqc) in "Hmenv".
     (* [Hsenv] needs no [Hdqc] rewrite -- [user_cfg]'s senvcfg conjunct is
        already [↦ᵣ□], decoupled from [dqc] entirely (UserExec.v). *)
-    iEval (rewrite Hdqc) in "Hmse".
-    iEval (rewrite Hdqc) in "Hsse".
     (* the pc: stvec's direct base is the trampoline base *)
     assert (Hsb : stvec_base (uc_stvec C) = uva 0x00).
     { rewrite Hstvec. apply bv_eq; vm_compute; reflexivity. }
@@ -1810,7 +1807,7 @@ Section UservecAllPt.
                               u136 u144 u152 u160 u168 u176 u184 u192 u200 u208 u216 u224 u232
                               u240 u248 u256 u264 u272 u280 u112)
              ms' usatp uepc sc' stval' mdv0
-             with "[%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hsenv3 Hsc2 Hstval2 Hsepc3
+             with "[%] [%] [%] [%] [%] [%] Hhs3 Hpriv3 Hms3 Hmie4 Hmdl4 Hmenv4 Hstvec2 Hsenv3 Hsc2 Hstval2 Hsepc3
                     Hupt3 Hpc3 Hfile3 Hures3 Hhw2 Hmin2").
     - exact Hpttf.
     - exact Hmapwf.

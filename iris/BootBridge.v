@@ -453,8 +453,14 @@ Section BootBridge.
       as "[Hspp1 Hspp2]".
     iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez Hmieval eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
-    (* --- cpus[cid] --- *)
+    (* --- cpus[cid].  The three never-written CSRs are FROZEN here: they are
+       read by the user tier ([UserExec.user_cfg]) and held by the kernel
+       residue ([IntrDefs.hart_csrs]), and at an owned fraction those two
+       would claim the same cells. --- *)
     iDestruct "Hssc" as (sscr) "Hssc".
+    iMod (reg_pointsto_persist medeleg _ _ with "Hmedl") as "#Hmedl".
+    iMod (reg_pointsto_persist mstateen0 _ _ with "Hmse") as "#Hmse".
+    iMod (reg_pointsto_persist sstateen0 _ _ with "Hsse") as "#Hsse".
     iDestruct (cpu_own_init_boot p0 nv iv sscr MEDELEG_S Hnv eq_refl
                  with "Hnoff Hint He2 Hproc Hlks Hssc Hmedl Hmse Hsse") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY

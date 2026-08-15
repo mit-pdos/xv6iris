@@ -916,6 +916,17 @@ Section IntrDefsBase.
   (* [usertrap_res] and its parked/bare forms too, which is where the      *)
   (* trampoline reaches [sscratch].                                        *)
   (*                                                                      *)
+  (* THREE OF THE FOUR ARE PERSISTENT, AND THEY HAVE TO BE.  [user_cfg]    *)
+  (* (UserExec.v) owns [medeleg] and the two state-enable pins while user   *)
+  (* code runs, and [wp_uservec_pt] takes the trap frame AND this residue   *)
+  (* at once -- so at [DfracOwn 1] the two bundles claim the same three     *)
+  (* cells and uservec's precondition is UNSATISFIABLE (it was, briefly).   *)
+  (* Nothing writes them after M-mode boot, so [↦ᵣ□] is both sound and the  *)
+  (* right modelling: duplicable is exactly what "two bundles see it" needs,*)
+  (* and it removes the handoff entirely -- no cell has to move at the      *)
+  (* trampoline boundaries.  [sscratch] is the one that stays EXCLUSIVE:    *)
+  (* uservec writes it.                                                     *)
+  (*                                                                      *)
   (* VALUES.  [medeleg] is PINNED: [start()] writes it once and            *)
   (* [legalize_medeleg] ignores its old value, so the post-boot value is a *)
   (* closed constant -- the same treatment, and the same reason, as        *)
@@ -929,9 +940,9 @@ Section IntrDefsBase.
   (* ------------------------------------------------------------------- *)
   Definition hart_csrs : iProp Σ :=
     ((∃ v : mword 64, sscratch ↦ᵣ v) ∗
-     medeleg ↦ᵣ MEDELEG_S ∗
-     mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) ∗
-     sstateen0 ↦ᵣ (mword_of_int 0 : mword 32))%I.
+     medeleg ↦ᵣ□ MEDELEG_S ∗
+     mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
+     sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32))%I.
 
   Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) (lks : gset string) : iProp Σ :=
     (cpu_cells n eb p ∗ cpu_locks_lvl n lks ∗ hart_csrs)%I.
