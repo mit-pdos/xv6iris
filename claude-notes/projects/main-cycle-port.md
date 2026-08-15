@@ -99,7 +99,30 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    (`wp_hart_restart` hands out both ticks); the tick=true tail's extra
    `tick_clock` stretch is leaf-side (three clock_inv chops + ∀-reads),
    like the rest of the tail.
-0f. **The decode gap (open — the last design item before the leaf).**
+0f′. **The decode gap, bottomed out (supersedes 0f's first cut).**  A
+   monad that branches on a symbolic encoding `w` has no constructor
+   head, so NO WP rule can step it per-node — the exec-span idea fails
+   at the meta level (the rule's own induction cannot case an open
+   term), not on soundness.  Consequences, in order of delivery:
+   (a) **The pilot leaf is PER-WORD** (concrete encoding, like the
+   existing CodeXxx catalogue's `mni_*` altitude, and like the pilot):
+   everything computes, the existing kit suffices end to end.  Ship it
+   first — it is the honest heir of the catalogue's per-word facts and
+   is what whole-function proofs actually consume at concrete sites.
+   (b) **∀-operand leaf shapes** (wp_addi_gpr's ∀ imm/rs1/rd with `w`
+   existential) need a once-per-INSTRUCTION-SHAPE decode
+   characterization over the ENCODING FUNCTION: at
+   `ext_decode (encode_itype imm rs1 rd)` the branch bits are the
+   SHAPE's (opcode/funct, concrete) and the operand bits ride as values
+   into the constructor — so the span/batch reduces at symbolic
+   operands.  The seam to design: `instr` pins only `decode w = i`, not
+   `w = encode i` (non-canonical encodings), so either the per-shape
+   char takes the encoding form as its premise (and the leaf's caller —
+   the catalogue — supplies it, which it can: the kd_ words are
+   canonical), or the leaf statement's `instr` premise is consumed
+   per-word downstream.  Decide when building leaf #2; do not block the
+   per-word pilot on it.
+0f-old (first cut, kept for the analysis trail): **The decode gap.**
    A leaf's encoding word `w` is EXISTENTIAL inside `instr`, and decode
    branches on `w`'s bits — so the functional batch (hsil2) is a STUCK
    TERM through decode at symbolic `w`, and no cursor fact computes.  The
