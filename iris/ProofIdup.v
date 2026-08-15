@@ -313,7 +313,7 @@ Section ProofIdup.
        live slot ([IcacheInv.iref_share_lookup_au], design §14.7(2)).  That
        one opens [itable_inv] and closes it again with nothing moved, so it is
        a fupd where [iref_lookup] was a pure wand -- hence the [fupd_wp]. *)
-    iDestruct "Href" as "[Hrident Hrlive]".
+    iDestruct "Href" as "(Hrident & Hrlive & Hrslh)".
     iApply fupd_wp.
     iMod (iref_share_lookup_au ⊤ M k s ltac:(solve_ndisj) Hk
             with "Hinv Hhalf Hrlive") as "(%HMk0 & Hhalf & Hrlive)".
@@ -662,9 +662,9 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
-    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive] [Ht1 Hid2]").
+    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh] [Ht1 Hid2]").
     3:{ iExists (qr/2)%Qp. rewrite /inode_ref. iFrame "Ht1 Hid2". }
-    2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive". }
+    2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive Hrslh". }
     (* callee_saved m P5, and a0 = ip *)
     split; [| exact HP5a0].
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

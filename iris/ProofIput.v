@@ -476,7 +476,7 @@ Section IputCommon.
     ⌜∃ (qt : Qp) (nn : positive), M !! k = Some (qt, nn) /\
        (nn = 1%positive \/ ∃ qr : Qp, (qt - q)%Qp = Some qr)⌝.
   Proof.
-    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha [[Hf _] _]".
+    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha (Hf & _ & _)".
     iDestruct (own_valid_2 with "Ha Hf")
       as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
     iPureIntro.
@@ -1931,13 +1931,12 @@ Section ProofIput.
        before is refuted by REF-1.  The count [1] is a parameter
        [live_slot_regen] never reads.
        ================================================================ *)
-    iDestruct "Hrtok" as "[Hfrg Hlvq]".
+    iDestruct "Hrtok" as "(Hfrg & Hlvq & Hslh)".
     iMod (live_slot_regen ⊤ Mt k q 1%positive ltac:(solve_ndisj) HMk
             with "Hinv Hhalf Hlvq [Hlvh]") as (ga') "(Hhalf & Hlvq & Hlvh & Hpend)";
       [iExists ga; iExact "Hlvh" |].
-    iAssert (iref_tok k q) with "[Hfrg Hlvq]" as "Hrtok".
-    { rewrite /iref_tok. iSplitL "Hfrg"; [iExact "Hfrg" |].
-      iExists ga'. iExact "Hlvq". }
+    iAssert (iref_tok k q) with "[Hfrg Hlvq Hslh]" as "Hrtok".
+    { rewrite /iref_tok. iFrame "Hfrg Hslh". iExists ga'. iExact "Hlvq". }
     iInv "Hesc" as ">Hbody" "Hclose".
     (* the payload in hand is still the LOADED one at the OLD generation, and
        it must stay there: restating it at [ga'] would spend the fresh
@@ -1972,14 +1971,14 @@ Section ProofIput.
        arm's own 1/2 goes back into the arm beside the deposit.  The
        depositor's slice is generation-named by [live_gen_agree] against
        that 1/2 -- two slices of one slot always name one generation. *)
-    iDestruct "Hrtok" as "[Hfrg Hlvr]".
+    iDestruct "Hrtok" as "(Hfrg & Hlvr & Hslh)".
     iDestruct "Hlvr" as (gr) "Hlvr".
     iDestruct (live_gen_agree with "Hlvr Hlvh") as %->.
     iMod (ic_dep_checkout cn k (DepRef q dev inum ga') with "Hictok")
       as "[Hdepa Hdepk]".
-    iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hlvh Hrd Hrn Hmt Hgida]") as "_".
+    iMod ("Hclose" with "[Hdepa Hfrg Hlvr Hslh Hlvh Hrd Hrn Hmt Hgida]") as "_".
     { iApply bi.later_intro. iApply (ic_close_out cn gfs gi cov logstart k (DepRef q dev inum ga')
-                       dev inum with "Hdepa [Hfrg Hlvr Hlvh Hrd Hrn] Hmt Hgida").
+                       dev inum with "Hdepa [Hfrg Hlvr Hslh Hlvh Hrd Hrn] Hmt Hgida").
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       iSplitR "Hlvh"; [| iExact "Hlvh"].
       (* [ic_dep_own]'s pure conjunct is [dev = dev /\ inum = inum]: give the

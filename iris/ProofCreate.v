@@ -1253,10 +1253,10 @@ Section ProofCreateMain.
     inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
   Proof.
     rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
-            live_gen_split inode_ident_split.
+            live_gen_split inode_ident_split SleepLock.slh_tok_split.
     iSplit.
-    - iIntros "($ & [$ Hl2] & [$ Hi2])". iFrame.
-    - iIntros "[($ & $ & $) [$ $]]".
+    - iIntros "($ & [$ Hl2] & [$ Hi2] & [$ Hs2])". iFrame.
+    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
   Lemma cr_shed_gen (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :

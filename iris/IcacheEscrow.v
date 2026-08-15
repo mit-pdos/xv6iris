@@ -708,10 +708,10 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_dep_own.
     destruct d as [| q dv nu g | s dv nu g]; [iIntros "[]" | |].
-    - iIntros "[%Heq (Hfr & Hlv & Hid)]". iExists q. iFrame "Hid".
+    - iIntros "[%Heq (Hfr & Hlv & Hid & Hs)]". iExists q. iFrame "Hid".
       iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_ref_gen. iFrame.
-    - iIntros "[%Heq [Hid Hlv]]". iExists s. iFrame "Hid".
+    - iIntros "[%Heq (Hid & Hlv & Hs)]". iExists s. iFrame "Hid".
       iIntros "Hid". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
   Qed.
@@ -742,14 +742,14 @@ Section IcacheEscrow.
     - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
       iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
       iIntros "[%g2 Hhalf]".
-      iDestruct "Hown" as "[%Heq (Hfr & Hlv & Hid)]".
+      iDestruct "Hown" as "[%Heq (Hfr & Hlv & Hid & Hs)]".
       iDestruct (live_gen_agree with "Hlv Hhalf") as %<-.
       iFrame "Hhalf". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_ref_gen. iFrame.
     - iIntros "[Hown Hhalf]". iExists (1/2)%Qp.
       iSplitL "Hhalf"; [iExists g; iExact "Hhalf" |].
       iIntros "[%g2 Hhalf]".
-      iDestruct "Hown" as "[%Heq [Hid Hlv]]".
+      iDestruct "Hown" as "[%Heq (Hid & Hlv & Hs)]".
       iDestruct (live_gen_agree with "Hlv Hhalf") as %<-.
       iFrame "Hhalf". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
@@ -763,10 +763,10 @@ Section IcacheEscrow.
   Proof.
     rewrite /ic_dep_own /ic_dep_gname.
     destruct d as [| q dv nu g | s dv nu g]; [iIntros "[]" | |].
-    - iIntros "[%Heq (Hfr & Hlv & Hid)]". iExists q, g. iSplitR; [done |].
+    - iIntros "[%Heq (Hfr & Hlv & Hid & Hs)]". iExists q, g. iSplitR; [done |].
       iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_ref_gen. iFrame.
-    - iIntros "[%Heq [Hid Hlv]]". iExists s, g. iSplitR; [done |].
+    - iIntros "[%Heq (Hid & Hlv & Hs)]". iExists s, g. iSplitR; [done |].
       iFrame "Hlv". iIntros "Hlv". iSplitR; [iPureIntro; exact Heq |].
       rewrite /inode_shr_gen. iFrame.
   Qed.
@@ -1226,10 +1226,9 @@ Section IcacheEscrow.
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       destruct d as [| q' dv nu gd | s dv nu gd].
       + iDestruct "Hres" as "[[] _]".
-      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
-        iAssert (iref_tok k q') with "[Hfr' Hlv']" as "Htok'".
-        { rewrite /iref_tok. iSplitL "Hfr'"; [iExact "Hfr'" |].
-          iExists gd. iExact "Hlv'". }
+      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _ & Hs')] _]".
+        iAssert (iref_tok k q') with "[Hfr' Hlv' Hs']" as "Htok'".
+        { rewrite /iref_tok. iFrame "Hfr' Hs'". iExists gd. iExact "Hlv'". }
         iDestruct (iref_tok_two_lookup with "Hhalf Htok Htok'")
           as %(qt' & n & HMk' & Hn).
         rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
@@ -1238,8 +1237,8 @@ Section IcacheEscrow.
            ledger (§17.3 (A)): the opener's [q = qt], the invariant's
            [1/2 - qt], the ARM's own 1/2 and the share's [s] sum past one.
            The 1/2 is what §17.2's placement lost and what puts this back. *)
-        iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
-        iDestruct "Htok" as "[_ Hlv]".
+        iDestruct "Hres" as "[[_ (_ & Hlvs & _)] Hhf]".
+        iDestruct "Htok" as "(_ & Hlv & _)".
         iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
           [iExists gd; iExact "Hhf" |].
         iAssert (live_frac k s) with "[Hlvs]" as "Hfs";
@@ -1765,16 +1764,15 @@ Section IcacheEscrow.
       rewrite /ic_dep_res /ic_dep_own /ic_dep_half.
       destruct d as [| q' dv nu gd | s dv nu gd].
       + iDestruct "Hres" as "[[] _]".
-      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _)] _]".
-        iAssert (iref_tok k q') with "[Hfr' Hlv']" as "Htok'".
-        { rewrite /iref_tok. iSplitL "Hfr'"; [iExact "Hfr'" |].
-          iExists gd. iExact "Hlv'". }
+      + iDestruct "Hres" as "[[_ (Hfr' & Hlv' & _ & Hs')] _]".
+        iAssert (iref_tok k q') with "[Hfr' Hlv' Hs']" as "Htok'".
+        { rewrite /iref_tok. iFrame "Hfr' Hs'". iExists gd. iExact "Hlv'". }
         iDestruct (iref_tok_two_lookup with "Hhalf Htok Htok'")
           as %(qt' & n & HMk' & Hn).
         rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
         iExFalso. iPureIntro. cbn in Hn. lia.
-      + iDestruct "Hres" as "[[_ [_ Hlvs]] Hhf]".
-        iDestruct "Htok" as "[_ Hlv]".
+      + iDestruct "Hres" as "[[_ (_ & Hlvs & _)] Hhf]".
+        iDestruct "Htok" as "(_ & Hlv & _)".
         iAssert (live_frac k (1/2)%Qp) with "[Hhf]" as "Hfh";
           [iExists gd; iExact "Hhf" |].
         iAssert (live_frac k s) with "[Hlvs]" as "Hfs";

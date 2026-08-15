@@ -685,7 +685,7 @@ Section IcacheGhost.
     ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (qt ≤ 1)%Qp /\
        (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive)⌝.
   Proof.
-    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha [[Hf _] _]".
+    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha (Hf & _ & _)".
     iDestruct (own_valid_2 with "Ha Hf")
       as %[_ [Hincl Hval]]%auth_both_dfrac_valid_discrete.
     iPureIntro.
@@ -716,7 +716,7 @@ Section IcacheGhost.
     M !! k = None ->
     itable_half M -∗ iref_tok k q -∗ False.
   Proof.
-    rewrite /itable_half /iref_tok /iref_frag. iIntros (HM) "Ha [[Hf _] _]".
+    rewrite /itable_half /iref_tok /iref_frag. iIntros (HM) "Ha (Hf & _ & _)".
     iDestruct (own_valid_2 with "Ha Hf")
       as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
     iPureIntro.
@@ -735,7 +735,7 @@ Section IcacheGhost.
     itable_half M -∗ iref_tok k q1 -∗ iref_tok k q2 -∗
     ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.
   Proof.
-    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha [[H1 _] _] [[H2 _] _]".
+    rewrite /itable_half /iref_tok /iref_frag. iIntros "Ha (H1 & _ & _) (H2 & _ & _)".
     assert (Hop : (◯ {[ k := (q1, 1%positive) ]} ⋅ ◯ {[ k := (q2, 1%positive) ]}
                    : icacheUR)
                   = ◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]}).
@@ -851,7 +851,7 @@ Section IcacheGhost.
     isl_slot (<[k := (qt, Pos.succ n)]> M) k ∗
     iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp.
   Proof.
-    iIntros (HM) "Ha [[Hf Hsh] Hlv] Hisl".
+    iIntros (HM) "Ha (Hf & Hlv & Hsh) Hisl".
     (* the TOTAL is unchanged -- nothing is minted, the caller's own share
        halves along with its count fragment -- so the authority only has to
        be re-read at the updated map. *)
@@ -894,7 +894,7 @@ Section IcacheGhost.
     own icfg_iref (● (<[k := (qr, n)]> M)) ∗ live_slot (<[k := (qr, n)]> M) k ∗
     isl_slot (<[k := (qr, n)]> M) k.
   Proof.
-    iIntros (HM Hsub) "Ha [[Hf Hsh] Hlv] Hsl Hisl".
+    iIntros (HM Hsub) "Ha (Hf & Hlv & Hsh) Hsl Hisl".
     iDestruct (live_slot_close M k q qt qr n HM Hsub with "Hsl Hlv") as "Hsl".
     iFrame "Hsl".
     apply Qp.sub_Some in Hsub.       (* qt = q + qr *)
@@ -951,7 +951,7 @@ Section IcacheGhost.
     own icfg_iref (● (delete k M)) ∗ live_slot (delete k M) k ∗
     isl_slot (delete k M) k.
   Proof.
-    iIntros (HM) "Ha [[Hf Hsh] Hlv] Hh Hsl Hisl".
+    iIntros (HM) "Ha (Hf & Hlv & Hsh) Hh Hsl Hisl".
     iDestruct (live_slot_close_last M k qt HM with "Hsl Hlv Hh") as "Hsl".
     iFrame "Hsl".
     (* THE LAST reference's share returns and leaves the AUTHORITATIVE ZERO,
