@@ -264,7 +264,6 @@ Section Ut56.
     { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
     iAssert (printk_env (un_pr N) (un_u N) (un_v N)) with "[]" as "#Hpenv".
     { iDestruct "Hcaps" as "(_ & _ & _ & _ & _ & $ & _)". }
-    iPoseProof (panic_wp_any_at CID with "Hpa") as "#Hpw".
     iPoseProof (ut_fmt1_str with "Hkd") as "#Hf1".
     iPoseProof (ut_fmt2_str with "Hkd") as "#Hf2".
     (* the three trap CSR cells, named *)

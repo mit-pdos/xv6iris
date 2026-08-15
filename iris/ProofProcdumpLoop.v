@@ -696,7 +696,6 @@ Section ProofProcdumpLoop.
         iPoseProof (pd_fmt_str with "Hkd") as "Hfmt".
         iDestruct (cpu_own_transport CIDp CIDq3 0%nat eb p b 
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iPoseProof (panic_wp_any_at CIDq3 with "Hpanic") as "Hpanic3".
         iApply (Hpk CIDq3 P5c K' eb p DfracDiscarded pd_fmt
                   [PkANum; PkAStr DfracDiscarded ss; PkAStr dq3 nm2] b lks
                   ltac:(lia) pd_fmt_len pd_fmt_nonul
@@ -774,7 +773,6 @@ Section ProofProcdumpLoop.
         iPoseProof (pd_nl_str with "Hkd") as "Hnlstr".
         iDestruct (cpu_own_transport CIDq4 CIDq6 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iPoseProof (panic_wp_any_at CIDq6 with "Hpanic") as "Hpanic6".
         iApply (Hpk CIDq6 P62 K' eb p DfracDiscarded pd_nl [] b lks
                   ltac:(lia) pd_nl_len pd_nl_nonul
                   ltac:(rewrite pd_nl_kinds; reflexivity)

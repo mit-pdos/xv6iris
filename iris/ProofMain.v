@@ -798,7 +798,7 @@ Section ProofMain.
     iEval (rewrite Htgtki) in "Hpc".
     iApply (Kinit.wp_kinit_sconf V1 ps n 0%nat false p0 vkl vkn vkc
               false ∅ ltac:(lia) eq_refl Hprun (locks_below_empty _)
-              with "Hcg Hcpu Htext Hkdata Hpc Hpanic Hkw Hkn Hkc Hkmem24 Hpages").
+              with "Hcg Hcpu Htext Hkdata Hpc Hkw Hkn Hkc Hkmem24 Hpages").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (γl γk mki) "Hcg Hcpu Hpc %Hcski #Hkmem Havail".

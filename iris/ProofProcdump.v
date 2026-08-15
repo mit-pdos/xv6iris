@@ -118,7 +118,6 @@ Section ProofProcdumpMain.
     iPoseProof (pd_nl_str with "Hkdata") as "Hnlstr".
     iDestruct (cpu_own_transport CID CID2 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iPoseProof (panic_wp_any_at CID2 with "Hpanic") as "Hpanic2".
     iApply (Hpk CID2 M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
               (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)

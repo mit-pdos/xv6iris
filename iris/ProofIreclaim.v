@@ -1115,7 +1115,6 @@ Section IreclaimOrphan.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iPoseProof (panic_wp_any_at CID3 with "Hpanic") as "Hpanic3".
     (* the panic tail runs at depth 0, so the held set is forced empty and
        printk's order premise ("pr", 14) needs no hypothesis here. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".

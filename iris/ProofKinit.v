@@ -55,7 +55,7 @@ Section ProofKinit.
       HK Hncnt Hprun Hlkbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic Hlock Hname Hcpu Hflw Hpages Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
     assert (Hkmem : forall j bt, cstring_bytes "kmem"%string !! j = Some bt ->
                       KernelData.kernel_data !! (0x80007040 + Z.of_nat j)%Z = Some bt).
