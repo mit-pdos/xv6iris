@@ -13,518 +13,256 @@ subsystems that already have design files
 [`tlb-translation.md`](../design/tlb-translation.md)), and what is
 kexec-specific is the *composition*.
 
-## CHECKPOINT — read this first
+## kexec IS PROVEN — read this first
 
-**PHASE B IS DONE.  Proven: `+0x000 .. +0x1ae`, i.e. phase A entire, phase
-B1, the whole phdr loop with the inlined loadseg loop inside it, and all
-seven of phase B's `bad:` entries.**  `ProofKexecB3.kxc_b2` /
-`kxc_b2z` are the two paths from phase B1's two outputs to `+0x1ae`.
+`kexec()` is proven end to end and linked. `ProofKexec.v` composes the four
+phases into `SpecKexec.wp_kexec_sconf_body`; `LinkKexec.v` instantiates that
+functor against its sixteen callees' proofs. The cone's `Print Assumptions`
+is the five platform axioms, `functional_extensionality_dep`, and the
+transient `ProofIput.iput_acquiresleep_order_ADMITTED` every `iput` client
+inherits — nothing kexec-specific, and no `PanicStub` credential.
 
-**THE PHASE B2/B3/C BUILD CHAIN IS BROKEN.** `ProofKexecB3.v` no longer
-`Require`s `ProofKexecB2.v`, and `ProofKexecC.v` requires neither
-`ProofKexecB2.v` nor `ProofKexecB3.v` — `coqdep` confirms none of the three
-`.vo`s appears in another's dependency list. `SpecKexecB2.v` states
-`kxc_ls`/`kxc_bad324` (what B3 actually consumes out of B2) as `Module Type
-KEXECB2` Parameters over `_body` `Definition`s, plus the WHOLE of
-`KexecB2Frame`/`KexecB2Res` (the frame algebra and the resource bundle,
-verbatim — B3 turned out to call several of their small lemmas too, not
-just the two headline `Definition`s); `ProofKexecB3.v`'s `KexecB2Proof`
-ascribes `: KEXECB2` and `ProofKexecB3.v` takes `B2` as an abstract functor
-argument of that type instead of applying the functor itself. `SpecKexecB3.v`
-does the same for `kxc_b2`/`kxc_b2z`, ready for when phase C's argv loop
-needs them — `ProofKexecC.v` does not yet take a `(B3 : KEXECB3)` argument
-because it does not yet consume them; add that argument, not a
-`Require Import ProofKexecB3.`, when it does. See SpecKexecB2.v's header
-for the full rationale and the design/spec-modules.md pattern this applies.
+What is left in this project is `sys_exec` and four non-blocking cleanups;
+see the Worklist at the end.
 
-**PHASE C IS IN PROGRESS.**  Its design is worked out in full below (control
-flow re-verified independently, instruction by instruction, off the
-generated `CodeKexec.v` — not just transcribed from an earlier read), and its
-second shared tail — the `-1` path at `+0x1d6 .. +0x1f2` that six of the
-phase's branches funnel into — is **proven**
-(`ProofKexecTail.KexecTailProofC.kxc_bad_1d6`; see the phase-C section
-below). **`kxc_c_setup` (`+0x1ae .. +0x218`: myproc, PGROUNDUP, the first
-`uvmalloc` call and its failure/success split, `uvmclear` on the guard page,
-the stackbase/argv[0] setup, and the final branch into the loop) is now also
-PROVEN and committed** — `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup`,
-`Qed` in 5.3s. See the entry right below for the whole story (a `vm_compute`
-hang that looked like a Qed-scale problem, then a real design gap in which
-page table the loop invariant closes over) — read it before touching phase
-C's remainder, the argv loop.
+## The composition
 
-**THE "17 GB Qed" DIAGNOSIS BELOW WAS WRONG — CORRECTED HERE, READ THIS
-FIRST.** A later session ran `coqc -time -async-proofs off` (durable-notes'
-Rule Zero, `optimization.md`'s diagnosis-first rule) and the stall was NEVER
-in `Qed` at all — `-time` showed every individual sentence sub-second all the
-way to 79-100% of the file, repeatably, across many reruns. The real culprit
-was one TACTIC: `HW2s7`'s proof did `apply bv_eq; vm_compute` on a goal that
-still mentioned `sz1` (`pose`d from `uvmalloc`'s returned size — genuinely
-symbolic, not a closed literal). That is exactly `optimization.md`'s "never
-`vm_compute` a goal containing a symbolic `mword` variable" trap: RSS climbed
-~500 MB/s, linearly, no plateau, and would have hit the reported 40 GB inside
-two more minutes had the earlier session not killed it first. The `set`→
-`pose` swap made in that same round (30 chained `regfile` lets, `T0..T12,
-Z0, Y, U0..U3, Z1, W1..W8`) is ALSO the right call per `optimization.md`'s
-"Register maps" section (every one of them is unfolded by an explicit
-`rewrite /Xn`, never relied on `set`'s goal-folding) — keep it — but it is
-NOT what was hanging, and would not have fixed the real bug by itself.
-**The fix: never let a `pose`d symbolic value reach `vm_compute`.** Bridge
-two chained immediate offsets against a symbolic base via `bv_eq` +
-`add_vec64_unsigned`/`moi64_unsigned` + `bv_wrap_add_idemp_l` + `f_equal`
-(closes to a CLOSED-numeral goal only — `PrintintArith.wrap_add3'`/
-`addv_moi_moi` is the recipe, copied in LOCALLY as `kxc_wrap_add3'`/
-`kxc_addv_moi_moi`) rather than ever handing the whole equation to
-`vm_compute`. **Do not `Require Import PrintintArith` into a WP file** — its
-own header says why (a `Local Open Scope Z_scope` that is supposed to stay
-file-local but empirically leaks past `Require Import` and breaks every bare
-`nat` numeral in a typeclass-method position, e.g. `seq j n !! i`, with
-"Could not find an instance for `Lookup Z Z (list nat)`"); copy the one or
-two lemmas needed instead, as `ProofKexecC.v` now does.
+`ProofKexec.v` is plumbing and nothing else — every instruction is proven in
+a phase file. The chain, with the seam each step meets its successor at:
 
-With that fixed, plus a run of genuinely pre-existing bugs the compiler
-had simply never reached before (`ProofKexecC.v` never got past ~79% of
-the file until the `vm_compute` hang was gone), `kxc_c_setup` now compiles
-CLEANLY past the entire setup block, both branches' frame reassembly, and
-into `kxc_c_res`'s resource-by-resource close — stopping only at a genuine
-DESIGN bug: **`Hout`'s third argument (the loop invariant's `P`) was
-instantiated with `P'` (uvmalloc's grown table) in both branches, but the
-LAST resource actually in hand is `Hptcl : proc_pt (uptd_set P' (svpn_of
-…) (pte_clear_u …))`** — the table AFTER `uvmclear` clears the guard page's
-PTE too. `uptd_set` only touches `ud_um` (`ud_root`/`ud_tfp` pass through
-by construction — `ProcPtOwn.uptd_set`), so the `ud_root`/`ud_tfp` bullets
-carry over via a one-line `unfold uptd_set; reflexivity`-shaped fact once
-named, but `um_below`/`um_covered` on THIS table (one page's PTE
-overwritten from `P'`'s) need proving — almost certainly a short "insert
-preserves coverage" lemma next to `um_covered_pground`/`kxc_grow_inv`
-(`UmCovered.v`/`ProcPtOwn.v` are where its siblings live), not yet written.
-**FIXED.** Named `Pfinal := uptd_set P' (svpn_of (Z1 !!! Regidx
-(mword_of_int 11))) (pte_clear_u (uvm_pte (Z.lor 4 18) rleaf))`, passed
-`Pfinal` (not `P'`) as `Hout`'s third argument in both branches. The missing
-"insert preserves coverage" pair is two three-line lemmas,
-`kxc_um_below_insert`/`kxc_um_covered_insert` (top of `ProofKexecC.v`, next
-to `um_covered_pground`): `um_below` only cares about the KEY (any value
-already below the bound stays below it whatever it's overwritten with — the
-guard page's own vpn is below `sz1` because `Hbelow'` already says so, via
-the very leaf `Hleafeq` found before the clear) and `um_covered` transfers
-unconditionally through an insert (inserting only grows the domain, never
-shrinks it). `ud_root`/`ud_tfp` carry over via the one-line
-`unfold uptd_set; reflexivity` predicted above. **`kxc_c_setup` now compiles
-end to end**, `Qed` in 5.3s — confirming the earlier "17 GB" symptom really
-was the one `vm_compute` call, not a structural Qed-scale problem needing a
-lemma split.
+```
+  entry     SpecKexec.wp_kexec_sconf_body               pc = kexec + 0
+    PA.kxc_phaseA                                        -> +0x090
+  +0x090    the register block phase A publishes
+    PB.kxc_b1                                            -> +0x1a2 / +0x12c
+  +0x1a2    kxc_at_1a2   (elf.phnum = 0)   PB3.kxc_b2z   -> +0x1ae
+  +0x12c    kxc_at_12c   (the phdr loop)   PB3.kxc_b2    -> +0x1ae
+  +0x1ae    kxc_at_1ae    PC.kxc_c_setup                 -> +0x21a / +0x272
+  +0x21a    kxc_at_21a    PC.kxc_argv_loop               -> +0x272
+  +0x272    kxc_at_272    PC.kxc_c_close                 -> +0x2a6
+  +0x2a6    kxc_at_2a6    PD.kxd_phaseD                  -> ret
+```
 
-Along the way (found only because the file finally compiled far enough to
-reach them): a missing `w67` argument to `kxc_frameC` (dropped a slot,
-shifting every arg after it); `oldsz` used as a bare identifier where the
-lemma actually wanted `pv_sz V` (name collision with an unrelated "oldsz"
-in a comment about `uvmalloc`'s OWN argument); `wp_cli_s_sconf` (compressed
-`c.li`, signed 6-bit immediate) used for `+0x214`'s `li s8,32`, which is
-actually the NON-compressed 4-byte `addi s8,zero,32` (32 overflows `c.li`'s
-±32 range) — confirmed against `kernel.asm` and `CodeKexec.kxc_214`'s own
-`instr _ false _`; fix is `wp_li4_s_sconf`, `mword 12` immediate, and
-`Hpp218`'s advance is 4 not 2; and two `rewrite -Hroot' -Htfp'`-shaped
-bullets that had the wrong lemma/direction entirely (should be `rewrite
-Hroot'`/`rewrite Htfp'` — `Hroot' : P'.(ud_root) = P.(ud_root)`, `Htfp'`
-same shape, from `destruct Hext as (Hroot' & Htfp' & _)` on `uptd_ext`).
-None of these are performance issues; they are exactly the kind of thing
-`optimization.md`'s Rule Zero is for — the compiler reports them instantly
-and cheaply once nothing upstream is hanging.
+**EVERY PHASE SEAM HANDS THE CALLER'S EXIT BACK, AND THE COMPOSITION CANNOT
+BE WRITTEN OTHERWISE.** A `wp_next` continuation is LINEAR, so a block that
+owns a `bad:` path *and* publishes a successor state consumes the caller's
+one exit and leaves the successor with none. Each phase lemma therefore
+takes the exit once and returns it inside its own output — durable-notes'
+"CHAINING TWO HALVES", applied at every seam rather than at one. Reading an
+`iApply` in `ProofKexec.v`: `Hcont` travels through every step and is spent
+exactly once, by whichever block actually returns. (`kxc_b2z` is the one
+exception: the `phnum = 0` path has no failure exit, so it never takes the
+caller's copy in the first place.)
 
-**THE ARGV LOOP'S STEP LEMMA (`kxc_argv_step`) IS IN PROGRESS — drafted and
-individually compiler-verified through +0x222 (myproc analogue done; the
-`jal strlen` call, `addiw a5,a0,1`, `sub a5,s2,a5` all check), STOPPED at
-+0x226 (`andi s2,a5,-16`) on a genuine DESIGN GAP, not a tactic bug — read
-this whole entry before touching it again.**
+Two mechanical notes for the next composition of this shape:
 
-`ProofKexecC.v`'s `Section KexecCLoop` (after `KexecCSetup`, same file,
-`Strlen : STRLEN` and `Copyout : COPYOUT` added to `KexecCProof`'s own
-functor parameters) has the whole instruction listing re-verified against
-`CodeKexec.v` directly (every `kxc_21a` .. `kxc_272` fact read off, not
-guessed from the C or the earlier disassembly pass) — trust that listing
-over re-deriving it. Four new general-purpose lemmas landed alongside it,
-all compiler-checked:
+- the retarget inside `kxc_a2`/`kxc_b1` names the LITERAL `true`, not `b`:
+  `kxc_sie_b_agree` pins the index off the resources and the proof `subst`s
+  it away before the fall-through is reached;
+- the handback goes at the END of the `with` list, AFTER the seam's own
+  `[-Hcont]` slot — phase A builds `kxc_frameA6` in a later bullet, so
+  putting `Hcont` before it makes `iApply` demand the frame where the exit
+  was offered.
 
-- `kxc_addiw_p1 (n:nat) : Z.of_nat n<4096 -> sign_extend'64(subrange_vec_dec
-  (add_vec (mword_of_int(Z.of_nat n)) (sign_extend'64 1)) 31 0) =
-  mword_of_int(Z.of_nat n+1)` — `addiw rd,rs,1` on a bounded value.
-  Mirrors `ProofSafestrcpy.ssc_addiw_m1`'s technique (there for `+(-1)`).
-- `kxc_round16_land (Y:Z) : 0<=Y<2^64 -> Z.land Y 18446744073709551600 =
-  Y - Y mod 16` and `kxc_round16_andi (X:mword64) : and_vec X
-  (sign_extend'64 (mword_of_int(-16))) = mword_of_int(kxc_round16
-  (bv_unsigned X))` — bridges `andi s2,a5,-16` to `SpecKexec.kxc_round16`.
-  The route is `Stdlib.ZArith.Zbitwise`'s `Z.sub_land_same_l` (`x - x&y =
-  x&~y`) plus `Z.land_ones`; **`sub_land_same_l` lives inside `Module Z`,
-  so it's `Z.sub_land_same_l`, not bare** — the not-found error if you
-  forget. Nothing already in the tree did this; every prior `andi` call
-  site masked with a small POSITIVE constant (127, 15, …), never `-16`.
-- `kxc_ustack_collapse (sp0:mword64)(c:nat)(f:nat->mword64) : c<46 ->
-  ([∗list] j∈seq 0 c, pa_stk sp0(46-j)↦₈ f j) -∗ stack_own(pa_stk sp0
-  (46-c)) c` — folds `kxc_frameC`'s WRITTEN ustack prefix back to opaque
-  `stack_own`, which a `-1`-tail exit needs (`kxc_mid_join` wants the WHOLE
-  33-slot region opaque, and the loop only has it split at `c`). Plain
-  `induction c`, NOT `iInduction` — this is a one-shot entailment, not a
-  Löb recursion, and `iInduction`'s auto-generated IH fighting a leading
-  Coq-level premise (`c<46`) is exactly the kind of friction that's the
-  tell you want the plain tactic.
+### The three facts the composition has to supply itself
 
-**Two mechanical fixes worth remembering for the rest of this lemma:**
-`wp_sub_s_sconf`/`wp_andi_s_sconf`/`wp_slli_s_sconf` all take `wval`
-as an EXPLICIT ARGUMENT (unlike `wp_cmv_s_sconf`/`wp_addiw_s_sconf`, which
-compute it internally via a `let`) — and then ALSO want a SEPARATE proof
-that `wval` matches the semantics, typically closed by `reflexivity` since
-`rget m r` and `m !!! Regidx r` are convertible. And **every external-call
-spec in this codebase (`Strlen.wp_strlen_sconf` included) takes the process
-address `p := proc_addr jp` as an explicit trailing argument**, easy to
-forget since it comes after `b` and before the Coq-level premises.
+- **`used` SHRINKS ACROSS THE PHASES.** Phase A hands out a `used2 ⊆ used`
+  and phase B a `used3 ⊆ used`; the blocks past `kxc_c_setup` state their
+  exit's bitmap clause against the CURRENT set while the contract states it
+  against the entry one. Those are different propositions, so the exit is
+  TRANSPORTED (`ProofKexec.kxc_exit_weaken`), not framed — one application,
+  at the point `used3` first appears.
+- **THE ARGV LOOP IS ENTERED ONLY AT `c < na`,** and its head cannot say so.
+  What says it is the head's own `avf c <> 0` against the contract's
+  `avf na = 0`.
+- **PINNING `b`/`eb`/`lks` IS THE FIRST STEP, NOT A LATE ONE.** `b = true`
+  and `eb = true` are contract premises; `lks = ∅` comes from
+  `CpuOwn.cpu_own_zero_empty` at depth 0. `subst` all three before applying
+  phase A and every seam past it matches syntactically — phases B2/B3/C/D
+  state their continuations at the literal `true`/`true`/`∅`.
 
-**THE GAP: `kxc_at_21a`/`kxc_at_272` (`ProofKexecSeam.v`) need a NEW pure
-conjunct, `(uint sz1 - 4096 <= kxc_sp (uint sz1) alen c)%Z` (i.e. `M!!!Rs7
-<= M!!!Rs2`, "the current sp has not gone below stackbase"), or the ANDI
-step cannot be closed soundly.** This is `git log`'s own already-landed
-"blocker §7" fix (`93d2a371`, `SpecKexec.v`'s `(Z.of_nat (alen i) <
-4096)%Z` premise, already threaded into `kxc_c_setup`/`kxc_argv_step`) —
-but that commit's ARITHMETIC ARGUMENT ("`stackbase<=sp` from the PREVIOUS
-iteration's own `bltu`, `sub` is at most 4096, `sz1>=8192`, so no
-underflow") needs `stackbase<=sp` to be AVAILABLE AT THE START of each
-step, and nothing currently carries it there — `kxc_at_21a`'s own pure
-facts are just `c<=na /\ c<32 /\ avf c<>0`, no relation between `Rs7` and
-`Rs2` at all. Without it, the `andi`'s `wval` can't be related to
-`kxc_sp(...)( S c)` (need `bv_unsigned(sub_vec ...) = (exact Z difference)`,
-which needs the subtraction to NOT have wrapped, which is exactly the fact
-missing).
+### A SEAM MUST NOT `∀`-QUANTIFY A VALUE ITS SUCCESSOR HAS TO PIN
 
-**The fix — DONE AND COMPILER-VERIFIED** (a first "GCP build says it's
-fine" claim earlier in this session was PREMATURE — that build had been
-kicked off before any of this was written, so it verified nothing here;
-the real verification is the local `coqc`/`make` round documented below).
-Added the conjunct to both `kxc_at_21a`/`kxc_at_272` in `ProofKexecSeam.v`
-(same shape, alongside the existing `c<=na /\ c<32 /\ avf...` conjunct);
-updated `kxc_c_setup`'s two exit bullets in `ProofKexecC.v` with a 4th
-`split_and!` bullet, trivial at `c=0` since `kxc_sp top len 0 = top`
-definitionally; added `(8192 <= uint sz1)%Z` as a new explicit premise to
-`kxc_argv_step`'s own signature (needed for the "sz1>=8192" half of
-`93d2a371`'s argument — it does NOT fall out of `Hspok` alone, since
-`Hspok` only bounds `kxc_sp(...)c` from below by `uint sz1 - 4096`, not
-`uint sz1` itself); added `Local Lemma kxc_sp_S` (the `Fixpoint`'s `S`
-case as a named, `rewrite`-able equation) and `kxc_sp_le_top` (plain
-induction: `kxc_round16 X <= X` always since `X mod 16 >= 0` for a
-positive divisor regardless of `X`'s sign, so `kxc_sp` is non-increasing
-and `top` bounds it from above at every index — the OTHER half `93d2a371`
-needs, not spelled out in the commit message itself). Wrote the ANDI step
-(+0x226) AND the BLTU step (+0x22a) through to the fall-through arm's PC
-advance to +0x22e (both arms present; the taken/overflow arm progresses
-to the +0x358 stub and then `admit`s — its connector into `kxc_bad_1d6`
-is not written yet; the fall-through arm re-establishes `Hspok` at `S c`
-and then `admit`s the rest of the loop body). `Qed`-free but fully
-`coqc`-clean (`Admitted`, not a hidden error) as of this checkpoint.
+`kxc_c_setup` originally published `∀ (M' : regfile) (P' : uptd) (oldsz sz1 :
+mword 64), kxc_at_21a … oldsz sz1 0 ∨ …`. Its proof instantiates `oldsz` with
+`pv_sz V` — it read `p->sz` out of `proc_priv` — but the STATEMENT quantified
+it, so the caller received an opaque word, and `kxd_phaseD`'s entry state is
+stated at `pv_sz V`. A `∀`-bound output is a promise the caller can never
+tie down again: **if the block knows the value, put the value in the
+statement.** Same round added the other fact only that block knows,
+`⌜(8192 <= uint sz1)%Z⌝` — the stack top is `PGROUNDUP(szv) + 8192`, which is
+what rules out the push loop's underflow (blocker §7) and is a premise of
+every later phase-C lemma. Both are one line in the seam and unprovable
+anywhere else.
 
-**Four real bugs the compiler caught while landing the BLTU step — all
-fixed, all worth remembering for the rest of the loop:**
-1. **`f_equal.` on an mword equation can close the WHOLE goal by itself**
-   (via `reflexivity`'s use of full kernel conversion, which unfolds a
-   `Fixpoint` match on a literal `S _` — something `simpl` does NOT
-   reliably do, see #2) — a trailing `simpl. reflexivity.` after it then
-   fails with **"No such goal. Try unfocusing with '}'"** because there's
-   nothing left to run it on. Fix: drop the dead tactics once `f_equal`
-   alone closes it.
-2. **`simpl` is not a reliable way to unfold `kxc_sp top len (S i)`.**
-   `apply Z.mod_small. simpl. unfold kxc_round16. ... lia.` failed with
-   **"Cannot find witness"** because `simpl` left `kxc_sp top len (S i)`
-   folded, so `lia` saw it as an opaque atom unrelated to the `kxc_round16
-   X` hypotheses sitting right next to it. Fix: a named equation lemma
-   (`kxc_sp_S`, proved by bare `reflexivity` — which DOES do the full
-   unfold, per #1) and `rewrite` it explicitly instead of hoping `simpl`
-   will. Same fix applied to `kxc_sp_le_top`'s own induction step, which
-   had the identical `simpl`-on-`Fixpoint` pattern.
-3. **`apply Z.mod_small.` leaves the modulus as `bv_modulus 64`, not the
-   literal `18446744073709551616` — fatal for `lia`, invisible to
-   `exact`.** Two of the new arithmetic asserts closed the final range
-   goal with `lia` and failed the same way (`Cannot find witness`, and
-   spuriously looked like a SCOPING bug — see the debugging note below);
-   a THIRD, structurally identical assert (`HT2a5Z`, written earlier the
-   same session) closed the analogous goal with a bare `exact Hnowrap`
-   and worked FINE, which is what made this confusing to diagnose: `exact`
-   checks by conversion (unfolds `bv_modulus 64` for free), `lia` does
-   not. Fix: `change (bv_modulus 64) with 18446744073709551616%Z` right
-   after `apply Z.mod_small`, every time the goal is going to be closed
-   by `lia` rather than `exact`/`reflexivity`.
-4. **`Z_lt_ge_dec`'s `>=` branch is `Z.ge`, not `Z.le` flipped, and they
-   are NOT interchangeable by `exact`.** `destruct (Z_lt_ge_dec a b) as
-   [Hover|Hok]` gives `Hok : a >= b`; a downstream goal wanting `b <= a`
-   (from `Z.ltb_ge`) rejected `exact Hok` outright — `Z.ge`/`Z.le` unfold
-   to `compare ... = Gt` vs `compare ... = Lt`, different terms, and
-   `exact` does not do the inequality-flip reasoning `lia` does. Fix:
-   `lia` instead of `exact Hok` (already the standing rule elsewhere in
-   this file; this was the one place it got skipped).
+### `[]` AS A SPEC PATTERN MEANS AN EMPTY SPATIAL CONTEXT
 
-**Debugging note, since it cost real time and will recur:** the "Cannot
-find witness" in bug #3 first got MISDIAGNOSED as a hypothesis-scoping
-bug, because an `idtac "label:" SomeHyp.` diagnostic — the obvious way to
-try to print a hypothesis's value inline — itself errored with **"SomeHyp
-not found"**, which reads exactly like "the hypothesis isn't in context."
-It isn't a scoping check at all: `idtac`'s message arguments are Ltac-level,
-and a bare hypothesis name is not a valid one there. The tool that DOES
-work is `match goal with |- ?G => idtac "GOAL:" G end.` (prints the actual
-goal, which is what actually diagnosed the `bv_modulus`-vs-literal gap) —
-never trust `idtac H` for a hypothesis `H` as evidence of anything.
+`iApply (lemma with "… Hst []")` proves the bracketed premise with NO spatial
+hypotheses, so a resource still needed inside it — typically the exit that
+the *next* block will consume — is gone by the time the sub-goal is entered.
+The symptom is `iSpecialize: "Hcont" not found` several lines into the
+sub-proof, which reads like the trap in durable-notes' `[-]` section and is
+not it. Write `[Hcont]`.
 
-**Progress past the BLTU, same session, continuing "keep going":** the
-fall-through arm now reaches +0x236 -- reload argv[c] via `s11` (+0x22e
-`ld s11,3584(s0)`, +0x232 `ld s3,0(s11)` out of `Hargv`, extract/use/
-restore, same idiom as `kxc_c_setup`'s argv[0] read) then `mv a0,s3`
-prepping the SECOND `strlen` call's argument. `admit`s right before the
-+0x238 `jal` itself. `coqc`-clean (verified fresh, `EXIT: 0`, zero errors)
-as of this checkpoint.
+## Techniques and traps paid for here
 
-**A SECOND missing invariant conjunct, found the same way as the
-`stackbase<=sp` one:** +0x22e's `ld s11,3584(s0)` needs `s0`'s value, and
-`kxc_at_21a`/`kxc_at_272` didn't track it -- `s0 = sp0` is set once in
-`kxc_c_setup`'s prologue and never touched again for the rest of the
-function (confirmed: none of the loop body's own instructions write s0),
-so it's a genuine "dead invariant" register exactly like the earlier gap.
-**Fixed the same way:** added `M !!! Regidx Rs0 = sp0` as a new conjunct to
-both `kxc_at_21a`/`kxc_at_272` (`ProofKexecSeam.v`), threaded `HW{2..8}s0`
-through every intermediate register-file pose in `kxc_c_setup`'s existing
-chain (**most of this chain, `HW2s0`/`HW3s0`, already existed** -- only
-checking the OUTERMOST fact (`HW8s0`) was missing led to duplicating two
-already-present links first time through; `grep -c` each `HW{i}s0` before
-assuming a whole chain is absent), and added `HT{0..5}s0` through
-`kxc_argv_step`'s own T-chain the same way as every other tracked
-register.
+Everything in this section will recur; none of it is kexec-specific.
 
-**A costly false trail, worth remembering in full:** +0x236 looked like a
-NON-compressed `add a0,zero,s3` from an early, uncross-checked reading, so
-substantial effort went into writing a new `wp_mv_s_sconf` lemma (the
-non-compressed twin of `WpSconfAlu.wp_cmv_s_sconf`) to fill what looked
-like a real gap in the shared WP library -- necessary in principle (the
-generic `wp_add_s_sconf`'s wval premise genuinely does need `rget m zero =
-zero_reg`, a fact nothing forces structurally, for `rs1 = zero`; the fix
-is routing the zero read through `gpr_rd_val`'s own `if uint r = 0` case
-via `wp_gpr_write_s_sconf_base`, passing `rs2` into BOTH callback slots).
-That lemma is CORRECT and PROVEN (`Qed`), but **turned out to be
-unnecessary**: `kxc_236`'s own `instr` fact says `true` (compressed) --
-`CodeKexec.v` had it right the whole time; the transcription that started
-this detour just misread it. It was deleted rather than left as dead code.
-Two things worth keeping from the detour: (1) **a `Local Lemma` declared
-inside a section that fixes one hart/process as a Context variable (like
-`KexecCLoop`'s `CID0`/`jp`) bakes THAT SAME hart into its own statement
-instead of a fresh per-call-site implicit** -- symptom was `iSpecialize:
-cannot instantiate` with BOTH sides of the failing premise PRINTING
-IDENTICALLY (`CID0` vs the actual current hart several `wp_next`s later,
-invisible without `Set Printing All`); a leaf WP lemma needs its OWN
-freestanding section mirroring the library file's own header
-(`Context `{!riscvGS Σ}. Context `{!sieG Σ}. Context `{GEN}`{CID}`. Context
-{p}.`) to get a properly fresh, unifiable implicit hart. (2) **Before
-writing a new WP lemma for a suspicious instruction shape, re-`grep` its
-own `CodeKexec.v` fact one more time** -- the compressed flag is the
-cheapest possible check and would have skipped the entire detour.
+**NEVER LET A `pose`d SYMBOLIC VALUE REACH `vm_compute`.** The single most
+expensive mistake in this project: `apply bv_eq; vm_compute` on a goal still
+mentioning `sz1` climbed ~500 MB/s with no plateau and read as a `Qed`-scale
+problem for a whole session. Bridge two chained immediate offsets against a
+symbolic base with `bv_eq` + `add_vec64_unsigned`/`moi64_unsigned` +
+`bv_wrap_add_idemp_l` + `f_equal` instead (`ProofKexecC.kxc_wrap_add3'` /
+`kxc_addv_moi_moi`; `avi_moi` is the same move one type down, for a lemma
+parameterised by a symbolic `Z` offset, where `pcw` is likewise unavailable).
+`optimization.md`'s Rule Zero — `coqc -time -async-proofs off` — is what
+localises it, and it points at the TACTIC, never at `Qed`.
 
-**Progress past +0x236, same session, still "keep going":** the fall-through
-arm now reaches all the way through the SECOND `strlen` call (+0x238, for
-copyout's own `len`), the four `c.mv` argument preps (+0x240..+0x246), and
-the `copyout` call itself (+0x248) including its own branch at +0x24c —
-both arms of THAT branch are now written too (success falls through,
-`admit`; failure funnels to +0x35c, `admit`, same missing-connector shape
-as the BLTU overflow exit's +0x358). `coqc`-clean, and — per this
-session's mid-stream steer to build on the GCP VM instead of local
-`coqc` — verified via a full clean GCP build (exit 0, zero errors, only
-the harmless notation warnings). **Three `admit`s now**, not one: the
-+0x358 stub, the +0x35c stub (both need the SAME connector work), and the
-copyout-success continuation (ustack write onward).
+**DO NOT `Require Import PrintintArith` INTO A WP FILE.** Its own header says
+why: a `Local Open Scope Z_scope` that is supposed to stay file-local
+empirically leaks past `Require Import` and breaks every bare `nat` numeral
+in a typeclass-method position (`seq j n !! i` → "Could not find an instance
+for `Lookup Z Z (list nat)`"). Copy the one or two lemmas needed, as
+`ProofKexecC.v` does.
 
-**`sz1`'s MAXVA bound for copyout's own premise came free, unlike the two
-register-tracking gaps — no new invariant conjunct needed.** copyout
-requires `(uint sz1 <= 2^38)%Z`, and `SpecUvmalloc`'s postcondition does
-NOT give this (confirmed by an Explore agent: the postcondition has no
-upper bound at all when the precondition was discharged via the
-`um_covered` disjunct, which is kexec's own case — `uvmalloc`'s untrusted
-ELF-derived `newsz` has no a-priori bound). The fix: derive it from the
-loop invariant's OWN `um_covered sz1 P.(ud_um)` conjunct directly, via
-`UmCovered.proc_pt_covered_maxsz : proc_pt_wf P -> um_covered szv P.(ud_um)
--> bv_unsigned szv <= uvm_maxsz` (already used once before, in
-`kxc_bad_1d6`'s own proof, for exactly this purpose) — `proc_pt_wf_get`
-off `Hpt` plus this one lemma closes it, `uvm_maxsz = 2^38 - 8192` weakened
-to `2^38` by `lia` once both sides are literal.
+**A LOOP INVARIANT MUST CARRY EVERY REGISTER THE BODY READS — INCLUDING THE
+DEAD ONES.** Three conjuncts were missing from `kxc_at_21a`/`kxc_at_272` and
+each surfaced only when the instruction that reads the register was written:
+`stackbase <= sp` (without it the `andi` step cannot be closed soundly),
+`s0 = sp0` (set once in the prologue and never written again — a genuinely
+"dead" invariant register), and the ustack's 8-alignment, which rides as a
+Coq-level PREMISE rather than a conjunct because it is a fact about `sp0`
+alone. Corollaries:
 
-**A real, structural gap in the buffer/string distinction, worth
-remembering for any future strlen-then-copyout pair:** `Hargc` (extracted
-from `Hargs` for `strlen`) covers `seq 0 (aslen c)` — the WHOLE allocated
-buffer — but `copyout` only wants `seq 0 (S (alen c))` — the string plus
-its NUL. These are different ranges (`alen c < aslen c`), and passing the
-wrong one is a genuine type mismatch, not a cosmetic one. Fixed by
-`seq_app` + `big_sepL_app` to split `Hargc` into a prefix (handed to
-copyout) and a suffix (set aside), then `iCombine` + the same lemmas in
-reverse to re-fold it back to `Hargc`'s original shape once copyout's own
-contract (**"the source buffer comes back unchanged"**, `SpecCopyout.v`'s
-own header) hands the prefix back.
+- **When you add a `pose` in the middle of an already-long register-file
+  chain, carry EVERY fact the current state has, not just what the next line
+  needs.** An omitted fact costs nothing until a later step needs it, and
+  the fix is then a batch of near-identical `assert`s scattered across
+  several already-written `pose`s.
+- **`grep -c` each `H{i}s{j}` before assuming a chain is absent** — most of
+  the `s0` chain already existed and only the outermost link was missing.
+- **`callee_saved_lookup` bridges ONE call boundary at a time.** Chaining two
+  of them to reach through two different calls does not type-check; bridge
+  each boundary to its own immediately-preceding `pose`d state.
 
-**A THIRD instance of the "chain the register file through every
-intervening `pose`, or callee_saved_lookup will silently miss it" gap**
-(same species as the `Rs0`/stackbase gaps, but this time entirely LOCAL to
-`ProofKexecC.v`, no `ProofKexecSeam.v` change needed): the five `T8..T12`
-poses between the ADDIW and the `copyout` call each only carried the
-register facts the IMMEDIATELY NEXT step needed, not the full set —
-`Rs0`/`Rs1`/`Rs2`/`Rs4`/`Rs6`/`Rs7`/`Rs8`/`Rs9`/`Rs10`/`Rs11` all had gaps
-at one `T{i}` or another, surfacing one at a time as `"HT{i}s{j} was not
-found"` once `T13` (post-`copyout`) needed to reconstruct them via
-`callee_saved_lookup`. **The mechanical lesson: when adding a new `pose`
-in the middle of an already-long register-file chain, carry EVERY fact
-the CURRENT state has, not just the ones the very next line needs** — an
-omitted fact costs nothing until some LATER step needs it, at which point
-the fix is a batch of near-identical `assert`s scattered across several
-already-written `pose`s rather than one line in the state that dropped it.
-**Also**: `callee_saved_lookup` only bridges ONE call boundary at a time
-(`Hcs2 : callee_saved Z2 T13` relates `T13` to `Z2`, NOT to `T6` or any
-earlier state) — chaining `rewrite (callee_saved_lookup Hcs2 ...)` then
-`rewrite (callee_saved_lookup Hcs1 ...)` back-to-back to try to reach
-THROUGH two DIFFERENT calls in one step doesn't type-check (the second
-rewrite's target doesn't match); bridge each call boundary to its OWN
-immediately-preceding `pose`d state (here, `Z2` to `T12` via plain
-`upd_ne`, since `Z2` only touched `Rra`), not further back.
+**A HART MISMATCH IN A CALLEE'S POSTCONDITION LOOKS EXACTLY LIKE A CONTENT
+BUG, AND THE FIX GOES BOTH WAYS.** ("LHS does not match any subterm", or two
+premises that print character-for-character identically.)
 
-**Progress past +0x264, same session, still "keep going" — the whole
-copyout-success arm's mechanical body is now done:** the ustack write
-(+0x250..+0x256, `kxc_pa_stk_add` — a new local lemma for the
-register-arithmetic-vs-`pa_stk`-resource address bridge, `stack_own_app`+
-`stack_own_1` to peel the one slot off `Hust`'s opaque region, `seq_S`+
-`big_sepL_app`+`big_sepL_singleton` to fold it onto `Hwr`), the loop
-counter increment (+0x25a), the argv-pointer bump and spill
-(+0x25c..+0x260), and the next-arg load (+0x264, extracting `Hargv`'s
-`S c` entry — same extract/use/restore idiom as every other array read
-this file uses). `admit`s right before the three-way final branch.
-Verified on the GCP VM (per this session's build-there steer): a full
-clean build, exit 0, zero errors.
+- A STORE's postcondition (`wp_sd_s_sconf`, and every other `wp_s*_s_sconf`)
+  pins `storeval := rget m rs2` to the ENTRY hart — the one active when the
+  instruction was issued. Bridging the returned resource needs
+  `rget_ne (CID := <entry hart>) …`, named EXPLICITLY.
+- An ALU op's postcondition (`wp_cadd_s_sconf`, `wp_addi4_s_sconf`, …) does
+  the OPPOSITE: the `SrcOk`-based lifting restates `wval` at the EXIT hart,
+  so it needs no explicit CID and annotating the entry hart is what fails.
+- **The diagnostic that settles it in one round** rather than one compile per
+  guess: `Set Printing All. iDestruct "H" as "%probe".` — it fails, and the
+  failure message prints the fully-elaborated type, `@rget CIDxx …` and all.
+  Reach for it FIRST.
+- Related: **a `Local Lemma` declared inside a section that fixes `CID0` as a
+  `Context` variable bakes THAT hart into its own statement** instead of
+  taking a fresh per-call-site implicit. A leaf WP lemma, and any lemma
+  applied a dozen `wp_next`s past the entry hart, needs its own section (or
+  `` `{CID0 : CpuId} `` as a lemma binder, the way `kxc_argv_loop` and
+  `ProofKexec`'s `kxc_cd`/`kxc_d_tail` do).
 
-**A FOURTH class of hart-mismatch bug, distinct from the earlier `p`/CID0
-one, and genuinely non-obvious — spend real time on this note before
-touching another store's postcondition.** Diagnosing it burned a full
-debugging round because the failure ("LHS does not match any subterm")
-looks IDENTICAL whether it's a genuine content bug or a hart-CID mismatch,
-and — this is the trap — **the SAME-LOOKING fix (add or move an explicit
-`(CID := ...)` annotation) is required in some cases and WRONG in others,
-with no way to tell which from the code alone; only the compiler decides:**
-- **A store's postcondition (`wp_sd_s_sconf`, and presumably every other
-  `wp_s*_s_sconf`) pins `storeval := rget m rs2` to the ENTRY hart** — the
-  hart active when the instruction was ISSUED (i.e. whatever `iIntros`
-  bound just BEFORE that `iApply`), not the hart the continuation resumes
-  on. Bridging a returned store resource later needs
-  `rget_ne (CID := <entry hart>) m rs2`, named EXPLICITLY — omitting it
-  lets Coq default to the CURRENT ambient CID (the continuation's, i.e.
-  the WRONG one), which fails with no hint that a CID was even the issue.
-- **An ALU op's postcondition (`wp_cadd_s_sconf`, `wp_addi4_s_sconf`,
-  `wp_caddi_s_sconf`, …) does the OPPOSITE** — thanks to the `SrcOk`-based
-  "the read survives the rebinding" lifting these lemmas carry internally
-  (see their own family-note comments), the returned `wval` is restated at
-  the EXIT hart (the one the continuation's own `iIntros` binds). Bridging
-  these needs NO explicit CID at all (or, equivalently, the CURRENT
-  ambient CID, which after that `iIntros` already IS the exit hart) — and
-  explicitly annotating the ENTRY hart here is what fails, symmetrically.
-- **The diagnostic that actually resolves it**, since guessing between the
-  two costs a full compile round each time: force the term to print in
-  full via `Set Printing All. iDestruct "H" as "%probe".` (fails on a
-  non-pure resource, but the FAILURE MESSAGE prints the fully-elaborated
-  type) and read off the literal `@rget CIDxx ...` — that name IS the
-  answer, no more guessing needed. Used successfully twice now (`wp_mv_s_sconf`'s
-  CID0 gap, and this one) and worth reaching for FIRST next time, not last.
+**BEFORE WRITING A NEW WP LEAF FOR A SUSPICIOUS INSTRUCTION, RE-`grep` ITS
+`CodeKexec.v` FACT.** A whole `wp_mv_s_sconf` (the non-compressed twin of
+`wp_cmv_s_sconf`) was written, proven and then deleted because `kxc_236`'s
+own `instr` fact says `true`; the transcription that started the detour had
+misread it. The compressed flag is the cheapest possible check.
 
-**Two smaller mechanical gotchas from this same stretch, both cheap once
-named:**
-- `pa_add`'s own arithmetic (`pa_add p j := add_vec_int p (Z.of_nat j)`,
-  i.e. `j` is already a BYTE count, not a word count) means
-  `add_vec (pa_add p i) (mword_of_int j)` is NOT syntactically
-  `pa_add (pa_add p i) j` even though they are definitionally equal —
-  `pa_add_add` (the `pa_add(pa_add p i)j = pa_add p(i+j)` collapsing
-  lemma) needs an explicit `change ... with (pa_add (pa_add p i) j)` fold
-  first, or it reports "LHS does not match any subterm" against a goal
-  that looks like it should trivially match.
-- `rewrite pa_add_add. f_equal. lia.` on a goal `pa_add p X = pa_add p Y`
-  (X, Y equal `nat` expressions) intermittently failed `lia` with "Cannot
-  find witness" for reasons not fully run down (likely `f_equal` leaving a
-  goal shape `lia` can't zify cleanly through `pa_add`'s own definition);
-  the robust fix that always works is to prove the `nat` equation as its
-  OWN named `assert` first (`assert (Heq : (X = Y)%nat) by lia.`) and
-  `rewrite` it in, never relying on `f_equal` to hand `lia` a clean goal
-  through a non-transparent wrapper.
+**SMALL ROCQ GOTCHAS, ALL OF WHICH COST A COMPILE ROUND:**
 
-**`kxc_argv_step` IS PROVEN — `Qed`, whole file 85 s, admit-free.** All
-three of its `-1` exits go through ONE connector, `kxc_c_exit_m1`, and its
-three-way final branch is closed. What the connector settled, and what to
-reuse from it:
+- `f_equal` on an mword equation can close the WHOLE goal by itself (via
+  `reflexivity`'s full kernel conversion, which unfolds a `Fixpoint` match on
+  a literal `S _`); a trailing `simpl. reflexivity.` then fails with "No such
+  goal".
+- `simpl` is NOT a reliable way to unfold `kxc_sp top len (S i)` — it leaves
+  it folded and `lia` then sees an opaque atom ("Cannot find witness"). Use a
+  named equation lemma (`kxc_sp_S`, proved by bare `reflexivity`) and
+  `rewrite` it.
+- `apply Z.mod_small` leaves the modulus as `bv_modulus 64`, not the literal.
+  `exact` closes such a goal by conversion; `lia` cannot. Add
+  `change (bv_modulus 64) with 18446744073709551616%Z` whenever `lia` is
+  going to finish it.
+- `Z_lt_ge_dec`'s second branch is `Z.ge`, not a flipped `Z.le`, and `exact`
+  will not bridge them. Use `lia`.
+- A bare `replace X with Y` inside the proofmode rewrites the HYPOTHESES too
+  (the "goal" a plain `replace` sees is the whole `envs_entails`), and the
+  damage is reported far away as `iExact: does not match goal`. Put the
+  arithmetic in a helper's STATEMENT, or scope it with `iEval (…) in "H"`.
+- A `bv_wrap` normalisation needs the sum RE-ASSOCIATED between passes:
+  `Z.add` is left-nested, so after one `bv_wrap_add_idemp_l` the surviving
+  wrap sits at the head of `(w + sp0) + -256` and the lemma silently stops
+  matching. `rewrite -!Z.add_assoc` between passes.
+- `pa_add p j` takes a BYTE count, so `add_vec (pa_add p i) (mword_of_int j)`
+  is not syntactically `pa_add (pa_add p i) j` though the two are
+  definitionally equal — `pa_add_add` needs an explicit `change … with …`
+  fold first.
+- `rewrite pa_add_add. f_equal. lia.` on `pa_add p X = pa_add p Y`
+  intermittently fails; prove the `nat` equation as its own named `assert`
+  and rewrite that in.
+- **`idtac H` for a hypothesis `H` is NOT a scoping check.** `idtac`'s
+  message arguments are Ltac-level, so a bare hypothesis name errors with
+  "H not found" whatever the context holds — which reads exactly like the
+  scoping bug you were trying to rule out. Use
+  `match goal with |- ?G => idtac "GOAL:" G end.`
 
-- **The three stubs really are one lemma.** `+0x358` (stack overflow),
-  `+0x35c` (copyout failed) and `+0x26e` (MAXARG) are the same two
-  instructions — `c.mv s3,s4 ; c.j +0x1d6` — at three addresses, so the
-  lemma takes the stub's Z offset, the `c.j` immediate and the two `instr`
-  facts, and the caller supplies `CodeKexec`'s own. Re-derived from
-  `CodeKexec`, not from the disassembly: all three `c.j`s do land on
-  `+0x1d6`.
-- **Its own section, closed before `KexecCLoop` opens.** A `Local Lemma`
-  applied from inside a section that fixes `CID0` bakes THAT hart into its
-  statement; these call sites are a dozen `wp_next`s past the entry hart.
-- **The resource half is the work.** `kxc_frameC_collapse` folds the loop's
-  frame — ustack SPLIT at `c`, the written prefix carrying `kxc_sp`'s
-  recurrence — back to `kxc_frame_at`'s one opaque 55-slot region, which is
-  what `kxc_bad_1d6` takes. That pulls the ELF buffer in too (slots 47..54
-  are the only part of the frame `kxc_c_res` holds OUTSIDE `kxc_frameC`),
-  and `kxc_elf_give` wants their 8-alignment — a fact about `sp0` alone, so
-  it rides as a Coq-level PREMISE of `kxc_argv_step` rather than as a
-  constant conjunct of `kxc_at_21a`. **Thread it on to the loop wrapper and
-  to phase C's top-level lemma; `kxc_at_1ae` is where it comes from.**
-- **`kxc_frameC_intro` / `kxc_c_res_intro`** are the re-assembly the loop
-  body owes on every exit and on the back edge — written once, in the same
-  section, because `iFrame` does not terminate at this altitude.
+**A STRLEN-THEN-COPYOUT PAIR WANTS TWO DIFFERENT RANGES.** The buffer handed
+to `strlen` covers `seq 0 (aslen c)` — everything owned — while `copyout`
+wants `seq 0 (S (alen c))` — the string plus its NUL. Split with `seq_app` +
+`big_sepL_app`, hand copyout the prefix, and re-fold afterwards (copyout's
+contract returns the source unchanged). Passing the wrong one is a type
+mismatch, not a cosmetic difference.
 
-**Two traps paid for here, both of which will recur:**
-1. **A bare `replace X with Y` inside the proofmode rewrites the
-   HYPOTHESES too.** The "goal" a plain `replace`/`rewrite` sees is the
-   whole `envs_entails`, so `replace 33 with ((33-c)+c)` on a goal
-   `stack_own _ 33` also hit the `33` inside a hypothesis's own `33 - c`
-   and left `33 - c + c - c` — reported as `iExact: does not match goal`,
-   which reads like a resource bug. Fix: put the arithmetic in the
-   STATEMENT of a helper (`stack_own_join (n = n1 + n2)`, `intros ->`), or
-   scope the rewrite with `iEval (…) in "H"`.
-2. **A lemma parameterised by a symbolic Z offset cannot use `pcw`.**
-   `apply bv_eq; vm_compute` needs closed literals; `avi_moi` does the
-   `pc + k` bridge symbolically instead. Same rule as the symbolic-`mword`
-   one, one type down.
+**copyout WANTS A NAMED BYTE RUN AND A FRAME GIVES WORD CELLS.**
+`StackBytes` has the whole round trip: `slotsn_bytes_own` (which also hands
+out the eight-alignment facts the return needs), `bytes_own_name` to choose
+the naming function, `bytes_own_of_name` + `bytes_own_slotsn` coming back,
+then a `stack_own` fold.
 
-**A THIRD missing-conjunct finding, and this one is a KERNEL DEFECT rather
-than a proof gap — see [`../kernel-defects.md`](../kernel-defects.md).**
-`kxc_at_272` needed `(c <= 32)%nat` where the loop head `kxc_at_21a` has
-`(c < 32)%nat`, because the C tests `argc >= MAXARG` only INSIDE the loop
-body: with exactly 32 arguments the null-terminated exit is taken at
-`argc = 32` and the following `ustack[argc] = 0` writes one element past
-`uint64 ustack[MAXARG]`. Harmless as compiled (gcc reserved 33 slots), but
-**do not "tighten" that conjunct back to `< 32`** — the natural-exit arm
-becomes unprovable at exactly that case, which is the proof correctly
-refusing to certify the off-by-one.
+**`kxc_stack_ok`'S FIRST CONJUNCT IS UNIVERSALLY QUANTIFIED AND THE LOOP
+INVARIANT CARRIES THE BOUND ONLY AT THE CURRENT INDEX — AND THAT IS ENOUGH.**
+`kxc_sp` is non-increasing (`kxc_sp_mono`), so the bound at the last index
+implies it at every earlier one. Do not strengthen the invariant to the
+`forall` form; it is derivable.
 
-**PHASE C IS DONE — `+0x1ae .. +0x2a6` entire, admit-free.**  Four lemmas:
-`kxc_c_setup`, `kxc_argv_step`, `kxc_argv_loop`, `kxc_c_close`, plus the
-shared `-1` connector `kxc_c_exit_m1`.  Three things from the closing block
-that the next phase (or the next loop anywhere) should reuse:
+**A `-1` TAIL REACHED FROM SEVERAL ADDRESSES IS ONE LEMMA.** Phase C's
+`+0x358` (stack overflow), `+0x35c` (copyout failed) and `+0x26e` (MAXARG)
+are the same two instructions — `c.mv s3,s4 ; c.j +0x1d6` — at three
+addresses, so `kxc_c_exit_m1` takes the stub's `Z` offset, the `c.j`
+immediate and the two `instr` facts, and the caller supplies `CodeKexec`'s
+own. The resource half is the work: `kxc_frameC_collapse` folds the loop's
+frame (ustack SPLIT at `c`, the written prefix carrying `kxc_sp`'s
+recurrence) back to `kxc_frame_at`'s one opaque 55-slot region, which is what
+`kxc_bad_1d6` takes; `kxc_frameC_intro` / `kxc_c_res_intro` are the
+re-assembly the loop body owes on every exit and on the back edge, written
+once because `iFrame` does not terminate at this altitude.
 
-- **`kxc_stack_ok`'s first conjunct is universally quantified and the loop
-  invariant carries the bound only at the CURRENT index — and that is
-  enough.**  `kxc_sp` is non-increasing (`kxc_sp_mono`), so the bound at the
-  last index implies it at every earlier one.  Do not strengthen the
-  invariant to the `forall` form; it is derivable.
-- **copyout wants a NAMED BYTE run and a frame gives WORD cells.**
-  `StackBytes` has the whole round trip: `slotsn_bytes_own` (which also
-  hands out the eight-alignment facts the return needs), `bytes_own_name`
-  to choose the naming function, `bytes_own_of_name` + `bytes_own_slotsn`
-  coming back, then a `stack_own` fold.
-- **A `bv_wrap` normalisation needs the sum RE-ASSOCIATED between passes.**
-  `Z.add` is left-nested, so after one `bv_wrap_add_idemp_l` pass the
-  surviving wrap sits at the head of `(w + sp0) + -256` rather than as the
-  immediate left operand of the top `+`, and the lemma silently stops
-  matching.  The tell is a residual `bv_wrap` in an otherwise linear goal
-  and a "Cannot find witness" from `lia`.  `rewrite -!Z.add_assoc` between
-  the two passes fixes it.
+**`sz1`'s MAXVA BOUND COMES FROM THE COVERAGE INVARIANT, NOT FROM uvmalloc.**
+copyout requires `(uint sz1 <= 2^38)%Z` and `SpecUvmalloc`'s postcondition
+gives no upper bound at all when the precondition was discharged via the
+`um_covered` disjunct — which is kexec's own case. Derive it from the loop
+invariant's own `um_covered sz1 P.(ud_um)` with
+`UmCovered.proc_pt_covered_maxsz` plus `proc_pt_wf_get`; `uvm_maxsz = 2^38 -
+8192` weakens to `2^38` by `lia`.
 
-**PHASE D IS DONE TOO — `ProofKexecD.v`, admit-free.**  Every instruction
-of kexec is now covered by a proven block; what is left is the
-COMPOSITION (`ProofKexec.v` + `LinkKexec.v`) and then `sys_exec`.
+**A THIRD MISSING CONJUNCT WAS A KERNEL DEFECT, NOT A PROOF GAP** — see
+[`../kernel-defects.md`](../kernel-defects.md). `kxc_at_272` needs
+`(c <= 32)%nat` where the loop head has `(c < 32)%nat`, because the C tests
+`argc >= MAXARG` only INSIDE the loop body: with exactly 32 arguments the
+null-terminated exit is taken at `argc = 32` and the following
+`ustack[argc] = 0` writes one element past `uint64 ustack[MAXARG]`. Harmless
+as compiled (gcc reserved 33 slots), but **do not "tighten" that conjunct
+back to `< 32`** — the natural-exit arm becomes unprovable at exactly that
+case, which is the proof correctly refusing to certify the off-by-one.
+`SpecKexec`'s `na < MAXARG` premise is what rules the case out; sys_exec, the
+only caller, supplies it.
+
+## The four decisions that shaped the proof
 
 **THE SEAMS' `cpu_own 0 true … true ∅` IS NOT A HARDCODING DECISION — IT
 IS THE ONLY INHABITED INSTANCE.  SETTLED; DO NOT RE-OPEN IT.**  The
@@ -571,31 +309,6 @@ closes compose to the contract's own one-shot `upd_exec` — `kxd_upd_compose`
 is that equation, and `ProcInv.upd_exec_compose` is why the order comes out
 right.
 
-<details>
-<summary>Superseded diagnosis (kept for the record — the "17 GB" symptom
-was real, the "30-deep `set` chain" root cause was not)</summary>
-
-`kxc_c_setup` (drafted whole: myproc, PGROUNDUP, the first `uvmalloc`
-call incl. the branch into `kxc_bad_1d6`, `uvmclear`, the stackbase/argv[0]
-setup, and the final branch into the loop) got every individual step past
-`coqc` — ~25 rounds of real bugs found and fixed by the compiler, all
-genuine (missing `wp_next_retarget` before hand-in to `kxc_bad_1d6`, a bare
-`rewrite /proc_priv` that leaked into `Hcont`'s TYPE because it wasn't
-scoped with `iEval ... in "H"`, two-sided `lia` bounds that silently need
-splitting into named `assert`s before `conj`, `rewrite HYa1` only firing on
-one of two `uint` occurrences because `uint_unsigned` binds its first match
-and needs `!`, and several more) — but the file's own **`Qed` does not
-finish**: six minutes in, memory was at 17 GB and *accelerating*, not
-plateauing.  Not `iFrame` this time (there is none in the file) — the
-suspect is the ~30-deep chain of `set`-introdudced `regfile` lets (`T0..T12,
-Z0, Y, Mu, U0..U3, Z1, Z2, W1..W8`), each a transparent local definition
-built on the last: `set` doesn't abstract them the way an opaque hypothesis
-would, so the kernel's final conversion-checking pass may be re-walking the
-WHOLE chain at each step, which is exactly the shape that turns into
-quadratic-or-worse blowup.
-
-</details>
-
 **NEVER `iFrame` IN A KEXEC PROOF.  It does not terminate.** The goal at
 this altitude carries `ProcInv.tf_page`'s 4096-conjunct big-op inside
 `proc_priv`; one `iFrame` over an eighteen-conjunct seam state took
@@ -636,30 +349,37 @@ two states instead (`ProofKexecB3.kxc_incr`), and let the caller destruct.
 That is also why `kxc_ph_step` — one whole loop iteration, head to back
 edge — is the unit the phdr loop's induction is over.
 
-## Status
+## The files
 
-| piece | state |
+Every one of these is landed and proven; the table is a map, not a scoreboard.
+
+| file | what is in it |
 | --- | --- |
-| `CodeKexec.v` (289 instr facts, prefix `kxc_`) | **landed**, generated |
-| `CodeFlags2perm.v` / `SpecFlags2perm.v` / `ProofFlags2perm.v` / `LinkFlags2perm.v` | **PROVEN AND LINKED** |
-| `ElfEnc.v` — the ELF byte vocabulary | **landed** |
-| `ProcInv.proc_priv_newspace` / `proc_priv_name` / `upd_name` / `upd_exec` | **landed** |
-| `SpecKexec.v` — the contract, incl. `fs_fabric` | **landed** |
-| `SpecSafestrcpy` source relaxed (`ssc_src_ok`) | **landed, proven** |
-| `SpecWalkaddr` failure arm made informative | **landed, proven** |
-| `StackBytes.slotsn_bytes_own` (general n-slot carve) | **landed, proven** |
-| `WpSconfAlu` base-encoded sp movers (width-generic) | **landed, proven** |
-| `ProofKexecParts.v` — frame carve, `kxc_epi`, `kxc_frame` | **landed, proven** |
-| `ProofKexecTail.v` — frame/seam algebra + the shared `+0x064` tail | **landed, proven** |
-| `ProofKexecA.v` — **PHASE A PROVEN** (`kxc_a1`/`kxc_a2`/`kxc_phaseA`) | **landed, proven** |
-| `ProofKexecB.v` — **B1 PROVEN** (`kxc_b1`) | **landed, proven** |
-| `ProofKexecSeam.v` — the B1/B2 seam layer (the two seam states, the frame algebra, the elf carve, `kxc_cs_cases`) | **landed, proven** |
-| `SpecKexecB2.v` — `KEXECB2` (the `kxc_ls`/`kxc_bad324` interface B3 consumes), the frame algebra and the resource bundle | **landed, proven** |
-| `ProofKexecB2.v` — `kxc_frameBpin`, the shared `bad:` tail `kxc_bad324`, `kxc_res` + the peel/seal pairs, and the loadseg loop `kxc_ls` | **landed, proven** |
-| `SpecKexecB3.v` — `KEXECB3` (the `kxc_b2`/`kxc_b2z` interface phase C will consume) | **landed, proven, not yet consumed** |
-| `ProofKexecB3.v` — **THE PHDR LOOP**: `kxc_incr`, `kxc_ph_step`, `kxc_phdr`, `kxc_seam1a2`, `kxc_close`, and phase B2 whole (`kxc_b2` / `kxc_b2z`) | **landed, proven** |
-| `W32Arith.v` — the two-ABI-uint laws and the `slli/srli` truncation | **landed, proven** |
-| `SpecUvmalloc` / `ProofUvmalloc` — the success arm now names the new LEAVES (blocker §6) | **landed, proven** |
+| `CodeKexec.v` | the 289 instruction facts, prefix `kxc_` (generated) |
+| `ElfEnc.v` | the ELF byte vocabulary |
+| `SpecKexec.v` | the contract, the two pure models, `fs_fabric` |
+| `ProofKexecParts.v` | the frame carve, `kxc_epi`, `kxc_frame` |
+| `ProofKexecTail.v` | the frame/seam algebra, the `+0x064` tail (`KexecTailProof`) and phase C's `-1` tail `kxc_bad_1d6` (`KexecTailProofC`) |
+| `ProofKexecSeam.v` | the seam STATES (`kxc_at_1a2` … `kxc_at_2a6`), the frame algebra, the elf carve, `kxc_cs_cases` |
+| `ProofKexecA.v` | **phase A** — `kxc_a1`, `kxc_a2`, `kxc_phaseA` |
+| `ProofKexecB.v` | **phase B1** — `kxc_b1`, and the `+0x31c` tail |
+| `SpecKexecB2.v` / `ProofKexecB2.v` | the loadseg loop `kxc_ls`, the shared `bad:` tail `kxc_bad324`, `kxc_res` and the peel/seal pairs |
+| `SpecKexecB3.v` / `ProofKexecB3.v` | **the phdr loop** — `kxc_incr`, `kxc_ph_step`, `kxc_phdr`, `kxc_seam1a2`, `kxc_close`, and phase B whole (`kxc_b2` / `kxc_b2z`) |
+| `ProofKexecC.v` | **phase C** — `kxc_c_setup`, `kxc_argv_step`, `kxc_argv_loop`, `kxc_c_close`, and the shared `-1` connector `kxc_c_exit_m1` |
+| `ProofKexecD.v` | **phase D** — the name scan (`kxd_scan_tail`/`kxd_name_step`/`kxd_name_loop`), `kxd_commit`, `kxd_phaseD` |
+| `ProofKexec.v` | **the composition** — `kxc_exit_weaken`, `kxc_d_tail`, `kxc_cd`, `wp_kexec_sconf` |
+| `LinkKexec.v` | the sixteen callees, instantiated |
+
+Landed elsewhere for kexec's sake, and reusable: `CodeFlags2perm.v` /
+`SpecFlags2perm.v` / `ProofFlags2perm.v` / `LinkFlags2perm.v`;
+`ProcInv.proc_priv_newspace` / `proc_priv_name` / `upd_name` / `upd_exec`;
+`SpecSafestrcpy`'s relaxed source (`ssc_src_ok`); `SpecWalkaddr`'s
+informative failure arm; `StackBytes.slotsn_bytes_own` (the general n-slot
+carve); `WpSconfAlu`'s base-encoded, width-generic sp movers; `W32Arith.v`
+(the two-ABI-uint laws and the `slli`/`srli` truncation); and
+`SpecUvmalloc`/`ProofUvmalloc`'s leaf-naming success arm (blocker §6).
+
+`exec.c` is 2/2 functions, 896/896 bytes.
 
 **WHERE TO PUT A LEMMA TWO PHASES SHARE: `ProofKexecTail.v`, NOT `ProofKexecA.v`.**
 Phase B used to `Require Import ProofKexecA` for six pieces of frame/seam
@@ -671,10 +391,9 @@ time *was* `SpecKexec → ProofKexecA → ProofKexecB` and was the longest chain
 the tree by ~40 s. `ProofKexecTail.v` now holds the frame algebra, the seam
 definitions and the `KexecTailProof` functor (`kxc_exit_m1`, `kxc_bad64`, the
 `kxa_*` icache accessors); A opens it as `T` and B as `A`, at the same seven
-modules each already named. **Every later phase will hit this too** — C and D
-both reach the epilogue through tails A already proved — so put the next shared
-tail in `ProofKexecTail.v` when you prove it, and keep phase files reaching each
-other only through that one.
+modules each already named. C and D reach the epilogue through tails A already
+proved, so put the next shared tail there too, and keep phase files reaching
+each other only through that one.
 
 **THAT RULE IS FOR REUSABLE VOCABULARY — A PROVEN, PHASE-SPECIFIC FACT (e.g.
 a whole loop's induction) NEEDS THE `SpecKexecB2.v`/`SpecKexecB3.v` MOVE
@@ -695,13 +414,9 @@ an ABSTRACT functor argument of that type rather than applying the producer's
 functor itself. The two phases then meet only through the fast, `Qed`-free
 Spec file — `coqdep` is how you confirm it worked (grep the consuming phase's
 `.vo` dependency line for the producer's `.vo`; it should not appear).
-| phase C — the shared `-1` tail (`+0x1d6 .. +0x1f2`), `KexecTailProofC.kxc_bad_1d6` | **landed, proven** |
-| phase C — the setup block (`+0x1ae .. +0x218`), `ProofKexecC.KexecCProof.KexecCSetup.kxc_c_setup` | **landed, proven** |
-| phase C — the argv loop's STEP (`+0x21a .. +0x272`, one iteration), `kxc_argv_step`, and the shared `-1` connector `kxc_c_exit_m1` | **landed, proven** |
-| phase C — `kxc_argv_loop` (the fuel induction over the step) | **landed, proven** |
-| phase C — the closing copyout (`+0x272 .. +0x2a6`), `kxc_c_close`, and the `kxc_d_res` / `kxc_at_2a6` seam | **landed, proven** |
-| phase D — **THE COMMIT PROVEN** (`+0x2a6 .. +0x31a`): `ProofKexecD.v`'s name scan (`kxd_scan_tail` / `kxd_name_step` / `kxd_name_loop`), `kxd_commit`, `kxd_phaseD` | **landed, proven** |
-| phase D, `ProofKexec.v`, `LinkKexec.v`, `sys_exec` | not started |
+**`ProofKexec.v` is where the two producers are finally applied**, and it is
+the only file that requires all six phase proofs; nothing requires it but
+`LinkKexec.v`, so it costs the build one leaf.
 
 **`ProofKexecSeam.kxc_cs_cases` — the thirteen callee-saved indices,
 enumerated.** `is_cs_idx` is a decision procedure, which is what a proof
@@ -715,9 +430,6 @@ kill the impossible cases against its own `r <> csp_rs1`. With the numeral
 spelling that silently fails, the sp case stays live, and every later bullet
 handles the register one to its left — surfacing as an `upd_eq` that "does
 not match any subterm" in the branch AFTER the one that is really wrong.
-
-`exec.c` is 1/2 functions, 32/896 bytes; the tree is 170/189 functions and 81%
-of text bytes.
 
 ### What moved under us, and what it cost
 
@@ -1492,16 +1204,13 @@ first one to name it.
   is nothing in the source that tells you which that is. One definition, in
   `IcacheBoot.v`, re-exported.
 
-## Worklist
+## Phase C: the design
 
-Ordered. Each step ends at a seam the next one starts from.
-
-### 1. PHASE C — the user stack (`+0x1ae .. +0x2a2`)
-
-Entry is `ProofKexecSeam.kxc_at_1ae` (the inode closed, the half-built table
-in `proc_pt P`, `s2 = szv`, `s6 = page_base P.(ud_root)`, the ELF buffer
-still NAMED because phase D reads `elf.entry` out of it).  Read the control
-flow off `CodeKexec.v`, not the C:
+Phase C is `+0x1ae .. +0x2a2`, the user stack. Entry is
+`ProofKexecSeam.kxc_at_1ae` (the inode closed, the half-built table in
+`proc_pt P`, `s2 = szv`, `s6 = page_base P.(ud_root)`, the ELF buffer still
+NAMED because phase D reads `elf.entry` out of it). The control flow, read
+off `CodeKexec.v` rather than the C:
 
 ```
   +0x1ae  jal myproc ; mv s5,a0 ; ld s10,72(a0)      oldsz = p->sz
@@ -1525,93 +1234,42 @@ flow off `CodeKexec.v`, not the C:
 
 **SIX PATHS REACH THE `-1` TAIL AT +0x1d6** (+0x1d4, the two two-instruction
 stubs at +0x358 / +0x35c, +0x26e, +0x290, +0x2a2), each with `s3` holding a
-size and `s6` the new root.  Factor it exactly as `kxc_bad324` was: one
-lemma from +0x1d6, taking `um_below s3 P` and `um_covered s3 P` (the size
-premise `proc_freepagetable` asks for is again a projection of coverage) and
-the nine spill slots at `m`'s values.  It reaches `ProofKexecParts.kxc_epi`
-directly, NOT `kxc_bad64` — the inode is already closed here, so there is no
-iunlockput to do.
+size and `s6` the new root, and one lemma serves them all:
+`ProofKexecTail.KexecTailProofC.kxc_bad_1d6`, which takes `um_below s3 P` and
+`um_covered s3 P` (the size premise `proc_freepagetable` asks for is again a
+projection of coverage) plus the nine spill slots at `m`'s values. It reaches
+`ProofKexecParts.kxc_epi` directly, NOT `kxc_bad64` — the inode is already
+closed here, so there is no iunlockput to do. It is a SECOND functor in
+`ProofKexecTail.v` (`KexecTailProofC`, wrapping `KexecTailProof` as `T` and
+adding the one extra module `PFP : PROC_FREEPAGETABLE` that `kxc_exit_m1`
+itself does not need, so phase A/B's instantiations are untouched), and it
+reloads all NINE of s3..s11 from their spill slots — unlike `kxc_bad64`,
+which only ever reloads slot 6 — via `kxc_slot5_sp` .. `kxc_slot13_sp` in
+`KexecAFrame` and a LOCAL copy of `kxc_cs_cases` (`kxc_cs_cases9`; Seam
+requires Tail, so importing the original is not an option, and hoisting it to
+`CalleeSaved.v` is a 548-dependent cone one lemma does not owe).
 
-**LANDED: `ProofKexecTail.KexecTailProofC.kxc_bad_1d6`** — the whole +0x1d6
-`.. `+0x1f2 tail, proven.  It is a SECOND functor in `ProofKexecTail.v`
-(`KexecTailProofC`, wrapping `KexecTailProof` as `T` and adding the one extra
-module, `PFP : PROC_FREEPAGETABLE`, that `kxc_exit_m1` itself does not need —
-phase A/B's existing instantiations are untouched).  Reloads all NINE of
-s3..s11 from their spill slots (unlike `kxc_bad64`, which only ever reloads
-slot 6), via eight new one-off slot-address lemmas (`kxc_slot5_sp` ..
-`kxc_slot13_sp`, `kxc_slot6_sp` already existed) beside `kxc_slot6_sp` in
-`KexecAFrame`, and a LOCAL copy of `ProofKexecSeam.kxc_cs_cases` (named
-`kxc_cs_cases9`) — Seam requires Tail, so importing the original is not an
-option; hoisting it to `CalleeSaved.v` is a 548-dependent cone this one lemma
-does not owe, per durable-notes' promote-on-second-consumer rule. Establishing
-(not discharging) the nine-way threading clause from a fully-local reload
-needs the same "land the symbolic `r` on the register the clause is really
-about" shape `kxc_cs_cases` was built for.
+**uvmalloc's failure arm needs NOTHING beyond what `kxc_at_1ae` carries.**
+Its postcondition on `a0 = 0` is `proc_pt P` UNCHANGED, and
+`s3 = PGROUNDUP(szv)` is exactly `kxc_bad_1d6`'s `szf`, with
+`um_below`/`um_covered` inherited from `kxc_at_1ae`'s own conjuncts via
+`UmCovered.um_covered_z_mono`.
 
-**That makes it the second shared tail, and
-`ProofKexecTail.v` is its home** (the note under "Status").
+**The `+0x218 beqz a0,+0x272` branch is the "two successors, one caller exit"
+shape**, so `kxc_c_setup` ends in a DISJUNCTION over "argv[0] <> 0, at the
+loop head" and "argv[0] = 0, at +0x272 with c = 0" — no registers to
+reconcile, since `s1`/`s2`/`s7`/`s8`/`s9` were just set at +0x20c..+0x214 and
+are already the invariant's `c = 0` instance.
 
-**NEXT UP: the +0x1ae .. +0x21a setup block**, re-verified independently
-against `CodeKexec.v`'s decoded ASTs (not just transcribed from the C) —
-matches the block listing above exactly, and pins down the register-level
-call arguments the next lemma needs:
-
-```
-  +0x1ae  jal ra,myproc              a0 = p
-  +0x1b2  mv s5,a0                   s5 = p            (kept; DEAD entering,
-                                                          so this is a fresh
-                                                          write, not a reuse)
-  +0x1b4  ld s10,72(a0)              s10 = p->sz = oldsz  (via a0, before a0
-                                                             is next clobbered)
-  +0x1b8..+0x1c0  s3 = PGROUNDUP(s2)              (s2 = szv, phase B's exit)
-  +0x1c4..+0x1cc  a3=4 (PTE_W) a2=s3+8192 a1=s3 a0=s6
-  +0x1ce  jal uvmalloc                uvmalloc(root=s6, s3, s3+8192, PTE_W)
-  +0x1d2  mv s4,a0                    s4 = sz1 (0 on failure)
-  +0x1d4  bnez a0,+0x1f4              failure falls through into kxc_bad_1d6
-                                       (s3 already = PGROUNDUP(szv), the size
-                                       to free -- uvmalloc's own failure arm
-                                       hands proc_pt P back UNCHANGED)
-  +0x1f4..+0x1f8  a1 = sz1 - 8192 (guard page va)  a0 = s6
-  +0x1fa  jal uvmclear                 uvmclear(root, sz1-8192) -- total, no
-                                       failure arm to thread
-  +0x1fe..+0x202  s7 = sz1 - 4096      stackbase
-  +0x206..+0x20a  a5 = slot 64 (spilled argv)  a0 = argv[0]
-  +0x20c..+0x214  s2 := s4 (=sz1)  s1 := 0  s9 := pa_stk sp0 46  s8 := 32
-  +0x218  beqz a0,+0x272            argv[0] = NULL skips the loop entirely
-  +0x21a  the argv loop head, at c = 0
-```
-
-Two things worth planning around before writing it:
-
-- **uvmalloc's failure arm needs NOTHING beyond what `kxc_at_1ae` already
-  carries.**  Its postcondition on `a0 = 0` is `proc_pt P` UNCHANGED
-  (SpecUvmalloc.v), and `s3 = PGROUNDUP(szv)` is exactly `kxc_bad_1d6`'s
-  `szf` with `um_below`/`um_covered` inherited straight from `kxc_at_1ae`'s
-  own `um_below szv` / `um_covered szv` conjuncts via
-  `UmCovered.um_covered_z_mono` (`PGROUNDUP(szv) >= szv`, the same
-  "PGROUNDUP only grows coverage" fact `UmCovered.um_covered_run` already
-  proves as a step). No new invariant conjunct.
-- **The `+0x218 beqz a0,+0x272` branch is the "two successors, one caller
-  exit" shape** (durable-notes / this file's block-interface rule 
-  `ProofKexecB3.kxc_incr`'s instance): it either enters the loop at `c = 0`
-  (`+0x21a`) or skips straight to `+0x272` with `c = 0` implicitly (no
-  registers to reconcile — `s1`/`s2`/`s7`/`s8`/`s9` are already exactly the
-  loop invariant's `c = 0` instance by construction, since they were just
-  set at +0x20c..+0x214).  So the natural shape is: this setup block ends
-  in a DISJUNCTION over "argv[0] <> 0, entering the loop head" vs "argv[0]
-  = 0, at +0x272 with c = 0" — and the loop's own top-level lemma should be
-  stated to accept EITHER as its entry (i.e. induct from a general `c`,
-  called at `c := 0` either way), so the disjunction collapses into one
-  call rather than two.
-
-**THE ARGV LOOP'S INVARIANT**, at the head `+0x21a` with index `c`:
+**THE ARGV LOOP'S INVARIANT** (`kxc_at_21a`), at the head with index `c`:
 
 - `s1 = c`, `c <= na`, `c < MAXARG`; `a0 = avf c` and `avf c <> 0`
   (so `c < na`, since `avf na = 0` and nothing below it is);
 - `s2 = mword_of_int (kxc_sp (uint sz1) alen c)` — the contract's own
   recurrence, so the exit's `spv` needs no reconciliation;
 - `s4 = sz1`, `s7 = sz1 - 4096`, `s8 = 32`, `s9 = pa_stk sp0 46`,
-  `s5 = proc_addr jp`, `s10 = oldsz`, `s6 = page_base P.(ud_root)`;
+  `s5 = proc_addr jp`, `s10 = oldsz`, `s6 = page_base P.(ud_root)`,
+  `s0 = sp0`, and `sz1 - 4096 <= kxc_sp (uint sz1) alen c`;
 - slot 64 = `pa_add av (8*c)` — the C bumps `argv` in the frame, not in a
   register;
 - the ustack, SPLIT AT `c`: `stack_own (pa_stk sp0 13) (33 - c)` for the
@@ -1636,22 +1294,27 @@ success arm's `kxc_stack_ok` and `na <= MAXARG` are ASSERTED by that good
 exit, not assumed: above them the machine takes `bad:`, which is the other
 arm of `kexec_ok`.
 
-### 2. PHASE D — the commit (`+0x2a6 .. +0x31a`)
+## Phase D: the design
 
-
-`proc_priv_newspace` (the address-space bridge that does not pin `ud_root`) +
-three `tf_page_word_upd` at `tf_epc_idx` / `tf_sp_idx` / `tf_arg_idx 1`, then
-`proc_priv_name`, then `proc_freepagetable` of the OLD table at the OLD size.
+`+0x2a6 .. +0x31a`, and the shortest phase because every lemma it needs
+already existed: `proc_priv_newspace` (the address-space bridge that does not
+pin `ud_root`) plus three `tf_page_word_upd` at `tf_epc_idx` /
+`kxc_tf_sp_idx` / `tf_arg_idx 1`, then `proc_priv_name` around the
+`safestrcpy`, then `proc_freepagetable` of the OLD table at the OLD size.
 `upd_exec_compose` turns the composite back into the contract's `upd_exec`.
-All four lemmas exist and are proven; this should be the shortest phase.
 
-### 3. `ProofKexec.v` and `LinkKexec.v`, then `sys_exec`
+## Worklist
 
-`sys_exec` is 0/1 with `CodeSysExec.v` already generated upstream. It builds
-the argv array kexec's contract consumes (a kalloc'd page per argument via
-`fetchstr`), so its spec and kexec's want designing against each other.
+### 1. `sys_exec`
 
-### 4. Optional, none blocking
+0/1, with `CodeSysExec.v` already generated upstream. It builds the argv
+array kexec's contract consumes (a kalloc'd page per argument via
+`fetchstr`), and it is what pays kexec's two argument premises for free:
+`fetchstr` passes `max = PGSIZE`, so every `alen i < 4096`, and it is
+`sys_exec` that guarantees the NULL is below `MAXARG`. Its spec and kexec's
+want designing against each other.
+
+### 2. Optional, none blocking
 
 - Tighten `SpecNamei`'s SUCCESS-arm budget to `L * iput_units` (namex iputs
   the parents and RETURNS the last inode), which widens kexec from `L ≤ 1` to
@@ -1667,14 +1330,13 @@ the argv array kexec's contract consumes (a kalloc'd page per argument via
 
 ## Reading order for whoever picks this up
 
-1. This file's CHECKPOINT, then "Block-interface conventions" (six numbered
+1. "The composition" and then "Block-interface conventions" (six numbered
    rules A/B/C/D compose under — they are what keep the seams from being
    renegotiated).
 2. `SpecKexec.v`'s header — what the contract says and what it deliberately
    does not.
-3. `ProofKexecA.v` for the idiom, `ProofKexecB.v` for the seam you continue
-   from, and `ProofKexecTail.v` for the frame/seam vocabulary both of them are
-   written in (and for the `+0x064` tail any new phase's failure arm will want).
+3. `ProofKexec.v` for how the phases meet, `ProofKexecA.v` for the idiom, and
+   `ProofKexecTail.v` for the frame/seam vocabulary every phase is written in.
 4. `durable-notes.md`'s newer traps, all of which were paid for here: the
    `[-]` spec pattern eating hypotheses named after it; `iFrame` at syscall
    altitude not terminating; the exit having to be handed back when two halves

@@ -61,6 +61,9 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
+(* [WpLock] for [lockG] itself: [Import] is not transitive, so without it the
+   [!lockG Σ] binder below auto-generalizes instead of resolving. *)
+Require Import WpLock SleepLock.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
@@ -336,14 +339,14 @@ Qed.
 (*  [live_gen_agree].  Two lemmas, and nothing else changes.                *)
 (* ---------------------------------------------------------------------- *)
 Section FwShare.
-  Context `{!riscvGS Σ, ICFG : icfg, !icacheG Σ}.
+  Context `{!riscvGS Σ, ICFG : icfg, !icacheG Σ, !lockG Σ}.
 
   Lemma fw_shr_gen_split (k : nat) (s1 s2 : Qp) (dev inum : mword 32) (g : gname) :
     inode_shr_gen k (s1 + s2)%Qp dev inum g ⊣⊢
     inode_shr_gen k s1 dev inum g ∗ inode_shr_gen k s2 dev inum g.
   Proof.
-    rewrite /inode_shr_gen inode_ident_split live_gen_split.
-    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+    rewrite /inode_shr_gen inode_ident_split live_gen_split slh_tok_split.
+    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
   Qed.
 
   Lemma fw_shr_gen_halve (k : nat) (s : Qp) (dev inum : mword 32) (g : gname) :
@@ -364,9 +367,10 @@ Section FwShare.
     iIntros "Hkeep Hback".
     iEval (rewrite inode_shr_gen_intro) in "Hback".
     iDestruct "Hback" as (g') "Hback".
-    iDestruct "Hkeep" as "[Hid1 Hlv1]". iDestruct "Hback" as "[Hid2 Hlv2]".
+    iDestruct "Hkeep" as "(Hid1 & Hlv1 & Hs1)".
+    iDestruct "Hback" as "(Hid2 & Hlv2 & Hs2)".
     iDestruct (live_gen_agree with "Hlv1 Hlv2") as %<-.
-    rewrite /inode_shr_gen inode_ident_split live_gen_split. iFrame.
+    rewrite /inode_shr_gen inode_ident_split live_gen_split slh_tok_split. iFrame.
   Qed.
 
 End FwShare.

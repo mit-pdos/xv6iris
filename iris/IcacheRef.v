@@ -1067,30 +1067,30 @@ Section IcacheRefGhost.
      parent keeps its whole count fragment while its liveness and identity
      slices shrink -- [inode_ref_short], and the reason iput's caller cannot
      be a parent with a share out. *)
-  (* THE COUNT FRAGMENT, and with it the SLEEPLOCK SHARE.
-
-     [slh_tok (icfg_isl k) q] is a q-share of "somebody may hold slot [k]'s
-     sleeplock" (SleepLock.v), and it rides HERE rather than beside
-     [live_frac] because the authority that counts it is the one this
-     fragment answers to: the total outstanding share is the [qt] of
-     [M !! k], so [IcacheInv.isl_slot] can couple the two definitionally and
-     REF-1 -- "your [q] is the whole outstanding share" -- becomes "no share
-     of the lock exists anywhere", which is the premise iput's non-blocking
-     [acquiresleep] takes (claude-notes/projects/iput-acquiresleep.md).
-
-     It rides at the SAME [q], which is what makes every existing step free:
-     [iref_dup_step]'s halving splits the share the same way, and the
-     carve/gather family does not move the count fragment at all, so a
-     carved-out [inode_shr] carries no share and the reference keeps it. *)
   Definition iref_frag (k : nat) (q : Qp) : iProp Σ :=
-    (own icfg_iref (◯ {[ k := (q, 1%positive) ]}) ∗ slh_tok (icfg_isl k) q)%I.
+    own icfg_iref (◯ {[ k := (q, 1%positive) ]}).
 
   (* ONE reference to slot [k], holding fraction [q] of its identity -- the
      count fragment AND the matching liveness slice, canonically paired (see
      the header).  Every consumer of [iref_tok] treats it as opaque, which is
      why the pool could be folded in here without touching a statement. *)
+  (* ...AND THE SLEEPLOCK SHARE.  [slh_tok (icfg_isl k) q] is a q-share of
+     "somebody may hold slot [k]'s sleeplock" (SleepLock.v).  The authority
+     that counts it is the one the COUNT fragment answers to -- the total
+     outstanding share is the [qt] of [M !! k], which is what
+     [IcacheInv.isl_slot] couples definitionally, and what turns REF-1
+     ("your [q] is the whole outstanding share") into "no share of the lock
+     exists anywhere", the premise iput's non-blocking [acquiresleep] takes.
+
+     But it rides on the SLICE axis, beside [live_frac] and the identity,
+     NOT on the count fragment: [inode_ref_carve] keeps the count fragment
+     whole and splits the slices, and the share has to go WITH the slice,
+     because a carved [inode_shr] is what ilock consumes and therefore what
+     has to carry the deposit it leaves in the lock.  Nothing else in the
+     accounting moves: the carve preserves the sum, so the total is still
+     the [qt] the reference algebra records. *)
   Definition iref_tok (k : nat) (q : Qp) : iProp Σ :=
-    (iref_frag k q ∗ live_frac k q)%I.
+    (iref_frag k q ∗ live_frac k q ∗ slh_tok (icfg_isl k) q)%I.
 
   Global Instance itable_half_timeless M : Timeless (itable_half M).
   Proof. apply _. Qed.
@@ -1174,7 +1174,8 @@ Section IcacheRef.
      it refutes ilock's [ref < 1] panic, but it can never be spent as a
      reference, because no amount of it produces the count fragment. *)
   Definition inode_shr (k : nat) (s : Qp) (dev inum : mword 32) : iProp Σ :=
-    (inode_ident k (DfracOwn s) dev inum ∗ live_frac k s)%I.
+    (inode_ident k (DfracOwn s) dev inum ∗ live_frac k s ∗
+     slh_tok (icfg_isl k) s)%I.
 
   (* ---- THE GENERATION-NAMED FORMS (design §17.3, ratified §17.4) ------
 
@@ -1195,19 +1196,21 @@ Section IcacheRef.
      else. *)
   Definition inode_shr_gen (k : nat) (s : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
-    (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g)%I.
+    (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g ∗
+     slh_tok (icfg_isl k) s)%I.
 
   Definition inode_ref_gen (k : nat) (q : Qp) (dev inum : mword 32)
       (g : gname) : iProp Σ :=
-    (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum)%I.
+    (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum ∗
+     slh_tok (icfg_isl k) q)%I.
 
   Lemma inode_shr_gen_intro k s dev inum :
     inode_shr k s dev inum ⊣⊢ ∃ g : gname, inode_shr_gen k s dev inum g.
   Proof.
     rewrite /inode_shr /inode_shr_gen /live_frac.
     iSplit.
-    - iIntros "[Hid [%g Hg]]". iExists g. iFrame.
-    - iIntros "[%g [Hid Hg]]". iFrame "Hid". iExists g. iFrame.
+    - iIntros "[Hid [[%g Hg] Hs]]". iExists g. iFrame.
+    - iIntros "[%g (Hid & Hg & Hs)]". iFrame "Hid Hs". iExists g. iFrame.
   Qed.
 
   Lemma inode_ref_gen_intro k q dev inum :
@@ -1215,8 +1218,8 @@ Section IcacheRef.
   Proof.
     rewrite /inode_ref /inode_ref_gen /iref_tok /live_frac.
     iSplit.
-    - iIntros "[[Hf [%g Hg]] Hid]". iExists g. iFrame.
-    - iIntros "[%g (Hf & Hg & Hid)]". iFrame "Hf Hid". iExists g. iFrame.
+    - iIntros "[(Hf & [%g Hg] & Hs) Hid]". iExists g. iFrame.
+    - iIntros "[%g (Hf & Hg & Hid & Hs)]". iFrame "Hf Hid Hs". iExists g. iFrame.
   Qed.
 
   Global Instance inode_shr_gen_timeless k s dev inum g :
@@ -1236,7 +1239,7 @@ Section IcacheRef.
   Definition inode_ref_short (k : nat) (qtok qid : Qp)
       (dev inum : mword 32) : iProp Σ :=
     (iref_frag k qtok ∗ live_frac k qid ∗
-     inode_ident k (DfracOwn qid) dev inum)%I.
+     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid)%I.
 
   (* THE SHORT PARENT, GENERATION-NAMED (fs-log.md §G.24, G-4d).  Same
      three pieces as [inode_ref_short], with the liveness slice at a NAMED
@@ -1254,7 +1257,7 @@ Section IcacheRef.
   Definition inode_ref_short_gen (k : nat) (qtok qid : Qp)
       (dev inum : mword 32) (g : gname) : iProp Σ :=
     (iref_frag k qtok ∗ live_gen k qid g ∗
-     inode_ident k (DfracOwn qid) dev inum)%I.
+     inode_ident k (DfracOwn qid) dev inum ∗ slh_tok (icfg_isl k) qid)%I.
 
   Lemma inode_ref_short_gen_intro k qt qi dev inum :
     inode_ref_short k qt qi dev inum
@@ -1279,7 +1282,7 @@ Section IcacheRef.
     inode_ref_short_gen k qt qi dev inum g1 -∗ inode_shr_gen k s d2 n2 g2 -∗
     ⌜g1 = g2⌝.
   Proof.
-    iIntros "(_ & H1 & _) [_ H2]". iApply (live_gen_agree with "H1 H2").
+    iIntros "(_ & H1 & _ & _) (_ & H2 & _)". iApply (live_gen_agree with "H1 H2").
   Qed.
 
   (* THE NAMED GATHER: [inode_ref_gather] with the generation surviving *)
@@ -1288,10 +1291,11 @@ Section IcacheRef.
     inode_shr_gen k s dev inum g -∗
     inode_ref_gen k (qi + s)%Qp dev inum g.
   Proof.
-    iIntros "(Hf & Hl1 & Hid1) [Hid2 Hl2]".
+    iIntros "(Hf & Hl1 & Hid1 & Hs1) (Hid2 & Hl2 & Hs2)".
     rewrite /inode_ref_gen. iFrame "Hf".
     iSplitL "Hl1 Hl2"; [iApply (live_gen_join with "Hl1 Hl2") |].
-    rewrite inode_ident_split. iFrame.
+    rewrite inode_ident_split. iFrame "Hid1 Hid2".
+    iApply (slh_tok_join with "Hs1 Hs2").
   Qed.
 
   Global Instance inode_ref_short_gen_timeless k qt qi dev inum g :
@@ -1302,7 +1306,7 @@ Section IcacheRef.
     inode_ref k q dev inum ⊣⊢ inode_ref_short k q q dev inum.
   Proof.
     rewrite /inode_ref /inode_ref_short /iref_tok.
-    iSplit; [iIntros "[[$ $] $]" | iIntros "($ & $ & $)"].
+    iSplit; [iIntros "[($ & $ & $) $]" | iIntros "($ & $ & $ & $)"].
   Qed.
 
   (* THE CARVE, and its inverse.  Both are pure resource algebra: the
@@ -1314,10 +1318,10 @@ Section IcacheRef.
     inode_ref_short k (q + s)%Qp q dev inum ∗ inode_shr k s dev inum.
   Proof.
     rewrite /inode_ref /inode_ref_short /inode_shr /iref_tok
-            live_frac_split inode_ident_split.
+            live_frac_split inode_ident_split slh_tok_split.
     iSplit.
-    - iIntros "[[$ [$ Hl2]] [$ Hi2]]". iFrame.
-    - iIntros "[($ & $ & $) [$ $]]".
+    - iIntros "[($ & [$ Hl2] & [$ Hs2]) [$ Hi2]]". iFrame.
+    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
   Lemma inode_ref_gather k q s dev inum :
@@ -1347,7 +1351,7 @@ Section IcacheRef.
   Lemma inode_ref_short_shr_agree k qt qi s d1 n1 d2 n2 :
     inode_ref_short k qt qi d1 n1 -∗ inode_shr k s d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
-    iIntros "(_ & _ & H1) [H2 _]". iApply (inode_ident_agree with "H1 H2").
+    iIntros "(_ & _ & H1 & _) [H2 _]". iApply (inode_ident_agree with "H1 H2").
   Qed.
 
   (* A SHARE SPLITS, which is what makes the file payload's arm proportional:
@@ -1356,8 +1360,8 @@ Section IcacheRef.
     inode_shr k (s1 + s2)%Qp dev inum ⊣⊢
     inode_shr k s1 dev inum ∗ inode_shr k s2 dev inum.
   Proof.
-    rewrite /inode_shr inode_ident_split live_frac_split.
-    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+    rewrite /inode_shr inode_ident_split live_frac_split slh_tok_split.
+    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
   Qed.
 
   (* SHEDDING A HALF-SHARE -- the form every caller that has no fraction in
@@ -1509,18 +1513,19 @@ Section IcacheHeld.
     inode_shr_held_gen v s1 g ∗ inode_shr_held_gen v s2 g.
   Proof.
     rewrite /inode_shr_held_gen /inode_shr_gen. iSplit.
-    - iIntros "(%k & %inum & %Hv & %Hk & %Hb & [Hid Hlv])".
-      rewrite inode_ident_split live_gen_split.
+    - iIntros "(%k & %inum & %Hv & %Hk & %Hb & (Hid & Hlv & Hs))".
+      rewrite inode_ident_split live_gen_split slh_tok_split.
       iDestruct "Hid" as "[Hid1 Hid2]". iDestruct "Hlv" as "[Hl1 Hl2]".
-      iSplitL "Hid1 Hl1"; iExists k, inum; by iFrame.
-    - iIntros "[(%k1 & %n1 & %Hv1 & %Hk1 & %Hb1 & [Hid1 Hl1])
-                (%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & [Hid2 Hl2])]".
+      iDestruct "Hs" as "[Hs1 Hs2]".
+      iSplitL "Hid1 Hl1 Hs1"; iExists k, inum; by iFrame.
+    - iIntros "[(%k1 & %n1 & %Hv1 & %Hk1 & %Hb1 & (Hid1 & Hl1 & Hs1))
+                (%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & (Hid2 & Hl2 & Hs2))]".
       assert (Hkk : k1 = k2).
       { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
       subst k2.
       iDestruct (inode_ident_agree with "Hid1 Hid2") as %[_ ->].
       iExists k1, n2. iFrame "%".
-      rewrite inode_ident_split live_gen_split. iFrame.
+      rewrite inode_ident_split live_gen_split slh_tok_split. iFrame.
   Qed.
 
   Global Instance inode_shr_held_gen_timeless v s g :

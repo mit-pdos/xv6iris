@@ -553,8 +553,8 @@ Section SpecFileread.
     IcacheRef.inode_shr_gen ik s2 dev inum g.
   Proof.
     rewrite /IcacheRef.inode_shr_gen IcacheRef.inode_ident_split
-            IcacheRef.live_gen_split.
-    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+            IcacheRef.live_gen_split SleepLock.slh_tok_split.
+    iSplit; [iIntros "[[$ $] [[$ $] [$ $]]]" | iIntros "[($ & $ & $) ($ & $ & $)]"].
   Qed.
 
   (* halving, as its OWN lemma -- durable-notes' [rewrite -(Qp.div_2 q)]
@@ -582,7 +582,7 @@ Section SpecFileread.
     iIntros "H1 H2".
     iEval (rewrite IcacheRef.inode_shr_gen_intro) in "H2".
     iDestruct "H2" as (g2) "H2".
-    iDestruct "H1" as "[Hid1 Hlv1]". iDestruct "H2" as "[Hid2 Hlv2]".
+    iDestruct "H1" as "(Hid1 & Hlv1 & Hs1)". iDestruct "H2" as "(Hid2 & Hlv2 & Hs2)".
     iDestruct (IcacheRef.live_gen_agree with "Hlv1 Hlv2") as %<-.
     rewrite inode_shr_gen_split2. iFrame.
   Qed.

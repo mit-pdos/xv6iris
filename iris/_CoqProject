@@ -1095,6 +1095,8 @@ SpecKexecB3.v
 ProofKexecB3.v
 ProofKexecC.v
 ProofKexecD.v
+ProofKexec.v
+LinkKexec.v
 SpecSysFstat.v
 SpecSysRead.v
 SpecSysWrite.v
