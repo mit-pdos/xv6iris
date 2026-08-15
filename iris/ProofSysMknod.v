@@ -1738,6 +1738,10 @@ Section ProofSysMknodBody.
         iDestruct "Hlocked" as (gil gisl)
           "(Hslk & Hslkd & Hslpid & Hdep & Hidev & Hiinum & Hivalid & Hload &
             Hshot & Href)".
+        (* create's payout is GENERATION-NAMED now; iunlockput takes the
+           erased reference, so weaken it back here.  One line, and the
+           name is what sys_open's O_CREATE arm needs kept. *)
+        iDestruct (inode_ref_short_gen_forget with "Href") as "Href".
         iDestruct (mn_esc_acc cn gfs gi cov logstart kk ltac:(lia)
                      with "Hescrows") as "#Hesc".
         destruct (Hiregb inum ltac:(lia)) as [Hibcov Hiblog].
