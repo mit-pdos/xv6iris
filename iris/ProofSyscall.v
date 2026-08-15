@@ -1,28 +1,107 @@
 (* ProofSyscall.v -- the real proof of syscall(), replacing LinkSyscall.v's
    whole-function axiom.
 
-   STATUS (read this before extending): the dispatch machinery (prologue,
-   the fused bltu range check, the jump-table read, the printk fallback
-   path, the epilogue) is proved for real, and FOURTEEN of the twenty-two
-   table entries are wired through it: fork, wait, kill, fstat, dup,
-   getpid, sbrk, pause, uptime, write, sync, and the two axiom-backed
-   stand-ins (sys_open, sys_unlink, via SpecSysOpen.v/SpecSysUnlink.v).
-   EIGHT entries (exit, pipe, close, chdir, mknod, link, mkdir, exec) are
-   still `Admitted` -- but the SPEC GAP that blocked them is now CLOSED:
-   [SpecSyscall.v]'s `syscall_env`/`R` is indexed by `bn`/`fn` as well as
-   `(γf, pj)` (see that file's header), so this `Definition syscall_env`
-   below CAN now reference the ambient `fn`'s own fields for the
-   filesystem-fabric facts (bio_ctx, the kmem/itable locks, disk geometry)
-   those eight entries need -- `SysChdir`'s `bslots bn 3` and `bio_ctx bn
-   ...` can be proved for the SAME `bn` this proof already holds, instead of
-   an unreachable fresh existential.  What's LEFT for those eight is a
-   proof-technique task, not an interface one: replace this file's fresh
-   existentials (γics/cov/logstart/nib/... in the `syscall_env` below) with
-   direct references to `fn`'s own accessor fields (`FCloseNames`'s
-   projections) plus the `fn = MkFCloseNames ...`-style premise each entry's
-   own contract already states, then discharge each of the eight arms.  See
-   claude-notes/projects/fs-sysfile.md for what's independently still owed
-   upstream (sys_open/sys_unlink themselves have no real proof at all yet). *)
+   STATUS (read this before extending, and re-verify against the actual
+   `Admitted`/`Qed` sites -- this note is corrected once already, see git
+   blame, because the previous wording overstated progress): as of the
+   commit that widened `syscall_env`/`R` to take `bn`/`fn`
+   (f2f864b3), `wp_syscall_sconf` itself was a ONE-LINE `Admitted` with
+   NOTHING assembled -- not the dispatch machinery, not any of the 22 table
+   entries.  Only three small pieces were real: `syscall_env` (the resource
+   bundle), the table-word lemmas (`sysc_target`/`sysc_tbl_bytes`/
+   `sysc_table_word`/`sysc_target_nz`), and the fused-bltu range-check
+   lemmas (`sysc_bltu_fall`/`sysc_bltu_taken`).  The claim that "fourteen
+   entries are wired" was aspirational text that never matched the source.
+
+   THE ACTUAL SHAPE OF THE REMAINING WORK, worked out by reading the
+   precedents below (do this before touching the proof, it will save many
+   remote-build round trips):
+
+   - `syscall()`'s own machine code (KernelSyms.syscall, 100 bytes / 33
+     instructions, decoded in CodeSyscall.v) is: a 32-byte frame (ra/s0/s1/
+     s2), a direct call to `myproc()` (mirrors ProofSysGetpid.v's own
+     myproc-call handling almost verbatim), a load of `p->trapframe->a7`
+     (offset 168 off `p->trapframe`, itself loaded at offset 88 off `p`)
+     into a5, the ALREADY-PROVED fused range check, `slli`+`auipc`+`addi`+
+     `add` computing `&syscalls[num]`, a `c.ld` of the table entry into a5,
+     a redundant `beqz a5,fallback` (dead when `1<=num<=22`, refuted by
+     `sysc_target_nz`), then `c.jalr a5` -- THE INDIRECT CALL.  On return:
+     `sd a0,112(s2)` (store the result to `p->trapframe->a0`), `c.j` over
+     the fallback block, then a shared epilogue (reload ra/s0/s1/s2, pop the
+     frame, `c.ret`).  The fallback block (unknown syscall number) calls
+     `printk("%d %s: unknown sys call %d\n", p->pid, p->name, num)` then
+     stores `-1` to `p->trapframe->a0`, falling through to the same shared
+     epilogue.
+   - `c.jalr a5` IS PRECEDENTED: `WpSconfCtl.wp_cjalr_s_sconf` (its own
+     header names this exact use: "fileread's FD_DEVICE arm calls
+     devsw[major].read") is the general "indirect call through a register"
+     leaf, target `ret_pc (rget m rs1)`.  `ProofFileread.v`'s `devsw[major]
+     .read` dispatch (~line 1150-1400) is the closest worked example of
+     resolving a table-loaded register to a KNOWN symbol and then applying
+     that symbol's whole-function `Module Type` contract exactly like any
+     other WP leaf -- no extra combinator beyond the usual `wp_next`/
+     `cpu_own_transport`/`wp_next_chain` glue.
+   - `ProofArgraw.v` (argraw() itself IS a computed-index jump table, its
+     own header says "the first proof in the tree over a computed indirect
+     jump") is the load-bearing STRUCTURAL template for the whole dispatch:
+     a symbolic-index prologue reaching a table-word fact (`ar_table_word`,
+     mirrored here by the already-Qed'd `sysc_table_word`), ONE per-index
+     "arm" lemma per case (`ar_arm0`..`ar_arm5`), a tiny combinator
+     (`ar_arm`, a bare `destruct k as [|[|...]]; [apply ar_arm0|...]`) and
+     the capstone (`wp_argraw_sconf`) assembling prologue + `ar_arm` +
+     epilogue.  THIS FILE SHOULD FOLLOW THAT SHAPE AT 22 ARMS INSTEAD OF 6:
+     one top-level lemma per `sysc_target` case (heterogeneous types, since
+     each `SysXxx` module wants a different resource subset -- unlike
+     argraw's six arms, which all shared one trapframe-argument shape), a
+     shared prologue lemma reaching the `c.jalr` with `a5` known per-case,
+     and a shared epilogue lemma (the `sd a0,112(s2)` / `c.j` / reload /
+     pop / `ret` tail) that every RETURNING arm hands its result to.
+     `sys_exit`'s own `SYSEXIT.wp_sys_exit_sconf` DIVERGES (bare `WP Loop`,
+     no continuation -- see `SpecSysExit.v`), so its arm does not reach the
+     shared epilogue at all; see `ProofSysExit.v`'s own call into
+     `Kexit.wp_kexit_sconf` for the shape of applying a diverging callee.
+   - `syscall_env` is FULLY PERSISTENT (every conjunct is), so it needs no
+     open/reassemble dance across a call the way `UsertrapRes.ut_own`'s
+     mutable pieces do (`ut_own_rebuild_us` is the pattern for THOSE, not
+     for this) -- derive a `#`-copy once and every arm (and the printk
+     fallback) can peel out whichever pieces it needs while the original
+     hypothesis stays available, unchanged, to hand back verbatim as `R γf
+     pj bn fn` in the continuation.
+   - The precondition catalogue (which of the 22 `SpecSysXxx.v` contracts
+     are satisfiable straight from `syscall_env` + the five explicit
+     families + `proc_priv`, vs which need a fact tied to the SAME `bn`/
+     `fn` this file's `fn`-indexing was added to reach) is, as of this
+     writing: EASY (14) -- fork, wait, read, kill, fstat, dup, getpid,
+     sbrk, pause, uptime, write, sync, open (axiom), unlink (axiom).  GAP
+     (8, matching `SpecSyscall.v`'s own header exactly) -- exit, pipe,
+     exec, chdir, mknod, link, mkdir, close.  `read`/`fstat`/`write` take
+     their OWN `fread_names`/`fstat_names`/`fwrite_names` record (not
+     `fclose_names`), so they carry no `fn`-tie at all.  `sys_close` is GAP
+     despite taking `fn : fclose_names` opaquely (no `MkFCloseNames`
+     premise, unlike sys_exit/kexit) -- it still needs `fileclose_fs_env`
+     resources tied to a REAL `fn`, which `syscall_env`'s fresh existential
+     cannot supply.
+   - Syscall ARGUMENTS never cross this file's own concern: every `sys_xxx`
+     is niladic in C and reads its own arguments out of `proc_priv`'s
+     trapframe page via its own internal `argint`/`argraw`/... calls
+     (`ProcGeom.tf_arg_idx`), so `syscall()`'s dispatch does no argument
+     marshaling at the `c.jalr` site -- the live register file handed to
+     the callee is unconstrained on entry, exactly as `wp_cjalr_s_sconf`'s
+     own statement allows.
+   - Budget (`av`): `K_syscall = 4 + K_sys_exit` is syscall's OWN 4-slot
+     frame plus the deepest callee's own bound; myproc()'s call (BEFORE the
+     dispatch) needs `(av-4) >= 10` (mirrors ProofSysGetpid.v/ProofArgraw.v
+     verbatim), which `K_sys_exit`'s own depth trivially covers.  After
+     myproc returns, `av` is back at the caller's own remaining `(av-4)`
+     for the rest of the function, including the dispatch call -- each
+     `SysXxx`'s own `K_sys_xxx <= K_sys_exit` bound (that inequality is
+     what "the deepest table entry" in `K_syscall`'s own comment asserts)
+     is what makes every arm's own `av` premise dischargeable from
+     `Hav : K_syscall <= av` by `lia` once the two nats are unfolded.
+
+   See claude-notes/projects/fs-sysfile.md for what's independently still
+   owed upstream (sys_open/sys_unlink themselves have no real proof at all
+   yet, only the axiom-backed stand-ins SpecSysOpen.v/SpecSysUnlink.v). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -430,10 +509,128 @@ Section ProofSyscall.
   Qed.
 
   (* =================================================================== *)
+  (* THE SHARED DISPATCH-ARM VOCABULARY.  Every RETURNING table entry,
+     once its own [SysXxx.wp_sys_xxx_sconf] resolves, hands back exactly
+     what [wp_syscall_sconf_body]'s own continuation wants -- mirrors
+     [UsertrapRes.ut_own]'s five shared families plus [proc_priv]/[R] (see
+     the file header).  [sys_exit] alone diverges (SpecSysExit.v), so it
+     gets its own, simpler shape ([sysc_arm_pre ... -* WP Loop] directly,
+     no continuation).  These are SCAFFOLDING for the not-yet-assembled
+     capstone below: the [_placeholder] lemmas are honest [Admitted] stand-
+     ins for "resolve [WpSconfCtl.wp_cjalr_s_sconf] into the real
+     [SysXxx.wp_sys_xxx_sconf] call, then the shared epilogue" -- see the
+     file header's per-arm catalogue (EASY vs GAP) for which real proof
+     replaces which [k]. *)
+
+  (* the state a RETURNING arm needs before it can start: [pc_is] at the
+     table entry's own known address, plus every resource
+     [wp_syscall_sconf_body] threads opaquely through the dispatch. *)
+  Definition sysc_arm_pre (γf : gname) (pj : mword 64) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
+      (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
+      (tgt : mword 64) (us : gset Z) :=
+    (pc_is tgt ∗
+     sie_cap_gpr M av true pj ∗
+     cpu_own 0%nat true pj true lks ∗
+     kernel_text ∗
+     syscall_env γf pj bn fn ∗
+     bslots bn 3 ∗
+     fileclose_bm fn us ∗
+     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip ∗
+     fd_slots FDSPARE ∗
+     iref_slots IREFSPARE ∗
+     proc_priv γf pj pid V)%I.
+
+  (* what a RETURNING arm hands back: [wp_next]-shaped, at the arm's OWN
+     regfile [M] (not the function's true entry regfile -- the capstone's
+     shared epilogue is what composes this with [callee_saved <entry> M]
+     via [CalleeSaved.callee_saved_trans] before invoking the real
+     [Hcont]).  [a0v] is the table entry's C return value, landing in a0
+     per the RISC-V calling convention (mirrors every [SpecSysXxx.v]'s own
+     [mf !!! Regidx 10 = ...] postcondition, e.g. [SpecSysGetpid.v]). *)
+  Definition sysc_ret_cont (γf : gname) (pj : mword 64) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
+      (V : pprivate) (lks : gset string) (av : nat) (M : regfile) :=
+    wp_next true pj (fun (CID : CpuId) =>
+      (∀ (mf : regfile) (a0v : mword 64) (us' : gset Z) (V' : pprivate),
+        ⌜ callee_saved M mf /\
+          mf !!! Regidx (mword_of_int 10 : mword 5) = a0v ⌝ -∗
+        ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
+        sie_cap_gpr mf av true pj -∗
+        cpu_own 0%nat true pj true lks -∗
+        bslots bn 3 -∗
+        fileclose_bm fn us' -∗
+        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+        fd_slots FDSPARE -∗
+        iref_slots IREFSPARE -∗
+        syscall_env γf pj bn fn -∗
+        proc_priv γf pj pid V' -∗
+        pc_is (ret_pc (M !!! Regidx (mword_of_int 1 : mword 5))) -∗
+        WP (Loop : expr riscv_lang))%I).
+
+  (* PLACEHOLDER for a not-yet-specialized RETURNING table entry (real
+     content: [wp_cjalr_s_sconf] into [SysXxx.wp_sys_xxx_sconf] then the
+     shared epilogue, exactly as a real per-[k] lemma would do). *)
+  Lemma sysc_arm_return_placeholder (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (M : regfile) (k : nat) (us : gset Z) :
+    (1 <= k <= 22)%nat ->
+    sysc_arm_pre γf pj bn fn dqi ip pid V lks av M (mword_of_int (sysc_target k)) us -∗
+    sysc_ret_cont γf pj bn fn dqi ip pid V lks av M.
+  Admitted.
+
+  (* PLACEHOLDER for [sys_exit] (table index 2): its own contract
+     DIVERGES (bare [WP Loop], no continuation -- SpecSysExit.v), so it
+     never reaches the shared epilogue; mirrors [ProofSysExit.v]'s own
+     call into [Kexit.wp_kexit_sconf]. *)
+  Lemma sysc_arm_exit_placeholder (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (M : regfile) (us : gset Z) :
+    sysc_arm_pre γf pj bn fn dqi ip pid V lks av M (mword_of_int (sysc_target 2)) us -∗
+    WP (Loop : expr riscv_lang).
+  Admitted.
+
+  (* PLACEHOLDER for the "unknown syscall number" fallback path (num <= 0,
+     num > 22, or -- unreachably, given [sysc_target_nz] -- a NULL table
+     entry): [printk("%d %s: unknown sys call %d\n", p->pid, p->name,
+     num)] then stores -1 to [p->trapframe->a0].  Entry pc is
+     [KernelSyms.syscall + 0x40], the branch target of both the [bltu]
+     taken arm and the (dead, in range) second [beqz]. *)
+  Definition sysc_fallback_pre (γf : gname) (pj : mword 64) (bn : bio_names)
+      (fn : fclose_names) (dqi : dfrac) (ip : mword 64) (pid : mword 32)
+      (V : pprivate) (lks : gset string) (av : nat) (M : regfile)
+      (us : gset Z) :=
+    (pc_is (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) ∗
+     sie_cap_gpr M av true pj ∗
+     cpu_own 0%nat true pj true lks ∗
+     kernel_text ∗ kernel_data ∗
+     syscall_env γf pj bn fn ∗
+     bslots bn 3 ∗
+     fileclose_bm fn us ∗
+     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip ∗
+     fd_slots FDSPARE ∗
+     iref_slots IREFSPARE ∗
+     proc_priv γf pj pid V)%I.
+
+  Lemma sysc_fallback_placeholder (γf : gname) (pj : mword 64)
+      (bn : bio_names) (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
+      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
+      (M : regfile) (us : gset Z) :
+    sysc_fallback_pre γf pj bn fn dqi ip pid V lks av M us -∗
+    sysc_ret_cont γf pj bn fn dqi ip pid V lks av M.
+  Admitted.
+
+  (* =================================================================== *)
   (* THE CAPSTONE -- placeholder pending the prologue/dispatch/epilogue
      write-up (see file header STATUS).  Everything above this point
-     (syscall_env, the table dispatch, the fused range check) is real and
-     Qed-sealed; this is the one piece not yet assembled. *)
+     (syscall_env, the table dispatch, the fused range check, and the
+     dispatch-arm scaffolding) is real and Qed-sealed; assembling the
+     actual prologue (myproc() call, trapframe reads) and the shared
+     epilogue (store a0, reload ra/s0/s1/s2, pop the frame, ret) around
+     the scaffolding above -- and specializing individual arms against it
+     -- is the one piece not yet done. *)
   Lemma wp_syscall_sconf (γf : gname) (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names) (fn : fclose_names) (us : gset Z)
       (ip : mword 64) (dqi : dfrac)
