@@ -238,6 +238,31 @@ proof interface is:
    nodes are batched silent stretches broken only at the clock_inv cells,
    each taking a single-node rule that opens `clock_inv` around exactly
    that node — the per-node heir of `wp_exec_step_clock`'s absorption).
+1c. **THE SPAN RULE (the B′ keystone; charted from the pilot's per-node
+   register trace).**  A real M-mode cycle's prelude reads ~54 registers
+   that are NOT ownable and whose values are irrelevant (pmpaddr_n ×~48
+   with every PMP entry OFF, mie/mideleg/mip/sig_meip/sig_seip under
+   MIE=0): footprinted batching cannot cover them (no cell to put in a
+   frame) and per-node ∀-rules would cost ~54 applications per cycle.  The
+   rule that fits: a WHOLE-STRETCH rule whose writes are gated on the
+   caller's exclusive footprint `Drw` (frame + ghost updates, PC/nextPC/
+   GPRs) and whose READS ARE UNGATED — the machine answers them — with a
+   read-only dfrac-generic frame `Dro` (the config bundle: cur_privilege,
+   mstatus, misa, pmpcfg, mcountinhibit, …) exported as an agreement fact,
+   and the continuation quantified over the RELATIONAL landing set: rtc of
+   span steps where, between nodes, every register OUTSIDE `Drw ∪ Dro` may
+   be perturbed arbitrarily (the honest in-WP knowledge: ghost cells pin
+   exactly the framed registers; the semantic licence pins more but is not
+   derivable inside WP).  The quantifier is killed by a ONCE-PER-CLASS pure
+   characterization lemma: with the `Dro` values pinned, every chain is
+   forced to the same landing because each unowned read feeds a
+   value-insensitive continuation (cbn-checkable; the symbolic-stretch
+   probe validated the mechanism).  Spans are CHOPPED only at
+   invariant-cell WRITES (minstret_increment, minstret, the tick's
+   mcycle/mtime/mip — ~2-5 per cycle), each a single-node HartRegNode rule
+   opening the invariant.  The prelude characterization is ONE lemma for
+   ALL M-mode leaves.  The rule's proof is by structural induction on the
+   monad (each step's continuation is a subterm), not Löb.
 2. **Per-memory-event rules**: one WP rule each for RAM read, RAM write,
    the fused AMO, device read/write — these are where the real reasoning
    (points-to, invariants) happens, exactly as in today's leaves.

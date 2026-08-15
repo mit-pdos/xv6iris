@@ -34,13 +34,30 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
 
 ## Left
 
+0. **The span rule** (`iris/HartSpan.v`, statements pinned, proof in
+   flight) — the B′ keystone, design in the doc's §5 item 1c.  Charted
+   from the pilot's per-node register trace: a real M-mode cycle reads
+   ~54 unownable value-irrelevant registers (pmpaddr×48, mie/mideleg/mip/
+   sig_meip/sig_seip), so batching cannot cover the prelude and per-node
+   ∀-rules would not be at parity.  Span = writes gated on `Drw` (frame),
+   reads ungated, `Dro` ro-frame (dfrac-generic) for the value-sensitive
+   config, relational landing killed by a once-per-class pure
+   characterization.  Chop points: invariant-cell writes only
+   (minstret_increment, minstret, tick's clock cells).
+0b. **The prelude characterization** (once for ALL M-mode leaves): the
+   pure lemma computing every span landing of the M-mode cycle prelude
+   with the config pinned — then the M-mode cycle rule
+   (span / chop(minstret_increment) / span-to-fetch / F7-fetch-event /
+   decode+execute batches / tail chops / boundary, in the
+   `wp_hart_rw_seq` rule/instance discipline).
 1. **The pinned-text fetch rule** (spike F7): derive from
    `wp_hart_ram_read` + `↦ₓ□` facts (`text_valid` per byte → `read_bytes`
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
    against the pilot's real fetch plumbing (`instr`/`fetch_from_pts_*`),
    not speculatively.
-2. **The certification adapter** (Phase B's remaining gate; the pilot half
-   is delivered — `HartPilot.v`):
+2. **The first converted leaf** — `wp_addi_gpr` re-derived spec-verbatim
+   on 0b's cycle rule, timed against the original (the design doc's real
+   Phase B gate), then:
    - ONE small whole-function proof re-established at parity (the pilot was
      one instruction; a whole function exercises the boundary chaining and
      the tick family).
