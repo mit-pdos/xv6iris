@@ -557,6 +557,11 @@ depth 0, then `locks_union_empty`.  That IS xv6's `panic("sched locks")`
 discipline, stated: a path that reaches `sched` holding anything else is
 genuinely a panic and should not be provable.
 
+**And as of the iput/acquiresleep work it is not provable**: `sched`'s noff ≥ 2
+contract was deleted once its last client went away, so the panic branch is
+refuted rather than permitted
+([`../projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md)).
+
 ## The audit: xv6 never holds two spinlocks of the same NAME
 
 Checked over every `acquire`/`sleep_prepare`/`sleep`/`wakeup`/`acquiresleep`

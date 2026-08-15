@@ -168,59 +168,22 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
-(*  ROUTE B, LEMMA (3): THE NESTED acquiresleep.                          *)
+(*  THE NESTED BLOCKING CONTRACT IS GONE, AND THAT IS THE POINT.          *)
 (* ===================================================================== *)
 (* iput calls acquiresleep(&ip->lock) while HOLDING itable.lock -- the
-   kernel's only nested acquiresleep (fs.c:348).  The contract above is
-   unusable there: it demands [cpu_own 0], because everything below it
-   sleeps.  Design fs-icache.md 13.12 adopts Route B: the FREE branch takes
-   the lock and returns, and the LOCKED branch NEVER REACHES A
-   POSTCONDITION -- it is the wait loop, run at noff >= 2.
+   kernel's only nested acquiresleep (fs.c:348) -- so this file used to
+   publish a contract entered at noff >= 2, whose LOCKED branch was the wait
+   loop: sleep_prepare / release / sleep / acquire, forever, with
+   [sleep] at noff >= 2 reaching sched() and panic("sched locks").  It was
+   provable ONLY because [SpecSleep] offered that panic as an arm.
 
-   WHAT THE LOCKED BRANCH ACTUALLY DOES is the one thing that changed when
-   sleep was split in two, and it is worth being exact about, because the
-   older reading ("it diverges in sched's panic") is no longer true.  Each
-   iteration is sleep_prepare / release(&lk->lk) / sleep() /
-   acquire(&lk->lk), and sleep() at noff >= 2 has TWO arms
-   ([SpecSleep.wp_sleep_nested_body]): if [p->chan] is still armed it goes
-   SLEEPING -> sched() -> panic("sched locks") and nothing comes back; if a
-   wakeup cleared the channel inside the window it returns, noff-balanced,
-   and the thread goes round the loop again.  Nothing can rule the second
-   arm out (SpecSleep.v's header: [p_chan] is existential under p->lock and
-   no receipt survives the window), so the branch is proved as a Löb loop
-   rather than as a divergence -- the honest reading of a thread that keeps
-   being woken and keeps finding the sleeplock taken.  Either way it has no
-   exit, which is all this contract needs.
-
-   So the nested contract is the ordinary one with
-
-     - the level raised to [S n] and the resource index pinned to the
-       LITERAL [false] ([cpu_own]'s enabled arm demands noff = 0, so a
-       [b] binder would have exactly one live instance anyway);
-     - NO [eb = true] parking premise.  It exists so a parking thread can
-       hand the trap CSRs across a swtch; the returning branch never
-       parks, and on the looping branch the swtch is on the arm that never
-       comes back (the interior release pops to [S n], re-enabling
-       nothing), so there is no crossing to pay for;
-     - the crossing index [false] as well: the caller is inside its own
-       critical section, so no leaf here can move the hart.
-
-   The postcondition is otherwise IDENTICAL -- [sleeplocked], the pid
-   cell, the protected [R] -- and the level comes back unchanged, i.e.
-   the function is noff-balanced exactly as at level 0.
-
-   REF-1 (design 5(b)) makes the LOCKED branch -- panic or wait loop --
-   unreachable at iput's call site; we do not prove that, we permit it. *)
-(* THE NESTED BLOCKING CONTRACT IS GONE, and that is the point.
-
-   [sched()] panics on [noff != 1], and the nested contract's wait loop
-   reached [sleep] at noff >= 2 -- it was provable only because
-   [SpecSleep.wp_sleep_nested_body] offers that panic as one of its two arms.
    Its sole consumer was iput, and iput now takes the NON-BLOCKING contract
    below.  So every acquiresleep that can SLEEP is entered at noff = 0
-   ([wp_acquiresleep_sconf]'s [cpu_own 0]), which is what a proof that the
-   "sched locks" panic is unreachable needs.
-   (claude-notes/projects/iput-acquiresleep.md, step 5.) *)
+   ([wp_acquiresleep_gen_sconf]'s [cpu_own 0]), sleep's own acquire puts it
+   at exactly noff = 1 for the call to sched, and sched's "sched locks"
+   panic became unreachable rather than permitted -- SpecSched.v now has no
+   noff <> 1 contract at all.
+   (claude-notes/projects/iput-acquiresleep.md.) *)
 
 (* ===================================================================== *)
 (*  THE NON-BLOCKING NESTED CONTRACT.                                     *)

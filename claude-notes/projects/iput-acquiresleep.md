@@ -67,11 +67,36 @@ the only way to take a sleeplock with a spinlock held — and it cannot sleep.
 **Anything that CAN sleep is now entered at noff = 0**, which is what a proof
 that the "sched locks" panic is unreachable needs.
 
-## What is left
+## 6. And that panic is now UNREACHABLE
 
-- `SpecSleep.wp_sleep_nested_body` — the nested sleep arm — has no consumer
-  now. Retiring it (and with it sched's panic arm) is the next step and is
-  what step 5 above was setting up.
+`sched()`'s `if (mycpu()->noff != 1) panic("sched locks")` no longer has a
+contract that reaches it. Deleting the nested `acquiresleep` left
+`SpecSleep.wp_sleep_nested` client-less, and that was the only client of
+`SpecSched.wp_sched_locks` — the contract that entered `sched` at noff ≥ 2,
+TOOK the `bne` at sched+0x30 and jumped to `panic`, consuming the caller's
+`panic_wp_any`. Both are deleted (~930 lines of proof with them), along with
+`ProofSched.sched_noff_ne_one`, whose only user was that walk.
+
+**What replaces them is a refutation, not a smaller permission.**
+`wp_sched_sconf` is now sched's ONLY contract: it demands `cpu_own 1`, takes
+NO `panic_wp_any`, and refutes the branch from the level. So no proof in this
+tree can hand a WP to sched's entry PC at any level but 1 — and along that
+one, the panic's basic block is not reached. The same contract already refutes
+the three `unreachable()` checks around it (`holding(&p->lock)` from
+`proc_held`, `state != RUNNING` from `park_ok st`, interrupts off from the
+entry index `false`), so all four of sched's failure exits are dead code in
+the verified kernel.
+
+`SpecSched.v` and `ProofSched.v` dropped `Require Import PanicStub` with the
+deletion — sched no longer touches the panic credential in any form, which
+takes two files off [`panic.md`](panic.md)'s splice list.
+
+The chain that makes it true end to end: every contract that can sleep is
+entered at `cpu_own 0` → sleep's own `acquire(&p->lock)` puts the thread at
+exactly noff = 1 → sched's check passes. The one caller that could not meet
+"noff = 0", `iput`, does not sleep at all (step 5).
+
+## What is left
 - `SleepLock.new_sleeplock_gen_at` / `sl_fresh_new_gen_at` and the
   `sl_free_tok` half of `icfg_alloc`'s output are unused: the icache keys the
   deposit by the slot and lets each lock keep its own existential gname, so

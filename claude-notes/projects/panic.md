@@ -57,6 +57,21 @@ The message survives the first call because gcc parks it in `s1`:
 `callee_saved` carries `s1` across `printk("panic: ")` and `c.mv a1,s1` makes
 it the `"%s"` vararg of the second call.
 
+## Panics that are UNREACHABLE rather than threaded
+
+Two of the four are already retired at the source, which is the cheaper end of
+the splice — a site that cannot reach `panic` needs no credential at all:
+
+- **`sched`'s all four** — `panic("sched locks")` and the three
+  `unreachable()` checks. `SpecSched` has ONE contract now, at `cpu_own 1`,
+  and it takes no `panic_wp_any`
+  ([`iput-acquiresleep.md`](iput-acquiresleep.md)). `SpecSched.v` and
+  `ProofSched.v` dropped their `Require Import PanicStub` outright, so two
+  files left the 433-file closure and `sched` is off the splice list.
+- **`acquire`'s "acquire"** — planned, from the `lk->cpu` disjointness the
+  held set already carries; see [`../completed/lock-set.md`](../completed/lock-set.md).
+  That one is the big win, and it should land BEFORE the splice below.
+
 ## What is LEFT: the splice
 
 169 files `Require` `PanicStub.v` and thread `panic_wp` / `panic_wp_any`
