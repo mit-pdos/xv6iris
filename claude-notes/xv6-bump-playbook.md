@@ -166,6 +166,21 @@ not line up), so this costs a build round, not a soundness hole:**
   earlier `if` is the one at the LOWER address — and each branch's own
   immediate says which block is its own.
 
+**THE TRAP RECURS ON EVERY GUARD-BEFORE-A-BAIL-ARM BUMP, so treat "the new
+code is a copy of an existing arm" as the standing signal.** `sys_link` on
+`f60ff58` gained `if (dp->nlink == 0) { iunlockput(dp); goto bad; }`, whose
+block (`mv a0,s2 ; jal iunlockput`) is byte-for-byte the existing dev/dirlink
+bail arm's. difflib paired the two and mapped old `+0xe0`/`+0xe2` onto the NEW
+block at `+0xe6`/`+0xe8` instead of onto `+0xee`/`+0xf0` — one self-consistent
+map, `UNALIGNED` showing exactly the 5 entries the C predicted, and a
+proposed `jal` immediate (2090250) that is a real instruction's, just not this
+one's (2090242). **The cheapest way to be sure is to stop using the tool's
+map**: write `newoff(o)` as the three-interval function the disassembly says
+it is, rebuild `offmap`/`immmap` from the two `Code<F>.v` at `(o, newoff o)`,
+and call `relayout_shift.apply` with that. It is fifteen lines, it reports a
+SHAPE mismatch at once if the intervals are wrong, and the inserted
+instructions fall out as the offsets nothing maps to.
+
 Cross-check it against `git diff <old>..<new> -- kernel/` — the two should name
 the same functions. If the sweep says a function changed shape and the C did
 not, suspect the tooling, not gcc.
@@ -407,11 +422,62 @@ ilw_code KernelSyms.fileinit (mword_of_int 3) (mword_of_int 30)
 ```
 
 There is no anchor on that line, so no map applies and only `residue` reports
-it. `grep -ln 'ilw_code\|wp_initlock_wrapper'` names them all
+it. `grep -ln 'ilw_code\|wp_initlock_wrapper'` names the leaf instances
 (`ProofFileinit`, `ProofPrintkinit`, `ProofTrapinit`); fix by hand from
 `relayout_map.py map`. Note which of the five moved: the two `addi`
 immediates completing a data address did, the `jal` did not — caller and
 callee shifted together, so their distance is unchanged.
+
+**AND THE PATTERN IS NOT CONFINED TO WHOLE-FUNCTION WRAPPERS — A BLOCK LEMMA
+INSIDE ONE PROOF HAS IT TOO, and there the two spellings sit 150 lines
+apart.** `ProofSysPipe.sp_close2` takes its two `jal fileclose` immediates as
+`imm1 imm2` arguments and ALSO takes, as premises, the two `assert`s that
+resolve them. `fix_proof_imms` fixes the asserts — they spell the pc — and
+cannot see the argument list, which carries no pc at all. The file then fails
+at the `iApply` with *"The term `Hcc4f` has type … 2091976 … while it is
+expected to have type … 2091990"*, i.e. the tool's own correct rewrite
+reported as the error. Two call sites of one such lemma is two separate
+misses. **`grep -n 'mword_of_int [0-9]\{6,\} : mword 21'` and check each hit
+is either inside a `wp_jal` application or beside its own pc**; the systematic
+answer is `residue`, which flags them as `stale` and is the only step that
+does.
+
+### A RETURN ADDRESS THAT LANDS ON AN INSERTED INSTRUCTION IS THE ONE
+### OFFSET THE MAP GETS WRONG
+
+Every relayout tool maps an offset by asking *where did the instruction that
+used to be here go*. That is the right question for a `pc_is` and for a
+branch target, and the WRONG one for `ret_pc (ra) = <sym> + off`, which does
+not name an instruction at all — it names *the address four bytes after the
+`jal`*. When the insertion lands exactly there, the two answers differ:
+sys_link's `jal ilock` at `+0x80` still returns to `+0x84`, but old `+0x84`
+(the `c.mv a0,s2`) moved to `+0x8a`, so the map rewrote the assertion to
+`+0x8a` and the file failed one call later with **`Unable to unify
+"2147503770" with "2147503764"`** — two raw addresses six apart, in a proof
+whose every other offset is right.
+
+Subtract the symbol before you go looking: `2147503770 - 2147503764 = 6` is
+the first shift interval's delta, which says at once that this is a map
+artefact and not a proof error. **After any insertion, check the ONE call
+whose return address is the insertion point** — there is at most one per
+inserted block, and `grep -n 'ret_pc.*= mword_of_int (<ALIAS> + 0x<insertion
+offset in the NEW image>' ` finds it or shows it missing.
+
+### `relayout_batch --residue` READS THE OLD IMAGE FROM `HEAD`
+
+So once the generated layer is committed — which is the natural first
+stage-commit of a bump — `read_old` returns the NEW `Code<F>.v` and the batch
+truthfully reports *nothing changed*, for every file. It is the "0
+substitutions" failure one level up, and it is silent. Point it at the real
+baseline instead:
+
+```sh
+RELAYOUT_OLD_REV=<the bump commit>^ python3 tools/relayout_batch.py --residue
+```
+
+`residue` is worth this: on `f60ff58` it was the only step that found the two
+`sp_close2` argument lists above, and `fix_proof_imms` reported 0 stale over
+the same tree at the same moment.
 
 ### READING `residue`'s OUTPUT
 

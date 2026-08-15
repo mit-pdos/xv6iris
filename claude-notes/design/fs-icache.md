@@ -5326,9 +5326,15 @@ the guard just certified live — hence `ilink`, hence allocated.  `ARM F-BAD`
 follows for both `T_FILE` (a directory fails the +0x5c test) and `T_DIR`
 (fails the +0x4c test).  ✓
 
-**(iii) — REFUTED at `sys_link`.**  `sys_link`'s `dirlink(dp, name, ...)`
+**(iii) — REFUTED at `sys_link` ON THE BINARY THIS WAS WRITTEN AGAINST.
+`XV6_REV` is now `f60ff58` and `ilock(dp)` there IS guarded**, by create's
+`dp->nlink == 0` re-check (the ruling in
+[`../projects/fs-fragments-campaign.md`](../projects/fs-fragments-campaign.md);
+the walk is `sys_link`'s ARM E2).  So (iii) has the shelter (i) and (ii)
+have, and the argument below is kept as the reason the kernel had to move
+rather than as a live refutation.  `sys_link`'s `dirlink(dp, name, ...)`
 runs `dirlookup(dp, name, 0)` with `name` produced by `skipelem` from the
-user's `new` path, unfiltered, under an unguarded `ilock(dp)`.  So
+user's `new` path, unfiltered, under what WAS an unguarded `ilock(dp)`.  So
 `link(old, "/a/b/..")` makes `dirlookup` match the `".."` record of `b`, and
 if `b` was orphaned in the race window of §20.17.3 that record's fragment is
 **grey**.  A reachable `iget` consumes a grey licence.  The ruling's

@@ -343,19 +343,19 @@ noticed until S7 road-tested it — **`sys_unlink`'s own INPUT premise**,
 since a live non-dot record under it forces `di_nlink dp <> 0`, which is
 `dir_links_unlink`'s home-live premise.
 
-**It is FALSE of the binary pinned by `XV6_REV` today**, and `sys_link` is
-why: `nameiparent(new, name)` → `ilock(dp)` → `dirlink(dp, name,
-ip->inum)` with **no `dp->nlink == 0` re-check** (contrast create's at
-`sysfile.c:262`).  namex's guard fires under the WALKER's lock and
-sys_link re-locks afterwards, so a concurrent `rmdir dp` in that window
-appends a non-dot record to an orphaned directory — a real leak, and in
-the model a stranded `ilink`, which is precisely what §20.6's itrunc row
-calls "a blocker on a reachable step".
+It was FALSE of the binary and `sys_link` was why: `nameiparent(new, name)`
+→ `ilock(dp)` → `dirlink(dp, name, ip->inum)` with **no `dp->nlink == 0`
+re-check** (contrast create's at `sysfile.c:262`).  namex's guard fires
+under the WALKER's lock and sys_link re-locks afterwards, so a concurrent
+`rmdir dp` in that window appends a non-dot record to an orphaned
+directory — a real leak, and in the model a stranded `ilink`, which is
+precisely what §20.6's itrunc row calls "a blocker on a reachable step".
 
-**RULED (user, 2026-08-15): real bug, kernel fix taken.**  create's guard
-verbatim, routed to `bad:`, on xv6-riscv's `verified` branch at `f60ff58`.
-The invariant becomes true of the new binary and needs no weakening; every
-sysfile walk WAITS on the upstream push and the `XV6_REV` pin bump, since
-`sys_link`'s bytes move and `sys_unlink`'s with them.  See
-[`../kernel-defects.md`](../kernel-defects.md) and
+**RULED real, KERNEL FIX TAKEN, AND LANDED.**  `XV6_REV` is `f60ff58`:
+create's guard verbatim, routed to `bad:`, seven lines of C and five
+instructions.  So the clause above is a property of the pinned binary and
+needs no weakening, and the walk that has to preserve it is proven against
+the image that enforces it (`sys_link`'s ARM E2, `ProofSysLinkTails.sl_tail_e2`).
+What still gates F1.5d is finding 2 alone — §20.17.4's `".."`-location
+fact.  See [`../kernel-defects.md`](../kernel-defects.md) and
 [`../xv6-bump-playbook.md`](../xv6-bump-playbook.md).

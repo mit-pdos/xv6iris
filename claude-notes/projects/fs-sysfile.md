@@ -9501,3 +9501,113 @@ pay 352 twice for no green intermediate.  (Beware the obvious parse of
 (`X.vo X.glob X.v.beautified X.required_vo:`), so a script that takes only
 the first token still works but one that requires a single target silently
 builds an EMPTY reverse map and reports every cone as zero.  Mine did, twice.)
+
+### `XV6_REV` -> `f60ff58` (sys_link's ORPHAN GUARD).  sys_link is the only
+### proven function that RESHAPED; its walk gains ARM E2 and the seal keeps
+### the standing six.  The map is NOT what `relayout_shift.py` prints
+
+**WHAT THE KERNEL GAINED.**  `if (dp->nlink == 0) { iunlockput(dp); goto
+bad; }` immediately after `ilock(dp)` — create's re-check at
+`sysfile.c:262`, given to sys_link.  It is the fix the user ruled on in
+[`fs-fragments-campaign.md`](fs-fragments-campaign.md): the STRONG
+isdirempty invariant ("an orphaned directory's live records are exactly `.`
+and `..`") was refuted by sys_link's unguarded `dirlink`, and it is true of
+this binary.  Five instructions, fourteen bytes.
+
+**THE SYMBOL MAP, from `KernelSyms.v` and not by assumption:**
+
+```
++0   _entry .. sys_link             206 syms, and every data symbol
++14  sys_unlink .. sys_pipe         7 syms
++16  kernelvec .. virtio_disk_intr  9 syms (kernelvec.S's .align 4 rounds
+                                    the 14 up, and gives the two bytes back
+                                    as fresh padding in KernelData.v)
++0   _trampoline onward             page-aligned; .rodata does NOT move, so
+                                    etext stays 0x80007000 and the whole
+                                    §4b string-address and §4c-bis
+                                    derived-constant categories are free
+```
+
+**sys_link's OWN MAP, and difflib gets two entries of it WRONG** (the
+playbook's "the wrong map can be perfectly self-consistent"):
+
+```
+old +0x00 .. +0x82   ->  +0     prologue .. jal ilock(dp)
+old +0x84 .. +0xde   ->  +6     the test (lh a5,74(s2) ; c.beqz) at +0x84
+old +0xe0 .. +0x114  ->  +14    the guard's own arm block at +0xe6
+```
+
+278 bytes / 96 instructions becomes 292 / 101.  The new arm's block is
+`mv a0,s2 ; jal iunlockput` — byte-for-byte the existing dev/dirlink bail
+arm at old `+0xe0` — so difflib paired the two and mapped old
+`+0xe0`/`+0xe2` onto `+0xe6`/`+0xe8` instead of `+0xee`/`+0xf0`, proposing
+`jal` immediate 2090250 where the truth is 2090242.  gcc emits the cold
+blocks in SOURCE order (the guard's `if` is the earlier one, so its block is
+at the LOWER address) and the `c.beqz` at `+0x88` targets `+0xe6` while the
+`bne`/`bltz` at `+0x92`/`+0xa0` both target `+0xee`.  The map above was
+written as a three-interval `newoff`, `offmap`/`immmap` rebuilt from the two
+`Code<F>.v` at `(o, newoff o)`, and fed to `relayout_shift.apply`.
+
+**ARM E2 IS THE CHEAP CASE, and the reason is that it LEAVES.**  create's
+guard (117c0e7) cost an `∧` of two `wp_next`-wrapped continuations because
+its taken arm and the NLINK_MAX gate below it rejoin at `+0x3e`; sys_link's
+taken arm is a `bad:` route that never comes back, so an ordinary
+`destruct (decide (di_nlink dnd = 0))` is the whole of it and the 900 lines
+below the branch are untouched.  Nine lines of walk in `ProofSysLink.v`
+(the `lh`, the two branch arms, and `ic_mk_loaded` to hand the parent's
+record back whole) plus `ProofSysLinkTails.sl_tail_e2`, which is
+`sl_tail_f`'s two hundred lines at another address plus the `c.j` that ARM F
+does not need — a separate lemma for the reason ARMs C and D are two
+lemmas, every decode fact and every `pc_is` equation here being per-address.
+
+**IT IS CHEAPER THAN ARM F BY THE WHOLE CREDIT APPARATUS.**  ARM F runs
+AFTER the dirlink, so the parent's free may absorb the bitmap block or the
+directory's own inode block and it carries both claim booleans plus a
+closure over them.  ARM E2 runs BEFORE it — nothing has been logged since
+nameiparent — so both are `false` outright, the count is `sl_u3` whole, and
+one new `SysLinkBudget.sl_orphan_closes` row closes it at every corner of
+the two walks with room.  No premise was added to any statement.
+
+**AND THE ARM IS *AFTER* THE MINT, WHICH THE C's READING ORDER HIDES.**  The
+guard is at `+0x84` and `ip->nlink++` is at `+0x5e`, so the `ilink` is LIVE
+on this route exactly as on ARMs E and F and the `bad:` tail's `ip->nlink--`
+consumes it back.  A reading that puts the guard before the `++` predicts a
+`bad:` entry that does not decrement, and there is no such entry — read the
+disassembly, not the diff.
+
+**TWO SWEEP MISSES, AND ONLY `residue` FOUND THEM.**
+`ProofSysPipe.sp_close2` takes its two `jal fileclose` immediates as
+ARGUMENTS and its two resolving `assert`s as premises; `fix_proof_imms`
+fixes the asserts and cannot see the argument lists, at both call sites.
+And `relayout_batch --residue` reads its old image from `HEAD`, so once the
+generated layer is committed it truthfully reports "nothing changed" for
+every file — `RELAYOUT_OLD_REV=<bump>^` is not optional.  Both are recorded
+in the playbook.
+
+**ONE MAP ARTEFACT THAT IS NOT A PROOF ERROR.**  `ret_pc (ra) = SL + off`
+names *the address after the `jal`*, not an instruction, so where the
+insertion lands exactly there the map is wrong by construction: ilock's
+return is still `+0x84`, but old `+0x84` moved to `+0x8a`.  It surfaces as
+`Unable to unify "2147503770" with "2147503764"` — subtract the symbol and
+the difference is the first interval's delta, which identifies it in one
+step.
+
+**GATE.**  On the EC2 mirror in its own checkout `/shared/xv6iris-bump`
+(cloned from the box's `/shared/xv6iris` so the two lanes live there do not
+share a tree with the bump), every edited `.v` md5-verified against the
+working tree.  The six edited files' reverse transitive closure out of
+`.CoqMakefile.d` was `rm`'d before the run — eight files, which is the
+honest cone: `Link<F>` is where a syscall proof ends until the syscall
+table is wired — so `make -f CoqMakefile -j30 -k` could not skip it on an
+mtime artefact.  MAKEEXIT=0, 1122 `.vo` for 1122 `.v`, staleness 0, and
+`make -n` afterwards emits 0 compile lines.  `fix_proof_imms` 0 stale over
+26778 anchored sites against the SYNTHETIC old image (sys_link's 117c0e7
+bytes relocated to their f60ff58 offsets — the only baseline that can see a
+reshaped function at all, since the guard resolves the old immediate at
+`old_syms[sym] + off`).  `relayout_batch --residue` at
+`RELAYOUT_OLD_REV=<bump>^` over every Code/hand-written pair: two `stale`
+lines, both `sp_close2`, both fixed; every other hit is a pc offset or a
+value that is some other offset's old immediate.  `lemma_diff` against the
+pre-bump commit reports nothing outside the generated layer — no
+hand-written declaration dropped, no `Admitted`, no new `Axiom`.  Coverage
+183/190, unmoved.
