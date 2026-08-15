@@ -658,10 +658,10 @@ Section ProofSysLinkBody.
     inode_ref_short_gen k (q + s)%Qp q dev inum g ∗ inode_shr_gen k s dev inum g.
   Proof.
     rewrite /inode_ref_gen /inode_ref_short_gen /inode_shr_gen
-            live_gen_split inode_ident_split.
+            live_gen_split inode_ident_split SleepLock.slh_tok_split.
     iSplit.
-    - iIntros "($ & [$ Hl2] & [$ Hi2])". iFrame.
-    - iIntros "[($ & $ & $) [$ $]]".
+    - iIntros "($ & [$ Hl2] & [$ Hi2] & [$ Hs2])". iFrame.
+    - iIntros "[($ & $ & $ & $) ($ & $ & $)]".
   Qed.
 
   Lemma sl_shed_gen (k : nat) (q : Qp) (dev inum : mword 32) (g : gname) :
@@ -2137,7 +2137,13 @@ Section ProofSysLinkBody.
                       REFERENCE: ip is UNLOCKED here and needs no lock for it. *)
                    iEval (rewrite /inode_ref_short /inode_ident /i_dev /i_inum)
                      in "Hkeep".
-                   iDestruct "Hkeep" as "(Hkfrag & Hklive & Hipdev & Hipinum)".
+                   (* [inode_ref_short] carries the sleeplock share on the
+                      SLICE since GR-25, so the flattened shape is
+                      [iref_frag ∗ live_frac ∗ (i_dev ∗ i_inum) ∗ slh_tok]:
+                      the identity pair needs its own bracket, and the share
+                      rides along to the reassembly at +0x9a below. *)
+                   iDestruct "Hkeep"
+                     as "(Hkfrag & Hklive & (Hipdev & Hipinum) & Hkshare)".
                    iApply (wp_clw_s_sconf (CID := CID54) (mword_of_int (SL + 0x8a))
                              Ra5 Rs1 (mword_of_int 0 : mword 12) U2 (K - 38)%nat
                              dev b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8a [Hipdev]").
@@ -2324,7 +2330,7 @@ Section ProofSysLinkBody.
                    assert (Hmem3 : IBLOCK inum inodestart ∈ Sb3)
                      by exact (HSb3 _ Hmem2').
                    iAssert (inode_ref_short kk (qq/2 + qq/2)%Qp (qq/2)%Qp dev inum)
-                     with "[Hkfrag Hklive Hipdev Hipinum]" as "Hkeep".
+                     with "[Hkfrag Hklive Hipdev Hipinum Hkshare]" as "Hkeep".
                    { rewrite /inode_ref_short /inode_ident /i_dev /i_inum. iFrame. }
                    (* the three post-dirlink arms.  TWO of them go to
                       [bad:] through the [iunlockput(dp)] at +0xe0, and the
