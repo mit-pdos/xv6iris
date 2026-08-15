@@ -378,9 +378,13 @@ Local Ltac mf_step_any reg v Hag H Hstop :=
   clear Hag HagN; rename Hag' into Hag.
 
 (* ---------------------------------------------------------------------- *)
-(* the segment characterization                                            *)
+(* the segment characterization, K-GENERALIZED (worklist 0e): the whole    *)
+(* tail continuation [KT] is abstract -- the tick's if-node sits beyond    *)
+(* the fetch, so ONE proof serves both ticks; [mfetch_char] below is the   *)
+(* tick=false instance                                                     *)
 (* ---------------------------------------------------------------------- *)
-Lemma mfetch_char (D Drw : gset register) (rs rs0 : regstate)
+Lemma mfetch_charK (KT : bool -> M unit)
+    (D Drw : gset register) (rs rs0 : regstate)
     (l : M unit * regstate)
     (pc misa0 mstatus0 : SailStdpp.Values.mword 64)
     (pcfg : type_of_register pmpcfg_n) (pmar0 : list PMA_Region) :
@@ -412,19 +416,19 @@ Lemma mfetch_char (D Drw : gset register) (rs rs0 : regstate)
   pma_allows_ram pmar0 ->
   addr_is_ram pc ->
   reg_agree_on D rs0 rs ->
-  hspan D Drw (mseg2_start, rs0) l ->
+  hspan D Drw (mseg2_startK KT, rs0) l ->
   hspan_stops Drw l.1 = true ->
   l.1 = (hrun_any_f 200 (register_set pmpcfg_n pmpcfg_boot rs)
-           mseg2_start).2
+           (mseg2_startK KT)).2
   /\ hread_req_at 4 l.1 = Some (mfetch_req pc)
   /\ reg_agree_on D l.2 rs.
 Proof.
   intros HD1 HD2 HD3 HD4 HD5 HD6 HD7 HD8 HmisaS HmIE Hmprv
     Hhart Hpriv Hmisa Hmst Hpma Hpcfg Hhtif Hpc Hunlock Hva Hpa
     Hpallow Hram Hag0 Hchain Hstop.
-  (* reduce mseg2_start's spine in the chain hypothesis (the
-     mseg1_resume_set_local script, replayed in H) *)
-  unfold mseg2_start, riscv_step, try_step in Hchain.
+  (* reduce mseg2_startK's spine in the chain hypothesis (the
+     mseg1_resume_set_local script, replayed in H; KT stays opaque) *)
+  unfold mseg2_startK, mwrap, try_step in Hchain.
   mf_red_in Hchain.
   rewrite !hregread_resume_red in Hchain.
   mf_red_in Hchain.
@@ -765,12 +769,18 @@ Proof.
                    pmpcfg_boot eq_refl); exact Hpc).
   split; [ | split; [ exact (mf_hread_req_at_red_local 4 _ _) | exact Hag ] ].
   (* -------------------------------------------------------------------- *)
-  (* conclusion 1: THE WALK.  Reduce the walker application on the goal's
-     right side by the same staged rewrites; the goal's left side (the
-     landing) is already normal for every constant the incantation opens,
-     so the passes are symmetric and reflexivity closes the equality.      *)
+  (* conclusion 1: THE WALK.  Reduce the walker application by the same
+     staged rewrites; the landing is already normal for every constant the
+     incantation opens, so the passes are symmetric and reflexivity closes
+     the equality.  QED-COST SHAPE: the reduction runs under
+     [etransitivity] against an evar, so none of its ~60 rewrite motives
+     spells the giant landing (each eq_ind motive would otherwise carry
+     both sides of the equality, and the kernel's Qed walks are linear in
+     tree OCCURRENCES); the landing enters exactly one term -- the final
+     reflexivity between the two reduced forms.                            *)
   (* -------------------------------------------------------------------- *)
-  unfold mseg2_start, riscv_step, try_step.
+  symmetry. etransitivity.
+  { unfold mseg2_startK, mwrap, try_step.
   cbn beta iota zeta delta
     [Defs.bind Defs.bind0 Interface.iMon_bind ext_pre_step_hook
      should_inc_minstret Defs.and_boolM Defs.read_reg Defs.write_reg
@@ -838,5 +848,60 @@ Proof.
   mf_red_g.
   rewrite Whtif.
   mf_red_g.
+  reflexivity. }
   reflexivity.
+Qed.
+
+(* the ORIGINAL statement, re-proven as the tick=false instance:
+   transport the hspan premise and the walker conclusion with
+   [mseg2_start_as_K] *)
+Lemma mfetch_char (D Drw : gset register) (rs rs0 : regstate)
+    (l : M unit * regstate)
+    (pc misa0 mstatus0 : SailStdpp.Values.mword 64)
+    (pcfg : type_of_register pmpcfg_n) (pmar0 : list PMA_Region) :
+  (hart_state : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  (misa : register) ∈ D ->
+  (mstatus : register) ∈ D ->
+  (pma_regions : register) ∈ D ->
+  (pmpcfg_n : register) ∈ D ->
+  (htif_tohost_base : register) ∈ D ->
+  (R_bitvector_64 PC : register) ∈ D ->
+  eq_vec (_get_Misa_S misa0)
+    (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+  eq_vec (_get_Mstatus_MIE mstatus0)
+    (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+  eq_vec (_get_Mstatus_MPRV mstatus0)
+    (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+  register_lookup hart_state rs = HART_ACTIVE tt ->
+  register_lookup cur_privilege rs = Machine ->
+  register_lookup misa rs = misa0 ->
+  register_lookup mstatus rs = mstatus0 ->
+  register_lookup pma_regions rs = pmar0 ->
+  register_lookup pmpcfg_n rs = pcfg ->
+  register_lookup htif_tohost_base rs = None ->
+  register_lookup (R_bitvector_64 PC) rs = pc ->
+  (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+  is_aligned_vaddr (Virtaddr pc) 4 = true ->
+  is_aligned_paddr (Physaddr pc) 4 = true ->
+  pma_allows_ram pmar0 ->
+  addr_is_ram pc ->
+  reg_agree_on D rs0 rs ->
+  hspan D Drw (mseg2_start, rs0) l ->
+  hspan_stops Drw l.1 = true ->
+  l.1 = (hrun_any_f 200 (register_set pmpcfg_n pmpcfg_boot rs)
+           mseg2_start).2
+  /\ hread_req_at 4 l.1 = Some (mfetch_req pc)
+  /\ reg_agree_on D l.2 rs.
+Proof.
+  intros HD1 HD2 HD3 HD4 HD5 HD6 HD7 HD8 HmisaS HmIE Hmprv
+    Hhart Hpriv Hmisa Hmst Hpma Hpcfg Hhtif Hpc Hunlock Hva Hpa
+    Hpallow Hram Hag0 Hchain Hstop.
+  rewrite mseg2_start_as_K in Hchain.
+  destruct (mfetch_charK _ D Drw rs rs0 l pc misa0 mstatus0 pcfg pmar0
+              HD1 HD2 HD3 HD4 HD5 HD6 HD7 HD8 HmisaS HmIE Hmprv
+              Hhart Hpriv Hmisa Hmst Hpma Hpcfg Hhtif Hpc Hunlock Hva Hpa
+              Hpallow Hram Hag0 Hchain Hstop) as (H1 & H2 & H3).
+  rewrite <- mseg2_start_as_K in H1.
+  exact (conj H1 (conj H2 H3)).
 Qed.

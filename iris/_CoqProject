@@ -29,6 +29,7 @@ HartMCycle.v
 HartMPmp.v
 HartMFetch.v
 HartLift2.v
+HartMLeaf.v
 HartMDispatch.v
 HartPilot.v
 RegFile.v
