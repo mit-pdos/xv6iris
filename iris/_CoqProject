@@ -28,6 +28,7 @@ HartSpanChar.v
 HartMCycle.v
 HartMPmp.v
 HartMFetch.v
+HartLift2.v
 HartMDispatch.v
 HartPilot.v
 RegFile.v
