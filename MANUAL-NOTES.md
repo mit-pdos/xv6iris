@@ -73,6 +73,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - why kexec can't panic by calling uvmalloc(TRAPFRAME): will run out of memory before getting to such a high address
 - xv6 bug: scheduler did not reset intena, could miss process wakeup between loop and wfi
 - weak memory: expose internal steps of architecture model, expr gets Cycle which executes Sail monad, so every memory op is explicit and separate in trace
+- resources tracking possible sleeplock holders, to reason about iput's acquiresleep while holding itable.lock
 
 Big things that still need to be done/explored:
 
