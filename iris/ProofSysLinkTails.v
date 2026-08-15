@@ -1860,7 +1860,7 @@ Section ProofSysLinkTails.
       (dnd : dinode) (bmd : blkmap)
       (n : nat) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (bnm bw bo : nat -> bv 8) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->

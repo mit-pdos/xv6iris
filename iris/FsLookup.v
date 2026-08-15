@@ -610,7 +610,7 @@ Definition wp_dirlookup_tree_body
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
@@ -727,7 +727,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       (fn : nat -> bv 8)
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                              γa γf cov logstart nib dev ip bm data dn
