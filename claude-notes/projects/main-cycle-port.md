@@ -75,6 +75,21 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    characterized — it is the leaf's own functional-cursor batch, pilot
    style; the generic machinery covers boundary→fetch and the tail (whose
    start monad is one closed term, spellable from try_step's own source).
+0d. **The leaf-attachment seam — RESOLVED by the mixed-file walker**
+   (`HartMFetch.mfetch_char`, proven, 5-axiom-clean): the fetch landing is
+   pinned to `(hrun_any_f 200 (register_set pmpcfg_n pmpcfg_boot rs)
+   mseg2_start).2` — the caller's own pin file with pmpcfg alone forced
+   concrete-OFF (a merely-unlocked symbolic pcfg leaves the walk's
+   per-entry branches stuck; the chain side still runs at the real pcfg,
+   and the equality holds because the post-fetch continuation retains
+   nothing the PMP loop read).  Leaves' functional cursors start at
+   `hread_resume w <that application>`.
+   **Known debt: `mfetch_char`'s Qed is 665 s** (92% of the file; tactic
+   side ~55 s) — kernel rechecking of rewrite motives carrying the giant
+   residuals.  Once-per-tree-build, tolerated; MUST be fixed before Phase
+   C replays the pattern for the S-mode fetch (walk events multiply the
+   residuals).  Candidates: apply-transitivity chains instead of
+   rewrite-in-big-goal, or `abstract` on the heavy sub-goals.
 0e. **The tick generalization pass** (mechanical, after `mfetch_char`
    lands): `mseg1_char`/`mseg2_start`/`mfetch_char` are pinned at
    `riscv_step false`, but the tick's `if` node sits BEYOND every
