@@ -6,16 +6,18 @@
 
 # ---- GCP placement -----------------------------------------------------
 PROJECT="${ROCQ_PROJECT:-gcp-jplu8a}"
-REGION="${ROCQ_REGION:-us-east4}"
+# h4d-standard-192 is not offered in us-east4 (where the original rocq-builder
+# lives) -- us-central1 is the nearest region that has it.
+REGION="${ROCQ_REGION:-us-central1}"
 # Leave ZONE empty to auto-pick the first zone in REGION that offers MACHINE_TYPE.
 ZONE="${ROCQ_ZONE:-}"
 
-INSTANCE="${ROCQ_INSTANCE:-rocq-builder}"
-# Sized from a measured build: the 1092-file xv6iris development peaked at
-# ~119 concurrent workers with a ~1min serial tail, so 180 vCPU sat mostly
-# idle. 90 costs half as much ($1.68 vs $3.37/hr spot) for near-identical
-# wall-clock. Revisit if several agents routinely build at once.
-MACHINE_TYPE="${ROCQ_MACHINE_TYPE:-c3d-standard-90}"
+INSTANCE="${ROCQ_INSTANCE:-rocq-builder-v2}"
+# Benchmarked against c4-standard-192 and c4d-standard-192 (see
+# claude-notes/remote-build-gcp.md): h4d-standard-192 built the same tree
+# fastest of the three (~314s vs 340s/425s) and prices lowest on both
+# on-demand and Spot. Revisit if several agents routinely build at once.
+MACHINE_TYPE="${ROCQ_MACHINE_TYPE:-h4d-standard-192}"
 
 # SPOT + STOP means preemption halts the VM instead of deleting it, so both
 # disks survive and the instance can simply be started again.
@@ -31,13 +33,14 @@ TERMINATION_ACTION="${ROCQ_TERMINATION_ACTION:-STOP}"
 BOOT_IMAGE_FAMILY="${ROCQ_BOOT_IMAGE_FAMILY:-ubuntu-2604-lts-amd64}"
 BOOT_IMAGE_PROJECT="${ROCQ_BOOT_IMAGE_PROJECT:-ubuntu-os-cloud}"
 BOOT_DISK_SIZE="${ROCQ_BOOT_DISK_SIZE:-100GB}"
-BOOT_DISK_TYPE="${ROCQ_BOOT_DISK_TYPE:-pd-balanced}"
+# h4d/c4/c4d only support Hyperdisk, not the pd-* family.
+BOOT_DISK_TYPE="${ROCQ_BOOT_DISK_TYPE:-hyperdisk-balanced}"
 
 # The persistent data disk. Holds the opam root and every agent's work tree,
 # so it survives preemption *and* a full rebuild of the instance.
-DATA_DISK="${ROCQ_DATA_DISK:-rocq-data}"
+DATA_DISK="${ROCQ_DATA_DISK:-rocq-data-v2}"
 DATA_DISK_SIZE="${ROCQ_DATA_DISK_SIZE:-1000GB}"
-DATA_DISK_TYPE="${ROCQ_DATA_DISK_TYPE:-pd-balanced}"
+DATA_DISK_TYPE="${ROCQ_DATA_DISK_TYPE:-hyperdisk-balanced}"
 DATA_MOUNT="${ROCQ_DATA_MOUNT:-/mnt/rocq}"
 
 # ---- access ------------------------------------------------------------
@@ -55,20 +58,22 @@ EXTRA_AUTHORIZED_KEYS="${ROCQ_EXTRA_AUTHORIZED_KEYS:-$HOME/.ssh/authorized_keys}
 
 # ---- idle shutdown -----------------------------------------------------
 # Seconds of continuous inactivity before the VM powers itself off.
-IDLE_LIMIT="${ROCQ_IDLE_LIMIT:-3600}"
+IDLE_LIMIT="${ROCQ_IDLE_LIMIT:-1800}"
 IDLE_CHECK_INTERVAL="${ROCQ_IDLE_CHECK_INTERVAL:-5min}"
 
 # ---- toolchain ---------------------------------------------------------
-OCAML_VERSION="${ROCQ_OCAML_VERSION:-4.14.2}"
-# Base packages installed into the shared switch. Project-specific
-# dependencies are better installed later via: run-on-gcp opam install ...
-ROCQ_PACKAGES="${ROCQ_PACKAGES:-rocq-prover}"
-EXTRA_OPAM_PACKAGES="${ROCQ_EXTRA_OPAM_PACKAGES:-}"
+# provision-gcp.sh does not install an opam switch: the project's own switch is
+# a byte-identical copy of the dev machine's, at /shared/xv6rocq (see
+# claude-notes/remote-build-gcp.md > "Creating the VM"), not something opam
+# installs from a package repository here. It only points OPAMROOT at this
+# root (see wire_opam_env in provision-gcp.sh) so `opam exec --switch=...`
+# in the Makefile has an opam state to run against; the root itself has to
+# already know about that switch, which is true whenever the data disk is a
+# clone of one that was set up that way.
+OPAM_ROOT="${ROCQ_OPAM_ROOT:-$DATA_MOUNT/opam}"
 # Extra system packages. The riscv64 cross toolchain is here because xv6iris
 # disassembles a real kernel ELF into Rocq; harmless for projects that do not.
 EXTRA_APT_PACKAGES="${ROCQ_EXTRA_APT_PACKAGES:-gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu}"
-OPAM_ROOT="${ROCQ_OPAM_ROOT:-$DATA_MOUNT/opam}"
-OPAM_SWITCH="${ROCQ_OPAM_SWITCH:-default}"
 
 # ---- sync --------------------------------------------------------------
 TREES_DIR="${ROCQ_TREES_DIR:-$DATA_MOUNT/trees}"

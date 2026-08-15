@@ -41,11 +41,31 @@ run-on-gcp --pull doc/ <cmd>  # copy something back afterwards
 run-on-gcp --where            # print the remote path for $PWD
 ```
 
-Measured on `c3d-standard-90`: initial sync of the tree ~4.5s, clean build
-~7m15s, a no-op `make` ~6s. A one-file edit costs whatever its reverse
-dependency cone costs — touching `iris/PrintkFmt.v` rebuilt its dependents in
-~3m15s. The sync itself is never the bottleneck, so there is no reason to
-avoid going through it.
+Measured on `c3d-standard-90` (the original default, since replaced): initial
+sync of the tree ~4.5s, clean build ~7m15s, a no-op `make` ~6s. A one-file
+edit costs whatever its reverse dependency cone costs — touching
+`iris/PrintkFmt.v` rebuilt its dependents in ~3m15s. The sync itself is never
+the bottleneck, so there is no reason to avoid going through it.
+
+**Machine type history.** `c3d-standard-90` was the default until a benchmark
+comparing it against `c4-standard-192`, `c4d-standard-192`, and
+`h4d-standard-192` (same clean build, same tree, `make clean` then timed
+`make -k proofs`) found:
+
+| machine type | vCPUs | clean build |
+|---|---|---|
+| c3d-standard-90 (old default) | 90 | 435s (7m15s) |
+| c4-standard-192 | 192 | 425s (7m5s) |
+| c4d-standard-192 | 192 | 340s (5m40s) |
+| **h4d-standard-192 (current default)** | 192 | **314s (5m14s)** |
+
+`h4d-standard-192` won on both speed and price (see the pricing note in
+"Preemption and cost" below), so it is now the default — instance
+`rocq-builder-v2` in `us-central1`, since `h4d-standard-192` is not offered in
+`us-east4` where the original `rocq-builder` lived. `rocq-builder` /
+`rocq-data` (the `c3d-standard-90` instance and its disk) were left in place
+rather than deleted; `rocq-data-v2` is a clone of `rocq-data` taken at
+migration time, so the opam switch and already-synced work trees carried over.
 
 ## Getting the .vo back for a local recheck
 
@@ -220,7 +240,7 @@ takes THREE flags, not one:
 
 ```sh
 run-on-gcp --stop        # wait for TERMINATED; the change is rejected while RUNNING
-gcloud compute instances set-scheduling rocq-builder --zone=us-east4-a \
+gcloud compute instances set-scheduling rocq-builder-v2 --zone=us-central1-a \
   --no-preemptible --provisioning-model=STANDARD --clear-instance-termination-action
 run-on-gcp --start
 ```
@@ -246,13 +266,13 @@ command with `--preemptible --provisioning-model=SPOT
 Verify with:
 
 ```sh
-gcloud compute instances describe rocq-builder --zone=us-east4-a \
+gcloud compute instances describe rocq-builder-v2 --zone=us-central1-a \
   --format="value(scheduling.provisioningModel,scheduling.preemptible)"   # STANDARD  False
 ```
 
 **The change survives the idle shutdown, and resets when the instance is
 RECREATED.** Provisioning model is a property of the instance resource, not a
-per-boot setting, so the 1-hour idle power-off and every later `--start` keep
+per-boot setting, so the 30-minute idle power-off and every later `--start` keep
 it. But `config.sh` deliberately keeps `PROVISIONING_MODEL=SPOT` as the
 default, so `provision-gcp.sh` — the documented way to change the machine or
 boot image — brings a recreated instance back as Spot with no warning. Re-apply
@@ -263,7 +283,7 @@ On-demand `c3d-standard-90` is ~$4.30/hr against Spot's ~$1.68, so switch back
 once capacity recovers — and note the idle-shutdown timer matters much more at
 that rate.
 
-The VM powers itself off after **1 hour idle**, judged by live SSH sessions and
+The VM powers itself off after **30 minutes idle**, judged by live SSH sessions and
 running `rocq`/`make`/`opam` processes, so a detached build keeps it alive on
 its own. To pin it up (a long run you do not want interrupted):
 

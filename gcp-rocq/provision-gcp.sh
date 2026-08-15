@@ -377,69 +377,19 @@ echo "OS packages installed"
 REMOTE
 }
 
-# ---------------------------------------------------------------- opam switch
-# Guarded by a sentinel on the *data* disk, because that is where the switch
-# lives. Rebuild the instance and this step correctly skips itself.
-setup_opam() {
+# ---------------------------------------------------------------- opam env
+# No opam init/repository/install here -- see the comment on OPAM_ROOT in
+# config.sh. This just points every future login shell's OPAMROOT at the data
+# disk's opam root, so `opam exec --switch=/shared/xv6rocq --` (what the
+# Makefile actually runs) has a root to resolve that switch against. Cheap and
+# idempotent, so it runs on every provision rather than being sentinel-gated.
+wire_opam_env() {
   local ip; ip="$(instance_ip)"
   mapfile -t opts < <(ssh_opts)
-  say "setting up opam switch (this takes a while the first time)"
-  # No -t here: stdin is the heredoc below, so forcing a pty just produces a
-  # "pseudo-terminal will not be allocated" warning and buys nothing.
-  ssh "${opts[@]}" "$SSH_USER@$ip" \
-    "OPAM_ROOT=$(printf %q "$OPAM_ROOT") \
-     OPAM_SWITCH=$(printf %q "$OPAM_SWITCH") \
-     OCAML_VERSION=$(printf %q "$OCAML_VERSION") \
-     ROCQ_PACKAGES=$(printf %q "$ROCQ_PACKAGES") \
-     EXTRA_OPAM_PACKAGES=$(printf %q "$EXTRA_OPAM_PACKAGES") \
-     DATA_MOUNT=$(printf %q "$DATA_MOUNT") \
-     bash -s" <<'REMOTE'
-set -euo pipefail
-export OPAMROOT="$OPAM_ROOT"
-export OPAMYES=1
-JOBS="$(nproc)"
-SENTINEL="$DATA_MOUNT/.provisioned-opam"
-
-mountpoint -q "$DATA_MOUNT" || { echo "data disk not mounted at $DATA_MOUNT" >&2; exit 1; }
-
-if [[ ! -d "$OPAMROOT/repo" ]]; then
-  echo "initialising opam root at $OPAMROOT"
-  opam init --bare --no-setup --yes
-fi
-
-opam repository add coq-released https://coq.inria.fr/opam/released \
-  --all-switches --set-default --yes 2>/dev/null || true
-opam update --yes || true
-
-if ! opam switch list --short 2>/dev/null | grep -qx "$OPAM_SWITCH"; then
-  echo "creating switch $OPAM_SWITCH on OCaml $OCAML_VERSION"
-  opam switch create "$OPAM_SWITCH" "ocaml-base-compiler.$OCAML_VERSION" --yes -j "$JOBS"
-fi
-
-eval "$(opam env --switch="$OPAM_SWITCH" --set-switch)"
-
-if [[ ! -f "$SENTINEL" ]]; then
-  echo "installing: $ROCQ_PACKAGES $EXTRA_OPAM_PACKAGES"
-  # shellcheck disable=SC2086
-  opam install --yes -j "$JOBS" $ROCQ_PACKAGES $EXTRA_OPAM_PACKAGES
-  touch "$SENTINEL"
-fi
-
-echo "--- installed ---"
-opam list --installed 2>/dev/null | grep -Ei 'rocq|coq|ocaml-base' || true
-REMOTE
-
-  # Make the switch active for every future login shell, so that
-  # `run-on-gcp make` finds coqc/rocq without any per-command setup.
-  say "wiring opam env into login shells"
-  # shellcheck disable=SC2087  # expansion is deliberately local: OPAM_ROOT and
-  # OPAM_SWITCH are baked in here, while \$OPAMROOT stays literal for runtime.
+  say "wiring OPAMROOT into login shells"
   ssh "${opts[@]}" "$SSH_USER@$ip" \
     "sudo tee /etc/profile.d/rocq-opam.sh >/dev/null" <<PROFILE
 export OPAMROOT=$OPAM_ROOT
-if command -v opam >/dev/null 2>&1 && [ -d "\$OPAMROOT" ]; then
-  eval "\$(opam env --root="\$OPAMROOT" --switch=$OPAM_SWITCH --set-switch 2>/dev/null)" || true
-fi
 PROFILE
 }
 
@@ -456,7 +406,9 @@ $(say "provisioning complete")
                     run-on-gcp looks it up each time and pins the host key
                     to the instance name)
   data disk  $DATA_DISK ($DATA_DISK_SIZE) mounted at $DATA_MOUNT
-  opam root  $OPAM_ROOT (switch: $OPAM_SWITCH)
+  opam root  $OPAM_ROOT (OPAMROOT wired into login shells; the switch
+             itself, /shared/xv6rocq, is not installed here -- copy it onto
+             this disk, see claude-notes/remote-build-gcp.md)
   work trees $TREES_DIR
   idle       powers off after ${IDLE_LIMIT}s idle; touch $DATA_MOUNT/.keep-awake to pin it up
 
@@ -479,7 +431,7 @@ main() {
   # apt needs no data disk, so run it first and let it overlap with the format.
   bootstrap_vm
   wait_for_startup_script
-  setup_opam
+  wire_opam_env
   summary
 }
 
