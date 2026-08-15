@@ -96,7 +96,7 @@ Import Defs.
    [pre] is the held-set precondition; see the tier note in the file header.
    It is the LAST argument so that it reads as an index on an otherwise fixed
    contract, exactly as [lks] itself does on [cpu_own]. *)
-Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) (pre : Prop) :=
+Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) (pre : Prop) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -114,7 +114,7 @@ Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : G
      [lock_refute_False] is already hart-generic. *)
   (forall i : CPU, ⊢ locked_pre γl i -∗ Dc -∗ False) ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lk0 s R Dc -∗
   Tc -∗
@@ -149,7 +149,7 @@ Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : G
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C false ({[s]} ∪ lks) -∗
+    cpu_own (S n) eb p false ({[s]} ∪ lks) -∗
     arm_pay n eb p -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -157,23 +157,23 @@ Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : G
 (* THE FRESH TIER: the premise the ghost step actually consumes.  This is the
    lowest-level contract acquire has, and the only one its proof discharges
    directly. *)
-Definition wp_acquire_gen_fresh_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
-  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p C av b lks (s ∉ lks).
+Definition wp_acquire_gen_fresh_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
+  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p av b lks (s ∉ lks).
 
 (* THE BELOW TIER: the deadlock-freedom discipline, and what every ordinary
    caller states. *)
-Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
-  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p C av b lks (locks_below lks s).
+Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
+  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p av b lks (locks_below lks s).
 
 (* the contract is ANTITONE in its precondition -- which is the whole content
    of the tiering, and is what makes BELOW a corollary of FRESH rather than a
    second proof. *)
 Lemma wp_acquire_gen_pre_weaken `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool)
-    (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) (pre pre' : Prop) :
+    (p : mword 64) (av : nat) (b : bool) (lks : gset string) (pre pre' : Prop) :
   (pre' -> pre) ->
-  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p C av b lks pre ->
-  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p C av b lks pre'.
+  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p av b lks pre ->
+  wp_acquire_gen_pre_body γl s R Tc Dc m n eb p av b lks pre'.
 Proof.
   cbv beta zeta delta [wp_acquire_gen_pre_body].
   intros Himp H Hpos Hav Hpre' Href Hrefpre.
@@ -182,7 +182,7 @@ Qed.
 
 (* ---- the static-kernel-lock level: same two tiers over [is_lock] -------- *)
 
-Definition wp_acquire_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) (pre : Prop) :=
+Definition wp_acquire_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) (pre : Prop) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquire in
   let lk0 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -190,7 +190,7 @@ Definition wp_acquire_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
   (10 <= av)%nat ->
   pre ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
   panic_wp_any -∗
@@ -203,23 +203,23 @@ Definition wp_acquire_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
-    cpu_own (S n) eb p C false ({[s]} ∪ lks) -∗
+    cpu_own (S n) eb p false ({[s]} ∪ lks) -∗
     arm_pay n eb p -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Definition wp_acquire_fresh_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
-  wp_acquire_pre_body γl s R m n eb p C av b lks (s ∉ lks).
+Definition wp_acquire_fresh_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
+  wp_acquire_pre_body γl s R m n eb p av b lks (s ∉ lks).
 
-Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
-  wp_acquire_pre_body γl s R m n eb p C av b lks (locks_below lks s).
+Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
+  wp_acquire_pre_body γl s R m n eb p av b lks (locks_below lks s).
 
 Lemma wp_acquire_pre_weaken `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool)
-    (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) (pre pre' : Prop) :
+    (p : mword 64) (av : nat) (b : bool) (lks : gset string) (pre pre' : Prop) :
   (pre' -> pre) ->
-  wp_acquire_pre_body γl s R m n eb p C av b lks pre ->
-  wp_acquire_pre_body γl s R m n eb p C av b lks pre'.
+  wp_acquire_pre_body γl s R m n eb p av b lks pre ->
+  wp_acquire_pre_body γl s R m n eb p av b lks pre'.
 Proof.
   cbv beta zeta delta [wp_acquire_pre_body].
   intros Himp H Hpos Hav Hpre'.
@@ -228,18 +228,18 @@ Qed.
 
 Module Type ACQUIRE_GEN.
   Parameter wp_acquire_gen_fresh_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
-      wp_acquire_gen_fresh_sconf_body γl s R Tc Dc m n eb p C av b lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string),
+      wp_acquire_gen_fresh_sconf_body γl s R Tc Dc m n eb p av b lks.
   Parameter wp_acquire_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
-      wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R Tc Dc : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string),
+      wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p av b lks.
 End ACQUIRE_GEN.
 
 Module Type ACQUIRE.
   Parameter wp_acquire_fresh_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
-      wp_acquire_fresh_sconf_body γl s R m n eb p C av b lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string),
+      wp_acquire_fresh_sconf_body γl s R m n eb p av b lks.
   Parameter wp_acquire_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
-      wp_acquire_sconf_body γl s R m n eb p C av b lks.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string),
+      wp_acquire_sconf_body γl s R m n eb p av b lks.
 End ACQUIRE.

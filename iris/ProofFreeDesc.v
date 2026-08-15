@@ -510,9 +510,9 @@ Section ProofFreeDesc.
   (* ================================================================== *)
   Lemma wp_free_desc_sconf  (γs : list gname)
       (pd : mword 64) (i : nat)
-      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string)
-    : wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
+    : wp_free_desc_sconf_body γs pd i m K lvl eb pme va vl vf vn b lks.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
     intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl Hbelow.
@@ -803,10 +803,10 @@ Section ProofFreeDesc.
     assert (HE2dom : forall r : regidx, r ∈ dom (rf_to_gmap E2))
       by (intro r; apply rf_to_gmap_dom).
     (* ===================== wakeup(&disk.free[0]) ===================== *)
-    iDestruct (cpu_own_transport CID CIDd15 lvl eb pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CIDd15 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15)  E2 γs
-              pme lvl (K - 2)%nat eb C b
+              pme lvl (K - 2)%nat eb b
               _ HKw HE2dom Hlen Hlvl
               Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hpi").
@@ -916,7 +916,7 @@ Section ProofFreeDesc.
       rewrite /E1 upd_ne; [| congruence].
       rewrite /E0 upd_ne; [| congruence].
       exact (HM9 r N10 N13 N14 N15 Ncsp N8). }
-    iDestruct (cpu_own_transport CIDw CIDe4 lvl eb pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDw CIDe4 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe4 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! F2 with "[%] Hcg Hcnt Htext [Hpc] Hfree Hva Hvl Hvf Hvn").

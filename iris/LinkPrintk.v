@@ -40,10 +40,10 @@ Module PrintkGen : PRINTK_GEN.
   Lemma wp_printk_gen_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
-      (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool)
       (lks : gset string) :
-    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b lks.
+    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj dqf f descs b lks.
   Proof.
     rewrite /wp_printk_gen_sconf_body /=.
     intros HK Hlen Hnonul Hkinds Hdlen Hbelow.
@@ -51,7 +51,7 @@ Module PrintkGen : PRINTK_GEN.
     iDestruct "Hpenv" as "(#Hprlk & #Hdoff & #Hdev & [%γl #Htxl] & #Hsub0)".
     iAssert (panic_wp_any) as "#Hpa".
     { iApply panic_wp_any_holds. }
-    iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb C
+    iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb
               (dqf := dqf) f descs b pj lks
               ltac:(rewrite /printk_stack; lia)
               Hlen Hnonul Hkinds Hdlen ltac:(lia)

@@ -377,9 +377,9 @@ Section ProofFetchstr.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_fetchstr_sconf (γa : gname) (γf : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_fetchstr_sconf_body γa γf m av n eb p C pid V maxn buf_olds b lks.
+    : wp_fetchstr_sconf_body γa γf m av n eb p pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
     intros pcE buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
@@ -612,8 +612,8 @@ Section ProofFetchstr.
     (* [Hcpu] was established at the entry hart; the eleven leaf steps above
        may have moved us to a different one, so it must be transported before
        it can be fed to [myproc]'s own [cpu_own] premise. *)
-    iDestruct (cpu_own_transport CID CID11 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p C b lks
+    iDestruct (cpu_own_transport CID CID11 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf M6 (av - 6)%nat n eb p b lks
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID12 Hk12 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -791,9 +791,9 @@ Section ProofFetchstr.
        [kalloc_env γa None], a [cpu_own], K = 50 rather than 20, and it hands
        back a descriptor P' EXTENDING the one it was given.  None of the four
        can be supplied from [wp_fetchstr_sconf_body] as it stands. *)
-    iDestruct (cpu_own_transport CID12 CID17 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID12 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Copyinstr.wp_copyinstr_sconf γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
-              (av - 6)%nat n eb p C b lks
+              (av - 6)%nat n eb p b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
     all: try lkbelow.
@@ -907,7 +907,7 @@ Section ProofFetchstr.
       (* [Hcpu] has been sitting at [CID12] (myproc's exit hart) ever since;
          re-anchor it at the final hart before it can feed the function's own
          [Hcont]. *)
-      iDestruct (cpu_own_transport CID18 CID23 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID18 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
       { exact Hcsf. }
@@ -965,7 +965,7 @@ Section ProofFetchstr.
                 HE1sp HE1a0 HthrE1
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
       iIntros (CID22 Hk22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID18 CID22 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID18 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf P' dst_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
       { exact Hcsf. }

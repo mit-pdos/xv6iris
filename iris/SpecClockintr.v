@@ -108,7 +108,7 @@ End SpecClockintr.
    no [wp_next] wrapper at all ([wp_next_off] would collapse it). *)
 Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl : gname) (γs : list gname)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset string) :=
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* acquire's transient noff increments (one for the tickslock, one inside
@@ -117,14 +117,14 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (20 <= av)%nat ->
   locks_below lks "time" ->
   sie_cap_gpr m av false p -∗
-  cpu_own n eb p C false lks -∗
+  cpu_own n eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   timer_cap -∗
   tick_keeper γl γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av false p -∗
-      cpu_own n eb p C false lks -∗
+      cpu_own n eb p false lks -∗
       pc_is ret_tgt -∗
       tick_keeper γl γs -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -134,6 +134,6 @@ Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset string),
-      wp_clockintr_sconf_body γl γs m n eb p C av lks.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string),
+      wp_clockintr_sconf_body γl γs m n eb p av lks.
 End CLOCKINTR.

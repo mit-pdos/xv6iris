@@ -585,7 +585,7 @@ Definition wp_filewrite_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fwrite_names)                          (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string) :=
+    (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filewrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -616,7 +616,7 @@ Definition wp_filewrite_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
@@ -640,7 +640,7 @@ Definition wp_filewrite_sconf_body
       ⌜filewrite_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
@@ -660,6 +660,6 @@ Module Type FILEWRITE.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string),
-      wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
+      (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
+      wp_filewrite_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
 End FILEWRITE.

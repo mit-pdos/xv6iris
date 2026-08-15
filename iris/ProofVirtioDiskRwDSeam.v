@@ -92,7 +92,7 @@ Section ProofVirtioDiskRwDSeam.
   (* ------------------------------------------------------------------- *)
   Definition vdrw_p4_exit (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (bs_buf bs_disk : list (bv 8)) (m0 : regfile)
       (kq : nat * positive) (lks : gset string) : iProp Σ :=
@@ -114,7 +114,7 @@ Section ProofVirtioDiskRwDSeam.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false lks -∗
+       cpu_own 1 eb (proc_addr j) false lks -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x19a) : mword 64) -∗
@@ -131,7 +131,7 @@ Section ProofVirtioDiskRwDSeam.
   (* [P3.vdrw_p3_exit] plus the triple-disjointness conjunct (see above). *)
   Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
       (m0 : regfile) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr j) (fun (CID : CpuId) =>
@@ -146,7 +146,7 @@ Section ProofVirtioDiskRwDSeam.
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (trap_res eb + (K - 12))%nat false (proc_addr j) -∗
-       cpu_own 1 eb (proc_addr j) C false lks -∗
+       cpu_own 1 eb (proc_addr j) false lks -∗
        trap_csrs -∗
        cpu_claim (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) -∗
@@ -161,7 +161,7 @@ Section ProofVirtioDiskRwDSeam.
   (* P4, packaged as the wand P3 consumes. *)
   Lemma wp_vdrw_p4_seam (γk : gname)
       (γs : list gname) (jp : nat) (γu : uart_names) (γd : disk_names)
-      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool)
       (sp0 b : Arch.pa) (wr : SailStdpp.Values.mword 64)
       (bno : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
       (m0 : regfile) (kq : nat * positive) (lks : gset string) :
@@ -177,9 +177,9 @@ Section ProofVirtioDiskRwDSeam.
        REQUEST'S WRITE IDENTITY (phase C2a): [1024 * bno] is the byte offset
        the sector arithmetic lands on. *)
     perm_pend (dn_perm γd) kq (vdrwd_wr wr (1024 * uint bno)%Z bs_buf) -∗
-    vdrw_p4_exit CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
+    vdrw_p4_exit CID γk γs jp γd pd pav pu K eb sp0 b wr (vdrw_sector_raw bno)
                  bs_buf bs_disk m0 kq lks -∗
-    vdrw_p3_exit_x CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0 lks.
+    vdrw_p3_exit_x CID γk γs jp γd pd pav pu K eb sp0 b wr (vdrw_sector_raw bno) m0 lks.
   Proof.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".

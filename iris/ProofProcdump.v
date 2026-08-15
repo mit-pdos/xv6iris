@@ -70,9 +70,9 @@ Section ProofProcdumpMain.
 
   Lemma wp_procdump_sconf
       (γpr : gname) (γd : uart_names) (γv : disk_names)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (b : bool)
       (lks : gset string)
-    : wp_procdump_sconf_body γpr γd γv m K eb p C b lks.
+    : wp_procdump_sconf_body γpr γd γv m K eb p b lks.
   Proof.
     cbv beta zeta delta [wp_procdump_sconf_body].
     intros HK Hpk Hlkbelow.
@@ -116,10 +116,10 @@ Section ProofProcdumpMain.
       split_and!; (rewrite upd_ne; [ reflexivity | rdok_tpne ]). }
     (* ---- printk("\n"), general path, descs = [] ---- *)
     iPoseProof (pd_nl_str with "Hkdata") as "Hnlstr".
-    iDestruct (cpu_own_transport CID CID2 0%nat eb p C b
+    iDestruct (cpu_own_transport CID CID2 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iPoseProof (panic_wp_any_at CID2 with "Hpanic") as "Hpanic2".
-    iApply (Hpk CID2 M1 (K - 10)%nat eb p C DfracDiscarded pd_nl [] b lks
+    iApply (Hpk CID2 M1 (K - 10)%nat eb p DfracDiscarded pd_nl [] b lks
               (pd_K48 K HK) pd_nl_len pd_nl_nonul
               ltac:(rewrite pd_nl_kinds; reflexivity)
               ltac:(cbn [length]; lia)
@@ -152,14 +152,14 @@ Section ProofProcdumpMain.
       apply (pd_regs_hi_trans M M1 M'); [ exact HhiM1 |].
       apply (pd_regs_hi_trans M1 mP M');
         [ exact (pd_regs_hi_of_cs M1 mP Hcs) | exact Hhi' ]. }
-    iDestruct (cpu_own_transport CID3 CID4 0%nat eb p C b
+    iDestruct (cpu_own_transport CID3 CID4 0%nat eb p b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* ================================================================== *)
     (* +0x56 .. +0x8c -- the scan, entered at its head with j = 0, with   *)
     (* the epilogue (+0x8e .. +0xa2) as its exit continuation.            *)
     (* ================================================================== *)
     iPoseProof (wp_pd_loop (CID0 := CID4) γpr γd γv m
-                  (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b C lks
+                  (pa_stk (m !!! pdR 2 : mword 64) 10) p (K - 10)%nat eb b lks
                   Hpk (pd_K48 K HK) Hlkbelow
                   with "Htext Hkdata Hpenv Hpanic [Hframe Hcont]") as "Hscan".
     { iIntros (CIDx Hsx Mx) "%Hxc Hcg Hcnt2 Hpc Hview".
@@ -167,7 +167,7 @@ Section ProofProcdumpMain.
       iApply (wp_pd_epilogue (CID0 := CIDx) m Mx K b p (pd_K10 K HK) Hxsp Hxhi
                 with "Hcg Htext Hpc Hframe").
       iIntros (CIDy Hsy mf) "%Hcsf Hcg Hpc".
-      iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p C b
+      iDestruct (cpu_own_transport CIDx CIDy 0%nat eb p b
                    ltac:(wp_next_chain) with "Hcnt2") as "Hcnt2".
       iSpecialize ("Hcont" $! CIDy with "[%]"); [ wp_next_chain |].
       iApply ("Hcont" $! mf with "Hcg Hpc [%] Hcnt2 Hview").

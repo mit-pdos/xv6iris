@@ -192,9 +192,9 @@ Section ProofPanic.
   Lemma wp_panic_sconf
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
+      (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string)
-    : wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm lks.
+    : wp_panic_sconf_body γpr γl γd γv m K bs n eb b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31 Hbelow.
@@ -362,10 +362,10 @@ Section ProofPanic.
       by (rewrite /P5 upd_ne; [exact HP4a0 | reg_neq]).
     assert (HP5s1 : P5 !!! Regidx Rs1 = m !!! Regidx Ra0)
       by (rewrite /P5 upd_ne; [exact HP4s1 | reg_neq]).
-    iDestruct (cpu_own_transport CID CID9 n eb p C b
+    iDestruct (cpu_own_transport CID CID9 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID9) (dqf := DfracDiscarded)
-              γpr γl γd γv P5 (K - 4)%nat bs n eb C pn_hdr [] b p lks
+              γpr γl γd γv P5 (K - 4)%nat bs n eb pn_hdr [] b p lks
               (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
@@ -451,10 +451,10 @@ Section ProofPanic.
       by (rewrite /Q3 upd_ne; [exact HQ2a0 | reg_neq]).
     (* vararg 0 IS a1 -- [pk_vararg Q3 0] is [Q3 !!! Regidx x11] by conversion *)
     assert (Hva : pk_vararg Q3 0%nat = m !!! Regidx Ra0) by exact HQ2a1.
-    iDestruct (cpu_own_transport CID10 CID14 n eb p C b
+    iDestruct (cpu_own_transport CID10 CID14 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID14) (dqf := DfracDiscarded)
-              γpr γl γd γv Q3 (K - 4)%nat (bs ++ cs)%list n eb C pn_fmt [dm] b p lks
+              γpr γl γd γv Q3 (K - 4)%nat (bs ++ cs)%list n eb pn_fmt [dm] b p lks
               (pn_Kpk K HK) pn_fmt_len pn_fmt_nonul
               ltac:(rewrite pn_fmt_kinds; cbn [map pk_desc_kind];
                     rewrite Hdm; reflexivity)

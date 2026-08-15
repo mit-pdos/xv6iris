@@ -89,9 +89,9 @@ Section ProofSysGetpid.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_getpid_sconf (γf : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_getpid_sconf_body γf m av n eb p C pid V b lks.
+    : wp_sys_getpid_sconf_body γf m av n eb p pid V b lks.
   Proof.
     cbv beta delta [wp_sys_getpid_sconf_body].
     intros pcE ret_tgt Hn Hav.
@@ -178,9 +178,9 @@ Section ProofSysGetpid.
     (* [Hcpu] rode through the four leaf steps untouched (only [Hcg]/[Hpc] are
        part of an ordinary leaf's own footprint), so it is still anchored at
        the ENTRY hart -- re-anchor it at [CID5] before crossing into myproc. *)
-    iDestruct (cpu_own_transport CID CID5 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID CID5 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- myproc(): a0 = p, callee-saved preserved ---- *)
-    iApply (Myproc.wp_myproc_sconf Bj (av - 2)%nat n eb p C b
+    iApply (Myproc.wp_myproc_sconf Bj (av - 2)%nat n eb p b
               _ Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hs6 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
@@ -308,7 +308,7 @@ Section ProofSysGetpid.
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
     (* [Hcpu] has sat at [CID6] (myproc's own resumed hart) since the crossing;
        the five leaf steps since then never touched it. *)
-    iDestruct (cpu_own_transport CID6 CID11 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID6 CID11 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply ("Hcont" $! E12 with "[%] Hcg Hcpu Hpc Hpriv").
     split; [| exact HE12a0].
     unfold callee_saved.

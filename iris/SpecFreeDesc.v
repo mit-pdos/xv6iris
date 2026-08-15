@@ -43,7 +43,7 @@ Definition wp_free_desc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
     (pd : mword 64) (i : nat)
-    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
     (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.free_desc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -56,7 +56,7 @@ Definition wp_free_desc_sconf_body
   (* free_desc's only callee is wakeup, whose bound is "proc" (11). *)
   locks_below lks "proc" ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗ procs_inv γs -∗
   (* the descriptor-page pointer cell: free_desc RE-READS [disk.desc] (twice)
@@ -74,7 +74,7 @@ Definition wp_free_desc_sconf_body
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
       sie_cap_gpr mf K b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       d_free_cell i ↦ₘ Z_to_bv 8 1 -∗
       d_desc pd i ↦₈ (zero_reg : mword 64) -∗
@@ -89,7 +89,7 @@ Module Type FREEDESC.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (pd : mword 64) (i : nat)
-      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) (lks : gset string),
-      wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b lks.
+      wp_free_desc_sconf_body γs pd i m K lvl eb pme va vl vf vn b lks.
 End FREEDESC.

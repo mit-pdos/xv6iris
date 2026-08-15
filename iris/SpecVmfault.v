@@ -70,7 +70,7 @@ From Kernel Require KernelSyms.
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
   (* a0 = pagetable, a1 = psz, a2 = va, a3 = read *)
   let va := mm !!! Regidx (mword_of_int 12) in
@@ -97,7 +97,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      ismapped/mappages take no lock, so one premise covers everything. *)
   locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b lks -∗
+  cpu_own lvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
@@ -105,7 +105,7 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b lks -∗
+    cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     ( (⌜mr !!! Regidx (mword_of_int 10) = mword_of_int 0⌝ ∗ proc_pt P)
@@ -123,6 +123,6 @@ Module Type VMFAULT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
+      (b : bool) (lks : gset string),
+      wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
 End VMFAULT.

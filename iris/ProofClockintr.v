@@ -92,12 +92,12 @@ Section ProofClockintr.
   (* [eb = true].  At any [S _] level the match is [false] outright.        *)
   (* ================================================================== *)
   Local Lemma ci_outb_false (M : regfile) (av n : nat) (eb : bool)
-      (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr M av false p -∗ cpu_own n eb p C false lks -∗
+      (p : mword 64) (lks : gset string) :
+    sie_cap_gpr M av false p -∗ cpu_own n eb p false lks -∗
     ⌜ (match n with O => eb | S _ => false end) = false ⌝.
   Proof.
     iIntros "Hcg Hcnt".
-    iDestruct "Hcnt" as "[Hh _]". iDestruct "Hh" as "[_ Hic]".
+    iDestruct "Hcnt" as "[_ Hic]".
     destruct n as [|n'].
     - iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
       iDestruct "Hsie" as "(_ & _ & Hbit)".
@@ -303,8 +303,8 @@ Section ProofClockintr.
   (* THE WHOLE FUNCTION.                                                 *)
   (* ================================================================== *)
   Lemma wp_clockintr_sconf  (γl : gname) (γs : list gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset string)
-    : wp_clockintr_sconf_body γl γs m n eb p C av lks.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
+    : wp_clockintr_sconf_body γl γs m n eb p av lks.
   Proof.
     cbv beta delta [wp_clockintr_sconf_body].
     intros pcE ret_tgt Hn Hav Hbelow.
@@ -314,7 +314,7 @@ Section ProofClockintr.
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Htcap Htk Hcont".
     (* release's exit index, fixed once here (it is used only at the very end) *)
-    iDestruct (ci_outb_false m av n eb p C lks with "Hcg Hcnt") as %Hout.
+    iDestruct (ci_outb_false m av n eb p lks with "Hcg Hcnt") as %Hout.
     (* ===================== PROLOGUE (16-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
@@ -499,7 +499,7 @@ Section ProofClockintr.
         rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Hmosp. }
       (* ===================== acquire(&tickslock) ===================== *)
       iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res B2
-                n eb p C (av - 2)%nat false lks
+                n eb p (av - 2)%nat false lks
                 ltac:(lia)
                 ltac:(lia)
                 Hbelow
@@ -637,7 +637,7 @@ Section ProofClockintr.
         exact HB2sp. }
       (* ===================== wakeup(&ticks) ===================== *)
       iApply (Wakeup.wp_wakeup_sconf D5 γs p
-                (S n) (av - 2)%nat eb C false ({["time"]} ∪ lks)
+                (S n) (av - 2)%nat eb false ({["time"]} ∪ lks)
                 ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
@@ -720,7 +720,7 @@ Section ProofClockintr.
                          + (av - 2))%nat) by (rewrite Hout; reflexivity).
       iEval (rewrite Hridx) in "Hcg".
       iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res E2
-                n eb p C (av - 2)%nat
+                n eb p (av - 2)%nat
                 ({["time"]} ∪ lks)
                 ltac:(rewrite HE2a0; apply addv_sext0)
                 ltac:(lia)

@@ -359,7 +359,8 @@ Section SpecMain.
        calls. *)
     p0 = zero_reg ->
     sie_cap_gpr m K false p0 -∗
-    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
+    cpu_ctx_free -∗
+    cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
        code that ever allocates [IntrDefs.intr_inv] (out of trapinithart's
        [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)

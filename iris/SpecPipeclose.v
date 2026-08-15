@@ -51,7 +51,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (γs : list gname)
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
-    (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
+    (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipeclose in
   let pi := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -77,7 +77,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      lock kfree takes is entirely inside kfree, after the release. *)
   locks_below lks "pipe" ->
   sie_cap_gpr m av b pme -∗
-  cpu_own n eb pme C b lks -∗
+  cpu_own n eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_pipe γl γp pi -∗
   pipe_ref γp w 1 -∗
@@ -90,7 +90,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
     sie_cap_gpr mr av b pme -∗
-    cpu_own n eb pme C b lks -∗
+    cpu_own n eb pme b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (* the page came back iff this was the LAST reference; the caller cannot
@@ -105,7 +105,7 @@ Module Type PIPECLOSE.
       (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
-      (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
+      (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
       (b : bool) (lks : gset string),
-      wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme C av b lks.
+      wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks.
 End PIPECLOSE.

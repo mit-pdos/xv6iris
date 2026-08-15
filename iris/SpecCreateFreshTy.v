@@ -160,7 +160,7 @@ Definition create_fresh_ty_body
     (kd : nat) (dqp : dfrac)                     (* the LOCKED PARENT's slot *)
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
-    (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (Ma : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) : Prop :=
   let pj := proc_addr j in
   (* ---- ialloc's and ilock's own geometry, verbatim ---- *)
@@ -203,12 +203,12 @@ Definition create_fresh_ty_body
      (cov' : gset Z) (logstart' inodestart' ninodes' : Z) (nib' : nat)
      (dev' : mword 32) (ty' : mword 16) (u' : nat) (Sb' : gset Z)
      (pidv' : mword 32) (dq' dqs' dqn' : dfrac)
-     (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool)
+     (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string),
      wp_ialloc_gen_body (CID := CIDa) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                         γ' γfs' γi' cn' gtl' γpr' cov' logstart' inodestart'
                         ninodes' nib' dev' ty' u' Sb' pidv' dq' dqs' dqn'
-                        m' K' eb' C' b' lks') ->
+                        m' K' eb' b' lks') ->
   (forall `{CIDl : CpuId}
      (γs' : list gname) (j' : nat) (γl' : gname)
      (γu' : uart_names) (γd' : disk_names) (γk' : gname)
@@ -217,15 +217,15 @@ Definition create_fresh_ty_body
      (cov' : gset Z) (logstart' inodestart' : Z) (nib' : nat)
      (k' : nat) (s' : Qp) (g' : gname) (dev' inum' : mword 32)
      (pidv' : mword 32) (dq' dqs' : dfrac)
-     (m' : regfile) (K' : nat) (eb' : bool) (C' : iProp Σ) (b' : bool)
+     (m' : regfile) (K' : nat) (eb' : bool) (b' : bool)
      (lks' : gset string),
      wp_ilock_sconf_body (CID := CIDl) γs' j' γl' γu' γd' γk' pd' pav' pu' bn'
                          γfs' γi' cn' gil' gisl' cov' logstart' inodestart'
                          nib' k' s' g' dev' inum' pidv' dq' dqs'
-                         m' K' eb' C' b' lks') ->
+                         m' K' eb' b' lks') ->
   (* ================= THE SPAN ================= *)
   sie_cap_gpr Ma K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -257,7 +257,7 @@ Definition create_fresh_ty_body
     (gil gisl : gname) (dn : dinode) (bm : blkmap),
       ⌜cr_cs_but_s3 Ma Mo⌝ -∗
       sie_cap_gpr Mo K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -318,9 +318,9 @@ Module Type CREATE_FRESH_TY.
       (kd : nat) (dqp : dfrac)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
-                           u Sb pidv dq dqs dqn Ma K eb C b lks.
+                           u Sb pidv dq dqs dqn Ma K eb b lks.
 End CREATE_FRESH_TY.

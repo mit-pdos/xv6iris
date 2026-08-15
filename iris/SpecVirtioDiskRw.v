@@ -61,7 +61,7 @@ Definition wp_virtio_disk_rw_sconf_body
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* fabric + lock ghosts *)
     (pd pav pu : mword 64)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
     (Q : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_rw in
@@ -101,7 +101,7 @@ Definition wp_virtio_disk_rw_sconf_body
   locks_below lks "virtio_disk" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; acquire raises to the level sleep requires *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  Everything below sleeps,
      and a parking thread must hand [trap_csrs] and [cpu_claim] across the
      crossing (SpecSched.v).  At [eb = true] this function's OWN acquire
@@ -153,7 +153,7 @@ Definition wp_virtio_disk_rw_sconf_body
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -178,9 +178,9 @@ Module Type VIRTIODISKRW.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
       (Q : iProp Σ) (lks : gset string),
       wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
-                                   m K eb C bno dsk0 bs_buf bs_disk b Q lks.
+                                   m K eb bno dsk0 bs_buf bs_disk b Q lks.
 End VIRTIODISKRW.

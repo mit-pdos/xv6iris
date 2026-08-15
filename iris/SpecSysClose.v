@@ -101,7 +101,7 @@ Definition wp_sys_close_sconf_body
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -117,7 +117,7 @@ Definition wp_sys_close_sconf_body
      myproc) carries any order premise at all. *)
   locks_below lks "log" ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
      come from the TRAP.  sys_close mints nothing itself -- it holds no lock
@@ -150,7 +150,7 @@ Definition wp_sys_close_sconf_body
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b lks -∗
+      cpu_own n eb p b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
@@ -169,7 +169,7 @@ Module Type SYSCLOSE.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b lks.
+      wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
 End SYSCLOSE.

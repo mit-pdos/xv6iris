@@ -113,7 +113,7 @@ Section KforkB1Proof.
       (V : pprivate) (pid : mword 32) (P : uptd) (ws : list (mword 64))
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s50 : mword 64)
-      (pme : mword 64) (eb b : bool) (C : iProp Σ) (lvl : nat) (lks : gset string) :
+      (pme : mword 64) (eb b : bool) (lvl : nat) (lks : gset string) :
     (52 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (* The EXIT arm, named.  This block is entered with np->lock HELD, so its
@@ -150,7 +150,7 @@ Section KforkB1Proof.
        physical carve [trap_res b + (K - 8)] -> [trap_res b + K] is exactly the
        8-slot epilogue pop, i.e. the reserve is CONSERVED across this block. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
@@ -174,7 +174,7 @@ Section KforkB1Proof.
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr mf K (match lvl with O => eb | S _ => false end) pme -∗
         pc_is (ret_pc ra0) -∗
-        cpu_own lvl eb pme C (match lvl with O => eb | S _ => false end) lks -∗
+        cpu_own lvl eb pme (match lvl with O => eb | S _ => false end) lks -∗
         kalloc_env γa None -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -221,7 +221,7 @@ Section KforkB1Proof.
       by (rewrite /T1 upd_ne; [exact HT0a0 | vm_compute; discriminate]).
     (* ---- freeproc ---- *)
     iApply (FP.wp_freeproc_sconf γa T1 j γl V pid USED ch (Some P) (Some (ud_tfp P, ws))
-              (trap_res b + (K - 8))%nat eb pme C (S lvl) ({["proc"]} ∪ lks)
+              (trap_res b + (K - 8))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
               ltac:(pose proof (kfkb1_K44 K HK); lia) (kfkb1_lvlS lvl Hlvl) HT1a0
               with "Hcg Hcpu Htext Hpc Hheld Hfprest Hfppt Hfptf Henv").
     all: try lkbelow.
@@ -299,7 +299,7 @@ Section KforkB1Proof.
        undoing afterwards. *)
     iEval (rewrite -Hb) in "Hcg".
     iApply (RL.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme C (K - 8)%nat
+              (proc_lock_res γs γl (proc_addr j)) T3 lvl eb pme (K - 8)%nat
               ({["proc"]} ∪ lks)
               Hlka (kfkb1_K10 K HK)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -388,7 +388,7 @@ Section KforkB1Proof.
               (kfkb1_K8 K HK) Hsp0 Hra0 Hs00 Hs10 Hs50 HT5sp HT5s1 HT5thr
               with "Hcg Htext Hpc Hframe").
     iIntros (CIDf Hsf mf) "%Hpost Hcg Hpc".
-    iDestruct (cpu_own_transport CIDr CIDf lvl eb pme C
+    iDestruct (cpu_own_transport CIDr CIDf lvl eb pme
                 (match lvl with O => eb | S _ => false end)
                 ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].

@@ -89,7 +89,7 @@ Definition wp_begin_op_sconf_body
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.begin_op in
   let pj := proc_addr j in
@@ -106,7 +106,7 @@ Definition wp_begin_op_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  begin_op's own acquire
      mints the pay its interior sleeps need at [eb = true] (the complement is
      [emp] and the caller brings nothing); at [eb = false] the push_off frees
@@ -129,7 +129,7 @@ Definition wp_begin_op_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -149,8 +149,8 @@ Module Type BEGIN_OP.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
-                             pidv dq m K eb C b lks.
+                             pidv dq m K eb b lks.
 End BEGIN_OP.

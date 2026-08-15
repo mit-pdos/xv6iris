@@ -77,7 +77,7 @@ Definition wp_userinit_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
-    (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (eb : bool) (pj : mword 64)
     (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.userinit in
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -91,7 +91,7 @@ Definition wp_userinit_sconf_body
   (* [kernel_data] supplies the "initcode" / "/" string literals *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
@@ -103,7 +103,7 @@ Definition wp_userinit_sconf_body
     sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    cpu_own 0%nat eb pj C b lks -∗
+    cpu_own 0%nat eb pj b lks -∗
     kalloc_env γa (avail_sub on userinit_pages) -∗
     (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -115,7 +115,7 @@ Module Type USERINIT.
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
-      (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (eb : bool) (pj : mword 64)
       (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γs m0 K eb pj C on v0 b lks.
+      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
 End USERINIT.

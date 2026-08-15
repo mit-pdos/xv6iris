@@ -133,9 +133,9 @@ Section ProofPrepareReturn.
      map), per [ProcInv.v]'s header on [tf_page_word_mem]. *)
 
   Lemma wp_prepare_return_sconf (γf : gname) (ks : mword 64) (pid : mword 32)
-      (V : pprivate) (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
+      (V : pprivate) (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string)
-    : wp_prepare_return_sconf_body γf ks pid V m av C p epc b lks.
+    : wp_prepare_return_sconf_body γf ks pid V m av p epc b lks.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.
@@ -275,9 +275,9 @@ Section ProofPrepareReturn.
                        (sign_extend' 64 (mword_of_int 2094204 : mword 21))
                      = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hentry) in "Hpc".
-    iDestruct (cpu_own_transport CID CID5 0%nat b p C b
+    iDestruct (cpu_own_transport CID CID5 0%nat b p b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p C b lks
+    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p b lks
               prr_n0 ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hk6 msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -297,7 +297,7 @@ Section ProofPrepareReturn.
     iDestruct (trap_csrs_ext_transport CID CID6 b p
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iApply (wp_intr_off_lvl0_s_sconf (mword_of_int (PRR + 0x0c)) b p A
-              (av - 2)%nat C with "Hcg Hcpu Hext Hpc Hi0c").
+              (av - 2)%nat with "Hcg Hcpu Hext Hpc Hi0c").
     (* THE BINDER INDEX IS THE ENTRY ONE.  The leaf's continuation is
        [wp_next b p] at the instruction's OWN index, and at [b = true] an
        interrupt can be taken ON this very instruction, so the hart may have

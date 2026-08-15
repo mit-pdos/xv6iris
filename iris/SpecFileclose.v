@@ -616,7 +616,7 @@ Definition wp_fileclose_sconf_body
     (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
     (fn : fclose_names) (on : option nat) (us : gset Z) (* the arms' ghosts   *)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -628,7 +628,7 @@ Definition wp_fileclose_sconf_body
   m !!! Regidx (mword_of_int 10 : mword 5) = fnode k ->
   locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, ON EVERY ARM.  [emp] at [eb = true], where
      fileclose's own acquire mints what the FS arm's interior sleeps need;
      the real pair at [eb = false], where the acquire mints nothing and it
@@ -656,7 +656,7 @@ Definition wp_fileclose_sconf_body
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
-    cpu_own n eb p C b lks -∗
+    cpu_own n eb p b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
@@ -675,7 +675,7 @@ Module Type FILECLOSE.
       (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat) (us : gset Z)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p C K b lks.
+      wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p K b lks.
 End FILECLOSE.

@@ -156,8 +156,8 @@ Section ProofMyproc.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_myproc_sconf
-      (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_myproc_sconf_body m av n eb p C b lks.
+      (m : regfile) (av n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_myproc_sconf_body m av n eb p b lks.
   Proof.
     cbv beta delta [wp_myproc_sconf_body].
     intros pcE ret_tgt Hpos Hav.
@@ -266,10 +266,10 @@ Section ProofMyproc.
     (* [Hown] was introduced at the function's ENTRY hart; the six plain
        instructions above each moved to a FRESH hart (CID1..CID6), so
        push_off wants it at CID6. *)
-    iDestruct (cpu_own_transport CID CID6 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID6 n eb p b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* the noff/intena cells + counting token ride inside cpu_own *)
-    iApply (PushOff.wp_push_off_sconf A2 (av - 4)%nat n eb p C b _
+    iApply (PushOff.wp_push_off_sconf A2 (av - 4)%nat n eb p b _
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
@@ -381,7 +381,7 @@ Section ProofMyproc.
       rewrite mp_load_reconcile. reflexivity. }
     (* ---- 0x1e: c.ld a5,48(a5) -- read the current-proc field ---- *)
     (* expose c->proc from cpu_own for the read, then refold *)
-    iDestruct (cpu_own_set_proc (S n) eb p p C lks with "Hown") as "(Hcur & Hown)".
+    iDestruct (cpu_own_set_proc (S n) eb p p lks with "Hown") as "(Hcur & Hown)".
     iEval (rewrite /cur_proc /a_cpu_proc) in "Hcur".
     iPoseProof (mpi_1e with "Htext") as "Hi1e".
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.myproc + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))
@@ -433,7 +433,7 @@ Section ProofMyproc.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
-    iApply (PushOff.wp_pop_off_sconf B9 (av - 4)%nat n eb p C _
+    iApply (PushOff.wp_pop_off_sconf B9 (av - 4)%nat n eb p _
               ltac:(lia) Hszlks
               with "Hcg Hown Hpay Htext Hpc").
     rewrite -Hbmatch.
@@ -574,7 +574,7 @@ Section ProofMyproc.
     (* [Hown] rode unchanged (at [CIDpp]) across the 6 plain epilogue
        instructions; transport it to the final hart [CIDe6] before handing
        everything back to [Hcont]. *)
-    iDestruct (cpu_own_transport CIDpp CIDe6 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDpp CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! ms E4 with "[%] Hcg Hown Hpc [%]").

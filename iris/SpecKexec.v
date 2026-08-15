@@ -396,7 +396,7 @@ Definition wp_kexec_sconf_body
     (afun : nat -> nat -> bv 8)                         (* the argument bytes  *)
     (pidv : mword 32) (V : pprivate)
     (dqb dqs dqa : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexec in
   let pj := proc_addr jp in
@@ -486,7 +486,7 @@ Definition wp_kexec_sconf_body
   b = true ->
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -524,7 +524,7 @@ Definition wp_kexec_sconf_body
       ⌜kexec_ok V V' (mf !!! Regidx (mword_of_int 10 : mword 5))
                 entry spv szv' na alen⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -562,10 +562,10 @@ Module Type KEXEC.
       (alen aslen : nat -> nat) (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_kexec_sconf_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used plen pfun na avf alen aslen afun
-                          pidv V dqb dqs dqa m K eb C b lks.
+                          pidv V dqb dqs dqa m K eb b lks.
 End KEXEC.

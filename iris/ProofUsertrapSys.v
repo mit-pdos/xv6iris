@@ -112,7 +112,7 @@ Section UtSysBlock.
   Qed.
 
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ)
+      (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -132,7 +132,7 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N V C false lks -∗
+    ut_hold (SY.syscall_env) N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -183,7 +183,7 @@ Section UtSysBlock.
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
     iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
-              M1 nx 0%nat false (un_pj N) C false lks
+              M1 nx 0%nat false (un_pj N) false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
     all: try lkbelow.
@@ -249,7 +249,7 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx C false lks Hwf' ltac:(unfold K_kexit; lia)
+                nx false lks Hwf' ltac:(unfold K_kexit; lia)
                 with "Htext Hpc Hcg [-]").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -374,7 +374,7 @@ Section UtSysBlock.
       assert (HV1upt : pv_upt V1 = pv_upt V)
         by (rewrite /V1; destruct V; reflexivity).
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
-      iDestruct (ut_flip_pre (un_pj N) C with "Hcpu") as "(Hcnt & Hcells & HC)".
+      iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
       (* THE CARVE, and why it needs a NAME for the remainder.  The enabling
          leaf's pre index is [trap_res true + n], so the block's own [nx] has
          to be re-spelled that way -- and [rewrite] on an equation whose LHS is
@@ -431,13 +431,15 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
-                S4 n2 C (un_pid N) V1 lks
+                S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; unfold K_syscall, K_sys_exit, K_kexit,
                                             kv_frame_slots; lia)
-                with "Hcg [HC] Htext Hkd Hpc Hpi Hpa Hsy Hpv [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hpa Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
-         at depth 0 makes that the set syscall's contract names. *)
-      { rewrite Hlkempty. iApply (cpu_own_on_intro (CID := CID1) (un_pj N) C with "HC"). }
+         at depth 0 makes that the set syscall's contract names.  It now
+         takes no premise at all -- [cpu_own] carries no caller frame to
+         fold in any more. *)
+      { rewrite Hlkempty. iApply cpu_own_on_intro. }
       iIntros (CID2 Hk2 mg V2) "%Hcsg %Htfg Hcg Hcpu Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -454,7 +456,7 @@ Section UtSysBlock.
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
-                n2 C true
+                n2 true
                 mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp

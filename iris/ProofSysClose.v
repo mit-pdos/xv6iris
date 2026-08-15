@@ -326,9 +326,9 @@ Section ProofSysClose.
   (* =================================================================== *)
   Lemma wp_sys_close_sconf  (γl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b lks.
+    : wp_sys_close_sconf_body γl γf fn on us m av n eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow.
@@ -540,8 +540,8 @@ Section ProofSysClose.
     iEval (rewrite -HM6a1) in "Hs3hi".
     iEval (rewrite -HM6a2) in "Hs4".
     (* ---- argfd(0, &fd, &f) ---- *)
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p C 0%nat v
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p 0%nat v
               pid V (word_hi w3) w4 b lks
               ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
               ltac:(unfold argfd_stack; lia)
@@ -627,7 +627,7 @@ Section ProofSysClose.
                 ltac:(lia) eq_refl eq_refl eq_refl HA7sp HA7a5 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
       iIntros (CID12 Hs12 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID9 CID12 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID9 CID12 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* [Hextc]/[Hextm] never moved: argfd does not mention them, so they
          rode along in the frame at the ENTRY hart.  ONE WIDE HOP from there,
          spanning argfd's own guard fact and every leaf step since. *)
@@ -675,8 +675,8 @@ Section ProofSysClose.
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)
                      = add_vec_int (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) 4)
         by (rewrite /B upd_eq; reflexivity).
-      iDestruct (cpu_own_transport CID9 CID12 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Myproc.wp_myproc_sconf B (av - 4)%nat n eb p C b lks
+      iDestruct (cpu_own_transport CID9 CID12 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iApply (Myproc.wp_myproc_sconf B (av - 4)%nat n eb p b lks
                 Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iIntros (CID13 Hs13 ms P) "%Hms Hcg Hcpu Hpc %HcsP".
@@ -835,7 +835,7 @@ Section ProofSysClose.
       assert (HDa0 : D !!! Regidx (mword_of_int 10 : mword 5) = fnode k).
       { rewrite /D upd_ne; [| reg_neq].
         rewrite /C5 upd_eq. exact Hfv. }
-      iDestruct (cpu_own_transport CID13 CID20 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID13 CID20 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* the complement is fileclose's, and it has not moved since entry --
          neither argfd nor myproc mentions it, so it rode along in the frame
          at the ENTRY hart.  ONE WIDE HOP from there, spanning both calls'
@@ -849,7 +849,7 @@ Section ProofSysClose.
          keep the other ([fileclose_env_split]). *)
       iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p C (av - 4)%nat b lks
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
                 ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href Hfcenv").
@@ -914,7 +914,7 @@ Section ProofSysClose.
                 ltac:(lia) eq_refl eq_refl eq_refl HR8sp HR8a5 HthrR
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hfcell").
       iIntros (CID23 Hs23 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID21 CID23 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID21 CID23 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       (* fileclose gave the complement back re-indexed at its own return hart
          [CID21], so this hop starts THERE -- it does not have to span
          fileclose's crossing, which is the literal [true] and would carry no

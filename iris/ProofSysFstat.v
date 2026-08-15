@@ -328,8 +328,8 @@ Section ProofSysFstat.
   Lemma wp_sys_fstat_sconf
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fstat_names) (pidv : mword 32) (V : pprivate) (v : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b lks.
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_fstat_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Heb.
@@ -501,9 +501,9 @@ Section ProofSysFstat.
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
     iEval (rewrite -HM5a1) in "Hs4".
-    iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+    iDestruct (cpu_own_transport CID CID7 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Argaddr.wp_argaddr_sconf M5 (av - 4)%nat 0%nat eb pj C 1%nat
+    iApply (Argaddr.wp_argaddr_sconf M5 (av - 4)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w4 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
               ltac:(unfold argaddr_stack; lia) Hpv
@@ -602,11 +602,11 @@ Section ProofSysFstat.
     assert (Hnzf : N4 !!! Regidx Ra2 <> (zero_reg : mword 64)).
     { rewrite HN4a2 sfs_addr_f_base. apply stack_off_nonzero; [exact Hspb | lia]. }
     iEval (rewrite -HN4a2) in "Hs3".
-    iDestruct (cpu_own_transport CID8 CID12 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+    iDestruct (cpu_own_transport CID8 CID12 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* ---- argfd(0, 0, &f).  [pfd] IS NULL and carries no resource --
        [SpecArgfd.ofd_out_null] is exactly this case. ---- *)
-    iApply (Argfd.wp_argfd_sconf γf N4 (av - 4)%nat 0%nat eb pj C 0%nat v
+    iApply (Argfd.wp_argfd_sconf γf N4 (av - 4)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
               ltac:(unfold argfd_stack; lia)
@@ -704,7 +704,7 @@ Section ProofSysFstat.
                 ltac:(lia) eq_refl eq_refl eq_refl HA2sp HA2a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
       iIntros (CID17 Hs17 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID13 CID17 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
@@ -801,10 +801,10 @@ Section ProofSysFstat.
         as (kk qq Cf) "([%Hfvk %Hkk] & Href & Hcore & Howe)".
       assert (HS3a0' : S3 !!! Regidx Ra0 = fnode kk) by (rewrite HS3a0; exact Hfvk).
       iDestruct (sfs_env_frame fn Cf with "Henv") as "[Hfenv Hfback]".
-      iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID13 CID19 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf fn pidv V
-                S3 (av - 4)%nat eb C b lks
+                S3 (av - 4)%nat eb b lks
                 ltac:(unfold filestat_stack; lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
@@ -847,7 +847,7 @@ Section ProofSysFstat.
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4").
       iIntros (CID21 Hs21 mg) "[%Hcsg %Hmga0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj C b
+      iDestruct (cpu_own_transport CID20 CID21 0%nat eb pj b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' with "[%] [%] [%] [%] Hcg Hcpu Hpc Hpriv Hkenv Henv").

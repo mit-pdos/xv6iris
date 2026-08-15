@@ -201,7 +201,7 @@ Definition wp_sys_exec_sconf_body
     (dqb dqs : dfrac)
     (v0 v1 : mword 64)                        (* syscall arguments 0 and 1 *)
     (pid : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exec in
   let pj := proc_addr j in
@@ -239,7 +239,7 @@ Definition wp_sys_exec_sconf_body
      [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order goal the
      callees raise -- kexec's whole FS cone at "log"/"bcache"/"sleep lock",
      argstr and kalloc and kfree at "kmem" -- is [locks_below ∅ _]. *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], which this
      contract's own premise forces, so no caller gains an obligation. *)
   trap_csrs_ext eb -∗
@@ -270,7 +270,7 @@ Definition wp_sys_exec_sconf_body
          report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -307,9 +307,9 @@ Module Type SYSEXEC.
       (dqb dqs : dfrac)
       (v0 v1 : mword 64)
       (pid : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_exec_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                              cn gtl cov logstart bmapstart inodestart nib
-                             size dev used dqb dqs v0 v1 pid V m K eb C b lks.
+                             size dev used dqb dqs v0 v1 pid V m K eb b lks.
 End SYSEXEC.

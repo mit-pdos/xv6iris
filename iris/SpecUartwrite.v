@@ -92,7 +92,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
     (pidv : mword 32) (dqp : dfrac) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartwrite in
@@ -124,7 +124,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   locks_below lks "proc" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands tx_lock be the ONLY lock held *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the device, and the transmitter's lock -- the whole credential.  The
      lock is a SLEEPLOCK now (UartTxInv.v): uartwrite parks between bytes and
@@ -150,7 +150,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
       p_pid pj ↦₄{dqp} pidv -∗
@@ -163,8 +163,8 @@ Module Type UARTWRITE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool)
       (pidv : mword 32) (dqp : dfrac) (lks : gset string),
-      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b pidv dqp lks.
+      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb n f dq b pidv dqp lks.
 End UARTWRITE.

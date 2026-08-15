@@ -575,7 +575,7 @@ Section ProofSysPipe.
   (* =================================================================== *)
   Lemma sp_close2 `{CID0 : CpuId}  (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
-      (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64)
       (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (Cf0 Cf1 : fcontent)
       (za zb zc zd ze zf : Z) (imm1 imm2 : mword 21) (b : bool) (lks : gset string) :
     (fileclose_stack <= nav)%nat ->
@@ -594,7 +594,7 @@ Section ProofSysPipe.
        its body touches a lock. *)
     locks_below lks "log" ->
     sie_cap_gpr Mt nav b p -∗
-    cpu_own 0%nat eb p C b lks -∗
+    cpu_own 0%nat eb p b lks -∗
     (* THE COMPLEMENT, THREADED THROUGH BOTH CLOSES.  fileclose takes it at
        the top level of its contract on every arm and gives it back, so this
        block cannot frame it: its two crossings are the literal [true]. *)
@@ -627,7 +627,7 @@ Section ProofSysPipe.
         ⌜ (forall c : mword 5, is_cs_idx c = true -> Mr !!! Regidx c = Mt !!! Regidx c)
           /\ Mr !!! Regidx Ra5 = (mword_of_int (-1) : mword 64) ⌝ -∗
         sie_cap_gpr Mr nav b p -∗
-        cpu_own 0%nat eb p C b lks -∗
+        cpu_own 0%nat eb p b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int zf : mword 64) -∗
@@ -673,7 +673,7 @@ Section ProofSysPipe.
     { rewrite /D2 upd_ne; [| vm_compute; discriminate]. rewrite /D1; apply upd_eq. }
     assert (HD2ra : D2 !!! Regidx Rra = add_vec_int (mword_of_int zb : mword 64) 4)
       by (rewrite /D2; apply upd_eq).
-    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iDestruct (trap_csrs_ext_transport CID0 CID6 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
@@ -681,7 +681,7 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (fileclose_env_frame fn on us 0%nat eb p Cf0 with "Hpenv Hfenv")
       as "[Hfcenv0 Hfcback0]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p C nav b lks
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p nav b lks
               Hnav sp_noff0 HD2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href0 Hfcenv0").
     all: try lkbelow.
@@ -722,7 +722,7 @@ Section ProofSysPipe.
     { rewrite /F2 upd_ne; [| vm_compute; discriminate]. rewrite /F1; apply upd_eq. }
     assert (HF2ra : F2 !!! Regidx Rra = add_vec_int (mword_of_int zd : mword 64) 4)
       by (rewrite /F2; apply upd_eq).
-    iDestruct (cpu_own_transport CID7 CID9 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID7 CID9 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* from [CID7], the hart the FIRST close came back on -- its crossing is
        [true] and carries no chain fact of its own. *)
@@ -732,7 +732,7 @@ Section ProofSysPipe.
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (fileclose_env_frame fn on1 us1 0%nat eb p Cf1 with "Hpenv Hfenv")
       as "[Hfcenv1 Hfcback1]".
-    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p C nav b lks
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p nav b lks
               Hnav sp_noff0 HF2a0 Hbelow
               with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href1 Hfcenv1").
     all: try lkbelow.
@@ -752,7 +752,7 @@ Section ProofSysPipe.
     set (G2 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> G1).
     change (<[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> G1) with G2.
     iEval (rewrite Hs1618) in "Hpc".
-    iDestruct (cpu_own_transport CID10 CID11 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID10 CID11 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iDestruct (trap_csrs_ext_transport CID10 CID11 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
@@ -963,9 +963,9 @@ Section ProofSysPipe.
   (* =================================================================== *)
   Lemma wp_sys_pipe_sconf (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
-      (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
+    : wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_pipe_sconf_body].
     intros pcE ret_tgt Harg Hav Hbelow.
@@ -1116,7 +1116,7 @@ Section ProofSysPipe.
                 r <> Rs0 -> r <> Rs1 -> mj !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
         sie_cap_gpr mj (av - 8)%nat b p -∗
-        cpu_own 0%nat eb p C b lks -∗
+        cpu_own 0%nat eb p b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0xda) : mword 64) -∗
@@ -1143,7 +1143,7 @@ Section ProofSysPipe.
                 Hav8 eq_refl eq_refl eq_refl eq_refl Hjsp Hja5 Hjthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
       iIntros (CID23 Hcr23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CIDE CID23 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDE CID23 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* [sp_epi] does not mention the complement, so the hop spans only its
          own crossing, from the hart the epilogue was entered on. *)
@@ -1174,9 +1174,9 @@ Section ProofSysPipe.
     iEval (rewrite Hjmp) in "Hpc".
     assert (HR3ra : R3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0xa) : mword 64) 4)
       by (rewrite /R3; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID24 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID24 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R3 (av - 8)%nat 0%nat eb p C b lks
+    iApply (Myproc.wp_myproc_sconf R3 (av - 8)%nat 0%nat eb p b lks
               sp_noff0 Hav10 with "Hcg Hcpu Htext Hpc").
     iIntros (CID25 Hcr25 ms P0) "%Hms Hcg Hcpu Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
@@ -1287,9 +1287,9 @@ Section ProofSysPipe.
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
     iEval (rewrite -HP4a1) in "Hb5".
-    iDestruct (cpu_own_transport CID25 CID29 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID25 CID29 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Argaddr.wp_argaddr_sconf P4 (av - 8)%nat 0%nat eb p C 0%nat
+    iApply (Argaddr.wp_argaddr_sconf P4 (av - 8)%nat 0%nat eb p 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v u5 (DfracOwn (1/4)) b lks
               sp_arg0 HP4a0 Harg sp_noff0
               Havaa Hpv with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hb5").
@@ -1386,7 +1386,7 @@ Section ProofSysPipe.
       rewrite /Q2 upd_ne; [| congruence].
       rewrite /Q1 upd_ne; [| congruence]. apply HthrQ0; assumption. }
     iEval (rewrite -HQ3a0) in "Hb6". iEval (rewrite -HQ3a1) in "Hb7".
-    iDestruct (cpu_own_transport CID30 CID33 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID30 CID33 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* neither myproc nor argaddr mentions the complement, so it rode along in
        the frame at the ENTRY hart: ONE WIDE HOP from there.  pipealloc DOES
@@ -1397,7 +1397,7 @@ Section ProofSysPipe.
     iDestruct (cpu_claim_ext_transport CID CID33 eb p
                  ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
     iApply (Pipealloc.wp_pipealloc_sconf γfl γf γa γk
-              (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p C (av - 8)%nat b lks
+              (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p (av - 8)%nat b lks
               Hav24 eq_refl sp_noff0
               with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpanic Hua Hub Hb6 Hb7").
     all: try lkbelow.
@@ -1462,7 +1462,7 @@ Section ProofSysPipe.
                     = mword_of_int (KernelSyms.sys_pipe + 0xda))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbt) in "Hpc".
-      iDestruct (cpu_own_transport CID34 CID36 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID34 CID36 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID34 CID36 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
@@ -1609,13 +1609,13 @@ Section ProofSysPipe.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /X1 upd_ne; [| congruence].
       rewrite /X0 upd_ne; [| congruence]. apply HthrW1; assumption. }
-    iDestruct (cpu_own_transport CID34 CID40 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID34 CID40 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* fdalloc now takes the block SPLIT at the fd table and no reference of
        its own; [Href0] stays here and settles the deficit on the way out. *)
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
     rewrite -(proc_ofiles_owe_empty γf p (pv_ofile V)).
-    iApply (Fdalloc.wp_fdalloc_sconf γf k0 ∅ X1 (av - 8)%nat 0%nat eb p C pid V b lks
+    iApply (Fdalloc.wp_fdalloc_sconf γf k0 ∅ X1 (av - 8)%nat 0%nat eb p pid V b lks
               HX1a0 Hk0lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
     iIntros (CID41 Hcr41 Y0) "%HcsY0 Hcg Hcpu Hpc Hcore Hpost1".
@@ -1660,7 +1660,7 @@ Section ProofSysPipe.
                      = mword_of_int (KernelSyms.sys_pipe + 0xc8))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbt1) in "Hpc".
-      iDestruct (cpu_own_transport CID41 CID43 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID41 CID43 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* fdalloc does not mention the complement: hop from [CID34], the hart
          pipealloc handed it back on. *)
@@ -1668,7 +1668,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID43 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iApply (sp_close2 (CID0 := CID43)  γfl γf fn on us Y0 (av - 8)%nat eb p C sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
+      iApply (sp_close2 (CID0 := CID43)  γfl γf fn on us Y0 (av - 8)%nat eb p sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091990 : mword 21) (mword_of_int 2091982 : mword 21) b lks
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
@@ -1765,11 +1765,11 @@ Section ProofSysPipe.
       assert (N10 : r <> Ra0) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /Z1 upd_ne; [| congruence].
       rewrite /Z0 upd_ne; [| congruence]. apply HthrY0; assumption. }
-    iDestruct (cpu_own_transport CID41 CID47 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID41 CID47 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iDestruct (proc_priv_split with "Hpriv") as "[Hcore Hof]".
     rewrite -(proc_ofiles_owe_empty γf p (pv_ofile (upd_ofile V fd0 (fnode k0)))).
-    iApply (Fdalloc.wp_fdalloc_sconf γf k1 ∅ Z1 (av - 8)%nat 0%nat eb p C pid
+    iApply (Fdalloc.wp_fdalloc_sconf γf k1 ∅ Z1 (av - 8)%nat 0%nat eb p pid
               (upd_ofile V fd0 (fnode k0)) b lks
               HZ1a0 Hk1lt sp_noff0 Havfd
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
@@ -1884,14 +1884,14 @@ Section ProofSysPipe.
       rewrite (sp_ofile_restore V fd0 (fnode k0) Hfree0).
       iEval (rewrite Hfv0) in "Hb6".
       (* +0xc8: fileclose(rf); fileclose(wf); a5 = -1 *)
-      iDestruct (cpu_own_transport CID48 CID53 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID48 CID53 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* neither fdalloc mentions the complement: still the hop from [CID34]. *)
       iDestruct (trap_csrs_ext_transport CID34 CID53 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CID34 CID53 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
-      iApply (sp_close2 (CID0 := CID53)  γfl γf fn on us F2 (av - 8)%nat eb p C sp0 k0' k1 q0' 1%Qp C0' Cf1
+      iApply (sp_close2 (CID0 := CID53)  γfl γf fn on us F2 (av - 8)%nat eb p sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091990 : mword 21) (mword_of_int 2091982 : mword 21) b lks
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
@@ -2210,13 +2210,13 @@ Section ProofSysPipe.
     (* the [int fd0] cell AS copyout's four-byte source buffer *)
     iDestruct "Hhi" as "[%Halhi Hbufhi]".
     iEval (rewrite -HA6a3) in "Hbufhi".
-    iDestruct (cpu_own_transport CID48 CID60 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID48 CID60 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Copyout.wp_copyout_sconf γa A6
               (pv_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)))
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) j)
-              (av - 8)%nat 0%nat eb p C b lks
+              (av - 8)%nat 0%nat eb p b lks
               Hav52 HA6a0 HA6a1 HA6a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henva Hbufhi").
     all: try lkbelow.
@@ -2255,7 +2255,7 @@ Section ProofSysPipe.
                 r <> Rs0 -> r <> Rs1 -> Mt !!! Regidx r = m !!! Regidx r) ⌝ -∗
         ⌜ uptd_ext (pv_upt V) P' ⌝ -∗
         sie_cap_gpr Mt (av - 8)%nat b p -∗
-        cpu_own 0%nat eb p C b lks -∗
+        cpu_own 0%nat eb p b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0x80) : mword 64) -∗
@@ -2382,7 +2382,7 @@ Section ProofSysPipe.
         rewrite (HE2thr r N15 N15). rewrite /E1 upd_ne; [| congruence].
         apply Htthr; assumption. }
       (* +0xa0: fileclose(rf); fileclose(wf); a5 = -1 *)
-      iDestruct (cpu_own_transport CIDT CID65 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDT CID65 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CIDT CID65 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
@@ -2390,7 +2390,7 @@ Section ProofSysPipe.
                    ltac:(rewrite Hb; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct "Hpenv" as (on2) "Hpenv".
       iDestruct "Hfenv" as (us2) "Hfenv".
-      iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 us2 E4 (av - 8)%nat eb p C sp0 k0' k1' q0' q1' C0' C1'
+      iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 us2 E4 (av - 8)%nat eb p sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
                 (mword_of_int 2092030 : mword 21) (mword_of_int 2092022 : mword 21) b lks
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
@@ -2408,7 +2408,7 @@ Section ProofSysPipe.
                       = mword_of_int (KernelSyms.sys_pipe + 0xda))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".
-      iDestruct (cpu_own_transport CID66 CID67 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID66 CID67 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID66 CID67 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
@@ -2446,7 +2446,7 @@ Section ProofSysPipe.
       iEval (rewrite Hbt3) in "Hpc".
       iDestruct ("Hpback" $! Pa with "[%] Hszc Hptc Hpt") as "Hpriv"; [exact Hext1|].
       iDestruct "HK" as "[_ Ht7c]".
-      iDestruct (cpu_own_transport CID61 CID68 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID61 CID68 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       (* neither fdalloc nor copyout mentions the complement: the hop is still
          from [CID34], the hart pipealloc handed it back on. *)
@@ -2649,12 +2649,12 @@ Section ProofSysPipe.
     (* the [int fd1] cell AS the second copyout's buffer *)
     iDestruct "Hlo" as "[%Hallo Hbuflo]".
     iEval (rewrite -HC7a3) in "Hbuflo".
-    iDestruct (cpu_own_transport CID61 CID75 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID61 CID75 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Copyout.wp_copyout_sconf γa C7 Pa
               (pv_sz (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1))) 4%nat
               (fun j => nth_byte (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) j)
-              (av - 8)%nat 0%nat eb p C b lks
+              (av - 8)%nat 0%nat eb p b lks
               Hav52 HC7a0 HC7a1 HC7a4 sp_len4 Hszb sp_n0
               with "Hcg Hcpu Htext Hpc Hpt Henvb Hbuflo").
     all: try lkbelow.
@@ -2721,7 +2721,7 @@ Section ProofSysPipe.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbt4) in "Hpc".
       iDestruct "HK" as "[Hepi _]".
-      iDestruct (cpu_own_transport CID76 CID78 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID76 CID78 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID34 CID78 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".
@@ -2753,7 +2753,7 @@ Section ProofSysPipe.
                       = mword_of_int (KernelSyms.sys_pipe + 0x80)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp80) in "Hpc".
       iDestruct "HK" as "[_ Ht7c]".
-      iDestruct (cpu_own_transport CID76 CID79 0%nat eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID76 CID79 0%nat eb p b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID34 CID79 eb p
                    ltac:(rewrite Hb; wp_next_chain) with "Hextc") as "Hextc".

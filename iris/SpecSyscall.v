@@ -93,7 +93,7 @@ Definition wp_syscall_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (R : gname -> mword 64 -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (C : iProp Σ)
+    (m : regfile) (av : nat)
     (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
@@ -104,7 +104,7 @@ Definition wp_syscall_sconf_body
   (* INTERRUPTS ON, at push_off level 0 -- see the header: the [csrsi] that
      precedes the only call site, and what the parking entries need. *)
   sie_cap_gpr m av true pj -∗
-  cpu_own 0%nat true pj C true lks -∗
+  cpu_own 0%nat true pj true lks -∗
   (* [kernel_data] is the jump table itself ([syscalls] lives in .rodata) and
      argraw's below it; [procs_inv]/[panic_wp_any] are the proc array and the
      panic arms every acquire/release in the cone reaches. *)
@@ -122,7 +122,7 @@ Definition wp_syscall_sconf_body
          return value), and sbrk / exec / chdir / open move the rest. *)
       ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
       sie_cap_gpr mf av true pj -∗
-      cpu_own 0%nat true pj C true lks -∗
+      cpu_own 0%nat true pj true lks -∗
       R γf pj -∗
       proc_priv γf pj pid V' -∗
       pc_is ret_tgt -∗
@@ -156,7 +156,7 @@ Module Type SYSCALL.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (C : iProp Σ)
+      (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl m av C pid V lks.
+      wp_syscall_sconf_body syscall_env γf γs j γl m av pid V lks.
 End SYSCALL.

@@ -95,8 +95,8 @@ Section ProofAllocpid.
 
 
   Lemma wp_allocpid_sconf (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_allocpid_sconf_body γp m av n eb p C b lks.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_allocpid_sconf_body γp m av n eb p b lks.
   Proof.
     cbv beta delta [wp_allocpid_sconf_body].
     intros pcE ret_tgt Hn Hav Hbelow.
@@ -234,9 +234,9 @@ Section ProofAllocpid.
     (* [Hcpu] was introduced at this function's ENTRY hart; the eight plain
        instructions above have each moved to a FRESH, universally quantified
        hart (CID1..CID8), so acquire wants it at CID8. *)
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p C (av - 4)%nat b lks
+    iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p (av - 4)%nat b lks
               Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     all: try lkbelow.
@@ -410,7 +410,7 @@ Section ProofAllocpid.
        it -- so this is a pure re-spelling, and it is what makes the
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p C (av - 4)%nat
+    iApply (Release.wp_release_sconf γp alp_pid_lock "nextpid"%string nextpid_res B7 n eb p (av - 4)%nat
               ({["nextpid"]} ∪ lks)
               Hlka ltac:(pose proof (apid_K10 av Hav); lia)
               with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -556,7 +556,7 @@ Section ProofAllocpid.
     (* [Hcpu] was handed back by release at [CIDrel]; the six plain
        epilogue instructions have each moved to a fresh hart, so [Hcont]
        (specialized at the LAST one, [CIDe6]) wants it there. *)
-    iDestruct (cpu_own_transport CIDrel CIDe6 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc").

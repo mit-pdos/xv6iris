@@ -163,7 +163,7 @@ Definition wp_sys_pipe_sconf_body
       !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat) (us : gset Z)
-    (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
      naming both would put TWO instance paths to [inG Σ fracR] in scope --
@@ -186,7 +186,7 @@ Definition wp_sys_pipe_sconf_body
   (* [n = 0]: copyout's chain reaches vmfault, whose kalloc runs with
      interrupts un-pushed (SpecCopyout.v) -- and sys_pipe holds no lock
      across any of its calls anyway. *)
-  cpu_own 0%nat eb p C b lks -∗
+  cpu_own 0%nat eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
      come from the TRAP.  sys_pipe acquires no lock of its own, so it mints
@@ -225,7 +225,7 @@ Definition wp_sys_pipe_sconf_body
       ⌜callee_saved m mf⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own 0%nat eb p C b lks -∗
+      cpu_own 0%nat eb p b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb p -∗
       pc_is ret_tgt -∗
@@ -245,7 +245,7 @@ Module Type SYSPIPE.
              !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat) (us : gset Z)
-      (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b lks.
+      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p v pid V b lks.
 End SYSPIPE.

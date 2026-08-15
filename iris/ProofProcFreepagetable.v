@@ -230,8 +230,8 @@ Section ProofProcFreepagetable.
   Lemma wp_proc_freepagetable_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string)
-    : wp_proc_freepagetable_sconf_body γa mm P K eb p C ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string)
+    : wp_proc_freepagetable_sconf_body γa mm P K eb p ilvl b lks.
   Proof.
     cbv beta delta [wp_proc_freepagetable_sconf_body].
     intros pcE sz ret_tgt HK Hilvl Hroot Hbnd Hbelow Hlkbelow.
@@ -528,11 +528,11 @@ Section ProofProcFreepagetable.
       by (rewrite /B5 upd_eq; reflexivity).
     (* ---- the table, at the fixed-leaf altitude ---- *)
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
-    iDestruct (cpu_own_transport CID CID14 ilvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID14 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa B5
               (upt_fixed_both P.(ud_tfp)) P.(ud_root) P.(ud_um) tramp_vpn
-              (K - 4)%nat eb p C ilvl b
+              (K - 4)%nat eb p ilvl b
               _ HKuu Hilvl HB5a0
               ltac:(rewrite HB5a1; exact pf_tramp_align)
               HB5a2 HB5a3
@@ -681,11 +681,11 @@ Section ProofProcFreepagetable.
     assert (HC6ra : C6 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) 4)
       by (rewrite /C6 upd_eq; reflexivity).
-    iDestruct (cpu_own_transport CID15 CID22 ilvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID15 CID22 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (UvmunmapFixed.wp_uvmunmap_fixed_sconf γa C6
               {[tf_vpn := pte_tf P.(ud_tfp)]} P.(ud_root) P.(ud_um) tf_vpn
-              (K - 4)%nat eb p C ilvl b
+              (K - 4)%nat eb p ilvl b
               _ HKuu Hilvl HC6a0
               ltac:(rewrite HC6a1; exact pf_tf_align)
               HC6a2 HC6a3
@@ -772,10 +772,10 @@ Section ProofProcFreepagetable.
     assert (HD2ra : D2 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) 4)
       by (rewrite /D2 upd_eq; reflexivity).
-    iDestruct (cpu_own_transport CID23 CID26 ilvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID23 CID26 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Uvmfree.wp_uvmfree_sconf γa D2 P.(ud_root) P.(ud_um)
-              (K - 4)%nat eb p C ilvl b
+              (K - 4)%nat eb p ilvl b
               _ HKuf Hilvl HD2a0
               ltac:(rewrite HD2a1; exact Hbnd)
               ltac:(rewrite HD2a1; exact Hdom)
@@ -927,7 +927,7 @@ Section ProofProcFreepagetable.
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (E4 !!! Regidx Rra) = ret_tgt) by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iDestruct (cpu_own_transport CID27 CID33 ilvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID27 CID33 ilvl eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID33 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "Hcg Hcpu Hpc [%]").

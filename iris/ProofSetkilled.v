@@ -65,8 +65,8 @@ Section ProofSetkilled.
   Notation sk_a5 := (mword_of_int 15 : mword 5).
 
   Lemma wp_setkilled_sconf  (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_setkilled_sconf_body γs j γl m av n eb p C b lks.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_setkilled_sconf_body γs j γl m av n eb p b lks.
   Proof.
     cbv beta delta [wp_setkilled_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav Hno.
@@ -182,10 +182,10 @@ Section ProofSetkilled.
     assert (HB1a0 : B1 !!! Regidx sk_a0 = proc_addr j)
       by (rewrite /B1 upd_ne; [exact HA2a0 | vm_compute; discriminate]).
     (* ===================== acquire(&p->lock) ===================== *)
-    iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b lks
+              (proc_lock_res γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     all: try lkbelow.
@@ -276,7 +276,7 @@ Section ProofSetkilled.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C3 n eb p C (av - 4)%nat
+              (proc_lock_res γs γl (proc_addr j)) C3 n eb p (av - 4)%nat
               ({["proc"%string]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
@@ -414,7 +414,7 @@ Section ProofSetkilled.
       rewrite /A2 upd_ne; [| congruence].
       rewrite /A1 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
-    iDestruct (cpu_own_transport CIDrel CIDe7 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E3 with "[%] Hcg Hcpu Hpc").

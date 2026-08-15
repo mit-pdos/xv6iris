@@ -121,8 +121,8 @@ Section ProofBpin.
   Proof. intros H0 H1. rewrite /incr32. by apply moi32_storeval_succ. Qed.
 
   Lemma wp_bpin_sconf (bn : bio_names) (V : bio_view Σ) (k : nat)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
-    : wp_bpin_sconf_body bn V k m n eb p C K b lks.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
+    : wp_bpin_sconf_body bn V k m n eb p K b lks.
   Proof.
     cbv beta delta [wp_bpin_sconf_body].
     intros pcE ret_tgt HK Hnoffpos Hk Ha0 Hbelow.
@@ -276,9 +276,9 @@ Section ProofBpin.
       rewrite /R4 upd_ne; [| vm_compute; discriminate]. exact HR3s1. }
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) mA
-              n eb p C (K - 4)%nat b lks
+              n eb p (K - 4)%nat b lks
               Hnoffpos ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     all: try lkbelow.
@@ -520,7 +520,7 @@ Section ProofBpin.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) D5
-              n eb p C (K - 4)%nat
+              n eb p (K - 4)%nat
               ({["bcache"]} ∪ lks)
               ltac:(rewrite HD5a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
@@ -647,7 +647,7 @@ Section ProofBpin.
       rewrite /R3 upd_ne; [| regne].
       rewrite /R2 upd_ne; [| regne].
       rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iDestruct (cpu_own_transport CID11 CID16 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID11 CID16 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID16 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P4 with "Hcg Hcnt Hpc [%] Href").
     unfold callee_saved.

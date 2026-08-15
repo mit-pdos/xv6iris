@@ -605,14 +605,14 @@ Section KexecA.
   (*  callee below chains at the literal [true].                          *)
   (* =================================================================== *)
   Lemma kxc_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+      (p : mword 64) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
@@ -927,7 +927,7 @@ Section KexecASeam.
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64)
       (n1 : nat) : iProp Σ :=
     let pj := proc_addr jp in
@@ -942,7 +942,7 @@ Section KexecASeam.
           r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> M32 !!! Regidx r = m !!! Regidx r) ⌝ ∗
      pc_is (mword_of_int (KXA + 0x32) : mword 64) ∗
      sie_cap_gpr M32 (K - 68)%nat b pj ∗
-     cpu_own 0 eb pj C b lks ∗
+     cpu_own 0 eb pj b lks ∗
      (* ---- the open log transaction, and what namei left of its budget.
             [iput_units <= n1] AND NOT AN INTERVAL IN THE PATH LENGTH: the
             walk is priced by [SpecNamex.walk_need], which is 4 whatever the
@@ -1122,7 +1122,7 @@ Section KexecAExit.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m Mt : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (68 <= K)%nat ->
     used' ⊆ used ->
@@ -1136,7 +1136,7 @@ Section KexecAExit.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr Mt (K - 68)%nat b pj -∗
-    cpu_own 0 eb pj C b lks -∗
+    cpu_own 0 eb pj b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x72) : mword 64) -∗
     kxc_frame sp0 ra0 s00 s10 s20 -∗
@@ -1157,7 +1157,7 @@ Section KexecAExit.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K b pj -∗
-          cpu_own 0 eb pj C b lks -∗
+          cpu_own 0 eb pj b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1181,7 +1181,7 @@ Section KexecAExit.
               HK Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hthr
               with "Hcg Htext Hpc Hframe").
     iIntros (CIDe Hse mf) "%Hcs %Hpres Hcg Hpc".
-    iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj C b Hse
+    iDestruct (cpu_own_transport CID0 CIDe 0%nat eb pj b Hse
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe with "[%]"); [exact Hse |].
     iApply ("Hcont" $! mf used' V (mword_of_int 0 : mword 64)
@@ -1258,7 +1258,7 @@ Section KexecABad.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (C : iProp Σ) (lks : gset string)
+      (m Mt : regfile) (K : nat) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
     (k < NINODE)%nat ->
@@ -1286,7 +1286,7 @@ Section KexecABad.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 -> r <> Rs0 ->
         r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true lks -∗
+    cpu_own 0 true (proc_addr jp) true lks -∗
     kernel_text -∗
     panic_wp_any -∗
     pc_is (mword_of_int (KXA + 0x64) : mword 64) -∗
@@ -1325,7 +1325,7 @@ Section KexecABad.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) C true lks -∗
+          cpu_own 0 true (proc_addr jp) true lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1397,12 +1397,12 @@ Section KexecABad.
       by (rewrite /B2 upd_ne; [exact HB1a0 | nz]).
     assert (HB2sp : B2 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /B2 upd_ne; [exact HB1sp | nz]).
-    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Iunlockput.wp_iunlockput_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
-              B2 (K - 68)%nat true C true lks
+              B2 (K - 68)%nat true true lks
               ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
@@ -1439,11 +1439,11 @@ Section KexecABad.
       by (rewrite /B3; apply upd_eq).
     assert (HB3sp : B3 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /B3 upd_ne; [exact HM1sp | nz]).
-    iDestruct (cpu_own_transport CIDu CIDj2 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CIDu CIDj2 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true C true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+              true true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
@@ -1509,7 +1509,7 @@ Section KexecABad.
     (* ---- close the process back up and take the shared exit ---- *)
     iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
     rewrite kxc_upd_cwd_id.
-    iDestruct (cpu_own_transport CIDe CIDd 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CIDe CIDd 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iAssert (iref_slots 2) with "[Hirs Hirs1]" as "Hirs2".
     { change 2%nat with (1 + 1)%nat. rewrite iref_slots_op.
@@ -1548,7 +1548,7 @@ Section KexecABad.
        [transitivity] discharge it without touching the rest of Δ. *)
     iApply (kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart
               inodestart size used used3 plen pfun na avf alen aslen afun pidv V
-              dqb dqs dqa m B5 K true C true lks sp0 ra0 s00 s10 s20 pv av
+              dqb dqs dqa m B5 K true true lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) ltac:(transitivity used2; [exact Hu3 | exact Hu2])
               Hsp Hra Hs0 Hs1 Hs2 HB5sp HB5a0 HB5thr
               with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hbits Hka Hpriv Hpath Hargv
@@ -1656,7 +1656,7 @@ Section KexecCBad.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (C : iProp Σ) (lks : gset string)
+      (m Mt : regfile) (K : nat) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (P : uptd) (szf : mword 64) :
     (K_kexec <= K)%nat ->
@@ -1672,7 +1672,7 @@ Section KexecCBad.
     um_below szf P.(ud_um) ->
     um_covered szf P.(ud_um) ->
     sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true lks -∗
+    cpu_own 0 true (proc_addr jp) true lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KXA + 0x1d6) : mword 64) -∗
     proc_pt P -∗
@@ -1697,7 +1697,7 @@ Section KexecCBad.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K true (proc_addr jp) -∗
-          cpu_own 0 true (proc_addr jp) C true lks -∗
+          cpu_own 0 true (proc_addr jp) true lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1792,10 +1792,10 @@ Section KexecCBad.
       by (rewrite /B3 upd_ne; [exact HB2a1 | nz]).
     assert (HB3sp : B3 !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite /B3 upd_ne; [exact HB2sp | nz]).
-    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PFP.wp_proc_freepagetable_sconf ga B3 P (K - 68)%nat true
-              (proc_addr jp) C 0%nat true lks
+              (proc_addr jp) 0%nat true lks
               ltac:(lia) ltac:(lia) HB3a0
               ltac:(rewrite HB3a1 uint_unsigned; exact Hmax)
               ltac:(rewrite HB3a1; exact Hbelow)
@@ -2042,11 +2042,11 @@ Section KexecCBad.
                    (CIDj : CPU) = (CID0 : CPU)) by wp_next_chain.
     iDestruct (wp_next_retarget CID0 CIDj true (proc_addr jp) _ Hcr
                  with "Hcont") as "Hcont".
-    iDestruct (cpu_own_transport CID3 CIDj 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID3 CIDj 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (T.kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart
               inodestart size used used' plen pfun na avf alen aslen afun pidv V
-              dqb dqs dqa m B13 K true C true lks sp0 ra0 s00 s10 s20 pv av
+              dqb dqs dqa m B13 K true true lks sp0 ra0 s00 s10 s20 pv av
               ltac:(lia) Hused Hsp Hra Hs0 Hs1 Hs2 HB13sp HB13a0 HB13thr
               with "Hcg Hcnt Htext Hpc Hfr Hbm Hins Hbits Hka Hpriv Hpath Hargv
                     Hargs Hbs Hirs Hcont").

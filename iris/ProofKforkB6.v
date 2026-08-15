@@ -231,7 +231,7 @@ Section KforkPrologue.
   Lemma kfk_prologue
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
       (R : iProp Σ) (lks : gset string) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
@@ -247,7 +247,7 @@ Section KforkPrologue.
        and its own contract does not yet expose the premise. *)
     locks_below lks "proc" ->
     sie_cap_gpr m K b pme -∗
-    cpu_own lvl eb pme C b lks -∗
+    cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
     panic_wp_any -∗
@@ -280,7 +280,7 @@ Section KforkPrologue.
            [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
            lets a proof drop it silently, which is exactly how it went
            missing from this continuation the first time. *)
-        cpu_own lvl eb pme C b lks -∗
+        cpu_own lvl eb pme b lks -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
@@ -344,7 +344,7 @@ Section KforkPrologue.
         IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
+        cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -415,7 +415,7 @@ Section KforkPrologue.
                 either way, hence convertible, and [iApply] bridges them. *)
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
-        cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
+        cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
@@ -577,8 +577,8 @@ Section KforkPrologue.
     assert (HM2ra : M2 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0xc) : mword 64) 4)
       by (rewrite /M2 upd_eq; reflexivity).
     (* ---- myproc(): a0 = pme ---- *)
-    iDestruct (cpu_own_transport CID0 CID7 lvl eb pme C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme C b _
+    iDestruct (cpu_own_transport CID0 CID7 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf M2 K1 lvl eb pme b _
               ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -644,8 +644,8 @@ Section KforkPrologue.
       by (rewrite /M5 upd_ne; [exact HM4s5 | vm_compute; discriminate]).
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x12) : mword 64) 4)
       by (rewrite /M5 upd_eq; reflexivity).
-    iDestruct (cpu_own_transport CID8 CID10 lvl eb pme C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme C on b lks
+    iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on b lks
               ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Henv").
     all: try lkbelow.
@@ -689,7 +689,7 @@ Section KforkPrologue.
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
-      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
@@ -926,12 +926,12 @@ Section KforkPrologue.
          invariant), so uvmcopy's "child map free over the run" is
          [lookup_empty]. *)
       assert (HCempty : ud_um (pv_upt Vc) = ∅) by (rewrite HVcupt; reflexivity).
-      iDestruct (cpu_own_transport CID11 CID18 (S lvl) eb pme C false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID11 CID18 (S lvl) eb pme false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply fupd_wp.
       iMod (kalloc_env_seal with "Henv'") as "Henv'".
       iModIntro.
       iDestruct "Henv'" as "#Henv'".
-      iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme C (S lvl) false
+      iApply (Uvmcopy.wp_uvmcopy_sconf γa N5p (pv_upt Vp) (pv_upt Vc) (trap_res b + K1)%nat eb pme (S lvl) false
                 ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) HN5ptp HN5pa0 HN5pa1 HszbP
                 ltac:(intros i _; rewrite HCempty; apply lookup_empty)
@@ -973,7 +973,7 @@ Section KforkPrologue.
            unlike [sie_cap_gpr]/[pc_is]/etc which are re-quantified fresh by
            every leaf: bring them from CID11 (where allocproc's found arm
            left them) up to the current hart. *)
-        iDestruct (cpu_own_transport CID19 CID20 (S lvl) eb pme C false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID19 CID20 (S lvl) eb pme false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         assert (Hchain7c : false = false \/ pme = zero_reg -> (CID20 : CPU) = (CID11 : CPU))
           by wp_next_chain.
         assert (HCIDeq7c : (CID11 : CPU) = (CID20 : CPU))
@@ -1164,7 +1164,7 @@ Section KforkPrologue.
                   N9 (trap_res b + K1)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi046").
         iIntros (CID28 Hs28) "Hcg Hpc".
-        iDestruct (cpu_own_transport CID19 CID28 (S lvl) eb pme C false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID19 CID28 (S lvl) eb pme false ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         assert (Hchain4a : false = false \/ pme = zero_reg -> (CID28 : CPU) = (CID11 : CPU))
           by wp_next_chain.
         assert (HCIDeq4a : (CID11 : CPU) = (CID28 : CPU))
@@ -1290,7 +1290,7 @@ Section KforkPrologue.
       (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
          [allocproc_post] at CID11 and the continuation is at CID12, and the
          two print IDENTICALLY.  durable-notes' rule. *)
-      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".

@@ -192,7 +192,7 @@ Definition wp_ialloc_sconf_body
     (dev : mword 32) (ty : mword 16)
     (u : nat)
     (pidv : mword 32) (dq dqs dqn : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
@@ -230,7 +230,7 @@ Definition wp_ialloc_sconf_body
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -276,7 +276,7 @@ Definition wp_ialloc_sconf_body
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -336,7 +336,7 @@ Definition wp_ialloc_gen_body
     (dev : mword 32) (ty : mword 16)
     (u : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqs dqn : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ialloc in
   let pj := proc_addr j in
@@ -374,7 +374,7 @@ Definition wp_ialloc_gen_body
      whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
@@ -424,7 +424,7 @@ Definition wp_ialloc_gen_body
     (dn' : dinode),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -473,11 +473,11 @@ Module Type IALLOC.
       (dev : mword 32) (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_ialloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                          cov logstart inodestart ninodes nib dev ty u Sb
-                         pidv dq dqs dqn m K eb C b lks.
+                         pidv dq dqs dqn m K eb b lks.
 
   Parameter wp_ialloc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -495,9 +495,9 @@ Module Type IALLOC.
       (dev : mword 32) (ty : mword 16)
       (u : nat)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_ialloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty u
-                           pidv dq dqs dqn m K eb C b lks.
+                           pidv dq dqs dqn m K eb b lks.
 End IALLOC.

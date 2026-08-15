@@ -148,7 +148,8 @@ Section SpecMainSecondary.
        provably cannot move under this contract, and (as on the boot arm) it
        needs no [wp_next] wrapper: it diverges, there is no continuation. *)
     sie_cap_gpr m K false p0 -∗
-    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
+    cpu_ctx_free -∗
+    cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
        own [intr_res] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
        The ghost is this hart's canonical [sie_gname] now, not a parameter. *)

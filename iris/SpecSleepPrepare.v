@@ -64,7 +64,7 @@ Import Defs.
 
 Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (b : bool)
     (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sleep_prepare in
   let pj := proc_addr j in
@@ -83,7 +83,7 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
      [locks_below_not_elem] gives the non-membership the ghost step needs. *)
   locks_below lks "proc" ->
   sie_cap_gpr m av b pj -∗
-  cpu_own n eb pj C b lks -∗
+  cpu_own n eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
@@ -91,7 +91,7 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own n eb pj C b lks -∗
+      cpu_own n eb pj b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -100,7 +100,7 @@ Module Type SLEEP_PREPARE.
   Parameter wp_sleep_prepare_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (b : bool)
       (lks : gset string),
-      wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
+      wp_sleep_prepare_sconf_body γs j γl m av n eb b lks.
 End SLEEP_PREPARE.

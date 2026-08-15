@@ -53,8 +53,8 @@ Section ProofRelease.
   Lemma wp_release_gen_sconf
       (γl : gname) (lka : mword 64) (s : string) (R Dc Out : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (lks : gset string)
-    : wp_release_gen_sconf_body γl lka s R Dc Out m n eb p C av lks.
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (lks : gset string)
+    : wp_release_gen_sconf_body γl lka s R Dc Out m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_gen_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
@@ -292,7 +292,7 @@ Section ProofRelease.
     (* pop_off's UNWIND PREMISE, discharged exactly as the discipline says:
        the coupling gave [size lks <= S n] on the way in, the cpu-field clear
        above deleted this lock's rank, so the set now fits under [n]. *)
-    iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p C _
+    iApply (PushOff.wp_pop_off_sconf M1 (av - 4)%nat n eb p _
               ltac:(lia)
               ltac:(exact (size_del_lt s lks n Hin Hsz))
               with "Hcg Hown Hpay Htext Hpc").
@@ -403,7 +403,7 @@ Section ProofRelease.
       by (rewrite HE4ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
     assert (Hchainf : (match n with O => eb | S _ => false end) = false \/ p = zero_reg -> (CIDe5 : CPU) = (CIDpo : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CIDpo CIDe5 n eb p C (match n with O => eb | S _ => false end) Hchainf with "Hown") as "Hown".
+    iDestruct (cpu_own_transport CIDpo CIDe5 n eb p (match n with O => eb | S _ => false end) Hchainf with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "HOut Hcg Hpc [%] Hown").
     unfold callee_saved. repeat split.
@@ -506,14 +506,14 @@ Section OfGen.
   Lemma wp_release_sconf
       (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
-    : wp_release_sconf_body γl lka s R m n eb p C av lks.
+    : wp_release_sconf_body γl lka s R m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hown Hpay Hcont".
-    iApply (G.wp_release_gen_sconf γl lka s R False%I emp%I m n eb p C av lks
+    iApply (G.wp_release_gen_sconf γl lka s R False%I emp%I m n eb p av lks
               Hlka Hav (lock_refute_False _) (lock_refute_False _)
               with "Hcg Htext Hpc [] Htoken HR [] Hown Hpay").
     { iApply (is_lock_openable with "Hlock"). }
@@ -541,16 +541,16 @@ Section CancelOfGen.
   Lemma wp_release_cancel_sconf
       (γl : gname) (lka : mword 64) (s : string) (R D Out : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat)
       (lks : gset string)
-    : wp_release_cancel_sconf_body γl lka s R D Out m n eb p C av lks.
+    : wp_release_cancel_sconf_body γl lka s R D Out m n eb p av lks.
   Proof.
     cbv beta delta [wp_release_cancel_sconf_body].
     intros pcE lk0 ret_tgt. cbv zeta. intros Hlka Hav Href Hrefpre.
     iIntros "Hcg #Htext Hpc #Hlock Htoken HR Hbuild Hown Hpay Hcont".
     iApply (G.wp_release_gen_sconf γl lka s R D
               (lka ↦₄ (mword_of_int 0 : mword 32) ∗ lock_cpu lka ↦₈ (zero_reg : mword 64) ∗ Out)%I
-              m n eb p C av lks
+              m n eb p av lks
               Hlka Hav Href Hrefpre
               with "Hcg Htext Hpc Hlock Htoken HR [Hbuild] Hown Hpay").
     { iApply (lock_finisher_destroy with "Hbuild"). }

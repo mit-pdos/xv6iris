@@ -143,7 +143,7 @@ Definition wp_pipealloc_sconf_body
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
-    (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string) :=
+    (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipealloc in
   (* a0 = f0 (the read end's slot), a1 = f1 (the write end's slot).  They are
      SEPARATE conjuncts below, which is how the spec says the caller must pass
@@ -162,7 +162,7 @@ Definition wp_pipealloc_sconf_body
      by [LockRank.locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true], so no existing
      call site changes; at [eb = false] the real pair, which can only have
      come from the TRAP.  pipealloc acquires no lock of its own, so it mints
@@ -197,7 +197,7 @@ Definition wp_pipealloc_sconf_body
   wp_next true p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
-    cpu_own n eb p C b lks -∗
+    cpu_own n eb p b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb p -∗
     pc_is ret_tgt -∗
@@ -218,6 +218,6 @@ Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string),
-      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b lks.
+      (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
+      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks.
 End PIPEALLOC.

@@ -109,7 +109,7 @@ Definition wp_consoleread_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname) (γc : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool)
     (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consoleread in
   let pj := proc_addr j in
@@ -138,7 +138,7 @@ Definition wp_consoleread_sconf_body
   locks_below lks "cons" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands cons.lock be the ONLY lock held *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE WHOLE CREDENTIAL: cons.lock, whose resource is the ring and the
      three indices (ConsoleInv.v).  Persistent, so nothing about the console
@@ -157,7 +157,7 @@ Definition wp_consoleread_sconf_body
       ⌜(-1 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -169,7 +169,7 @@ Module Type CONSOLEREAD.
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γc : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb C pid V n b lks.
+      wp_consoleread_sconf_body γa γf γs j γlp γc m av eb pid V n b lks.
 End CONSOLEREAD.

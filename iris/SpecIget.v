@@ -166,7 +166,7 @@ Definition wp_iget_sconf_body
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
     (dev inum : mword 32)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iget in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -184,7 +184,7 @@ Definition wp_iget_sconf_body
      the caller must already hold only locks BELOW "itable"'s rank. *)
   locks_below lks "itable" ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
@@ -199,7 +199,7 @@ Definition wp_iget_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
     sie_cap_gpr mr K b p -∗
-    cpu_own n eb p C b lks -∗
+    cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ (k < NINODE)%nat
@@ -216,8 +216,8 @@ Module Type IGET.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
-                         m n eb p C K b lks.
+                         m n eb p K b lks.
 End IGET.

@@ -56,10 +56,10 @@ Section ProofArgaddr.
       tryif unify a b then fail else (vm_compute; discriminate) end.
 
   Lemma wp_argaddr_sconf
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (old : mword 64) (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_argaddr_sconf_body m av n eb p C i tfp ws v old dqt b lks.
+    : wp_argaddr_sconf_body m av n eb p i tfp ws v old dqt b lks.
   Proof.
     cbv beta delta [wp_argaddr_sconf_body].
     intros pcE ip ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
@@ -190,8 +190,8 @@ Section ProofArgaddr.
     (* ===================== argraw() ===================== *)
     (* carry [Hcpu] (cpu_own, hart-indexed) from the entry hart to the current
        chain hart [CID7] before the callee wants it. *)
-    iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argraw.wp_argraw_sconf A3 (av - 4)%nat n eb p C i tfp ws v dqt b lks
+    iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Argraw.wp_argraw_sconf A3 (av - 4)%nat n eb p i tfp ws v dqt b lks
               Hi HA3a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
     iIntros (CID8 Hs8 MF) "%HcsMF Hcg Hcpu Hpc Htfp Htfa".
@@ -330,7 +330,7 @@ Section ProofArgaddr.
       rewrite /A0 upd_ne; [| congruence]. reflexivity. }
     (* [Hcpu] was delivered at [CID8] by argraw's own [wp_next]; six more
        plain instructions have moved the hart to [CID14]. *)
-    iDestruct (cpu_own_transport CID8 CID14 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID8 CID14 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID14 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E5 with "[%] Hcg Hcpu Hpc Htfp Htfa Hip").
     unfold callee_saved.

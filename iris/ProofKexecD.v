@@ -889,7 +889,7 @@ Section KexecDCommit.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c q : nat) :
@@ -921,7 +921,7 @@ Section KexecDCommit.
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true ∅ -∗
+    cpu_own 0 true (proc_addr jp) true ∅ -∗
     kalloc_env ga None -∗
     kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
             plen pfun na avf aslen afun pidv
@@ -936,7 +936,7 @@ Section KexecDCommit.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1522,7 +1522,7 @@ Section KexecDCommit.
     assert (HF6s1 : F6 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F6 upd_ne; [exact HF5s1 | nz]).
     iApply (PFP.wp_proc_freepagetable_sconf ga F6 (pv_upt V) (K - 68)%nat true
-              (proc_addr jp) C 0%nat true ∅
+              (proc_addr jp) 0%nat true ∅
               ltac:(lia) ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
               HF6a0 ltac:(rewrite HF6a1; exact Hszmax)
               ltac:(rewrite HF6a1; exact Hbelold) (locks_below_empty _)
@@ -1756,7 +1756,7 @@ Section KexecDCommit.
               ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms2 HG10sp HG10thr
               with "Hcg Htext Hpc Hfr").
     iIntros (CIDe Hse mf) "%Hcs %Hpres Hcg Hpc".
-    iDestruct (cpu_own_transport CID16 CIDe 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID16 CIDe 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (kxd_priv_exec with "Hpriv") as "Hpriv".
     (* the final [sp] is inside the image's top page, which is [kxc_stack_ok]'s
@@ -1870,7 +1870,7 @@ Section KexecDMain.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat) :
@@ -1889,7 +1889,7 @@ Section KexecDMain.
     kernel_text -∗
     kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-               M K C sp0 ra0 s00 s10 s20 pv av
+               M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -1897,7 +1897,7 @@ Section KexecDMain.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2151,7 +2151,7 @@ Section KexecDMain.
       iEval (rewrite Htgt2d2a) in "Hpc".
       iDestruct (kxd_last_at0 with "Hf66") as "Hf66".
       iDestruct ("Hmk" $! (pa_add pv 0) with "Hf66 Hpath") as "Hres".
-      iDestruct (cpu_own_transport CID0 CID5 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID0 CID5 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr5 : true = false \/ proc_addr jp = zero_reg ->
                       (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -2159,7 +2159,7 @@ Section KexecDMain.
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID5) jp bn gfs ga gf cov logstart bmapstart
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m D3 K C sp0 ra0 s00 s10 s20 pv av
+                dqb dqs dqa m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
                 ltac:(unfold K_kexec; lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
@@ -2284,7 +2284,7 @@ Section KexecDMain.
       iIntros (CID9 Hs9 Mf q') "%Hpres Hpc Hcg Hpath Hf66".
       destruct Hpres as (Hq' & Hfsp & Hfs0 & Hfs1 & Hfs2 & Hfs4 & Hfs5 & Hfs6 & Hfs10).
       iDestruct ("Hmk" $! (pa_add pv q') with "Hf66 Hpath") as "Hres".
-      iDestruct (cpu_own_transport CID0 CID9 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID0 CID9 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr9 : true = false \/ proc_addr jp = zero_reg ->
                       (CID9 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -2292,7 +2292,7 @@ Section KexecDMain.
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID9) jp bn gfs ga gf cov logstart bmapstart
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m Mf K C sp0 ra0 s00 s10 s20 pv av
+                dqb dqs dqa m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
                 ltac:(unfold K_kexec; lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal

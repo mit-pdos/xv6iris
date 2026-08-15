@@ -336,9 +336,9 @@ Section ProofSysDup.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_dup_sconf (γl γf : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string)
-    : wp_sys_dup_sconf_body γl γf m av n eb p C v pid V b lks.
+    : wp_sys_dup_sconf_body γl γf m av n eb p v pid V b lks.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hftno.
@@ -551,9 +551,9 @@ Section ProofSysDup.
     assert (HM6a0' : M6 !!! Regidx Ra0 = (mword_of_int (Z.of_nat 0) : mword 64)).
     { rewrite HM6a0. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -HM6a2) in "Hs5".
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcpu")
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p C 0%nat v pid V
+    iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p 0%nat v pid V
               (word_lo w5) w5 b lks
               ltac:(unfold NARG; lia) HM6a0' Harg Hs5nz Hn
               ltac:(unfold argfd_stack; lia)
@@ -623,7 +623,7 @@ Section ProofSysDup.
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
       iIntros (CIDz1 Hkz1 Fz1) "%HcsF Hcg Hpc".
       destruct HcsF as [HcsF HFa0].
-      iDestruct (cpu_own_transport CID9 CIDz1 n eb p C b ltac:(wp_next_chain) with "Hcpu")
+      iDestruct (cpu_own_transport CID9 CIDz1 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iSpecialize ("Hcont" $! CIDz1 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Fz1 with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact HcsF|].
@@ -742,9 +742,9 @@ Section ProofSysDup.
        holed. *)
     iDestruct (proc_priv_lend γf p pid V fd0 fv Hlk0 Hfvnz with "Hpriv")
       as (k q Cf) "([%Hfvk %Hklt] & Href & Hcore & Hof)".
-    iDestruct (cpu_own_transport CID9 CID16 n eb p C b ltac:(wp_next_chain) with "Hcpu")
+    iDestruct (cpu_own_transport CID9 CID16 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
-    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p C pid V b lks
+    iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
               ltac:(rewrite HB4a0 Hfvk; reflexivity) Hklt Hn
               ltac:(unfold fdalloc_stack; lia)
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
@@ -916,7 +916,7 @@ Section ProofSysDup.
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
       iIntros (CIDz2 Hkz2 Fz2) "%HcsF Hcg Hpc".
       destruct HcsF as [HcsF HFa0].
-      iDestruct (cpu_own_transport CID17 CIDz2 n eb p C b ltac:(wp_next_chain) with "Hcpu")
+      iDestruct (cpu_own_transport CID17 CIDz2 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iSpecialize ("Hcont" $! CIDz2 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Fz2 with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact HcsF|].
@@ -989,10 +989,10 @@ Section ProofSysDup.
       rewrite /G2 upd_ne; [| congruence].
       rewrite /G1 upd_ne; [| congruence].
       apply HD2thr; assumption. }
-    iDestruct (cpu_own_transport CID17 CID22 n eb p C b ltac:(wp_next_chain) with "Hcpu")
+    iDestruct (cpu_own_transport CID17 CID22 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     (* THE UNIT fdalloc RELEASED IS WHAT PAYS FOR THE HIGHER COUNT *)
-    iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p C (av - 6)%nat b lks
+    iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p (av - 6)%nat b lks
               ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
               with "Hcg Hcpu Htext Hpc Hftab Hpanic Hunit Href").
     all: try lkbelow.
@@ -1100,7 +1100,7 @@ Section ProofSysDup.
               with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
     iIntros (CIDz3 Hkz3 Fz3) "%HcsF Hcg Hpc".
     destruct HcsF as [HcsF HFa0].
-    iDestruct (cpu_own_transport CID23 CIDz3 n eb p C b ltac:(wp_next_chain) with "Hcpu")
+    iDestruct (cpu_own_transport CID23 CIDz3 n eb p b ltac:(wp_next_chain) with "Hcpu")
       as "Hcpu".
     iSpecialize ("Hcont" $! CIDz3 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Fz3 with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact HcsF|].

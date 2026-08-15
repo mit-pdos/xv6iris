@@ -139,7 +139,7 @@ Section UsertrapRes.
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1))%I.
 
   Definition ut_trap (pj : mword 64) (ksp : mword 64) (av : nat)
-      (C : iProp Σ) (lks : gset string) : iProp Σ :=
+      (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
      (* the translation slot, in its KPT arm: THE KERNEL PAGE TABLE, on the
         SHARED tier ([KptShare.tlb_res_pt] inside), which is the whole point
@@ -155,7 +155,7 @@ Section UsertrapRes.
         [ut_trap_open]/the exit epilogue assemble/release [sconf] from
         those, not from a parked closer. *)
      ut_ghosts ∗
-     cpu_own 0%nat false pj C false lks ∗
+     cpu_own 0%nat false pj false lks ∗
      (* the running claim.  It is what [SpecYield] / [SpecKexit] want as
         [cpu_claim_ext false pj], and the trap is where it comes from. *)
      cpu_claim pj)%I.
@@ -181,17 +181,17 @@ Section UsertrapRes.
   (* completes it ([ut_trap_tlb_close]); userret's entry switch takes it   *)
   (* back out ([ut_trap_tlb_open]).                                       *)
   Definition ut_trap_parked (pj : mword 64) (ksp : mword 64) (av : nat)
-      (C : iProp Σ) (lks : gset string) : iProp Σ :=
+      (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
      sie_arm false pj ∗
      strans_bit strans_bit_kpt ∗ strans_bit strans_bit_kpt ∗
      ut_ghosts ∗
-     cpu_own 0%nat false pj C false lks ∗
+     cpu_own 0%nat false pj false lks ∗
      cpu_claim pj)%I.
 
-  Lemma ut_trap_tlb_close (pj ksp : mword 64) (av : nat) (C : iProp Σ)
+  Lemma ut_trap_tlb_close (pj ksp : mword 64) (av : nat)
       (lks : gset string) (kroot : mword 44) :
-    ut_trap_parked pj ksp av C lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av C lks.
+    ut_trap_parked pj ksp av lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av lks.
   Proof.
     iIntros "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm) Hkres".
     rewrite /ut_trap. iFrame "Hstk Harm Hb2 Hgh Hcpu Hclm".
@@ -199,10 +199,10 @@ Section UsertrapRes.
     iApply (strans_inv_intro kroot with "Hb1 Hkres").
   Qed.
 
-  Lemma ut_trap_tlb_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
+  Lemma ut_trap_tlb_open (pj ksp : mword 64) (av : nat)
       (lks : gset string) :
-    ut_trap pj ksp av C lks -∗
-    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av C lks.
+    ut_trap pj ksp av lks -∗
+    ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av lks.
   Proof.
     iIntros "(Hstk & Hstr & Harm & Hbit & Hgh & Hcpu & Hclm)".
     (* the bit BESIDE the slot pins the slot's arm: at Bare the two would
@@ -238,7 +238,7 @@ Section UsertrapRes.
      the bundle.  The three trap CSR CELLS stay on the boundary rather than
      coming out here because usertrap READS them (scause three times, sepc
      once, stval twice) before ever folding them away. *)
-  Lemma ut_trap_open (pj ksp : mword 64) (av : nat) (C : iProp Σ)
+  Lemma ut_trap_open (pj ksp : mword 64) (av : nat)
       (m : regfile) (ms : mword 64) (mie_v mdv0 menvcfg0 : mword 64)
       (lks : gset string) :
     sconf_ms_facts ms ->
@@ -260,9 +260,9 @@ Section UsertrapRes.
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
     gpr_file m -∗
-    ut_trap pj ksp av C lks -∗
+    ut_trap pj ksp av lks -∗
       sie_cap_gpr m av false pj ∗
-      cpu_own 0%nat false pj C false lks ∗
+      cpu_own 0%nat false pj false lks ∗
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       strans_bit strans_bit_kpt ∗
@@ -661,7 +661,7 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   Definition ut_res (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
+    (∃ (N : ut_names) (V : pprivate) (av : nat),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
           This equation is the whole reason R is keyed on [pt]: it is what
           lets userret install [MAKE_SATP(p->pagetable)] and know it is the
@@ -673,7 +673,7 @@ Section UsertrapRes.
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
        (* the trampoline hands over a hart that holds NO kernel lock, so the
           held set here is the literal [∅] rather than an existential *)
-       ut_trap (un_pj N) ksp av C ∅ ∗
+       ut_trap (un_pj N) ksp av ∅ ∗
        ut_env Rsys N V)%I.
 
   (* [ut_res]'s parked twin -- see [ut_trap_parked]'s header.  This is what
@@ -681,12 +681,12 @@ Section UsertrapRes.
      consumes. *)
   Definition ut_res_parked (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
+    (∃ (N : ut_names) (V : pprivate) (av : nat),
        ⌜ pv_upt V = pt ⌝ ∗
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
-       ut_trap_parked (un_pj N) ksp av C ∅ ∗
+       ut_trap_parked (un_pj N) ksp av ∅ ∗
        ut_env Rsys N V)%I.
 
   (* THE TRANSLATION BORROW, lifted to the residue.  [_close] is uservec's
@@ -697,9 +697,9 @@ Section UsertrapRes.
     ut_res_parked Rsys pt ksp -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp.
   Proof.
     iIntros "H Hkres".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
     iDestruct (ut_trap_tlb_close with "Htrap Hkres") as "Htrap".
-    iExists N, V, av, C. iFrame "Htrap Henv".
+    iExists N, V, av. iFrame "Htrap Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
@@ -709,10 +709,10 @@ Section UsertrapRes.
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
     iDestruct (ut_trap_tlb_open with "Htrap") as (kroot) "[Hkres Htrap]".
     iExists kroot. iFrame "Hkres".
-    iExists N, V, av, C. iFrame "Htrap Henv".
+    iExists N, V, av. iFrame "Htrap Henv".
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
@@ -728,7 +728,7 @@ Section UsertrapRes.
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res_parked Rsys pt ksp).
   Proof.
     iIntros (Hgap) "H".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
     iDestruct "Henv" as "[Hcaps Hown]".
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (proc_priv_tf_open with "Hpv") as (ws) "[Htf Hclose]".
@@ -738,7 +738,7 @@ Section UsertrapRes.
     iIntros (ws') "Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
-    iExists N, (upd_tf V ws'), av, C.
+    iExists N, (upd_tf V ws'), av.
     iFrame "Htrap Hcaps Hown'".
     iPureIntro. split; [| split; [| split]].
     - rewrite /upd_tf. exact Hupt.
@@ -835,12 +835,12 @@ Section UsertrapRes.
 
   Definition ut_res_bare (Rsys : gname -> mword 64 -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
-    (∃ (N : ut_names) (V : pprivate) (av : nat) (C : iProp Σ),
+    (∃ (N : ut_names) (V : pprivate) (av : nat),
        ⌜ pv_upt V = pt ⌝ ∗
        ⌜ add_vec (un_ks N) (mword_of_int 4096) = ksp ⌝ ∗
        ⌜ ut_wf N ⌝ ∗
        ⌜ (K_usertrap <= av)%nat ⌝ ∗
-       ut_trap_parked (un_pj N) ksp av C ∅ ∗
+       ut_trap_parked (un_pj N) ksp av ∅ ∗
        ut_env_nopt Rsys N V)%I.
 
   Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> iProp Σ)
@@ -848,10 +848,10 @@ Section UsertrapRes.
     ut_res_bare Rsys pt ksp -∗ proc_pt pt -∗ ut_res_parked Rsys pt ksp.
   Proof.
     iIntros "H Hpt".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
     subst pt.
     iDestruct (ut_own_pt_close with "Hown Hpt") as "Hown".
-    iExists N, V, av, C. rewrite /ut_env. iFrame "Htrap Hcaps Hown".
+    iExists N, V, av. rewrite /ut_env. iFrame "Htrap Hcaps Hown".
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
 
@@ -860,11 +860,11 @@ Section UsertrapRes.
     ut_res_parked Rsys pt ksp -∗ proc_pt pt ∗ ut_res_bare Rsys pt ksp.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
     subst pt.
     iDestruct (ut_own_pt_open with "Hown") as "(Hown & Hpt)".
     iFrame "Hpt".
-    iExists N, V, av, C. rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown".
+    iExists N, V, av. rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown".
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
 
@@ -879,11 +879,11 @@ Section UsertrapRes.
     ut_res_bare Rsys pt ksp -∗ ut_res_bare Rsys (ud_norm pt) ksp.
   Proof.
     iIntros "H".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
     subst pt.
     rewrite (ut_own_nopt_upt_irrel Rsys N V (ud_norm (pv_upt V))
                eq_refl eq_refl eq_refl).
-    iExists N, (upd_upt V (ud_norm (pv_upt V))), av, C.
+    iExists N, (upd_upt V (ud_norm (pv_upt V))), av.
     rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown".
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
@@ -900,7 +900,7 @@ Section UsertrapRes.
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ ut_res_bare Rsys pt ksp).
   Proof.
     iIntros (Hgap) "H".
-    iDestruct "H" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
     iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "[Htf Hclose]".
     rewrite Hupt.
@@ -909,7 +909,7 @@ Section UsertrapRes.
     iIntros (ws') "Htf'".
     iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
     iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
-    iExists N, (upd_tf V ws'), av, C.
+    iExists N, (upd_tf V ws'), av.
     rewrite /ut_env_nopt. iFrame "Htrap Hcaps Hown'".
     iPureIntro. split; [| split; [| split]].
     - rewrite /upd_tf. exact Hupt.
@@ -1050,8 +1050,8 @@ Section UsertrapRes.
      +0xa6 is reached at [true] from the syscall arm and at [false] from the
      other four. *)
   Definition ut_hold (Rsys : gname -> mword 64 -> iProp Σ)
-      (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
-    (cpu_own 0%nat b (un_pj N) C b lks ∗
+      (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) : iProp Σ :=
+    (cpu_own 0%nat b (un_pj N) b lks ∗
      trap_csrs_ext b ∗
      cpu_claim_ext b (un_pj N) ∗
      ut_env Rsys N V)%I.
@@ -1085,13 +1085,13 @@ Section UsertrapRes.
      [cpu_own 0 false pj C false] IS the two of them beside the caller's own
      frame.  ProofScheduler's [sc_flip_pre] is the same lemma at [C = emp];
      this one is [C]-generic because usertrap's frame is a parameter. *)
-  Lemma ut_flip_pre (pj : mword 64) (C : iProp Σ) (lks : gset string) :
-    cpu_own 0%nat false pj C false lks -∗
-    intr_count 0 false ∗ cpu_priv 0 true pj lks ∗ C.
+  Lemma ut_flip_pre (pj : mword 64) (lks : gset string) :
+    cpu_own 0%nat false pj false lks -∗
+    intr_count 0 false ∗ cpu_priv 0 true pj lks.
   Proof.
     rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
-    iIntros "((((_ & Hn & Hi & Hp) & Hl) & Hc) & HC)".
-    iFrame "Hc HC Hn Hi Hp Hl". iPureIntro. vm_compute. reflexivity.
+    iIntros "(((_ & Hn & Hi & Hp) & Hl) & Hc)".
+    iFrame "Hc Hn Hi Hp Hl". iPureIntro. vm_compute. reflexivity.
   Qed.
 
 End UsertrapRes.
@@ -1143,12 +1143,12 @@ Lemma ut_hold_transport
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId}
     (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> iProp Σ)
-    (N : ut_names) (V : pprivate) (C : iProp Σ) (b : bool) (lks : gset string) :
+    (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-  ut_hold (CID := CID0) Rsys N V C b lks -∗ ut_hold (CID := CID1) Rsys N V C b lks.
+  ut_hold (CID := CID0) Rsys N V b lks -∗ ut_hold (CID := CID1) Rsys N V b lks.
 Proof.
   intros Heq. rewrite /ut_hold. iIntros "(Hcpu & Hcsrs & Hclm & Henv)".
- iDestruct (cpu_own_transport CID0 CID1 0%nat b (un_pj N) C b  Heq
+ iDestruct (cpu_own_transport CID0 CID1 0%nat b (un_pj N) b  Heq
                with "Hcpu") as "$".
   iDestruct (trap_csrs_ext_transport CID0 CID1 b (un_pj N) Heq
                with "Hcsrs") as "$".

@@ -99,14 +99,14 @@ Section ProofFilealloc.
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
      two independent presentations of the same SIE state; see
      ProofFiledup.v's identical helper for the full comment. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
@@ -157,7 +157,7 @@ Section ProofFilealloc.
      rather than invoking [Hcont] directly). *)
   Definition fa_epi_body
       (γf : gname) (m : regfile) (spr : mword 64) (K : nat) (b : bool)
-      (p : mword 64) (C : iProp Σ) (n : nat) (eb : bool) (ret_tgt : mword 64)
+      (p : mword 64) (n : nat) (eb : bool) (ret_tgt : mword 64)
       (CID0 : CpuId) (lks : gset string) : iProp Σ :=
     (∀ (mj : regfile) (res : mword 64),
         ⌜ mj !!! Regidx csp_rs1 = spr
@@ -167,12 +167,12 @@ Section ProofFilealloc.
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CID0) mj (K - 4)%nat b p -∗
         pc_is (CID := CID0) (mword_of_int (KernelSyms.filealloc + 0x52)) -∗
-        cpu_own (CID := CID0) n eb p C b lks -∗
+        cpu_own (CID := CID0) n eb p b lks -∗
         filealloc_post γf res -∗
         wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
           ∀ mfin,
           sie_cap_gpr mfin K b p -∗
-          cpu_own n eb p C b lks -∗
+          cpu_own n eb p b lks -∗
           pc_is ret_tgt -∗
           ⌜ callee_saved m mfin ⌝ -∗
           filealloc_post γf (mfin !!! Regidx Ra0) -∗
@@ -181,15 +181,15 @@ Section ProofFilealloc.
 
   Lemma wp_filealloc_sconf
       (γl γf : gname) (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
-    : wp_filealloc_sconf_body γl γf m n eb p C K b lks.
+      (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
+    : wp_filealloc_sconf_body γl γf m n eb p K b lks.
   Proof.
     cbv beta delta [wp_filealloc_sconf_body].
     intros pcE ret_tgt HK HnZ Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hfdslot Hcont".
-    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (fai_00 with "Htext") as "Hi00".
@@ -327,10 +327,10 @@ Section ProofFilealloc.
       by (rewrite /mA; apply upd_eq).
     (* [Hcnt] was introduced at the entry hart; eight plain instructions have
        moved us to CID8. *)
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "ftable"%string (ftable_res γf) mA
-              n eb p C (K - 4)%nat b lks
+              n eb p (K - 4)%nat b lks
               HnZ ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     all: try lkbelow.
@@ -431,7 +431,7 @@ Section ProofFilealloc.
        closes THAT via [wp_next_chain] relative to [CID0]; the CALLER,
        at each concrete call site, is the one who both knows the full
        chain back to entry and holds the real [Hcont]. *)
-    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p C n eb ret_tgt CID0 lks)%I
+    iAssert (∀ (CID0 : CpuId), fa_epi_body γf m spr K b p n eb ret_tgt CID0 lks)%I
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hepi".
     { iIntros (CID0 mj res) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hpc Hcnt Hpost Kont".
       (* +0x52 c.mv a0,s1 *)
@@ -541,7 +541,7 @@ Section ProofFilealloc.
       iEval (rewrite Hretf) in "Hpc".
       (* [cpu_own] was handed to us at [CID0]; six more plain instructions
          have moved us to [CIDe6]. *)
-      iDestruct (cpu_own_transport CID0 CIDe6 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID0 CIDe6 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Kont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Kont" $! P5 with "Hcg Hcnt Hpc [%] [Hpost]").
@@ -891,7 +891,7 @@ Section ProofFilealloc.
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) F4
-                n eb p C (K - 4)%nat
+                n eb p (K - 4)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HF4a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -998,7 +998,7 @@ Section ProofFilealloc.
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Houtb) in "Hcg".
       iApply (Release.wp_release_sconf γl ftable_addr "ftable"%string (ftable_res γf) G3
-                n eb p C (K - 4)%nat
+                n eb p (K - 4)%nat
                 ({["ftable"]} ∪ lks)
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -1041,7 +1041,7 @@ Section ProofFilealloc.
       iEval (rewrite Htgtj) in "Hpc".
       (* two more plain instructions since release handed [cpu_own] back at
          [CIDr]. *)
-      iDestruct (cpu_own_transport CIDr CIDg2 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDr CIDg2 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("Hepi" $! CIDg2 G4 (zero_reg : mword 64) with "[%] Hcg Hpc Hcnt [Hfdslot]").
       { split.

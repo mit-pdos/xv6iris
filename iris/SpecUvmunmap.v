@@ -75,7 +75,7 @@ Import Defs.
 Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile)
     (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -101,7 +101,7 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
      "kmem" (13); nothing else in the cone touches a lock. *)
   locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
-  cpu_own ilvl eb p C b lks -∗
+  cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt P -∗
@@ -109,7 +109,7 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own ilvl eb p C b lks -∗
+    cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_del_run P vpn0 npages) -∗
@@ -121,8 +121,8 @@ Module Type UVMUNMAP.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_sconf_body γa mm P npages K eb p C ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_uvmunmap_sconf_body γa mm P npages K eb p ilvl b lks.
 End UVMUNMAP.
 
 (* --------------------------------------------------------------------- *)
@@ -142,7 +142,7 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
     (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn0 := svpn_of va in
@@ -161,7 +161,7 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
      cone. *)
   locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
-  cpu_own ilvl eb p C b lks -∗
+  cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   bare_pt uroot um -∗
@@ -169,7 +169,7 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own ilvl eb p C b lks -∗
+    cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗
@@ -182,8 +182,8 @@ Module Type UVMUNMAP_BARE.
       (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p C ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p ilvl b lks.
 End UVMUNMAP_BARE.
 
 (* --------------------------------------------------------------------- *)
@@ -224,7 +224,7 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
     (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
     (um : gmap (mword 27) (mword 64)) (v : mword 27)
     (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string) :=
+    (ilvl : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
   let va := mm !!! Regidx (mword_of_int 11) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -245,7 +245,7 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   (* the cursor does not wrap; TRAMPOLINE = 2^38 - 4096 meets this exactly *)
   (uint va + 4096 <= 2 ^ 38)%Z ->
   sie_cap_gpr mm K b p -∗
-  cpu_own ilvl eb p C b lks -∗
+  cpu_own ilvl eb p b lks -∗
   kernel_text -∗
   pc_is pcE -∗
   uptg fx uroot um -∗
@@ -253,7 +253,7 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own ilvl eb p C b lks -∗
+    cpu_own ilvl eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     uptg (delete v fx) uroot um -∗
@@ -267,6 +267,6 @@ Module Type UVMUNMAP_FIXED.
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)
       (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) (lks : gset string),
-      wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p C ilvl b lks.
+      (ilvl : nat) (b : bool) (lks : gset string),
+      wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p ilvl b lks.
 End UVMUNMAP_FIXED.

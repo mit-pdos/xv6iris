@@ -196,7 +196,7 @@ Definition wp_sys_mkdir_sconf_body
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
   let pj := proc_addr j in
@@ -239,7 +239,7 @@ Definition wp_sys_mkdir_sconf_body
   (* ENTERED WITH NO LOCK HELD, exactly as sys_chdir: the depth is pinned at
      ZERO, so [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order
      goal the four callees raise is [locks_below ∅ _]. *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
   trap_csrs_ext eb -∗
@@ -286,7 +286,7 @@ Definition wp_sys_mkdir_sconf_body
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -327,10 +327,10 @@ Module Type SYSMKDIR.
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_mkdir_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
                               ninodes size dev used ns dqb dqs dqbs dqn v
-                              pid V m K eb C b lks.
+                              pid V m K eb b lks.
 End SYSMKDIR.

@@ -116,8 +116,8 @@ Section ProofSysUptime.
 
 
   Lemma wp_sys_uptime_sconf (γl : gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
-    : wp_sys_uptime_sconf_body γl m n eb p C av b lks.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
+    : wp_sys_uptime_sconf_body γl m n eb p av b lks.
   Proof.
     cbv beta delta [wp_sys_uptime_sconf_body].
     intros pcE ret_tgt Htp Hn Hav Hfresh.
@@ -252,9 +252,9 @@ Section ProofSysUptime.
       rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspA0. }
     (* ===================== acquire(&tickslock) ===================== *)
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "time"%string ticks_res A4
-              n eb p C (av - 4)%nat b lks
+              n eb p (av - 4)%nat b lks
               ltac:(exact Hn)
               ltac:(lia)
               Hfresh
@@ -379,7 +379,7 @@ Section ProofSysUptime.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res B5
-              n eb p C (av - 4)%nat
+              n eb p (av - 4)%nat
               ({["time"]} ∪ lks)
               ltac:(rewrite HB5a0; apply addv_sext0)
               ltac:(lia)
@@ -588,7 +588,7 @@ Section ProofSysUptime.
       rewrite /A2 upd_ne; [| congruence].
       rewrite /A1 upd_ne; [| congruence].
       rewrite /A0 upd_ne; [| congruence]. reflexivity. }
-    iDestruct (cpu_own_transport CID10 CID17 n eb p C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID10 CID17 n eb p b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E4 t with "[%] Hcg Hcnt Hpc").
     split; [| exact HE4a0].

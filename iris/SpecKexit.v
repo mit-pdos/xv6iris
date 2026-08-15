@@ -157,7 +157,7 @@ Definition wp_kexit_sconf_body
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
     (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
     (pid : mword 32) (V : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
@@ -188,7 +188,7 @@ Definition wp_kexit_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE -- the whole
      point of the sweep.  usertrap calls kexit(-1) on paths that have not
      run intr_on(): the first killed(p) check runs before it, and the second
@@ -299,10 +299,10 @@ Module Type KEXIT.
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
                           γi cn γtl bmapstart inodestart nib size dqb dqs us
-                          on fn m av eb C b lks pid V.
+                          on fn m av eb b lks pid V.
 End KEXIT.

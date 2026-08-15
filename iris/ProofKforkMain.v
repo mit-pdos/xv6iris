@@ -226,7 +226,7 @@ Section KforkArms.
   (* =================================================================== *)
   Lemma kfork_arm2
       (γa γf γl2 : gname) (γs : list gname) (cn : ic_names)
-      (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
       (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) (lks : gset string) :
@@ -255,7 +255,7 @@ Section KforkArms.
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
     arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
@@ -272,7 +272,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
+        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -293,7 +293,7 @@ Section KforkArms.
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
                  with "HCpriv Hfd Hir Hctx") as "(Hfprest & Hfppt & Hfptf)".
     iApply (B1.kfk_exit_uvmcopy γs γa γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
-              m Mt K sp0 ra0 s00 s10 s50 pme eb b C lvl lks
+              m Mt K sp0 ra0 s00 s10 s50 pme eb b lvl lks
               HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
               with "Hcg Hcpu Hpay Htext Hpc Hb1 Hb2 Hb3 Hb4x Hb5x Hb6 Hb7 Hb8
                     Hheld Hhart Hislock Hkalloc Hfprest Hfppt Hfptf").
@@ -332,7 +332,7 @@ Section KforkArms.
   (* =================================================================== *)
   Lemma kfork_arm1
       (γa γf : gname) (cn : ic_names)
-      (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64) (Mt : regfile) (lks : gset string) :
     (8 <= K)%nat ->
@@ -342,7 +342,7 @@ Section KforkArms.
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
         r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     sie_cap_gpr Mt (K - 8)%nat b pme -∗
-    cpu_own lvl eb pme C b lks -∗
+    cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
@@ -356,7 +356,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
+        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -368,7 +368,7 @@ Section KforkArms.
               with "Hcg Htext Hpc Hframe").
     iIntros (CID Hcross mf) "%Hpf Hcg Hpc".
     destruct Hpf as [Hcsmf Hmfa0].
-    iDestruct (cpu_own_transport CID0 CID lvl eb pme C b Hcross with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID0 CID lvl eb pme b Hcross with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID with "[%]"); [exact Hcross |].
     iApply ("Hcont" $! mf with "[%] Hpc [Hcg Hcpu Hpv Hkalloc]").
     - exact Hcsmf.
@@ -420,7 +420,7 @@ Section KforkArms.
   Lemma kfork_arm3
       (γa γf γil γic γw γl : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-      (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64)
       (pid_p : mword 32) (Vp : pprivate)
       (sp0 ra0 s00 s10 s50 : mword 64)
       (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
@@ -458,7 +458,7 @@ Section KforkArms.
        this block returns at, namely [b].  See ProofKforkB1/B5 -- the
        whole post-allocproc stretch of kfork runs at this index. *)
     sie_cap_gpr Mt (trap_res b + (K - 8))%nat false pme -∗
-    cpu_own (S lvl) eb pme C false ({["proc"]} ∪ lks) -∗
+    cpu_own (S lvl) eb pme false ({["proc"]} ∪ lks) -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
     kfk_frame_at sp0 ra0 s00 s10 s50
       (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
@@ -483,7 +483,7 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
+        kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
           (mr !!! Regidx Ra0) lks -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -563,7 +563,7 @@ Section KforkArms.
     (* [trap_res b] is the RESERVE the in-lock window is carrying; B3 is
        arm-generic and instantiated at [b := false], so it cannot compute the
        reserve itself -- it takes it as the opaque [rsv] parameter. *)
-    iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false C
+    iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false
                   (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({["proc"]} ∪ lks)
                   ltac:(lia) ltac:(lia) HofnullV2 ltac:(lkbelow)) as "Hb3app".
     iSpecialize ("Hb3app" with "Htext Hft Hpanic").
@@ -586,7 +586,7 @@ Section KforkArms.
       (* ---- ProofKforkB4: idup / safestrcpy / pid read ---- *)
       iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
-                Mx2 (trap_res b) K (S lvl) eb C ({["proc"]} ∪ lks)
+                Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
       all: try lkbelow.
@@ -612,7 +612,7 @@ Section KforkArms.
          the in-lock index we are handing it is spelled [trap_res b + (K - 8)],
          and B5's entry index has to be syntactically that. *)
       iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb b
-                pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) C lks
+                pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
                       Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx").
@@ -644,7 +644,7 @@ Section KforkArms.
                 with "Hsc5 Htext Hpc5 Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8").
       iIntros (CID6 Hcross6 mr) "%Hpost Hsc6 Hpc6".
       destruct Hpost as (Hcsm & Hrv).
-      iDestruct (cpu_own_transport CID5 CID6 lvl eb pme C b Hcross6 with "Hown5") as "Hown5".
+      iDestruct (cpu_own_transport CID5 CID6 lvl eb pme b Hcross6 with "Hown5") as "Hown5".
       iSpecialize ("Hcont" $! CID6 with "[%]").
       { intros Hdisj. transitivity CID5; [exact (Hcross6 Hdisj) | exact (Hcross5 Hdisj)]. }
       iApply ("Hcont" $! mr with "[%] Hpc6 [Hsc6 Hown5 Hpvx4 Hkalloc]").
@@ -688,11 +688,11 @@ Section KforkMain.
   Lemma wp_kfork_sconf
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string)
  :
     wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-      m lvl K eb pme C b pid_p Vp lks.
+      m lvl K eb pme b pid_p Vp lks.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
@@ -704,13 +704,13 @@ Section KforkMain.
        pins it at [None] here, which is what collapses its Hcont10a
        disjunction and, with it, two of [kfork_post]'s three arms. *)
     iApply (B6.kfk_prologue γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-              m lvl K eb pme C None b
+              m lvl K eb pme None b
               pid_p Vp
               (wp_next b pme (fun (CID : CpuId) =>
                  (∀ mr : regfile,
                     ⌜ callee_saved m mr ⌝ -∗
                     pc_is (ret_pc (m !!! Regidx Rra)) -∗
-                    kfork_post γa γf cn lvl eb pme C b pid_p Vp
+                    kfork_post γa γf cn lvl eb pme b pid_p Vp
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
@@ -726,7 +726,7 @@ Section KforkMain.
          [kfork_post] state [kalloc_env] once instead of per-arm. *)
       iAssert (kalloc_env γa None) with "[Hke]" as "Hke".
       { iDestruct "Hke" as "[$ | (% & _ & $)]". }
-      iApply (kfork_arm1 (CID0 := CID1) γa γf cn m K lvl eb b pme C pid_p Vp
+      iApply (kfork_arm1 (CID0 := CID1) γa γf cn m K lvl eb b pme pid_p Vp
                 (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt lks
                 (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
@@ -738,7 +738,7 @@ Section KforkMain.
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
       iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hctx Hpay Hcpu Hke HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
-      iApply (kfork_arm2 (CID0 := CID2) γa γf γl2 γs cn m K lvl eb b pme C
+      iApply (kfork_arm2 (CID0 := CID2) γa γf γl2 γs cn m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 npa j pid_c ch Vc Mt lks
@@ -762,7 +762,7 @@ Section KforkMain.
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γa γf γil γic γw γl γs
-                cn γfs cov logstart nib m K lvl eb b pme C
+                cn γfs cov logstart nib m K lvl eb b pme
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst lks

@@ -228,7 +228,7 @@ Section SwtchCtx.
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗
          sie_cap_gpr (CID := h) m av false p -∗
-         cpu_own (CID := h) 1 eb' p emp false {["proc"]} -∗
+         cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
          pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1))) -∗
          ctx_cells c vs -∗
          (∃ (A' : ctx_adm) (cret : mword 64),

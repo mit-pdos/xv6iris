@@ -87,10 +87,10 @@ Section ProofSysFork.
   Lemma wp_sys_fork_sconf
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-      (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64)
       (b : bool) (pid : mword 32) (V : pprivate) (lks : gset string)
     : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-                             m lvl av eb p C b pid V lks.
+                             m lvl av eb p b pid V lks.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
@@ -173,10 +173,10 @@ Section ProofSysFork.
     assert (HBjra : Bj !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) 4) by (rewrite /Bj upd_eq; reflexivity).
     (* [Hcpu] rode through the four leaf steps untouched, so it is still
        anchored at the ENTRY hart -- re-anchor it before crossing. *)
-    iDestruct (cpu_own_transport CID CID5 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID CID5 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ---- kfork(): a0 = -1 or the child's pid; the parent's block back ---- *)
     iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-              Bj lvl (av - 2)%nat eb p C b pid V lks
+              Bj lvl (av - 2)%nat eb p b pid V lks
               ltac:(lia) Hlvl ltac:(lkbelow)
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpriv").
@@ -283,7 +283,7 @@ Section ProofSysFork.
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
     (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
        crossing; the four leaf steps since then never touched it. *)
-    iDestruct (cpu_own_transport CID6 CID11 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID6 CID11 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Henv [%]").
     - unfold callee_saved.
       split_and!.

@@ -242,7 +242,7 @@ Definition wp_kerneltrap_sconf_body
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
-    (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (p : mword 64)
     (ep sc tv : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kerneltrap in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -290,7 +290,7 @@ Definition wp_kerneltrap_sconf_body
      handler resource.  It crosses the yield park inside [trap_csrs] and comes
      back as the RESUMING hart's, which is why it is a post as well. *)
   strans_bit strans_bit_kpt -∗
-  cpu_own 0 false p C false lks -∗
+  cpu_own 0 false p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
@@ -314,7 +314,7 @@ Definition wp_kerneltrap_sconf_body
       (* at the RESUMING hart -- see the premise *)
       intr_res -∗
       strans_bit strans_bit_kpt -∗
-      cpu_own 0 false p C false lks -∗
+      cpu_own 0 false p false lks -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)
       sepc ↦ᵣ ep -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ tv' -∗
@@ -329,8 +329,8 @@ Module Type KERNELTRAP.
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
-      (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (p : mword 64)
       (ep sc tv : mword 64) (lks : gset string),
       wp_kerneltrap_sconf_body γu γv γdk γtl γs pd pav pu
-        m av p C ep sc tv lks.
+        m av p ep sc tv lks.
 End KERNELTRAP.

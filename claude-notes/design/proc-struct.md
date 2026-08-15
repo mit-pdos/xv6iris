@@ -690,8 +690,8 @@ cost. It isn't:
 
 ```coq
 Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) : iProp Σ :=
-  ((if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p) ∗ C)%I.
+    (b : bool) : iProp Σ :=
+  if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p.
 ```
 
 `cpu_hart` is *also* what the thread carries once interrupts are off, so a

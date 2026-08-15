@@ -218,8 +218,8 @@ Section ProofAcquire.
   Lemma wp_acquire_gen_fresh_sconf
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
-    : wp_acquire_gen_fresh_sconf_body γl s R Tc Dc m n eb p C av b lks.
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
+    : wp_acquire_gen_fresh_sconf_body γl s R Tc Dc m n eb p av b lks.
   Proof.
     cbv beta delta [wp_acquire_gen_fresh_sconf_body wp_acquire_gen_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
@@ -343,9 +343,9 @@ Section ProofAcquire.
       rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate].
       exact HcspA0. }
-    iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (PushOff.wp_push_off_sconf A3 (av - 4)%nat n eb p C b _
+    iApply (PushOff.wp_push_off_sconf A3 (av - 4)%nat n eb p b _
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hown Htext Hpc").
@@ -824,12 +824,12 @@ Section ProofAcquire.
   Lemma wp_acquire_gen_sconf
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string)
-    : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p C av b lks.
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string)
+    : wp_acquire_gen_sconf_body γl s R Tc Dc m n eb p av b lks.
   Proof.
-    exact (wp_acquire_gen_pre_weaken γl s R Tc Dc m n eb p C av b lks
+    exact (wp_acquire_gen_pre_weaken γl s R Tc Dc m n eb p av b lks
              (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
-             (wp_acquire_gen_fresh_sconf γl s R Tc Dc m n eb p C av b lks)).
+             (wp_acquire_gen_fresh_sconf γl s R Tc Dc m n eb p av b lks)).
   Qed.
 
 End ProofAcquire.
@@ -851,14 +851,14 @@ Section OfGen.
   Lemma wp_acquire_fresh_sconf
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
       (lks : gset string)
-    : wp_acquire_fresh_sconf_body γl s R m n eb p C av b lks.
+    : wp_acquire_fresh_sconf_body γl s R m n eb p av b lks.
   Proof.
     cbv beta delta [wp_acquire_fresh_sconf_body wp_acquire_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh.
     iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
-    iApply (G.wp_acquire_gen_fresh_sconf γl s R emp%I False%I m n eb p C av b lks
+    iApply (G.wp_acquire_gen_fresh_sconf γl s R emp%I False%I m n eb p av b lks
               Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
               with "Hcg Hown Htext Hpc [] [] Hpanic").
     { iApply (is_lock_openable with "Hlock"). }
@@ -871,13 +871,13 @@ Section OfGen.
   Lemma wp_acquire_sconf
       (γl : gname) (s : string) (R : iProp Σ)
       (m : regfile)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool)
+      (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool)
       (lks : gset string)
-    : wp_acquire_sconf_body γl s R m n eb p C av b lks.
+    : wp_acquire_sconf_body γl s R m n eb p av b lks.
   Proof.
-    exact (wp_acquire_pre_weaken γl s R m n eb p C av b lks
+    exact (wp_acquire_pre_weaken γl s R m n eb p av b lks
              (s ∉ lks) (locks_below lks s) (locks_below_not_elem lks s)
-             (wp_acquire_fresh_sconf γl s R m n eb p C av b lks)).
+             (wp_acquire_fresh_sconf γl s R m n eb p av b lks)).
   Qed.
 
 End OfGen.

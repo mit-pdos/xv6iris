@@ -425,8 +425,8 @@ Section ProofAllocproc.
   Lemma wp_allocproc_core
       (γa : gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
-    : wp_allocproc_core_body γa γp γf γs m lvl K eb pme C on b lks.
+      (pme : mword 64) (on : option nat) (b : bool) (lks : gset string)
+    : wp_allocproc_core_body γa γp γf γs m lvl K eb pme on b lks.
   Proof.
     cbv beta delta [wp_allocproc_core_body].
     intros pcE ret_tgt HK Hlvl Hbelow.
@@ -770,11 +770,11 @@ Section ProofAllocproc.
                      ∀ (mr : regfile),
                        ⌜ callee_saved m mr ⌝ -∗
                        pc_is ret_tgt -∗
-                       allocproc_post γa γf γs lvl eb pme C on b lks mr K
+                       allocproc_post γa γf γs lvl eb pme on b lks mr K
                          (mr !!! Regidx ap_a0) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr Mk (K - 4)%nat b pme -∗
-                   cpu_own lvl eb pme C b lks -∗
+                   cpu_own lvl eb pme b lks -∗
                    kalloc_env γa on -∗
                    pc_is (mword_of_int (KernelSyms.allocproc + 0x1c)) -∗
                    WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
@@ -830,10 +830,10 @@ Section ProofAllocproc.
         rewrite /L2 upd_ne; [| congruence].
         rewrite /L1 upd_ne; [| congruence].
         exact (Hkrest r Hr Ncsp N8 N9 N18). }
-      iDestruct (cpu_own_transport CIDk CIDl2 lvl eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDk CIDl2 lvl eb pme b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iApply (Acquire.wp_acquire_sconf (CID := CIDl2) γl "proc"%string
-                (proc_lock_res γs γl (proc_addr k)) L2 lvl eb pme C (K - 4)%nat b lks
+                (proc_lock_res γs γl (proc_addr k)) L2 lvl eb pme (K - 4)%nat b lks
                 (ap_lvl1 lvl Hlvl) ltac:(pose proof (ap_K10 K HK); lia) Hbelow
                 with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
       all: try lkbelow.
@@ -945,7 +945,7 @@ Section ProofAllocproc.
           exact (HL3rest r Hr Ncsp N8 N9 N18). }
         (* p->lock (rank 11) is still held here, so allocpid's own held set
            is [{["proc"]} ∪ lks], not bare [lks]. *)
-        iApply (Allocpid.wp_allocpid_sconf (CID := CIDf) γp F1 (trap_res b + (K - 4))%nat (S lvl) eb pme C false
+        iApply (Allocpid.wp_allocpid_sconf (CID := CIDf) γp F1 (trap_res b + (K - 4))%nat (S lvl) eb pme false
                   ({["proc"]} ∪ lks)
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K14 K HK); lia) (ap_below_nextpid lks Hbelow)
                   with "Hcg Hcpu Htext Hpc Hpidlk Hpanic").
@@ -1042,7 +1042,7 @@ Section ProofAllocproc.
            [{["proc"]} ∪ lks], and its "kmem" freshness premise
            needs [ap_below_kmem]. *)
         iApply (AK.wp_kalloc_sconf (CID := CIDf) γa γk (mword_of_int (KernelSyms.kmem + 24))
-                  F3 on (S lvl) eb pme C (trap_res b + (K - 4))%nat false
+                  F3 on (S lvl) eb pme (trap_res b + (K - 4))%nat false
                   ({["proc"]} ∪ lks)
                   ltac:(pose proof (ap_K14 K HK); lia) ltac:(reflexivity) (ap_lvlS lvl Hlvl)
                   (ap_below_kmem lks Hbelow)
@@ -1187,7 +1187,7 @@ Section ProofAllocproc.
              acquires nothing, so no order premise) is
              [{["proc"]} ∪ lks]. *)
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa T2 k γl V pidn USED ch None None
-                    (trap_res b + (K - 4))%nat eb pme C (S lvl) ({["proc"]} ∪ lks)
+                    (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HT2a0
                     with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell] Henv").
           all: try lkbelow.
@@ -1278,7 +1278,7 @@ Section ProofAllocproc.
           (* [b] IS [outb] ([cpu_own] forces it); pure re-spelling for release. *)
           iEval (rewrite Hbmatch) in "Hcg".
           iApply (Release.wp_release_sconf (CID := CIDf) γl (proc_addr k) "proc"%string
-                    (proc_lock_res γs γl (proc_addr k)) T4 lvl eb pme C (K - 4)%nat
+                    (proc_lock_res γs γl (proc_addr k)) T4 lvl eb pme (K - 4)%nat
                     ({["proc"]} ∪ lks)
                     Hlka1 ltac:(pose proof (ap_K10 K HK); lia)
                     with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1330,7 +1330,7 @@ Section ProofAllocproc.
             rewrite /T5 upd_ne; [| congruence].
             exact (Hrl_rest r Hr Ncsp N8 N9 N18). }
           iIntros (CIDp Hsp Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
-          iDestruct (cpu_own_transport CIDg CIDp lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
           iApply ("Hcont" $! Mf with "[%] Hpcf").
@@ -1405,7 +1405,7 @@ Section ProofAllocproc.
            scope, so this call supplies no order proof for it -- left as-is
            rather than guessed at; flagging for whoever owns
            SpecProcPagetable.v. *)
-        iApply (PPT.wp_proc_pagetable_core (CID := CIDf) γa F6 tfr (DfracOwn 1) (S lvl) (trap_res b + (K - 4))%nat eb pme C (avail_dec on) false
+        iApply (PPT.wp_proc_pagetable_core (CID := CIDf) γa F6 tfr (DfracOwn 1) (S lvl) (trap_res b + (K - 4))%nat eb pme (avail_dec on) false
                   ({["proc"]} ∪ lks)
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K36 K HK); lia)
                   (ap_tf_align tfr Hpvtf) (ap_tf_bound tfr Hpvtf)
@@ -1557,7 +1557,7 @@ Section ProofAllocproc.
           (* p->lock is still held: freeproc's own held set is
              [{["proc"]} ∪ lks]. *)
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa U2 k γl V pidn USED ch None (Some (tfp, tfws))
-                    (trap_res b + (K - 4))%nat eb pme C (S lvl) ({["proc"]} ∪ lks)
+                    (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HU2a0
                     with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell Htfpage] Henv").
           all: try lkbelow.
@@ -1647,7 +1647,7 @@ Section ProofAllocproc.
           (* [b] IS [outb] ([cpu_own] forces it); pure re-spelling for release. *)
           iEval (rewrite Hbmatch) in "Hcg".
           iApply (Release.wp_release_sconf (CID := CIDf) γl (proc_addr k) "proc"%string
-                    (proc_lock_res γs γl (proc_addr k)) U4 lvl eb pme C (K - 4)%nat
+                    (proc_lock_res γs γl (proc_addr k)) U4 lvl eb pme (K - 4)%nat
                     ({["proc"]} ∪ lks)
                     Hlka2 ltac:(pose proof (ap_K10 K HK); lia)
                     with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -1699,7 +1699,7 @@ Section ProofAllocproc.
             rewrite /U5 upd_ne; [| congruence].
             exact (Hrl_rest r Hr Ncsp N8 N9 N18). }
           iIntros (CIDp Hsp Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
-          iDestruct (cpu_own_transport CIDg CIDp lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
           iApply ("Hcont" $! Mf with "[%] Hpcf").
@@ -2088,7 +2088,7 @@ Section ProofAllocproc.
         (* [b] IS [outb] ([cpu_own] forces it); pure re-spelling for release. *)
         iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γl (proc_addr k) "proc"%string
-                  (proc_lock_res γs γl (proc_addr k)) R2 lvl eb pme C (K - 4)%nat
+                  (proc_lock_res γs γl (proc_addr k)) R2 lvl eb pme (K - 4)%nat
                   ({["proc"]} ∪ lks)
                   Hlka ltac:(pose proof (ap_K10 K HK); lia)
                   with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay").
@@ -2184,7 +2184,7 @@ Section ProofAllocproc.
             rewrite /R4 upd_ne; [| congruence].
             exact (HR3rest r Hr Ncsp N8 N9 N18). }
           iIntros (CIDp Hsp Mf) "[%Hcsf %Ha0f] Hcgf Hpcf".
-          iDestruct (cpu_own_transport CIDg CIDp lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDg CIDp lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("Hcont" $! CIDp with "[%]"); [wp_next_chain|].
           iApply ("Hcont" $! Mf with "[%] Hpcf").
@@ -2206,7 +2206,7 @@ Section ProofAllocproc.
                              (sign_extend' 64 (mword_of_int 8172 : mword 13)) = mword_of_int (KernelSyms.allocproc + 0x1c))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgt1c) in "Hpc".
-          iDestruct (cpu_own_transport CIDg CIDi lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDg CIDi lvl eb pme b ltac:(wp_next_chain)
                        with "Hcpu") as "Hcpu".
           iSpecialize ("IHf" $! CIDi with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S k) R3 with "[%] [%] [%] Htl Hcont Hcg Hcpu Henv Hpc").
@@ -2215,7 +2215,7 @@ Section ProofAllocproc.
           * split; [exact HR3csp|]. split; [exact HR3s1|]. split; [exact HR3s2|].
             exact HR3rest. }
     (* ---- enter the scan at k = 0 ---- *)
-    iDestruct (cpu_own_transport CID0 CID10 lvl eb pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID10 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hloop" $! NPROC).
     iSpecialize ("Hloop" $! CID10 with "[%]"); [wp_next_chain|].
@@ -2252,14 +2252,14 @@ Section SealAllocproc.
   Lemma wp_allocproc_sconf
       (γa : gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
-    : wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme C on b lks.
+      (pme : mword 64) (on : option nat) (b : bool) (lks : gset string)
+    : wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme on b lks.
   Proof.
     cbv beta delta [wp_allocproc_sconf_body].
     intros pcE ret_tgt HK Hlvl Hex Hbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hpidlk Henv Hcont".
-    iApply (Core.wp_allocproc_core γa γp γf γs m lvl K eb pme C (Some nb) b lks HK Hlvl Hbelow
+    iApply (Core.wp_allocproc_core γa γp γf γs m lvl K eb pme (Some nb) b lks HK Hlvl Hbelow
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hpidlk Henv").
     all: try lkbelow.
     iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".

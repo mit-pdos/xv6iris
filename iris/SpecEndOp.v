@@ -100,7 +100,7 @@ Definition wp_end_op_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (u : nat)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.end_op in
   let pj := proc_addr j in
@@ -125,7 +125,7 @@ Definition wp_end_op_sconf_body
      satisfy, so nothing about them is stated here. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -164,7 +164,7 @@ Definition wp_end_op_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -186,8 +186,8 @@ Module Type END_OP.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (u : nat)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_end_op_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart dev u pidv dq m K eb C b lks.
+                           cov logstart dev u pidv dq m K eb b lks.
 End END_OP.

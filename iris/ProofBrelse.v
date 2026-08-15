@@ -245,7 +245,7 @@ Section ProofBrelse.
      so no [nn] binder survives. *)
   Local Lemma brelse_tail `{CID0 : CpuId}  (bn : bio_names)
       (V : bio_view Σ)
-      (m M : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m M : regfile) (K : nat) (eb : bool) (p : mword 64)
       (lks : gset string) :
     (K_brelse <= K)%nat ->
     M !!! Regidx csp_rs1
@@ -266,7 +266,7 @@ Section ProofBrelse.
     is_lock (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
-    cpu_own 1%nat eb p C false ({["bcache"]} ∪ lks) -∗
+    cpu_own 1%nat eb p false ({["bcache"]} ∪ lks) -∗
     arm_pay 0%nat eb p -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
@@ -279,7 +279,7 @@ Section ProofBrelse.
         (* [lks], NOT [∅]: the release above only drops "bcache"; whatever
            this hart already held on entry to brelse is untouched by this
            tail, so it is handed back to the caller's continuation as-is. *)
-        cpu_own 0%nat eb p C eb lks -∗
+        cpu_own 0%nat eb p eb lks -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -349,7 +349,7 @@ Section ProofBrelse.
     assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x68) : mword 64) 4)
       by (rewrite /T3; apply upd_eq).
     iApply (Rl.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) T3
-              0%nat eb p C (K - 4)%nat ({["bcache"]} ∪ lks)
+              0%nat eb p (K - 4)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HT3a0; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -484,7 +484,7 @@ Section ProofBrelse.
     iEval (rewrite HP5ra) in "Hpc".
     (* [cpu_own] is the one resource a leaf's [wp_next] does NOT re-deliver:
        release handed it back at [CIDr], the six epilogue leaves moved on. *)
-    iDestruct (cpu_own_transport CIDr CIDe6 0%nat eb p C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDr CIDe6 0%nat eb p eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc").
@@ -530,9 +530,9 @@ Section ProofBrelse.
       (γs : list gname)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (bs bsd : list (bv 8)) (d : bool) (b : bool) (lks : gset string)
-    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b lks.
+    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p bs bsd d b lks.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
     intros pcE ret_tgt HK Hk Ha0 Hbelow.
@@ -784,10 +784,10 @@ Section ProofBrelse.
       rewrite /R5 upd_ne; [| vm_compute; discriminate]. exact HR4s2. }
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID10 0%nat b p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b C b lks
+              "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
     all: try lkbelow.
@@ -866,10 +866,10 @@ Section ProofBrelse.
       by (rewrite /H2 upd_ne; [exact HH1a0 | vm_compute; discriminate]).
     assert (HH2ra : H2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64) 4)
       by (rewrite /H2; apply upd_eq).
-    iDestruct (cpu_own_transport CID11 CID14 0%nat b p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID11 CID14 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b C b lks
+              "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hpanic Hprocs").
     all: try lkbelow.
@@ -946,10 +946,10 @@ Section ProofBrelse.
       by (rewrite /U3 upd_ne; [exact HU2a0 | vm_compute; discriminate]).
     assert (HU3ra : U3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.brelse + 0x28) : mword 64) 4)
       by (rewrite /U3; apply upd_eq).
-    iDestruct (cpu_own_transport CID15 CID18 0%nat b p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID15 CID18 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Aq.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) U3
-              0%nat b p C (K - 4)%nat b lks
+              0%nat b p (K - 4)%nat b lks
               ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     all: try lkbelow.
@@ -1381,7 +1381,7 @@ Section ProofBrelse.
         rewrite /E1 upd_ne; [| regne].
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p C lks HK HE9sp HE9thr Hbelow
+      iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p lks HK HE9sp HE9thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
@@ -1512,7 +1512,7 @@ Section ProofBrelse.
       { intros c Hcs N2 N8 N9 N18.
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p C lks HK HD2sp HD2thr Hbelow
+      iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p lks HK HD2sp HD2thr Hbelow
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].

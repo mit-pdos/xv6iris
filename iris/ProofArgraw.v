@@ -1278,10 +1278,10 @@ Section ProofArgraw.
 
 
   Lemma wp_argraw_sconf
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_argraw_sconf_body m av n eb p C i tfp ws v dqt b lks.
+    : wp_argraw_sconf_body m av n eb p i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_argraw_sconf_body].
     intros pcE ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
@@ -1387,8 +1387,8 @@ Section ProofArgraw.
     iEval (rewrite Hjmp) in "Hpc".
     assert (HA3ra : A3 !!! Regidx ar_ra = add_vec_int (mword_of_int (KernelSyms.argraw + 0x0c) : mword 64) 4)
       by (rewrite /A3 upd_eq; reflexivity).
-    iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p C b
+    iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
@@ -1532,7 +1532,7 @@ Section ProofArgraw.
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    iDestruct (cpu_own_transport CID8 CID15 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID8 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hcpu Hpc Htfp Htf").
     split; [| exact Hfa0].

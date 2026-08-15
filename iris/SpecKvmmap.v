@@ -25,7 +25,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let pa := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of va in
@@ -58,14 +58,14 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   | Some nb => ⌜(pt_missing t vpn0 npages < nb)%nat⌝
   end -∗
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b lks -∗ kernel_text -∗
+  cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.kvmmap) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b lks -∗
+    cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -81,6 +81,6 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
 Module Type KVMMAP.
   Parameter wp_kvmmap_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p on b lks.
 End KVMMAP.

@@ -350,9 +350,9 @@ Section ProofFetchaddr.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_fetchaddr_sconf (γa : gname) (γf : gname)
-      (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (oldv : mword 64) (b : bool) (lks : gset string)
-    : wp_fetchaddr_sconf_body γa γf m av eb p C pid V oldv b lks.
+    : wp_fetchaddr_sconf_body γa γf m av eb p pid V oldv b lks.
   Proof.
     cbv beta delta [wp_fetchaddr_sconf_body].
     intros pcE addr ip ret_tgt Hav.
@@ -542,8 +542,8 @@ Section ProofFetchaddr.
     (* [Hcpu] was established at the entry hart; the nine leaf steps above may
        have moved us to another one, so re-anchor it before myproc's own
        [cpu_own] premise can take it. *)
-    iDestruct (cpu_own_transport CID CID9 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M5 (av - 4)%nat 0%nat eb p C b
+    iDestruct (cpu_own_transport CID CID9 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf M5 (av - 4)%nat 0%nat eb p b
               _ fa_n0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID10 Hk10 ms A) "%Hms Hcg Hcpu Hpc %HcsA".
@@ -666,7 +666,7 @@ Section ProofFetchaddr.
       iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
         [iPureIntro; apply uptd_ext_sz_refl|].
       iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
-      iDestruct (cpu_own_transport CID10 CID15 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID10 CID15 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf (pv_upt V) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
       { exact Hcsf. }
@@ -783,7 +783,7 @@ Section ProofFetchaddr.
         iAssert (⌜uptd_ext_sz (pv_sz V) (pv_upt V) (pv_upt V)⌝)%I as "#Hxr";
           [iPureIntro; apply uptd_ext_sz_refl|].
         iDestruct ("Hpback" $! (pv_upt V) with "Hxr Hszc Hptc Hpt") as "Hpriv".
-        iDestruct (cpu_own_transport CID10 CID17 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID10 CID17 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf (pv_upt V) with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }
@@ -918,9 +918,9 @@ Section ProofFetchaddr.
         iDestruct (bb_word_acc with "Hip") as "[Hbuf Hipback]".
         iEval (rewrite -HA7a2) in "Hbuf".
         (* ---- copyin(p->pagetable, p->sz, ip, addr, 8) ---- *)
-        iDestruct (cpu_own_transport CID10 CID19 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID10 CID19 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iApply (Copyin.wp_copyin_sconf γa A7 (pv_upt V) (pv_sz V) 8%nat
-                  (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p C b
+                  (fun j => nth_byte (oldv : mword 64) j) (av - 4)%nat 0%nat eb p b
                   _ HK50 HA7a0 HA7a1 HA7len fa_len8 Hszb38 fa_n0
                   with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
         all: try lkbelow.
@@ -1006,7 +1006,7 @@ Section ProofFetchaddr.
                   HB2sp HB2a0 HthrB2
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4").
         iIntros (CID23 Hk23 mf) "[%Hcsf %Hfa0] Hcg Hpc".
-        iDestruct (cpu_own_transport CID20 CID23 0%nat eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID20 CID23 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf P' with "[%] [%] Hcg Hcpu Hpc Hpriv [Hip]").
         { exact Hcsf. }

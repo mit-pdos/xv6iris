@@ -129,7 +129,7 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Pr
 
 Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
-    (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.growproc in
   let n := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -137,7 +137,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (growproc_stack <= av)%nat ->
   sie_cap_gpr m av b p -∗
   (* [n = 0]: uvmalloc's kalloc runs with interrupts un-pushed *)
-  cpu_own 0%nat eb p C b lks -∗
+  cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
@@ -147,7 +147,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜growproc_ok (pv_sz V) n (pv_upt V) P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own 0%nat eb p C b lks -∗
+      cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -156,7 +156,7 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type GROWPROC.
   Parameter wp_growproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_growproc_sconf_body γa γf m av eb p C pid V b lks.
+      wp_growproc_sconf_body γa γf m av eb p pid V b lks.
 End GROWPROC.

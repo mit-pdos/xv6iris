@@ -89,7 +89,7 @@ Import Defs.
 
 Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname) (j : nat) (γl : gname)
-    (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    (γt : gname) (m : regfile) (av : nat) (eb : bool)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_pause in
@@ -116,7 +116,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   page_valid (page_base tfp) ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* argint's trapframe resources *)
   p_trapframe pj ↦₈{dqt} page_base tfp -∗
@@ -133,7 +133,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
         mf !!! Regidx (mword_of_int 10 : mword 5) = r /\
         (r = (zero_reg : mword 64) \/ r = mword_of_int (-1)) ⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
@@ -144,8 +144,8 @@ Module Type SYSPAUSE.
   Parameter wp_sys_pause_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname) (j : nat) (γl : gname)
-      (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (γt : gname) (m : regfile) (av : nat) (eb : bool)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool) (lks : gset string),
-      wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b lks.
+      wp_sys_pause_sconf_body γs j γl γt m av eb i tfp ws v dqt b lks.
 End SYSPAUSE.

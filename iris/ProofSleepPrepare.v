@@ -75,9 +75,9 @@ Section ProofSleepPrepare.
   Notation spr_s2 := (mword_of_int 18 : mword 5).
 
   Lemma wp_sleep_prepare_sconf (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (b : bool)
       (lks : gset string)
-    : wp_sleep_prepare_sconf_body γs j γl m av n eb C b lks.
+    : wp_sleep_prepare_sconf_body γs j γl m av n eb b lks.
   Proof.
     cbv beta delta [wp_sleep_prepare_sconf_body].
     intros pcE pj chan ret_tgt Hj Hgl Hchan Hn Hav Hno.
@@ -199,9 +199,9 @@ Section ProofSleepPrepare.
       by (rewrite /A3 upd_eq; reflexivity).
     assert (HA3s1 : A3 !!! Regidx spr_s1 = chan)
       by (rewrite /A3 upd_ne; [exact HA2s1 | vm_compute; discriminate]).
-    iDestruct (cpu_own_transport CID CID8 n eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb pj C b
+    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb pj b
               _ ltac:(lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
     iIntros (CID9 Hs9 ms mp) "%Hmsf Hcg Hcpu Hpc %Hmp".
@@ -248,10 +248,10 @@ Section ProofSleepPrepare.
     assert (HB2s2 : B2 !!! Regidx spr_s2 = proc_addr j)
       by (rewrite /B2 upd_ne; [exact HB1s2 | vm_compute; discriminate]).
     (* ===================== acquire(&p->lock) ===================== *)
-    iDestruct (cpu_own_transport CID9 CID11 n eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID9 CID11 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B2 n eb pj C (av - 4)%nat b lks
+              (proc_lock_res γs γl (proc_addr j)) B2 n eb pj (av - 4)%nat b lks
               Hn ltac:(lia) Hno
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
     all: try lkbelow.
@@ -336,7 +336,7 @@ Section ProofSleepPrepare.
     (* ===================== release(&p->lock) ===================== *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C2 n eb pj C (av - 4)%nat
+              (proc_lock_res γs γl (proc_addr j)) C2 n eb pj (av - 4)%nat
               ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
@@ -494,7 +494,7 @@ Section ProofSleepPrepare.
       rewrite /A2 upd_ne; [| reg_ne_side].
       rewrite /A1 upd_ne; [| reg_ne_side].
       rewrite /M1 upd_ne; [| reg_ne_side]. reflexivity. }
-    iDestruct (cpu_own_transport CIDrel CIDe6 n eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe6 n eb pj b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc").

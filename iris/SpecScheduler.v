@@ -74,7 +74,8 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      exists to remove. *)
   (kv_frame_slots + 20 <= av)%nat ->
   sie_cap_gpr m av false p0 -∗
-  cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
+  cpu_ctx_free -∗
+  cpu_own 0 false p0 false ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]

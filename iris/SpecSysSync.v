@@ -99,7 +99,7 @@ Definition wp_sys_sync_sconf_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sync in
   let pj := proc_addr j in
@@ -113,7 +113,7 @@ Definition wp_sys_sync_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM: see the header note, and
      SpecBeginOp.v, whose wait loop this one is a transcription of. *)
   trap_csrs_ext eb -∗
@@ -133,7 +133,7 @@ Definition wp_sys_sync_sconf_body
       (* the syscall's return value: [return 0] *)
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -149,7 +149,7 @@ Module Type SYS_SYNC.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
-      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb C b lks.
+      wp_sys_sync_sconf_body γs j γl bn γ γfs cov logstart dev m K eb b lks.
 End SYS_SYNC.

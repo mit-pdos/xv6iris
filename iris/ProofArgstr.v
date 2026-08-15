@@ -87,10 +87,10 @@ Section ProofArgstr.
   Notation Ra2 := (mword_of_int 12 : mword 5).
 
   Lemma wp_argstr_sconf (γa : gname) (γf : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_argstr_sconf_body γa γf m av n eb p C i v pid V maxn buf_olds b lks.
+    : wp_argstr_sconf_body γa γf m av n eb p i v pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
     intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31 Hlkbelow.
@@ -299,8 +299,8 @@ Section ProofArgstr.
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     (* ---- the FIRST borrow: argraw wants the trapframe page ---- *)
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Htfa & Hpbacktf)".
-    iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argraw.wp_argraw_sconf M5 (av - 4)%nat n eb p C
+    iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Argraw.wp_argraw_sconf M5 (av - 4)%nat n eb p
               i (ud_tfp (pv_upt V)) (pv_tf V) v (DfracOwn (1/4)) b
               _ Hi HM5a0 Hargs Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa").
@@ -389,8 +389,8 @@ Section ProofArgstr.
     assert (HKfs : (fetchstr_stack <= av - 4)%nat) by (unfold fetchstr_stack; lia).
     iEval (rewrite -HA3a1) in "Hbuf".
     (* ---- fetchstr(addr, buf, max) ---- *)
-    iDestruct (cpu_own_transport CID10 CID13 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
+    iDestruct (cpu_own_transport CID10 CID13 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Fetchstr.wp_fetchstr_sconf γa γf A3 (av - 4)%nat n eb p pid V maxn buf_olds b
               _ Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Henv Hbuf").
     all: try lkbelow.
@@ -554,7 +554,7 @@ Section ProofArgstr.
       apply Hthrr; assumption. }
     (* [Hcpu] was delivered at [CID14] by fetchstr's own [wp_next]; six more
        plain instructions have moved the hart to [CID20]. *)
-    iDestruct (cpu_own_transport CID14 CID20 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID14 CID20 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID20 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! T5 P' buf_new with "[%] [%] Hcg Hcpu Hpc Hpriv Hbuf [%]").
     { unfold callee_saved.

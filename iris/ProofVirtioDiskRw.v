@@ -118,7 +118,7 @@ Section ProofVirtioDiskRw.
   (* =================================================================== *)
   Lemma wp_vdrw_p1
       (γd : disk_names) (γk : gname) (pd pav pu : mword 64)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (bno : mword 32) (lks : gset string) :
     let sp0 : Arch.pa := m !!! Regidx csp_rs1 in
     let bp  : Arch.pa := m !!! Regidx Ra0 in
@@ -129,7 +129,7 @@ Section ProofVirtioDiskRw.
        phase's OWN [lks] is not enough, it must also reach P6's release. *)
     locks_below lks "virtio_disk" ->
     sie_cap_gpr m K eb pj -∗
-    cpu_own 0 eb pj C eb lks -∗
+    cpu_own 0 eb pj eb lks -∗
     (* NOT USED HERE: [wp_vdrw_p1] is pure prologue-plus-acquire, so the
        complement just RIDES ALONG, transported to the acquire-return hart
        exactly like [cpu_own] below, and handed to the continuation
@@ -154,7 +154,7 @@ Section ProofVirtioDiskRw.
            file list) continue this phase chain and almost certainly still
            thread the OLD bare [lks] through their own "holding the lock"
            cpu_own occurrences -- they need the matching fix, unverified here. *)
-        cpu_own 1 eb pj C false ({["virtio_disk"]} ∪ lks) -∗
+        cpu_own 1 eb pj false ({["virtio_disk"]} ∪ lks) -∗
         arm_pay 0 eb pj -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -558,10 +558,10 @@ Section ProofVirtioDiskRw.
     assert (HR11ra : R11 !!! Regidx Rra
                      = add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64) 4)
       by (rewrite /R11; apply upd_eq).
-    iDestruct (cpu_own_transport CID CIDp21 0 eb pj C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CIDp21 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
-              (disk_res γd pd pav pu) R11 0%nat eb pj C (K - 12)%nat eb lks
+              (disk_res γd pd pav pu) R11 0%nat eb pj (K - 12)%nat eb lks
               vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hfresh
               with "Hcg Hown Htext Hpc [] Hpanic").
     all: try lkbelow.

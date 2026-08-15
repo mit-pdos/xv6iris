@@ -105,7 +105,7 @@ Definition wp_sys_exit_sconf_body
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
     (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+    (m : regfile) (av : nat) (eb : bool) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
@@ -129,7 +129,7 @@ Definition wp_sys_exit_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   (* [kernel_data] is argint/argraw's own premise (the jump table it reads
      lives there); kexit needs none of it *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -189,10 +189,10 @@ Module Type SYSEXIT.
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m : regfile) (av : nat) (eb : bool) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64) (lks : gset string),
       wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka
                              γi cn γtl bmapstart inodestart nib size dqb dqs us
-                             on fn m av eb C b pid V v0 lks.
+                             on fn m av eb b pid V v0 lks.
 End SYSEXIT.

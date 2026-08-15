@@ -101,7 +101,7 @@ Definition wp_nameiparent_sconf_body
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
   let pj := proc_addr j in
@@ -138,7 +138,7 @@ Definition wp_nameiparent_sconf_body
   gs !! j = Some gl ->
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -174,7 +174,7 @@ Definition wp_nameiparent_sconf_body
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -226,7 +226,7 @@ Definition wp_nameiparent_gen_body
     (nfun : nat -> bv 8)                               (* the name buffer, in *)
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.nameiparent in
   let pj := proc_addr j in
@@ -265,7 +265,7 @@ Definition wp_nameiparent_gen_body
   gs !! j = Some gl ->
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -301,7 +301,7 @@ Definition wp_nameiparent_gen_body
     (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -360,12 +360,12 @@ Module Type NAMEIPARENT.
       (nfun : nat -> bv 8)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n
-                                pidv dq dqb dqs dqc m K eb C b lks.
+                                pidv dq dqb dqs dqc m K eb b lks.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_nameiparent_gen :
@@ -388,10 +388,10 @@ Module Type NAMEIPARENT.
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n Sb
-                                pidv dq dqb dqs dqc m K eb C b lks.
+                                pidv dq dqb dqs dqc m K eb b lks.
 End NAMEIPARENT.

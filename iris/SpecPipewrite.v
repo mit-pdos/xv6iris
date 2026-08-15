@@ -83,7 +83,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)
     (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool)
     (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pipewrite in
   let pj := proc_addr j in
@@ -111,7 +111,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   locks_below lks "pipe" ->
   sie_cap_gpr m av b pj -∗
   (* noff = 0: sleep demands the pipe lock be the ONLY lock held *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* the pipe, and a share of one end -- the whole credential *)
   is_pipe γl γp pi -∗
@@ -128,7 +128,7 @@ Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       ⌜pipe_rw_ret n (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       pipe_ref γp w q -∗
       proc_priv_core pj pid (upd_upt V P') -∗
@@ -140,7 +140,7 @@ Module Type PIPEWRITE.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b lks.
+      wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb pid V n b lks.
 End PIPEWRITE.

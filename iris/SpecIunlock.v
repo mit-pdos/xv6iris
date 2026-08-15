@@ -114,7 +114,7 @@ Definition wp_iunlock_sconf_body
     (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
   let ip : mword 64 := ientry k in
@@ -129,7 +129,7 @@ Definition wp_iunlock_sconf_body
      the caller must already hold only locks BELOW its rank. *)
   locks_below lks "sleep lock" ->
   sie_cap_gpr m K b p -∗
-  cpu_own 0 eb p C b lks -∗
+  cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the [ref] words, and the entry's content escrow *)
@@ -163,7 +163,7 @@ Definition wp_iunlock_sconf_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b p -∗
-      cpu_own 0 eb p C b lks -∗
+      cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
       (* the caller's share, back whole, at ITS OWN fraction and device *)
@@ -185,8 +185,8 @@ Module Type IUNLOCK.
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
       wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p C b lks.
+                            dn' bm' pidv dq m K eb p b lks.
 End IUNLOCK.

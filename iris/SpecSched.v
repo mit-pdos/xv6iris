@@ -120,7 +120,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      exactly the eb retune back to the caller's own state, now realized
      against the DISPATCHING hart's fresh [trap_csrs] (the entry stash is
      about the wrong hart's ghost). *)
-  cpu_own 1 eb pj emp false {["proc"]} -∗
+  cpu_own 1 eb pj false {["proc"]} -∗
   own_ctx (p_context pj) -∗
   (* THE HART TAG, WHOLE.  The parking thread merged the slot's half with its
      own claim's half at [SchedCtx.proc_slots_running], and the reclaiming
@@ -139,7 +139,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
          rides inside it, which is what the caller's own retune needs. *)
       trap_csrs -∗
-      cpu_own 1 eb pj emp false {["proc"]} -∗
+      cpu_own 1 eb pj false {["proc"]} -∗
       own_ctx (p_context pj) -∗
       hart_full j cpu_id -∗
       ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗

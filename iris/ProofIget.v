@@ -346,14 +346,14 @@ Section ProofIget.
   Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
@@ -406,17 +406,17 @@ Section ProofIget.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
     : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
-                         m n eb p C K b lks.
+                         m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
     intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
     unfold K_iget in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hcont".
-    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iPoseProof (igi_00 with "Htext") as "Hi00".
@@ -605,11 +605,11 @@ Section ProofIget.
       rewrite /R5 upd_ne; [| regne]. rewrite /R4 upd_ne; [| regne].
       rewrite /R3 upd_ne; [| regne]. rewrite /R2 upd_ne; [| regne].
       rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iDestruct (cpu_own_transport CID CID13 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p C (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
+              n eb p (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
@@ -744,7 +744,7 @@ Section ProofIget.
                 c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
-        cpu_own (CID := CIDt) n eb p C b lks -∗
+        cpu_own (CID := CIDt) n eb p b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
@@ -878,7 +878,7 @@ Section ProofIget.
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (P8 !!! Regidx Rra) = ret_tgt) by (rewrite HP8ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iDestruct (cpu_own_transport CIDt CIDt9 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href").
@@ -956,7 +956,7 @@ Section ProofIget.
                             /\ M !! e = None) ⌝ -∗
       sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
-      cpu_own (S n) eb p C false ({["itable"]} ∪ lks) -∗
+      cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
@@ -992,7 +992,7 @@ Section ProofIget.
                               /\ M !! e = None) ⌝ -∗
         sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
-        cpu_own (S n) eb p C false ({["itable"]} ∪ lks) -∗
+        cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗
@@ -1469,7 +1469,7 @@ Section ProofIget.
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                       (itable_res2 cn γfs γi cov logstart nib dev) V4
-                      n eb p C (K - 6)%nat ({["itable"]} ∪ lks)
+                      n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
             { iExact "Hlock". }
@@ -1889,7 +1889,7 @@ Section ProofIget.
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                   (itable_res2 cn γfs γi cov logstart nib dev) L7
-                  n eb p C (K - 6)%nat ({["itable"]} ∪ lks)
+                  n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
         { iExact "Hlock". }
@@ -1941,7 +1941,7 @@ Section ProofIget.
                   with "Hcg Hpc Hi68").
         iIntros (CIDh2 Hsh2). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt8c) in "Hpc".
-        iDestruct (cpu_own_transport CIDr CIDh2 n eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDr CIDh2 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iEval (rewrite /TAILC) in "Hcont2".
         iSpecialize ("Hcont2" $! CIDh2 with "[]"); [ iPureIntro; wp_next_chain | ].

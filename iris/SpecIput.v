@@ -136,7 +136,7 @@ Definition wp_iput_sconf_body
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
@@ -178,7 +178,7 @@ Definition wp_iput_sconf_body
      NESTED one, which does not park; bread under itrunc/iupdate still
      does, so this premise stays.) *)
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
@@ -230,7 +230,7 @@ Definition wp_iput_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
@@ -336,7 +336,7 @@ Definition wp_iput_gen_body
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
@@ -364,7 +364,7 @@ Definition wp_iput_gen_body
   (* THE FRESHNESS PREMISE -- see [wp_iput_sconf_body]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -413,7 +413,7 @@ Definition wp_iput_gen_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -456,11 +456,11 @@ Module Type IPUT.
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb C b lks.
+                          k q inum n pidv dq dqb dqs m K eb b lks.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness ([ip_spend_w w false false <= 2], and iput's own flush is the
@@ -482,9 +482,9 @@ Module Type IPUT.
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b lks.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
 End IPUT.

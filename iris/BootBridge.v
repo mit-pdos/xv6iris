@@ -386,7 +386,8 @@ Section BootBridge.
     ==∗
     ∃ mf : regfile,
       sie_cap_gpr mf (kv_frame_slots + K) false p0 ∗
-      cpu_own 0 false p0 cpu_ctx_free false ∅ ∗
+      cpu_ctx_free ∗
+      cpu_own 0 false p0 false ∅ ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
@@ -444,8 +445,8 @@ Section BootBridge.
     iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez Hmieval eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
-    iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
-                 with "Hnoff Hint He2 Hproc Hlks Hctx") as "Hcpu".
+    iDestruct (cpu_own_init_boot p0 nv iv Hnv
+                 with "Hnoff Hint He2 Hproc Hlks") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY
        carries this hart's id there and IS its own pin ([tp_pin_id]). --- *)
     assert (Htpm : Mf !!! Regidx Rtp = cid_word_of cpu_id).
@@ -459,7 +460,7 @@ Section BootBridge.
     iExists Mf.
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
-    iFrame "Hcpu Hg4a".
+    iFrame "Hctx Hcpu Hg4a".
     rewrite /main_hart_raw /trap_csrs_raw.
     iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
     iExists (_get_Mstatus_SPP msf), (_get_Mstatus_SPIE msf). iExact "Hspp2".

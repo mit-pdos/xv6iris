@@ -943,14 +943,14 @@ Section SysExecHead.
   Lemma sx_head
       (γf γa : gname) (jp : nat)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) :
     (K_sys_exec <= K)%nat ->
     pv_tf V !! tf_arg_idx 0 = Some v0 ->
     pv_tf V !! tf_arg_idx 1 = Some v1 ->
     locks_below lks "kmem" ->
     sie_cap_gpr m K b (proc_addr jp) -∗
-    cpu_own 0 eb (proc_addr jp) C b lks -∗
+    cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int SX : mword 64) -∗
     proc_priv γf (proc_addr jp) pid V -∗
     kalloc_env γa None -∗
@@ -961,7 +961,7 @@ Section SysExecHead.
         ⌜uptd_ext (pv_upt V) P'⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr mf K b (proc_addr jp) -∗
-        cpu_own 0 eb (proc_addr jp) C b lks -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         proc_priv γf (proc_addr jp) pid (upd_upt V P') -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -977,7 +977,7 @@ Section SysExecHead.
           sx_ala (m !!! Regidx csp_rs1 : mword 64) ⌝ -∗
         pc_is (mword_of_int (SX + 0x28) : mword 64) -∗
         sie_cap_gpr M (K - 60)%nat b (proc_addr jp) -∗
-        cpu_own 0 eb (proc_addr jp) C b lks -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
         proc_priv γf (proc_addr jp) pid (upd_upt V P') -∗
         (* the frame: ra and s0 spilled, s1..s7 and slot 10 still free,
            the path buffer holding its NUL-terminated string, the argv
@@ -1178,9 +1178,9 @@ Section SysExecHead.
     iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hprivback)".
     iEval (rewrite -HM5a1) in "F59".
-    iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) C b
+    iDestruct (cpu_own_transport CID0 CID7 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Argaddr.wp_argaddr_sconf M5 (K - 60)%nat 0%nat eb (proc_addr jp) C
+    iApply (Argaddr.wp_argaddr_sconf M5 (K - 60)%nat 0%nat eb (proc_addr jp)
               1%nat (ud_tfp (pv_upt V)) (pv_tf V) v1 u59 (DfracOwn (1/4)) b lks
               sx_arg1_lt ltac:(rewrite HM5a0; reflexivity) Harg1 sx_noff0 Kaa
               Hpv
@@ -1303,10 +1303,10 @@ Section SysExecHead.
     (* the path buffer, named *)
     iDestruct (sx_bytes_name (pa_stk sp0 26) 128 with "Hpb") as (bf) "Hbuf".
     iEval (rewrite -HM10a1) in "Hbuf".
-    iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr jp) C b
+    iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Argstr.wp_argstr_sconf γa γf M10 (K - 60)%nat 0%nat eb
-              (proc_addr jp) C 0%nat v0 pid V 128%nat bf b lks
+              (proc_addr jp) 0%nat v0 pid V 128%nat bf b lks
               sx_arg0_lt ltac:(rewrite HM10a0; reflexivity) Harg0 sx_noff0 Kar
               ltac:(rewrite HM10a2; reflexivity) sx_maxpath_lt Hlb
               with "Hcg Hcnt Htext Hdata Hpc Hpriv Hka Hbuf").
@@ -1386,7 +1386,7 @@ Section SysExecHead.
       iEval (rewrite Hpp028) in "Hpc".
       iDestruct (sx_buf_split (pa_stk sp0 26) bnew k Hklt with "Hbuf")
         as "[Hpre Hsuf]".
-      iDestruct (cpu_own_transport CID13 CID16 0%nat eb (proc_addr jp) C b
+      iDestruct (cpu_own_transport CID13 CID16 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hout" $! CID16 with "[%]"); [wp_next_chain |].
       iApply ("Hout" $! M13 P' k bnew (fun j => bnew (S k + j)%nat) v1 u60
@@ -1433,7 +1433,7 @@ Section SysExecHead.
                 (HM13thr Rs7 ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(nz))
                 Halp Hala with "Hcg Htext Hpc F1 F2 Hrest [Hcnt Hpriv Hm1]").
       iIntros (CID17) "%Hq17". iIntros (mf) "%Hcsf %Hfa0 Hcg Hpc".
-      iDestruct (cpu_own_transport CID13 CID17 0%nat eb (proc_addr jp) C b
+      iDestruct (cpu_own_transport CID13 CID17 0%nat eb (proc_addr jp) b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hm1" $! CID17 with "[%]"); [wp_next_chain |].
       iApply ("Hm1" $! mf P' with "[%] [%] [%] Hcg Hcnt Hpc Hpriv").

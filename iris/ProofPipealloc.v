@@ -125,9 +125,9 @@ Section ProofPipealloc.
   Lemma wp_pipealloc_sconf
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
+      (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool)
       (lks : gset string)
-    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b lks.
+    : wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p K b lks.
   Proof.
     cbv beta delta [wp_pipealloc_sconf_body].
     (* [Hbelow] is the ORDER premise pipealloc's whole cone needs: the LOWEST
@@ -349,7 +349,7 @@ Section ProofPipealloc.
                 mj !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr mj (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xb8)) -∗
-        cpu_own n eb p C b lks -∗
+        cpu_own n eb p b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -466,7 +466,7 @@ Section ProofPipealloc.
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (P5 !!! Regidx Rra) = ret_tgt) by (rewrite HP5ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iDestruct (cpu_own_transport CIDe CIDf6 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDe CIDf6 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* the complement arrived at [CIDe] with [cpu_own], so it moves with it:
          the hop spans only the epilogue's own six leaf steps. *)
@@ -540,7 +540,7 @@ Section ProofPipealloc.
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa8)) -∗
-        cpu_own n eb p C b lks -∗
+        cpu_own n eb p b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -565,7 +565,7 @@ Section ProofPipealloc.
                 Mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mt (K - 6)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.pipealloc + 0xa4)) -∗
-        cpu_own n eb p C b lks -∗
+        cpu_own n eb p b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb p -∗
         file_ref γf k0 1 Cf0 -∗
@@ -653,7 +653,7 @@ Section ProofPipealloc.
                         = mword_of_int (KernelSyms.pipealloc + 0xb8))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt8) in "Hpc".
-        iDestruct (cpu_own_transport CIDt CIDt3 n eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDt CIDt3 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iDestruct (trap_csrs_ext_transport CIDt CIDt3 eb p ltac:(ext_chain Hbf)
                      with "Hextc") as "Hextc".
@@ -714,7 +714,7 @@ Section ProofPipealloc.
         { intros c Hcs N2 N8 N9 N20. rewrite /U4 upd_ne; [| regne]. apply HU3thr; assumption. }
         assert (HU4ra : U4 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipealloc + 0xb2) : mword 64) 4)
           by (rewrite /U4; apply upd_eq).
-        iDestruct (cpu_own_transport CIDt CIDt5 n eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDt CIDt5 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         (* fileclose THREADS the complement -- it is at the top level of its
            contract, never inside the framed environment bundle -- so it goes
@@ -723,7 +723,7 @@ Section ProofPipealloc.
                      with "Hextc") as "Hextc".
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
-        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p C (K - 6)%nat b lks
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p (K - 6)%nat b lks
                   ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href1 []").
         all: try lkbelow.
@@ -747,7 +747,7 @@ Section ProofPipealloc.
         assert (Hpab8 : add_vec_int (mword_of_int (KernelSyms.pipealloc + 0xb6) : mword 64) 2 = mword_of_int (KernelSyms.pipealloc + 0xb8))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpab8) in "Hpc".
-        iDestruct (cpu_own_transport CIDt6 CIDt7 n eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDt6 CIDt7 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         (* from the hart fileclose CAME BACK on, not from [CIDt]: its own
            crossing is the literal [true] and carries no chain fact. *)
@@ -795,13 +795,13 @@ Section ProofPipealloc.
       { intros c Hcs N2 N8 N9 N20. rewrite /V1 upd_ne; [| regne]. apply Htthr; assumption. }
       assert (HV1ra : V1 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipealloc + 0xa4) : mword 64) 4)
         by (rewrite /V1; apply upd_eq).
-      iDestruct (cpu_own_transport CIDu CIDu1 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDu CIDu1 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextc") as "Hextc".
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
-      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p C (K - 6)%nat b lks
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p (K - 6)%nat b lks
                 ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href0 []").
       all: try lkbelow.
@@ -868,9 +868,9 @@ Section ProofPipealloc.
       by (rewrite /mA upd_ne; [exact HR4s4 | vm_compute; discriminate]).
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x18) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID11 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID11 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p C (K - 6)%nat b lks
+    iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p (K - 6)%nat b lks
               ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslota").
     all: try lkbelow.
@@ -921,7 +921,7 @@ Section ProofPipealloc.
       iEval (rewrite HtgtA) in "Hpc".
       iEval (rewrite Hb4) in "Hr16". iEval (rewrite Hb5) in "Hr8".
       iDestruct "HK" as "[_ [Ht8 _]]".
-      iDestruct (cpu_own_transport CID12 CID14 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID12 CID14 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* filealloc does not mention the complement, so it rode along in the
          frame at the ENTRY hart: ONE WIDE HOP from there, spanning
@@ -974,9 +974,9 @@ Section ProofPipealloc.
       by (rewrite /mC upd_ne; [exact HmBs4 | vm_compute; discriminate]).
     assert (HmCra : mC !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x20) : mword 64) 4)
       by (rewrite /mC; apply upd_eq).
-    iDestruct (cpu_own_transport CID12 CID15 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID12 CID15 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p C (K - 6)%nat b lks
+    iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p (K - 6)%nat b lks
               ltac:(lia) Hnoffpos ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslotb").
     all: try lkbelow.
@@ -1063,7 +1063,7 @@ Section ProofPipealloc.
       iEval (rewrite Hppa4) in "Hpc".
       iEval (rewrite Hb4) in "Hr16". iEval (rewrite Hb5) in "Hr8".
       iDestruct "HK" as "[_ [_ Ht4]]".
-      iDestruct (cpu_own_transport CID16 CID20 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID16 CID20 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID CID20 eb p ltac:(ext_chain Hbf)
                    with "Hextc") as "Hextc".
@@ -1134,9 +1134,9 @@ Section ProofPipealloc.
       by (rewrite /mE upd_ne; [exact HmDs4 | vm_compute; discriminate]).
     assert (HmEra : mE !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) 4)
       by (rewrite /mE; apply upd_eq).
-    iDestruct (cpu_own_transport CID16 CID20 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID16 CID20 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p C (K - 6)%nat b lks
+    iApply (Kalloc.wp_kalloc_sconf γkl γk fl mE on n eb p (K - 6)%nat b lks
               ltac:(lia) Hfl Hnoffpos
               (* "kmem" (13) outranks "ftable" (1): weaken [Hbelow] up to it --
                  kalloc's own acquire needs no more than that, since
@@ -1280,7 +1280,7 @@ Section ProofPipealloc.
       iEval (rewrite HtgtC4) in "Hpc".
       iEval (rewrite Hs4pa) in "Hr16". iEval (rewrite Hb5) in "Hr8".
       iDestruct "HK" as "[_ [_ Ht4]]".
-      iDestruct (cpu_own_transport CID21 CID27 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID21 CID27 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* neither filealloc nor kalloc mentions the complement: still the wide
          hop from the entry hart. *)
@@ -2041,7 +2041,7 @@ Section ProofPipealloc.
                     = mword_of_int (KernelSyms.pipealloc + 0xb8))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite HtgtD) in "Hpc".
-    iDestruct (cpu_own_transport CID21 CID53 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID21 CID53 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* the success path calls filealloc, kalloc and initlock, none of which
        mentions the complement: the wide hop is still from the entry hart. *)

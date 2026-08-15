@@ -151,7 +151,7 @@ Definition kxc_b2_body
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-    (m M : regfile) (K : nat) (C : iProp Σ)
+    (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :=
   (K_kexec <= K)%nat ->
@@ -178,7 +178,7 @@ Definition kxc_b2_body
             cov logstart inodestart nib dev -∗
   kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
              size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K C
+             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -190,7 +190,7 @@ Definition kxc_b2_body
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -209,7 +209,7 @@ Definition kxc_b2_body
     ∀ (M' : regfile) (used3 : gset Z) (P' : uptd) (szv' : mword 64),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                  used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
-                 M' K C sp0 ra0 s00 s10 s20 pv av
+                 M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -220,7 +220,7 @@ Definition kxc_b2_body
             ⌜callee_saved m mf⌝ -∗
             ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
             sie_cap_gpr mf K true (proc_addr jp) -∗
-            cpu_own 0 true (proc_addr jp) C true ∅ -∗
+            cpu_own 0 true (proc_addr jp) true ∅ -∗
             pc_is (ret_pc ra0) -∗
             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -258,7 +258,7 @@ Definition kxc_b2z_body
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-    (m M : regfile) (K : nat) (C : iProp Σ)
+    (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) :=
   (K_kexec <= K)%nat ->
@@ -279,7 +279,7 @@ Definition kxc_b2z_body
             cov logstart inodestart nib dev -∗
   kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
              size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K C
+             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -289,7 +289,7 @@ Definition kxc_b2z_body
     ∀ (M' : regfile) (used3 : gset Z),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                  used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
-                 M' K C sp0 ra0 s00 s10 s20 pv av
+                 M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -314,13 +314,13 @@ Module Type KEXECB3.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av w67
+      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
 
   Parameter kxc_b2z :
@@ -339,11 +339,11 @@ Module Type KEXECB3.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av w67 ef P.
+      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
 End KEXECB3.

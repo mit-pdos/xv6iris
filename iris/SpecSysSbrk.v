@@ -125,7 +125,7 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
 
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
-    (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sbrk in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -136,7 +136,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   (sys_sbrk_stack <= av)%nat ->
   sie_cap_gpr m av b p -∗
   (* [n = 0]: growproc's uvmalloc reaches kalloc with interrupts un-pushed *)
-  cpu_own 0%nat eb p C b lks -∗
+  cpu_own 0%nat eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
   kalloc_env γa None -∗
@@ -146,7 +146,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       ⌜sys_sbrk_ok V v0 v1 P' szv'
          (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own 0%nat eb p C b lks -∗
+      cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -155,7 +155,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type SYSSBRK.
   Parameter wp_sys_sbrk_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) (lks : gset string),
-      wp_sys_sbrk_sconf_body γa γf m av eb p C pid V v0 v1 b lks.
+      wp_sys_sbrk_sconf_body γa γf m av eb p pid V v0 v1 b lks.
 End SYSSBRK.

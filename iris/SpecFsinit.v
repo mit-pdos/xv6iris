@@ -248,7 +248,7 @@ Definition wp_fsinit_sconf_body
     (vlock : mword 32) (vname vcpu : mword 64)
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fsinit in
   let pj := proc_addr j in
@@ -315,7 +315,7 @@ Definition wp_fsinit_sconf_body
      so one premise there covers the whole cone via [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   printk_env γpr γu γd -∗
@@ -384,7 +384,7 @@ Definition wp_fsinit_sconf_body
   ∀ (mf : regfile) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* ================================================================ *)
@@ -443,7 +443,7 @@ Module Type FSINIT.
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_fsinit_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl γpr
                            cov logstart bmapstart inodestart ninodes nib size
@@ -451,5 +451,5 @@ Module Type FSINIT.
                            v_magic v_size v_nblocks v_ninodes v_nlog
                            v_logstart v_inodestart v_bmapstart bs_sb sb_old
                            bs_hdr L D vlock vname vcpu v_start v_dev v_nc v_n
-                           pidv dq m K eb C b lks.
+                           pidv dq m K eb b lks.
 End FSINIT.

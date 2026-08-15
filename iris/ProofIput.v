@@ -365,7 +365,7 @@ Proof.
   repeat split.
   - rewrite (callee_saved_lookup Hcs (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact A.
   - rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact B.
-  - rewrite (callee_saved_lookup Hcs (mword_of_int 18 : mword 5) ltac:(vm_compute; reflexivity)). exact C.
+  - rewrite (callee_saved_lookup Hcs (mword_of_int 18 : mword 5) ltac:(vm_compute; reflexivity)). exact.
   - rewrite (callee_saved_lookup Hcs (mword_of_int 19 : mword 5) ltac:(vm_compute; reflexivity)). exact E.
   - rewrite (callee_saved_lookup Hcs (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)). exact F.
   - rewrite (callee_saved_lookup Hcs (mword_of_int 21 : mword 5) ltac:(vm_compute; reflexivity)). exact G.
@@ -427,14 +427,14 @@ Section IputCommon.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Lemma ip_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
-      `{GEN : GenId} `{CID : CpuId} (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+      `{GEN : GenId} `{CID : CpuId} (p : mword 64) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
@@ -509,7 +509,7 @@ Section IputTail.
       (size : Z) (dev : mword 32) (used used' Sb Sb' : gset Z)
       (k n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m D : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m D : regfile) (K : nat) (eb : bool)
       (sp0 vg4 : mword 64) (lks : gset string) :
     let pj := proc_addr j in
     let ret_tgt := ret_pc (m !!! Regidx Rra) in
@@ -536,7 +536,7 @@ Section IputTail.
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x26) : mword 64) -∗
     sie_cap_gpr D (trap_res eb + (K - 4))%nat false pj -∗
-    cpu_own 1 eb pj C false ({["itable"]} ∪ lks) -∗
+    cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
     arm_pay 0 eb pj -∗
     (* the trap-CSR complement: a PURE PASS-THROUGH, threaded from the
        caller's own entry straight to release's continuation -- iput never
@@ -562,7 +562,7 @@ Section IputTail.
       ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z) (w : bool),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb pj -∗
-        cpu_own 0 eb pj C eb lks -∗
+        cpu_own 0 eb pj eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         pc_is ret_tgt -∗
@@ -655,7 +655,7 @@ Section IputTail.
       by (rewrite (HD5thr csp_rs1 ltac:(vm_compute; reflexivity)); exact HDsp).
     iApply (Release.wp_release_sconf gtl itable_lock "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) D5
-              0%nat eb pj C (K - 4)%nat ({["itable"]} ∪ lks)
+              0%nat eb pj (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
@@ -748,7 +748,7 @@ Section IputTail.
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P4 !!! Regidx Rra) = ret_tgt) by (rewrite HP4ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iDestruct (cpu_own_transport CIDr CIDe5 0%nat eb pj C eb
+    iDestruct (cpu_own_transport CIDr CIDe5 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* [Hextc]/[Hextm] were never re-derived across the nested (level >= 1)
        stretch above -- nothing there threads them, and none of it can move
@@ -804,7 +804,7 @@ Section IputTail.
       (Mt : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32))
       (n n' : nat) (spf : bool -> nat) (wb crb0 : bool)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (K : nat) (eb : bool)
       (sp0 vg4 : mword 64) (lks : gset string) :
     let pj := proc_addr j in
     let ret_tgt := ret_pc (m !!! Regidx Rra) in
@@ -835,7 +835,7 @@ Section IputTail.
     ic_escrow cn gfs gi cov logstart k -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
     sie_cap_gpr M (trap_res eb + (K - 4))%nat false pj -∗
-    cpu_own 1 eb pj C false ({["itable"]} ∪ lks) -∗
+    cpu_own 1 eb pj false ({["itable"]} ∪ lks) -∗
     arm_pay 0 eb pj -∗
     (* pure pass-through, exactly as in [ip_tail_exit] above *)
     trap_csrs_ext eb -∗
@@ -861,7 +861,7 @@ Section IputTail.
       ∀ (mf : regfile) (n'' : nat) (used'' Sb'' : gset Z) (w : bool),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K eb pj -∗
-        cpu_own 0 eb pj C eb lks -∗
+        cpu_own 0 eb pj eb lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         pc_is ret_tgt -∗
@@ -1039,7 +1039,7 @@ Section IputTail.
       assert (Hp1 : Pos.to_nat 1 = 1%nat) by reflexivity.
       iEval (rewrite Hp1) in "Hiu".
       iApply (ip_tail_exit CID0 j bn g gfs gi cn gtl cov logstart bmapstart inodestart
-                nib size dev used used' Sb Sb' k n n' spf wb crb0 pidv dq dqb dqs m D2 K eb C sp0 vg4 lks
+                nib size dev used used' Sb Sb' k n n' spf wb crb0 pidv dq dqb dqs m D2 K eb sp0 vg4 lks
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hiu Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hiu
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
@@ -1106,7 +1106,7 @@ Section IputTail.
       { intros i Hi. reflexivity. }
       { rewrite /islot2 lookup_insert Hcik. iFrame. }
       iApply (ip_tail_exit CID0 j bn g gfs gi cn gtl cov logstart bmapstart inodestart
-                nib size dev used used' Sb Sb' k n n' spf wb crb0 pidv dq dqb dqs m D2 K eb C sp0 vg4 lks
+                nib size dev used used' Sb Sb' k n n' spf wb crb0 pidv dq dqb dqs m D2 K eb sp0 vg4 lks
                 HK Hanch Hsp0 HD2regs Hlo Hhi Hsub Hssub Hwm Hwc Hfresh
                 with "Htext Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok [-Hislot Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont] Hislot
                       Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont").
@@ -1185,11 +1185,11 @@ Section ProofIput.
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b lks.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iput_gen_body].
     intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
@@ -1369,11 +1369,11 @@ Section ProofIput.
         first [ exact HmAs1 | exact HmAsp
               | rewrite HmAthr;
                 [ reflexivity | vm_compute; reflexivity | nz | nz | nz ] ]. }
-    iDestruct (cpu_own_transport CID CID9 0%nat eb pj C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID9 0%nat eb pj eb ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf gtl "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) mA
-              0%nat eb pj C (K - 4)%nat eb lks
+              0%nat eb pj (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
@@ -1478,7 +1478,7 @@ Section ProofIput.
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb pidv dq dqb dqs
-                m E2 K eb C sp0 vg4 lks
+                m E2 K eb sp0 vg4 lks
                 HK Hk ltac:(wp_next_chain) Hsp0eq HE2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
@@ -1620,7 +1620,7 @@ Section ProofIput.
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb pidv dq dqb dqs
-                m F1 K eb C sp0 vg4 lks
+                m F1 K eb sp0 vg4 lks
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF1regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
@@ -1733,7 +1733,7 @@ Section ProofIput.
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used Sb Sb k q inum Mt ci n n
                 (fun w => ip_spend_w w cru crz) false crb pidv dq dqb dqs
-                m F2 K eb C sp0 vg4 lks
+                m F2 K eb sp0 vg4 lks
                 HK Hk ltac:(wp_next_chain) Hsp0eq HF2regs Hwf Hciwf
                 ltac:(cbn; lia) ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 ltac:(discriminate) ltac:(intros _; reflexivity) ltac:(lkbelow)
@@ -1892,7 +1892,7 @@ Section ProofIput.
     iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
     iMod (slh_return_last (icfg_isl k) q with "Hisl Hrslh") as "Hisl".
     iApply (ASL.wp_acquiresleep_nb_sconf (dq := dq) j gil gisl "inode"%string
-              (ic_tok cn k) (icfg_isl k) q G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
+              (ic_tok cn k) (icfg_isl k) q G4 pidv (trap_res eb + (K - 4))%nat eb 0%nat
               ({["itable"]} ∪ lks)
               ltac:(lia) ltac:(cbn; lia) Hslfresh
               with "Hcg Hcnt Htext Hpc [] Hisl Hpanic Hppid").
@@ -2056,7 +2056,7 @@ Section ProofIput.
       rewrite /H2 upd_ne; [| regne]. rewrite /H1 upd_ne; [reflexivity | regne]. }
     iApply (Release.wp_release_sconf gtl itable_lock "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) H3
-              0%nat eb pj C (K - 4)%nat ({["itable"]} ∪ lks)
+              0%nat eb pj (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HH3a0; reflexivity) ltac:(lia)
               with "Hcg Htext Hpc [Hitab] Htok HRres Hcnt Hpay").
     { iExact "Hitab". }
@@ -2160,7 +2160,7 @@ Section ProofIput.
     pose (uit := (n - (if crb then 1 else 2))%nat).
     assert (Hun : it_entry crb uit = n)
       by (unfold it_entry, uit; destruct crb; lia).
-    iDestruct (cpu_own_transport CIDrl CIDm2 0%nat eb pj C eb
+    iDestruct (cpu_own_transport CIDrl CIDm2 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* [Hextc]/[Hextm] have sat at [CIDacq] since the wide hop right after
        the first acquire -- nothing between there and here (acquiresleep's
@@ -2208,7 +2208,7 @@ Section ProofIput.
               cov logstart bmapstart inodestart nib size dev used
               (ientry k) inum dn dn bm data2 uit Sb crb (cru || crz)%bool e0
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
-              eb C eb lks
+              eb eb lks
               ltac:(unfold K_itrunc; lia) Hcrb
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Htyne2
@@ -2312,7 +2312,7 @@ Section ProofIput.
           destruct crb, cru, crz, wit; simpl in *; lia).
     iDestruct (bslots_op bn 2 1) as "[Hbsp2 _]".
     iDestruct ("Hbsp2" with "Hbslots") as "[Hbs2 Hbs1]".
-    iDestruct (cpu_own_transport CIDit CIDm4 0%nat eb pj C eb
+    iDestruct (cpu_own_transport CIDit CIDm4 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* itrunc IS one of the already-generalized threading callees, so this
        hop is NORMAL -- the same span as [Hcnt]'s own, matching the entry
@@ -2338,7 +2338,7 @@ Section ProofIput.
               cov logstart inodestart nib dev (ientry k) inum
               (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true e1 0%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
-              eb C eb lks
+              eb eb lks
               ltac:(unfold K_iupdate; lia)
               Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1, THE LEFT DISJUNCT: this is the free path's
@@ -2470,11 +2470,11 @@ Section ProofIput.
     assert (HJ6c : forall c : mword 5, is_cs_idx c = true ->
                      J6 !!! Regidx c = mfu !!! Regidx c).
     { intros c Hcs. rewrite /J6 upd_ne; [| regne]. exact (HJ5c c Hcs). }
-    iDestruct (cpu_own_transport CIDiu CIDm6 0%nat eb pj C eb
+    iDestruct (cpu_own_transport CIDiu CIDm6 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (RS.wp_releasesleep_gen_sconf gs gil gisl "inode"%string (ic_tok cn k)
               (slh_tok (icfg_isl k)) q
-              J6 pidv pj (K - 4)%nat eb C eb lks ltac:(lia)
+              J6 pidv pj (K - 4)%nat eb eb lks ltac:(lia)
               (* releasesleep's bound is "sleep lock"(6); iput's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -2539,11 +2539,11 @@ Section ProofIput.
                      J9 !!! Regidx c = mrs !!! Regidx c).
     { intros c Hcs. rewrite /J9 upd_ne; [| regne].
       rewrite /J8 upd_ne; [| regne]. rewrite /J7 upd_ne; [reflexivity | regne]. }
-    iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj C eb
+    iDestruct (cpu_own_transport CIDrs CIDm9 0%nat eb pj eb
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf gtl "itable"%string
               (itable_res2 cn gfs gi cov logstart nib dev) J9
-              0%nat eb pj C (K - 4)%nat eb lks
+              0%nat eb pj (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
               Hitbelow
               with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
@@ -2638,7 +2638,7 @@ Section ProofIput.
     iApply (ip_tail (CID := CIDac2) CID j bn g gfs gi cn gtl cov logstart bmapstart
               inodestart nib size dev used (used ∖ bm_blocks bm)
               Sb (Sb1 ∪ {[IBLOCK inum inodestart]}) k q inum Mt2 ci2
-              n u' (fun w => ip_spend_w w cru crz) wit crb pidv dq dqb dqs m J10 K eb C sp0
+              n u' (fun w => ip_spend_w w cru crz) wit crb pidv dq dqb dqs m J10 K eb sp0
               (m !!! Regidx Rs2) lks
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
               Hblo Hbhi Hdsub Hssub Hwbm2 Hwitc Hitbelow
@@ -2669,11 +2669,11 @@ Section ProofIput.
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb C b lks.
+                          k q inum n pidv dq dqb dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
@@ -2687,7 +2687,7 @@ Section ProofIput.
     iDestruct (log_opS_named with "Hop") as (e00) "Hop".
     iApply (wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k q inum n Sb0 false false false e00 pidv dq dqb dqs m K eb C b lks
+              k q inum n Sb0 false false false e00 pidv dq dqb dqs m K eb b lks
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh

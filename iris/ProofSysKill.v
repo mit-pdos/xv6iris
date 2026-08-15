@@ -66,9 +66,9 @@ Section ProofSysKill.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma wp_sys_kill_sconf  (γs : list gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b lks.
+    : wp_sys_kill_sconf_body γs m av n eb p tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_sys_kill_sconf_body].
     intros pcE ret_tgt Hlen Hws Hn Hav Hbelow Hpv.
@@ -218,8 +218,8 @@ Section ProofSysKill.
       rewrite /A2 upd_ne; [| vm_compute; discriminate]. exact HA1sp. }
     (* ===================== argint(0, &pid) ===================== *)
     iEval (rewrite -HA4a1) in "Hb3hi".
-    iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p C 0%nat tfp ws v (word_hi w3) dqt b lks
+    iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Argint.wp_argint_sconf A4 (av - 4)%nat n eb p 0%nat tfp ws v (word_hi w3) dqt b lks
               ltac:(unfold NARG; lia) HA4a0 Hws Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htf Hpage Hb3hi").
     iIntros (CID8 Hk8 Mai) "%HcsAi Hcg Hcpu Hpc Htf Hpage Hb3hi".
@@ -266,8 +266,8 @@ Section ProofSysKill.
     { rewrite /B2 upd_ne; [| vm_compute; discriminate].
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kkill(pid) ===================== *)
-    iDestruct (cpu_own_transport CID8 CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kkill.wp_kkill_sconf γs B2 (av - 4)%nat n eb p C b lks
+    iDestruct (cpu_own_transport CID8 CID10 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Kkill.wp_kkill_sconf γs B2 (av - 4)%nat n eb p b lks
               Hlen Hn ltac:(lia) Hbelow
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic").
     all: try lkbelow.
@@ -387,7 +387,7 @@ Section ProofSysKill.
       rewrite /A2 upd_ne; [| congruence].
       rewrite /A1 upd_ne; [| congruence].
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
-    iDestruct (cpu_own_transport CID11 CID15 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID11 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E2 rv with "[%] Hcg Hcpu Hpc Htf Hpage").
     split; [| split; [exact HE2a0 | exact Hrv]].

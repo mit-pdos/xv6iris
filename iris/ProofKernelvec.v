@@ -1674,11 +1674,11 @@ Section KernelvecHandler.
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
-              (kv_m2 Me) (46 + av) p emp%I pc0 sc tv ∅
+              (kv_m2 Me) (46 + av) p pc0 sc tv ∅
               Hgs ltac:(unfold kerneltrap_stack; lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
     all: try lkbelow.
-    { rewrite /cpu_own. iFrame "Hcpu". }
+    { iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)
     iIntros (CIDn Hsn mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
     assert (Hret : ret_pc (kv_m2 (tp_pin m) !!! Regidx (mword_of_int 1 : mword 5))
@@ -1716,8 +1716,7 @@ Section KernelvecHandler.
        one of the two registers no [callee_saved] contract can speak about. *)
     iDestruct (gpr_file_x0 (tp_pin mf) (mword_of_int 0 : mword 5)
                  ltac:(vm_compute; reflexivity) with "Hfilef") as "[%Hx0f Hfilef]".
-    iDestruct "Hownf" as "[Hhartf _]".
-    iDestruct "Hhartf" as "(Hcellsf & Hcntf)".
+    iDestruct "Hownf" as "(Hcellsf & Hcntf)".
     (* sp is callee-saved, so the returned file's sp still names our frame *)
     assert (Hspf : tp_pin mf !!! Regidx csp_rs1 = kv_sp1 Me).
     { rewrite tp_pin_sp. destruct Hcs as (Hsp & _). rewrite Hsp. exact Hsp_l. }

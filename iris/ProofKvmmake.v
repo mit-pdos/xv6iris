@@ -654,7 +654,7 @@ Section KvmmakeHouse.
      [ProofUvmdealloc.wp_uvmdealloc_epi] is. *)
   Lemma wp_kvmmake_epilogue_sconf `{CID0 : CpuId} (γa : gname)
       (mm Mf : regfile) (tf : ptree) (pas : nat -> mword 44)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :
+      (K lvl : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -677,7 +677,7 @@ Section KvmmakeHouse.
     pt_rep0 tf (kvm_map_full pas) ->
     pt_nodes tf = 102%nat ->
     kvm_pas_ok pas ->
-    sie_cap_gpr Mf (K - 4)%nat b p -∗ cpu_own lvl eb p C b lks -∗
+    sie_cap_gpr Mf (K - 4)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0xa2)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -690,7 +690,7 @@ Section KvmmakeHouse.
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
     wp_next (CID0 := CID) b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t : ptree) (pas' : nat -> mword 44),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗ pc_is ret_tgt -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t -∗
       ⌜mr !!! Regidx (mword_of_int 10)
          = zero_extend' 64 (concat_vec (pt_base t) (zeros' 12 : mword 12))⌝ -∗
@@ -803,7 +803,7 @@ Section KvmmakeHouse.
     { rewrite /E4. rewrite upd_ne; [| reg_neq]. rewrite /E3. rewrite upd_ne; [| reg_neq].
       rewrite /E2. rewrite upd_ne; [| reg_neq]. rewrite /E1. rewrite upd_ne; [| reg_neq].
       rewrite /E0 upd_eq. rewrite add_vec_zero_l. exact Hs1. }
-    iDestruct (cpu_own_transport CID0 CID6 lvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID6 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID6 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 tf pas with "Hcg Hcnt Hpc Hptree [%] [%] [%] Henv [%] [%] Hpages").
@@ -923,8 +923,8 @@ Section KvmmakeBody.
   Hypothesis wp_kalloc :
     forall `{CID : CpuId} (γl : gname) (γk : gname * gname)
       (fl : mword 64) (m : regfile) (on : option nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string),
-      wp_kalloc_sconf_body γl γk fl m on n eb p C K b lks.
+      (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string),
+      wp_kalloc_sconf_body γl γk fl m on n eb p K b lks.
   Hypothesis wp_memset :
     forall `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
@@ -932,13 +932,13 @@ Section KvmmakeBody.
   Hypothesis wp_kvmmap :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
+      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_kvmmap_sconf_body γa mm t m npages perm lvl K eb p on b lks.
   Hypothesis wp_pms :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
+      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p on b lks.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -953,20 +953,20 @@ Section KvmmakeBody.
 
   Lemma wp_kmk_prologue_node `{CID0 : CpuId}
       (γa : gname) (mm : regfile) (K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) (b : bool) (lks : gset string) :
+      (eb : bool) (p : mword 64) (nb : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
     (48 <= K)%nat ->
     (K_kvmmake < nb)%nat ->
     sie_cap_gpr mm K b p -∗
-    cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int KernelSyms.kvmmake) -∗
     kalloc_env γa (Some nb) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (M : regfile) (bppn : mword 44),
       sie_cap_gpr M (K - 4)%nat b p -∗
-      cpu_own 0%nat eb p C b lks -∗
+      cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x18)) -∗
       ptree_own 2 (DfracOwn 1) (pt_empty_node bppn) -∗
       kalloc_env γa (avail_sub (Some nb) 1) -∗
@@ -1074,10 +1074,10 @@ Section KvmmakeBody.
     iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J /W2. repeat (rewrite upd_ne; [| reg_neq]). exact HspW1. }
-    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (wp_kalloc γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J (Some nb) 0%nat eb p C (K - 4)%nat b lks
+              J (Some nb) 0%nat eb p (K - 4)%nat b lks
               Hc14
               ltac:(reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -1186,7 +1186,7 @@ Section KvmmakeBody.
     { rewrite (callee_saved_lookup Hmcs csp_rs1 ltac:(vm_compute; reflexivity)).
       rewrite /M4 /M3 /M2 /M1. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr0sp. }
     (* the s2..s11 registers: untouched since [mm] (through kalloc/memset callee-saved) *)
-    iDestruct (cpu_own_transport CID7 CID12 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID7 CID12 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! mfin bppn with "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 [Hc4] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]").
@@ -1209,7 +1209,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_uart `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
+      (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
@@ -1218,13 +1218,13 @@ Section KvmmakeBody.
     (gsprev <= 0)%nat ->
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
-    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0x18)) -∗
     ptree_own 2 (DfracOwn 1) (pt_empty_node bppn) -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗
+      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x28)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
@@ -1316,9 +1316,9 @@ Section KvmmakeBody.
     (* budget arm *)
     assert (Hbud : (pt_missing (pt_empty_node bppn) (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) 1 < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 2 gsprev 0 nb (bound_uart bppn) Hgs ltac:(nat_le) Hnb). }
-    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmap γa Wk (pt_empty_node bppn) ∅ 1 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat) b lks
+    iApply (wp_kvmmap γa Wk (pt_empty_node bppn) ∅ 1 6 0%nat (K - 4)%nat eb p (Some (nb - (1 + gsprev))%nat) b lks
               ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0; rewrite pt_empty_node_base; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
@@ -1359,7 +1359,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_virtio `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
@@ -1367,13 +1367,13 @@ Section KvmmakeBody.
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
     pt_base t = bppn -> pt_rep0 t kvm_m1 ->
-    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0x28)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗
+      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x38)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
@@ -1451,9 +1451,9 @@ Section KvmmakeBody.
     iEval (rewrite Havin) in "Henv".
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) 1 < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 0 gsprev 2 nb (bound_virtio t Hrep) Hgs ltac:(nat_le) Hnb). }
-    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmap γa Wk t kvm_m1 1 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat) b lks
+    iApply (wp_kvmmap γa Wk t kvm_m1 1 6 0%nat (K - 4)%nat eb p (Some (nb - (1 + gsprev))%nat) b lks
               ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
@@ -1494,7 +1494,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_plic `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
@@ -1502,13 +1502,13 @@ Section KvmmakeBody.
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
     pt_base t = bppn -> pt_rep0 t kvm_m2 ->
-    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0x38)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗
+      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x4a)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
@@ -1586,9 +1586,9 @@ Section KvmmakeBody.
     iEval (rewrite Havin) in "Henv".
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) plic_npages < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 32 gsprev 2 nb (bound_plic t Hrep) Hgs ltac:(nat_le) Hnb). }
-    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmap γa Wk t kvm_m2 plic_npages 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat) b lks
+    iApply (wp_kvmmap γa Wk t kvm_m2 plic_npages 6 0%nat (K - 4)%nat eb p (Some (nb - (1 + gsprev))%nat) b lks
               ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
@@ -1629,7 +1629,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_text `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
@@ -1637,13 +1637,13 @@ Section KvmmakeBody.
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
     pt_base t = bppn -> pt_rep0 t kvm_m3 ->
-    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0x4a)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗
+      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x60)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
@@ -1737,9 +1737,9 @@ Section KvmmakeBody.
     iEval (rewrite Havin) in "Henv".
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) text_npages < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 2 gsprev 34 nb (bound_text t) Hgs ltac:(nat_le) Hnb). }
-    iDestruct (cpu_own_transport CID0 CID8 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID8 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmap γa Wk t kvm_m3 text_npages 10 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat) b lks
+    iApply (wp_kvmmap γa Wk t kvm_m3 text_npages 10 0%nat (K - 4)%nat eb p (Some (nb - (1 + gsprev))%nat) b lks
               ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
@@ -1780,7 +1780,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_data `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
@@ -1788,13 +1788,13 @@ Section KvmmakeBody.
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
     pt_base t = bppn -> pt_rep0 t kvm_m4 ->
-    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0x60)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗
+      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x82)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
@@ -1914,9 +1914,9 @@ Section KvmmakeBody.
     iEval (rewrite Havin) in "Henv".
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) data_npages < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 63 gsprev 36 nb (bound_data t Hrep) Hgs ltac:(nat_le) Hnb). }
-    iDestruct (cpu_own_transport CID0 CID11 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID11 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmap γa Wk t kvm_m4 data_npages 6 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat) b lks
+    iApply (wp_kvmmap γa Wk t kvm_m4 data_npages 6 0%nat (K - 4)%nat eb p (Some (nb - (1 + gsprev))%nat) b lks
               ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
@@ -1957,7 +1957,7 @@ Section KvmmakeBody.
   (* ================================================================= *)
   Lemma wp_kmk_region_tramp `{CID0 : CpuId}
       (γa : gname) (mm M : regfile) (bppn : mword 44)
-      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (nb gsprev : nat) (b : bool) (lks : gset string) :
+      (t : ptree) (K : nat) (eb : bool) (p : mword 64) (nb gsprev : nat) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) in
     locks_below lks "kmem" ->
@@ -1965,13 +1965,13 @@ Section KvmmakeBody.
     M !!! Regidx csp_rs1 = spr ->
     M !!! Regidx (mword_of_int 9 : mword 5) = zero_extend' 64 (concat_vec bppn (zeros' 12 : mword 12)) ->
     pt_base t = bppn -> pt_rep0 t kvm_m5 ->
-    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗ kernel_text -∗
+    sie_cap_gpr M (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kvmmake + 0x82)) -∗
     ptree_own 2 (DfracOwn 1) t -∗
     kalloc_env γa (avail_sub (Some nb) (1 + gsprev)) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat),
-      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p C b lks -∗
+      sie_cap_gpr mr (K - 4)%nat b p -∗ cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.kvmmake + 0x9c)) -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       kalloc_env γa (avail_sub (Some nb) (1 + (gsprev + g))) -∗
@@ -2070,9 +2070,9 @@ Section KvmmakeBody.
     iEval (rewrite Havin) in "Henv".
     assert (Hbud : (pt_missing t (svpn_of (Wk !!! Regidx (mword_of_int 11 : mword 5))) 1 < nb - (1 + gsprev))%nat).
     { rewrite Hsvpn. apply (budget_arm _ 2 gsprev 99 nb (bound_tramp t) Hgs ltac:(nat_le) Hnb). }
-    iDestruct (cpu_own_transport CID0 CID9 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID9 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmap γa Wk t kvm_m5 1 10 0%nat (K - 4)%nat eb p C (Some (nb - (1 + gsprev))%nat) b lks
+    iApply (wp_kvmmap γa Wk t kvm_m5 1 10 0%nat (K - 4)%nat eb p (Some (nb - (1 + gsprev))%nat) b lks
               ltac:(vm_compute; reflexivity) Hc34 ltac:(rewrite HWka0 Hbase; reflexivity)
               ltac:(rewrite HWka1; apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite HWka2; apply bv_eq; vm_compute; reflexivity)
@@ -2114,8 +2114,8 @@ Section KvmmakeBody.
   (* pinning.                                                           *)
   (* ================================================================= *)
   Lemma wp_kvmmake_sconf_gen (γa : gname) (mm : regfile)
-      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :
-    wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks.
+      (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :
+    wp_kvmmake_sconf_body γa mm lvl K eb p on b lks.
   Proof.
     unfold wp_kvmmake_sconf_body.
     intros Hlvl HK Hex Hbelow.
@@ -2125,41 +2125,41 @@ Section KvmmakeBody.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Henv Hcont".
     (* ---- prologue: frame + root kalloc + memset -> pt_empty_node bppn ---- *)
-    iApply (wp_kmk_prologue_node γa mm K eb p C nb b lks Hbelow HK Hnbk
+    iApply (wp_kmk_prologue_node γa mm K eb p nb b lks Hbelow HK Hnbk
               with "Hcg Hcnt Htext Hpc Henv").
     iIntros (CIDpr Hspr M0 bppn) "Hcg Hcnt Hpc Hptree Henv Hc1 Hc2 Hc3 Hc4 %H9 %Hsp0 %H18 %H19 %H20 %H21 %H22 %H23 %H24 %H25 %H26 %H27".
     (* ---- region 1: UART ---- *)
-    iApply (wp_kmk_region_uart γa mm M0 bppn K eb p C nb 0%nat b lks
+    iApply (wp_kmk_region_uart γa mm M0 bppn K eb p nb 0%nat b lks
               Hbelow HK Hnb (Nat.le_0_l 0) Hsp0 H9
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID1 Hs1 mr1 t1 g1) "Hcg Hcnt Hpc Hptree Henv %Hcs1 %H9_1 %Hsp1 %Hbase1 %Hrep1 %Hnodes1 %Hg1".
     (* ---- region 2: VIRTIO ---- *)
     assert (Bv : (0 + g1 <= 2)%nat) by (rewrite Nat.add_0_l; exact Hg1).
-    iApply (wp_kmk_region_virtio γa mm mr1 bppn t1 K eb p C nb (0 + g1)%nat b lks
+    iApply (wp_kmk_region_virtio γa mm mr1 bppn t1 K eb p nb (0 + g1)%nat b lks
               Hbelow HK Hnb Bv Hsp1 H9_1 Hbase1 Hrep1
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID2 Hs2 mr2 t2 g2) "Hcg Hcnt Hpc Hptree Henv %Hcs2 %H9_2 %Hsp2 %Hbase2 %Hrep2 %Hnodes2 %Hg2".
     (* ---- region 3: PLIC ---- *)
     assert (Bp : (0 + g1 + g2 <= 2)%nat) by exact (acc_step (0+g1) g2 2 0 2 Bv Hg2 ltac:(nat_le)).
-    iApply (wp_kmk_region_plic γa mm mr2 bppn t2 K eb p C nb (0 + g1 + g2)%nat b lks
+    iApply (wp_kmk_region_plic γa mm mr2 bppn t2 K eb p nb (0 + g1 + g2)%nat b lks
               Hbelow HK Hnb Bp Hsp2 H9_2 Hbase2 Hrep2
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID3 Hs3 mr3 t3 g3) "Hcg Hcnt Hpc Hptree Henv %Hcs3 %H9_3 %Hsp3 %Hbase3 %Hrep3 %Hnodes3 %Hg3".
     (* ---- region 4: text ---- *)
     assert (Bt : (0 + g1 + g2 + g3 <= 34)%nat) by exact (acc_step (0+g1+g2) g3 2 32 34 Bp Hg3 ltac:(nat_le)).
-    iApply (wp_kmk_region_text γa mm mr3 bppn t3 K eb p C nb (0 + g1 + g2 + g3)%nat b lks
+    iApply (wp_kmk_region_text γa mm mr3 bppn t3 K eb p nb (0 + g1 + g2 + g3)%nat b lks
               Hbelow HK Hnb Bt Hsp3 H9_3 Hbase3 Hrep3
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID4 Hs4 mr4 t4 g4) "Hcg Hcnt Hpc Hptree Henv %Hcs4 %H9_4 %Hsp4 %Hbase4 %Hrep4 %Hnodes4 %Hg4".
     (* ---- region 5: data ---- *)
     assert (Bd : (0 + g1 + g2 + g3 + g4 <= 36)%nat) by exact (acc_step (0+g1+g2+g3) g4 34 2 36 Bt Hg4 ltac:(nat_le)).
-    iApply (wp_kmk_region_data γa mm mr4 bppn t4 K eb p C nb (0 + g1 + g2 + g3 + g4)%nat b lks
+    iApply (wp_kmk_region_data γa mm mr4 bppn t4 K eb p nb (0 + g1 + g2 + g3 + g4)%nat b lks
               Hbelow HK Hnb Bd Hsp4 H9_4 Hbase4 Hrep4
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID5 Hs5 mr5 t5 g5) "Hcg Hcnt Hpc Hptree Henv %Hcs5 %H9_5 %Hsp5 %Hbase5 %Hrep5 %Hnodes5 %Hg5".
     (* ---- region 6: trampoline ---- *)
     assert (Br : (0 + g1 + g2 + g3 + g4 + g5 <= 99)%nat) by exact (acc_step (0+g1+g2+g3+g4) g5 36 63 99 Bd Hg5 ltac:(nat_le)).
-    iApply (wp_kmk_region_tramp γa mm mr5 bppn t5 K eb p C nb (0 + g1 + g2 + g3 + g4 + g5)%nat b lks
+    iApply (wp_kmk_region_tramp γa mm mr5 bppn t5 K eb p nb (0 + g1 + g2 + g3 + g4 + g5)%nat b lks
               Hbelow HK Hnb Br Hsp5 H9_5 Hbase5 Hrep5
               with "Hcg Hcnt Htext Hpc Hptree Henv").
     iIntros (CID6 Hs6 mr6 t6 g6) "Hcg Hcnt Hpc Hptree Henv %Hcs6 %H9_6 %Hsp6 %Hbase6 %Hrep6 %Hnodes6 %Hg6".
@@ -2190,9 +2190,9 @@ Section KvmmakeBody.
     { rewrite /Wp. rewrite upd_ne; [| reg_neq]. rewrite /Wm upd_eq. rewrite add_vec_zero_l. rewrite H9_6 Hbase6. reflexivity. }
     assert (HcsW : callee_saved mr6 Wp).
     { rewrite /Wp /Wm. repeat (apply callee_saved_insert_r; [vm_compute; reflexivity |]). apply callee_saved_refl. }
-    iDestruct (cpu_own_transport CID6 CID8 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID6 CID8 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_pms γa Wp t6 kvm_map 0%nat (K - 4)%nat eb p C (avail_sub (Some nb) (1 + (0 + g1 + g2 + g3 + g4 + g5 + g6))) b lks
+    iApply (wp_pms γa Wp t6 kvm_map 0%nat (K - 4)%nat eb p (avail_sub (Some nb) (1 + (0 + g1 + g2 + g3 + g4 + g5 + g6))) b lks
               ltac:(vm_compute; reflexivity) Hc44 HWp10 Hrep6 kmk_kstack_None
               ltac:(exists (nb - (1 + (0 + g1 + g2 + g3 + g4 + g5 + g6)))%nat; split;
                     [apply avail_sub_Some
@@ -2237,7 +2237,7 @@ Section KvmmakeBody.
        CpuId happens to be nearest in the tactic's local context -- which
        silently defeats EPI's own [CID0] generality even though EPI's
        OWN standalone type is perfectly correct (checked separately). *)
-    iApply (wp_kvmmake_epilogue_sconf (CID := CID) (CID0 := CID9) γa mm mr7 t7 pas K 0%nat eb p C (Some nb) b lks
+    iApply (wp_kvmmake_epilogue_sconf (CID := CID) (CID0 := CID9) γa mm mr7 t7 pas K 0%nat eb p (Some nb) b lks
               eq_refl HK
               ltac:(wp_next_chain)
               ltac:(rewrite (callee_saved_lookup HcsAll csp_rs1 ltac:(vm_compute; reflexivity)); exact Hsp0)
@@ -2270,12 +2270,12 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
      insertion would silently collapse that genericity (the exact trap
      documented for [ProofKvminit.v]'s [KvminitProof]).  Eta-expand each. *)
   Definition wp_kvmmake_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
-      : wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks :=
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
+      : wp_kvmmake_sconf_body γa mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf (CID := CID'))
       (fun (CID' : CpuId) => MS.wp_memset_sconf (CID := CID'))
       (fun (CID' : CpuId) => KM.wp_kvmmap_sconf (CID := CID'))
       (fun (CID' : CpuId) => PM.wp_proc_mapstacks_sconf (CID := CID'))
-      γa mm lvl K eb p C on b lks.
+      γa mm lvl K eb p on b lks.
 End KvmmakeProof.

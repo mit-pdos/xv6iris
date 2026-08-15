@@ -200,7 +200,7 @@ Definition wp_sys_fstat_sconf_body
     (fn : fstat_names)                           (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
     (v : mword 64)                               (* syscall argument 0      *)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_fstat in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -219,7 +219,7 @@ Definition wp_sys_fstat_sconf_body
   eb = true ->
   sie_cap_gpr m av b pj -∗
   (* a syscall runs at push_off level 0 *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
   panic_wp_any -∗
@@ -238,7 +238,7 @@ Definition wp_sys_fstat_sconf_body
       ⌜sys_fstat_ret V v r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
       kalloc_env γa None -∗
@@ -263,6 +263,6 @@ Module Type SYSFSTAT.
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
       (v : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb C b lks.
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_sys_fstat_sconf_body γa γf γs j γlp fn pidv V v m av eb b lks.
 End SYSFSTAT.

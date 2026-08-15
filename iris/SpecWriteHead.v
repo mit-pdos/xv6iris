@@ -95,7 +95,7 @@ Definition wp_write_head_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (Q : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
@@ -113,7 +113,7 @@ Definition wp_write_head_sconf_body
      its cone touches a lower rank, so one premise covers both callees. *)
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -162,7 +162,7 @@ Definition wp_write_head_sconf_body
   ∀ (mf : regfile) (bs' : list (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -197,8 +197,8 @@ Module Type WRITE_HEAD.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (Q : iProp Σ) (lks : gset string),
       wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb C b Q lks.
+                               cov logstart dev n W L pidv dq m K eb b Q lks.
 End WRITE_HEAD.

@@ -101,7 +101,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr γl : gname) (γd : uart_names) (γv : disk_names)
     (m : regfile) (K : nat) (bs : list (bv 8))
-    (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
+    (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let msg := m !!! Regidx a0_idx in
@@ -117,7 +117,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
      the header and PanicStub.v. *)
   panic_wp_any -∗
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗
   pc_is (mword_of_int KernelSyms.panic) -∗
   panic_env γpr γl γd γv -∗
@@ -131,7 +131,7 @@ Module Type PANIC.
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat) (bs : list (bv 8))
-      (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64)
+      (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),
-      wp_panic_sconf_body γpr γl γd γv m K bs n eb C b p dm lks.
+      wp_panic_sconf_body γpr γl γd γv m K bs n eb b p dm lks.
 End PANIC.

@@ -140,7 +140,7 @@ Section ProofSysLinkTails.
       (bn : bio_names) (g : log_names) (gfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (u : nat) (pidv : mword 32) (dq : dfrac)
-      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
       (bnm bw bo : nat -> bv 8) :
     (K_end_op <= K - 38)%nat -> (38 <= K)%nat -> ((K - 38) + 38 = K)%nat ->
@@ -152,7 +152,7 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
-    cpu_own 0 eb (proc_addr jx) C b lks -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xb6)) -∗
@@ -179,7 +179,7 @@ Section ProofSysLinkTails.
         ⌜callee_saved m mf⌝ -∗
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr mf K b (proc_addr jx) -∗
-        cpu_own 0 eb (proc_addr jx) C b lks -∗
+        cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -218,14 +218,14 @@ Section ProofSysLinkTails.
     assert (HM1thr : sl_thr m M1).
     { intros c Hc N2 N8 N9 N18. rewrite /M1 upd_ne; [| regne].
       exact (HMthr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID1 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID0 CID1 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID0 CID1 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
-              g gfs cov logstart dev u pidv dq M1 (K - 38)%nat eb C b lks
+              g gfs cov logstart dev u pidv dq M1 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -299,7 +299,7 @@ Section ProofSysLinkTails.
                        (sign_extend' 21 (concat_vec (mword_of_int 39 : mword 11) ('b"0"))))
                   = mword_of_int (SL + 0x10c)) by pcw.
     iEval (rewrite Htg) in "Hpc".
-    iDestruct (cpu_own_transport CID2 CID5 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID2 CID5 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID2 CID5 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -314,7 +314,7 @@ Section ProofSysLinkTails.
                     [Hown Htce Hcce Hpid Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
-    iDestruct (cpu_own_transport CID5 CIDy 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID5 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID5 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -352,7 +352,7 @@ Section ProofSysLinkTails.
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
       (bnm bw bo : nat -> bv 8) :
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
@@ -377,7 +377,7 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
-    cpu_own 0 eb (proc_addr jx) C b lks -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xc0)) -∗
@@ -423,7 +423,7 @@ Section ProofSysLinkTails.
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr mf K b (proc_addr jx) -∗
-        cpu_own 0 eb (proc_addr jx) C b lks -∗
+        cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -493,7 +493,7 @@ Section ProofSysLinkTails.
     assert (HM2thr : sl_thr m M2).
     { intros c Hc N2 N8 N9 N18. rewrite /M2 upd_ne; [| regne].
       exact (HM1thr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -502,7 +502,7 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 38)%nat eb C b lks
+              dqb dqs M2 (K - 38)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -547,14 +547,14 @@ Section ProofSysLinkTails.
     assert (HM3thr : sl_thr m M3).
     { intros c Hc N2 N8 N9 N18. rewrite /M3 upd_ne; [| regne].
       exact (Hupthr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
-              g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb C b lks
+              g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -628,7 +628,7 @@ Section ProofSysLinkTails.
                        (sign_extend' 21 (concat_vec (mword_of_int 31 : mword 11) ('b"0"))))
                   = mword_of_int (SL + 0x10c)) by pcw.
     iEval (rewrite Htg) in "Hpc".
-    iDestruct (cpu_own_transport CID5 CID8 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID5 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID5 CID8 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -643,7 +643,7 @@ Section ProofSysLinkTails.
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbmres Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
-    iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -671,7 +671,7 @@ Section ProofSysLinkTails.
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string) (w4 : mword 64)
       (bnm bw bo : nat -> bv 8) :
     (K_iunlockput <= K - 38)%nat -> (K_end_op <= K - 38)%nat ->
@@ -696,7 +696,7 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64) ->
     sl_al sp0 ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
-    cpu_own 0 eb (proc_addr jx) C b lks -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xd0)) -∗
@@ -742,7 +742,7 @@ Section ProofSysLinkTails.
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr mf K b (proc_addr jx) -∗
-        cpu_own 0 eb (proc_addr jx) C b lks -∗
+        cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -812,7 +812,7 @@ Section ProofSysLinkTails.
     assert (HM2thr : sl_thr m M2).
     { intros c Hc N2 N8 N9 N18. rewrite /M2 upd_ne; [| regne].
       exact (HM1thr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID0 CID2 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -821,7 +821,7 @@ Section ProofSysLinkTails.
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn bm u pidv dq
-              dqb dqs M2 (K - 38)%nat eb C b lks
+              dqb dqs M2 (K - 38)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -866,14 +866,14 @@ Section ProofSysLinkTails.
     assert (HM3thr : sl_thr m M3).
     { intros c Hc N2 N8 N9 N18. rewrite /M3 upd_ne; [| regne].
       exact (Hupthr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
     iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
-              g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb C b lks
+              g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -947,7 +947,7 @@ Section ProofSysLinkTails.
                        (sign_extend' 21 (concat_vec (mword_of_int 23 : mword 11) ('b"0"))))
                   = mword_of_int (SL + 0x10c)) by pcw.
     iEval (rewrite Htg) in "Hpc".
-    iDestruct (cpu_own_transport CID5 CID8 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID5 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID5 CID8 eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -962,7 +962,7 @@ Section ProofSysLinkTails.
                     [Hown Htce Hcce Hpid Hsbb Hsbi Hbmres Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
-    iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID8 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (trap_csrs_ext_transport CID8 CIDy eb (proc_addr jx)
                  ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
@@ -1019,7 +1019,7 @@ Section ProofSysLinkTails.
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (bnm bw bo : nat -> bv 8) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
@@ -1048,7 +1048,7 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     sl_al sp0 ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
-    cpu_own 0 eb (proc_addr jx) C b lks -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -1089,7 +1089,7 @@ Section ProofSysLinkTails.
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr mf K b (proc_addr jx) -∗
-        cpu_own 0 eb (proc_addr jx) C b lks -∗
+        cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -1166,12 +1166,12 @@ Section ProofSysLinkTails.
     assert (HM2thr : sl_thr m M2).
     { intros c Hc N2 N8 N9 N18. rewrite /M2 upd_ne; [| regne].
       exact (HM1thr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iDestruct (sl_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
     iApply (Ilock.wp_ilock_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
               gfs gi cn gil gisl cov logstart inodestart nib kk s gy dev inum
-              pidv dq dqs M2 (K - 38)%nat eb C b lks
+              pidv dq dqs M2 (K - 38)%nat eb b lks
               HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hesck Hireg
@@ -1333,12 +1333,12 @@ Section ProofSysLinkTails.
     { rewrite /dn' sl_setnl_addrs. exact (proj1 (proj2 (proj2 Hiok))). }
     assert (Hdirlen : length (bm_dir bm) = NDIRECT)
       by exact (blkmap_wf_dir_len cov logstart bm (proj1 Hiok)).
-    iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iupdate.wp_iupdate_unlink (CID := CID8) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart inodestart nib dev (ientry kk) inum
               dn' dn bm u Sb true pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
-              P4 (K - 38)%nat eb C b lks
+              P4 (K - 38)%nat eb b lks
               HKiup ltac:(intros _; exact Hmem) Hgeom Hist0 Hiblk Hiblog Hinb
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
               Htynz Hdec Haddreq Hdirlen Hj Hgl HP4a0 Heb
@@ -1420,12 +1420,12 @@ Section ProofSysLinkTails.
     assert (HQ2thr : sl_thr m Q2).
     { intros c Hc N2 N8 N9 N18. rewrite /Q2 upd_ne; [| regne].
       exact (HQ1thr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_sconf (CID := CID11) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gil gisl cov logstart bmapstart
               inodestart nib size dev used kk qi s gy inum dn' bm (S u) pidv dq
-              dqb dqs Q2 (K - 38)%nat eb C b lks
+              dqb dqs Q2 (K - 38)%nat eb b lks
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -1468,10 +1468,10 @@ Section ProofSysLinkTails.
     assert (HQ3thr : sl_thr m Q3).
     { intros c Hc N2 N8 N9 N18. rewrite /Q3 upd_ne; [| regne].
       exact (Hupthr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID12 CID13 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID12 CID13 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl gu gd gk pd pav pu bn
-              g gfs cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb C b lks
+              g gfs cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
               with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
@@ -1567,7 +1567,7 @@ Section ProofSysLinkTails.
                     [Hown Hpid Hsbb Hsbi Hbmres Hbsl Hislot Hcont]").
     iEval (rewrite /wp_next).
     iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha5f Hcg Hpc".
-    iDestruct (cpu_own_transport CID14 CIDy 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID14 CIDy 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! mf used2 with "[%] [%] [%] Hcg Hown [] [] Hpc Hpid
@@ -1607,7 +1607,7 @@ Section ProofSysLinkTails.
       (dnd : dinode) (bmd : blkmap)
       (n : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
       (bnm bw bo : nat -> bv 8) :
     (K_ilock <= K - 38)%nat -> (K_iupdate <= K - 38)%nat ->
@@ -1648,7 +1648,7 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs2 : mword 64) = ientry kd ->
     sl_al sp0 ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
-    cpu_own 0 eb (proc_addr jx) C b lks -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xe0)) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -1699,7 +1699,7 @@ Section ProofSysLinkTails.
         ⌜(mf !!! Regidx Ra0 : mword 64) = (mword_of_int (-1) : mword 64)⌝ -∗
         ⌜used' ⊆ used⌝ -∗
         sie_cap_gpr mf K b (proc_addr jx) -∗
-        cpu_own 0 eb (proc_addr jx) C b lks -∗
+        cpu_own 0 eb (proc_addr jx) b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr jx) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -1767,13 +1767,13 @@ Section ProofSysLinkTails.
     assert (HM2thr : sl_thr m M2).
     { intros c Hc N2 N8 N9 N18. rewrite /M2 upd_ne; [| regne].
       exact (HM1thr c Hc N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) C b
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Iunlockput.wp_iunlockput_gen (CID := CID2) gs jx gl gu gd gk
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb crb cru false e0 pidv dq dqb dqs
-              M2 (K - 38)%nat eb C b lks
+              M2 (K - 38)%nat eb b lks
               HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -1808,7 +1808,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID3) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used1 kk qi s gy inum u1 Sb1 pidv dq dqb dqs m mup sp0 K eb C b
+              used1 kk qi s gy inum u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl

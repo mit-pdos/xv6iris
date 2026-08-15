@@ -31,7 +31,7 @@ Module Userinit : USERINIT.
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
-      (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (eb : bool) (pj : mword 64)
       (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γs m0 K eb pj C on v0 b lks.
+      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
 End Userinit.

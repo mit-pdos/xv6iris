@@ -187,11 +187,11 @@ Definition kfork_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
-    (pme : mword 64) (C : iProp Σ)
+    (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
   ( sie_cap_gpr mr K b pme ∗
-    cpu_own lvl eb pme C b lks ∗
+    cpu_own lvl eb pme b lks ∗
     (* THE PARENT COMES BACK VERBATIM on every arm -- kfork only reads it.
        Its cwd reference comes back INSIDE it: idup halves the fraction on
        the success path and does not run at all on the two failure paths,
@@ -216,7 +216,7 @@ Definition wp_kfork_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-    (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+    (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -236,7 +236,7 @@ Definition wp_kfork_sconf_body
      kalloc/uvmcopy's "kmem" all follow by [LockRank.locks_below_mono]. *)
   locks_below lks "wait_lock" ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv γs -∗
@@ -251,7 +251,7 @@ Definition wp_kfork_sconf_body
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
+      kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -263,8 +263,8 @@ Module Type KFORK.
       `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
       wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-        m lvl K eb pme C b pid_p Vp lks.
+        m lvl K eb pme b pid_p Vp lks.
 End KFORK.

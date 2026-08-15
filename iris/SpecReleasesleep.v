@@ -53,7 +53,7 @@ Import Defs.
 Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -61,7 +61,7 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   (22 <= av)%nat ->
   locks_below lks "sleep lock" ->
   sie_cap_gpr m av b pme -∗
-  cpu_own 0 eb pme C b lks -∗
+  cpu_own 0 eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock_gen γl γsl slk s R H -∗
   (* the holder's bundle, surrendered back into the lock *)
@@ -75,7 +75,7 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pme -∗
-      cpu_own 0 eb pme C b lks -∗
+      cpu_own 0 eb pme b lks -∗
       pc_is ret_tgt -∗
       (* the deposit comes back, at the holder's own fraction *)
       H q -∗
@@ -86,7 +86,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
 
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.releasesleep in
   let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -102,7 +102,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
      releases lk->lk; the wakeup() in between is itself balanced. *)
   locks_below lks "sleep lock" ->
   sie_cap_gpr m av b pme -∗
-  cpu_own 0 eb pme C b lks -∗
+  cpu_own 0 eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
   (* the holder's bundle, surrendered back into the lock *)
@@ -116,7 +116,7 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pme -∗
-      cpu_own 0 eb pme C b lks -∗
+      cpu_own 0 eb pme b lks -∗
       pc_is ret_tgt -∗
           WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -126,13 +126,13 @@ Module Type RELEASESLEEP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb C b lks.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
   Parameter wp_releasesleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb b lks.
 End RELEASESLEEP.
