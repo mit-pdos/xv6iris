@@ -906,24 +906,67 @@ Proof. intros -> ->. exact id. Qed.
 (*  any-match = first-match -- a live [".."] at index 1 is the ONLY live     *)
 (*  [".."].  That is why no [dir_first] clause is needed here.               *)
 (*                                                                          *)
-(*  ITS CONTENT IS OVER [data] ALONE, and that is forced: the round trip     *)
+(*  THE GUARD IS [T_DIR] *AND* [nlink <> 0], AND BOTH HALVES ARE            *)
+(*  LOAD-BEARING: as a PAYLOAD conjunct the type guard alone is not weak     *)
+(*  enough, because it is FALSE of a reachable parked state.  create's       *)
+(*  mkdir arm reaches [fail:] from three [bltz]es (ProofCreate.v, +0x10a /   *)
+(*  +0x11e / +0x130) and re-parks the child's [ic_loaded] at every one of    *)
+(*  them; at the first two the child IS a directory whose [".."] was never   *)
+(*  written -- the ["."] link fell short, or the [".."] link did -- so a     *)
+(*  type-guarded clause is not vacuous there, it is false.  What discharges  *)
+(*  all three is the [sh zero,74(s3)] at +0x146: [ip->nlink = 0] is stored   *)
+(*  BEFORE the re-park, so what the walk rebuilds is an ORPHAN and           *)
+(*  [dir_dotdot_ix_orphan] closes it in one line at every entry, with no     *)
+(*  premise threaded to the body.  The complement -- what an orphaned        *)
+(*  directory's records ARE -- is the [nlink = 0] clause riding beside this  *)
+(*  one; the two guards partition the directory case and neither weakens     *)
+(*  the other.                                                              *)
+(*                                                                          *)
+(*  IT COUNTS ITS OWN RECORDS, AND THAT IS WHAT MAKES THE PRESERVATION       *)
+(*  SELF-SUPPLYING.  [dir_dotdot_ix_dirlink] has to know the write window is *)
+(*  not index 1, i.e. that [dir_slot data nrec <> 1]: BELOW [nrec] the slot  *)
+(*  is free ([dir_slot_free]) while index 1 is live, and AT [nrec] the slot  *)
+(*  IS [nrec] -- which differs from 1 only because the clause carries        *)
+(*  [2 <= nrec].  Stated as a premise instead, that fact has no supplier:    *)
+(*  nothing in any walk pins a parent directory's size, so every caller      *)
+(*  would have to assume a directory it never measured has two records.      *)
+(*  Carrying the count HERE costs one [dir_nrec_mono] step per dirlink (the  *)
+(*  size only ever grows) and closes the gap for every caller at once.       *)
+(*                                                                          *)
+(*  ITS CONTENT IS OVER [data] AND THE RECORD'S OWN THREE FIELDS, and the    *)
+(*  round trip is what fixes which fields are admissible:                    *)
 (*  [DirLinks.dir_links_live] -> write -> [dir_links_of_ilink] reconstructs  *)
-(*  at a [dn'] related to nothing, so a clause mentioning [di_size dn] would *)
-(*  not survive it.  The TYPE guard is fine -- a reconstructing caller knows *)
-(*  its own [dn'].                                                          *)
+(*  at a [dn'] related to nothing, so every field the clause names must be   *)
+(*  one the RECONSTRUCTING caller knows of its own [dn'].  Type, nlink and   *)
+(*  size all are -- and [dir_dotdot_ix_eq] is the congruence that says so,   *)
+(*  in the form the re-parks need: nlink as an IMPLICATION and size as a     *)
+(*  BOUND, because create's [dp->nlink++] moves the first and every growing  *)
+(*  flush moves the second.                                                  *)
 (* ====================================================================== *)
 
 Definition dotdot_name : list (bv 8) := [Z_to_bv 8 0x2e; Z_to_bv 8 0x2e].
 
 Definition dir_dotdot_ix (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
   bv_unsigned (di_type dn) = T_DIR_z ->
-    dir_live data 1 /\ bname 14 (dir_name data 1) = dotdot_name.
+  bv_unsigned (di_nlink dn) <> 0 ->
+    (2 <= dir_nrec (bv_unsigned (di_size dn)))%nat
+    /\ dir_live data 1
+    /\ bname 14 (dir_name data 1) = dotdot_name.
 
-(* ---- the same four discharges [dir_ok] has ---------------------------- *)
+(* the record count is monotone in the size, which is all a dirlink ever
+   does to it ([cr_wi_size_max]: [di_size dn' = Z.max (di_size dn) …]) *)
+Lemma dir_nrec_mono (sz sz' : Z) :
+  sz <= sz' -> (dir_nrec sz <= dir_nrec sz')%nat.
+Proof.
+  intro H. unfold dir_nrec.
+  pose proof (Z.div_le_mono sz sz' 16 ltac:(lia) H) as Hd. lia.
+Qed.
+
+(* ---- the discharges: [dir_ok]'s four, plus the ORPHAN one the guard adds *)
 
 Lemma dir_dotdot_ix_not_dir (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) <> T_DIR_z -> dir_dotdot_ix dn data.
-Proof. intros H Hc. exfalso. exact (H Hc). Qed.
+Proof. intros H Hc _. exfalso. exact (H Hc). Qed.
 
 Lemma dir_dotdot_ix_free (dn : dinode) (data : nat -> list (bv 8)) :
   bv_unsigned (di_type dn) = 0 -> dir_dotdot_ix dn data.
@@ -931,30 +974,55 @@ Proof.
   intros H. apply dir_dotdot_ix_not_dir. rewrite H. unfold T_DIR_z. lia.
 Qed.
 
-Lemma dir_dotdot_ix_eq (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
-  di_type dn' = di_type dn -> data = data' ->
-  dir_dotdot_ix dn data -> dir_dotdot_ix dn' data'.
-Proof. intros Hty <- Hd Hdir'. apply Hd. rewrite <- Hty. exact Hdir'. Qed.
+(* THE ORPHAN DISCHARGE -- create's three [fail:] entries, and iput's
+   post-itrunc park.  A directory nobody names has nothing to say about its
+   [".."], which is exactly the state the [nlink = 0] sibling clause
+   describes instead. *)
+Lemma dir_dotdot_ix_orphan (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) = 0 -> dir_dotdot_ix dn data.
+Proof. intros H _ Hc. exfalso. exact (Hc H). Qed.
 
-(* ...and the one that makes it FREE across every append.  [dir_slot] never
-   returns a LIVE record ([dir_slot_free]), and this conjunct's own first
-   half says record 1 IS live -- so a dirlink's write window can never be
-   index 1, and the record rides on the range clause untouched.  The
-   conjunct preserves ITSELF -- the only added premise is the home's record
-   COUNT, which the caller reads off its own size. *)
+(* THE CONGRUENCE over the three fields the clause names, and it takes the
+   nlink one as an IMPLICATION and the size one as a BOUND rather than as
+   three equalities -- because the re-parks that need it MOVE those fields.
+   create's [dp->nlink++] at +0x134 hands the PARENT back at
+   [cr_setf dp3 _ _ (di_nlink dp3 + 1)] (ProofCreate.v's ARM C-OK re-walk),
+   a live directory whose count changed; there the caller closes the premise
+   from its own [dp->nlink != 0] guard (sysfile.c:262) rather than from any
+   equation, which an equality could not express.  All-equal is the
+   degenerate case. *)
+Lemma dir_dotdot_ix_eq (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
+  di_type dn' = di_type dn ->
+  (bv_unsigned (di_nlink dn') <> 0 -> bv_unsigned (di_nlink dn) <> 0) ->
+  bv_unsigned (di_size dn) <= bv_unsigned (di_size dn') ->
+  data = data' ->
+  dir_dotdot_ix dn data -> dir_dotdot_ix dn' data'.
+Proof.
+  intros Hty Hnl Hsz <- Hd Hdir' Hnl'.
+  assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z)
+    by (rewrite <- Hty; exact Hdir').
+  destruct (Hd Hdir (Hnl Hnl')) as (Hnrec & Hlive & Hnm).
+  split; [| split; [exact Hlive | exact Hnm]].
+  pose proof (dir_nrec_mono _ _ Hsz). lia.
+Qed.
+
+(* ...and the one that makes it FREE across every append, WITH NO COUNT
+   PREMISE.  [dir_slot] never returns a LIVE record ([dir_slot_free]) and the
+   conjunct's own second half says record 1 IS live, so below [nrec] the
+   window cannot be index 1; AT [nrec] it cannot be either, because the
+   conjunct's FIRST half says [2 <= nrec].  The record then rides on the
+   range clause untouched and the count rides on the size, which a dirlink
+   only grows.  The conjunct preserves ITSELF -- every premise below is one
+   the writing caller already holds about its own two records. *)
 Lemma dir_dotdot_ix_dirlink (dn dn' : dinode)
     (data data' : nat -> list (bv 8))
     (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
   nrec = dir_nrec (bv_unsigned (di_size dn)) ->
   k0 = dir_slot data nrec ->
-  (* the home already HAS its two self-records; every directory a dirlink
-     appends to does, and the caller reads it off its own size.  It cannot
-     live in the conjunct: [dir_links_of_ilink] reconstructs at a [dn']
-     related to nothing, so a [di_size]-dependent CONTENT clause would not
-     survive the live/write/re-park round trip. *)
-  (2 <= nrec)%nat ->
   (tot <= 16)%nat ->
   di_type dn' = di_type dn ->
+  di_nlink dn' = di_nlink dn ->
+  bv_unsigned (di_size dn) <= bv_unsigned (di_size dn') ->
   (forall x : nat,
      file_byte data' x
      = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
@@ -963,12 +1031,16 @@ Lemma dir_dotdot_ix_dirlink (dn dn' : dinode)
   dir_dotdot_ix dn data ->
   dir_dotdot_ix dn' data'.
 Proof.
-  intros Hnrec Hk0 Hnrec2 Htot Hty Hrng Hd Hdir'.
+  intros Hnrec Hk0 Htot Hty Hnl Hsz Hrng Hd Hdir' Hnl'.
   assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z)
     by (rewrite <- Hty; exact Hdir').
-  destruct (Hd Hdir) as [Hlive Hnm].
-  (* THE WINDOW MISSES INDEX 1, and the conjunct's own first half is what
-     makes it: [dir_slot] never returns a LIVE record. *)
+  assert (Hnlz : bv_unsigned (di_nlink dn) <> 0)
+    by (rewrite <- Hnl; exact Hnl').
+  destruct (Hd Hdir Hnlz) as (Hnrec2 & Hlive & Hnm).
+  rewrite <- Hnrec in Hnrec2.
+  (* THE WINDOW MISSES INDEX 1, and BOTH halves of the conjunct are what
+     make it: [dir_slot] never returns a LIVE record below [nrec], and at
+     [nrec] the count itself is what separates the slot from index 1. *)
   assert (Hne : k0 <> 1%nat).
   { intro Hc.
     assert (Hlt : (dir_slot data nrec < nrec)%nat)
@@ -978,7 +1050,8 @@ Proof.
   assert (Hwin : dir_win_agree data data' 1).
   { intros j Hj. rewrite (Hrng (16 * 1 + j)%nat).
     rewrite decide_False; [reflexivity |]. intros [Hlo Hhi]. apply Hne. lia. }
-  split.
+  split; [| split].
+  - pose proof (dir_nrec_mono _ _ Hsz). lia.
   - unfold dir_live. rewrite (dir_inum_agree data data' 1 Hwin). exact Hlive.
   - rewrite (dir_bname_agree data data' 1 Hwin). exact Hnm.
 Qed.

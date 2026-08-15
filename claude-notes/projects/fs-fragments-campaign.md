@@ -181,6 +181,62 @@ every mkfs image (mkfs's `ialloc` writes `nlink = 1` into the root and the
 against). `ireg_alloc` has no caller yet, so the third conjunct costs
 nothing downstream.
 
+### The `".."` INDEX BRIDGE — `iris/DirView.v`, `iris/DirLinks.v`
+
+§20.17.4's owed fact: `dir_dotdot_ix dn data` says a directory's record 1 is
+the live `".."`, and `DirLinks.dir_links_dotdot_out` borrows that index's
+`dir_link_at` out of `dir_links` and returns it, so S7's `dp->nlink--` can
+finally name the `ilink dp` it converts. `Print Assumptions` on both, and on
+every discharge: **closed under the global context.**
+
+**THE GUARD IS `T_DIR` *AND* `di_nlink <> 0`, AND THE TYPE GUARD ALONE IS
+FALSE OF A REACHABLE PARKED STATE.** This is the correction the payload pass
+found by road-testing the clause against create, and it is the difference
+between a fact about directories and a fact a PAYLOAD can carry. create's
+mkdir arm reaches `fail:` from three `bltz`es (`ProofCreate.v`, +0x10a /
++0x11e / +0x130) and re-parks the child's `ic_loaded` at every one of them;
+at the first two the child IS a directory whose `".."` was never written —
+the `"."` link fell short, or the `".."` link did — so a type-guarded clause
+is not vacuous there, **it is false**, and no walk discharge exists. What
+closes all three is the `sh zero,74(s3)` at +0x146: `ip->nlink = 0` is stored
+BEFORE the re-park, so what the walk rebuilds is an ORPHAN and
+`dir_dotdot_ix_orphan` closes it in one line at every entry, **with no
+premise threaded to `cr_fail_mkdir_body`**. The rule the road test leaves
+behind: **a payload conjunct is only as strong as the WORST state any walk
+re-parks that payload in, and create's failure arms park directories that no
+sane filesystem contains.**
+
+**IT COUNTS ITS OWN RECORDS, WHICH IS WHAT MAKES THE PRESERVATION
+SELF-SUPPLYING.** `dir_dotdot_ix_dirlink` has to know the write window is not
+index 1, i.e. `dir_slot data nrec <> 1`: below `nrec` the slot is free
+(`dir_slot_free`) while index 1 is live, and AT `nrec` the slot IS `nrec` —
+which differs from 1 only because the clause carries `2 <= nrec`. Stated as a
+premise on the lemma instead, that fact **has no supplier**:
+nothing in any walk pins a parent directory's size, so every dirlink caller
+would have to assume a directory it never measured has two records. Carrying
+the count costs one `dir_nrec_mono` step per dirlink — the size only grows —
+and closes the gap for every caller at once. `dir_links_dotdot_out`'s
+`1 < dir_nrec` premise became a projection and is gone.
+
+The discharge set is `dir_ok`'s four plus the one the guard adds:
+`_not_dir`, `_free`, `_orphan` (new), `_eq` and `_dirlink`. Every field the
+clause names is one a RECONSTRUCTING caller knows of its own `dn'`, which is
+what the `dir_links_live` -> write -> `dir_links_of_ilink` round trip
+demands. **`_eq` takes nlink as an IMPLICATION and size as a BOUND, not as
+equalities**, and that is not generality for its own sake: create's
+`dp->nlink++` at +0x134 re-parks the PARENT at
+`cr_setf dp3 _ _ (di_nlink dp3 + 1)` (`ProofCreate.v`:8226-8234), a live
+directory whose count moved, and the premise there is closed from create's
+own `dp->nlink != 0` guard — `nlink + 1 <> 0` does NOT imply `nlink <> 0`,
+so an equality-shaped congruence has no caller at the one site that needs
+it.
+
+**The two clauses partition the directory case.** `dir_dotdot_ix` is the
+`nlink <> 0` half; the strong-`isdirempty` clause (`nlink = 0`, live records
+are exactly `"."` and `".."`) is the other, and neither weakens the other.
+That is why they ride beside each other in the payload rather than being one
+predicate.
+
 ### F2 — `iris/FsLookup.v`
 
 R8's increment: ONE `dirlookup` under ONE lock, read at the tree, lifted
@@ -291,6 +347,19 @@ live `".."` at index 1 is the ONLY live `".."`. Feed that number to
 `DOTDOT_dotdot_name` bridges the tree layer's `mword` spelling of the name to
 the record view's `bv` one.
 
+**THE PASTE'S PREMISES MOVE WITH THE AMENDED GUARD (for the F2 agent).**
+`dir_dotdot_ix` is now guarded by `T_DIR` **and** `di_nlink <> 0`, and it
+carries `2 <= dir_nrec (di_size dn)` as its first conjunct (see "The `".."`
+INDEX BRIDGE, amended" below). So §6's composition takes the home's
+liveness alongside its type — both of which a caller holding `fnode`/`fdir`
+already has, since `node_rep`'s NDir case is where the type comes from and
+S7 reads the liveness off the kernel's own `if(ip->nlink < 1) panic` — and
+in exchange the record-count side condition that fed `dir_first data nrec
+".." = Some 1` is a PROJECTION of the clause rather than an obligation.
+`dir_links_dotdot_out` lost its `1 < dir_nrec` premise for the same reason.
+Nothing else in the sketch moves: the tree half, `dir_names_unique`'s
+joining role and `DOTDOT_dotdot_name` are untouched.
+
 #### A tactic trap worth keeping
 
 `FsTree.v` does not import the proofmode and `FsLookup.v` does, so its
@@ -356,6 +425,18 @@ Compiles are mirror-only. Two things about that are worth keeping:
   tell is `ls --time-style=full-iso`: identical timestamps to the NANOSECOND
   across unrelated files. The fix — reverse transitive closure out of
   `.CoqMakefile.d`, `rm` those `.vo`, rebuild — is now a durable-notes rule.
+- **A LIVE SIBLING LANE UNDER YOUR CONE MAKES THE SHARED MIRROR UNGATEABLE,
+  AND THE FIX IS A LANE TREE, NOT A SMALLER GATE.** `DirView.v`'s cone is
+  **400** files; the file layer's is **387**, and 387 of those 400 are the
+  same files — because `FileInvDefs.v` sits under `ProcInv.v`, so a lane
+  editing the file layer owns almost everything below any fs change. With
+  its sources dirty in the shared mirror, `make` in that tree compiles ITS
+  in-flight work: a red that is not yours, or a green built from code nobody
+  committed. `cp -a` the mirror to a private lane tree (`/shared/xv6iris-frag`,
+  the bump lane's precedent), `git checkout --` the OTHER lane's dirty paths
+  **in the copy only**, confirm `git status --porcelain` lists exactly your
+  own files, then `rm` the cone and build there. Copying the `.vo` tree along
+  is what keeps it to one cone instead of a from-scratch build.
 - **`DirLinks.v`'s cone is 142 files**, and the only two that consume the
   ticket lemmas at all are `ProofCreate.v` and `ProofSysLink.v`
   (`SpecDirlink.v` and `SpecSysLink.v` name them in prose only). Both are in
@@ -370,6 +451,43 @@ Carried forward from R9; none of it is F1a/F1b/F1.5b's to discharge.
 - `isdirempty`'s invariant — S7's brief, as a PREREQUISITE of
   `create_fresh_ty`'s retirement, not a local convenience.
 - `SpecIget`'s licence enumeration (C′), or fs-icache §20.17.7's kernel fix.
+
+## THE PAYLOAD-CONJUNCT PASS — the site inventory, and why it is SEQUENCED
+
+Both payload clauses (`dir_dotdot_ix`, and the strong-`isdirempty`
+`dir_orphan_clean`) ride beside `dir_ok` in `IcacheEscrow.ipool_alloc` and
+`ic_loaded`. The foundation is landed (above); the pass itself waits.
+
+**THE SITE COUNT IS ~45, NOT SIX, AND THE REASON IS ARITY.** A separate
+`∗`-conjunct changes `ic_loaded`'s arity, so every hand-rolled destruct
+pattern and every hand-rolled rebuild moves — not just the named
+constructors. Raw `rewrite /ic_loaded` (or `/ipool_shape`) sites, per file:
+`ProofSysLink` 6, `IcacheEscrow` 5, `ProofNamex` 4, `ProofKexecA` 3,
+**`ProofFileread` 3**, `ProofCreate` 3, `SpecKexecB2` 2, `ProofSysChdir` 2,
+`ProofIlock` 2, **`ProofFilewrite` 2**, **`ProofFilestat` 2**, `IcacheBoot` 2,
+`ProofSysLinkTails` 1, `ProofIput` 1 — plus ~15 `ic_mk_loaded` /
+`kxc_load_peel` / `kxc_load_seal` application sites that each gain an
+argument. **Count the raw unfolds before pricing a payload change**; the
+constructor lemmas centralise a lot of `ProofCreate`/`ProofSysLink` but they
+do not centralise the file layer, namex, chdir or kexec.
+
+**SEVEN OF THEM ARE THE FILE LAYER'S**, which is why the pass sequences
+behind the FileOff/sys_open lane rather than negotiating shape:
+`ProofFileread.v`:1793-1795, :2084-2093, :2359-2368;
+`ProofFilewrite.v`:1896-1898, :2227-2232 (and its `Hjoin` assert at :2126,
+which carries `dir_ok` as a conjunct); `ProofFilestat.v`:736-738, :906-909.
+All seven are mechanical — destruct/rebuild arity only.
+
+**FOLDING THE CLAUSES INTO `dir_ok` INSTEAD IS DEAD, and the refutation is
+worth keeping** because the fold looks strictly better on the blast radius
+(the payload's `∗`-structure never moves, all ~45 sites stay byte-identical,
+and even `ProofFilewrite`'s own `dir_ok` producers survive because
+`fw_dir_ok_wi`/`fw_dir_ok_same` go through `dir_ok_not_dir`, whose statement
+would not change). It dies on `dir_ok` being a **body premise**:
+`ProofCreate.v`:1795, :1926, :1938, :2058, :2066, :6337, :6351 state it at
+the ENTRY record, where the child still has `di_nlink dc = 1` and `nrec` 0 or
+1 — exactly the states the `nlink <> 0` guard makes the clause false in. A
+separate conjunct is never a body premise, so it never has to be true there.
 
 ## Standing constraints (do not violate, do not re-propose)
 

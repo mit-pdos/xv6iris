@@ -8796,11 +8796,23 @@ two things, in this order:
 
 1. **the pin bump** carrying `f60ff58`, after which finding 1's premise is
    derivable and the T_FILE success arm is unblocked;
-2. **finding 2's payload conjunct** — the one open DESIGN item, and the
-   only thing between the resume and the T_DIR arm.  It lands at create's
-   mkdir arm, beside `dir_links`, at `dirlink(ip, "..", dp->inum)`;
-   coordinate with the create owner, since it moves a payload create is
-   the sole producer of.
+2. **finding 2's payload conjunct** — no longer a design item.  The FACT
+   and its extraction are landed (`DirView.dir_dotdot_ix`,
+   `DirLinks.dir_links_dotdot_out`); what is left is the mechanical pass
+   that puts the conjunct into `IcacheEscrow.ipool_alloc` / `ic_loaded`,
+   and that is SEQUENCED behind the FileOff/sys_open lane — see
+   [`fs-fragments-campaign.md`](fs-fragments-campaign.md), "THE
+   PAYLOAD-CONJUNCT PASS".  **Two things S7 must read before spending the
+   `ilink`:** the clause is guarded by `T_DIR` **and** `di_nlink <> 0`, so
+   S7 supplies the liveness from the kernel's own
+   `if(ip->nlink < 1) panic("unlink: nlink < 1")` — walked before the
+   zeroing, like the two `namecmp` refusals — and in exchange the clause
+   HANDS BACK `2 <= dir_nrec (di_size ip)`, so `dir_links_dotdot_out` takes
+   no record-count premise and the `isdirempty` loop does not have to
+   establish one.  The `di_nlink` guard is also what makes the conjunct
+   true of create's three `fail:` re-parks, which a type-only guard was
+   not; the complement (`nlink = 0` ⇒ only dot records) is the strong
+   `isdirempty` clause riding beside it.
 
 The contract was deliberately not written first: fixing a postcondition
 around an arm nobody can reach is what the D₀ stops exist to prevent.

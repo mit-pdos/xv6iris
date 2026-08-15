@@ -674,19 +674,27 @@ Section DirLinks.
   (*  amendment) any-match is first-match, so the two compose to           *)
   (*  [dir_inum data 1 = dp].  That last step is the tree layer's, not     *)
   (*  this file's.                                                        *)
+  (*                                                                      *)
+  (*  IT TAKES NO RECORD-COUNT PREMISE.  [dir_dotdot_ix] carries           *)
+  (*  [2 <= dir_nrec] itself, under the SAME two guards this lemma already *)
+  (*  needs for the ticket ([T_DIR] to open the big-op, [nlink <> 0] to    *)
+  (*  make index 1's ticket an [ilink] rather than a colour disjunction),  *)
+  (*  so the bound the [big_sepL_lookup_acc] wants is a projection rather  *)
+  (*  than an obligation.  S7 supplies both guards from the kernel: the    *)
+  (*  type test it branched on, and [if(ip->nlink < 1) panic].            *)
   (* ==================================================================== *)
   Lemma dir_links_dotdot_out (self : Z) (dn : dinode)
       (data : nat -> list (bv 8)) :
     bv_unsigned (di_type dn) = T_DIR_z ->
     bv_unsigned (di_nlink dn) <> 0 ->
-    (1 < dir_nrec (bv_unsigned (di_size dn)))%nat ->
     dir_dotdot_ix dn data ->
     bv_unsigned (dir_inum data 1) <> self ->
     dir_links self dn data -∗
       ilink (bv_unsigned (dir_inum data 1))
       ∗ (dir_link_at self dn data 1 -∗ dir_links self dn data).
   Proof.
-    intros Hty Hnl Hnrec Hdd Hself.
+    intros Hty Hnl Hdd Hself.
+    destruct (Hdd Hty Hnl) as (Hnrec & Hlive & _).
     rewrite /dir_links decide_True; [| exact Hty].
     iIntros "H".
     iDestruct (big_sepL_lookup_acc _
@@ -694,8 +702,7 @@ Section DirLinks.
                  with "H") as "[H1 Hback]".
     { apply lookup_seq. lia. }
     iSplitL "H1"; [| iExact "Hback"].
-    iApply (dir_link_at_unlink self dn data 1 Hnl (proj1 (Hdd Hty)) Hself
-              with "H1").
+    iApply (dir_link_at_unlink self dn data 1 Hnl Hlive Hself with "H1").
   Qed.
 
 End DirLinks.
