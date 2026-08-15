@@ -50,7 +50,8 @@ Section ProofKvmmap.
   Proof.
     cbv beta delta [wp_kvmmap_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
-      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hlkbelow.
+      Hlvl HK Hroot Hvaal Hpaal Hsz Hnp Hpermreg Hpok Hvab Hpab Hrep Hnone Hex Hlkbelow.
+    destruct Hex as (nb & Hon & Hnbk). subst on.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     set (W1 := <[Regidx csp_rs1 := regval_into_reg
@@ -58,7 +59,7 @@ Section ProofKvmmap.
     assert (Hsp1 : W1 !!! Regidx csp_rs1 = pa_stk (mm !!! Regidx csp_rs1) 2).
     { rewrite /W1 upd_eq. unfold regval_into_reg, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
-    iIntros "Hbudget Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hptree Henv Hcont".
     assert (Hb1 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { unfold spr, pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
@@ -219,7 +220,7 @@ Section ProofKvmmap.
        them.  ONE line, no case split on [b]. ---- *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Mappages.wp_mappages_sconf γa P6 t m npages perm lvl (K - 2)%nat eb p on b lks
+    iApply (Mappages.wp_mappages_sconf γa P6 t m npages perm lvl (K - 2)%nat eb p (Some nb) b lks
               Hlvl ltac:(lia)
               HP6a0
               ltac:(rewrite HP6a1; exact Hvaal)
@@ -250,65 +251,15 @@ Section ProofKvmmap.
     iPoseProof (ki_18 with "Htext") as "Hi18'".
     iPoseProof (ki_1a with "Htext") as "Hi1a'".
     destruct Hpay as [(Hkn & Ha0z) | (Hklt & Ha0m1 & Havz)].
-    2:{ (* ---- mappages FAILED (a0 = -1) ---- *)
-      (* Under a counted budget [Some nb] the sharp bound [g <= pt_missing <
-         nb] refutes the [avail_zero] witness (no page was left, yet the
-         counter says zero) -- the branch is DEAD.  Under [None] the panic
-         contract [Hbudget] discharges it -- at whatever hart the four
-         instructions below end on, which is why it is threaded in the
-         hart-GENERIC form [panic_wp_any]. *)
-      destruct on as [nb |].
-      { (* Some nb: the counted-budget arm is dead *)
-        iDestruct "Hbudget" as %Hbud.
-        change vpn0 with (svpn_of va) in Hbud.
-        rewrite avail_sub_Some in Havz. cbn in Havz.
-        exfalso. lia. }
-      (* None: panic *)
-      iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x12)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
-                mr (K - 2)%nat b
-                ltac:(vm_compute; reflexivity)
-                ltac:(vm_compute; discriminate)
-                ltac:(rgne; rewrite Ha0m1; vm_compute; reflexivity)
-                ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi12'").
-      iNext. iIntros (CIDa Hsa) "Hcg Hpc".
-      assert (Htgt1c : add_vec (mword_of_int (KernelSyms.kvmmap + 0x12) : mword 64)
-                (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 5 : mword 8) ('b"0"))))
-              = mword_of_int (KernelSyms.kvmmap + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Htgt1c) in "Hpc".
-      iPoseProof (ki_1c with "Htext") as "Hi1c".
-      iPoseProof (ki_20 with "Htext") as "Hi20".
-      iPoseProof (ki_24 with "Htext") as "Hi24".
-      (* +0x1c auipc a0 / +0x20 addi a0 / +0x24 jal panic *)
-      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 6 : mword 20)
-                mr (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi1c").
-      iIntros (CIDb Hsb) "Hcg Hpc".
-      set (Q1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (mword_of_int (KernelSyms.kvmmap + 0x1c) : mword 64) (auipc_off (mword_of_int 6 : mword 20)))]> mr).
-      assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.kvmmap + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.kvmmap + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp20) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x20)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x62 : mword 12)
-                Q1 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi20").
-      iIntros (CIDc Hsc) "Hcg Hpc".
-      (* the leaf's write value reads the entry map at a VARIABLE index, so it
-         is spelled [rget] and let-bound OUTSIDE its own [wp_next] (read at
-         CIDb).  [rgne] peels it to the CID-free lookup. *)
-      iEval (rgne) in "Hcg".
-      set (Q2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (Q1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 98 : mword 12)))]> Q1).
-      assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.kvmmap + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.kvmmap + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp24) in "Hpc".
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x24)) (mword_of_int 1 : mword 5) (mword_of_int 2094934 : mword 21)
-                Q2 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi24").
-      iIntros (CIDd Hsd) "Hcg Hpc".
-      assert (Hpcpn : add_vec (mword_of_int (KernelSyms.kvmmap + 0x24) : mword 64) (sign_extend' 64 (mword_of_int 2094934 : mword 21)) = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpcpn) in "Hpc".
-      iDestruct (panic_wp_any_at CIDd with "Hbudget") as "#Hpan".
-      iApply ("Hpan" $! _ _ _ _ with "Htext Hpc Hcg").
-    }
+    2:{ (* ---- mappages FAILED (a0 = -1): DEAD.  The counted budget's sharp
+           bound [g <= pt_missing t vpn0 npages < nb] refutes the
+           [avail_zero] witness (no page was left, yet the counter already
+           says zero).  [Hmiss] came back through [Mappages.wp_mappages_sconf]
+           already rewritten by [HP6a1] (line above), so it reads [svpn_of va]
+           where [Hnbk] still reads the local [vpn0] -- fold it to match. *)
+      change vpn0 with (svpn_of va) in Hnbk.
+      rewrite avail_sub_Some in Havz. cbn in Havz.
+      exfalso. lia. }
     (* ---- mappages SUCCEEDED (k = npages, a0 = 0): bnez FALLS, epilogue ---- *)
     subst k.
     iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.kvmmap + 0x12)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)

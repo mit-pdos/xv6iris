@@ -807,9 +807,9 @@ Section ProofPMS.
               ltac:(rewrite HWka2; exact Hpaal) HWka3 ltac:(lia) HWka4 pms_perm_ok6
               ltac:(rewrite HWka1; unfold VA; apply va_i_range; exact Hilt)
               ltac:(rewrite HWka2; exact Hpab) Hrep ltac:(rewrite HWka1; exact Hnone)
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
+              ltac:(eexists; split; [reflexivity | rewrite HWka1; exact Hkbud])
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     all: try lkbelow.
-    { iPureIntro. rewrite HWka1. exact Hkbud. }
     { rewrite avail_sub_Some. iExact "Henv". }
     iIntros (CIDl16 Hsl16 mr1 t' g') "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs1 %Hbase' %Hrep' %Hpres %Hg'miss".
     assert (Henveq : avail_sub (Some ((nb - (i + gk + 1))%nat)) g' = avail_sub (Some nb) (S i + (gk + g'))).

@@ -1327,9 +1327,9 @@ Section KvmmakeBody.
               ltac:(rewrite HWka2; rewrite uint_unsigned; apply (proj1 (Z.ltb_lt _ _)); vm_compute; reflexivity)
               (pt_rep0_empty bppn)
               ltac:(intros i Hi; rewrite (lt1 i Hi); apply lookup_empty)
+              ltac:(eexists; split; [reflexivity | exact Hbud])
               Hbelow
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
-    { iPureIntro. exact Hbud. }
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x28)).
@@ -1464,9 +1464,9 @@ Section KvmmakeBody.
               ltac:(intros i Hi; rewrite Hsvpn; rewrite (lt1 i Hi);
                     assert (Hv0 : vpn_at virtio_vpn 0 = virtio_vpn) by (apply bv_eq; apply vpn_at_0_bv);
                     rewrite Hv0; exact kvm_m1_none_virtio)
+              ltac:(eexists; split; [reflexivity | exact Hbud])
               Hbelow
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
-    { iPureIntro. exact Hbud. }
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x38)).
@@ -1599,9 +1599,9 @@ Section KvmmakeBody.
               ltac:(intros i Hi; rewrite Hsvpn; apply kvm_m2_none_plic;
                     rewrite (vpn_at_unsigned plic_vpn i ltac:(rewrite plic_vpn_uns; exact (proj1 (plic_bounds i Hi))));
                     rewrite plic_vpn_uns; exact (proj2 (plic_bounds i Hi)))
+              ltac:(eexists; split; [reflexivity | exact Hbud])
               Hbelow
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
-    { iPureIntro. exact Hbud. }
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID7 Hs7 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x4a)).
@@ -1750,9 +1750,9 @@ Section KvmmakeBody.
               ltac:(intros i Hi; rewrite Hsvpn; apply kvm_m3_none_text;
                     rewrite (vpn_at_unsigned text_vpn0 i ltac:(rewrite text_vpn_uns; exact (proj1 (text_bounds i Hi))));
                     rewrite text_vpn_uns; exact (proj2 (text_bounds i Hi)))
+              ltac:(eexists; split; [reflexivity | exact Hbud])
               Hbelow
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
-    { iPureIntro. exact Hbud. }
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID9 Hs9 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x60)).
@@ -1927,9 +1927,9 @@ Section KvmmakeBody.
               ltac:(intros i Hi; rewrite Hsvpn; apply kvm_m4_none_data;
                     rewrite (vpn_at_unsigned data_vpn0 i ltac:(rewrite data_vpn_uns; exact (proj1 (data_bounds i Hi))));
                     rewrite data_vpn_uns; exact (proj2 (data_bounds i Hi)))
+              ltac:(eexists; split; [reflexivity | exact Hbud])
               Hbelow
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
-    { iPureIntro. exact Hbud. }
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID12 Hs12 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x82)).
@@ -2083,9 +2083,9 @@ Section KvmmakeBody.
               ltac:(intros i Hi; rewrite Hsvpn; rewrite (lt1 i Hi);
                     assert (Hv0 : vpn_at tramp_vpn 0 = tramp_vpn) by (apply bv_eq; apply vpn_at_0_bv);
                     rewrite Hv0; exact kvm_m5_none_tramp)
+              ltac:(eexists; split; [reflexivity | exact Hbud])
               Hbelow
-              with "[] Hcg Hcnt Htext Hpc Hptree [Henv]").
-    { iPureIntro. exact Hbud. }
+              with "Hcg Hcnt Htext Hpc Hptree [Henv]").
     { iExact "Henv". }
     iIntros (CID10 Hs10 mr t' g) "Hcg Hcnt Hpc Hptree %Hnodes' Henv %Hkcs %Hbase' %Hrep' %Hpres %Hgmiss".
     assert (Hret : ret_pc (Wk !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x9c)).
