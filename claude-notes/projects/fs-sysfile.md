@@ -8648,7 +8648,7 @@ one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
-## S7-unlink — **STOPPED BEFORE ANY WALK INSTRUCTION.**  The budget audit
+## S7-unlink — **STOPPED, AND WAITING ON THE PIN BUMP.**  The budget audit
 ## LANDS and every arm closes; the success arm is blocked on TWO resource
 ## facts, and the second of them is `sys_unlink`'s own owed invariant
 ## turned round and pointed back at it.  No `Spec`/`Proof`/`Link` file was
@@ -8740,17 +8740,29 @@ rule ("A RE-`ilock` RETURNS A FRESH RECORD, AND THE LEDGER IS THE ONLY
 THING THAT CROSSES") biting the one caller that has no ledger fragment to
 cross with.
 
-**The discriminator sys_unlink DOES have is the NAME.**  Both `namecmp`
-guards are walked before the zeroing, so the matched record's name is
-neither `"."` nor `".."` (`SpecNamecmp`'s post is an iff on
-`bname 14 f = bname 14 g`), and `dirlookup`'s found arm names the record
-(`SpecDirlookup.v:270`).  A grey ticket is only ever §20.8's orphaned
-`".."`.  So the fact that closes this is
-**"a grey record's name is `".."`"** — and `dir_link_at` is deliberately
-NAME-BLIND (fs-icache.md §20.17.4 sharpening (b) calls name-blindness
-"strictly better than the ruling's step 5 needs").  It is strictly WORSE
-for the first consumer.  See the fragment-campaign ledger for the
-amendment this asks for.
+**RULED (user, 2026-08-15) — THE KERNEL GETS THE GUARD, AND THAT IS WHAT
+CLOSES IT.**  The missing re-check is not sys_unlink's; it is `sys_link`'s
+unguarded `dirlink`, which is what makes an orphaned directory able to
+hold a non-dot record at all.  With create's guard added there
+(xv6-riscv `verified` `f60ff58`), the STRONG isdirempty invariant — *an
+orphaned directory's live records are exactly `"."` and `".."`* — becomes
+true of the binary, and sys_unlink's home-live premise follows from it in
+one step: both `namecmp` guards are walked before the zeroing, so the
+matched record's name is neither dot (`SpecNamecmp`'s post is an iff on
+`bname 14 f = bname 14 g`) and `dirlookup`'s found arm names the record
+(`SpecDirlookup.v:270`), so the home cannot be orphaned.  **This walk
+therefore WAITS on the upstream push and the `XV6_REV` pin bump** —
+sys_link's bytes move and sys_unlink's with them.
+
+A weaker route was proposed and is **superseded: do not pursue it** —
+putting the record's NAME into `dir_link_at`'s grey disjunct so the
+`namecmp` refusals refute grey directly.  It bought only this one arm and
+left §20.6's itrunc row open; fs-icache.md §20.17.4 sharpening (b)'s
+name-blindness stands.  The rule worth keeping is the one the road test
+found: **when a resource premise has no supplier, check whether the fact
+is missing from the MODEL or from the KERNEL** — here the guard that
+would have established it is absent from the C, and three of its four
+siblings already have one.
 
 ### FINDING 2 — **THE T_DIR ARM'S `dp->nlink--` IS §20.17.4's RECORDED
 ### "S7's BLOCKER", AND IT IS STILL OPEN**
@@ -8771,17 +8783,24 @@ loop, `ip`'s live records are among indices 0 and 1, index 0's ticket is
 `emp` if it is the self-record — but the inum at index 1 is unconstrained
 by any landed statement, so the `ilink` it holds is for an unknown target.
 
-### WHAT IS PROVABLE TODAY, AND WHAT IS NOT
+### WHAT THE RESUME OWES
 
 Provable with what is landed: ARM A (`argstr < 0`), ARM B (`nameiparent`
 returns 0), ARMs C/D (the two `namecmp` guards and `dirlookup` returning
 0), ARM E (the `T_DIR && !isdirempty` refusal), and the whole isdirempty
-loop including its panic arm.  **Not provable: everything from the
-`writei` down, on BOTH the T_FILE and the T_DIR path** — finding 1 blocks
-the zeroing's ticket on every success arm and finding 2 blocks the T_DIR
-sub-arm on top of it.  Writing the contract before the two are ruled on
-would fix a postcondition around an arm nobody can reach, which is what
-the D₀ stops exist to prevent.
+loop including its panic arm.  Everything from the `writei` down waits on
+two things, in this order:
+
+1. **the pin bump** carrying `f60ff58`, after which finding 1's premise is
+   derivable and the T_FILE success arm is unblocked;
+2. **finding 2's payload conjunct** — the one open DESIGN item, and the
+   only thing between the resume and the T_DIR arm.  It lands at create's
+   mkdir arm, beside `dir_links`, at `dirlink(ip, "..", dp->inum)`;
+   coordinate with the create owner, since it moves a payload create is
+   the sole producer of.
+
+The contract was deliberately not written first: fixing a postcondition
+around an arm nobody can reach is what the D₀ stops exist to prevent.
 
 ## S7-open — **STOPPED AND REPORTED before any walk instruction.**  The
 ## ledger is machine-checked and CLOSES; `SysOpenBudget.v` lands.  The walk
@@ -9154,3 +9173,150 @@ when the wiring is written").  This is that surface.
 `SpecFilealloc.v`:18-21's stale sentence is left alone deliberately: it has
 to be rewritten to say what the ruled repair ends up being, and a
 comment-only edit would cost its cone twice.
+
+### THE THIRTEENTH STOP (R-open-1, 2026-08-15) — **A PARKED WITNESS MUST BE
+### REFUTABLE *AND* CLOSED, AND NOTHING FRACTIONAL IS CLOSED.**  The ruled
+### repair was executed as far as its first lemma and withdrawn
+
+Recorded beside stop 15's arithmetic error, and for the same reason: the
+mistake was in the SIZING, not in the proof, and it was refutable by a
+sentence already in the file.
+
+R-open-1 proposed parking `fref_tok γ k q` in `off_body`'s checked-out
+disjunct so that the exclusive initializer could refute it with
+`fref_tok γ k 1` and no authority.  The refutation half is correct
+(`FileInvDefs.v`:477 + `frac_valid`, on the FRAGMENT — no auth, no lock).
+The RETURN half is not: `off_body` can only hand a parked slice back
+existentially, the borrower needs its own `q` back exactly
+(`SpecFileread.v`:698/722 takes and returns `file_ref γf k q Cf` at the same
+fraction), and `file_ref` has no splitting law to shrink past the mismatch
+because `flive_tok` does not split.
+
+**THE RULE.**  A witness parked in an invariant and handed back to its
+depositor must be **CLOSED** — no existential fraction — because an
+invariant records propositions, not provenance.  `off_mark` is fungible
+precisely because `i_valid ip ↦₄ 1` pins its value and carries no fraction;
+`flive_tok` is fungible because it is a constant.  **So a parked witness
+must be simultaneously refutable by a fractional exclusive token and itself
+fraction-free, and nothing in `fileUR` is both** — `flive_tok` is closed but
+lives over `positiveR`, whose fragments compose (which is exactly why
+`off_acc_excl` needs the authority in the first place); `fref_tok` and
+`fpay_tok` are refutable but fractional; and a CONSTANT slice is not
+available either, since a borrower's `q` comes out of
+`ProcInv.ofile_slot`'s existential and can be arbitrarily small.
+
+`FileOff.v`:48-53 already stated the closed-ness half ("A slice of the
+borrower's own points-to fraction is NOT fungible ... which is why the
+marker cannot be one").  The sizing reinvented the refuted shape one
+component over.  **Check a proposed parked witness against that sentence
+before pricing anything built on it.**
+
+### R-open-1b — THE DESIGN, AND IT HITS THE RULING'S OWN STOP CONDITION.
+### `SpecFileread` / `SpecFilewrite` MUST MOVE, so nothing was edited
+
+The transplant is exact and the file layer already contains it one field
+over.  `fpnames` (`FileInvDefs.v`:242-244) is
+`{ fp_lock; fp_pipe; fp_icv : gname; fp_iq : Qp; fp_ig : gname }`, where
+`fp_icv` is ALREADY a cancellable invariant's name and `inode_pay`
+(`FileInvDefs.v`:629-633) already carries `cinv fileipN γx (…)` (persistent,
+so it rides every share) beside `cinv_own γx q` (proportional, so fraction
+one is the cancel).  The `off` cell simply joins that discipline.
+
+**THE SHAPE, VERBATIM.**
+
+```coq
+(* FileInvDefs.v -- one new field *)
+Record fpnames := MkFPNames
+  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp;
+    fp_ig : gname; fp_ocv : gname }.                    (* NEW *)
+
+(* FileOff.v -- the body is UNCHANGED; only its wrapper moves *)
+Definition off_body (γ : gname) (k : nat) : iProp Σ :=
+  (∃ ip : mword 64,
+     a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗
+     (off_resident k ∨ (off_mark ip ∗ flive_tok γ k)))%I.
+
+Definition off_cinv (γ γx : gname) (k : nat) : iProp Σ :=
+  cinv (offN .@ k) γx (off_body γ k).                   (* was [inv] *)
+
+(* FileInvDefs.v -- the token rides the payload, proportionally *)
+Definition off_pay (pn : fpnames) (γ : gname) (k : nat) (q : Qp) : iProp Σ :=
+  (off_cinv γ (fp_ocv pn) k ∗ cinv_own (fp_ocv pn) q)%I.
+```
+
+with `off_pay` added to `file_pay γ k q C`'s body **inside the existing
+`∃ pn`** — so `file_ref γ k q C` keeps its arity, its four components and
+its every consumer.  That is the `is_sleeplock` precedent the ruling named,
+and it works for the BORROWER exactly as the constraint hoped: a borrower
+opens with `cinv_acc` at its own `q`, runs the unchanged marker protocol
+inside, and hands `file_ref γf k q Cf` back at the same fraction.
+
+**WHY THE INITIALIZER NEVER FACES THE DISJUNCTION.**  Cancelling is not what
+resolves it — cancelling yields the BODY, disjunction and all, and the
+initializer still could not refute the checked-out arm.  What resolves it is
+that **`filealloc` does the refutation, inside the lock, with the authority
+it already holds** (`FileInv.flive_excl_last`, exactly as `off_acc_excl`
+does today).  filealloc cancels slot `k`'s off-cinv, refutes the checked-out
+arm, and hands the caller the two cells outright:
+
+```coq
+(* SpecFilealloc.v -- the post MOVES, as ruled *)
+Definition filealloc_post (γf γ : gname) (r : mword 64) : iProp Σ :=
+  (⌜r = zero_reg⌝ ∗ fd_slot
+   ∨ ∃ (k : nat) (Cf : fcontent) (ip : mword 64) (v : mword 32),
+       ⌜(k < NFILE)%nat /\ r = fnode k /\ fc_type Cf = FD_NONE /\ off_wf v⌝ ∗
+       file_ref γf k 1 Cf ∗
+       a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗ a_foff k ↦₄ v)%I.
+```
+
+The initializer then holds the FULL `f->ip` cell (its own half out of
+`file_fields` joined to the one filealloc handed over), writes both cells
+with no invariant in the way, allocates a FRESH `off_cinv` and records its
+name with `fpay_tok_update` — the same single ghost step that publishes
+`inode_pay`'s names, so sys_open performs ONE update, not two.
+
+**AT FD_NONE THERE IS NO OFF-CINV, AND THAT IS THE RIGHT INVARIANT.**
+`file_payload`'s FD_NONE arm is already `emp`; a slot with no payload has no
+off-cinv either, and the two are created and cancelled by the same parties
+at the same moments.  So `off_pay` belongs INSIDE `file_payload`'s typed
+arms, not beside them, and the free-slot leftover (`FileInv.file_rest`)
+carries the two cells instead.
+
+**THE HONEST CANCEL SITE IS `fileclose`'s LAST-REFERENCE ARM** — confirmed
+against the zero-consumers finding.  fileclose never READS `off` (gcc emits
+no such load, and `ProofFileclose.v` / `SpecFileclose.v` do not `Require
+FileOff` at all), but the last closer is the only party that ever again
+holds fraction one *inside the lock*, so it is where the cinv must be
+cancelled and the two cells returned to `file_rest` for the next
+`filealloc`.  It is internal to the lock, so **`SpecFileclose` does not
+move**; `ProofFileclose`'s last-reference arm gains the cancel.
+`ProofPipealloc` gains the mirror move (it now receives the two cells and
+allocates the cinv when it publishes FD_PIPE).
+
+**AND HERE IS THE STOP.**  `SpecFileread.v`:450 and `SpecFilewrite.v`:454
+both take **`off_invs γf`** — the fixed persistent family
+`[∗ list] k ∈ seq 0 NFILE, inv (offN .@ k) (off_body γf k)` — in their fs
+environments.  Under R-open-1b that family **cannot exist**: the cinv's name
+is per-slot AND changes on every open (a cancelled cinv can never be
+re-armed at the same `γ`, and `cinv_alloc` mints a fresh one), so there is
+no fixed persistent constant to hand down.  The borrower must instead read
+the assertion out of its own `file_ref` — which it can, `off_cinv` being
+persistent and riding `off_pay` — and **`off_invs γf` is DELETED from both
+environments**.
+
+That is a signature move on two frozen contracts, which the ruling said to
+stop and report before touching.  It is a WEAKENING (a premise removed, no
+premise added), so `SpecSysRead` / `SpecSysWrite` and their walks gain
+nothing to discharge and only drop a conjunct; `FileOff.off_invs` /
+`off_invs_lookup` / `off_invs_alloc` retire with it, which also settles
+`FileOff.v`:293-297's flagged boot hole — **there is nothing to mint at
+boot any more.**  The BSS's zeroed cells go into `file_rest` at boot
+instead, where `ftable_ghosts_alloc` already has to put the rest of a free
+slot, and the first `filealloc` hands them out.  That is strictly less boot
+wiring than the family was going to need.
+
+Ripple, measured: `FileInvDefs.v` (the record + `file_payload`/`file_pay`
+bodies) and `FileInv.v` (`file_rest`, the alloc/close steps) are the
+expensive ones — everything with a `proc_priv` in scope recompiles.
+`FileOff.v` + four consumers + six call sites is the cheap half
+(`ProofFileread.v`:1808/2075/2349, `ProofFilewrite.v`:1906/2216).
