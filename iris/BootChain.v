@@ -286,19 +286,24 @@ Section BootChain.
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
+      (* --- the three [IntrDefs.hart_csrs] cells: no boot code writes them,
+             they go straight into this hart's [cpu_own] --- *)
+      (∃ v : mword 64, sscratch ↦ᵣ v) ∗
+      mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) ∗
+      sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) ∗
       (* --- the PLIC wire pins ([WireInv.wire_inv]'s, allocated across all
              harts by the client) --- *)
       sig_seip ↦ᵣ register_lookup sig_seip rs ∗
       sig_meip ↦ᵣ register_lookup sig_meip rs.
   Proof.
     intros (Hpc0 & Hnpc0 & Hpv0 & Hhs0 & Hmh0 & Hms0 & Hmisa0 & Hsec0 & Hmenv0 &
-            Hhtif0 & Help0 & Hpma0 & _ & _ & _ & Hsenv0).
+            Hhtif0 & Help0 & Hpma0 & _ & _ & _ & Hsenv0 & Hmse0 & Hsse0).
     iIntros "#Hcl #Hcert Hregs".
     iDestruct (boot_reg_split rs with "Hregs") as
       "(HPC & HnPC & Hpriv & Hhs & Hmh & Hms & Hmisa & Hsec & Hmenv & Hhtif & Help &
         Hpma & Hpmpc & Hpmpa & Hmepc & Hsatp & Hmede & Hmdl & Hmie & Hmcen & Hstc &
         Hmst & Hminc & Hmcy & Hmt & Hmip & Hseip & Hmeip & Htlb & Hstvec &
-        Hsepc & Hscause & Hstval & Hsenv & Hgprs)".
+        Hsepc & Hscause & Hstval & Hsenv & Hssc & Hmse & Hsse & Hgprs)".
     (* the pinned cells, at their pinned values *)
     iEval (rewrite Hpc0 boot_pc_entry) in "HPC".
     iEval (rewrite Hnpc0 boot_pc_entry) in "HnPC".
@@ -328,7 +333,10 @@ Section BootChain.
     iSplitL "Hsepc". { iExists (register_lookup sepc rs). iExact "Hsepc". }
     iSplitL "Hscause". { iExists (register_lookup scause rs). iExact "Hscause". }
     iSplitL "Hstval". { iExists (register_lookup stval rs). iExact "Hstval". }
-    iFrame "Hseip Hmeip".
+    iSplitL "Hssc". { iExists (register_lookup sscratch rs). iExact "Hssc". }
+    iEval (rewrite Hmse0) in "Hmse".
+    iEval (rewrite Hsse0) in "Hsse".
+    iFrame "Hmse Hsse Hseip Hmeip".
   Qed.
 
 End BootChain.
@@ -389,6 +397,9 @@ Section BootRun.
      (∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v) ∗
+     (∃ v : mword 64, sscratch ↦ᵣ v) ∗
+     mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) ∗
+     sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) ∗
      (* --- this hart's slice of the image and of the stack --- *)
      mb_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
      stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
@@ -461,7 +472,7 @@ Section BootRun.
     pose proof (reset_regs_pmpcfg _ _ Hreset) as Hpmpc0.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
-              Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
+              Hsepc & Hscause & Hstval & Hssc & Hmse & Hsse & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
               Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hlks & Hctx & _) Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
@@ -489,7 +500,8 @@ Section BootRun.
        [mstatus_kernel_facts]. *)
     iIntros (Mf msf satpf medelegf midelegf mief menvcfgf stimecmpf mcounterenf
              pmpcfgf pmpaddrf)
-      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hmiev & %Hsatpm & %Hpmpo & %HmcenTM)
+      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hmiev & %Hsatpm & %Hpmpo & %HmcenTM
+        & %Hmedv)
        Hhs Hpriv Hmst Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
        Hmenv Hmcen Hstc Hgot Hstk".
     (* the two stack-location bounds: [sp0_uint] rewrites only at ITS OWN
@@ -502,6 +514,7 @@ Section BootRun.
     assert (Hhi : uint (mword_of_int (sp_of (fin_to_nat cpu_id)) : mword 64)
                   <= ram_base + ram_size)
       by (rewrite (sp0_uint _ Hn); exact (sp_of_hi _ Hn)).
+    iEval (rewrite Hmedv) in "Hmede".
     iMod (boot_bridge K_main boot_stack_depth Mf
               (mword_of_int (sp_of (fin_to_nat cpu_id)))
               msf satpf midelegf mief menvcfgf
@@ -516,7 +529,8 @@ Section BootRun.
               eq_refl
               with "Hhw Hmin Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
-                    Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hlks Hctx")
+                    Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hlks
+                    Hssc Hmede Hmse Hsse Hctx")
       as (mf) "(Hcap & Hctx & Hcpu & Hg & Hraw)".
     (* the two cells this seam used to drop become the timer capability.  The
        fupd goes in front of a [WP (Loop)] goal, so peel it with [fupd_wp]

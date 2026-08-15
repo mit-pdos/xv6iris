@@ -149,7 +149,14 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
          two cells below.  Stated here for the same reason [mief = MIE_S] is:
          the M-mode proof computes the value, so it is free there and
          unobtainable anywhere else. *)
-      /\ eq_vec (_get_Counteren_TM mcounterenf) ('b"1" : mword 1) = true ⌝ -∗
+      /\ eq_vec (_get_Counteren_TM mcounterenf) ('b"1" : mword 1) = true
+      (* THE DELEGATION WORD, stated for the same reason [mief = MIE_S] is:
+         [start()]'s [csrw medeleg, 0xffff] fixes it, [legalize_medeleg]
+         ignores the old value, so the M-mode proof computes a CLOSED
+         constant that is unobtainable anywhere else.  It is what lets the
+         S-mode side park [medeleg] in [IntrDefs.hart_csrs] at a pinned
+         value ([IntrDefs.MEDELEG_S] is this term). *)
+      /\ medelegf = legalize_medeleg (zeros' 64) (mword_of_int 0xffff) ⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ msf -∗

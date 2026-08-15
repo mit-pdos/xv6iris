@@ -743,7 +743,17 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
      is what lets [hw_config] (RiscvFetchExec.v) hold it as a sixth frozen,
      persistently-shareable cell alongside misa/mseccfg/pma_regions/
      htif_tohost_base/elp. *)
-  /\ register_lookup senvcfg rs = boot_w64 0.
+  /\ register_lookup senvcfg rs = boot_w64 0
+  (* THE TWO STATE-ENABLE PINS, and they come from DIFFERENT places.  The
+     U-mode decode gates read both, so the user-execution tier needs the
+     zeros, and [IntrDefs.hart_csrs] parks the two cells at these values.
+     [mstateen0] is DERIVED over arbitrary garbage: [reset_sys] calls the
+     spec's own [reset_stateen], which zeroes mstateen0..3.  [sstateen0] is
+     NOT written by any line of the reset chain -- [reset_stateen] stops at
+     the M-mode four -- so it is a BOARD obligation, [ArchReset.board_regs]'
+     tenth write, exactly like mie / mideleg / senvcfg. *)
+  /\ register_lookup mstateen0 rs = boot_w64 0
+  /\ register_lookup sstateen0 rs = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32).
 
 (* NAMED PROJECTIONS of the three clauses consumers ask for one at a time
    (pmpcfg, mie, mideleg).  [reset_regs] is a sixteen-way
@@ -764,7 +774,16 @@ Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). e
 
 Lemma reset_regs_senvcfg (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup senvcfg rs = boot_w64 0.
-Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
+
+Lemma reset_regs_mstateen0 (c : CPU) (rs : regstate) :
+  reset_regs c rs -> register_lookup mstateen0 rs = boot_w64 0.
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H & _). exact H. Qed.
+
+Lemma reset_regs_sstateen0 (c : CPU) (rs : regstate) :
+  reset_regs c rs ->
+  register_lookup sstateen0 rs = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32).
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client

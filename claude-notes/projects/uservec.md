@@ -702,29 +702,41 @@ from the single owner.
 Target: `SpecUserretClosed` — userret's spec with no user-mode-WP premise
 and no `stvec_handler_wp`, entered where forkret enters the loop.
 
-- **The `▷` costs nothing.** `wp_user_exec` already uses `Htrap` under the
-  step obligation's `▷`, so it can take `▷ stvec_handler_wp` (4 lines across
-  `UserExec`/`UserStep`/`UserActiveClass`/`SpecUser`). The Löb then goes on
-  `stvec_handler_wp` (∀ hart, `C`, `pt`) and uservec keeps chaining usertrap
-  and userret as it does. Splitting uservec at the userret point needs the
-  same `▷` and rewrites ProofUservec's tail, so it buys nothing.
+- **The handler contract is already taken under a later.**
+  `wp_user_exec`/`wp_user_exec_active`/`wp_user_exec_full`/
+  `SpecUser.wp_user_exec_closed` and `UserretUser.wp_userret_user` all take
+  `▷ stvec_handler_wp` — sound because the trap frame reaches the handler
+  only through the step obligation, whose continuations are under a `▷`. So
+  the Löb goes on `stvec_handler_wp` (∀ hart, `C`, `pt`) and uservec keeps
+  chaining usertrap and userret as it does; splitting uservec at the userret
+  point would need the same `▷` and rewrite ProofUservec's tail, so it buys
+  nothing.
 - **The back edge needs cells at the RESUMING hart.** uservec's continuation
   is `wp_next true (proc_addr j)`, `j < NPROC`, so it is hart-generic and
   entry-hart `↦ᵣ` cells are useless. `uservec_post` is missing five, to
   rebuild `user_cfg` at `CID'`:
-  - `stvec` — free, `usertrap_post` returns it at `CID'`; add it to the post.
-  - `senvcfg` — free, rides in `hw_config`, which `usertrap_post` returns.
-  - `medeleg`/`mstateen0`/`sstateen0` — never written after M-mode boot:
-    freeze to `↦ᵣ□` and take the all-harts family (`∀ c : CPU,
-    reg_pointsto_at c …`) as a premise, established by boot. Also what makes
-    `uc_del` re-provable per round (the `ucfg` record is REBUILT each round;
-    `uc_mideleg` is the fresh `mdv0` from `uservec_post`).
-  - `sscratch` — owned and written every round (`csrw sscratch, a0`), so it
-    needs a value-agnostic all-harts invariant on the `clock_inv`/`wire_inv`
-    pattern, borrowed by uservec across its write. Cannot be caller-framed
-    and cannot be a `□` premise.
+  - `stvec`, plus the two per-hart PERSISTENT bundles `hw_config` (which
+    carries `senvcfg`) and `minstret_inv` — free, `usertrap_post` returns all
+    three at `CID'`; they just have to be added to the post. Both bundles are
+    ambient-hart (`inv minstretN` over THIS hart's cells), so a pre-crossing
+    copy is a different resource; `wire_inv` by contrast is all-harts and
+    rides for free.
+  - `sscratch`/`medeleg`/`mstateen0`/`sstateen0` ride in
+    `IntrDefs.hart_csrs`, a conjunct of `cpu_priv`: they cross a migration
+    with `cpu_hart`, and `UsertrapRes.ut_trap` already carries
+    `cpu_own ... false`, so they sit inside `usertrap_res`'s parked and bare
+    forms for free. `medeleg` is pinned at `MEDELEG_S`, which gives `uc_del`.
+    What is left is the access path: one `USERTRAP_RES` accessor (the shape
+    of `usertrap_res_tf_open`) for uservec to borrow `sscratch` across its 44
+    instructions and to hand the other three to `user_cfg`, and dropping
+    `SpecUservec`'s `sscratch` premise.
+  - `mstateen0`/`sstateen0` are pinned at zero, which is what `user_cfg`
+    wants: `reset_regs` carries both -- `mstateen0` derived from the spec's
+    own `reset_stateen`, `sstateen0` from `ArchReset.board_regs`, that file's
+    platform-assumption list, since `reset_stateen` stops at the M-mode
+    four.
 - `Rut` is `fun p => ∃ ksp, usertrap_res_bare p ksp`.
 
-Order: (R1) the `▷`; (R2) `uservec_post` grows `stvec` + the frozen-cell
-premise + `sscratch_inv`; (R3) the Löb and
+Order: (R2) `uservec_post` grows `stvec`/`hw_config`/`minstret_inv` + the
+frozen-cell premise + `sscratch_inv`; (R3) the Löb and
 `SpecUserretClosed`/`ProofUserretClosed`/`LinkUserretClosed`.

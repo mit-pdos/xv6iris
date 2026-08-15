@@ -181,6 +181,11 @@ Qed.
    The '0' regime recovers the legalize fixpoint smode_config carried via
    [legalize_sie_clear_idem] (WpGprCsrwC.v) from ghost-derived SIE=0 +
    the XS/FS/VS/SD/MPP conjuncts. *)
+(* the value [start()]'s [csrw medeleg, 0xffff] leaves: [legalize_medeleg]
+   ignores its OLD-value argument, so this is closed. *)
+Definition MEDELEG_S : mword 64 :=
+  legalize_medeleg (zeros' 64) (mword_of_int 0xffff).
+
 Definition sconf_ms_facts (ms : mword 64) : Prop :=
   eq_vec (_get_Mstatus_MPRV ms) ('b"1") = false /\
   _get_Mstatus_SXL ms = 'b"10" /\
@@ -897,8 +902,39 @@ Section IntrDefsBase.
      with the coupling [size lks <= n] (LockSet.v).  Bundled INTO the second
      conjunct rather than added as a third, so every positional destructuring
      of this bundle keeps matching. *)
+  (* ------------------------------------------------------------------- *)
+  (* THIS HART'S KERNEL-OWNED CSRs: the ones the kernel holds but never    *)
+  (* reads while it runs.                                                  *)
+  (*                                                                      *)
+  (* WHY HERE.  A register cell is per-hart, so a thread that may MIGRATE  *)
+  (* can only keep one by riding the bundle a leaf's [wp_next]             *)
+  (* re-delivers, and that bundle is [cpu_hart] (§6a below: at [b = true]  *)
+  (* it is inside [sie_arm]'s enabled arm, at [b = false] inside           *)
+  (* [CpuOwn.cpu_own]).  Putting them in [cpu_priv] therefore buys the     *)
+  (* crossing for free, and -- because [UsertrapRes.ut_trap] already       *)
+  (* carries [cpu_own 0 false pj false lks] -- puts them inside            *)
+  (* [usertrap_res] and its parked/bare forms too, which is where the      *)
+  (* trampoline reaches [sscratch].                                        *)
+  (*                                                                      *)
+  (* VALUES.  [medeleg] is PINNED: [start()] writes it once and            *)
+  (* [legalize_medeleg] ignores its old value, so the post-boot value is a *)
+  (* closed constant -- the same treatment, and the same reason, as        *)
+  (* [sconf]'s [mie = MIE_S].  [sscratch] is genuinely scratch (the        *)
+  (* trampoline writes it, reads it back nine instructions later, and no   *)
+  (* one else looks), so its value is existential.  The two state-enable   *)
+  (* pins are at ZERO, which is what the U-mode decode gates need:         *)
+  (* [RiscvLang.reset_regs] establishes both -- mstateen0 from the spec's  *)
+  (* own [reset_stateen], sstateen0 from the board ([ArchReset.board_regs] *)
+  (* tenth write, since [reset_stateen] stops at the M-mode four).         *)
+  (* ------------------------------------------------------------------- *)
+  Definition hart_csrs : iProp Σ :=
+    ((∃ v : mword 64, sscratch ↦ᵣ v) ∗
+     medeleg ↦ᵣ MEDELEG_S ∗
+     mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) ∗
+     sstateen0 ↦ᵣ (mword_of_int 0 : mword 32))%I.
+
   Definition cpu_priv (n : nat) (eb : bool) (p : mword 64) (lks : gset string) : iProp Σ :=
-    (cpu_cells n eb p ∗ cpu_locks_lvl n lks)%I.
+    (cpu_cells n eb p ∗ cpu_locks_lvl n lks ∗ hart_csrs)%I.
 
   (* the private state PLUS the counting token -- the whole per-cpu bundle
      minus the caller's context-slot payload [C] (which is an ordinary caller

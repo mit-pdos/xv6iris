@@ -327,7 +327,9 @@ Lemma board_regs_after_sim :
   /\ register_lookup mideleg (sregs sim_board_state)
     = register_lookup mideleg (sregs sim_state)
   /\ register_lookup senvcfg (sregs sim_board_state)
-    = register_lookup senvcfg (sregs sim_state).
+    = register_lookup senvcfg (sregs sim_state)
+  /\ register_lookup sstateen0 (sregs sim_board_state)
+    = register_lookup sstateen0 (sregs sim_state).
 Proof.
   (* [reflexivity] settles the six the simulator writes EXPLICITLY; mie and
      mideleg come from [init_regstate]'s [inhabitant], which is [zeros] rather
