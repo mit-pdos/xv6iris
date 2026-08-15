@@ -118,6 +118,40 @@ R9. **Owed items registered**, each with its home:
       headline dividend — §20.17.4's owed fact, free as a conjunct of
       `fnode ip (NDir ents)`.
 
+R13 (2026-08-15, C′ RULINGS — the C′ verification report is the design
+     of record for the licence enumeration; find it in the coordinator
+     session's task output and its content mirrored in
+     fs-fragments-campaign.md's C′ entry):
+     (i) C′'s indexed form (ilic/iname, borrowed-and-returned at the
+     SAME l, IgetLic.v leaf home, licence (e) as the fsblock half NOT
+     bio_locked) is ADOPTED as designed.
+     (ii) §20.18 ruling 1 is AMENDED: "no dir_links OBLIGATION at
+     dirlink/dirlookup; a ticket list borrowed over the PRE-state and
+     returned verbatim on both arms is admissible" — the re-park
+     objection and the +0x128 ordering are untouched by a borrow.
+     (iii) K-F2 (the ialloc brelse-after-iget kernel fix) is REJECTED
+     (user, 2026-08-15: "roll back kernel change — one reason we are
+     going for the tree representation is that we can see this inum
+     isn't in the tree yet").  The invisibility licence for ialloc's
+     window comes from the TREE (the §7 founding ruling: inum ∉ t /
+     the detached fragment), not from a kernel reorder; the kernel is
+     correct as-is and only bug fixes go upstream.  C′ therefore waits
+     for the tree route to mature rather than landing behind a kernel
+     edit; formerly-K-F2-parked — kernel changes are the user's; the writeup is ready
+     (three lines, founds ialloc's iget, closes the ireclaim boot-only
+     hazard structurally, enables the escort route). C′ EXECUTES ONLY
+     AFTER K-F2 lands and its bump cycle completes.
+     (iv) The ESCORT-PROBE (§6.4's route to ireg_free_au's discharge —
+     the first non-dead candidate) is QUEUED as a design-only pass
+     behind K-F2 + C′.
+     (v) R7 STANDS: F1.5c does not start — the report's own finding is
+     that the gate does not open when C′ lands; the door is the free,
+     and the escort is its first honest key.
+     (vi) The S7-PLANK (the strong isdirempty payload conjunct) is
+     independently correct NOW (true of f60ff58) and is assigned to
+     the in-flight payload-conjunct pass (same home, same movers as
+     dir_dotdot_ix).
+
 R10. **Byte-stability map accepted** (§5.1): the only moving seams in
      F1.5c are SpecIalloc (both forms) and SpecIlock (+9 callers, 8 at
      None); SpecIupdate moves only at F1.5d and is deferred with it.
