@@ -588,7 +588,7 @@ Section UsertrapRes.
   (* the EXCLUSIVE remainder: what a callee can consume and must give back --
      plus [proc_priv], which every callee gives back at a MOVED record, which
      is why [V] is a parameter of this half and not of [ut_caps]. *)
-  Definition ut_own (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_own (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots (un_bn N) 3 ∗
      fileclose_bm (un_fn N) (un_us N) ∗
@@ -600,23 +600,23 @@ Section UsertrapRes.
         boundary hands over neither. *)
      proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
      (* everything the twenty-two syscall table entries consume, abstractly *)
-     Rsys (un_f N) (un_pj N))%I.
+     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N))%I.
 
-  Definition ut_env (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_env (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (ut_caps N ∗ ut_own Rsys N V)%I.
 
   (* the process block and the syscall environment, borrowed together and
      handed back at a moved record: syscall wants both, prepare_return and
      vmfault only the first. *)
-  Lemma ut_own_priv (Rsys : gname -> mword 64 -> iProp Σ) (N : ut_names)
+  Lemma ut_own_priv (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) :
     ut_own Rsys N V -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V ∗
-    Rsys (un_f N) (un_pj N) ∗
+    Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) ∗
     (∀ V' : pprivate,
        proc_priv (un_f N) (un_pj N) (un_pid N) V' -∗
-       Rsys (un_f N) (un_pj N) -∗ ut_own Rsys N V').
+       Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own Rsys N V').
   Proof.
     iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
     iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
@@ -633,7 +633,7 @@ Section UsertrapRes.
      [iFrame]'s search degenerate (durable-notes.md's "failing tactic looks
      like a hang" family -- this one is a slow, not a failing, tactic, but
      the fix is the same: keep the reconstruction in a small lemma). *)
-  Lemma ut_own_rebuild_us (Rsys : gname -> mword 64 -> iProp Σ) (N : ut_names)
+  Lemma ut_own_rebuild_us (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) (us : gset Z) :
     bslots (un_bn N) 3 -∗
     fileclose_bm (un_fn N) us -∗
@@ -641,7 +641,7 @@ Section UsertrapRes.
     fd_slots FDSPARE -∗
     iref_slots IREFSPARE -∗
     proc_priv (un_f N) (un_pj N) (un_pid N) V -∗
-    Rsys (un_f N) (un_pj N) -∗
+    Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗
     ut_own Rsys (upd_us N us) V.
   Proof.
     rewrite /ut_own.
@@ -713,7 +713,7 @@ Section UsertrapRes.
   (* ------------------------------------------------------------------- *)
   (* [usertrap_res] itself.                                              *)
   (* ------------------------------------------------------------------- *)
-  Definition ut_res (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_res (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (N : ut_names) (V : pprivate) (av : nat),
        (* THE PROCESS RUNNING IS THE ONE WHOSE TABLE THE TRAMPOLINE PARKED.
@@ -733,7 +733,7 @@ Section UsertrapRes.
   (* [ut_res]'s parked twin -- see [ut_trap_parked]'s header.  This is what
      survives user execution (no [satp]); [ut_res] itself is what usertrap
      consumes. *)
-  Definition ut_res_parked (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_res_parked (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (N : ut_names) (V : pprivate) (av : nat),
        ⌜ pv_upt V = pt ⌝ ∗
@@ -746,7 +746,7 @@ Section UsertrapRes.
   (* THE TRANSLATION BORROW, lifted to the residue.  [_close] is uservec's
      move (its exit switch just produced [tlb_res_pt kroot]); [_open] is
      userret's (its entry switch is about to consume it). *)
-  Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_tlb_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     ut_res_parked Rsys pt ksp -∗ tlb_res_pt kroot -∗ ut_res Rsys pt ksp.
   Proof.
@@ -757,7 +757,7 @@ Section UsertrapRes.
     iPureIntro. split; [| split; [| split]]; assumption.
   Qed.
 
-  Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_tlb_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res Rsys pt ksp -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_res_parked Rsys pt ksp.
@@ -774,7 +774,7 @@ Section UsertrapRes.
      of [SpecUsertrap.USERTRAP_RES.usertrap_res_tf_open].  Opens via
      [ut_own_priv] + [proc_priv_tf_open]; the closer moves [V] to
      [upd_tf V ws'] (its [pv_upt] is unchanged, so [pt] is unaffected). *)
-  Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_tf_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
     ut_res_parked Rsys pt ksp -∗
@@ -826,7 +826,7 @@ Section UsertrapRes.
   (* userret's entry switch consumes both.  See                           *)
   (* claude-notes/projects/uservec.md.                                    *)
   (* =================================================================== *)
-  Definition ut_own_nopt (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_own_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (bslots (un_bn N) 3 ∗
      fileclose_bm (un_fn N) (un_us N) ∗
@@ -834,13 +834,13 @@ Section UsertrapRes.
      fd_slots FDSPARE ∗
      iref_slots IREFSPARE ∗
      proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
-     Rsys (un_f N) (un_pj N))%I.
+     Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N))%I.
 
-  Definition ut_env_nopt (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_env_nopt (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) : iProp Σ :=
     (ut_caps N ∗ ut_own_nopt Rsys N V)%I.
 
-  Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_own_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) :
     ut_own_nopt Rsys N V -∗ proc_pt (pv_upt V) -∗ ut_own Rsys N V.
   Proof.
@@ -849,7 +849,7 @@ Section UsertrapRes.
     iFrame "Hb Hbm Hip Hfd Hir Hpv Hpt Hsy".
   Qed.
 
-  Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_own_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) :
     ut_own Rsys N V -∗ ut_own_nopt Rsys N V ∗ proc_pt (pv_upt V).
   Proof.
@@ -859,14 +859,14 @@ Section UsertrapRes.
   Qed.
 
   (* the borrow accessor, at the reduced environment -- [ut_own_priv]'s twin *)
-  Lemma ut_own_nopt_priv (Rsys : gname -> mword 64 -> iProp Σ) (N : ut_names)
+  Lemma ut_own_nopt_priv (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ) (N : ut_names)
       (V : pprivate) :
     ut_own_nopt Rsys N V -∗
     proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V ∗
-    Rsys (un_f N) (un_pj N) ∗
+    Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) ∗
     (∀ V' : pprivate,
        proc_priv_nopt (un_f N) (un_pj N) (un_pid N) V' -∗
-       Rsys (un_f N) (un_pj N) -∗ ut_own_nopt Rsys N V').
+       Rsys (un_f N) (un_pj N) (un_bn N) (un_fn N) -∗ ut_own_nopt Rsys N V').
   Proof.
     iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
     iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
@@ -875,7 +875,7 @@ Section UsertrapRes.
 
   (* the descriptor's derived footprint field is invisible to the reduced
      environment -- see [ProcInv.proc_priv_nopt_upt_irrel] *)
-  Lemma ut_own_nopt_upt_irrel (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_own_nopt_upt_irrel (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (Q : uptd) :
     ud_root (pv_upt V) = ud_root Q ->
     ud_tfp (pv_upt V) = ud_tfp Q ->
@@ -887,7 +887,7 @@ Section UsertrapRes.
     reflexivity.
   Qed.
 
-  Definition ut_res_bare (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_res_bare (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) : iProp Σ :=
     (∃ (N : ut_names) (V : pprivate) (av : nat),
        ⌜ pv_upt V = pt ⌝ ∗
@@ -897,7 +897,7 @@ Section UsertrapRes.
        ut_trap_parked (un_pj N) ksp av ∅ ∗
        ut_env_nopt Rsys N V)%I.
 
-  Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_pt_close (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ proc_pt pt -∗ ut_res_parked Rsys pt ksp.
   Proof.
@@ -909,7 +909,7 @@ Section UsertrapRes.
     iPureIntro. split; [reflexivity | split; [| split]]; assumption.
   Qed.
 
-  Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_pt_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_parked Rsys pt ksp -∗ proc_pt pt ∗ ut_res_bare Rsys pt ksp.
   Proof.
@@ -928,7 +928,7 @@ Section UsertrapRes.
      may be re-keyed on [ud_norm pt] for free.  This is what lets the trap
      loop hand the user tier a descriptor whose [udata_cov] holds by
      construction -- see [ProcPtOwn.user_pt_inv_close]. *)
-  Lemma ut_res_bare_norm (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_bare_norm (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗ ut_res_bare Rsys (ud_norm pt) ksp.
   Proof.
@@ -946,7 +946,7 @@ Section UsertrapRes.
      save/restore walks open: the trapframe page never leaves the residue
      (physical tier, unreachable from user mode), so it is available in
      exactly the window where the address space is not. *)
-  Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_bare_tf_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
     ut_res_bare Rsys pt ksp -∗
@@ -980,7 +980,7 @@ Section UsertrapRes.
      two state-enable pins to [UserExec.user_cfg] for the user phase, keeping
      the closer wand as the parked remainder.  Open/close, not a tier of its
      own: nothing needs a name for "the residue minus its CSRs". *)
-  Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) :
     ut_res_bare Rsys pt ksp -∗
     hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp).
@@ -1002,7 +1002,7 @@ Section UsertrapRes.
      borrows therefore overlap.  Each single accessor consumes the whole
      residue, so neither can be applied to the other's remainder -- a sealed
      bundle's simultaneous borrows have to come out of ONE opener. *)
-  Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> iProp Σ)
+  Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
     (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
     ut_res_bare Rsys pt ksp -∗
@@ -1168,7 +1168,7 @@ Section UsertrapRes.
      That is what makes the tail blocks index-generic, which they have to be:
      +0xa6 is reached at [true] from the syscall arm and at [false] from the
      other four. *)
-  Definition ut_hold (Rsys : gname -> mword 64 -> iProp Σ)
+  Definition ut_hold (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
       (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) : iProp Σ :=
     (cpu_own 0%nat b (un_pj N) b lks ∗
      trap_csrs_ext b ∗
@@ -1261,7 +1261,7 @@ Lemma ut_hold_transport
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
       !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId}
-    (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> iProp Σ)
+    (CID0 CID1 : CpuId) (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ)
     (N : ut_names) (V : pprivate) (b : bool) (lks : gset string) :
   (b = false \/ un_pj N = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
   ut_hold (CID := CID0) Rsys N V b lks -∗ ut_hold (CID := CID1) Rsys N V b lks.

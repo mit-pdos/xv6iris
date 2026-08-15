@@ -81,6 +81,7 @@ Require Import KptTree.
 Require Import TrampPt.
 Require Import KallocInv.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
@@ -137,7 +138,7 @@ Section UtEntry.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* the trapframe page's own [page_valid], read off [proc_priv] without
      consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]

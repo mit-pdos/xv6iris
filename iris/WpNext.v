@@ -175,6 +175,15 @@ Section WpNext.
     iPureIntro. intros Hb. rewrite (Hs Hb). exact (Heq Hb).
   Qed.
 
+  (* The inference-friendly form used when transporting a live continuation
+     through a proofmode step.  This is the same generic [wp_next] law as
+     [wp_next_retarget], with its anchors and state made implicit. *)
+  Lemma wp_next_shift `{GEN : GenId} {K : CpuId -> iProp Σ} {b : bool}
+      {p : mword 64} {CIDa CIDb : CpuId}
+      (Hs : b = false \/ p = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) :
+    wp_next (CID0 := CIDa) b p K -∗ wp_next (CID0 := CIDb) b p K.
+  Proof. exact (wp_next_retarget CIDa CIDb b p K Hs). Qed.
+
   (* Chaining: the conditional equalities compose, which is what lets a
      [b]-GENERIC whole-function proof thread one implication per instruction
      and still discharge its own continuation at the end -- with no case split

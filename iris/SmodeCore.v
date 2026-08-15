@@ -1334,33 +1334,6 @@ Section SmodeCoreIris.
   (* for K2 (its second halfword read HITS the just-filled entry).        *)
   (* =================================================================== *)
 
-  (* =================================================================== *)
-  Definition pmp_config (root_ppn : mword 44) : iProp Σ :=
-    (∃ (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n),
-       pmpcfg_n ↦ᵣ pmpcfg0 ∗ pmpaddr_n ↦ᵣ pmpaddr00 ∗
-       ⌜ pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ⌝ ∗
-       ⌜ zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ⌝ ∗
-       ⌜ eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
-       ⌜ eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
-       ⌜ eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ⌝ ∗
-       ⌜ (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ⌝)%I.
-
-  (* re-seal [pmp_config] from the raw cells + the ambient facts (used by     *)
-  (* engines / data WPs after they open it to drive a fetch / data walk).     *)
-  Lemma pmp_config_intro (root_ppn : mword 44)
-      (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n) :
-    pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A (vec_access_dec pmpcfg0 0)) = TOR ->
-    zopz0zKzJ_u (zeros' 64) (vec_access_dec pmpaddr00 0) = false ->
-    eq_vec (_get_Pmpcfg_ent_X (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_W (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    eq_vec (_get_Pmpcfg_ent_R (vec_access_dec pmpcfg0 0)) ('b"1") = true ->
-    (ram_base + ram_size <= uint (vec_access_dec pmpaddr00 0) * 4)%Z ->
-    pmpcfg_n ↦ᵣ pmpcfg0 -∗ pmpaddr_n ↦ᵣ pmpaddr00 -∗ pmp_config root_ppn.
-  Proof.
-    intros HA Hord HX HW HR Hcov. iIntros "Hc Ha".
-    iExists pmpcfg0, pmpaddr00. iFrame "Hc Ha". iPureIntro. tauto.
-  Qed.
-
 End SmodeCoreIris.
 
 (* ===================================================================== *)

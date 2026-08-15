@@ -49,7 +49,7 @@
                              so the S-mode side can only compute that set from
                              a pinned [mie] -- see
                              claude-notes/completed/kerneltrap.md.
-     [mb_pmp_open]           PMP entry 0 as [SmodeCore.pmp_config_intro] wants
+     [mb_pmp_open]           PMP entry 0 as [SmodePte.pmp_config_intro] wants
                              it, so the Bare translation arm can be built
                              without knowing which pmpcfg the machine powered
                              up with.

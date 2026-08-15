@@ -21,7 +21,7 @@
      - [mb_ld_ea]     the image word _entry loads the stack0 pointer out of
      - [mb_tpv]       the value start() writes to tp (sext32 of mhartid)
      - [mb_pmp_open]  the PMP-entry-0 shape start() leaves behind, exactly
-                      the six premises of [SmodeCore.pmp_config_intro]
+                      the six premises of [SmodePte.pmp_config_intro]
 
    Every one is stated over the definitional layer alone -- the decode-field
    constants come from [WpDecode.v] / [ExecCommon.v], never from a [Code*.v]
@@ -93,7 +93,7 @@ Definition mb_tpv (mh : mword 64) : mword 64 :=
 
 (* PMP entry 0 after start()'s widening write: a TOR region covering all of
    RAM, readable/writable/executable.  These are exactly the six premises of
-   [SmodeCore.pmp_config_intro], bundled so the contract can hand them over
+   [SmodePte.pmp_config_intro], bundled so the contract can hand them over
    without the caller knowing which pmpcfg the boot started from. *)
 Definition mb_pmp_open (cfg : type_of_register pmpcfg_n)
     (adr : type_of_register pmpaddr_n) : Prop :=

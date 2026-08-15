@@ -88,6 +88,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import KallocInv KvmSpec.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import SchedCtx PanicStub.
@@ -143,7 +144,7 @@ Section UtArmsCommon.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* [ut_hold] AT THE LITERAL [false], BOTH WAYS.                          *)
@@ -204,7 +205,7 @@ Section Ut56.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0x56 .. +0x82: THE UNEXPECTED-SCAUSE ARM.                            *)
@@ -623,7 +624,7 @@ Section UtD0.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xd0 .. +0xe8: THE VMFAULT ARM.                                      *)
@@ -999,7 +1000,7 @@ Section UtE8.
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (Rsys : gname -> mword 64 -> iProp Σ).
+  Context (Rsys : gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ).
 
   (* ==================================================================== *)
   (* +0xea .. +0xf2: THE DEVICE ARM'S killed CHECK.                        *)
