@@ -57,6 +57,53 @@ The message survives the first call because gcc parks it in `s1`:
 `callee_saved` carries `s1` across `printk("panic: ")` and `c.mv a1,s1` makes
 it the `"%s"` vararg of the second call.
 
+## Where the splice stands (2026-08-15)
+
+`PanicStub` is down from 104 spec files to 75, and what is left is a
+**ten-function inventory**, not a tree-wide sweep.
+
+**Done, on `main`:**
+
+- **`acquire`'s arm is refuted**, not discharged — the lock invariant's held
+  state keeps `lk_in i s` beside `lk->cpu`, so a hart whose held set omits `s`
+  cannot be the owner. That is what freed ~everything: acquire is called from
+  nearly every function in the tree.
+- **The printk cone needs no credential at all.** `SpecPanic`'s own
+  `panic_wp_any` premise existed for printk's inner `acquire(&tx_lock)`; with
+  acquire's arm gone, printk, printint, consputc and uartputc_sync all drop it
+  and panic's contract is self-contained. **The `panic → printk → acquire →
+  panic` cycle never had to be closed by Löb.**
+- **`pr` and `uart` are at the top of the lock order** (16, 17). `SpecPanic`
+  demands `locks_below lks "pr"`, and `iget` panics holding `itable` (14).
+- Nine files' `panic_wp_any_at` was feeding **printk**, not a panic — xv6's
+  `ialloc` is `printf(...); return 0;`. Those are deleted.
+
+**The real inventory — ten functions with a `jal panic` of their own:**
+bread, ilock, iget, dirlookup, dirlink, fileread, filewrite, kexit (two arms),
+kexec's B2, kvmmap.
+
+**On branch `panic-splice`** (not green — one of ten arms spliced):
+
+- `PanicCred.v` — `panic_cred`, the real contract packaged the way the stub
+  was: persistent, hart-generic, no postcondition. `kernel_data` rides inside
+  (a .rodata message is minted from it by `panic_cred_msg`), and it mentions
+  **no console typeclasses**, so the 140 files that thread it keep their
+  ambient context. `panic_go` is the application form.
+- `LinkPanicCred.v` — `panic_cred_holds`, **proved** from
+  `Panic.wp_panic_sconf` and `SpecPrintk.printk_env`. `printk_env` *is*
+  `panic_env` plus an existential `γl`.
+- 228 premises across 140 files renamed to it; `ProofKvmmap` spliced.
+
+**What each remaining arm costs:** its own message lemmas (string, address,
+`_bytes` by `vm_compute` — the addresses are in `.rodata`, e.g. `bget: no
+buffers` at `0x800073c0`), a `cpu_own_transport` to the panic hart, and a
+stack floor of `panic_stack = 52` at the panic point — `K_bread` 40,
+`K_ilock` 44, `K_iget` 16 all have to rise, and that ripples into callers'
+budgets. Then the root moves off the bridge: `boot_shared_alloc` cannot use
+`panic_cred_holds` (it runs before `consoleinit`), so the root belongs in
+main, where `printk_env` is in hand — and then `PanicStub.v` /
+`LinkPanicStub.v` go.
+
 ## Panics that are UNREACHABLE rather than threaded
 
 Two of the four are already retired at the source, which is the cheaper end of
