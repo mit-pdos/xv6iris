@@ -9611,3 +9611,29 @@ value that is some other offset's old immediate.  `lemma_diff` against the
 pre-bump commit reports nothing outside the generated layer — no
 hand-written declaration dropped, no `Admitted`, no new `Axiom`.  Coverage
 183/190, unmoved.
+
+`Print Assumptions`, verbatim and in order:
+
+```
+SysLink.wp_sys_link_sconf     valid_reservation, plat_term_write,
+                              match_reservation, load_reservation,
+                              cancel_reservation,
+                              functional_extensionality_dep,
+                              ProofIput.iput_acquiresleep_order_ADMITTED
+Create.wp_create_sconf        the same, plus
+                              LinkCreateFreshTy.CreateFreshTy.create_fresh_ty
+SysMkdir.wp_sys_mkdir_sconf   as Create (it calls create)
+```
+
+i.e. sys_link's seal is the standing six plus the transient iput admit, and
+**not** `create_fresh_ty` — the guard's arm mints nothing, so LinkSysLink.v's
+"nothing new enters the cone" still holds with ARM E2 in it.  The two
+shifted seals are byte-for-byte the sets their own owners recorded.
+
+**A `Print Assumptions` AT THIS ALTITUDE COSTS 35-60 MINUTES**, dominated by
+the proof-term traversal and not by loading, so budget for it rather than
+treating a silent hour as a hang.  Two ways to lose the answer after paying
+for it: `Set Printing Depth n` elides the WHOLE list to `...` (it is not a
+per-term depth), and piping the run through `tail` keeps the last block
+only.  Redirect to a file on the box and grep `^Axioms:|^[A-Za-z][\w.]* :`
+out of it.
