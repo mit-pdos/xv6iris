@@ -9639,3 +9639,61 @@ for it: `Set Printing Depth n` elides the WHOLE list to `...` (it is not a
 per-term depth), and piping the run through `tail` keeps the last block
 only.  Redirect to a file on the box and grep `^Axioms:|^[A-Za-z][\w.]* :`
 out of it.
+
+### THE GR-27 RE-DERIVATION (base `a85e65e7`) — the plan SURVIVES, with
+### three deltas.  Checked before executing; nothing edited
+
+**sys_open DID NOT MOVE.**  Still 0x800050b4, still 342 bytes to
+`sys_mkdir` at 0x8000520a, still a 24-slot frame, still shrink-wrapped at
++0x28/+0x5e/+0x68, and all fourteen branch targets at their recorded
+symbol-relative offsets.  `K_sys_open = 138` holds and the whole S7-open
+record stands for the second bump running.  `SysOpenBudget.v` names no
+address and no resource, so `cpu_own`'s lost `C` argument does not reach it
+either.
+
+**THE ADMIT IS REALLY GONE** — `ProofIput.v` declares no `Axiom` and no
+`Admitted`; only three `Link*` headers still mention the name in prose.  So
+sys_open's expected seal is **the standing six + `create_fresh_ty`, and
+nothing else**.
+
+**DELTA 1 — THE SITE LIST GREW, AND `SpecFilestat` JOINED IT.**  The
+`/file_payload` sites went 8 -> 13, and the new ones are in a THIRD Spec
+file: `SpecFilestat.v`:419, 429 (and `SpecFileread.v` now has two, 638/650,
+where the pre-merge list had one), plus `ProofPipealloc.v`:1587, 1598.
+`/file_pay` is still exactly two (`ProofFileread.v`:921,
+`ProofFilewrite.v`:3105), `/file_ref` is still 21, and `MkFPNames` is still
+confined to `FileInvDefs.v` + `ProofPipealloc.v`.
+
+**And the new Spec sites are CHEAP, which is the fact that matters.**  All
+four are inside HELPER-LEMMA PROOFS, not contract bodies: the lemma at
+`SpecFilestat.v`:407 / `SpecFileread.v`:626 is a carve/gather pair whose
+STATEMENT mentions `file_pay` opaquely
+(`… -∗ (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay γf k q Cf)`)
+and only the proof unfolds it.  So an added conjunct costs each one slot in
+an `iDestruct` pattern and one `iFrame` — **no contract moves.**  Worth
+flagging while passing: `SpecFilestat.v`:407-421 and `SpecFileread.v`:626-640
+are character-for-character IDENTICAL, a near-duplicate pair the guiding
+principle would hoist.
+
+**DELTA 2 — `SpecFilealloc` LOST ITS PANIC CREDENTIAL** (`4e2e0cec`, the
+`acquire`-panic-is-dead sweep across 17 specs).  It is one of the seventeen.
+That is free for R-open-1b, which rewrites that post anyway — but it means
+the post being rewritten is the POST-SWEEP one, and the pre-merge text in
+this file's R-open-1b section is stale by one premise.
+
+**DELTA 3 — `d42cdd33` MADE THE INODE SLEEPLOCKS TRACKED, and it reached
+eight of my walk's contracts.**  `sleeplocked γisl` is now
+`sleeplocked_q γisl s`: `create_locked` carries it (`SpecCreate.v`:462) and
+`SpecIlock`/`SpecIunlock`/`SpecIput`/`SpecIunlockput`/`SpecFileclose` moved
+with it.  For the un-written walk this is free (the arity is fixed when the
+walk is written).  **The load-bearing check is that `SpecIunlock.v`:171
+STILL returns the generation-ERASED `inode_shr k s dev inum`** — so blocker
+2's analysis and R-open-2's fix (create's gen-named retained parent) are
+still the mechanism, and the iref-parity story is unchanged.
+
+**BOTH SHAPE-CORRECTION PREMISES RE-VERIFIED.**  `file_payload_split`
+(`FileInvDefs.v`:773) is still a `⊣⊢` at every arm, so correction (A)'s
+free-slot home in `fslot`'s free arm (`FileInvDefs.v`:849) stands; and
+`InodeInv.v` / `FsCrash.v` still mention `FileInv` NOWHERE, so correction
+(B)'s two imports still close no cycle.  **The cone figures did not move at
+all**: 352 / 63 / 12, plus `SpecFilestat.vo` at 5.
