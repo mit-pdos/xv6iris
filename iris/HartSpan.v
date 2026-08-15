@@ -141,7 +141,13 @@ Lemma hspan_node_mchild (Drw : gset register) (c c' : M unit * regstate) :
 Proof.
   (* TODO(agent): destruct the node; each arm's successor is [k v] for the
      node's own continuation -- exhibit the [∃ v]. *)
-Admitted.
+  destruct c as [m rs]. destruct m as [y|T oc k]; simpl; [intros []|].
+  destruct oc; simpl; intros H;
+    first
+      [ exact (match H with end)
+      | rewrite H; simpl; by eexists
+      | destruct H as [_ ->]; simpl; by eexists ].
+Qed.
 
 (* ====================================================================== *)
 (* 3. The read-only frame: dfrac-generic, never updated, exported as       *)
@@ -164,7 +170,165 @@ Section span.
     ⌜reg_agree_on Dro rs rs0⌝.
   Proof.
     (* TODO(agent): as HartLift.hreg_frame_agree, with [reg_valid_dq]. *)
-  Admitted.
+    rewrite /hreg_frame_ro. iIntros "Hi Hf".
+    rewrite bi.pure_forall. iIntros (r). rewrite bi.pure_impl. iIntros (Hr).
+    iDestruct (big_sepS_elem_of _ _ r Hr with "Hf") as "Hr".
+    iDestruct (reg_valid_dq rs0 r (Df r) (register_lookup r rs) with "Hi Hr")
+      as %Hv.
+    iPureIntro. by symmetry.
+  Qed.
+
+  (* helper: the ro-frame, like [hreg_frame], only reads the footprint's
+     lookups, so it re-anchors across any file agreeing on [Dro]. *)
+  Local Lemma hreg_frame_ro_ext_local Df rs rs' Dro :
+    reg_agree_on Dro rs rs' ->
+    hreg_frame_ro Df rs Dro ⊣⊢ hreg_frame_ro Df rs' Dro.
+  Proof.
+    intros Hag. rewrite /hreg_frame_ro. apply big_sepS_proper.
+    intros r Hr. by rewrite (Hag r Hr).
+  Qed.
+
+  (* helper: ONE machine node of a span, with the [wp_hart_step] mask dance,
+     witness/inversion and ghost re-establishment done once.  The
+     continuation receives the machine's pre file [rsM] (which the frames
+     pin on [Drw ∪ Dro]) and the [hspan_node] step it took, with both
+     frames re-anchored at the landing file [rs2]. *)
+  Local Lemma wp_hspan_node_local (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (m : M unit) :
+    Drw ## Dro ->
+    hspan_stops Drw m = false ->
+    ⊢ gen_cert -∗
+      hreg_frame rs Drw -∗
+      hreg_frame_ro Df rs Dro -∗
+      ▷ (∀ (m2 : M unit) (rsM rs2 : regstate),
+           ⌜reg_agree_on (Drw ∪ Dro) rs rsM⌝ -∗
+           ⌜hspan_node Drw (m, rsM) (m2, rs2)⌝ -∗
+           hreg_frame rs2 Drw -∗
+           hreg_frame_ro Df rs2 Dro -∗
+           WP (HartE gen_id cpu_id m2 : expr riscv_lang)) -∗
+      WP (HartE gen_id cpu_id m : expr riscv_lang).
+  Proof.
+    iIntros (Hdisj Hns) "#Hcert Hrf Hro H".
+    iApply (wp_hart_step with "Hcert").
+    iIntros (σ) "Hσ". destruct σ as [rsM mem0 dev0].
+    iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
+    iDestruct (hreg_frame_agree rs Drw rsM with "Hri Hrf") as %HagW.
+    iDestruct (hreg_frame_ro_agree Df rs Dro rsM with "Hri Hro") as %HagO.
+    assert (Hag : reg_agree_on (Drw ∪ Dro) rs rsM).
+    { intros r' Hr'. apply elem_of_union in Hr' as [Hr'|Hr'];
+        [by apply HagW|by apply HagO]. }
+    destruct m as [y|T oc k]; [discriminate Hns|].
+    destruct oc; try discriminate Hns.
+    (* 14 goals: RegRead, RegWrite, then the 12 silent classes *)
+    2: { (* RegWrite: [hspan_stops = false] forces [reg ∈ Drw] *)
+      apply bool_decide_eq_false_1, dec_stable in Hns.
+      assert (HrO : reg ∉ Dro) by set_solver.
+      assert (HagW' : reg_agree_on Drw (register_set reg regval rs)
+                        (register_set reg regval rsM)).
+      { intros r' Hr'. destruct (decide (r' = reg)) as [->|Hne].
+        - by rewrite !register_lookup_set.
+        - rewrite !(irrelevant_register_set r' reg _ regval
+                      (register_beq_false r' reg Hne)).
+          by apply HagW. }
+      assert (HagO' : reg_agree_on Dro rs (register_set reg regval rsM)).
+      { intros r' Hr'.
+        assert (Hne : r' <> reg) by (intros ->; by apply HrO).
+        rewrite (irrelevant_register_set r' reg rsM regval
+                   (register_beq_false r' reg Hne)).
+        by apply HagO. }
+      iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
+      iExists (k tt), (MState (register_set reg regval rsM) mem0 dev0).
+      iSplitR; [iPureIntro; split; reflexivity|].
+      iNext. iIntros (m' σ') "%Hstep".
+      destruct Hstep as [-> Hσ'].
+      assert (σ' = MState (register_set reg regval rsM) mem0 dev0) as ->
+        by exact Hσ'.
+      iMod (hreg_frame_update rs Drw reg regval rsM Hns with "Hri Hrf")
+        as "[Hri Hrf]".
+      iMod "Hmask" as "_". iModIntro.
+      iSplitR "H Hrf Hro"; [iFrame "Hri Hmem Hdev"|].
+      iApply ("H" $! (k tt) rsM (register_set reg regval rsM)
+                with "[%] [%] [Hrf] [Hro]").
+      - exact Hag.
+      - simpl. split; [exact Hns|reflexivity].
+      - by iApply (hreg_frame_ext (register_set reg regval rs)
+                     (register_set reg regval rsM) Drw HagW').
+      - by iApply (hreg_frame_ro_ext_local Df rs (register_set reg regval rsM)
+                     Dro HagO'). }
+    (* RegRead and the silent classes: the file does not move *)
+    all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
+         iExists _, (MState rsM mem0 dev0);
+         (iSplitR; [iPureIntro; split; reflexivity|]);
+         iNext; iIntros (m' σ') "%Hstep";
+         destruct Hstep as [-> ->];
+         iMod "Hmask" as "_"; iModIntro;
+         (iSplitR "H Hrf Hro"; [iFrame "Hri Hmem Hdev"|]);
+         iApply ("H" $! _ rsM rsM with "[%] [%] [Hrf] [Hro]");
+         [ exact Hag
+         | simpl; reflexivity
+         | by iApply (hreg_frame_ext rs rsM Drw HagW)
+         | by iApply (hreg_frame_ro_ext_local Df rs rsM Dro HagO) ].
+  Qed.
+
+  (* helper: an [hspani] step's ∃rs1 only constrains the start file on
+     [D], so the SAME step launches from any [D]-agreeing start file. *)
+  Local Lemma hspani_shift_local (D Drw : gset register)
+      (rsA rsB : regstate) (m : M unit) (c' : M unit * regstate) :
+    reg_agree_on D rsA rsB ->
+    hspani D Drw (m, rsA) c' -> hspani D Drw (m, rsB) c'.
+  Proof.
+    intros Hag (rs1 & Hag1 & Hnode). exists rs1. split; [|exact Hnode].
+    intros r Hr. etrans; [exact (Hag1 r Hr)|exact (Hag r Hr)].
+  Qed.
+
+  (* helper: the span rule with the [Acc] argument explicit -- the
+     well-founded induction lives here; [wp_hart_span] instantiates it
+     with [macc m]. *)
+  Local Lemma wp_hart_span_acc_local (Drw Dro : gset register)
+      (Df : register -> dfrac) :
+    Drw ## Dro ->
+    forall m : M unit, Acc mchild m ->
+    forall rs : regstate,
+    hspan_stops Drw m = false ->
+    ⊢ gen_cert -∗
+      hreg_frame rs Drw -∗
+      hreg_frame_ro Df rs Dro -∗
+      ▷ (∀ (m' : M unit) (rs' : regstate),
+           ⌜exists rs0 : regstate,
+              reg_agree_on (Drw ∪ Dro) rs rs0 /\
+              hspan (Drw ∪ Dro) Drw (m, rs0) (m', rs') /\
+              hspan_stops Drw m' = true⌝ -∗
+           hreg_frame rs' Drw -∗
+           hreg_frame_ro Df rs' Dro -∗
+           WP (HartE gen_id cpu_id m' : expr riscv_lang)) -∗
+      WP (HartE gen_id cpu_id m : expr riscv_lang).
+  Proof.
+    intros Hdisj m HAcc. induction HAcc as [m _ IH]. intros rs Hns.
+    iIntros "#Hcert Hrf Hro Hcont".
+    iApply (wp_hspan_node_local Drw Dro Df rs m Hdisj Hns
+              with "Hcert Hrf Hro [Hcont]").
+    iNext. iIntros (m2 rsM rs2) "%Hag %Hnode Hrf Hro".
+    destruct (hspan_stops Drw m2) eqn:Hs2.
+    - (* the successor stops: fire the continuation with a one-step chain *)
+      iApply ("Hcont" $! m2 rs2 with "[%] Hrf Hro").
+      exists rsM. split; [exact Hag|]. split; [|exact Hs2].
+      apply rtc_once. exists rsM.
+      split; [intros r' Hr'; reflexivity|exact Hnode].
+    - (* still a span class: recurse on the subterm, prepending the step *)
+      iApply (IH m2 (hspan_node_mchild Drw (m, rsM) (m2, rs2) Hnode) rs2 Hs2
+                with "Hcert Hrf Hro [Hcont]").
+      iNext. iIntros (m' rs') "%Hland Hrf Hro".
+      iApply ("Hcont" $! m' rs' with "[%] Hrf Hro").
+      destruct Hland as (rs0' & Hag' & Hchain & Hstop').
+      apply rtc_inv in Hchain as [Heq|(cmid & Hfirst & Hrest)].
+      { exfalso. injection Heq as <- <-. congruence. }
+      exists rsM. split; [exact Hag|]. split; [|exact Hstop'].
+      eapply rtc_l.
+      { exists rsM. split; [intros r' Hr'; reflexivity|exact Hnode]. }
+      eapply rtc_l; [|exact Hrest].
+      apply (hspani_shift_local (Drw ∪ Dro) Drw rs0' rs2 m2 cmid);
+        [intros r' Hr'; symmetry; exact (Hag' r' Hr')|exact Hfirst].
+  Qed.
 
   (* ==================================================================== *)
   (* 4. THE SPAN RULE.                                                     *)
@@ -237,6 +401,8 @@ Section span.
        ([reg_agree_on] is preserved by the step on Drw ∪ Dro: reads change
        nothing, Drw writes move both [rs] and the machine file in
        lock-step, so re-anchor [rs := post-write rs]). *)
-  Admitted.
+    intros Hdisj Hns.
+    exact (wp_hart_span_acc_local Drw Dro Df Hdisj m (macc m) rs Hns).
+  Qed.
 
 End span.
