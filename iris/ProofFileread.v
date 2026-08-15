@@ -743,9 +743,9 @@ Section ProofFileread.
         assert (Htyp : fc_type Cf = FD_PIPE)
           by (apply eq_vec_true_iff; exact Hp1).
         iDestruct "Hrpay" as (pn) "[Hpn Hpl]".
-        iEval (rewrite /file_payload Htyp bool_decide_eq_true_2; [| reflexivity])
-          in "Hpl".
-        iDestruct "Hpl" as "[#Hpipe Hpref]".
+        iEval (rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
+               [| reflexivity]) in "Hpl".
+        iDestruct "Hpl" as "[[#Hpipe Hpref] Hoh]".
         assert (Htgt64 : add_vec (mword_of_int (FR + 0x1e) : mword 64)
                   (sign_extend' 64 (mword_of_int 70 : mword 13))
                   = mword_of_int (FR + 0x64))
@@ -911,7 +911,7 @@ Section ProofFileread.
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P'
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
-                        [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hrlv]
+                        [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hoh Hrlv]
                         Hpriv [Henv]").
         { exact Hcsf. }
         { exact Hupt. }
@@ -921,8 +921,9 @@ Section ProofFileread.
         { rewrite /file_ref /file_fields /file_pay.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrlv".
           iExists pn. iFrame "Hpn".
-          rewrite /file_payload Htyp bool_decide_eq_true_2; [| reflexivity].
-          iFrame "Hpipe Hpref". }
+          rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
+            [| reflexivity].
+          iFrame "Hpipe Hpref Hoh". }
         { by iApply fileread_env_out_of_env. }
       + (* ---- +0x22 c.li a4,3 ; +0x24 beq a5,a4 -> FD_DEVICE ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FR + 0x1e))
@@ -1593,7 +1594,7 @@ Section ProofFileread.
              iDestruct (fr_env_fs γf fn Cf Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hgeo &
-                                   #Hoffinvs & #Hbio & #Hitbl & #Hescs &
+                                   #Hbio & #Hitbl & #Hescs &
                                    #Hireg & #Hslks & Hsb &
                                    #Hdevi & #Hdgeom & #Hdlock & Hbslot)".
              (* ---- THE CARVE (fs-sysfile S4', blocker 2's ratified
@@ -1607,12 +1608,11 @@ Section ProofFileread.
                 of the off FAMILY by the slot THIS CONTRACT names. ---- *)
              iDestruct (fileread_pay_carve γf k q Cf (or_introl Htyi)
                           with "Hrpay")
-               as (ikk inm ssh gsh ty0)
-                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 &
+               as (ikk inm ssh gsh ty0 γox)
+                  "(%Hipk & %Hik & %Hinlt & %Hnd0 & #Hshot0 & Hshr0 & Hoh &
                     Hpayback)".
              assert (Hibcov : IBLOCK inm (frn_inodestart fn) ∈ frn_cov fn)
                by (apply Hgeo; exact Hinlt).
-             iDestruct (off_invs_lookup γf k Hk with "Hoffinvs") as "#Hoffinv".
              iDestruct (ic_escrows_acc2 (frn_ic fn) (frn_fs fn) (frn_ireg fn)
                           (frn_cov fn) (frn_logstart fn) ikk Hik with "Hescs")
                as "#Hesc".
@@ -1806,9 +1806,9 @@ Section ProofFileread.
              { rewrite /inode_map. iFrame. }
              (* ---- CHECK OUT the offset cell ---- *)
              iApply fupd_wp.
-             iMod (off_checkout γf k (DfracOwn (q/2)) (fc_ip Cf) ⊤
-                     ltac:(solve_ndisj) with "Hoffinv Hcip Hvalid Hrlv")
-               as "[Hcip Hoffc]".
+             iMod (off_checkout γf γox k q (DfracOwn (q/2)) (fc_ip Cf) ⊤
+                     ltac:(solve_ndisj) with "Hoh Hcip Hvalid Hrlv")
+               as "(Hoh & Hcip & Hoffc)".
              iModIntro.
              iDestruct "Hoffc" as (v) "[Hoff %Hwf]".
              pose proof (bv_unsigned_in_range _ v) as Hvr.
@@ -2073,9 +2073,9 @@ Section ProofFileread.
                 iEval (rewrite Htgt4e) in "Hpc".
                 (* CHECK IN the cell, at the value it went out with *)
                 iApply fupd_wp.
-                iMod (off_checkin γf k (DfracOwn (q/2)) (fc_ip Cf) v ⊤
-                        ltac:(solve_ndisj) Hwf with "Hoffinv Hcip Hoff")
-                  as "(Hcip & Hvalid & Hrlv)".
+                iMod (off_checkin γf γox k q (DfracOwn (q/2)) (fc_ip Cf) v ⊤
+                        ltac:(solve_ndisj) Hwf with "Hoh Hcip Hoff")
+                  as "(Hoh & Hcip & Hvalid & Hrlv)".
                 iModIntro.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
@@ -2170,7 +2170,7 @@ Section ProofFileread.
                 iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
                              icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
                 iEval (rewrite Qp.div_2) in "Hshr".
-                iDestruct ("Hpayback" with "Hshr") as "Hrpay".
+                iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
                 iEval (rewrite Hpc54) in "Hpc".
@@ -2347,10 +2347,10 @@ Section ProofFileread.
                 iEval (rewrite Hpp4e) in "Hpc".
                 (* CHECK IN the advanced cell *)
                 iApply fupd_wp.
-                iMod (off_checkin γf k (DfracOwn (q/2)) (fc_ip Cf)
+                iMod (off_checkin γf γox k q (DfracOwn (q/2)) (fc_ip Cf)
                         (mword_of_int (bv_unsigned v + Z.of_nat tot)) ⊤
-                        ltac:(solve_ndisj) Hwf2 with "Hoffinv Hcip Hoff")
-                  as "(Hcip & Hvalid & Hrlv)".
+                        ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hoff")
+                  as "(Hoh & Hcip & Hvalid & Hrlv)".
                 iModIntro.
                 (* re-assemble the checked-out bundle, back at the SLOT *)
                 iAssert (ic_loaded (frn_fs fn) (frn_ireg fn) (frn_cov fn)
@@ -2445,7 +2445,7 @@ Section ProofFileread.
                 iDestruct (inode_shr_regen2 ikk (ssh/2)%Qp (ssh/2)%Qp
                              icfg_dev inm gsh with "Hkeep Hrefout") as "Hshr".
                 iEval (rewrite Qp.div_2) in "Hshr".
-                iDestruct ("Hpayback" with "Hshr") as "Hrpay".
+                iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
                 assert (Hpc54 : ret_pc (N2 !!! Regidx Rra) = mword_of_int (FR + 0x54)).
                 { rewrite HN2ra. apply bv_eq; vm_compute; reflexivity. }
                 iEval (rewrite Hpc54) in "Hpc".

@@ -1574,32 +1574,57 @@ Section ProofPipealloc.
        authority.  Both [file_pay]s are built HERE, at their FINAL contents,
        because the payload is a function of the content and nothing between
        here and the epilogue can touch it. *)
-    iDestruct "Hpay0" as (pn0) "[Hpn0 _]".
-    iDestruct "Hpay1" as (pn1) "[Hpn1 _]".
-    iMod (fpay_tok_update γf k0 pn0 (MkFPNames γpl γp 1%positive 1%Qp 1%positive) with "Hpn0") as "Hpn0".
-    iMod (fpay_tok_update γf k1 pn1 (MkFPNames γpl γp 1%positive 1%Qp 1%positive) with "Hpn1") as "Hpn1".
+    (* R-open-1b: an untyped slot's payload is [emp] BESIDE the off-borrow
+       cinv's assertion and token, which are what its [off] cell and the
+       other half of its [ip] cell live in.  A pipe never touches either, so
+       the cinv stays UNARMED and pipealloc has no ghost step to perform on
+       it -- it only has to keep the name when it overwrites [fpnames]. *)
+    iDestruct "Hpay0" as (pn0) "[Hpn0 [_ Hoh0]]".
+    iDestruct "Hpay1" as (pn1) "[Hpn1 [_ Hoh1]]".
+    iEval (rewrite (file_armed_none Cf0 Hk0ty)) in "Hoh0".
+    iEval (rewrite (file_armed_none Cf1 Hk1ty)) in "Hoh1".
+    iMod (fpay_tok_update γf k0 pn0
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0))
+            with "Hpn0") as "Hpn0".
+    iMod (fpay_tok_update γf k1 pn1
+            (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1))
+            with "Hpn1") as "Hpn1".
     iAssert (file_pay γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
                   (fc_ip Cf0) (fc_major Cf0)))
-      with "[Hpn0 Hrd]" as "Hpay0".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive). iFrame "Hpn0".
-      rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
+      with "[Hpn0 Hrd Hoh0]" as "Hpay0".
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn0)).
+      iFrame "Hpn0".
+      rewrite /file_payload /file_core /fc_wbool;
+        cbn [fc_type fc_pipe fc_writable].
       rewrite bool_decide_eq_true_2; [|reflexivity].
       rewrite (_ : negb (eq_vec (mword_of_int 0 : mword 8) (mword_of_int 0 : mword 8))
                    = false); [|vm_compute; reflexivity].
-      cbn [fp_lock fp_pipe]. iSplitR; [iExact "Hpipe"|iExact "Hrd"]. }
+      rewrite (file_armed_pipe
+                 (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
+                    (mword_of_int 0 : mword 8) pi (fc_ip Cf0) (fc_major Cf0))
+                 ltac:(reflexivity)).
+      cbn [fp_lock fp_pipe fp_ocv].
+      iSplitL "Hrd"; [iSplitR; [iExact "Hpipe"|iExact "Hrd"] | iExact "Hoh0"]. }
     iAssert (file_pay γf k1 1
                (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
                   (mword_of_int 1 : mword 8) pi
                   (fc_ip Cf1) (fc_major Cf1)))
-      with "[Hpn1 Hwr]" as "Hpay1".
-    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive). iFrame "Hpn1".
-      rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
+      with "[Hpn1 Hwr Hoh1]" as "Hpay1".
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp 1%positive (fp_ocv pn1)).
+      iFrame "Hpn1".
+      rewrite /file_payload /file_core /fc_wbool;
+        cbn [fc_type fc_pipe fc_writable].
       rewrite bool_decide_eq_true_2; [|reflexivity].
       rewrite (_ : negb (eq_vec (mword_of_int 1 : mword 8) (mword_of_int 0 : mword 8))
                    = true); [|vm_compute; reflexivity].
-      cbn [fp_lock fp_pipe]. iSplitR; [iExact "Hpipe"|iExact "Hwr"]. }
+      rewrite (file_armed_pipe
+                 (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
+                    (mword_of_int 1 : mword 8) pi (fc_ip Cf1) (fc_major Cf1))
+                 ltac:(reflexivity)).
+      cbn [fp_lock fp_pipe fp_ocv].
+      iSplitL "Hwr"; [iSplitR; [iExact "Hpipe"|iExact "Hwr"] | iExact "Hoh1"]. }
     (* +0x54 load the file pointer, +0x56 store the field *)
     assert (Hld54 : pf0 = add_vec (mH !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))).
     { rewrite (_ : mH !!! Regidx Rs1 = pf0); [symmetry; apply addv_sext0 | assumption]. }

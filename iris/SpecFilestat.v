@@ -82,7 +82,7 @@
      return (fileread and filewrite both panic there).
 
    THE OFFSET DOES NOT APPEAR.  [f->off] is not read and not written, so
-   [FileOff.off_inv] -- which fileread's contract must carry -- is absent here.
+   the off-borrow cinv -- which fileread's walk opens -- is never opened here.
 
    ==== WHAT IS AMBIENT =================================================
 
@@ -416,8 +416,11 @@ Section SpecFilestat.
       - by rewrite (bool_decide_eq_true_2 (FD_INODE = FD_INODE) eq_refl).
       - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
                    orb_true_r. }
-    rewrite /file_payload Hnp Hyes /inode_pay.
-    iDestruct "Hpl" as "(#Hci & Hown & Hs & Hwt)".
+    rewrite /file_payload /file_core Hnp Hyes /inode_pay.
+    (* R-open-1b (the off-cinv conjunct): the off-borrow cinv rides the typed arm too.  filestat
+       never touches [f->off], so the token is simply carried across and put
+       back -- one slot in the pattern and one [iExact]. *)
+    iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
     iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
@@ -426,7 +429,8 @@ Section SpecFilestat.
        instance search does not see through the definition. *)
     iSplitL "Hshr"; [iExact "Hshr"|].
     iIntros "Hshr". iExists pn. iFrame "Hpn".
-    rewrite /file_payload Hnp Hyes /inode_pay.
+    rewrite /file_payload /file_core Hnp Hyes /inode_pay.
+    iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
     iExact "Hwt".

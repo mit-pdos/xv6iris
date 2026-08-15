@@ -118,7 +118,7 @@
    The WRITTEN BYTES are not describable here, and that is inherited rather
    than lost: writei's range clause is about [data'], which lives inside the
    escrow's parked payload and no caller-held resource names.  The file's
-   OFFSET likewise stays in [FileOff.off_inv]. *)
+   OFFSET likewise stays in the per-slot off-borrow cinv. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -447,12 +447,6 @@ Section SpecFilewrite.
      (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as
         a hypothesis, never a functor (SpecBalloc.v's header) *)
      ⌜printk_gen_contract (fwn_pr fn) (fwn_uart fn) (fwn_disk fn)⌝ ∗
-     (* THE OFF-BORROW INVARIANTS: [f->off] is not a content field, and its
-        [off_wf] bound is what makes writei's joint premise closed (see the
-        header).  The FAMILY, not the slot's -- an environment that may not
-        name the descriptor cannot name [k]; [FileOff.off_invs_lookup]
-        selects the slot at the call. *)
-     off_invs γf ∗
      bio_ctx (fwn_bio fn)
        (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) ∗
      (* THE LOG: begin_op mints the reservation, end_op spends it, and the
@@ -546,7 +540,7 @@ Section SpecFilewrite.
   Proof.
     rewrite /filewrite_fs_env /filewrite_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              _ & Hsbi & Hsbs & Hsbb & Hbits & _ & _ & _ & Hbsl)".
+              Hsbi & Hsbs & Hsbb & Hbits & _ & _ & _ & Hbsl)".
     iFrame "Hsbi Hsbs Hsbb Hbits Hbsl". iPureIntro. reflexivity.
   Qed.
 

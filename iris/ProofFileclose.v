@@ -624,10 +624,29 @@ Section ProofFileclose.
              whole OUTSTANDING total; the invariant's leftover makes it the
              whole slot ([file_rest_join]).  Doing it here, before the reads,
              is what puts every content cell at fraction 1. ---- *)
-      iMod (file_close_last_step γf Mg k Cf q HMk
-              with "Hauth [Hrtok Hrfields Hrpay Hrlv]") as "(Hauth & Hfl & Hpy)".
-      { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay Hrlv". }
-      iDestruct (file_rest_join γf k q Cf Hqt1 with "Hfl Hpy Hrest") as "[Hfl Hpy]".
+      iDestruct (file_rest_join γf k q Cf Hqt1 with "Hrfields Hrpay Hrest")
+        as "[Hfl Hpy]".
+      iDestruct "Hpy" as (pn) "[Hpn Hpl]".
+      iDestruct "Hpl" as "[Hcore Hoh]".
+      (* ---- R-open-1b: RETIRE THE OFF-BORROW CINV, and it has to happen
+             HERE.  The refutation of a stale checked-out state is the
+             liveness COUNT, which reads the authority entry the ghost step
+             below deletes; and the join above is what makes the cancel token
+             whole.  The type is not tested for another two hundred lines, so
+             the cancel is uniform in [file_armed] -- an unarmed body has no
+             disjunction to refute.  What comes back are the two cells, which
+             go straight into a FRESH unarmed cinv for the free slot. ---- *)
+      iApply fupd_wp.
+      iMod (off_hold_cancel ⊤ γf (fp_ocv pn) (file_armed Cf) Mg k q
+              ltac:(solve_ndisj) HMk with "Hoh Hauth Hrlv")
+        as "(Hauth & Hrlv & Hraw)".
+      iMod (off_hold_alloc ⊤ γf k false with "Hraw") as (γo0) "Hoh0".
+      set (pn0 := MkFPNames (fp_lock pn) (fp_pipe pn) (fp_icv pn) (fp_iq pn)
+                    (fp_ig pn) γo0).
+      iMod (fpay_tok_update γf k pn pn0 with "Hpn") as "Hpn".
+      iMod (file_close_last_ghost γf Mg k q HMk with "Hauth Hrtok Hrlv")
+        as "Hauth".
+      iModIntro.
       assert (Hzz : (Z.pos 1 - 1)%Z = 0%Z) by lia.
       iEval (rewrite Hzz) in "Hcell".
       rewrite /file_fields.
@@ -829,12 +848,14 @@ Section ProofFileclose.
       (* ---- the slot goes back FREE, and the payload leaves with us ---- *)
       set (C0 := MkFContent (mword_of_int 0 : mword 32) (fc_readable Cf)
                    (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf) (fc_major Cf)).
-      iDestruct "Hpy" as (pn) "[Hpn Hpl]".
-      iAssert (file_pay γf k 1 C0) with "[Hpn]" as "Hpy0".
-      { iExists pn. iFrame "Hpn". rewrite /file_payload /C0; cbn [fc_type].
+      iAssert (file_pay γf k 1 C0) with "[Hpn Hoh0]" as "Hpy0".
+      { iExists pn0. iFrame "Hpn".
+        rewrite /file_payload /file_core /C0 /pn0; cbn [fc_type fp_ocv].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
         rewrite bool_decide_eq_false_2; [|by vm_compute].
-        rewrite bool_decide_eq_false_2; [|by vm_compute]. done. }
+        rewrite bool_decide_eq_false_2; [|by vm_compute].
+        rewrite (file_armed_none C0 ltac:(rewrite /C0 /FD_NONE; reflexivity)).
+        iSplitR; [done|]. iExact "Hoh0". }
       (* NB: [Hfd] is NOT handed over.  The free arm of [fslot] holds no fd
          slots, and the unit the destroyed reference was accounted by is
          exactly what the postcondition returns -- framing it here would
@@ -1107,9 +1128,9 @@ Section ProofFileclose.
         assert (HP3sp : P3 !!! Regidx csp_rs1 = pa_stk sp0 8)
           by (rewrite (HP3cs csp_rs1 ltac:(vm_compute; reflexivity)); exact HH1sp).
         (* the payload IS the pipe end this call closes *)
-        iEval (rewrite /file_payload Hpipe bool_decide_eq_true_2; [|reflexivity])
-          in "Hpl".
-        iDestruct "Hpl" as "[#Hispipe Hpref]".
+        iEval (rewrite /file_core Hpipe bool_decide_eq_true_2; [|reflexivity])
+          in "Hcore".
+        iDestruct "Hcore" as "[#Hispipe Hpref]".
         iEval (rewrite /fileclose_env Hpipe bool_decide_eq_true_2; [|reflexivity])
           in "Henv".
         rewrite /fileclose_pipe_env.
@@ -1295,9 +1316,9 @@ Section ProofFileclose.
              cancellable invariant rather than a fraction of the reference
              (which does not exist -- see [FileInv.inode_pay]). *)
           iAssert (inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip Cf)
-                     (fc_wbool Cf) 1) with "[Hpl]" as "Hpl".
-          { rewrite /file_payload bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib. iExact "Hpl". }
+                     (fc_wbool Cf) 1) with "[Hcore]" as "Hpl".
+          { rewrite /file_core bool_decide_eq_false_2; [|exact Hnpipe].
+            rewrite Hib. iExact "Hcore". }
           iApply fupd_wp.
           (* THE GATHER IS INSIDE THE CANCEL (B3).  The cinv parks the
              reference SHORT by [fp_iq pn] and the payload's own arm at

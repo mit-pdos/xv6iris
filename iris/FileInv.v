@@ -303,6 +303,42 @@ Section FileInv.
     - apply pos_included in Hlt. lia.
   Qed.
 
+  (* OBLIGATION (b), R-open-1b's form: THE CANCEL, and it is the LAST
+     CLOSER'S move.  fileclose's last-reference arm is the only party that
+     ever again holds fraction one of the slot INSIDE ftable.lock, so it is
+     where the off-borrow cinv is retired and the two cells go back to
+     [fslot]'s free arm for the next filealloc.  Cancelling yields the BODY,
+     disjunction and all; what resolves the disjunction is the COUNT, exactly
+     as [off_acc_excl] resolved it before -- at the last reference the
+     authority records ONE unit and the closer holds it, so the parked one
+     cannot exist.
+
+     Uniform in [armed], because the closer must cancel BEFORE its ghost step
+     (the refutation reads the very entry the step deletes) and the type is
+     not tested until much later; an unarmed body has no disjunction to
+     refute.  fileclose never READS [off] (gcc emits no such load), so this
+     is internal to the lock and [SpecFileclose] does not move. *)
+  Lemma off_hold_cancel (E : coPset) (γ γx : gname) (armed : bool)
+      (M : gmap nat (Qp * positive)) (k : nat) (qt : Qp) :
+    ↑(offN .@ k) ⊆ E ->
+    M !! k = Some (qt, 1%positive) ->
+    off_hold γ k γx armed 1 -∗ ftable_auth γ M -∗ flive_tok γ k
+    ={E}=∗ ftable_auth γ M ∗ flive_tok γ k ∗ off_raw k.
+  Proof.
+    iIntros (HE HM) "[#Hci Hown] [Ha Hl] Hlv".
+    assert (Hml : Mcount M !! k = Some 1%positive)
+      by (rewrite Mcount_lookup HM; reflexivity).
+    iMod (cinv_cancel with "Hci Hown") as "H"; [exact HE|].
+    iMod "H". rewrite /off_content. destruct armed; last first.
+    { iModIntro. rewrite /ftable_auth. iFrame "Ha Hl Hlv". iExact "H". }
+    iDestruct "H" as (ip) "[Hip Hd]".
+    iDestruct "Hd" as "[Hres | [_ Hlv2]]"; last first.
+    { iExFalso. iApply (flive_excl_last γ (Mcount M) k Hml with "Hl Hlv Hlv2"). }
+    iDestruct "Hres" as (v) "[Hc %Hwf]".
+    iModIntro. rewrite /ftable_auth. iFrame "Ha Hl Hlv".
+    iExists ip, v. iFrame. done.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  The three ghost steps, all performed under ftable.lock              *)
   (* ------------------------------------------------------------------ *)
@@ -441,13 +477,12 @@ Section FileInv.
      Note the entry can be deleted at any [qt]: it is the COUNT component
      that is exclusive here, since [positiveR] has no unit, so no frame can
      sit beside a fragment recording the last reference. *)
-  Lemma file_close_last_step γ M k C (qt : Qp) :
+  Lemma file_close_last_ghost γ M k (qt : Qp) :
     M !! k = Some (qt, 1%positive) ->
-    ftable_auth γ M -∗ file_ref γ k qt C ==∗
-    ftable_auth γ (delete k M) ∗ file_fields k qt C ∗
-    file_pay γ k qt C.
+    ftable_auth γ M -∗ fref_tok γ k qt -∗ flive_tok γ k ==∗
+    ftable_auth γ (delete k M).
   Proof.
-    iIntros (HM) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
+    iIntros (HM) "[Ha Hl] Hf Hlv".
     rewrite /ftable_auth /fref_tok.
     assert (Hml : Mcount M !! k = Some 1%positive)
       by (rewrite Mcount_lookup HM; reflexivity).
@@ -475,6 +510,22 @@ Section FileInv.
       assert (Hn' : 1%positive = (1 + nf)%positive) by exact Hn. lia.
     - split; done.
     - split; done.
+  Qed.
+
+  (* the same step with the reference's points-to half framed through -- the
+     shape most callers want.  fileclose's own last-reference arm uses the
+     GHOST half above instead, because it has to cancel the off-borrow cinv
+     first (the refutation reads the entry this step deletes) and by then it
+     holds the joined fraction rather than [qt]. *)
+  Lemma file_close_last_step γ M k C (qt : Qp) :
+    M !! k = Some (qt, 1%positive) ->
+    ftable_auth γ M -∗ file_ref γ k qt C ==∗
+    ftable_auth γ (delete k M) ∗ file_fields k qt C ∗
+    file_pay γ k qt C.
+  Proof.
+    iIntros (HM) "Hauth (Hf & Hc & Hp & Hlv)".
+    iMod (file_close_last_ghost γ M k qt HM with "Hauth Hf Hlv") as "$".
+    iModIntro. iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)

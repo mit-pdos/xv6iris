@@ -77,8 +77,8 @@
    [fileread_pay_carve] below hands them out and takes the share back; the
    per-slot escrow and sleeplock then come out of the two FAMILIES
    ([ic_escrows], [IcacheBoot.ic_sleeplocks]) at the slot the payload named,
-   and the off-borrow invariant out of [FileOff.off_invs] at the slot the
-   CONTRACT names.  The postcondition carries no share at all, so nothing is
+   and the off-borrow CINV comes out of the SAME carve, since it too rides
+   the payload ([FileInvDefs.off_hold]).  The postcondition carries no share at all, so nothing is
    left for the generation to be lost through
    ([SpecIunlock] returns the arity-preserving [inode_shr]; the LEND-HALF /
    KEEP-HALF discipline is what re-pins it -- [inode_shr_regen2]).
@@ -108,15 +108,18 @@
 
    ==== THE OFFSET, AND THE ONE PREMISE IT FORCES =======================
 
-   [f->off] is not a content field: it lives in [FileOff.off_inv] and is
-   BORROWED across the readi call under [ip->lock] (design/file-table.md).
-   fileread is the whole reason that protocol exists.  Two consequences for
-   this contract:
+   [f->off] is not a content field: it lives in a per-slot CANCELLABLE
+   invariant ([FileInvDefs.off_cinv]) and is BORROWED across the readi call
+   under [ip->lock] (design/file-table.md).  fileread is the whole reason
+   that protocol exists.  Two consequences for this contract:
 
-   * the fs environment carries [off_invs γf] -- the FAMILY, since the
-     environment may not name a slot (see above) -- and nothing else about
-     the offset: the value is existential in the invariant, and the
-     invariant's [off_wf] bound is what makes it usable;
+   * the environment carries NOTHING about the offset.  The invariant's
+     assertion and the fraction that opens it ride the descriptor's own
+     payload ([FileInvDefs.off_hold]) and come out of
+     [fileread_pay_carve] -- a fixed persistent FAMILY cannot exist, because
+     the cinv is minted afresh at every open (R-open-1b).  The value is
+     existential in the invariant, and the invariant's [off_wf] bound is what
+     makes it usable;
    * readi's joint numeric premise [off + n < 2^32] has to be discharged from
      a bound on [n] ALONE, because nothing in memory bounds a freshly loaded
      offset.  Hence [MAXFILE * BSIZE + n < 2^31] below -- which is STRONGER
@@ -444,11 +447,6 @@ Section SpecFileread.
      ⌜forall inum : mword 32,
         bv_unsigned inum < 16 * Z.of_nat icfg_nib ->
         IBLOCK inum (frn_inodestart fn) ∈ frn_cov fn⌝ ∗
-     (* THE OFF-BORROW INVARIANTS -- persistent, and the whole reason
-        design/file-table.md's stage 2 exists.  The FAMILY, not the slot's:
-        an environment that may not name the descriptor cannot name [k].
-        [FileOff.off_invs_lookup] selects the slot at the call. *)
-     off_invs γf ∗
      bio_ctx (frn_bio fn)
        (fs_view (frn_fs fn) (frn_disk fn) icfg_dev (frn_cov fn)) ∗
      (* THE THREE PERSISTENT INVARIANTS SpecIlock / SpecIunlock take: the
@@ -503,7 +501,7 @@ Section SpecFileread.
     fileread_fs_env γf fn -∗ fileread_fs_out fn.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & Hsb & _ & _ & _ & Hbs)".
     iFrame "Hsb Hbs".
   Qed.
 
@@ -617,13 +615,16 @@ Section SpecFileread.
   Lemma fileread_pay_carve (γf : gname) (k : nat) (q : Qp) (Cf : fcontent) :
     fc_type Cf = FD_INODE \/ fc_type Cf = FD_DEVICE ->
     file_pay γf k q Cf -∗
-    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16),
+    ∃ (ik : nat) (inum : mword 32) (s : Qp) (g : gname) (ty : bv 16)
+      (γx : gname),
       ⌜fc_ip Cf = ientry ik⌝ ∗ ⌜(ik < NINODE)%nat⌝ ∗
       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
       ⌜fc_wbool Cf = true -> bv_unsigned ty <> T_DIR_z⌝ ∗
       IcacheRef.ity_shot g ty ∗
       IcacheRef.inode_shr_gen ik s icfg_dev inum g ∗
-      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ file_pay γf k q Cf).
+      off_hold γf k γx true q ∗
+      (IcacheRef.inode_shr_gen ik s icfg_dev inum g -∗ off_hold γf k γx true q -∗
+         file_pay γf k q Cf).
   Proof.
     intros Hty. iIntros "(%pn & Hpn & Hpl)".
     assert (Hnp : bool_decide (fc_type Cf = FD_PIPE) = false).
@@ -635,19 +636,22 @@ Section SpecFileread.
       - by rewrite (bool_decide_eq_true_2 (FD_INODE = FD_INODE) eq_refl).
       - by rewrite (bool_decide_eq_true_2 (FD_DEVICE = FD_DEVICE) eq_refl)
                    orb_true_r. }
-    rewrite /file_payload Hnp Hyes /inode_pay.
-    iDestruct "Hpl" as "(#Hci & Hown & Hs & Hwt)".
+    assert (Harm : file_armed Cf = true) by (rewrite /file_armed; exact Hyes).
+    rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
+    iDestruct "Hpl" as "((#Hci & Hown & Hs & Hwt) & Hop)".
     iDestruct "Hs" as (ik inum) "(%Hipk & %Hik & %Hinb & Hshr)".
     iDestruct "Hwt" as (ty) "[#Hshot %Hnd]".
-    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty.
+    iExists ik, inum, (q * fp_iq pn)%Qp, (fp_ig pn), ty, (fp_ocv pn).
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitR; [iExact "Hshot"|].
     (* [iExact], not [iFrame]: both sides are the same FOLDED
        [IcacheRef.inode_shr_gen] and conversion closes it, while the [Frame]
        instance search does not see through the definition. *)
     iSplitL "Hshr"; [iExact "Hshr"|].
-    iIntros "Hshr". iExists pn. iFrame "Hpn".
-    rewrite /file_payload Hnp Hyes /inode_pay.
+    iSplitL "Hop"; [iExact "Hop"|].
+    iIntros "Hshr Hop". iExists pn. iFrame "Hpn".
+    rewrite /file_payload /file_core Hnp Hyes Harm /inode_pay.
+    iSplitR "Hop"; [| iExact "Hop"].
     iSplitR; [iExact "Hci"|]. iSplitL "Hown"; [iExact "Hown"|].
     iSplitL "Hshr"; [iExists ik, inum; iFrame "%"; iExact "Hshr"|].
     iExists ty. iSplitR; [iExact "Hshot"|]. done.

@@ -1513,7 +1513,6 @@ Section ProofFilewrite.
     proc_priv_core pj pidv (upd_upt V PI) -∗
     KvmSpec.kalloc_env ga None -∗
     (* ---- the PERSISTENT half of [filewrite_fs_env] ---- *)
-    off_inv gf kx -∗
     bio_ctx (fwn_bio fn)
       (fs_view (fwn_fs fn) (fwn_disk fn) icfg_dev (fwn_cov fn)) -∗
     log_ctx (fwn_log fn) (fwn_bio fn) (fwn_fs fn) (fwn_cov fn)
@@ -1570,7 +1569,7 @@ Section ProofFilewrite.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
-             #Hoff #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
+             #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
              #Hslks #Hdev #Hgeo #Hdlk Hout Hcont".
     (* PIN THE INDEX.  Same one-liner as the contract's own proof below, and
        needed for the same reason: the body calls THREE [true]-crossing
@@ -1719,8 +1718,8 @@ Section ProofFilewrite.
        names below are local to the iteration and everything derived from
        them is re-derived on the next one. ---- *)
     iDestruct (fileread_pay_carve gf kx qx Cf (or_introl Htyi) with "Hrpay")
-      as (ik inum sh g ty)
-         "(%P8 & %P9 & %P5 & %P10 & #Hty & Hshr & Hpayback)".
+      as (ik inum sh g ty γox)
+         "(%P8 & %P9 & %P5 & %P10 & #Hty & Hshr & Hoh & Hpayback)".
     assert (P3 : IBLOCK inum (fwn_inodestart fn) ∈ fwn_cov fn)
       by (apply P3q; exact P5).
     assert (P4 : IBLOCK inum (fwn_inodestart fn)
@@ -1904,8 +1903,9 @@ Section ProofFilewrite.
     iAssert (off_mark (fc_ip Cf)) with "[Hvalid]" as "Hmark".
     { rewrite /off_mark P8. iExact "Hvalid". }
     iApply fupd_wp.
-    iMod (off_checkout gf kx (DfracOwn (qx/2)) (fc_ip Cf) ⊤
-            ltac:(solve_ndisj) with "Hoff Hcip Hmark Hrlv") as "[Hcip Hoffc]".
+    iMod (off_checkout gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) ⊤
+            ltac:(solve_ndisj) with "Hoh Hcip Hmark Hrlv")
+      as "(Hoh & Hcip & Hoffc)".
     iModIntro.
     iDestruct "Hoffc" as (v) "[Hcell %Hwf]".
     pose proof (bv_unsigned_in_range _ v) as Hvr.
@@ -2214,9 +2214,9 @@ Section ProofFilewrite.
     { intros r Hr N1. rewrite (Hxcs r Hr). exact (HW1cs r Hr N1). }
     (* ---- CHECK IN the cell and REBUILD the checked-out bundle ---- *)
     iApply fupd_wp.
-    iMod (off_checkin gf kx (DfracOwn (qx/2)) (fc_ip Cf) v2 ⊤
-            ltac:(solve_ndisj) Hwf2 with "Hoff Hcip Hcell")
-      as "(Hcip & Hmark & Hrlv)".
+    iMod (off_checkin gf γox kx qx (DfracOwn (qx/2)) (fc_ip Cf) v2 ⊤
+            ltac:(solve_ndisj) Hwf2 with "Hoh Hcip Hcell")
+      as "(Hoh & Hcip & Hmark & Hrlv)".
     iModIntro.
     iAssert (i_valid (ientry ik) ↦₄ valid_word true)%I
       with "[Hmark]" as "Hvalid".
@@ -2309,7 +2309,7 @@ Section ProofFilewrite.
     iEval (rewrite fw_qp_halves) in "Hshr".
     (* ...and back into the payload it came from.  From here the reference is
        intact again and the postcondition carries no share at all. *)
-    iDestruct ("Hpayback" with "Hshr") as "Hrpay".
+    iDestruct ("Hpayback" with "Hshr Hoh") as "Hrpay".
     (* ---- +0xbc jal ra,end_op : the transaction closes at whatever the
            chunk left of its reservation ([SpecEndOp] takes any [u]) ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (FW + 0xbc)) Rra
@@ -2593,7 +2593,7 @@ Section ProofFilewrite.
                   with "Hcg Hcnt Htext Hpc Hpanic Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
-                        Hoff Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
+                        Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
                         Hslks Hdev Hgeo Hdlk Hout Hcont").
     - (* ============ THE SHORT WRITE (and writei's -1): +0xea ============ *)
       iPoseProof (fwri_0ea with "Htext") as "Hiea".
@@ -2976,9 +2976,9 @@ Section ProofFilewrite.
         assert (Htyp : fc_type Cf = FD_PIPE)
           by (apply eq_vec_true_iff; exact Hp1).
         iDestruct "Hrpay" as (pn) "[Hpn Hpl]".
-        iEval (rewrite /file_payload Htyp bool_decide_eq_true_2; [| reflexivity])
-          in "Hpl".
-        iDestruct "Hpl" as "[#Hpipe Hpref]".
+        iEval (rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
+               [| reflexivity]) in "Hpl".
+        iDestruct "Hpl" as "[[#Hpipe Hpref] Hoh]".
         assert (Htgt54 : add_vec (mword_of_int (FW + 0x20) : mword 64)
                   (sign_extend' 64 (mword_of_int 52 : mword 13))
                   = mword_of_int (FW + 0x54))
@@ -3095,7 +3095,7 @@ Section ProofFilewrite.
         iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P' (fwn_used fn)
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
-                        [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hrlv]
+                        [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hoh Hrlv]
                         Hpriv [Henv]").
         { exact Hcsf. }
         { exact Hupt. }
@@ -3105,8 +3105,9 @@ Section ProofFilewrite.
         { rewrite /file_ref /file_fields /file_pay.
           iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrlv".
           iExists pn. iFrame "Hpn".
-          rewrite /file_payload Htyp bool_decide_eq_true_2; [| reflexivity].
-          iFrame "Hpipe Hpref". }
+          rewrite /file_payload /file_core Htyp bool_decide_eq_true_2;
+            [| reflexivity].
+          iFrame "Hpipe Hpref Hoh". }
         { by iApply filewrite_env_out_of_env. }
       + (* ---- +0x24 c.li a4,3 ; +0x26 beq a5,a4 -> +0x5c (FD_DEVICE) ---- *)
         iApply (wp_beq_fall_s_sconf (mword_of_int (FW + 0x20))
@@ -4133,11 +4134,14 @@ Section ProofFilewrite.
                     its [ity_shot] with the [fc_wbool] side condition) are
                     gone, replaced by the two QUANTIFIED geometry facts and
                     the two FAMILIES -- fs-sysfile S4c. *)
-                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E7 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & E18 & E19 & E20 & E21 & #E22 & #E23 & #E24 & E25)".
+                 (* R-open-1b deleted the off-borrow FAMILY from this
+                    environment (the cinv is minted per publication, so no
+                    fixed persistent family can exist); the names below keep
+                    their meanings and the seventh slot is simply gone. *)
+                 iDestruct "Henv" as "(%E1 & %E2 & %E3 & %E4 & %E5 & %E6 & #E8 & #E9 & #E10 & #E11 & #E12 & #E13 & #E14 & #E15 & #E16 & #E17 & E18 & E19 & E20 & E21 & #E22 & #E23 & #E24 & E25)".
                  (* the loop still takes the ONE slot's off-borrow invariant;
                     the environment now carries the family, so it is selected
                     here rather than by the caller. *)
-                 iDestruct (off_invs_lookup γf k Hk with "E7") as "#Eoff".
                  assert (HVid : upd_upt V (pv_upt V) = V) by apply fw_upd_upt_id.
                  (* [cpu_own] IS HART-INDEXED and the loop lemma states it at
                     ITS OWN [CID0]; the walk still holds the ENTRY hart's copy.
@@ -4161,7 +4165,7 @@ Section ProofFilewrite.
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv
-                                 Eoff E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
+                                 E8 E9 E10 E11 E12 E13 E14 E15 E16 E17
                                  E22 E23 E24 [E18 E19 E20 E21 E25]").
                  { rewrite /file_ref /file_fields.
                    iFrame "Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv". }

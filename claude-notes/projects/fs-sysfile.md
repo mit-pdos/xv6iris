@@ -8817,15 +8817,18 @@ two things, in this order:
 The contract was deliberately not written first: fixing a postcondition
 around an arm nobody can reach is what the D₀ stops exist to prevent.
 
-## S7-open — **STOPPED AND REPORTED before any walk instruction.**  The
-## ledger is machine-checked and CLOSES; `SysOpenBudget.v` lands.  The walk
-## is blocked on ONE file-layer resource that does not fit — sys_open is the
-## tree's FIRST WRITER of `f->ip` and `f->off`, and neither cell is writable
-## by an exclusive holder outside the ftable lock.  `SpecSysOpen.v` was NOT
-## written; no frozen file was touched
+## S7-open — **THE FILE-LAYER REPAIR IS LANDED (R-open-1b, below) AND THE
+## LEDGER CLOSES (`SysOpenBudget.v`).  WHAT IS LEFT IS THE WALK:**
+## `SpecSysOpen.v`, `ProofSysOpenParts.v`, `ProofSysOpen*.v`,
+## `LinkSysOpen.v`.  Both blockers are closed -- blocker 1 by the unarmed
+## per-slot cinv, blocker 2 by `create_locked`'s gen-named bundle -- so
+## sys_open may now write `f->ip` and `f->off` holding only its exclusive
+## reference, and the `+1` iref parks in `f->ip` via `inode_pay_alloc`
 
-`SysOpenBudget.v` (+ its `_CoqProject` row) is the whole of what landed, green
-on the mirror, `EXIT=0`.  Everything else in this section is a finding.
+`SysOpenBudget.v` (the machine-checked op-wide ledger) and R-open-1b (the
+file-layer repair, below) are what has landed.  The rest of this section is
+the derivation the walk will be written against: the arm graph, the frame
+map, `K = 138`, the ledger and the resource plan.
 
 ### What sys_open IS (verified against the tracked `kernel.asm`)
 
@@ -8919,8 +8922,9 @@ ARM F-FAIL's extra `fileclose(f)` is free: the file it closes is still
 FD_NONE and `SpecFileclose`'s environment at FD_NONE is empty — pipealloc's
 reason, reused (`SpecFileclose.v`:71-76).
 
-### BLOCKER 1 (fatal, and the reason no walk was written) — **`f->ip` AND
-### `f->off` ARE NOT WRITABLE BY AN EXCLUSIVE HOLDER OUTSIDE THE FTABLE LOCK**
+### BLOCKER 1 — **CLOSED by R-open-1b (below).**  The analysis is kept
+### because it is what the landed shape answers: `f->ip` and `f->off` were
+### not writable by an exclusive holder outside the ftable lock
 
 sys_open is the tree's FIRST WRITER of either cell.  Every existing
 occurrence of `a_fip` is an `ld` (`ProofFileread.v`:1682/1870/2100/2375,
@@ -8962,41 +8966,6 @@ either — `off_body`'s `∃ ip` is shared between the pointer cell and
 **AN OPENER PREMISE CANNOT PATCH IT** (S4's ruling, reused): whoever proved
 the opener would need the authority, so the premise would be unsatisfiable
 and the contract vacuous.
-
-**THE REPAIR, PRICED (recommendation: repair 1).**
-
-*Repair 1 — make the exclusive-holder refutation FRACTION-based.*  Park a
-reference fraction in the checked-out disjunct:
-
-```coq
-Definition off_body γ k : iProp Σ :=
-  (∃ ip, a_fip k ↦₈{#(1/2)} ip ∗
-     (off_resident k ∨ (off_mark ip ∗ flive_tok γ k ∗ ∃ q : Qp, fref_tok γ k q)))%I.
-```
-
-`fref_tok γ k q` is `◯ {[k := (q, 1%positive)]}` (`FileInvDefs.v`:550) whose
-first component is a `frac`, so `fref_tok γ k 1 ∗ fref_tok γ k q ⊢ False` by
-`own_valid` **on the fragment alone** — no authority, hence no lock.  Then:
-
-* `off_checkout` / `off_checkin` gain one input / one output.  Every borrower
-  already holds `fref_tok γ k q` inside its own `file_ref` and splits it, so
-  **no contract moves**: `SpecFileread` / `SpecFilewrite` hand `file_ref` in
-  and out unchanged.  Touches `ProofFileread.v` and `ProofFilewrite.v` bodies.
-* `off_acc_excl` is re-proved from `fref_tok γ k 1` instead of
-  `ftable_auth ∗ flive_tok` — a strictly WEAKER premise, so
-  `ProofFileclose.v`'s call site only drops arguments.
-* NEW, and what sys_open needs: `off_init_ip` and `off_init_off`, two
-  single-instruction accessors for a holder of `fref_tok γ k 1`.  `_ip` hands
-  out the FULL `a_fip` cell (the invariant's half joined to the caller's) and
-  takes it back at a NEW value; `_off` is `off_acc_excl` at the new premise.
-  Two accessors rather than one borrow because the two stores are four bytes
-  apart (+0x84, +0x88) **and the FD_DEVICE arm runs only the second**.
-
-*Repair 2 — strengthen `filealloc`'s post.*  filealloc holds the authority
-at the moment it sets `ref = 1` and could hand the caller an "this slot is
-yours to initialize" token — but nothing carries a resource out of an
-invariant, so the token has to be new per-slot ghost state minted at boot.
-Bigger, and it adds a ghost where repair 1 adds none.  Not recommended.
 
 ### BLOCKER 2 (small, mechanical, sized and NOT started) — **`create_locked`
 ### ERASES THE GENERATION THE FD's PAYLOAD MUST BE KEYED ON**
@@ -9070,12 +9039,13 @@ Nothing else in the walk needed inventing.  The pieces, in order:
   and that is the same ledger sentence as sys_chdir's `p->cwd`, one
   descriptor further along.
 
-### NOT STARTED, honestly
+### WHAT IS LEFT
 
-`SpecSysOpen.v`, `ProofSysOpen*.v`, `LinkSysOpen.v`.  The contract was not
-written because blocker 1 decides one of its premises (repair 1 adds nothing
-to it; repair 2 would add a token), and a contract written against the wrong
-answer is worse than none.
+`SpecSysOpen.v`, `ProofSysOpenParts.v`, `ProofSysOpen*.v`, `LinkSysOpen.v`,
+their `_CoqProject` rows and the coverage flip.  The contract's premises are
+now decided: R-open-1b adds NOTHING to it (the two cells never leave the
+slot -- they live in the reference's own cinv and the publisher cancels it),
+so the resource plan recorded above is the plan.
 
 ### Gate
 
@@ -9226,238 +9196,95 @@ marker cannot be one").  The sizing reinvented the refuted shape one
 component over.  **Check a proposed parked witness against that sentence
 before pricing anything built on it.**
 
-### R-open-1b — THE DESIGN, AND IT HITS THE RULING'S OWN STOP CONDITION.
-### `SpecFileread` / `SpecFilewrite` MUST MOVE, so nothing was edited
+### R-open-1b — **LANDED, AND ITS SHAPE CHANGED IN ONE PLACE THAT REMOVED
+### TWO OF THE THREE RULED SIGNATURE MOVES.**  The off-borrow invariant is a
+### per-slot cinv that is UNARMED while the slot is untyped; `SpecFilealloc`,
+### `SpecFileclose` and `fslot` do not move at all, and blocker 1 is closed
 
-The transplant is exact and the file layer already contains it one field
-over.  `fpnames` (`FileInvDefs.v`:242-244) is
-`{ fp_lock; fp_pipe; fp_icv : gname; fp_iq : Qp; fp_ig : gname }`, where
-`fp_icv` is ALREADY a cancellable invariant's name and `inode_pay`
-(`FileInvDefs.v`:629-633) already carries `cinv fileipN γx (…)` (persistent,
-so it rides every share) beside `cinv_own γx q` (proportional, so fraction
-one is the cancel).  The `off` cell simply joins that discipline.
+The ruled shape put the two cells (`f->off`, and the invariant's half of
+`f->ip`) into `fslot`'s FREE arm, handed them out of `filealloc`'s post, and
+had `fileclose`'s last-reference arm put them back.  **That is refuted by one
+caller.**  sys_open's ARM F-FAIL and pipealloc's two error paths call
+`fileclose` on a file that is still `FD_NONE`, so at `FD_NONE` the last
+closer would need the cells — i.e. they would have to enter
+`SpecFileclose`'s environment, whose `FD_NONE` arm is `emp` and is *proved*
+so by `SpecFileclose.fileclose_env_none`, which `ProofSysClose`, `ProofKexit`,
+`ProofSysPipe` and `ProofSysFstat` all use.  A caller closing a descriptor of
+unknown type could not supply them.  The ruled shape's boundary is therefore
+wrong at `FD_NONE`, and the fix is not a premise but a lifetime.
 
-**THE SHAPE, VERBATIM.**
-
-```coq
-(* FileInvDefs.v -- one new field *)
-Record fpnames := MkFPNames
-  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp;
-    fp_ig : gname; fp_ocv : gname }.                    (* NEW *)
-
-(* FileOff.v -- the body is UNCHANGED; only its wrapper moves *)
-Definition off_body (γ : gname) (k : nat) : iProp Σ :=
-  (∃ ip : mword 64,
-     a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗
-     (off_resident k ∨ (off_mark ip ∗ flive_tok γ k)))%I.
-
-Definition off_cinv (γ γx : gname) (k : nat) : iProp Σ :=
-  cinv (offN .@ k) γx (off_body γ k).                   (* was [inv] *)
-
-(* FileInvDefs.v -- the token rides the payload, proportionally *)
-Definition off_pay (pn : fpnames) (γ : gname) (k : nat) (q : Qp) : iProp Σ :=
-  (off_cinv γ (fp_ocv pn) k ∗ cinv_own (fp_ocv pn) q)%I.
-```
-
-with `off_pay` added to `file_pay γ k q C`'s body **inside the existing
-`∃ pn`** — so `file_ref γ k q C` keeps its arity, its four components and
-its every consumer.  That is the `is_sleeplock` precedent the ruling named,
-and it works for the BORROWER exactly as the constraint hoped: a borrower
-opens with `cinv_acc` at its own `q`, runs the unchanged marker protocol
-inside, and hands `file_ref γf k q Cf` back at the same fraction.
-
-**WHY THE INITIALIZER NEVER FACES THE DISJUNCTION.**  Cancelling is not what
-resolves it — cancelling yields the BODY, disjunction and all, and the
-initializer still could not refute the checked-out arm.  What resolves it is
-that **`filealloc` does the refutation, inside the lock, with the authority
-it already holds** (`FileInv.flive_excl_last`, exactly as `off_acc_excl`
-does today).  filealloc cancels slot `k`'s off-cinv, refutes the checked-out
-arm, and hands the caller the two cells outright:
+**THE SHAPE THAT LANDED.**  A slot carries an off-cinv for its WHOLE
+referenced life, and the cinv is ARMED exactly on the two types that borrow
+the cell:
 
 ```coq
-(* SpecFilealloc.v -- the post MOVES, as ruled *)
-Definition filealloc_post (γf γ : gname) (r : mword 64) : iProp Σ :=
-  (⌜r = zero_reg⌝ ∗ fd_slot
-   ∨ ∃ (k : nat) (Cf : fcontent) (ip : mword 64) (v : mword 32),
-       ⌜(k < NFILE)%nat /\ r = fnode k /\ fc_type Cf = FD_NONE /\ off_wf v⌝ ∗
-       file_ref γf k 1 Cf ∗
-       a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗ a_foff k ↦₄ v)%I.
+Definition off_raw (k : nat) : iProp Σ :=                     (* the cells *)
+  (∃ ip v, a_fip k ↦₈{#(1/2)} ip ∗ a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+Definition off_content γ k (armed : bool) : iProp Σ :=
+  (if armed then off_body γ k else off_raw k)%I.
+Definition off_hold γ k γx armed q : iProp Σ :=
+  (cinv (offN .@ k) γx (off_content γ k armed) ∗ cinv_own γx q)%I.
+
+Definition file_armed (C : fcontent) : bool :=
+  (bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE))%bool.
+Definition file_payload γ k q pn C : iProp Σ :=
+  (file_core q pn C ∗ off_hold γ k (fp_ocv pn) (file_armed C) q)%I.
 ```
 
-The initializer then holds the FULL `f->ip` cell (its own half out of
-`file_fields` joined to the one filealloc handed over), writes both cells
-with no invariant in the way, allocates a FRESH `off_cinv` and records its
-name with `fpay_tok_update` — the same single ghost step that publishes
-`inode_pay`'s names, so sys_open performs ONE update, not two.
+`file_core` is the OLD `file_payload` verbatim (the pipe / inode / `emp`
+if-tree), so `file_payload_split` is now `file_core_split ∗ off_hold_split`
+and every existing unfold site gains `/file_core` and one slot.
 
-**AT FD_NONE THERE IS NO OFF-CINV, AND THAT IS THE RIGHT INVARIANT.**
-`file_payload`'s FD_NONE arm is already `emp`; a slot with no payload has no
-off-cinv either, and the two are created and cancelled by the same parties
-at the same moments.  So `off_pay` belongs INSIDE `file_payload`'s typed
-arms, not beside them, and the free-slot leftover (`FileInv.file_rest`)
-carries the two cells instead.
+**WHY THE UNARMED ARM IS BLOCKER 1'S WHOLE ANSWER.**  Cancelling an ARMED
+cinv yields `off_body`, disjunction and all, and the exclusive publisher
+still cannot refute the checked-out arm — that is the structural obstruction
+stop 13 recorded and it is untouched.  Cancelling an UNARMED one yields
+`off_raw` outright: there is nothing to refute.  sys_open and pipealloc hold
+`file_ref γ k 1 Cf` at `FD_NONE`, hence `cinv_own γx 1`, so they cancel,
+write both cells with no lock and no invariant in the way, mint an ARMED cinv
+with `off_hold_alloc` and record its name in the SAME `fpay_tok_update` that
+installs the payload's names.  One ghost step, not two.
 
-**THE HONEST CANCEL SITE IS `fileclose`'s LAST-REFERENCE ARM** — confirmed
-against the zero-consumers finding.  fileclose never READS `off` (gcc emits
-no such load, and `ProofFileclose.v` / `SpecFileclose.v` do not `Require
-FileOff` at all), but the last closer is the only party that ever again
-holds fraction one *inside the lock*, so it is where the cinv must be
-cancelled and the two cells returned to `file_rest` for the next
-`filealloc`.  It is internal to the lock, so **`SpecFileclose` does not
-move**; `ProofFileclose`'s last-reference arm gains the cancel.
-`ProofPipealloc` gains the mirror move (it now receives the two cells and
-allocates the cinv when it publishes FD_PIPE).
+**AND A PIPE IS NEVER ARMED**, because `file_armed` names only the two types
+that borrow: `FD_NONE -> FD_PIPE` changes neither the flag nor the name, so
+`ProofPipealloc` performs no cinv step at all — it keeps `fp_ocv` when it
+overwrites `fpnames` and threads one conjunct through.  That is the honest
+statement of the fact that a pipe's `off` is dead memory.
 
-**AND HERE IS THE STOP.**  `SpecFileread.v`:450 and `SpecFilewrite.v`:454
-both take **`off_invs γf`** — the fixed persistent family
-`[∗ list] k ∈ seq 0 NFILE, inv (offN .@ k) (off_body γf k)` — in their fs
-environments.  Under R-open-1b that family **cannot exist**: the cinv's name
-is per-slot AND changes on every open (a cancelled cinv can never be
-re-armed at the same `γ`, and `cinv_alloc` mints a fresh one), so there is
-no fixed persistent constant to hand down.  The borrower must instead read
-the assertion out of its own `file_ref` — which it can, `off_cinv` being
-persistent and riding `off_pay` — and **`off_invs γf` is DELETED from both
-environments**.
+**WHAT MOVED, AND IT IS ONLY THE TWO PREMISE DELETIONS.**
+`SpecFileread.v`'s and `SpecFilewrite.v`'s fs environments lose `off_invs γf`
+— a cinv minted per publication cannot have a fixed persistent family, which
+is the ruling's own stop condition and stands.  A borrower reads the
+assertion out of its OWN reference instead: `fileread_pay_carve` grew two
+outputs (`γx` and `off_hold γf k γx true q`) and its return closure one
+argument, and it serves both borrowers (`ProofFileread` and
+`ProofFilewrite` both call it).  `FileOff.off_invs` / `off_invs_lookup` /
+`off_inv_alloc` / `off_invs_alloc` / `off_acc_excl` retire; `FileOff.v` is
+the PROTOCOL only (`off_checkout` / `off_checkin`, over `off_hold … true`),
+its definitions having moved down beside `inode_pay` in `FileInvDefs.v` as
+the layering note ruled.
 
-That is a signature move on two frozen contracts, which the ruling said to
-stop and report before touching.  It is a WEAKENING (a premise removed, no
-premise added), so `SpecSysRead` / `SpecSysWrite` and their walks gain
-nothing to discharge and only drop a conjunct; `FileOff.off_invs` /
-`off_invs_lookup` / `off_invs_alloc` retire with it, which also settles
-`FileOff.v`:293-297's flagged boot hole — **there is nothing to mint at
-boot any more.**  The BSS's zeroed cells go into `file_rest` at boot
-instead, where `ftable_ghosts_alloc` already has to put the rest of a free
-slot, and the first `filealloc` hands them out.  That is strictly less boot
-wiring than the family was going to need.
+`SpecFilealloc`'s post, `SpecFileclose`'s environment, `FileInvDefs.fslot`
+and `SpecFilestat`'s contract are **unchanged**.
 
-Ripple, measured: `FileInvDefs.v` (the record + `file_payload`/`file_pay`
-bodies) and `FileInv.v` (`file_rest`, the alloc/close steps) are the
-expensive ones — everything with a `proc_priv` in scope recompiles.
-`FileOff.v` + four consumers + six call sites is the cheap half
-(`ProofFileread.v`:1808/2075/2349, `ProofFilewrite.v`:1906/2216).
+**THE ONE PROOF-SIDE REORDERING, and the reason for it.**  `fileclose`'s
+last-reference arm must retire the cinv BEFORE its ghost step: the refutation
+of a stale checked-out state is the liveness COUNT, which reads the very
+authority entry `file_close_last_step` deletes.  So the arm now runs
+`file_rest_join` first (the cancel wants fraction ONE of the token), then
+`off_hold_cancel`, then `off_hold_alloc … false` for the free slot it puts
+back, then a `fpay_tok_update`, and only then the ghost step — which is why
+`FileInv.file_close_last_ghost` was split out of `file_close_last_step`
+(the latter is now derived from it in three lines).  The cancel is uniform in
+`file_armed`, which is what lets it happen two hundred lines before the type
+is tested.
 
-### R-open-1b LAYERING — **FEASIBLE IN ONE FILE, WITH ZERO NEW IMPORTS.**
-### The cinv redesign belongs in `FileInvDefs.v`, and `FileOff.v` becomes the
-### protocol layer over it (offset-independent; checked during the pin-bump
-### pause)
-
-The obvious objection to the shape — "`file_payload` would have to mention
-`off_cinv`, which lives in `FileOff.v`, which is ABOVE `FileInvDefs.v`" — does
-not bite.  Every ingredient of `off_body` is already in scope at
-`FileInvDefs.v`:
-
-* `a_fip` / `a_foff` are DEFINED there (`FileInvDefs.v`:117-118);
-* `flive_tok` is DEFINED there (`FileInvDefs.v`:538);
-* `i_valid` — `off_mark`'s cell — is `IcacheRef.v`:113, and `FileInvDefs.v`
-  already `Require Import IcacheRef` (line 77) for `inode_pay`;
-* `cancelable_invariants` is already imported (line 69), for the same reason.
-
-So `off_resident` / `off_mark` / `off_body` / `off_cinv` / `off_pay` all move
-DOWN into `FileInvDefs.v` beside `inode_pay`, which is where the discipline
-they are copying already lives, and `FileOff.v` keeps exactly what it should:
-the PROTOCOL — `off_checkout` / `off_checkin` (obligation (a)) and the
-exclusive accessor (obligation (b)) — over definitions it no longer owns.
-`off_wf` stays where it is (it is a pure bound on a `mword 32` and
-`SpecFileread` / `SpecFilewrite` name it).
-
-Two consequences worth having before the redesign starts:
-
-* **The expensive cone is paid ONCE, not twice.**  `FileInvDefs.v` recompiles
-  everything with a `proc_priv` in scope whichever way this is arranged; the
-  layering above means `FileOff.v`'s own four consumers are the only ADDITION
-  to that cone, rather than `FileInvDefs` and `FileOff` each dragging one.
-* **`FileOff.v`:293-297's flagged boot hole is not filled, it is DELETED.**
-  With the cinv minted by whoever publishes a payload (`sys_open`,
-  `pipealloc`) and cancelled by whoever retires one (`fileclose`'s
-  last-reference arm), there is nothing per-slot to mint at boot: the BSS's
-  zeroed cells go into `FileInv.file_rest` with the rest of a free slot, and
-  the first `filealloc` hands them out.  `off_inv_alloc` / `off_invs_alloc` /
-  `off_invs` / `off_invs_lookup` all retire together.
-
-Still STOPPED on the ruling's own condition (`off_invs` must leave
-`SpecFileread`'s and `SpecFilewrite`'s environments); the layering result
-above does not change that and is orthogonal to it.
-
-### R-open-1b — THE FULL SITE LIST AND THE TWO SHAPE CORRECTIONS.  The
-### `file_ref` unfold check is IN, the free-slot home is settled, and the
-### "zero new imports" claim was WRONG BY ONE.  Nothing edited
-
-**1. THE `file_ref` UNFOLD CHECK (ruling item 3): 21 SITES, AND 19 OF THEM
-ARE BYTE-STABLE ANYWAY.**  `file_ref`'s ARITY does not move (the cinv share
-goes inside `file_pay`, inside its existing `∃ pn`), so a site that unfolds
-`file_ref` and reassembles it while framing `file_pay` WHOLE does not move.
-Sorted by how deep they reach:
-
-* `/file_ref` + `/file_fields` only, `file_pay` framed opaquely — **byte
-  stable**: `ProofFiledup.v`:382; `ProofFilestat.v`:1298, 1377;
-  `ProofFileclose.v`:473, 628; `ProofFileread.v`:577, 1312, 1479, 1550,
-  2231, 2506; `ProofFilewrite.v`:2378, 2795, 3390, 3530, 3592, 3791, 4165.
-* reach into `/file_pay` — **2 sites move**: `ProofFileread.v`:920,
-  `ProofFilewrite.v`:3104.
-* reach into `/file_payload` — **8 sites move**: `ProofFileclose.v`:833,
-  1109, 1298; `ProofFileread.v`:745, 923; `ProofFilewrite.v`:2978, 3107;
-  and one in a SPEC, `SpecFileread.v`:637.
-* construct `fpnames` — **4 sites, all in one proof body**:
-  `ProofPipealloc.v`:1578, 1579, 1585, 1596, plus the `Inhabited` populate
-  at `FileInvDefs.v`:247.  **NO Spec names an `fpnames` literal and no Spec
-  signature mentions the record**, so adding `fp_ocv` moves no contract.
-
-**2. SHAPE CORRECTION A — `file_payload`'s FD_NONE ARM CANNOT HOLD THE
-CELLS, BECAUSE IT MUST SPLIT.**  The natural reading of "a free slot has no
-payload and no off-cinv, so put its cells where the payload would be" is
-wrong: `file_payload_split` (`FileInvDefs.v`:772) is a `⊣⊢` at every arm,
-and two full points-tos do not split.  The cells' home is the FREE-SLOT arm
-of `FileInv.fslot` (`FileInvDefs.v`:845-856), which is the ftable lock's own
-per-slot shape, is not required to split, and is exactly where both parties
-that touch it already stand — `filealloc` when it hands them out and
-`fileclose`'s last closer when it puts them back:
-
-```coq
-  Definition fslot (γ : gname) (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
-    match M !! k with
-    | None =>
-        (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
-         ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗ file_pay γ k 1 C ∗
-              (* R-open-1b: between the fileclose that cancelled the cinv and
-                 the filealloc that hands them to the next initializer, the
-                 off cell and the ip half live HERE. *)
-              ∃ (ip : mword 64) (v : mword 32),
-                a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗ a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I
-    | Some (q, n) => (* unchanged *)
-    end.
-```
-
-So the cinv exists **only while a slot is typed**, which is the exact
-lifetime `inode_pay`'s already has — the parallel is tighter than the first
-sketch, not looser.
-
-**3. SHAPE CORRECTION B — "ZERO NEW IMPORTS" WAS WRONG BY ONE, AND THE ONE
-IS SAFE.**  `off_body`'s ingredients are all in scope at `FileInvDefs.v` as
-recorded.  **`off_wf` is not**: it is `bv_unsigned v <= MAXFILE * BSIZE`,
-`MAXFILE` is `InodeInv.v`:75 and `BSIZE` is `FsCrash.v`:77, and
-`FileInvDefs.v` reaches NEITHER transitively.  The free-slot shape above
-needs the bound, so `off_wf` must come down with the rest.
-
-Checked, and it is safe: `InodeInv.v` and `FsCrash.v` sit BELOW the file
-table and mention `FileInv` nowhere (`grep -c FileInv` is 0 in both), so
-`Require Import InodeInv FsCrash` in `FileInvDefs.v` closes no cycle —
-`FileOff.v` already requires both, which is the standing evidence.  Do NOT
-take the alternative of inlining `268 * 1024`: it duplicates a constant the
-inode layer owns, and the guiding principle is explicit about that.
-
-**4. THE EXECUTION ORDER, so the tree is green at every commit.**  The
-`FileInvDefs.v` cone is the whole cost and must be paid ONCE, so the
-definitional move, the record field, the `fslot` arm, the `FileOff.v`
-protocol restatement, the two Spec premise deletions and the ten moving
-proof sites are **one commit, one gate** — there is no green intermediate
-that splits them, because the moment `file_pay` gains a conjunct every site
-in list 1's second and third groups fails together.  Order within it:
-`FileInvDefs.v` (record + `off_*` definitions + `file_payload`/`file_pay` +
-`fslot`) -> `FileInv.v` (the alloc/close steps) -> `FileOff.v` (protocol
-only; `off_invs`/`off_invs_lookup`/`off_inv_alloc`/`off_invs_alloc` deleted)
--> `SpecFileread.v`/`SpecFilewrite.v` (premise deletion) -> the ten proof
-sites -> `ProofPipealloc.v` (mint) -> `ProofFileclose.v` (cancel) -> the
-sys_read/sys_write application sites.
+**BOOT.**  `off_invs_alloc` retiring does not delete the boot obligation, it
+relocates it: `ftable_ghosts_alloc`'s free slot now needs an UNARMED cinv per
+slot beside its `fpay_tok`, minted from the BSS's zeroed cells inside
+`ftable_res` — i.e. inside the lock, where the rest of a free slot already
+is, and not a family threaded through any environment.  The ftable lock is
+still unwired at boot, so nothing calls it yet.
 
 ### THE BUMP RE-DERIVATION (`XV6_REV` -> `f60ff58`) — **sys_open DID NOT
 ### RESHAPE.**  Every symbol-relative offset, the frame, and the register
@@ -9688,10 +9515,8 @@ are character-for-character IDENTICAL, a near-duplicate pair the guiding
 principle would hoist.
 
 **DELTA 2 — `SpecFilealloc` LOST ITS PANIC CREDENTIAL** (`4e2e0cec`, the
-`acquire`-panic-is-dead sweep across 17 specs).  It is one of the seventeen.
-That is free for R-open-1b, which rewrites that post anyway — but it means
-the post being rewritten is the POST-SWEEP one, and the pre-merge text in
-this file's R-open-1b section is stale by one premise.
+`acquire`-panic-is-dead sweep across 17 specs).  Free: R-open-1b as landed
+does not touch that post at all.
 
 **DELTA 3 — `d42cdd33` MADE THE INODE SLEEPLOCKS TRACKED, and it reached
 eight of my walk's contracts.**  `sleeplocked γisl` is now

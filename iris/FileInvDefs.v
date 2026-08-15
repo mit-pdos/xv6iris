@@ -79,6 +79,11 @@ Require Import IcacheRef.
    the number is stated once, where [IcacheEscrow.ic_loaded]'s [dir_ok]
    states it (design fs-icache.md §17.6 (5)). *)
 Require Import DirView.
+(* for [MAXFILE] and [BSIZE] alone -- [off_wf], the bound the off cell carries,
+   is stated over the inode layer's two constants, and the cell now lives here
+   (R-open-1b).  Neither file mentions the file table, so this closes no cycle. *)
+Require Import InodeInv.
+Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -238,15 +243,30 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    because a live reference PINS the generation: a bump needs the slot's
    whole liveness unit, which does not exist while any share is outstanding
    ([IcacheInv.live_slot_alloc] at the recycle, [IcacheInv.live_slot_regen]
-   at iput's REF-1 free window -- and this fd's share refutes both). *)
+   at iput's REF-1 free window -- and this fd's share refutes both).
+
+   [fp_ocv] IS THE OFF-BORROW CINV'S NAME, and it is [fp_icv]'s exact status
+   one field over (R-open-1b).  [off] is not a content field -- it is mutable
+   under ip->lock by a holder of an arbitrarily small fraction -- so its cell
+   lives in a per-slot invariant that is BORROWED across the instructions that
+   use it ([FileOff.v]).  That invariant cannot be permanent: sys_open is the
+   table's first WRITER of [f->ip] and [f->off], and an exclusive holder
+   outside ftable.lock has no credential that refutes a stale checked-out
+   state.  So it is CANCELLABLE, minted by whoever publishes a payload
+   (sys_open, pipealloc) and cancelled by whoever retires one (fileclose's
+   last-reference arm), and it exists exactly while the slot is TYPED -- the
+   same lifetime [inode_pay]'s cinv already has.  A borrower opens it with
+   [cinv_own] at its own fraction, which is why the token rides [file_payload]
+   proportionally ([off_hold]).  See [off_hold] for why it is UNARMED until
+   the slot is typed. *)
 Record fpnames := MkFPNames
   { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp;
-    fp_ig : gname }.
+    fp_ig : gname; fp_ocv : gname }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
               (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
-              1%positive 1%Qp 1%positive).
+              1%positive 1%Qp 1%positive 1%positive).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -405,6 +425,47 @@ Lemma pos_op_add (a b : positive) : (a ⋅ b) = (a + b)%positive.
 Proof. reflexivity. Qed.
 Lemma pos_succ_1_add (b : positive) : Pos.succ (1 + b) = (2 + b)%positive.
 Proof. lia. Qed.
+
+(* ------------------------------------------------------------------ *)
+(*  [off]: the namespace and the value bound                           *)
+(* ------------------------------------------------------------------ *)
+
+(* one namespace, one cancellable invariant per slot *)
+Definition offN : namespace := nroot .@ "fileoff".
+
+(* THE VALUE BOUND.  An offset never exceeds MAXFILE*BSIZE, and this is not
+   decoration: readi's contract demands [off + n < 2^31] and NOTHING IN MEMORY
+   bounds a freshly loaded [off], so without a bound in the invariant fileread
+   cannot call readi at all.  The bound is inductive: the BSS starts zeroed,
+   sys_open writes 0, and every advance is [off + r] with [r] clamped by
+   readi/writei to the file's size, which is itself bounded by MAXFILE*BSIZE.
+   A pipe or device file never writes the cell. *)
+Definition off_wf (v : mword 32) : Prop :=
+  bv_unsigned v <= Z.of_nat MAXFILE * Z.of_nat BSIZE.
+
+Lemma off_wf_zero : off_wf (mword_of_int 0 : mword 32).
+Proof.
+  rewrite /off_wf.
+  assert (Hz : bv_unsigned (mword_of_int 0 : mword 32) = 0) by reflexivity.
+  rewrite Hz. unfold MAXFILE, BSIZE. lia.
+Qed.
+
+(* an offset in range is BELOW int range, which is what makes the [lw] that
+   loads it read the literal (and readi's [off + n < 2^31] premise
+   dischargeable from a bound on [n] alone). *)
+Lemma off_wf_lt31 (v : mword 32) : off_wf v -> bv_unsigned v < 2 ^ 31.
+Proof.
+  rewrite /off_wf. unfold MAXFILE, BSIZE. intro H.
+  assert (E : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+  rewrite E. lia.
+Qed.
+
+(* Timelessness of the word points-to the off invariant puts in its body --
+   typeclass search does not unfold a [Definition] on its own, exactly as
+   [RiscvPtsto.word4_pointsto_timeless]'s comment says. *)
+Global Instance word_pointsto_timeless' `{!riscvGS Σ} (a : Arch.pa) (dq : dfrac)
+    (w : bv 64) : Timeless (word_pointsto a dq w).
+Proof. rewrite /word_pointsto. apply _. Qed.
 
 Section FileInv.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
@@ -747,6 +808,157 @@ Section FileInv.
     apply singleton_update, cmra_update_exclusive. done.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  [off]: the per-slot CANCELLABLE borrow invariant                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ---- full ownership of a word is EXCLUSIVE ----
+     [mem_pointsto_ne] at one address is a contradiction; that is all this
+     is, and it is what refutes a stale marker / a stale resident cell. *)
+  Lemma word4_pointsto_excl (a : Arch.pa) (dq : dfrac) (w1 w2 : bv 32) :
+    a ↦₄ w1 -∗ a ↦₄{dq} w2 -∗ False.
+  Proof.
+    iIntros "H1 H2".
+    rewrite !word4_pointsto_unfold.
+    iDestruct "H1" as "[_ H1]". iDestruct "H2" as "[_ H2]".
+    change (seq 0 4) with ([0; 1; 2; 3]%nat).
+    iDestruct "H1" as "[Hb1 _]". iDestruct "H2" as "[Hb2 _]".
+    iDestruct (mem_pointsto_ne with "Hb1 Hb2") as %Hne.
+    iPureIntro. exact (Hne eq_refl).
+  Qed.
+
+  Definition off_resident (k : nat) : iProp Σ :=
+    (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+
+  (* the borrower's marker: the inode's [valid] flag, which ilock hands out
+     at 1 and which no fs.c callee below ilock touches.  It is EXCLUSIVE, it
+     is keyed by the INODE'S ADDRESS (unlike a ghost-named token, which a
+     second borrower has no way to match) and it is CLOSED -- the value is
+     pinned at 1 -- so what a borrower takes back on return is provably what
+     it parked.  See FileOff.v's header for the full argument. *)
+  Definition off_mark (ip : mword 64) : iProp Σ :=
+    (i_valid ip ↦₄ (mword_of_int 1 : mword 32))%I.
+
+  (* THE BODY.  It holds, for the life of the invariant, HALF OF THE [f->ip]
+     CELL -- which is how it knows WHICH INODE governs this slot's offset, and
+     hence how two borrowers of one slot exclude each other (both would have
+     to hold that inode's lock).  [file_fields] holds the other half, at half
+     the nominal fraction, for exactly this reason. *)
+  Definition off_body (γ : gname) (k : nat) : iProp Σ :=
+    (∃ ip : mword 64,
+       a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗
+       (off_resident k ∨ (off_mark ip ∗ flive_tok γ k)))%I.
+
+  (* Proven STRUCTURALLY, one connective at a time, not by a single
+     [apply _] over the whole unfolded body.  The monolithic search
+     backtracks across the ∃/∗/∨ tower and the two points-to abstractions
+     underneath it: 12.7 s for a fact whose every leaf instance already
+     exists.  (The general rule is in claude-notes/optimization.md.) *)
+  Global Instance off_body_timeless γ k : Timeless (off_body γ k).
+  Proof.
+    rewrite /off_body /off_resident /off_mark.
+    apply bi.exist_timeless; intro ip.
+    apply bi.sep_timeless; [apply _ |].
+    apply bi.or_timeless.
+    - apply bi.exist_timeless; intro v.
+      apply bi.sep_timeless; [apply _ | apply _].
+    - apply bi.sep_timeless; [apply _ | apply _].
+  Qed.
+
+  (* THE TWO CELLS, PLAIN -- what the publisher writes and what the last
+     closer puts back.  [off_body]'s resident disjunct IS this. *)
+  Definition off_raw (k : nat) : iProp Σ :=
+    (∃ (ip : mword 64) (v : mword 32),
+       a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗ a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
+
+  Lemma off_raw_body (γ : gname) (k : nat) : off_raw k -∗ off_body γ k.
+  Proof.
+    iIntros "(%ip & %v & Hip & Hc & %Hwf)".
+    iExists ip. iFrame "Hip". iLeft. iExists v. iFrame. done.
+  Qed.
+
+  Global Instance off_raw_timeless k : Timeless (off_raw k).
+  Proof.
+    rewrite /off_raw.
+    apply bi.exist_timeless; intro ip.
+    apply bi.exist_timeless; intro v.
+    apply bi.sep_timeless; [apply _ |].
+    apply bi.sep_timeless; [apply _ | apply _].
+  Qed.
+
+  (* ---- ARMED AND UNARMED, AND WHY BOTH ----
+
+     The cells cannot ride a reference as points-to fractions (they do not
+     split, and [file_payload_split] is a ⊣⊢ at every arm), and they cannot
+     live in a PERMANENT invariant either: sys_open is the table's first
+     WRITER of [f->ip] and [f->off], it holds the exclusive reference with
+     ftable.lock RELEASED, and nothing it can hold refutes a stale
+     checked-out disjunct ([flive_tok] is fraction-free but composes; any
+     fractional witness comes back existentially quantified, which is not
+     what its depositor needs -- the thirteenth stop, fs-sysfile.md).
+
+     A CANCELLABLE invariant answers both, exactly as [inode_pay]'s does one
+     field over -- the assertion is persistent so it rides every share, and
+     the FRACTION is the cancel.  What makes the publisher's write work is
+     that the invariant is UNARMED while the slot is untyped: its body is
+     then the two cells with NO disjunction, so [cinv_cancel] at fraction one
+     hands them over outright and there is nothing to refute.  The publisher
+     writes them, mints an ARMED one -- whose body carries the borrow
+     protocol's resident/checked-out disjunction -- and records its name in
+     [fpnames] with the SAME [fpay_tok_update] that installs the payload's.
+     [fileclose]'s last-reference arm cancels whichever it finds (with the
+     authority, inside the lock, which is what refutes the checked-out arm)
+     and mints an unarmed one for the free slot it puts back.
+
+     So a slot carries an off-cinv for its whole referenced life, ARMED
+     exactly while it is typed -- and neither [FileInvDefs.fslot],
+     [SpecFilealloc]'s post nor [SpecFileclose]'s environment moves.  The
+     name is per-slot and changes on every publication, which is why no fixed
+     persistent FAMILY of off-invariants can exist and no environment carries
+     one. *)
+  Definition off_content (γ : gname) (k : nat) (armed : bool) : iProp Σ :=
+    (if armed then off_body γ k else off_raw k)%I.
+
+  Global Instance off_content_timeless γ k armed : Timeless (off_content γ k armed).
+  Proof. rewrite /off_content. destruct armed; apply _. Qed.
+
+  Definition off_hold (γ : gname) (k : nat) (γx : gname) (armed : bool)
+      (q : Qp) : iProp Σ :=
+    (cinv (offN .@ k) γx (off_content γ k armed) ∗ cinv_own γx q)%I.
+
+  Lemma off_hold_split γ k γx armed q1 q2 :
+    off_hold γ k γx armed (q1 + q2) ⊣⊢
+    off_hold γ k γx armed q1 ∗ off_hold γ k γx armed q2.
+  Proof.
+    rewrite /off_hold cinv_own_fractional. iSplit.
+    - iIntros "(#Hi & H1 & H2)". iFrame "Hi H1 H2".
+    - iIntros "[(#Hi & H1) (_ & H2)]". iFrame "Hi H1 H2".
+  Qed.
+
+  (* THE MINT, one lemma for both arms: an armed body's resident disjunct is
+     the raw cells ([off_raw_body]). *)
+  Lemma off_hold_alloc (E : coPset) (γ : gname) (k : nat) (armed : bool) :
+    off_raw k ={E}=∗ ∃ γx : gname, off_hold γ k γx armed 1.
+  Proof.
+    iIntros "Hraw". rewrite /off_hold.
+    iMod (cinv_alloc E (offN .@ k) (off_content γ k armed) with "[Hraw]")
+      as (γx) "[#Hi Hown]".
+    { iNext. rewrite /off_content. destruct armed; [| iExact "Hraw"].
+      by iApply off_raw_body. }
+    iModIntro. iExists γx. iFrame "Hi Hown".
+  Qed.
+
+  (* THE UNARMED CANCEL: no disjunction, hence no credential beyond the
+     token.  THIS IS WHAT LETS sys_open AND pipealloc WRITE [f->ip] AND
+     [f->off] WITH NO LOCK HELD -- blocker 1's whole answer. *)
+  Lemma off_hold_cancel_raw (E : coPset) (γ : gname) (k : nat) (γx : gname) :
+    ↑(offN .@ k) ⊆ E -> off_hold γ k γx false 1 ={E}=∗ ▷ off_raw k.
+  Proof.
+    iIntros (HE) "[#Hi Hown]".
+    iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
+    iModIntro. iExact "H".
+  Qed.
+
   (* [f->writable] as the BOOL that indexes the pipe's two ends -- the same
      bool pipeclose takes as its second argument, and the truth value of the
      byte fileclose loads with [lbu]. *)
@@ -761,8 +973,17 @@ Section FileInv.
 
      The free state pins [fc_type = FD_NONE], so a free slot carries no
      payload -- which is the real xv6 invariant: fileclose writes FD_NONE
-     before releasing, and the BSS starts zeroed. *)
-  Definition file_payload (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
+     before releasing, and the BSS starts zeroed.
+
+     THE OFF-BORROW CINV RIDES THE TYPED ARMS (R-open-1b).  A slot with no
+     payload has no off-borrow invariant either: the two are created and
+     cancelled by the same parties at the same moments, so the cinv exists
+     exactly while the slot is typed, and a FREE slot's two cells live in
+     [fslot]'s free arm instead.  That is also why the assertion cannot sit
+     beside the payload rather than inside it -- [file_payload_split] is a
+     ⊣⊢ at every arm and two full points-tos do not split, while
+     [cinv]/[cinv_own] do. *)
+  Definition file_core (q : Qp) (pn : fpnames) (C : fcontent) : iProp Σ :=
     (if bool_decide (fc_type C = FD_PIPE)
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
           pipe_ref (fp_pipe pn) (fc_wbool C) q
@@ -770,10 +991,10 @@ Section FileInv.
      then inode_pay (fp_icv pn) (fp_iq pn) (fp_ig pn) (fc_ip C) (fc_wbool C) q
      else emp)%I.
 
-  Lemma file_payload_split q1 q2 pn C :
-    file_payload (q1 + q2) pn C ⊣⊢ file_payload q1 pn C ∗ file_payload q2 pn C.
+  Lemma file_core_split q1 q2 pn C :
+    file_core (q1 + q2) pn C ⊣⊢ file_core q1 pn C ∗ file_core q2 pn C.
   Proof.
-    rewrite /file_payload.
+    rewrite /file_core.
     case_bool_decide as Hp; [|case_match].
     - rewrite pipe_ref_split. iSplit.
       + iIntros "(#Hi & H1 & H2)". iSplitL "H1"; (iSplitR; [iExact "Hi"|iFrame]).
@@ -782,11 +1003,40 @@ Section FileInv.
     - by rewrite left_id.
   Qed.
 
+  (* THE CINV IS ARMED EXACTLY ON THE TWO TYPES THAT BORROW [off].  Only
+     fileread's and filewrite's FD_INODE / FD_DEVICE arms ever touch the
+     cell; a pipe's [off] is dead memory, so an FD_PIPE file keeps the
+     UNARMED cinv it was allocated with and pipealloc has no ghost step to
+     perform.  One predicate rather than a case analysis, because fileclose's
+     last-reference arm has to retire the cinv long before the type is
+     tested. *)
+  Definition file_armed (C : fcontent) : bool :=
+    (bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE))%bool.
+
+  Lemma file_armed_none C : fc_type C = FD_NONE -> file_armed C = false.
+  Proof. intro Ht. rewrite /file_armed Ht. by vm_compute. Qed.
+
+  Lemma file_armed_pipe C : fc_type C = FD_PIPE -> file_armed C = false.
+  Proof. intro Ht. rewrite /file_armed Ht. by vm_compute. Qed.
+
+  Definition file_payload (γ : gname) (k : nat) (q : Qp) (pn : fpnames)
+      (C : fcontent) : iProp Σ :=
+    (file_core q pn C ∗ off_hold γ k (fp_ocv pn) (file_armed C) q)%I.
+
+  Lemma file_payload_split γ k q1 q2 pn C :
+    file_payload γ k (q1 + q2) pn C ⊣⊢
+    file_payload γ k q1 pn C ∗ file_payload γ k q2 pn C.
+  Proof.
+    rewrite /file_payload file_core_split off_hold_split. iSplit.
+    - iIntros "[[H1 H2] [O1 O2]]". iFrame.
+    - iIntros "[[H1 O1] [H2 O2]]". iFrame.
+  Qed.
+
   (* the payload with its names quantified -- the form a reference carries,
      since nothing outside the file layer names a pipe's ghosts.  It still
      JOINS, because the names ghost makes the two shares agree. *)
   Definition file_pay (γ : gname) (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
-    (∃ pn, fpay_tok γ k q pn ∗ file_payload q pn C)%I.
+    (∃ pn, fpay_tok γ k q pn ∗ file_payload γ k q pn C)%I.
 
   Lemma file_pay_split γ k q1 q2 C :
     file_pay γ k (q1 + q2) C ⊣⊢ file_pay γ k q1 C ∗ file_pay γ k q2 C.
