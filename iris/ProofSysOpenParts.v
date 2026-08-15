@@ -777,8 +777,17 @@ Section ProofSysOpenPublish.
       inode_blocks gfs bm data.
   Proof.
     iIntros "(%data & %Hok & %Hdir & Hlnk & Hat & Hmeta & Haddr & Hind & Hblk)".
-    iExists data. iFrame "%". iFrame "Hlnk Hat Hmeta Hblk".
-    rewrite /inode_map. iFrame "Haddr Hind".
+    (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
+       [inode_blocks] tail is large (171 s at this site). *)
+    iExists data.
+    iSplit; [iPureIntro; exact Hok |].
+    iSplit; [iPureIntro; exact Hdir |].
+    iSplitL "Hlnk"; [iExact "Hlnk" |].
+    iSplitL "Hat"; [iExact "Hat" |].
+    iSplitL "Hmeta"; [iExact "Hmeta" |].
+    iSplitL "Haddr Hind".
+    { rewrite /inode_map. iSplitL "Haddr"; [iExact "Haddr" | iExact "Hind"]. }
+    iExact "Hblk".
   Qed.
 
   (* ...and the close direction at itrunc's outputs. *)

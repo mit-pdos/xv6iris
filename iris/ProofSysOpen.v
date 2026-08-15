@@ -1005,6 +1005,11 @@ Section ProofSysOpenBody.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID17)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    (* Fix the fact before elaborating the large application: an inline
+       [ltac:(set_solver)] here sees its unresolved evars and the whole
+       function context. *)
+    assert (Husedsub : used ∖ bm_blocks bm ⊆ used)
+      by (apply subseteq_difference_l; reflexivity).
     iApply (so_tail_pub (CID0 := CID17) gf gs jx gl gu gd gk pd pav pu bn g
               gfs gi cn gil gisl cov logstart bmapstart inodestart size
               icfg_dev used kk qi s gy inum (di_trunc dn) bm_empty kf fd l C pn
@@ -1012,7 +1017,7 @@ Section ProofSysOpenBody.
               eb b lks w6 (word_of_words lo om) w24 bp
               HKiu HKeo HK24 Kpop Hkk eq_refl Hinb Hgeom Hj Hgl Hlkempty Hkf
               Hfdlt Hlen Hfrees eq_refl Htyor eq_refl Hdir Hwf
-              ltac:(set_solver) Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
+              Husedsub Hsp0 Hitsp Hitthr Hits1 Hits3 Hal
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
                     Hitinv Hesck Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hkeep Hfref Hflive Hflds Hfpn Hfip2 Hfoff
