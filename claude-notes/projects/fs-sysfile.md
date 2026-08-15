@@ -8782,3 +8782,280 @@ the zeroing's ticket on every success arm and finding 2 blocks the T_DIR
 sub-arm on top of it.  Writing the contract before the two are ruled on
 would fix a postcondition around an arm nobody can reach, which is what
 the D₀ stops exist to prevent.
+
+## S7-open — **STOPPED AND REPORTED before any walk instruction.**  The
+## ledger is machine-checked and CLOSES; `SysOpenBudget.v` lands.  The walk
+## is blocked on ONE file-layer resource that does not fit — sys_open is the
+## tree's FIRST WRITER of `f->ip` and `f->off`, and neither cell is writable
+## by an exclusive holder outside the ftable lock.  `SpecSysOpen.v` was NOT
+## written; no frozen file was touched
+
+`SysOpenBudget.v` (+ its `_CoqProject` row) is the whole of what landed, green
+on the mirror, `EXIT=0`.  Everything else in this section is a finding.
+
+### What sys_open IS (verified against the tracked `kernel.asm`)
+
+`KernelSyms.sys_open` = 0x800050a6, **342 bytes**, a 24-slot frame
+(`addi sp,sp,-192`), `s0 = sp+192`.  `omode` is at `s0-180` = **the UPPER word
+of slot 1**; `path[128]` is slots 2..17; slot 18 is dead; s3@152, s2@160,
+s1@168, s0@176, ra@184.
+
+**THE CALLEE-SAVES ARE SHRINK-WRAPPED, AND THAT IS THE WALK'S REAL SHAPE.**
+The prologue pushes only ra and s0.  `c.sdsp s1,168` is at **+0x28**, AFTER
+the `argstr < 0` branch; `sd s2,160` at **+0x5e**, after the T_DEVICE test;
+`sd s3,152` at **+0x68**, after `filealloc` succeeded.  The epilogue at +0xca
+restores only ra/s0 and every arm reloads exactly the subset it saved
+(+0xd8/+0x10a/+0x116 reload s1; +0x12e reloads s1+s2; +0x126 s3 then falls
+into +0x12e; the success tail +0xc4 reloads all three).  So **the frame carve
+is ARM-DEPENDENT** — unlike sys_chdir's and sys_link's, where the prologue
+saves everything and one `*_frame_join` serves every exit.  ARM 0 never owns
+slot 21 at all.
+
+The arm graph, entry-to-exit:
+
+    +0x08  jal argint (a1 = s0-180, a0 = 1)      the omode cell
+    +0x12  jal argstr (a0 = 0, a1 = path, a2 = 128)
+    +0x24  bltz a5 -> +0xca                      [ARM 0] no begin_op, -1
+    +0x2a  jal begin_op
+    +0x2e  lw a5,-180(s0); andi 512; beqz -> +0xdc
+      +0x38  create(path, T_FILE, 0, 0); s1 = a0
+      +0x48  beqz a0 -> +0xd2                    [ARM A-FAIL] end_op; -1
+      +0xdc  namei(path); s1 = a0
+      +0xe6  beqz a0 -> +0x10c                   [ARM B-FAIL] end_op; -1
+      +0xe8  jal ilock          (a0 STILL the returned pointer)
+      +0xec  lh a4,68(s1); li a5,1; bne -> +0x4a
+      +0xf6  lw a5,-180(s0); beqz -> +0x5e       (omode == O_RDONLY: join)
+      +0xfc  iunlockput; end_op; -1              [ARM C-FAIL]
+    ---- THE JOIN at +0x4a, ip LOCKED on BOTH sides ----
+    +0x4a  lh a4,68(s1); li a5,3; bne -> +0x5e
+    +0x54  lhu a4,70(s1); li a5,9; bltu a5,a4 -> +0x116   [ARM D-FAIL]
+    +0x60  jal filealloc; s2 = a0; beqz -> +0x12e          [ARM E-FAIL]
+    +0x6a  jal fdalloc;   s3 = a0; bltz -> +0x126          [ARM F-FAIL]
+    +0x74  lh a4,68(s1); li a5,3; beq -> +0x140  (the FD_DEVICE writes)
+    +0x7e  li a5,2; sw a5,0(s2); sw zero,32(s2)  f->type = FD_INODE; f->off = 0
+    +0x88  sd s1,24(s2)                          f->ip = ip
+    +0x8c  lw a5,-180(s0); andi 1; xori 1; sb    f->readable
+    +0x9c  andi a4,a5,3; snez; sb                f->writable
+    +0xa8  andi a5,a5,1024; beqz -> +0xb8
+    +0xae  lh a4,68(s1); li a5,2; beq -> +0x14e  itrunc(ip)
+    +0xb8  iunlock(ip); end_op; a0 = s3          [ARM S] and the epilogue
+
+**THE `major` BOUNDS CHECK IS ONE UNSIGNED TEST, NOT TWO.**  The C is
+`ip->major < 0 || ip->major >= NDEV`; gcc emitted `lhu` + `bltu 9 <u a4`.
+A negative `short` zero-extends to `>= 0x8000 > 9`, so the single unsigned
+compare decides both disjuncts and the walk has ONE branch to price, not a
+short-circuit pair.
+
+**NO 4 -> 2 CARVE, SO `ProofSysMknod`'s LOCAL PAIR GETS NO SECOND CONSUMER
+FROM HERE.**  `omode` is an `int` and every read of it is an `lw`
+(+0x2e, +0xf6, +0x8c, +0xa8); the only halfword traffic is `lh` on inode
+fields, which `inode_meta` already hands out at `↦₂`, and `sh` into
+`f->major`, which `FileInvDefs.file_fields` already holds at `↦₂`.  So
+sys_open needs `InstrBytes.word_pointsto_split4` on slot 1 and nothing else,
+and the hoist of `word4_pointsto_split2` out of `ProofSysMknod.v` stays
+correctly deferred.
+
+`K_sys_open = 138` (24 slots over create's 114).  Checked against every
+callee: create 114, namei 106, fileclose `8 + K_iput` = 68, iunlockput 64,
+argstr 60, end_op 58, itrunc 50, ilock 44, begin_op 26, iunlock 26, argint
+18, filealloc 14, fdalloc 14.
+
+### The ledger, and it CLOSES — `SysOpenBudget.v`
+
+The whole ledger turns on what the two entry arms leave AT THE JOIN.  The
+else arm leaves nine (ten less at most one `walk_spend`); the O_CREATE arm
+can offer only `SpecCreate`'s `ok = true` floor, which is `iput_units` —
+**three** — and three is EXACTLY what each of ARMs D/E/F spends on its
+`iunlockput`.  `so_join_exact`.  Recorded refutations:
+
+* `so_counted_namei_busts` — the counted `wp_namei_sconf` wants twelve of
+  the ten at `L = 3`, and at `L = 2` leaves one where the join needs three.
+  sys_chdir's ruling, at a longer tail.
+* `so_create_nofloor_busts` — without S6-mkdir's `ok = true` floor the
+  create arm reaches the join with a bare `u' <= u`, whose corner is zero.
+  **The floor is not a convenience for this walk; it is the walk.**
+* `so_trunc_closes` — and the surprise: the O_TRUNC tail is payable out of
+  create's THREE with no credit, because `it_entry false u = S (S u)` — the
+  whole free of a file's blocks costs two, every `bfree` hitting the one
+  bitmap block and the tail flush the one inode block.  sys_open could not
+  supply `crb`/`cru` in any case: create's post reports `Sb ⊆ Sb'` and never
+  a membership (`so_trunc_credit_would_gain` prices what that costs: one).
+
+ARM F-FAIL's extra `fileclose(f)` is free: the file it closes is still
+FD_NONE and `SpecFileclose`'s environment at FD_NONE is empty — pipealloc's
+reason, reused (`SpecFileclose.v`:71-76).
+
+### BLOCKER 1 (fatal, and the reason no walk was written) — **`f->ip` AND
+### `f->off` ARE NOT WRITABLE BY AN EXCLUSIVE HOLDER OUTSIDE THE FTABLE LOCK**
+
+sys_open is the tree's FIRST WRITER of either cell.  Every existing
+occurrence of `a_fip` is an `ld` (`ProofFileread.v`:1682/1870/2100/2375,
+`ProofFilestat.v`:628/798/911, `ProofFileclose.v`:773,
+`ProofFilewrite.v`:1798/1987/2234), and nothing anywhere writes `a_foff`
+except through the borrow protocol.
+
+* `FileInvDefs.v`:429-436 — `file_fields k q C` holds
+  `a_fip k ↦₈{DfracOwn (q/2)}`, i.e. **HALF the `f->ip` cell even at q = 1**,
+  and does not mention `off` at all.
+* `FileOff.v`:161-164 — `off_body γ k` holds the OTHER half of `a_fip`
+  (recording the inode the slot names) and the `a_foff` cell, under
+  `off_resident k ∨ (off_mark ip ∗ flive_tok γ k)`.
+* `FileOff.v`:264-287 — `off_acc_excl`, the ONLY accessor written for an
+  exclusive holder, takes **`ftable_auth γ M`**: the checked-out disjunct is
+  refuted by `flive_excl_last`, which needs the authority.  That authority
+  lives in the ftable LOCK, and it is why the accessor's one existing
+  consumer is `fileclose`, which is *inside* the lock when it reads
+  `ff = *f`.
+* `SpecFilealloc.v`:63-67 — `filealloc_post`'s success arm hands out
+  `file_ref γf k 1 Cf` and nothing else.  (Its header, `SpecFilealloc.v`:18-21,
+  still says "fraction 1 of all seven content cells, so the caller (sys_open,
+  pipealloc) can initialize them with no lock held" — **that sentence is stale
+  since the FileOff swap** and is what hid the gap.  pipealloc writes only
+  `f->type` and `f->pipe`, so it never met it.)
+
+sys_open holds `file_ref γf k 1 Cf` with the lock RELEASED.  To store
+`sd s1,24(s2)` it needs the invariant's half of `a_fip`; to store
+`sw zero,32(s2)` it needs the `a_foff` cell.  Opening `off_inv` for either
+requires refuting the checked-out disjunct, and **nothing sys_open holds can
+do it**: `flive_tok γ k` is `◯ {[k := 1%positive]}` over `positiveR`, so two
+fragments compose to `2` and are valid without the authority; and
+`off_mark ip` is `i_valid ip ↦₄ 1` at the invariant's OWN recorded inode
+(`fc_ip Cf`, the recycled slot's stale pointer), which is not the inode
+sys_open just locked.  Putting the disjunct back UNTOUCHED does not help
+either — `off_body`'s `∃ ip` is shared between the pointer cell and
+`off_mark`, so a store to `f->ip` invalidates the checked-out arm's payload.
+
+**AN OPENER PREMISE CANNOT PATCH IT** (S4's ruling, reused): whoever proved
+the opener would need the authority, so the premise would be unsatisfiable
+and the contract vacuous.
+
+**THE REPAIR, PRICED (recommendation: repair 1).**
+
+*Repair 1 — make the exclusive-holder refutation FRACTION-based.*  Park a
+reference fraction in the checked-out disjunct:
+
+```coq
+Definition off_body γ k : iProp Σ :=
+  (∃ ip, a_fip k ↦₈{#(1/2)} ip ∗
+     (off_resident k ∨ (off_mark ip ∗ flive_tok γ k ∗ ∃ q : Qp, fref_tok γ k q)))%I.
+```
+
+`fref_tok γ k q` is `◯ {[k := (q, 1%positive)]}` (`FileInvDefs.v`:550) whose
+first component is a `frac`, so `fref_tok γ k 1 ∗ fref_tok γ k q ⊢ False` by
+`own_valid` **on the fragment alone** — no authority, hence no lock.  Then:
+
+* `off_checkout` / `off_checkin` gain one input / one output.  Every borrower
+  already holds `fref_tok γ k q` inside its own `file_ref` and splits it, so
+  **no contract moves**: `SpecFileread` / `SpecFilewrite` hand `file_ref` in
+  and out unchanged.  Touches `ProofFileread.v` and `ProofFilewrite.v` bodies.
+* `off_acc_excl` is re-proved from `fref_tok γ k 1` instead of
+  `ftable_auth ∗ flive_tok` — a strictly WEAKER premise, so
+  `ProofFileclose.v`'s call site only drops arguments.
+* NEW, and what sys_open needs: `off_init_ip` and `off_init_off`, two
+  single-instruction accessors for a holder of `fref_tok γ k 1`.  `_ip` hands
+  out the FULL `a_fip` cell (the invariant's half joined to the caller's) and
+  takes it back at a NEW value; `_off` is `off_acc_excl` at the new premise.
+  Two accessors rather than one borrow because the two stores are four bytes
+  apart (+0x84, +0x88) **and the FD_DEVICE arm runs only the second**.
+
+*Repair 2 — strengthen `filealloc`'s post.*  filealloc holds the authority
+at the moment it sets `ref = 1` and could hand the caller an "this slot is
+yours to initialize" token — but nothing carries a resource out of an
+invariant, so the token has to be new per-slot ghost state minted at boot.
+Bigger, and it adds a ghost where repair 1 adds none.  Not recommended.
+
+### BLOCKER 2 (small, mechanical, sized and NOT started) — **`create_locked`
+### ERASES THE GENERATION THE FD's PAYLOAD MUST BE KEYED ON**
+
+This is the ledger story of the walk, and it is otherwise fully designed:
+sys_open's `+1` inode reference never leaves — it is parked in `f->ip` as
+`FileInvDefs.inode_pay`, and `FileInvDefs.v`:696-707's `inode_pay_alloc` was
+written FOR this caller ("sys_open runs `inode_held_shed_gen` first, reads
+`g` off it, discharges the witness against ilock's postcondition ... and only
+then installs the names").  It needs `inode_shr_held_gen v Q g` AND
+`ity_shot g ty` **at ONE `g`**.
+
+* the **else arm needs nothing**: sys_open sheds namei's `inode_held` itself,
+  names the parent's generation with `IcacheRef.inode_ref_short_gen_intro`,
+  pins it against the share it lends ilock with
+  `IcacheRef.inode_ref_short_shr_gen_agree` (`IcacheRef.v`:1281-1287), and
+  re-pins iunlock's generation-erased return against the parent it kept.
+  (No halving needed — `ProofFilewrite`'s `fw_shr_regen` trick keeps a half
+  SHARE because it has no parent; sys_open keeps the parent.)
+* the **O_CREATE arm cannot**: `SpecCreate.v`:456 states the payout's
+  retained parent as `inode_ref_short k (qi + s) qi dev inum`,
+  generation-ERASED, while the same bundle's `ic_deposit … (DepShr s dev inum g)`
+  and `ity_shot g (di_type dn)` are at a named `g`.  Nothing sys_open holds
+  links the two, and `SpecIunlock.v`:167 gives the share back erased as well
+  (S3g's recorded finding).
+
+**THE FIX IS A DELETION.**  `ProofCreate` already holds the parent
+generation-named and throws the name away immediately before every
+`create_locked_mk`: `ProofCreate.v`:3846, 5334, 5954, 6699, 8424 each read
+`iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp"`.  So:
+
+1. `SpecCreate.v`: `create_locked`'s last conjunct becomes
+   `inode_ref_short_gen k (qi + s)%Qp qi dev inum g` (`g` is ALREADY a
+   parameter of `create_locked`), and `create_locked_mk`'s premise with it.
+2. `ProofCreate.v`: delete the five `inode_ref_short_gen_forget` lines and
+   pass `Hckeep` straight through.
+3. `ProofSysMkdir.v` / `ProofSysMknod.v`: one `inode_ref_short_gen_forget`
+   after the `iDestruct` of `create_locked`, before `wp_iunlockput_*`.
+
+The alternative — adding `g` to `SpecIunlock`'s postcondition, which S3g
+already flagged as "the cleaner long-term fix" — is ALSO true and ALSO
+provable (the share the escrow returns is literally
+`ic_dep_own k (DepShr s dev inum g)`'s, `IcacheEscrow.v`:762-775), but it
+touches five consumers' proof bodies where this touches three, and sys_open
+does not need it once the parent is named.
+
+### WHAT THE RESOURCE PLAN LOOKS LIKE, since it is otherwise settled
+
+Nothing else in the walk needed inventing.  The pieces, in order:
+
+* `proc_priv` goes down WHOLE to create (it wants `cwd_ref`), and is SPLIT
+  with `ProcInv.proc_priv_split` only for `fdalloc`, which takes
+  `proc_priv_core` + `proc_ofiles_owe … D` — the exact shape B2's sweep
+  built.  `ProcInv.proc_ofiles_repay` (`ProcInv.v`:395-411) settles the
+  descriptor's deficit from the `file_ref`, one line, after the fields are
+  written.  There is no `file_ref`/`proc_priv` collision here: filealloc runs
+  long after create returned.
+* `dir_links` across `itrunc` is free — the guard is `ip->type == T_FILE`, so
+  `DirLinks.dir_links_not_dir` and `DirView.dir_ok_not_dir` rebuild
+  `IcacheEscrow.ic_loaded` at `(di_trunc dn, bm_empty)` with
+  `ic_mk_loaded`.  itrunc's `dn0` is the `ic_loaded`'s own `dn`, so
+  `di_type_stable` / `di_nlink_stable` are reflexive.
+* the `wr = true -> ty <> T_DIR` witness `inode_pay_alloc` demands is THE
+  theorem of this walk, and both arms discharge it from the code:
+  O_CREATE passes `T_FILE` (and the F-OK arm reports
+  `di_type dn ∈ {T_FILE, T_DEVICE}`), while the else arm's +0xf6 test forces
+  `omode = O_RDONLY = 0` on any `T_DIR` inode, whence
+  `f->writable = (omode & 1) || (omode & 3) = 0`.
+* `iref_slots 3` is the premise (`create_slots`), not chdir's 2, and the
+  success arm ends at `ns - 1`: **the unit stays out, parked in `f->ip`** —
+  and that is the same ledger sentence as sys_chdir's `p->cwd`, one
+  descriptor further along.
+
+### NOT STARTED, honestly
+
+`SpecSysOpen.v`, `ProofSysOpen*.v`, `LinkSysOpen.v`.  The contract was not
+written because blocker 1 decides one of its premises (repair 1 adds nothing
+to it; repair 2 would add a token), and a contract written against the wrong
+answer is worse than none.
+
+### Gate
+
+`coqc SysOpenBudget.v` on the mirror, `EXIT=0`, zero `Error`.  No frozen file
+touched; `lemma_diff` has nothing to say (one new file, no deletions, no
+`Axiom`).  `tools/proof_coverage.py --check` exits 0 with the new
+`_CoqProject` row.  No `Link` file, so no `Print Assumptions` to report and
+the coverage count is unchanged at 182/190.
+
+**MIRROR NOTE.**  The sys_unlink lane is live on the same box and had
+`InodeRegion.v` / `IregLinkNz.v` / `IcacheBoot.v` dirty with a full rebuild in
+flight; the first `coqc` of this file failed with *"Compiled library
+xv6iris.SpecCreate makes inconsistent assumptions over library
+xv6iris.InodeRegion"*, which is the stale-`.vo` trap wearing a sibling's
+clothes.  Waiting on `SpecCreate.vo -nt InodeRegion.vo` was the right probe
+and it cleared in one pass — cheaper than any `make -q`, which the
+durable notes already say lies here.
