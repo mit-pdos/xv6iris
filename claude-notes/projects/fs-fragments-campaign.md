@@ -11,7 +11,7 @@ diverged from the design's sketches, and what is left.
 |---|---|---|---|---|
 | **F1a** | the pure tree type, `dir_view` (first-match), `dir_names_unique`, `node_rep`, `node_rep_inj`, `path_at` | `FsTree.v` (new) | none | **LANDED** |
 | **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | **LANDED** |
-| **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | QUEUED |
+| **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | **LANDED** |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
 | **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + the unlanded root clause + C′ | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | — | F1b | NOT STARTED |
@@ -74,6 +74,26 @@ filter/complement carve) is what makes it a SLICE rather than a second
 predicate, and the whole frame law is `big_sepM_union` — free, exactly as
 §2(iv) promised.
 
+### F1.5b — `iris/DirLinks.v`, additive only
+
+`dir_link_at_zeroed` / `dir_link_at_unlink` / `dir_links_unlink`: zeroing a
+live non-self record's slot collapses its ticket and RELEASES one `ilink`,
+`dir_links_dirlink`'s exact inverse. 137 lines, zero deletions, nothing
+existing in the file touched. `Print Assumptions` on all three: **closed
+under the global context**.
+
+**Why it was owed.** Insert had a full resource story here
+(`dir_link_at_dirlink` and its two siblings); delete had only the refcount
+half — `InodeRegion.ireg_write_unlink` is the kernel's one nlink-LOWERING
+region write, it CONSUMES an `ilink` as it lowers, and it has no caller
+because nothing on the DirLinks side ever released the ticket out of a
+zeroed record. These three close the asymmetry.
+
+`dir_link_at_unlink` takes a LIVE-HOME premise, and that is not a
+convenience: a grey record's target already has `di_nlink = 0`, there is no
+count to lower, and the conversion S7 performs there is §20.17.4's different
+move. Zero consumers today (sys_unlink has only `CodeSysUnlink.v`).
+
 ## Divergences from the verification report's sketches
 
 The report (fs-fragments.md §1–§6) was written against the tree three merges
@@ -119,6 +139,25 @@ back. These differ at the code level; none moves a ruling.
    free inodes and `fs_rep` would stop being a statement about the file
    system. `node_rep_alloc` is the resulting one-liner, and it is what
    `fnode` hands a caller that needs allocatedness.
+
+## How the gates were run, and the trap in them
+
+Compiles are mirror-only. Two things about that are worth keeping:
+
+- **The mirror's `.vo` tree can be bulk-touched by a coordinator sync, and
+  then `make` validates NOTHING while reporting success.** A whole-tree
+  rsync plus a `touch` of every `.vo` leaves each `.vo` newer than each
+  `.v`; `make` says "Nothing to be done for 'real-all'" with zero compile
+  lines, which is indistinguishable at a glance from a real green cone. The
+  tell is `ls --time-style=full-iso`: identical timestamps to the NANOSECOND
+  across unrelated files. The fix — reverse transitive closure out of
+  `.CoqMakefile.d`, `rm` those `.vo`, rebuild — is now a durable-notes rule.
+- **`DirLinks.v`'s cone is 142 files**, and the only two that consume the
+  ticket lemmas at all are `ProofCreate.v` and `ProofSysLink.v`
+  (`SpecDirlink.v` and `SpecSysLink.v` name them in prose only). Both are in
+  the cone and both must recompile unchanged; that is F1.5b's whole gate,
+  and it passed: 143 files, `EXIT=0`, zero `Error` lines, with
+  `ProofCreate.v` and `ProofSysLink.v` the last two to finish.
 
 ## Owed, and where it lives
 

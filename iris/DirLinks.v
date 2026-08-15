@@ -514,4 +514,141 @@ Section DirLinks.
     iIntros "Hx". iApply (dir_link_at_of_ilink self dn' data k with "Hx").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  (vii) THE ALGEBRA'S INVERSE: THE EDGE-DELETE CONSTRUCTOR            *)
+  (*        design: claude-notes/design/fs-fragments.md R9 / §6           *)
+  (*                fs-icache.md §20.6's sys_unlink row                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* WHY THIS IS OWED, AND WHY IT LANDS AHEAD OF ITS CALLER.  Insert has a
+     full resource story here ([dir_link_at_dirlink] and its two siblings)
+     and delete has only the REFCOUNT half: [InodeRegion.ireg_write_unlink]
+     is the kernel's one nlink-LOWERING region write and it CONSUMES an
+     [ilink] as it lowers -- and it has no caller.  Nothing on THIS side
+     ever released the ticket out of a zeroed record, so the fragment the
+     region write demands could not be produced.  That asymmetry is the
+     single clearest statement of why the constructor is owed; these three
+     lemmas close it.
+
+     ZERO CONSUMERS TODAY.  sys_unlink does not exist (only CodeSysUnlink.v
+     -- no spec, no proof), and the fragment layer above ([FsRep.v]) is the
+     other future consumer.  Nothing existing in this file moves. *)
+
+  (* THE EMPTIED SLOT CARRIES NOTHING.  A record whose inum halfword is zero
+     is exactly what [dir_liveb] -- and hence [dirlookup]'s scan -- skips,
+     so its ticket is [emp] and is free.  This is the delete-side twin of
+     [dir_links_size_zero]: the resource does not have to be found, it has
+     to be shown absent. *)
+  Lemma dir_link_at_zeroed (self : Z) (dn' : dinode)
+      (data' : nat -> list (bv 8)) (k0 : nat) :
+    dir_inum data' k0 = bv_0 16 ->
+    ⊢ dir_link_at self dn' data' k0.
+  Proof.
+    intros Hz. rewrite /dir_link_at /dir_liveb /dir_freeb Hz.
+    rewrite (bool_decide_eq_true_2 (bv_0 16 = bv_0 16) eq_refl).
+    cbn [negb andb]. done.
+  Qed.
+
+  (* **THE HALF [dir_links_unlink] IS BUILT ON, AND THE INVERSE OF
+     [dir_link_at_dirlink].**  A live non-self record under a LIVE home
+     carries an [ilink] and nothing else -- the grey disjunct is refuted
+     where it stands, exactly as in [dir_link_at_live] -- so removing the
+     record RELEASES that [ilink], which is precisely the fragment
+     [ireg_write_unlink] consumes as it lowers the target's [nlink].
+
+     The home-live premise is not a convenience: a GREY record's target has
+     [di_nlink = 0] already and there is no count to lower, so the
+     conversion S7 performs there is a different move (§20.17.4) and not
+     this one. *)
+  Lemma dir_link_at_unlink (self : Z) (dn : dinode)
+      (data : nat -> list (bv 8)) (k0 : nat) :
+    bv_unsigned (di_nlink dn) <> 0 ->
+    dir_live data k0 ->
+    bv_unsigned (dir_inum data k0) <> self ->
+    dir_link_at self dn data k0 -∗ ilink (bv_unsigned (dir_inum data k0)).
+  Proof.
+    intros Hnl Hlv Hself. iIntros "H".
+    iDestruct (dir_link_at_live self dn data k0 Hnl with "H") as "H".
+    rewrite /dir_ilink_at.
+    rewrite (proj2 (dir_liveb_true data k0) Hlv).
+    rewrite (bool_decide_eq_false_2
+               (bv_unsigned (dir_inum data k0) = self) Hself).
+    cbn [negb andb]. iExact "H".
+  Qed.
+
+  (* **THE PAYLOAD-LEVEL DELETE, [dir_links_dirlink]'s exact inverse.**
+     sys_unlink's [memset(&de,0,sizeof(de)); writei(dp,0,&de,off,sizeof(de))]
+     writes a ZERO-INUM record over slot [k0]; the record count does not
+     move (the write is inside the existing size), every other slot's inum
+     halfword rides by [dir_link_at_agree], the written slot's ticket
+     becomes free by [dir_link_at_zeroed], and the [ilink] the old record
+     held falls out for the caller to spend at [ireg_write_unlink].
+
+     The premises are the same shape as [dir_links_dirlink]'s -- the range
+     clause writei's kernel arm actually delivers -- plus the three that
+     make the released fragment an [ilink] rather than a colour
+     disjunction: the home is live, the record is live, and it is not the
+     directory's own ["."]. *)
+  Lemma dir_links_unlink (self : Z) (dn dn' : dinode)
+      (data data' : nat -> list (bv 8))
+      (d : dirent) (nrec k0 tot : nat) :
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    (k0 < nrec)%nat ->
+    (2 <= tot)%nat -> (tot <= 16)%nat ->
+    de_inum d = bv_0 16 ->
+    bv_unsigned (di_nlink dn) <> 0 ->
+    dir_live data k0 ->
+    bv_unsigned (dir_inum data k0) <> self ->
+    di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
+    di_size dn' = di_size dn ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes d !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    dir_links self dn data -∗
+      dir_links self dn' data' ∗ ilink (bv_unsigned (dir_inum data k0)).
+  Proof.
+    intros Hty Hnrec Hk0 Htot2 Htot16 Hde Hnl Hlv Hself Hty' Hnl' Hsz' Hrng.
+    (* the written slot is dead: its two inum bytes came out of [d] *)
+    assert (Hz : dir_inum data' k0 = bv_0 16).
+    { rewrite (dir_inum_of_two data' k0 d); [exact Hde |].
+      intros j Hj. rewrite (Hrng (16 * k0 + j)%nat).
+      rewrite decide_True; [| lia].
+      replace (16 * k0 + j - 16 * k0)%nat with j by lia. reflexivity. }
+    (* ...and every other record keeps its two inum bytes *)
+    assert (Hagree : forall q : nat, q <> k0 ->
+                       dir_inum data' q = dir_inum data q).
+    { intros q Hq. unfold dir_inum.
+      rewrite (Hrng (16 * q)%nat). rewrite (Hrng (16 * q + 1)%nat).
+      rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+      reflexivity. }
+    (* the type and the size are unmoved, so the two big-ops run over the
+       same index range *)
+    rewrite /dir_links Hty' Hsz'.
+    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | Hnd];
+      [| destruct (Hnd Hty)].
+    rewrite <- Hnrec.
+    rewrite (big_sepL_delete (fun _ k => dir_link_at self dn data k)
+               (seq 0 nrec) k0 k0).
+    2:{ apply lookup_seq. lia. }
+    iIntros "[Hk0 Hrest]".
+    iSplitR "Hk0".
+    - rewrite (big_sepL_delete (fun _ k => dir_link_at self dn' data' k)
+                 (seq 0 nrec) k0 k0).
+      2:{ apply lookup_seq. lia. }
+      iSplitR "Hrest".
+      + iApply (dir_link_at_zeroed self dn' data' k0 Hz).
+      + iApply (big_sepL_mono with "Hrest"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        destruct (decide (i = k0)) as [_ | Hne]; [by iIntros "_" |].
+        assert (Heq : dir_inum data' k = dir_inum data k)
+          by (apply Hagree; lia).
+        iIntros "Hx".
+        iApply (dir_link_at_agree self dn dn' data data' k Hnl' Heq with "Hx").
+    - iApply (dir_link_at_unlink self dn data k0 Hnl Hlv Hself with "Hk0").
+  Qed.
+
 End DirLinks.
