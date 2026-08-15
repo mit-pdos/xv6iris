@@ -121,8 +121,18 @@ must be able to SAY this — the freeing-iput's iupdate is absorbed because
 logged set.  Recorded as the re-model direction in
 projects/fs-sysfile.md ("BLOCKER A, resolved").
 
-## CANDIDATE (2026-08-15, S7-unlink) — `sys_link` can append a link to an
-## ORPHANED directory, and the link is then leaked
+## RULED REAL (user, 2026-08-15: "it looks like a real bug") — `sys_link`
+## can append a link to an ORPHANED directory, and the link is then leaked
+##
+## FIX PREPARED: xv6-riscv `verified` branch commit f60ff58 ("sys_link:
+## refuse to link into an unlinked directory") — create's guard verbatim,
+## after the ilock(dp), routed to `goto bad` so the ip->nlink++ is undone.
+## Kernel builds clean.  AWAITING: user pushes upstream, then the pin
+## bump (every sysfile function AFTER sys_link shifts — relayout sweep
+## per the playbook), then sys_link's walk gains the guard arm and the
+## STRONG isdirempty invariant becomes true of the binary (discharging
+## §20.6's itrunc row and F1.5d's plank; the grey name-conjunct
+## alternative is superseded).
 
 `sys_link` does `nameiparent(new, name)` -> `ilock(dp)` ->
 `dirlink(dp, name, ip->inum)` with **no `dp->nlink == 0` re-check**.
