@@ -1547,7 +1547,7 @@ Section ProofAllocproc.
             as "[Hofc Hofs]".
           iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
           iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-            "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+            "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
               %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
               %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
           iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)
@@ -1958,7 +1958,7 @@ Section ProofAllocproc.
         (* ---------- assemble the private block and hand it to the tail ------- *)
         iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
         iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
-          "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
             %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
             %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
         iDestruct (tf_page_of_page_own tfp ltac:(rewrite Hbasetf; exact Hpvtf)

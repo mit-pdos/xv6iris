@@ -505,11 +505,6 @@ Section KforkArms.
     iDestruct (ProofKforkParts.proc_priv_nocwd_tf_upd with "HCpriv") as "(Htf_c & Htfp_c & Hclose_c)".
     iDestruct (ProofKforkB7.kfkb7_tf_len with "Htfp_p") as %Hlenp.
     iDestruct (ProofKforkB7.kfkb7_tf_len with "Htfp_c") as %Hlenc.
-    (* [a_tf_word]-shaped (this block's own vocabulary) -> [tf_pa]-shaped
-       (what the physical-native [kfk_tf_copy_loop] now wants). *)
-    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt Vp)) 0 ltac:(lia)) in HMta5.
-    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt Vc')) 0 ltac:(lia)) in HMta4.
-    rewrite (a_tf_word_eq_tf_pa (ud_tfp (pv_upt Vp)) 36 ltac:(lia)) in HMta3.
     (* ---- ProofKforkB2: the trapframe copy loop ---- *)
     iApply (ProofKforkB2.kfk_tf_copy_loop Mt (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc'))
               (pv_tf Vp) (pv_tf Vc') (trap_res b + (K - 8))%nat pme
