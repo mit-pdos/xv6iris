@@ -55,6 +55,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
+Require Import KptTree.
 Require Import CpuOwn.
 Require Import SleepLock.
 Require Import WpLock.
@@ -71,6 +72,7 @@ Require Import W32Arith.
 Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
+Require Import TrampPt.
 Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioInv.
@@ -624,14 +626,19 @@ Section KexecDCommit.
   (* ---- the small address/shape facts the commit block needs ---- *)
 
   (* every trapframe word this block writes, at one lemma: the [sd]'s own
-     12-bit displacement against [a_tf_word]'s [8*i] indexing. *)
+     12-bit displacement against [tf_pa]'s [8*i] indexing.  Concludes in
+     [tf_pa], not [a_tf_word]: every downstream consumer (tf_page_word_mem
+     and friends) is physical-native now, so stating it that way makes every
+     call site below line up with no further bridging. *)
   Lemma kxd_tf_addr (tfp : mword 44) (z : Z) (i : nat) :
+    (i < 512)%nat ->
     (sign_extend' 64 (mword_of_int z : mword 12) : mword 64)
       = mword_of_int (8 * Z.of_nat i) ->
     add_vec (page_base tfp) (sign_extend' 64 (mword_of_int z : mword 12))
-    = a_tf_word tfp i.
+    = tf_pa tfp (8 * Z.of_nat i).
   Proof.
-    intro Hz. rewrite Hz /a_tf_word /pa_add /add_vec_int.
+    intros Hi Hz. rewrite (tf_pa_eq_pa_add8 tfp i Hi).
+    rewrite Hz /pa_add /add_vec_int.
     f_equal. f_equal. lia.
   Qed.
 
@@ -1180,6 +1187,19 @@ Section KexecDCommit.
     assert (HF0s10 : mr !!! Regidx Rs10 = pv_sz V).
     { rewrite (callee_saved_lookup Hcsn Rs10 ltac:(vm_compute; reflexivity)).
       exact HE4s10. }
+    (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently) and
+       [page_valid] (the trapframe page's own well-formedness) -- what the
+       SD instructions below need to cross [tf_page_word_upd]'s physical-
+       native result to the mem tier they actually run at (kernel code
+       reaching the trapframe through its own mapping, not the trampoline's
+       physical entry/exit path). *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv_valid.
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the COMMIT's own three writes ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
@@ -1351,12 +1371,14 @@ Section KexecDCommit.
     { apply lookup_lt_is_Some_2. rewrite Htflen.
       unfold TFWORDS, tf_epc_idx. lia. }
     destruct Hw3 as [u3 Hu3].
-    iDestruct (tf_page_word_upd _ _ tf_epc_idx u3 Hu3 with "Htfp")
+    iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx u3
+                 ltac:(unfold tf_epc_idx; lia) Hu3 with "Hptc Htfp")
       as "(Hword3 & Htfback3)".
     assert (Haddr24 : add_vec (F3 !!! Regidx Ra5)
                         (sign_extend' 64 (mword_of_int 24 : mword 12))
-                      = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx).
+                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx)).
     { rewrite HF3a5. apply kxd_tf_addr.
+      { unfold tf_epc_idx. lia. }
       unfold tf_epc_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr24) in "Hword3".
     iApply (wp_csd_s_sconf (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
@@ -1414,12 +1436,14 @@ Section KexecDCommit.
     { apply lookup_lt_is_Some_2. rewrite length_insert Htflen.
       unfold TFWORDS, kxc_tf_sp_idx. lia. }
     destruct Hw6 as [u6 Hu6].
-    iDestruct (tf_page_word_upd _ _ kxc_tf_sp_idx u6 Hu6 with "Htfp")
+    iDestruct (tf_page_word_upd_mem _ _ kxc_tf_sp_idx u6
+                 ltac:(unfold kxc_tf_sp_idx; lia) Hu6 with "Hptc Htfp")
       as "(Hword6 & Htfback6)".
     assert (Haddr48 : add_vec (F4 !!! Regidx Ra5)
                         (sign_extend' 64 (mword_of_int 48 : mword 12))
-                      = a_tf_word (ud_tfp (pv_upt V)) kxc_tf_sp_idx).
+                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat kxc_tf_sp_idx)).
     { rewrite HF4a5. apply kxd_tf_addr.
+      { unfold kxc_tf_sp_idx. lia. }
       unfold kxc_tf_sp_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr48) in "Hword6".
     iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
@@ -1919,6 +1943,16 @@ Section KexecDMain.
     iPoseProof (kxc_2b8 with "Htext") as "Hi2b8".
     iPoseProof (kxc_2ba with "Htext") as "Hi2ba".
     iPoseProof (kxc_2be with "Htext") as "Hi2be".
+    (* [pt_node_claim], for the same reason as [kxd_phaseC]'s own commit
+       block above: [tf_page_word_upd]'s result is physical-native, and the
+       SD instruction here runs through the kernel's own mapping. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv_valid.
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the FIRST trapframe write ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
@@ -1962,12 +1996,14 @@ Section KexecDMain.
     assert (Hw15 : exists u15, pv_tf V !! tf_arg_idx 1 = Some u15).
     { apply lookup_lt_is_Some_2. rewrite Htflen. unfold TFWORDS, tf_arg_idx. lia. }
     destruct Hw15 as [u15 Hu15].
-    iDestruct (tf_page_word_upd _ _ (tf_arg_idx 1) u15 Hu15 with "Htfp")
+    iDestruct (tf_page_word_upd_mem _ _ (tf_arg_idx 1) u15
+                 ltac:(unfold tf_arg_idx; lia) Hu15 with "Hptc Htfp")
       as "(Hword & Htfback)".
     assert (Haddr120 : add_vec (D1 !!! Regidx Ra5)
                          (sign_extend' 64 (mword_of_int 120 : mword 12))
-                       = a_tf_word (ud_tfp (pv_upt V)) (tf_arg_idx 1)).
+                       = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat (tf_arg_idx 1))).
     { rewrite HD1a5. apply kxd_tf_addr.
+      { unfold tf_arg_idx. lia. }
       unfold tf_arg_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr120) in "Hword".
     iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2aa)) Rs2 Ra5

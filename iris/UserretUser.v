@@ -48,6 +48,7 @@ Require Import KptTree UptTree UserretDefs.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import KptShare.
+Require Import TrampPt.
 Require Import SpecUserret SpecUser.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
