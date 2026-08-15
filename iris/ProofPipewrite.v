@@ -341,7 +341,7 @@ Lemma pw_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 14%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 14%nat) o = pa_stk X k.
 Proof.
-  intro H. unfold pa_stk, add_vec_int. rewrite po_addv_assoc H. reflexivity.
+  intro H. unfold pa_stk, add_vec_int. rewrite add_vec_assoc H. reflexivity.
 Qed.
 
 (* A FIELD OF A KALLOC'D PAGE IS NEVER NULL -- sleep_prepare's
@@ -373,7 +373,7 @@ Proof. intro Hv. rewrite pw_pnwrite_pa. apply pw_pfield_nz; [exact Hv | lia]. Qe
 Lemma pw_ch_addr (X : mword 64) :
   add_vec X (sign_extend' 64 (mword_of_int 3999 : mword 12)) = pa_add (pa_stk X 13%nat) 7%nat.
 Proof.
-  unfold pa_add, pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_add, pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 

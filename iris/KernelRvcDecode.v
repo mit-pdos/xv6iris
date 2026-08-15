@@ -14,7 +14,7 @@ From stdpp Require Import bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvExec.
+Require Import RiscvLang RiscvExec RiscvExtras.
 Require Import WpRvcBridge.
 Require Import WpMmodeLeafBase.
 Require Import StackOwn.
@@ -149,15 +149,6 @@ Lemma poexec_sw120 s :
   exec (execute (C_SW (mword_of_int 30, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (STORE (mword_of_int 120, Regidx (mword_of_int 15), Regidx (mword_of_int 10), 4)), s).
 Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
-
-Lemma po_addv_assoc (a b c : mword 64) :
-  add_vec (add_vec a b) c = add_vec a (add_vec b c).
-Proof.
-  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
-    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
-  apply bv_eq. rewrite !bv_add_unsigned.
-  unfold bv_wrap. rewrite Zplus_mod_idemp_l, Zplus_mod_idemp_r, Z.add_assoc. reflexivity.
-Qed.
 
 (* ===================================================================== *)
 (* creg -> reg conversions.  An RVC expansion yields its register operands *)
@@ -900,7 +891,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma frame_cancel (X a b : mword 64) :
   add_vec a b = mword_of_int 0 -> add_vec (add_vec X a) b = X.
 Proof.
-  intro Hab. rewrite po_addv_assoc, Hab.
+  intro Hab. rewrite add_vec_assoc, Hab.
   apply bv_add_0_r. vm_compute. reflexivity.
 Qed.
 

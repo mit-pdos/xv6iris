@@ -74,7 +74,7 @@ Local Strategy 1000 [pa_stk].
    leaving a CLOSED constant equality. *)
 Lemma sc_swap (a sh b : mword 64) : add_vec (add_vec a sh) b = add_vec (add_vec a b) sh.
 Proof.
-  rewrite (po_addv_assoc a sh b) (add_vec64_comm sh b) (po_addv_assoc a b sh). reflexivity.
+  rewrite (add_vec_assoc a sh b) (add_vec64_comm sh b) (add_vec_assoc a b sh). reflexivity.
 Qed.
 
 Lemma sc_reconcile (K sh d MY : mword 64) :
@@ -101,7 +101,7 @@ Proof.
   { apply bv_eq. rewrite H.
     unfold mword_of_int, Values.to_word, get_word. cbn.
     rewrite Z_to_bv_unsigned. reflexivity. }
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc. rewrite Heq. reflexivity.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc. rewrite Heq. reflexivity.
 Qed.
 
 (* the two struct-proc field addresses in the 12-bit-displacement spelling. *)

@@ -103,7 +103,7 @@ Lemma cr_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 12%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 12%nat) o = pa_stk X k.
 Proof.
-  intro H. unfold pa_stk, add_vec_int. rewrite po_addv_assoc H. reflexivity.
+  intro H. unfold pa_stk, add_vec_int. rewrite add_vec_assoc H. reflexivity.
 Qed.
 
 
@@ -410,7 +410,7 @@ Section CrBodies.
     (* +0xde  c.addi16sp sp,+96 : the pop *)
     assert (Hspv : add_vec (E8 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6))) = sp0).
-    { rewrite HE8sp. unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { rewrite HE8sp. unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 12%nat)) : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 6 : mword 6)))
                    = (mword_of_int 0 : mword 64)); [| pcw].
@@ -931,7 +931,7 @@ Section ProofConsoleread.
     add_vec sp0 (sign_extend' 64 (mword_of_int 4015 : mword 12))
     = pa_add (pa_stk sp0 11%nat) 7%nat.
   Proof.
-    unfold pa_add, pa_stk, add_vec_int. rewrite po_addv_assoc.
+    unfold pa_add, pa_stk, add_vec_int. rewrite add_vec_assoc.
     apply f_equal. apply bv_eq; vm_compute; reflexivity.
   Qed.
 
@@ -2618,7 +2618,7 @@ Section ProofConsoleread.
     (* ---- +0x12 c.addi4spn s0,sp,96 ---- *)
     assert (Hs0v : add_vec (pa_stk sp0 12%nat)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8))) = sp0).
-    { unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 12%nat)) : mword 64)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8)))
                    = (mword_of_int 0 : mword 64)); [| pcw].

@@ -349,6 +349,7 @@ CodeAcquire.v
 WpLock.v
 ArrCursor.v
 FdSlots.v
+LogDefs.v
 IcacheRef.v
 FileInvDefs.v
 FileInv.v
@@ -369,6 +370,7 @@ VcGen.v
 VcGenS.v
 SwtchCtx.v
 CpuOwn.v
+ProcDefs.v
 ProcInv.v
 WpPushOffBridges.v
 CodeSwtch.v
@@ -515,6 +517,7 @@ CodeBinit.v
 SpecBinit.v
 ProofBinit.v
 LinkBinit.v
+BioDefs.v
 BioInv.v
 FsBlocks.v
 BlockWords.v
@@ -580,6 +583,7 @@ CodeIinit.v
 SpecIinit.v
 ProofIinit.v
 LinkIinit.v
+InodeDefs.v
 InodeInv.v
 DirView.v
 DirLinks.v

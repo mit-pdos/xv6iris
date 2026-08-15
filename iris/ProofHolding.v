@@ -431,7 +431,7 @@ Section ProofHolding.
     set (S10 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (S9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> S9).
     assert (Hwv : add_vec (S9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HcspS9 /spdh /sp0 po_addv_assoc.
+    { rewrite HcspS9 /spdh /sp0 add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                             (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
@@ -789,7 +789,7 @@ Section ProofHolding.
     set (S10 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (S9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> S9).
     assert (Hwv : add_vec (S9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite HcspS9 /spdh /sp0 po_addv_assoc.
+    { rewrite HcspS9 /spdh /sp0 add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                             (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).

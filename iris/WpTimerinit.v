@@ -169,7 +169,7 @@ Definition ti_deadline (mtime0 : mword 64) : mword 64 := add_vec mtime0 ti_inter
 Lemma ti_sp_restore (sp0 : mword 64) :
   add_vec (ti_sp1 sp0) (sign_extend' 64 i28) = sp0.
 Proof.
-  unfold ti_sp1. rewrite po_addv_assoc.
+  unfold ti_sp1. rewrite add_vec_assoc.
   replace (add_vec (sign_extend' 64 i9) (sign_extend' 64 i28))
     with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
   exact (avi0 sp0).

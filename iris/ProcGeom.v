@@ -30,7 +30,6 @@ Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so th
                             ~90 existing references through ProcGeom keep working *)
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
-Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 
@@ -45,9 +44,6 @@ Proof.
   change (MachineWord.MachineWord.Z_idx 64) with 64%N.
   apply Z_to_bv_bv_unsigned.
 Qed.
-
-(* add_vec associativity (mirror of KernelRvcDecode.po_addv_assoc, which lives
-   in a later file not imported here). *)
 
 (* ===================================================================== *)
 (* struct proc geometry.                                                  *)
@@ -259,7 +255,7 @@ Lemma p_ofile_succ (pa : mword 64) (fd : nat) :
   add_vec (p_ofile pa fd) (sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6)))
   = p_ofile pa (S fd).
 Proof.
-  unfold p_ofile. rewrite po_addv_assoc.
+  unfold p_ofile. rewrite add_vec_assoc.
   assert (Hsx : sign_extend' 64 (sign_extend' 12 (mword_of_int 8 : mword 6))
                 = (mword_of_int 8 : mword 64))
     by (apply bv_eq; vm_compute; reflexivity).
@@ -594,7 +590,7 @@ Qed.
 Lemma proc_addr_succ (k : nat) :
   add_vec (proc_addr k) (sign_extend' 64 (mword_of_int proc_size : mword 12)) = proc_addr (S k).
 Proof.
-  unfold proc_addr. rewrite po_addv_assoc.
+  unfold proc_addr. rewrite add_vec_assoc.
   assert (Hsx : sign_extend' 64 (mword_of_int proc_size : mword 12) = (mword_of_int proc_size : mword 64))
     by (apply bv_eq; vm_compute; reflexivity).
   rewrite Hsx. f_equal.

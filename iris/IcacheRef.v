@@ -84,7 +84,7 @@ Require Import RiscvPtsto RiscvExtras.
 (* for [log_names] alone -- [icfg_log], fs-log.md G.17's region placement.
    No class comes with it: the log's ghost lives in [logG], which this file
    does not need and does not take. *)
-Require Import LogInv.
+Require Import LogDefs.
 (* [WpLock] for [lockG] itself -- [Import] is not transitive, and without it
    the [!lockG Σ] binders below auto-generalize into a fresh variable. *)
 Require Import WpLock SleepLock.

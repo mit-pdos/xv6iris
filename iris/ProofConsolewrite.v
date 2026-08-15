@@ -94,7 +94,7 @@ Lemma cw_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 16%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 16%nat) o = pa_stk X k.
 Proof.
-  intro H. unfold pa_stk, add_vec_int. rewrite po_addv_assoc H. reflexivity.
+  intro H. unfold pa_stk, add_vec_int. rewrite add_vec_assoc H. reflexivity.
 Qed.
 
 (* the [beq a0,s8] at +0x4a, against the [-1] gcc parked in s8 *)
@@ -399,7 +399,7 @@ Section CwBodies.
     (* ---- +0x9e  c.addi16sp sp,+128 : the pop ---- *)
     assert (Hspv : add_vec (E4 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 8 : mword 6))) = sp0).
-    { rewrite HE4sp. unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { rewrite HE4sp. unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 16%nat)) : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 8 : mword 6)))
                    = (mword_of_int 0 : mword 64)); [| pcw].
@@ -1618,7 +1618,7 @@ Section CwBodies.
            (sign_extend' 64 (caddi4spn_imm (mword_of_int 32 : mword 8))))]> A0) with A1.
     assert (HA1s0 : A1 !!! Regidx Rs0 = sp0).
     { rewrite /A1 upd_eq HA0sp. unfold pa_stk, add_vec_int.
-      rewrite po_addv_assoc.
+      rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 16%nat)) : mword 64)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 32 : mword 8)))
                    = (mword_of_int 0 : mword 64)); [| pcw].

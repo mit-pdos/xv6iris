@@ -93,6 +93,16 @@ Proof.
   rewrite bv_add_unsigned. reflexivity.
 Qed.
 
+Lemma add_vec_assoc (a b c : mword 64) :
+  add_vec (add_vec a b) c = add_vec a (add_vec b c).
+Proof.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  apply bv_eq. rewrite !bv_add_unsigned.
+  unfold bv_wrap. rewrite Zplus_mod_idemp_l Zplus_mod_idemp_r Z.add_assoc.
+  reflexivity.
+Qed.
+
 Lemma sub_vec_unsigned {n : Z} (x y : mword n) :
   bv_unsigned (sub_vec x y)
   = bv_wrap (MachineWord.MachineWord.Z_idx n) (bv_unsigned x - bv_unsigned y).

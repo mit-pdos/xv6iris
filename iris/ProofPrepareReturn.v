@@ -101,7 +101,7 @@ Section ProofPrepareReturn.
   (* the page's own length invariant, read off without consuming it *)
   Local Lemma prr_tf_len (tfp : mword 44) (ws : list (mword 64)) :
     tf_page tfp ws -∗ ⌜length ws = TFWORDS⌝.
-  Proof. iIntros "(%Hlen & _ & _)". done. Qed.
+  Proof. rewrite /tf_page. iIntros "(%Hlen & _ & _)". done. Qed.
 
   (* the trapframe page's own [page_valid], read off [proc_priv] without
      consuming it -- [proc_pt_wf]'s last conjunct, the same projection

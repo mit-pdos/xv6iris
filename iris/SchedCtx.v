@@ -59,7 +59,8 @@ Require Import ProcGeom.
    [pavG] (durable-notes.md, "Typeclass sweeps", trap one). *)
 Require Export ProcAvail.
 Require Import FdSlots.
-Require Export ProcInv.
+Require Export IrefSlots.
+Require Import ProcDefs.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -109,28 +109,28 @@ Notation KX := KernelSyms.kexec (only parsing).
 Lemma kxc_frm1 (X : mword 64) :          (* 536(sp) : saved ra *)
   add_vec (pa_stk X 68) (sign_extend' 64 (mword_of_int 536 : mword 12)) = pa_stk X 1.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
 Lemma kxc_frm2 (X : mword 64) :          (* 528(sp) : saved s0 *)
   add_vec (pa_stk X 68) (sign_extend' 64 (mword_of_int 528 : mword 12)) = pa_stk X 2.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
 Lemma kxc_frm3 (X : mword 64) :          (* 520(sp) : saved s1 *)
   add_vec (pa_stk X 68) (sign_extend' 64 (mword_of_int 520 : mword 12)) = pa_stk X 3.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
 Lemma kxc_frm4 (X : mword 64) :          (* 512(sp) : saved s2 *)
   add_vec (pa_stk X 68) (sign_extend' 64 (mword_of_int 512 : mword 12)) = pa_stk X 4.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 

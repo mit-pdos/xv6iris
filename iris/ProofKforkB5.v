@@ -184,7 +184,7 @@ Section ProofKforkB5.
     ProcAvail.pslot_used_at (ProcGeom.proc_addr j) -∗
     FdSlots.fd_slots FDSPARE -∗
     IrefSlots.iref_slots IREFSPARE -∗
-    ProcInv.is_kstack (ProcGeom.proc_addr j) ks -∗
+    ProcDefs.is_kstack (ProcGeom.proc_addr j) ks -∗
     SwtchCtx.ctx_cells (ProcGeom.p_context (ProcGeom.proc_addr j))
       (SpecForkretPark.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     wp_next b pme (fun (CID : CpuId) =>

@@ -926,7 +926,7 @@ Section ProofPushOff.
         iExact "Hcnt". }
       { unfold callee_saved. repeat split.
       - (* sp *)
-        rewrite Hsp HcspN8 /spd /sp0 po_addv_assoc.
+        rewrite Hsp HcspN8 /spd /sp0 add_vec_assoc.
         assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                               (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1100,7 +1100,7 @@ Section ProofPushOff.
         iExact "Hcnt". }
       { unfold callee_saved. repeat split.
       - (* sp *)
-        rewrite Hsp HcspN5 /spd /sp0 po_addv_assoc.
+        rewrite Hsp HcspN5 /spd /sp0 add_vec_assoc.
         assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                               (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1464,7 +1464,7 @@ Section ProofPushOff.
       rewrite /P3 upd_ne; [| vm_compute; discriminate].
       exact HcspC'. }
     assert (Hsp0up : add_vec spd (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = sp0).
-    { rewrite /spd /sp0 po_addv_assoc.
+    { rewrite /spd /sp0 add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
                             (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
