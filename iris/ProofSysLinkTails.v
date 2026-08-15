@@ -1919,7 +1919,7 @@ Section ProofSysLinkTails.
     inode_shr_gen kk s dev inum gy -∗
     ilink (bv_unsigned inum) -∗
     (* ---- the PARENT, still locked ---- *)
-    sleeplocked gisld -∗
+    sleeplocked_q gisld sd -∗
     sl_pid (i_lock (ientry kd)) ↦₄ pidv -∗
     ic_deposit cn kd (DepShr sd dev dinum gyd) -∗
     i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
