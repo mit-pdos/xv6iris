@@ -1189,6 +1189,28 @@ Lemma usertrap_res_tf_open
     (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
 Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
 
+Lemma usertrap_res_csrs_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗
+  hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp). Qed.
+
+Lemma usertrap_res_tf_csrs_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+  (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+      usertrap_res_bare pt ksp -∗
+      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
+        tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+        (∀ ws' : list (mword 64),
+           tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp kroot). Qed.
+
 Section UtSeal.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

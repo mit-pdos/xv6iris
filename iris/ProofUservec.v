@@ -53,6 +53,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import KallocInv.
 Require Import IrefSlots InodeRegion.
+Require Import IntrDefs.   (* [hart_csrs]: the residue's per-hart CSR bundle *)
 Require Import SpecUsertrap.
 Require Import SpecUserret.
 Require Import SpecUservec.
@@ -74,6 +75,8 @@ Section UservecAllPt.
   Definition usertrap_res_parked := UT.usertrap_res_parked.
   Definition usertrap_res_bare := UT.usertrap_res_bare.
   Definition usertrap_res_tf_open := UT.usertrap_res_tf_open.
+  Definition usertrap_res_csrs_open := UT.usertrap_res_csrs_open.
+  Definition usertrap_res_tf_csrs_open := UT.usertrap_res_tf_csrs_open.
   Definition usertrap_res_tlb_close := UT.usertrap_res_tlb_close.
   Definition usertrap_res_tlb_open := UT.usertrap_res_tlb_open.
   Definition usertrap_res_pt_close := UT.usertrap_res_pt_close.
@@ -238,14 +241,14 @@ Section UservecAllPt.
   Qed.
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64) :
+      (kroot : mword 44) (j : nat) (vksp : mword 64) :
     (* [UT.]-qualified, not the section alias: inside a section that FIXES
        [CID], the alias has no [CID] implicit left to instantiate (section
        variables are discharged only at [End]).  The module-type parameter
        still does, and the two are convertible, so the [: USERVEC] check
        accepts it. *)
     wp_uservec_pt_body (fun h : CpuId => UT.usertrap_res_bare (CID := h))
-      C pt Rut kroot j sscr0 vksp.
+      C pt Rut kroot j vksp.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
     (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
@@ -255,7 +258,7 @@ Section UservecAllPt.
        unify through the definition. See claude-notes/optimization.md. *)
     unfold uservec_gpr.
     intros Hstvec Hdqc Hmie Hjlt Hnorm Hptwf Hgap Hkwgap.
-    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hsscr #Hkfr Hures Hcont".
+    iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe #Hkfr Hures Hcont".
     (* ============ open the trapped machine ============ *)
     iDestruct (user_trap_frame_open C pt Rut with "Hframe") as (ms_v sc_v stval_v sepc_v g)
       "(%Hok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc & Hpcc & Hnpc & Hfile &
@@ -285,8 +288,13 @@ Section UservecAllPt.
     iEval (rewrite Hsb) in "Hpcc".
     iEval (rewrite Hsb) in "Hnpc".
     (* ============ open usertrap_res for the SAVE walk's own cells ======= *)
-    iDestruct (usertrap_res_tf_open pt vksp kroot (Hkwgap CID) with "Hures") as (ws0)
-      "(%Hok0 & Htf0 & Hclose0)".
+    (* the trapframe page AND [sscratch] come out of the residue together:
+       the save walk and the sscratch swap overlap, and the residue is
+       sealed, so one opener hands out both. *)
+    iDestruct (usertrap_res_tf_csrs_open pt vksp kroot (Hkwgap CID) with "Hures") as (ws0)
+      "(%Hok0 & Htf0 & Hcsrs0 & Hclose0)".
+    iDestruct "Hcsrs0" as "(Hssc0 & Hmdlc & Hmsec & Hssec)".
+    iDestruct "Hssc0" as (sscr0) "Hsscr".
     iDestruct (tf_page_length with "Htf0") as %Hlen0.
     iDestruct (tf_page_open36 (ud_tfp pt) ws0 Hlen0 with "Htf0") as
       (vksat vksp0 vktr w3 vkhart
@@ -1643,7 +1651,10 @@ Section UservecAllPt.
                        Htf120 Htf128 Htf136 Htf144 Htf152 Htf160 Htf168 Htf176 Htf184
                        Htf192 Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256
                        Htf264 Htf272 Htf280 Htail0") as "Htf0'".
-    iDestruct ("Hclose0" with "Htf0'") as "Hures'".
+    (* hand the page and the CSRs back before the residue goes to usertrap *)
+    iAssert hart_csrs with "[Hsscr Hmdlc Hmsec Hssec]" as "Hcsrs0'".
+    { iFrame "Hmdlc Hmsec Hssec". iExists _. iExact "Hsscr". }
+    iDestruct ("Hclose0" with "Htf0' Hcsrs0'") as "Hures'".
     (* ---- THE ADDRESS SPACE CHANGES VIEW, then the two borrows close ----
        The exit switch just did the one thing that converts the views: it
        wrote the KERNEL root into satp, which turned the user table from the

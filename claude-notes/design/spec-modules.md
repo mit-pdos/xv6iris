@@ -7,6 +7,16 @@ amount of `-j` helps (the build is critical-path bound, not core bound; see
 
 Every whole-function proof under `iris/` is in this shape. Keep new ones in it.
 
+**Simultaneous borrows of a sealed bundle need ONE opener.** An accessor
+`Parameter` of the shape `res -∗ payload ∗ (payload -∗ res)` consumes the whole
+bundle, so two of them cannot be applied to each other's remainder: a consumer
+that needs both payloads live at once (uservec holds the trapframe page open
+across the same stretch as the `sscratch` cell) needs a combined accessor
+handing out both with one closer. Adding the second single accessor and
+discovering it does not compose is the trap; check the lifetimes first.
+`UsertrapRes.ut_res_bare_tf_csrs_open` is the worked example.
+
+
 ## The files
 
 For each kernel function `F`: `Code<F>.v`, `Spec<F>.v`, `Proof<F>.v`,

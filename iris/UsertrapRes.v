@@ -919,6 +919,71 @@ Section UsertrapRes.
     - exact Hav.
   Qed.
 
+  (* THE PER-HART CSRs.  [hart_csrs] rides in [cpu_priv], hence in the
+     [cpu_own 0 false pj false ∅] this residue's [ut_trap_parked] carries --
+     so the bare form, the one that parks across user execution, is exactly
+     where the trampoline and the trap loop reach it: uservec borrows
+     [sscratch] across its save walk, and the loop hands [medeleg] and the
+     two state-enable pins to [UserExec.user_cfg] for the user phase, keeping
+     the closer wand as the parked remainder.  Open/close, not a tier of its
+     own: nothing needs a name for "the residue minus its CSRs". *)
+  Lemma ut_res_bare_csrs_open (Rsys : gname -> mword 64 -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) :
+    ut_res_bare Rsys pt ksp -∗
+    hart_csrs ∗ (hart_csrs -∗ ut_res_bare Rsys pt ksp).
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
+    iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hback]".
+    iFrame "Hcsrs". iIntros "Hcsrs".
+    iDestruct ("Hback" with "Hcsrs") as "Hcpu".
+    iExists N, V, av. rewrite /ut_trap_parked.
+    iFrame "Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Henv".
+    iPureIntro. split; [| split; [| split]]; assumption.
+  Qed.
+
+  (* BOTH AT ONCE, and uservec needs exactly that: its save walk holds the
+     trapframe page open across +0x0c..+0x7a while its [csrw sscratch,a0] at
+     +0x00 and the [csrr] at +0x76 hold the [sscratch] cell, and the two
+     borrows therefore overlap.  Each single accessor consumes the whole
+     residue, so neither can be applied to the other's remainder -- a sealed
+     bundle's simultaneous borrows have to come out of ONE opener. *)
+  Lemma ut_res_bare_tf_csrs_open (Rsys : gname -> mword 64 -> iProp Σ)
+      (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+    (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+    ut_res_bare Rsys pt ksp -∗
+    ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
+      tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+      (∀ ws' : list (mword 64),
+         tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ ut_res_bare Rsys pt ksp).
+  Proof.
+    iIntros (Hgap) "H".
+    iDestruct "H" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & (Hcaps & Hown))".
+    (* the CSRs, out of the trap bundle's own [cpu_own] *)
+    iDestruct "Htrap" as "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm)".
+    iDestruct (cpu_own_csrs_open with "Hcpu") as "[Hcsrs Hcback]".
+    (* ... and the trapframe page, out of the process block *)
+    iDestruct (ut_own_nopt_priv with "Hown") as "(Hpv & Hsy & Hownback)".
+    iDestruct (proc_priv_nopt_tf_open with "Hpv") as (ws) "[Htf Hclose]".
+    rewrite Hupt.
+    iDestruct (tf_page_length with "Htf") as %Hlen.
+    iExists ws. iSplitR; [iPureIntro; exact (Hgap ws Hlen) |].
+    iFrame "Htf Hcsrs".
+    iIntros (ws') "Htf' Hcsrs'".
+    iDestruct ("Hclose" $! ws' with "Htf'") as "Hpv'".
+    iDestruct ("Hownback" $! (upd_tf V ws') with "Hpv' Hsy") as "Hown'".
+    iDestruct ("Hcback" with "Hcsrs'") as "Hcpu".
+    iExists N, (upd_tf V ws'), av.
+    rewrite /ut_env_nopt /ut_trap_parked.
+    iFrame "Hstk Harm Hb1 Hb2 Hgh Hcpu Hclm Hcaps Hown'".
+    iPureIntro. split; [| split; [| split]].
+    - rewrite /upd_tf. exact Hupt.
+    - exact Hksp.
+    - exact Hwf.
+    - exact Hav.
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* THE WALK'S OWN VOCABULARY -- what the block lemmas of ProofUsertrap  *)
   (* hand one another.  Definitional, so the phases do not depend on each *)
@@ -1249,5 +1314,27 @@ Module UtResFits (SY : SYSCALL) <: USERTRAP_RES.
     ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
       (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
   Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
+
+  Lemma usertrap_res_csrs_open
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+    usertrap_res_bare pt ksp -∗
+    hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
+  Proof. exact (ut_res_bare_csrs_open SY.syscall_env pt ksp). Qed.
+
+  Lemma usertrap_res_tf_csrs_open
+      `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+        !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+        !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+    (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+      usertrap_res_bare pt ksp -∗
+      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
+        tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+        (∀ ws' : list (mword 64),
+           tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
+  Proof. exact (ut_res_bare_tf_csrs_open SY.syscall_env pt ksp kroot). Qed.
 
 End UtResFits.

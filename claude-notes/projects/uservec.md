@@ -726,10 +726,15 @@ and no `stvec_handler_wp`, entered where forkret enters the loop.
     with `cpu_hart`, and `UsertrapRes.ut_trap` already carries
     `cpu_own ... false`, so they sit inside `usertrap_res`'s parked and bare
     forms for free. `medeleg` is pinned at `MEDELEG_S`, which gives `uc_del`.
-    What is left is the access path: one `USERTRAP_RES` accessor (the shape
-    of `usertrap_res_tf_open`) for uservec to borrow `sscratch` across its 44
-    instructions and to hand the other three to `user_cfg`, and dropping
-    `SpecUservec`'s `sscratch` premise.
+    The access path is built: `usertrap_res_csrs_open` (the CSRs alone, for
+    the loop's `user_cfg` handoff) and `usertrap_res_tf_csrs_open` (the
+    trapframe page AND the CSRs, which is what uservec needs -- its save walk
+    and its `csrw`/`csrr sscratch` pair overlap). `SpecUservec` no longer
+    takes a `sscratch` cell: that premise was both unmintable and, once the
+    residue owns the cell, unsatisfiable beside the residue premise.
+    What is left is `uservec_post` handing the three pinned cells (and
+    `hw_config`/`minstret_inv`) back at `CID'` so the next round can rebuild
+    `user_cfg`. `stvec` is on a separate plan.
   - `mstateen0`/`sstateen0` are pinned at zero, which is what `user_cfg`
     wants: `reset_regs` carries both -- `mstateen0` derived from the spec's
     own `reset_stateen`, `sstateen0` from `ArchReset.board_regs`, that file's

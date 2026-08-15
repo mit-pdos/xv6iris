@@ -207,7 +207,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
        HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
-    (j : nat) (sscr0 : mword 64) (vksp : mword 64) :=
+    (j : nat) (vksp : mword 64) :=
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
   (* the kernel owns the config cells outright at this join (same fact the
@@ -272,8 +272,11 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* the machine, exactly as the trap delivers it *)
   user_trap_frame C pt Rut -∗
-  (* the kernel-side resources parked while user code ran *)
-  sscratch ↦ᵣ sscr0 -∗
+  (* the kernel-side resources parked while user code ran.  [sscratch] is
+     NOT among them: it lives in [IntrDefs.hart_csrs], inside the residue
+     below, and the proof borrows it from there ([usertrap_res_tf_csrs_open])
+     -- a separate premise would be BOTH unsatisfiable (the residue owns the
+     cell, so a caller cannot hold a second one) and unmintable. *)
   kpt_inv kroot -∗
   (* usertrap's own kernel-internal bundle, for THIS trap round -- the ONE
      owner of the trapframe (SpecUsertrap.v's header), opened once at the
@@ -306,7 +309,7 @@ Module Type USERVEC.
              !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64),
+      (kroot : mword 44) (j : nat) (vksp : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
          THE SAME FOUR RESOURCES -- satp/tlb, the user page-table tree, the
@@ -321,5 +324,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut kroot j sscr0 vksp.
+        C pt Rut kroot j vksp.
 End USERVEC.

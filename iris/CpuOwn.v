@@ -214,6 +214,26 @@ Section CpuOwn.
     iFrame "Hmdl Hmse Hsse".
   Qed.
 
+  (* THE PER-HART CSRs, IN AND OUT.  [hart_csrs] (IntrDefs.v) is a conjunct
+     of [cpu_priv], so at the DISABLED index it is inside this bundle -- and
+     that is the whole point of parking it here: the trampoline reaches
+     [sscratch] through the residue that carries [cpu_own], and the trap loop
+     hands the three pinned cells to [UserExec.user_cfg] for the user phase
+     and gets them back on the next trap.  At [b = true] the payload is in
+     [sie_arm]'s enabled arm instead, so this accessor is stated at [false]
+     like the locks one above. *)
+  Lemma cpu_own_csrs_open (n : nat) (eb : bool) (p : mword 64)
+      (lks : gset string) :
+    cpu_own n eb p false lks -∗
+    hart_csrs ∗ (hart_csrs -∗ cpu_own n eb p false lks).
+  Proof.
+    iIntros "Hh".
+    iEval (rewrite /cpu_own /cpu_hart /cpu_priv) in "Hh".
+    iDestruct "Hh" as "((Hcells & Hlks & Hcsrs) & Hcnt)".
+    iFrame "Hcsrs". iIntros "Hcsrs".
+    rewrite /cpu_own /cpu_hart /cpu_priv. iFrame "Hcells Hlks Hcsrs Hcnt".
+  Qed.
+
   (* ===================================================================== *)
   (* THE HELD-LOCK SET, NAMED.  The index-aware replacement for the old      *)
   (* [cpu_own_locks_acc], which handed out an EXISTENTIAL set because the    *)
