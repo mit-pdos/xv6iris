@@ -1014,6 +1014,7 @@ SpecDirlink.v
 ProofDirlookupParts.v
 ProofDirlookup.v
 LinkDirlookup.v
+FsLookup.v
 ProofDirlink.v
 LinkDirlink.v
 SpecNamex.v
