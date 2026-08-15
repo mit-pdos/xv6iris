@@ -216,13 +216,25 @@
 
      is_sleeplock .. ∗ sleeplocked ∗ sl_pid ↦ pidv ∗ ic_deposit ∗
      i_dev/i_inum halves ∗ i_valid ↦ true ∗ ic_loaded ∗ ity_shot ∗
-     inode_ref_short k (qi + s) qi dev inum
+     inode_ref_short_gen k (qi + s) qi dev inum g
 
    i.e. exactly what sys_open must present to `iunlock(ip)` before it
    parks the inode in the file struct, and what sys_mkdir / sys_mknod
-   present to `iunlockput(ip)`.  The [inode_ref_short] is the RETAINED
-   PARENT of the share the deposit holds: [IcacheRef.inode_ref_gather]
-   re-forms the canonical reference the caller later spends.
+   present to `iunlockput(ip)`.  The reference is the RETAINED PARENT of
+   the share the deposit holds: [IcacheRef.inode_ref_gather] re-forms the
+   canonical reference the caller later spends.
+
+   IT IS GENERATION-NAMED, AND AT THE *SAME* [g] AS THE DEPOSIT AND THE
+   [ity_shot].  Erasing the name here cost nothing to the two callers that
+   only [iunlockput] (they weaken it back with
+   [IcacheRef.inode_ref_short_gen_forget], one line), and it BLOCKED the
+   one that does not: [FileInvDefs.inode_pay_alloc] wants
+   [inode_shr_held_gen v Q g] and [ity_shot g ty] AT ONE [g], and sys_open's
+   O_CREATE arm has no other route to that name -- its else arm keeps the
+   gen-named parent across its own [ilock], and this arm cannot, because
+   the name was thrown away inside create.  The general rule: a payout
+   that already names a generation in one conjunct must not erase it in
+   another, because no consumer can put it back.
 
    ==== THE OP-WIDE SET (fs-icache.md section 18 clause 1) ================
 
@@ -454,7 +466,7 @@ Section CreateSpec.
        i_valid (ientry k) ↦₄ valid_word true ∗
        ic_loaded γfs γi cov logstart k inum dn bm ∗
        ity_shot g (di_type dn) ∗
-       inode_ref_short k (qi + s)%Qp qi dev inum)%I.
+       inode_ref_short_gen k (qi + s)%Qp qi dev inum g)%I.
 
   (* Assembled structurally, not by [iFrame]: at the syscall altitude this
      is built at (hundreds of accumulated hypotheses), even a NAMED
@@ -473,7 +485,7 @@ Section CreateSpec.
     i_valid (ientry k) ↦₄ valid_word true -∗
     ic_loaded γfs γi cov logstart k inum dn bm -∗
     ity_shot g (di_type dn) -∗
-    inode_ref_short k (qi + s)%Qp qi dev inum -∗
+    inode_ref_short_gen k (qi + s)%Qp qi dev inum g -∗
     create_locked cn γfs γi cov logstart dev pidv k qi s g inum dn bm.
   Proof.
     iIntros "Hlk Hlkd Hpid Hdep Hdev Hinum Hvalid Hload Hshot Href".

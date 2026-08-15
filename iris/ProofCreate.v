@@ -3843,11 +3843,10 @@ Section ProofCreateMain.
                   split; [split; [exact Hcpos | exact Hcinb] |].
                   split; [exact Htyf |].
                   exact (cr_trange_in (di_type dnc) Hrng). }
-                iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp".
                 iApply (create_locked_mk cn γfs γi cov logstart
                           _ _ _ _ _ _ _ _ _ gilc gislc
                           with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
-                                Hcivalid Hcload Hcshot Hckp").
+                                Hcivalid Hcload Hcshot Hckeep").
           -- (* ===== ARM F-BAD (first entry): type != T_FILE ========== *)
              iApply (wp_bne_taken_s_sconf (mword_of_int (CK + 0x5c))
                        (mword_of_int 60 : mword 13) Ra5 Rs4 F6 (K - 10)%nat b
@@ -5331,7 +5330,6 @@ Section ProofCreateMain.
                split; [rewrite cr_setf_nlink; vm_compute; reflexivity |].
                intros _. exact (cr_setf_fresh_made dnc ty major minor
                                   Hfresh Htyc). }
-             iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp".
              (* the CHILD is not a directory on this arm, so its record
                 ledger is [emp] at either dinode and the flush's [nlink]
                 bump -- which would break [dir_link_at]'s grey disjunct on
@@ -5364,7 +5362,7 @@ Section ProofCreateMain.
              iApply (create_locked_mk cn γfs γi cov logstart
                        _ _ _ _ _ _ _ _ _ gil gisl
                        with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
-                             Hcivalid Hcload Hcshot1 Hckp").
+                             Hcivalid Hcload Hcshot1 Hckeep").
           -- (* ======================================================== *)
              (*  ARM FAIL's non-directory entry: the append fell short    *)
              (* ======================================================== *)
@@ -8421,7 +8419,6 @@ Section ProofCreateMain.
             as "Hcloadf".
           iAssert (ity_shot g (di_type dc2)) as "#Hcshot2".
           { rewrite Hc2ty0 Hc1ty0 cr_setf_type. iExact "Hcshot". }
-          iDestruct (inode_ref_short_gen_forget with "Hckeep") as "Hckp2".
           iSplitR.
           { iPureIntro. split; [rewrite Ha0f; exact HT4s2 |].
             split; [exact Hkslt |].
@@ -8434,7 +8431,7 @@ Section ProofCreateMain.
           iApply (create_locked_mk cn γfs γi cov logstart
                     _ _ _ _ _ _ _ _ _ gil gisl
                     with "Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
-                          Hcivalid Hcloadf Hcshot2 Hckp2").
+                          Hcivalid Hcloadf Hcshot2 Hckeep").
         * (* =========================================================== *)
           (*  FAIL ENTRY 3 (+0x130 taken): the PARENT's own [dirlink]     *)
           (*  fell short.  This entry sits BEFORE the +0x134 [lhu], so    *)
