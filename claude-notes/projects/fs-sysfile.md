@@ -9444,3 +9444,41 @@ only; `off_invs`/`off_invs_lookup`/`off_inv_alloc`/`off_invs_alloc` deleted)
 -> `SpecFileread.v`/`SpecFilewrite.v` (premise deletion) -> the ten proof
 sites -> `ProofPipealloc.v` (mint) -> `ProofFileclose.v` (cancel) -> the
 sys_read/sys_write application sites.
+
+### THE BUMP RE-DERIVATION (`XV6_REV` -> `f60ff58`) — **sys_open DID NOT
+### RESHAPE.**  Every symbol-relative offset, the frame, and the register
+### allocation are byte-identical; only the base moved, by `+0xe`
+
+Read off the regenerated `xv6-riscv/kernel/kernel.asm` at `82d6abde`, which
+is the first thing my standing authorization owes before the parts file
+restarts.
+
+`KernelSyms.sys_open` 0x800050a6 -> **0x800050b4** (`+0xe`), and the next
+symbol with it (0x800051fc -> 0x8000520a), so the SPAN is **342 bytes,
+unchanged**.  sys_link's new `NLINK_MAX` guard sits below it and pushed the
+whole tail along; nothing inside sys_open moved relative to its own entry.
+
+Checked instruction by instruction against the S7-open arm graph, and **every
+line of it stands verbatim**: the 24-slot frame (`addi sp,sp,-192` at +0x00,
+`addi s0,sp,192` at +0x06) — so **`K_sys_open = 138` holds** — the
+shrink-wrapped callee-saves at +0x28 (s1), +0x5e (s2), +0x68 (s3), the
+register allocation (s1 = ip, s2 = f, s3 = fd), the `omode` cell at `s0-180`
+= the upper word of slot 1, and all fourteen branch targets: +0xca
+(epilogue), +0xd2 (A-FAIL), +0xdc (the namei arm), +0x10c (B-FAIL), +0x116
+(D-FAIL), +0x126 (F-FAIL, falling into +0x12e's E-FAIL), +0x140 (the
+FD_DEVICE writes), +0x14e (itrunc), +0xb8 (the success tail).  The
+`sw a4,0(s2)` at +0x140 is still there too — gcc still reuses the `a4` it
+loaded for the type test as the `FD_DEVICE` it stores, because
+`T_DEVICE = FD_DEVICE = 3`.
+
+**So nothing in the S7-open record needs revising** — the arm graph, the
+frame map, the two decode findings (the single unsigned `bltu` deciding both
+halves of the `major` check; no 4 -> 2 carve) and the ledger are all at
+symbol-relative offsets and all survive.  `SysOpenBudget.v` names no address
+at all and is untouched by construction.
+
+The rule this confirms, and it is the reason the record was written that way:
+**an arm graph stated at symbol-relative offsets survives a bump that does
+not reshape the function, and the two-minute re-derivation is how you learn
+which case you are in.**  The bump playbook's "measure the shift from the
+SYMBOL TABLES, not by assumption" applied one level down.
