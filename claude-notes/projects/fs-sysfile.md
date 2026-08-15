@@ -9344,12 +9344,82 @@ consumer.
   `apply Hfin`; getting it wrong reports **"No applicable tactic"** at the
   bracket rather than a type error.
 
-**WHAT IS LEFT:** the walk (`ProofSysOpen*.v`), the tails, `LinkSysOpen.v`,
-their `_CoqProject` rows and the coverage flip.  The omode BIT cluster
-(`& O_CREATE`, `& O_WRONLY`, `& O_RDWR`, `& O_TRUNC`, and the `snez` that
-computes `f->writable`) is deliberately NOT in the parts file yet: its exact
-term shapes come out of the walk's instruction lemmas, and a leaf file is
-cheap to extend.
+### S7-open STEPS 3–5 — the omode BIT CLUSTER and **ALL SEVEN EXIT BLOCKS**
+### land.  What is left is the STRAIGHT-LINE BODY: `ProofSysOpen.v`,
+### `LinkSysOpen.v`, the `_CoqProject` row and the coverage flip
+
+**STEP 3 — the omode bit cluster, in `ProofSysOpenParts.v`.**  Seven
+instructions read `omode`, at four masks (+0x32 O_CREATE, +0xf6 the raw
+`beqz`, +0x90/+0x94 O_WRONLY and the `xori` that makes `f->readable`,
++0x9c/+0xa0 the merged writable mask and its `snez`, +0xa8 O_TRUNC).  Three
+definitions over the STORED 32-bit word (`so_omv` / `so_and` / `so_rd_word`
+/ `so_wr_word`) plus the facts the walk consumes.
+
+* **gcc MERGED THE C's TWO WRITABLE DISJUNCTS INTO ONE MASK.**  The source
+  is `(omode & O_WRONLY) || (omode & O_RDWR)` and the code is a single
+  `andi 3` plus a branchless `snez` — so there is no short-circuit pair to
+  price here either, the same story as the `major` check.
+* `so_and_rdonly` is **uniform in the mask**: at `omode = 0` every mask is
+  empty, so one lemma serves all four and there is nothing mask-specific to
+  prove.
+* **THE CENTRAL THEOREM IS `so_pay_witness`**, stated in exactly
+  `FileInvDefs.inode_pay_alloc`'s shape: `fc_writable C = trunc8 (so_wr_word
+  om)` and `di_type = T_DIR -> om = 0` give `fc_wbool C = true -> ty <>
+  T_DIR`.  The else arm discharges it by one `apply`; the O_CREATE arm by
+  `so_tdir_zne` at a literal, create having been called with T_FILE.
+
+**STEPS 4+5 — `ProofSysOpenTails.v`, seven blocks, all green.**
+`so_tail_a` (+0xd2, create returned 0), `so_tail_b` (+0x10c, namei returned
+0), `so_tail_c` (+0xfc, T_DIR opened rw), `so_tail_d` (+0x116, `major` out
+of range), `so_tail_e` (+0x12e, filealloc refused), `so_tail_f` (+0x126,
+fdalloc refused), `so_tail_s` (+0xb8, the success tail).  The functor is
+`SysOpenTails (Iunlock) (Iunlockput) (EndOp) (Fileclose)`, unascribed —
+a parts layer, exactly `SysLinkTails`'s shape.
+
+* **ARM 0 IS NOT A TAIL.**  The `bltz a5` at +0x24 targets the EPILOGUE
+  directly (a0 was set to -1 at +0x22), so ARM 0 is `so_epilogue` applied in
+  the walk with no block of its own.
+* **THE SHRINK-WRAPPED SAVES ARE WHAT MAKE THESE SEVEN LEMMAS AND NOT ONE.**
+  Which of `M s1 = m s1` / `M s2 = m s2` / `M s3 = m s3` is a PREMISE and
+  which is EARNED by a `c.ldsp` differs per tail, and the slot a tail does
+  not reload rides through as the caller's junk.  E is the only failure arm
+  that earns s2; F is the only route that owns slot 5 at all — which is
+  exactly why `so_tail_e` takes the s3 agreement as a premise and F's
+  `c.ldsp s3` sits on the near side of the fall-through.
+* **TWO FALL-THROUGHS, AND THEY ARE WHY TWO LEMMAS APPLY ANOTHER.**  ARM
+  F-FAIL's block has no `c.j`: it runs off its end into +0x12e, so
+  `so_tail_f` ends by applying `so_tail_e`.  ARM S runs off its end into the
+  epilogue.
+* **ARM F's `fileclose` IS THREADED OPAQUELY** (`fileclose_env` in, its dual
+  out) rather than discharged here: `fileclose_env_none` needs the TYPE, and
+  the walk is where the type is known.  That keeps the tail free of the file
+  layer entirely.
+* **ARM S CALLS iunlock, NOT iunlockput, AND THAT IS THE LEDGER SENTENCE OF
+  THE SYSCALL.**  The `+1` is already parked in `f->ip` as `inode_pay`, so
+  what comes back is the generation-ERASED `inode_shr k s dev inum` and NOT
+  an `iref_slot`; the tail moves no bitmap, no buffer pool and no reference
+  ledger, and the retained `inode_ref_short` rides in the walk's closure.
+  a0 is a PARAMETER there (a `c.mv a0,s3` after end_op), not the failure
+  arms' `-1` literal.
+
+**WHAT IS LEFT, AND IT IS ONE FILE.**  `ProofSysOpen.v`: the straight-line
+body +0x00 → +0xb8, i.e. the prologue and frame carve, argint, argstr and
+ARM 0's branch, begin_op, the O_CREATE split (create | namei + ilock +
+the T_DIR/omode refusal), the join's T_DEVICE and `major` tests, filealloc,
+fdalloc, the FD_DEVICE / FD_INODE field stores with the R-open-1b publisher
+choreography (cancel the UNARMED cinv, write `a_fip` and `a_foff`,
+`off_hold_alloc` to re-arm, record the names in the same `fpay_tok_update`,
+`inode_pay_alloc` with `so_pay_witness`), the O_TRUNC tail, and
+`ProcInv.proc_ofiles_repay`.  Every one of its eight exits is now a single
+`iApply` of a proven block.  Then `LinkSysOpen.v`, the `_CoqProject` rows
+SAME-COMMIT, and the coverage flip (expect 185/190, sysfile.c 15/16).
+
+**Gate for steps 3–5.**  `coqc ProofSysOpenParts.v` and
+`coqc ProofSysOpenTails.v` on the mirror, `EXIT=0`, zero `Error`.
+`proof_coverage.py --check` exits 0 with the new `_CoqProject` row;
+`lemma_diff` CLEAN.  No `Link` file yet, so no `Print Assumptions` and the
+coverage count is unmoved at **184/190** (not the 183 the earlier entries
+record — the tree moved under this lane).
 
 ### THE BUMP RE-DERIVATION (`XV6_REV` -> `f60ff58`) — **sys_open DID NOT
 ### RESHAPE.**  Every symbol-relative offset, the frame, and the register
