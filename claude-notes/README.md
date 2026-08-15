@@ -104,9 +104,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 
 ## `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`iput-acquiresleep.md`](projects/iput-acquiresleep.md)** — discharging
+- **[`iput-acquiresleep.md`](projects/iput-acquiresleep.md)** — DONE: how
   `iput_acquiresleep_order_ADMITTED`, the tree's one admitted (and FALSE)
-  statement: the staged plan, and the three dead ends not to re-walk.
+  statement, was discharged by making `acquiresleep` NON-BLOCKING on a
+  resource argument rather than by licensing the lock order. Read it for the
+  sleeplock DEPOSIT and why a purely pure held arm can never be refuted.
+  **The tree now has no admitted statements.**
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
@@ -185,6 +188,7 @@ discharge — which is what `sysfile.c` and the boot client inherit).
 `lock-set.md` is the third, and the one to read BEFORE adding a lock or
 changing where one sits: it carries the audit of every simultaneous lock pair
 in xv6 and the installed rank table. The one thing it left behind —
-`ProofIput.iput_acquiresleep_order_ADMITTED`, a FALSE axiom that makes
-everything downstream of `iput` vacuous — is a live effort of its own, in
+`ProofIput.iput_acquiresleep_order_ADMITTED`, a FALSE axiom that made
+everything downstream of `iput` vacuous — is GONE; how, and why no ranking
+could ever have licensed that edge, is in
 [`projects/iput-acquiresleep.md`](projects/iput-acquiresleep.md).

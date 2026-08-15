@@ -379,52 +379,27 @@ Qed.
 
 (* ===================================================================== *)
 
-(* THE ONE ORDER OBLIGATION THIS DEVELOPMENT ADMITS.  It lives HERE, in the
-   file that needs it, rather than in a header everyone imports, so nobody
-   picks it up by accident: the only way to depend on it is to depend on
-   iput.
+(* THE ORDER OBLIGATION THIS FILE USED TO ADMIT -- and no longer does.
 
-   iput holds itable.lock across acquiresleep (fs.c:341), and that edge is
-   the one the rank order cannot license.  kfork holds np->lock across idup,
-   so "itable" (14) must sit ABOVE "proc" (9); acquiresleep's blocking path
-   runs sleep_prepare while holding the sleeplock's own spinlock, so
-   "sleep lock" (4) must sit BELOW "proc".  Nothing fits between them, and
-   the obligation below needs 14 < 4.  See claude-notes/completed/lock-set.md,
-   "THE ONE UNLICENSED EDGE", for the three-edge cycle at the name level and
-   the concrete three-CPU execution that would have to happen for it to bite.
+   iput holds itable.lock (14) across [acquiresleep], whose spinlock is
+   "sleep lock" (4), and no ranking can license that edge: kfork holds
+   np->lock across idup, so "itable" must sit ABOVE "proc" (9), and
+   acquiresleep's BLOCKING path runs sleep_prepare while holding the
+   sleeplock's own spinlock, so "sleep lock" must sit BELOW "proc".  Nothing
+   fits between them (claude-notes/completed/lock-set.md, "THE ONE UNLICENSED
+   EDGE").  For a long time this file carried an axiom asserting the
+   obligation anyway -- a FALSE one, so everything downstream of iput was
+   vacuous.
 
-   xv6 is not wrong -- fs.c:339 says "ip->ref == 1 means no other process can
-   have ip locked, so this acquiresleep() won't block (or deadlock)".  The
-   real discharge is the icache REF-1 exclusivity theorem
-   (design/fs-icache.md) plus a NON-BLOCKING acquiresleep variant whose
-   contract never reaches sleep_prepare and so raises no order obligation at
-   all.  Until that lands, iput ASSUMES the obligation instead of proving it.
-
-   ---- READ THIS BEFORE TRUSTING ANYTHING DOWNSTREAM ------------------
-
-   THE ADMITTED STATEMENT IS FALSE, not merely unproven: [lock_rank] is a
-   closed computation, so [vm_compute] refutes it and [locks_below_not_elem]
-   turns it into [False].  Every theorem whose proof reaches this axiom is
-   logically vacuous -- iput, iunlockput, fileclose, dirlink, namex, namei,
-   nameiparent, kexit, sys_exit, sys_close, sys_pipe, pipealloc and their
-   Link files.  They typecheck; they do not yet mean anything.
-
-   There is no CONSISTENT way to close this goal, because the goal itself is
-   refutable; any axiom strong enough would be.  The consistent fix changes
-   the OBLIGATION (non-blocking acquiresleep) rather than assuming it.
-
-   [Print Assumptions] on any downstream theorem names
-   [iput_acquiresleep_order_ADMITTED].  That is the intended tripwire; grep
-   for the identifier to find everything standing on it.
-
-   Stated with iput's OWN premise on the left so it cannot be reused as a
-   general "any set is below any rank" escape hatch: it licenses exactly
-   iput's single nested acquiresleep, at exactly the held set iput has there
-   ({[itable]} plus whatever its caller brought). *)
-Axiom iput_acquiresleep_order_ADMITTED :
-  forall lks : gset string,
-    locks_below lks "itable" ->
-    locks_below ({["itable"]} ∪ lks) "sleep lock".
+   THE DISCHARGE CHANGED THE OBLIGATION rather than assuming it, which is
+   what xv6's own comment at fs.c:339 always said it should: "ip->ref == 1
+   means no other process can have ip locked, so this acquiresleep() won't
+   block (or deadlock)".  The entry's sleeplock is TRACKED -- a holder has
+   deposited a share of somebody's REFERENCE in it -- so REF-1's "your [q] is
+   the whole outstanding share" turns into "no deposit exists", and
+   [Acquiresleep.wp_acquiresleep_nb_sconf] takes that in place of any rank
+   bound.  See claude-notes/projects/iput-acquiresleep.md; the call site is
+   the one marked THE STEP THIS FILE EXISTS FOR. *)
 
 (* ===================================================================== *)
 
@@ -1887,29 +1862,47 @@ Section ProofIput.
                        G4 !!! Regidx c = m !!! Regidx c).
     { intros c Hcs N2 N8 N9 N18. rewrite /G4 upd_ne; [| regne].
       exact (HG3thr c Hcs N2 N8 N9 N18). }
-    (* THE ORDER STEP THIS FILE EXISTS TO JUSTIFY, and the ONE this
-       development does not prove.  iput holds itable.lock (14) across
-       acquiresleep, whose spinlock is "sleep lock" (4), so the obligation
-       needs 14 < 4 and [lkbelow] rightly refuses it.  It is ADMITTED here --
-       see [iput_acquiresleep_order_ADMITTED] at the top of this file for why
-       no ranking can license this edge, why xv6 is nonetheless correct, and
-       what everything downstream of this line is (and is not) worth. *)
-    pose proof (iput_acquiresleep_order_ADMITTED lks Hitbelow) as Hslbelow.
-    (* the deposit is this reference's OWN sleeplock slice.  It is what the
-       entry's lock holds while iput has it, and it is what comes back at the
-       [releasesleep] below -- the escrow arm keeps the other two slices.
-       (When the non-blocking contract replaces this call, the same slice is
-       returned to the slot's authority FIRST, which is what makes the zero;
-       see claude-notes/projects/iput-acquiresleep.md.) *)
+    (* ==================================================================
+       THE STEP THIS FILE EXISTS FOR, and it is now PROVED rather than
+       admitted.  xv6's comment at fs.c:339 is "ip->ref == 1 means no other
+       process can have ip locked, so this acquiresleep() won't block", and
+       this is that sentence:
+
+       REF-1 says the count is 1 and this thread's [q] is the WHOLE
+       outstanding share of slot [k].  A share of that same [q] is what any
+       holder of the entry's sleeplock would have had to deposit in it.  So
+       returning ours to the slot's authority leaves the AUTHORITATIVE ZERO
+       -- no share exists anywhere, hence no deposit, hence nobody holds the
+       lock -- and [wp_acquiresleep_nb_sconf] takes exactly that in place of
+       a lock-order bound no ranking can supply.
+
+       The authority is reachable because iput HOLDS itable.lock here: the C
+       releases it only after this call returns.
+
+       The share it mints for its own deposit is the same [q], so the slot's
+       authority goes back into the lock's resource unchanged -- which is
+       what the [release(&itable.lock)] at +0x54 needs.
+       ================================================================== *)
+    assert (Hslfresh : "sleep lock"%string ∉ ({["itable"%string]} ∪ lks : gset string)).
+    { apply not_elem_of_union. split.
+      - apply not_elem_of_singleton. discriminate.
+      - apply (locks_below_not_elem lks "sleep lock"%string). lkbelow. }
+    iDestruct (isl_pool_acc_upd Mt k Hk with "Hipool") as "[Hisl Hislback]".
+    rewrite (isl_slot_some Mt k q 1%positive HMk).
     iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
-    iApply (ASL.wp_acquiresleep_nested_gen_sconf (dq := dq) gs j gil gisl "inode"%string
-              (ic_tok cn k) (slh_tok (icfg_isl k)) q G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
+    iMod (slh_return_last (icfg_isl k) q with "Hisl Hrslh") as "Hisl".
+    iApply (ASL.wp_acquiresleep_nb_sconf (dq := dq) j gil gisl "inode"%string
+              (ic_tok cn k) (icfg_isl k) q G4 pidv (trap_res eb + (K - 4))%nat eb C 0%nat
               ({["itable"]} ∪ lks)
-              Hj ltac:(lia) ltac:(cbn; lia) Hslbelow
-              with "Hcg Hcnt Htext Hpc [] Hrslh Hpanic Hppid Hprocs").
+              ltac:(lia) ltac:(cbn; lia) Hslfresh
+              with "Hcg Hcnt Htext Hpc [] Hisl Hpanic Hppid").
     { iEval (rewrite HG4a0). iExact "Hslk". }
     iApply wp_next_off_intro.
-    iIntros (mfa) "%Hcsa Hcg Hcnt Hpc Hstok Hspid Hictok Hppid".
+    iIntros (mfa) "%Hcsa Hcg Hcnt Hpc Hstok Hisl Hspid Hictok Hppid".
+    (* the minted share is the same [q], so the authority goes back exactly
+       as it came out *)
+    rewrite -(isl_slot_some Mt k q 1%positive HMk).
+    iDestruct ("Hislback" $! Mt with "[%] Hisl") as "Hipool"; [ done |].
     iEval (rewrite HG4a0) in "Hspid".
     assert (Hpc54 : ret_pc (G4 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x54))
       by (rewrite HG4ra; pcw).

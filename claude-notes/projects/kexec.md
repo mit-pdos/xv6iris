@@ -18,9 +18,10 @@ kexec-specific is the *composition*.
 `kexec()` is proven end to end and linked. `ProofKexec.v` composes the four
 phases into `SpecKexec.wp_kexec_sconf_body`; `LinkKexec.v` instantiates that
 functor against its sixteen callees' proofs. The cone's `Print Assumptions`
-is the five platform axioms, `functional_extensionality_dep`, and the
-transient `ProofIput.iput_acquiresleep_order_ADMITTED` every `iput` client
-inherits — nothing kexec-specific, and no `PanicStub` credential.
+is the five platform axioms and `functional_extensionality_dep` — nothing
+kexec-specific, and no `PanicStub` credential.  (It used to inherit
+`ProofIput.iput_acquiresleep_order_ADMITTED` from every `iput` client; that
+axiom is gone — [`iput-acquiresleep.md`](iput-acquiresleep.md).)
 
 `sys_exec`, kexec's only caller, is SPECIFIED (`SpecSysExec.v`) and its
 frame algebra and epilogue are proven (`ProofSysExec.v`); its body is what is

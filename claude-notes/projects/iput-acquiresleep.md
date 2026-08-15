@@ -1,29 +1,83 @@
-# Discharging `iput_acquiresleep_order_ADMITTED`
+# Discharging `iput_acquiresleep_order_ADMITTED` — DONE
 
-The tree's one admitted statement, and the only one. `ProofIput.v:423` assumes
+**The axiom is gone.** `ProofIput.v` no longer assumes anything: `iput` takes
+the NON-BLOCKING `acquiresleep`, and `Print Assumptions` on
+`Iput.wp_iput_sconf` (and on `Kexit.wp_kexit_sconf`, downstream of it) names
+only the ambient Sail model axioms and functional extensionality. Everything
+that stood on `iput` — iunlockput, fileclose, dirlink, namex, namei,
+nameiparent, kexit, sys_exit, sys_close, sys_pipe, pipealloc and their Link
+files — means something again.
+
+**What it used to assume**, and why nothing could:
 
 ```coq
 Axiom iput_acquiresleep_order_ADMITTED :
   forall lks : gset string, locks_below lks "itable" -> locks_below ({["itable"]} ∪ lks) "sleep lock".
 ```
 
-**It is FALSE, not merely unproven** — `lock_rank` is a closed computation, so
-`vm_compute` refutes it and `locks_below_not_elem` turns it into `False`. Every
-theorem whose proof reaches it is logically vacuous, which is everything
-downstream of `iput`. `Print Assumptions` on any of them names it; that is the
-tripwire.
-
-Why no ranking can license the edge, and why xv6 is nonetheless correct, is in
-[`completed/lock-set.md`](../completed/lock-set.md) §"THE ONE UNLICENSED EDGE":
 `iput` (`kernel/fs.c:341-348`) holds `itable.lock` (14) across `acquiresleep`
-(4), and with `proc` (9) below `itable` and `sleep lock` below `proc` there is
-no room to place `itable` between them. xv6's own justification is the comment
-at `fs.c:339` — `ip->ref == 1` means no other process can have `ip` locked, so
-the `acquiresleep` cannot block.
+(4). With `proc` (9) below `itable` (kfork holds `np->lock` across `idup`) and
+`sleep lock` below `proc` (acquiresleep's BLOCKING path runs `sleep_prepare`),
+there is no room to place `itable` between them — see
+[`completed/lock-set.md`](../completed/lock-set.md) §"THE ONE UNLICENSED EDGE".
+The statement was FALSE, not merely unproven, so every theorem reaching it was
+vacuous.
 
-**The discharge changes the OBLIGATION rather than assuming it.** An
-`acquiresleep` that cannot block never reaches `sleep_prepare`, so it raises no
-order premise, so there is nothing to admit.
+**How it was discharged.** By changing the OBLIGATION, exactly as xv6's comment
+at `fs.c:339` says: *"ip->ref == 1 means no other process can have ip locked,
+so this acquiresleep() won't block (or deadlock)."* A non-blocking
+`acquiresleep` never reaches `sleep_prepare`, so it raises no order premise at
+all — and what makes it non-blocking is a resource argument, not a scheduling
+one. The chain, in the order it landed:
+
+1. **A FRESH tier on acquire.** `SpecAcquire` states one body per level indexed
+   by its held-set precondition: `s ∉ lks` (what the ghost step needs) and
+   `locks_below lks s` (the discipline), the latter a corollary of the former.
+2. **A holder DEPOSIT on the sleeplock.** `sl_res_gen`'s held arm holds a
+   resource the acquirer brought. That is forced, not chosen: a client's
+   evidence `P` that the lock is free is a frame for the acquire's ghost step,
+   so a held arm manufacturable from the free arm alone survives it.
+   `SleepLock.v`'s header carries the argument.
+3. **The tracked instance.** `slh_tok γ q` is a q-share of "somebody may hold
+   this lock", `slh_auth γ t` the total, `t = None` the AUTHORITATIVE ZERO that
+   refutes every share. Fractions (`ufrac`, uncapped) because one inode
+   reference is shared by many `struct file`s, all of which may race for the
+   lock.
+4. **The icache keys it by the SLOT.** `icfg_isl : nat -> gname`; the share
+   rides on a reference's slice axis so `inode_ref_carve` hands it to the
+   `inode_shr` that `ilock` already consumes; the escrow arm keeps the other
+   two slices (`inode_shr_gen_bare`); `sleeplocked_q` carries the fraction so
+   `iunlock` recovers exactly its own. The slot authorities live in the itable
+   LOCK's resource, because `iput` must hold a zero across the whole
+   `acquiresleep` call and `release(&itable.lock)` comes after it.
+5. **REF-1 spends it.** At `ip->ref == 1`, `iref_lookup` gives
+   `M !! k = Some (q, 1)` with `q` the thread's own whole outstanding share;
+   returning it leaves `slh_auth (icfg_isl k) None`, which is
+   `wp_acquiresleep_nb_sconf`'s premise. The share it mints for its own deposit
+   is the same `q`, so the authority goes back unchanged and the itable lock
+   can be released.
+
+**And the blocking nested contract is gone with it.** `sched()` panics on
+`noff != 1`, and that contract's wait loop reached `sleep` at noff >= 2 — it
+was provable only because `SpecSleep.wp_sleep_nested_body` offers that panic as
+one of its two arms. `iput` was its only consumer. `acquiresleep` now has three
+contracts: `wp_acquiresleep_gen_sconf` and its untracked instance
+`wp_acquiresleep_sconf`, both at `cpu_own 0`, and `wp_acquiresleep_nb_sconf`,
+the only way to take a sleeplock with a spinlock held — and it cannot sleep.
+**Anything that CAN sleep is now entered at noff = 0**, which is what a proof
+that the "sched locks" panic is unreachable needs.
+
+## What is left
+
+- `SpecSleep.wp_sleep_nested_body` — the nested sleep arm — has no consumer
+  now. Retiring it (and with it sched's panic arm) is the next step and is
+  what step 5 above was setting up.
+- `SleepLock.new_sleeplock_gen_at` / `sl_fresh_new_gen_at` and the
+  `sl_free_tok` half of `icfg_alloc`'s output are unused: the icache keys the
+  deposit by the slot and lets each lock keep its own existential gname, so
+  nothing needs to build a lock AT a given gname. Keep or drop.
+
+## The original plan, kept for the reasoning
 
 ## The plan, in order
 

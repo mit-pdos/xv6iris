@@ -19,9 +19,9 @@
    the contract takes is threaded down and never consumed locally.
 
    So this cone's assumption count is the five platform axioms plus funext,
-   plus [create_fresh_ty], plus the TRANSIENT
-   [ProofIput.iput_acquiresleep_order_ADMITTED] that iunlockput carries in
-   from upstream. *)
+   plus [create_fresh_ty].  (It also used to carry
+   [ProofIput.iput_acquiresleep_order_ADMITTED] in through iunlockput; that
+   axiom is gone -- claude-notes/projects/iput-acquiresleep.md.) *)
 Require Import LinkBeginOp LinkArgint LinkArgstr LinkCreate LinkIunlockput
         LinkEndOp ProofSysMknod.
 

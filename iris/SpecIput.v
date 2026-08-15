@@ -47,13 +47,16 @@
    Two below-icache blockers were found by tracing the proof forward and
    both are ruled on (design §13.12):
 
-     (B1) iput calls acquiresleep at noff = 1 (itable.lock held), and
-          SpecAcquiresleep demands [cpu_own 0 ...].  ROUTE B adopted: the
-          sleeping branch is panic("sched locks"), so it DIVERGES and
-          [panic_wp_any] -- which iput already carries -- closes it.
-          LANDED (ef035525): the truncate arm calls
-          [wp_acquiresleep_nested_sconf] at n := 0.  NOTHING in this
-          statement changes because of it.
+     (B1) iput calls acquiresleep at noff = 1 (itable.lock held), and the
+          blocking [SpecAcquiresleep] demands [cpu_own 0 ...].  SETTLED, and
+          not by the route this note first took: the truncate arm calls
+          [wp_acquiresleep_nb_sconf], the NON-BLOCKING contract, which never
+          reaches the sleeping branch at all -- REF-1 says no share of the
+          entry's "may hold" right exists, so nobody holds the lock
+          (claude-notes/projects/iput-acquiresleep.md).  The earlier plan
+          leaned on the sleeping branch being panic("sched locks"); that
+          contract is gone, because nothing that CAN sleep may be entered at
+          noff != 0.  NOTHING in this statement changes because of it.
 
      (B2) SpecItrunc's [forall i < MAXFILE, length (data i) = BSIZE] is not
           derivable: [data] is EXISTENTIAL inside [ic_loaded], and

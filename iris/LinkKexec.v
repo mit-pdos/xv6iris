@@ -7,8 +7,9 @@
    - the FS transaction: begin_op / end_op (LinkBeginOp.v, LinkEndOp.v) and,
      inside it, namei -> ilock -> readi -> iunlockput (LinkNamei.v,
      LinkIlock.v, LinkReadi.v, LinkIunlockput.v) -- iunlockput is kexec's
-     only route to iput, and hence the one that carries iput's transient
-     [iput_acquiresleep_order_ADMITTED] into this cone;
+     only route to iput, and hence the one that used to carry iput's
+     [iput_acquiresleep_order_ADMITTED] into this cone (that axiom is gone --
+     claude-notes/projects/iput-acquiresleep.md);
    - the address space: proc_pagetable (LinkProcPagetable.v) at its GENERAL
      [PROC_PAGETABLE_GEN] instantiation, uvmalloc / uvmclear / walkaddr
      (LinkUvmalloc.v, LinkUvmclear.v, LinkWalkaddr.v) and, on every [bad:]

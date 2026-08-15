@@ -99,25 +99,22 @@
    That let the NESTED body be split so a contract can REFUTE its wait loop
    instead of proving it:
 
-     * [asl_nloop_proof] -- the wait loop (Route B's locked branch).  It was
-       an [iAssert ... with "[]"] inside the nested contract, i.e. it already
-       used nothing but the persistent context, so lifting it out cost only
-       its binders.
-     * [asl_nested_core] -- everything else of the nested body, with the
+     * [asl_nested_core] -- everything but the wait loop, with the
        LOCKED arm handed off to whatever [asl_nloop] the caller supplies.
        Nothing in it reaches [sleep_prepare], so its held-set premise is down
        to FRESHNESS ("sleep lock" ∉ lks) -- no rank bound anywhere.
-     * the contracts over it: [wp_acquiresleep_nested_gen_sconf] supplies the
-       loop; [wp_acquiresleep_nb_sconf] supplies a refutation of it, out of
-       the caller's [slh_auth γsl None]; and the two [_sconf] contracts are
-       their untracked ([H := sl_untracked], [q := 1]) instances, so every
-       existing caller reads exactly as before.
+     * [wp_acquiresleep_nb_sconf] over it, which supplies a REFUTATION of
+       the loop out of the caller's [slh_auth γt None].  There is no longer
+       a BLOCKING nested contract to supply the loop itself: it reached
+       [sleep] at noff >= 2, where sched panics, and iput -- its only
+       consumer -- takes the non-blocking one now.  So the only acquiresleep
+       that can sleep is the level-0 one, at [cpu_own 0].
 
    [asl_nexit] / [asl_nloop] carry a ROUTED resource [X], and it is not
    decoration: the entry test picks exactly one arm, and the non-blocking
    instance needs its counting authority on BOTH -- to refute the locked arm,
    and to hand back on the free one.  A static split is impossible, so the
-   core takes [X] and routes it ([emp] for the blocking caller).
+   core takes [X] and routes it.
 
    A functor over ACQUIRE / RELEASE / MYPROC / SLEEP. *)
 From Stdlib Require Import ZArith Lia List.
@@ -1434,304 +1431,21 @@ Section ProofAcquiresleep.
          [asl_exit] anchor are NOT needed: the wait loop is entered only
          from the locked branch, which diverges before it can go round. *)
   (* ==================================================================== *)
-  (* THE WAIT LOOP, Route B's LOCKED branch, as a lemma of its own.        *)
-  (*                                                                      *)
-  (* It was an [iAssert ... with "[]"] inside the nested contract, i.e. it *)
-  (* already used nothing but the persistent context -- so lifting it out  *)
-  (* costs only its binders, and buys the thing this file needs: the rest  *)
-  (* of the nested body (prologue, entry acquire, exit stretch, dispatch)  *)
-  (* becomes reusable by a contract that does NOT prove this loop but      *)
-  (* REFUTES it.  That is the non-blocking acquiresleep.                   *)
-  (* ==================================================================== *)
-  Lemma asl_nloop_proof
-      (γs : list gname) (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp) (X : iProp Σ)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac)
-      (n : nat) (lks : gset string) (slk spd sp0 : mword 64) (γpl : gname) :
-    (j < NPROC)%nat ->
-    (26 <= av)%nat ->
-    (Z.of_nat n + 4 < 2 ^ 31)%Z ->
-    locks_below lks "sleep lock" ->
-    γs !! j = Some γpl ->
-    kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
-    is_sleeplock_gen γl γsl slk s R H -∗
-    asl_nloop γl γsl R H q X m j pidv av dq slk spd sp0 eb C n lks.
-  Proof.
-    intros Hj Hav Hb31 Hbelow Hjpl.
-    set (pj := proc_addr j).
-    iIntros "#Htext #Hpanic #Hpinv #Hslk".
-    iLöb as "IH".
-      iIntros (M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq HX Hpid Hown Hpay Hcg Hpc Hnexit".
-      destruct HaslL as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
-      iDestruct "Hheld" as (vh) "[Hw %Hvh]".
-      (* sleep_prepare's "chan <> 0", out of the word cell the loop holds *)
-      iDestruct (asl_word4_nonzero with "Hw") as %Hslknz.
-      iPoseProof (asl_1c with "Htext") as "Hi1c".
-      iPoseProof (asl_1e with "Htext") as "Hi1e".
-      iPoseProof (asl_22 with "Htext") as "Hi22".
-      iPoseProof (asl_24 with "Htext") as "Hi24".
-      iPoseProof (asl_28 with "Htext") as "Hi28".
-      iPoseProof (asl_2c with "Htext") as "Hi2c".
-      iPoseProof (asl_2e with "Htext") as "Hi2e".
-      iPoseProof (asl_32 with "Htext") as "Hi32".
-      iPoseProof (asl_34 with "Htext") as "Hi34".
-      (* ===== +0x1c c.mv a0,s1 : a0 := slk ===== *)
-      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-                M (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi1c").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      iEval (rgne) in "Hcg".
-      set (L0 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (M !!! Regidx (mword_of_int 9 : mword 5)))]> M).
-      change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (M !!! Regidx (mword_of_int 9 : mword 5)))]> M) with L0.
-      assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.acquiresleep + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp1e) in "Hpc".
-      (* ===== +0x1e jal ra,sleep_prepare ===== *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2088850 : mword 21)
-                L0 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi1e").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      set (L1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x1e) : mword 64) 4)]> L0).
-      change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x1e) : mword 64) 4)]> L0) with L1.
-      assert (Hjsp : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 2088850 : mword 21)) = mword_of_int KernelSyms.sleep_prepare)
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hjsp) in "Hpc".
-      assert (HL1a0 : L1 !!! Regidx (mword_of_int 10 : mword 5) = slk).
-      { rewrite /L1 upd_ne; [| reg_neq]. rewrite /L0 upd_eq. rewrite Hs1. apply add_vec_zero_l. }
-      assert (HL1ra : L1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x1e) : mword 64) 4)
-        by (rewrite /L1; apply upd_eq).
-      assert (HcsML1 : callee_saved M L1).
-      { rewrite /L1 /L0.
-        apply callee_saved_insert_r; [vm_compute; reflexivity|].
-        apply callee_saved_insert_r; [vm_compute; reflexivity|].
-        apply callee_saved_refl. }
-      assert (HaslML : asl_regs m M slk spd).
-      { unfold asl_regs. repeat split; assumption. }
-      assert (HaslL1 : asl_regs m L1 slk spd) by (apply (asl_regs_cs m M L1 slk spd HcsML1 HaslML)).
-      assert (Hchan : eq_vec (L1 !!! Regidx (mword_of_int 10 : mword 5)) (zero_reg : mword 64) = false)
-        by (rewrite HL1a0; exact Hslknz).
-      iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γpl L1 (av - 4)%nat (S (S n)) eb C false
-                ({["sleep lock"]} ∪ lks)
-                Hj Hjpl Hchan ltac:(lia) ltac:(lia)
-                ltac:(lkbelow)
-                with "Hcg Hown Htext Hpc Hpinv Hpanic").
-      all: try lkbelow.
-      iApply wp_next_off_intro.
-      iIntros (mfp) "%Hspcs Hcg Hown Hpc".
-      assert (Hpc22 : ret_pc (L1 !!! Regidx (mword_of_int 1 : mword 5))
-                      = mword_of_int (KernelSyms.acquiresleep + 0x22)) by (rewrite HL1ra; apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpc22) in "Hpc".
-      assert (HaslMfp : asl_regs m mfp slk spd)
-        by (apply (asl_regs_cs m L1 mfp slk spd Hspcs HaslL1)).
-      assert (Hmfp_s2 : mfp !!! Regidx (mword_of_int 18 : mword 5) = sl_lk slk)
-        by (destruct HaslMfp as (_ & Xs2 & _); exact Xs2).
-      (* ===== +0x22 c.mv a0,s2 : a0 := sl_lk slk ===== *)
-      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x22)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
-                mfp (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi22").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      iEval (rgne) in "Hcg".
-      set (L3 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (mfp !!! Regidx (mword_of_int 18 : mword 5)))]> mfp).
-      change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (mfp !!! Regidx (mword_of_int 18 : mword 5)))]> mfp) with L3.
-      assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.acquiresleep + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp24) in "Hpc".
-      (* ===== +0x24 jal ra,release ===== *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x24)) (mword_of_int 1 : mword 5) (mword_of_int 2084074 : mword 21)
-                L3 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi24").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      set (L4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x24) : mword 64) 4)]> L3).
-      change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x24) : mword 64) 4)]> L3) with L4.
-      assert (Hjrl : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x24) : mword 64) (sign_extend' 64 (mword_of_int 2084074 : mword 21)) = mword_of_int KernelSyms.release)
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hjrl) in "Hpc".
-      assert (HL4a0 : L4 !!! Regidx (mword_of_int 10 : mword 5) = sl_lk slk).
-      { rewrite /L4 upd_ne; [| reg_neq]. rewrite /L3 upd_eq. rewrite Hmfp_s2. apply add_vec_zero_l. }
-      assert (HL4ra : L4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x24) : mword 64) 4)
-        by (rewrite /L4; apply upd_eq).
-      assert (HcsL4 : callee_saved mfp L4).
-      { rewrite /L4 /L3.
-        apply callee_saved_insert_r; [vm_compute; reflexivity|].
-        apply callee_saved_insert_r; [vm_compute; reflexivity|].
-        apply callee_saved_refl. }
-      assert (HaslL4 : asl_regs m L4 slk spd) by (apply (asl_regs_cs m mfp L4 slk spd HcsL4 HaslMfp)).
-      iDestruct (sl_res_close_held γsl slk R H vh Hvh with "Hw Hdep") as "HRc".
-      assert (Hrel_lka : add_vec (L4 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = sl_lk slk).
-      { rewrite HL4a0. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-      (* the NESTED release: [S (S n)] -> [S n], so [outb = false], no hart
-         moves and the [arm_pay] needs no conversion. *)
-      iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) L4
-                (S n) eb pj C (av - 4)%nat
-                ({["sleep lock"]} ∪ lks)
-                Hrel_lka ltac:(lia)
-                with "Hcg Htext Hpc [] Htok HRc Hown Hpay").
-      { iApply (is_sleeplock_gen_lock with "Hslk"). }
-      iApply wp_next_off_intro.
-      iIntros (mrel) "Hcg Hpc %Hrelcs Hown".
-      (* back to the OUTER [lks] across the sleep_prepare/release/sleep/
-         acquire round trip. *)
-      assert (Hsetback : ({["sleep lock"]} ∪ lks) ∖ {["sleep lock"]} = lks)
-      by (apply locks_add_del_below; lkbelow).
-      iEval (rewrite Hsetback) in "Hown".
-      assert (Hpc28 : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5))
-                      = mword_of_int (KernelSyms.acquiresleep + 0x28)) by (rewrite HL4ra; apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpc28) in "Hpc".
-      assert (HaslMrel : asl_regs m mrel slk spd)
-        by (apply (asl_regs_cs m L4 mrel slk spd Hrelcs HaslL4)).
-      (* ===== +0x28 jal ra,sleep ===== *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x28)) (mword_of_int 1 : mword 5) (mword_of_int 2088900 : mword 21)
-                mrel (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi28").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      set (L5 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x28) : mword 64) 4)]> mrel).
-      change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x28) : mword 64) 4)]> mrel) with L5.
-      assert (Hjsl : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x28) : mword 64) (sign_extend' 64 (mword_of_int 2088900 : mword 21)) = mword_of_int KernelSyms.sleep)
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hjsl) in "Hpc".
-      assert (HL5ra : L5 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x28) : mword 64) 4)
-        by (rewrite /L5; apply upd_eq).
-      assert (HcsL5 : callee_saved mrel L5).
-      { rewrite /L5. apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
-      assert (HaslL5 : asl_regs m L5 slk spd) by (apply (asl_regs_cs m mrel L5 slk spd HcsL5 HaslMrel)).
-      (* sleep() AT LEVEL [S n].  Its parking arm reaches sched's
-         panic("sched locks") and never comes back; its no-park arm (a wakeup
-         cleared [p->chan] in the window) returns here, noff-balanced. *)
-      iApply (Sleep.wp_sleep_nested γs j γpl L5 (av - 4)%nat eb C n
-                lks   (* the release above already cancelled the singleton *)
-                Hj Hjpl ltac:(lia) ltac:(lia)
-                ltac:(lkbelow)
-                with "Hcg Hown Htext Hpc Hpinv Hpanic").
-      all: try lkbelow.
-      iIntros (mfs) "%Hs_cs Hcg Hown Hpc".
-      assert (Hpc2c : ret_pc (L5 !!! Regidx (mword_of_int 1 : mword 5))
-                      = mword_of_int (KernelSyms.acquiresleep + 0x2c)) by (rewrite HL5ra; apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpc2c) in "Hpc".
-      assert (HaslMfs : asl_regs m mfs slk spd)
-        by (apply (asl_regs_cs m L5 mfs slk spd Hs_cs HaslL5)).
-      assert (Hmfs_s2 : mfs !!! Regidx (mword_of_int 18 : mword 5) = sl_lk slk)
-        by (destruct HaslMfs as (_ & Xs2 & _); exact Xs2).
-      (* ===== +0x2c c.mv a0,s2 ===== *)
-      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x2c)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
-                mfs (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi2c").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      iEval (rgne) in "Hcg".
-      set (L6 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (mfs !!! Regidx (mword_of_int 18 : mword 5)))]> mfs).
-      change (<[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec zero_reg (mfs !!! Regidx (mword_of_int 18 : mword 5)))]> mfs) with L6.
-      assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x2c) : mword 64) 2 = mword_of_int (KernelSyms.acquiresleep + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp2e) in "Hpc".
-      (* ===== +0x2e jal ra,acquire ===== *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x2e)) (mword_of_int 1 : mword 5) (mword_of_int 2083928 : mword 21)
-                L6 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi2e").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      set (L7 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x2e) : mword 64) 4)]> L6).
-      change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x2e) : mword 64) 4)]> L6) with L7.
-      assert (Hjaq2 : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x2e) : mword 64) (sign_extend' 64 (mword_of_int 2083928 : mword 21)) = mword_of_int KernelSyms.acquire)
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hjaq2) in "Hpc".
-      assert (HL7a0 : L7 !!! Regidx (mword_of_int 10 : mword 5) = sl_lk slk).
-      { rewrite /L7 upd_ne; [| reg_neq]. rewrite /L6 upd_eq. rewrite Hmfs_s2. apply add_vec_zero_l. }
-      assert (HL7ra : L7 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x2e) : mword 64) 4)
-        by (rewrite /L7; apply upd_eq).
-      assert (HcsL7 : callee_saved mfs L7).
-      { rewrite /L7 /L6.
-        apply callee_saved_insert_r; [vm_compute; reflexivity|].
-        apply callee_saved_insert_r; [vm_compute; reflexivity|].
-        apply callee_saved_refl. }
-      assert (HaslL7 : asl_regs m L7 slk spd) by (apply (asl_regs_cs m mfs L7 slk spd HcsL7 HaslMfs)).
-      iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) L7
-                (S n) eb pj C (av - 4)%nat false lks
-                ltac:(lia)
-                ltac:(lia)
-                Hbelow
-                with "Hcg Hown Htext Hpc [] Hpanic").
-      all: try lkbelow.
-      { iEval (rewrite HL7a0). iApply (is_sleeplock_gen_lock with "Hslk"). }
-      iApply wp_next_off_intro.
-      iIntros (ms_b Macb) "%Hms_b Hcg Hpc %Hpinb Htok HRb Hown Hpay".
-      assert (Hpc32 : ret_pc (L7 !!! Regidx (mword_of_int 1 : mword 5))
-                      = mword_of_int (KernelSyms.acquiresleep + 0x32)) by (rewrite HL7ra; apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpc32) in "Hpc".
-      assert (HaslMacb : asl_regs m Macb slk spd)
-        by (apply (asl_regs_cs m L7 Macb slk spd Hpinb HaslL7)).
-      assert (Hmacb_s1 : Macb !!! Regidx (mword_of_int 9 : mword 5) = slk)
-        by (destruct HaslMacb as (Xs1 & _); exact Xs1).
-      (* ===== +0x32 lw a5,0(s1) : the loop test again ===== *)
-      iDestruct "HRb" as (vp) "[Hwp Harm]".
-      assert (Hlw32 : add_vec (rget Macb (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
-      { rgne. rewrite Hmacb_s1. replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x32)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
-                (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))) Macb (av - 4)%nat vp false (dqm := DfracOwn 1)
-                ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi32 [Hwp]").
-      { iEval (rewrite Hlw32). iExact "Hwp". }
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc Hwp".
-      iEval (rewrite Hlw32) in "Hwp".
-      set (La5 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 vp)]> Macb).
-      change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 vp)]> Macb) with La5.
-      assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x32) : mword 64) 2 = mword_of_int (KernelSyms.acquiresleep + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp34) in "Hpc".
-      assert (HLa5_15 : La5 !!! Regidx (mword_of_int 15 : mword 5) = sign_extend' 64 vp) by (rewrite /La5; apply upd_eq).
-      assert (HcsLa5 : callee_saved Macb La5).
-      { rewrite /La5. apply callee_saved_insert_r; [vm_compute; reflexivity|]. apply callee_saved_refl. }
-      assert (HaslLa5 : asl_regs m La5 slk spd) by (apply (asl_regs_cs m Macb La5 slk spd HcsLa5 HaslMacb)).
-      (* ===== +0x34 c.bnez a5 ===== *)
-      iDestruct "Harm" as "[(%Hvp0 & Hstok & Hspid & HRu) | (%Hvph & Hdep)]".
-      - (* FREE: fall through to +0x36, the exit *)
-        iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x34)) (mword_of_int 244 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
-                  La5 (av - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                  ltac:(rgne; rewrite HLa5_15 Hvp0; vm_compute; reflexivity)
-                  with "Hcg Hpc Hi34").
-        iApply wp_next_off_intro.
-        iIntros "Hcg Hpc".
-        assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.acquiresleep + 0x34) : mword 64) 2 = mword_of_int (KernelSyms.acquiresleep + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
-        iEval (rewrite Hpp36) in "Hpc".
-        iEval (rewrite Hvp0) in "Hwp".
-        iApply ("Hnexit" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok HHq HX Hspid HRu Hwp Hpid Hown Hpay Hcg Hpc").
-        exact HaslLa5.
-      - (* HELD: back edge to +0x1c -- the Löb IH, handed to the taken leaf's
-           later-continuation bracket. *)
-        iAssert (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝)%I with "[Hwp]" as "Hheldw".
-        { iExists vp. iFrame "Hwp". iPureIntro. exact Hvph. }
-        iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x34)) (mword_of_int 244 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
-                  La5 (av - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                  ltac:(rgne; rewrite HLa5_15; exact Hvph)
-                  ltac:(vm_compute; reflexivity)
-                  with "Hcg Hpc Hi34 [Hr24 Hr16 Hr8 Hr0 Htok Hpid Hown Hpay IH Hnexit Hheldw Hdep HHq HX]").
-        iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
-        assert (Hbk : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x34) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 244 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.acquiresleep + 0x1c))
-          by (apply bv_eq; vm_compute; reflexivity).
-        iEval (rewrite Hbk) in "Hpc".
-        iApply ("IH" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hdep HHq HX Hpid Hown Hpay Hcg Hpc Hnexit").
-    exact HaslLa5.
-  Qed.
-
-  (* ==================================================================== *)
   (*  THE NESTED BODY MINUS ITS WAIT LOOP.                                 *)
   (*                                                                      *)
   (* Prologue, entry [acquire(&slk->lk)], the [locked := 1] /              *)
   (* [pid := myproc()->pid] stores, the interior release and the entry     *)
   (* dispatch -- with the LOCKED arm handed off to whatever [asl_nloop]    *)
-  (* the caller supplies.  Two callers do:                                 *)
-  (*                                                                      *)
-  (*   - the blocking nested contract, which supplies [asl_nloop_proof];   *)
-  (*   - the NON-BLOCKING one, which supplies a REFUTATION -- the locked   *)
-  (*     arm cannot happen when no share of the "may hold" right exists.   *)
+  (* the caller supplies.  ONE caller does: the NON-BLOCKING contract,     *)
+  (* which supplies a REFUTATION -- the locked arm cannot happen when no   *)
+  (* share of the "may hold" right exists.  (A blocking nested contract    *)
+  (* used to supply the loop itself; it is gone -- file header.)           *)
   (*                                                                      *)
   (* Nothing here reaches [sleep_prepare], so the held-set precondition is *)
   (* only what the interior acquire's ghost step consumes: FRESHNESS.      *)
-  (* [X] is a resource routed to whichever arm the entry test picks; it is *)
-  (* [emp] for the blocking caller and the counting authority for the      *)
-  (* non-blocking one, which needs it BOTH to refute the locked arm and to *)
-  (* hand back on the free one.                                            *)
+  (* [X] is a resource routed to whichever arm the entry test picks: the   *)
+  (* counting authority, which the non-blocking caller needs BOTH to       *)
+  (* refute the locked arm and to hand back on the free one.               *)
   (* ==================================================================== *)
   Lemma asl_nested_core
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp) (X : iProp Σ)
@@ -2361,66 +2075,15 @@ Section ProofAcquiresleep.
     exact Hcs.
   Qed.
 
-  (* the BLOCKING nested contract: the core, with the real wait loop. *)
-  Lemma wp_acquiresleep_nested_gen_sconf
-      (γs : list gname) (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (n : nat) (lks : gset string)
-    : wp_acquiresleep_nested_gen_body γs j γl γsl s R H q m pidv av eb C dq n lks.
-  Proof.
-    cbv beta delta [wp_acquiresleep_nested_gen_body].
-    intros pcE slk pj ret_tgt Hj Hav Hb31 Hbelow.
-    pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hslk HHq #Hpanic Hpid #Hpinv Hcont".
-    iEval (rewrite wp_next_off) in "Hcont".
-    iAssert (⌜length γs = NPROC⌝)%I as %Hlen. { by iDestruct "Hpinv" as "[$ _]". }
-    destruct (lookup_lt_is_Some_2 γs j ltac:(rewrite Hlen; exact Hj)) as [γpl Hjpl].
-    iAssert (emp)%I with "[]" as "Hemp"; [ first [ done | iEmpIntro ] |].
-    iPoseProof (asl_nloop_proof γs j γl γsl s R H q emp%I m pidv av eb C dq n lks
-                  slk _ _ γpl Hj Hav Hb31 Hbelow Hjpl
-                  with "Htext Hpanic Hpinv Hslk") as "Hnloop".
-    iApply (asl_nested_core γl γsl s R H q emp%I m j pidv av eb C n lks
-              Hav Hb31 Hfresh
-              with "Hcg Hown Htext Hpc Hslk Hpanic HHq Hemp Hpid Hnloop [Hcont]").
-    iApply wp_next_off_intro.
-    iIntros (mf) "%Hcs Hcg Hown Hpc Hstok _ Hspid HR Hpid".
-    iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc Hstok Hspid HR Hpid").
-    exact Hcs.
-  Qed.
-
-  (* and its untracked instance -- what [iput] takes today. *)
-  Lemma wp_acquiresleep_nested_sconf
-      (γs : list gname) (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (n : nat) (lks : gset string)
-    : wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n lks.
-  Proof.
-    cbv beta delta [wp_acquiresleep_nested_body].
-    intros pcE slk pj ret_tgt Hj Hav Hb31 Hbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hslk #Hpanic Hpid #Hpinv Hcont".
-    iEval (rewrite wp_next_off) in "Hcont".
-    iAssert (emp)%I with "[]" as "Hemp"; [ first [ done | iEmpIntro ] |].
-    iApply (wp_acquiresleep_nested_gen_sconf γs j γl γsl s R sl_untracked 1%Qp m pidv av eb C n lks
-              Hj Hav Hb31 Hbelow
-              with "Hcg Hown Htext Hpc Hslk Hemp Hpanic Hpid Hpinv [Hcont]").
-    iApply wp_next_off_intro.
-    iIntros (mf) "%Hcs Hcg Hown Hpc Hstok Hspid HR Hpid".
-    iAssert (sleeplocked γsl) with "[Hstok]" as "Hstok"; [ iExists 1%Qp; iFrame |].
-    iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc Hstok Hspid HR Hpid").
-    exact Hcs.
-  Qed.
-
   (* ==================================================================== *)
   (*  THE NON-BLOCKING CONTRACT.                                          *)
   (* ==================================================================== *)
   Lemma wp_acquiresleep_nb_sconf
       (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ) (q : Qp)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (γt : gname) (q : Qp)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
       (n : nat) (lks : gset string)
-    : wp_acquiresleep_nb_body j γl γsl s R q m pidv av eb C dq n lks.
+    : wp_acquiresleep_nb_body j γl γsl s R γt q m pidv av eb C dq n lks.
   Proof.
     cbv beta delta [wp_acquiresleep_nb_body].
     intros pcE slk pj ret_tgt Hav Hb31 Hfresh.
@@ -2428,8 +2091,8 @@ Section ProofAcquiresleep.
     (* the share this call will deposit, minted out of the authoritative
        zero.  It is spent only on the FREE arm; on the other arm it is still
        in hand, which is what makes the refutation below go through. *)
-    iMod (slh_mint_none γsl q with "Hauth") as "[Hauth Htokq]".
-    iApply (asl_nested_core γl γsl s R (slh_tok γsl) q (slh_auth γsl (Some q))
+    iMod (slh_mint_none γt q with "Hauth") as "[Hauth Htokq]".
+    iApply (asl_nested_core γl γsl s R (slh_tok γt) q (slh_auth γt (Some q))
               m j pidv av eb C n lks Hav Hb31 Hfresh
               with "Hcg Hown Htext Hpc Hslk Hpanic Htokq Hauth Hpid [] Hcont").
     (* THE REFUTATION.  Reaching the wait loop means the lock was HELD, i.e.

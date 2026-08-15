@@ -5,7 +5,10 @@ client carries its order premise, the ranking is installed and audited, and
 all 1094 files build. `LockRank.v` / `LockSet.v` / `CpuOwn.v` are the live
 description; read those first and this file for the reasoning behind them.
 
-ONE THING IS ADMITTED, and it is tracked separately from this effort:
+ONE THING WAS ADMITTED, and it is now DISCHARGED — see
+[`projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md). The
+paragraph below is kept as the record of what it was and why no ranking could
+license it; the axiom itself is gone and `iput`'s cone is no longer vacuous.
 `ProofIput.iput_acquiresleep_order_ADMITTED`, the `iput`-holds-`itable`-across-
 `acquiresleep` edge no ranking can license. It is FALSE, not merely unproven,
 so `iput` and its cone typecheck without meaning anything until it is
@@ -60,17 +63,17 @@ has been revised once (ftable/itable above proc -- see below).
 (the `XV6_REV` bump to `117c0e7` and the create/kexec push).  The sweep that
 started at 72 failures is done.
 
-One thing in the tree is ASSUMED rather than proved:
+One thing in the tree WAS assumed rather than proved:
 `iput_acquiresleep_order_ADMITTED` in `ProofIput.v`, the one lock-order edge
-no ranking can license.  It is FALSE, not merely unproven, so everything
-downstream of `iput` is currently vacuous -- see "THE ONE UNLICENSED EDGE"
-below for the full accounting and for what the real discharge is.  Nothing
-else in the development is admitted.
+no ranking can license.  It was FALSE, not merely unproven.  IT IS NOW GONE --
+`iput` takes a NON-BLOCKING `acquiresleep` and raises no order obligation at
+all; see [`projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md).
+Nothing in the development is admitted.
 
 `Print Assumptions` is the way to check: on `LinkIput.Iput.wp_iput_sconf` it
-names `ProofIput.iput_acquiresleep_order_ADMITTED` alongside the ambient Sail
-model axioms.  Run it from `iris/` with the `_CoqProject` load paths spelled
-out, since `rocq compile` does not read them itself:
+now names only the ambient Sail model axioms.  Run it from `iris/` with the
+`_CoqProject` load paths spelled out, since `rocq compile` does not read them
+itself:
 
 ```
 rocq compile -R . xv6iris -R ../model-xv6iris Riscv \
@@ -285,9 +288,12 @@ the three-CPU cycle you would draw from the raw edges -- that one is broken
 instead by the fact that the lock `kfork` holds is a NOT-RUNNING process's,
 and `sleep_prepare` only ever acquires the running process's own.
 
-**It is ADMITTED for now**, as `iput_acquiresleep_order_ADMITTED` at the top
-of `ProofIput.v`, so the sweep can proceed.  Four things about how it is set
-up, all deliberate:
+**It WAS ADMITTED**, as `iput_acquiresleep_order_ADMITTED` at the top of
+`ProofIput.v`, so the sweep could proceed; it has since been discharged by the
+non-blocking `acquiresleep`
+([`projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md)).  Four
+things about how the axiom was set up, all deliberate, and all of which paid
+off when it came time to remove it:
 
 * it lives in `ProofIput.v`, NOT in `LockRank.v` or any other header, so the
   only way to depend on it is to depend on `iput`;

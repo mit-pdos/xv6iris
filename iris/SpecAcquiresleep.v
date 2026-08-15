@@ -211,96 +211,29 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
 
    REF-1 (design 5(b)) makes the LOCKED branch -- panic or wait loop --
    unreachable at iput's call site; we do not prove that, we permit it. *)
-(* the same deposit generalisation for the NESTED contract *)
-Definition wp_acquiresleep_nested_gen_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat)
-    (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac)
-    (n : nat) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
-  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let pj := proc_addr j in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (j < NPROC)%nat ->
-  (26 <= av)%nat ->
-  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
-  locks_below lks "sleep lock" ->
-  sie_cap_gpr m av false pj -∗
-  cpu_own (S n) eb pj C false lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  is_sleeplock_gen γl γsl slk s R H -∗
-  H q -∗
-  panic_wp_any -∗
-  p_pid pj ↦₄{dq} pidv -∗
-  procs_inv γs -∗
-  wp_next false pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile),
-      ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av false pj -∗
-      cpu_own (S n) eb pj C false lks -∗
-      pc_is ret_tgt -∗
-      sleeplocked_q γsl q -∗
-      sl_pid slk ↦₄ pidv -∗
-      R -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
+(* THE NESTED BLOCKING CONTRACT IS GONE, and that is the point.
 
-Definition wp_acquiresleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat)
-    (γl γsl : gname) (s : string) (R : iProp Σ)
-    (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac)
-    (n : nat) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
-  let slk := m !!! Regidx (mword_of_int 10 : mword 5) in
-  let pj := proc_addr j in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (j < NPROC)%nat ->
-  (26 <= av)%nat ->
-  (* the interior acquire pushes to [S (S n)] and sleep's own acquire to
-     [S (S (S n))], transiently +1 *)
-  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
-  (* same order fact as the non-nested route, for the same "sleep lock"
-     acquire; [lks] here is whatever the caller (e.g. iput, holding
-     "itable") already has, and "sleep lock" (6) outranks "itable" (2), so
-     [locks_below lks "itable"] (iput's own premise) is not
-     enough by itself -- the caller must give the bound AT "sleep lock",
-     i.e. [locks_below lks "sleep lock"], which subsumes it via
-     [locks_below_mono]. *)
-  locks_below lks "sleep lock" ->
-  sie_cap_gpr m av false pj -∗
-  (* NESTED: a spinlock IS held on entry, and is still held on exit *)
-  cpu_own (S n) eb pj C false lks -∗
-  kernel_text -∗ pc_is pcE -∗
-  is_sleeplock γl γsl slk s R -∗
-  panic_wp_any -∗
-  p_pid pj ↦₄{dq} pidv -∗
-  procs_inv γs -∗
-  wp_next false pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile),
-      ⌜ callee_saved m mf ⌝ -∗
-      sie_cap_gpr mf av false pj -∗
-      cpu_own (S n) eb pj C false lks -∗
-      pc_is ret_tgt -∗
-      sleeplocked γsl -∗
-      sl_pid slk ↦₄ pidv -∗
-      R -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
+   [sched()] panics on [noff != 1], and the nested contract's wait loop
+   reached [sleep] at noff >= 2 -- it was provable only because
+   [SpecSleep.wp_sleep_nested_body] offers that panic as one of its two arms.
+   Its sole consumer was iput, and iput now takes the NON-BLOCKING contract
+   below.  So every acquiresleep that can SLEEP is entered at noff = 0
+   ([wp_acquiresleep_sconf]'s [cpu_own 0]), which is what a proof that the
+   "sched locks" panic is unreachable needs.
+   (claude-notes/projects/iput-acquiresleep.md, step 5.) *)
 
 (* ===================================================================== *)
 (*  THE NON-BLOCKING NESTED CONTRACT.                                     *)
 (* ===================================================================== *)
-(* The nested contract above proves the wait loop, and that loop reaches
-   [sleep_prepare], which acquires [p->lock] at "proc" (9).  A caller that
-   already holds a lock ABOVE "sleep lock" -- [iput] holds "itable" (14) --
-   can hand it no such bound, and none is true; that is the whole content of
-   [ProofIput.iput_acquiresleep_order_ADMITTED]
+(* A BLOCKING acquiresleep's wait loop reaches [sleep_prepare], which acquires
+   [p->lock] at "proc" (9).  A caller that already holds a lock ABOVE
+   "sleep lock" -- [iput] holds "itable" (14) -- can hand it no such bound,
+   and none is true.  That was the whole content of the FALSE axiom
+   [ProofIput.iput_acquiresleep_order_ADMITTED], now discharged
    (claude-notes/projects/iput-acquiresleep.md).
 
    THE DISCHARGE CHANGES THE OBLIGATION.  Here the caller instead presents
-   [slh_auth γsl None], the AUTHORITATIVE ZERO of the sleeplock's
+   [slh_auth γt None], the AUTHORITATIVE ZERO of the object's
    outstanding-share count: no share of the "may hold this lock" right exists
    anywhere, so no deposit sits in the lock, so the [lk->locked != 0] arm of
    [sl_res_gen] is REFUTED at the leaf that reads the word.  The loop is not
@@ -316,10 +249,19 @@ Definition wp_acquiresleep_nested_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
 
    The sleep cone is gone from the contract with the loop: no [procs_inv], no
    [γs], no [j < NPROC].  What is left is the prologue, the entry acquire, the
-   [locked := 1] / [pid := myproc()->pid] stores and the interior release. *)
+   [locked := 1] / [pid := myproc()->pid] stores and the interior release.
+
+   THIS IS THE ONLY WAY TO TAKE A SLEEPLOCK WITH A SPINLOCK HELD.  The
+   blocking contracts are all at [cpu_own 0], which is what makes sched's
+   [noff != 1] panic unreachable from here. *)
 Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (j : nat)
-    (γl γsl : gname) (s : string) (R : iProp Σ) (q : Qp)
+    (γl γsl : gname) (s : string) (R : iProp Σ)
+    (* THE DEPOSIT'S OWN GNAME, separate from the lock's.  A client keys the
+       "may hold" right by the OBJECT rather than by the lock -- the icache
+       keys it by the inode SLOT ([IcacheRef.icfg_isl k]) so that a reference
+       can carry it -- and the refutation only ever looks at this one. *)
+    (γt : gname) (q : Qp)
     (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac)
     (n : nat) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.acquiresleep in
@@ -333,9 +275,9 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   sie_cap_gpr m av false pj -∗
   cpu_own (S n) eb pj C false lks -∗
   kernel_text -∗ pc_is pcE -∗
-  is_sleeplock_tok γl γsl slk s R -∗
+  is_sleeplock_gen γl γsl slk s R (slh_tok γt) -∗
   (* THE EVIDENCE THAT THE LOCK IS FREE *)
-  slh_auth γsl None -∗
+  slh_auth γt None -∗
   panic_wp_any -∗
   p_pid pj ↦₄{dq} pidv -∗
   wp_next false pj (fun (CID : CpuId) =>
@@ -345,7 +287,7 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       cpu_own (S n) eb pj C false lks -∗
       pc_is ret_tgt -∗
       sleeplocked_q γsl q -∗
-      slh_auth γsl (Some q) -∗
+      slh_auth γt (Some q) -∗
       sl_pid slk ↦₄ pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
@@ -359,20 +301,13 @@ Module Type ACQUIRESLEEP.
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset string),
       wp_acquiresleep_gen_sconf_body γs j γl γsl s R H q m pidv av eb C dq b lks.
-  Parameter wp_acquiresleep_nested_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (n : nat) (lks : gset string),
-      wp_acquiresleep_nested_gen_body γs j γl γsl s R H q m pidv av eb C dq n lks.
   Parameter wp_acquiresleep_nb_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ) (q : Qp)
+      (γl γsl : gname) (s : string) (R : iProp Σ) (γt : gname) (q : Qp)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
       (n : nat) (lks : gset string),
-      wp_acquiresleep_nb_body j γl γsl s R q m pidv av eb C dq n lks.
+      wp_acquiresleep_nb_body j γl γsl s R γt q m pidv av eb C dq n lks.
   Parameter wp_acquiresleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
 
@@ -380,11 +315,4 @@ Module Type ACQUIRESLEEP.
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool) (lks : gset string),
       wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b lks.
-  Parameter wp_acquiresleep_nested_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat)
-      (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
-      (n : nat) (lks : gset string),
-      wp_acquiresleep_nested_body γs j γl γsl s R m pidv av eb C dq n lks.
 End ACQUIRESLEEP.
