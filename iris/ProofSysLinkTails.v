@@ -2026,7 +2026,7 @@ Section ProofSysLinkTails.
               pd pav pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
               inodestart nib size dev used kd qd sd gyd dinum dnd bmd
               n Sb false false false e0 pidv dq dqb dqs
-              M2 (K - 38)%nat eb C b lks
+              M2 (K - 38)%nat eb b lks
               HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
@@ -2080,7 +2080,7 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used1 kk qi s gy inum u1 Sb1 pidv dq dqb dqs m mup sp0 K eb C b
+              used1 kk qi s gy inum u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl

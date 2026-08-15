@@ -2223,7 +2223,7 @@ Section ProofSysLinkBody.
                                kk (qq/2)%Qp (qq/2)%Qp gsh2 inum
                                kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                n2 Sb2 e0 pid (DfracOwn (1/4)) dqb dqs
-                               m Ug sp0 K eb C b lks bn1 bw2 bo2
+                               m Ug sp0 K eb b lks bn1 bw2 bo2
                                ltac:(exact Kil) ltac:(exact Kiupd)
                                ltac:(exact Kiup) ltac:(exact Keo) K38 Kpop
                                Hkk Hkd Hclog Hcist Hgeom Hsize Hbm0 Hbmcov

@@ -630,7 +630,7 @@ Definition wp_dirlookup_tree_body
   dir_inums_ok data nrec nib ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  (m !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ip ->
   eq_vec (m !!! Regidx (mword_of_int 12 : mword 5)) zero_reg = negb hasp ->
   eb = true ->
   locks_below lks "bcache" ->
@@ -686,7 +686,7 @@ Definition wp_dirlookup_tree_body
        then ⌜ents !! s = Some (bv_unsigned (dir_inum data k))⌝ ∗
             ⌜dir_first data nrec s = Some k
              /\ (kslot < NINODE)%nat
-             /\ mf !!! Regidx (mword_of_int 10 : mword 5) = ientry kslot⌝ ∗
+             /\ (mf !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ientry kslot⌝ ∗
             inode_ref kslot q dev
               (zero_extend' 32 (dir_inum data k : mword 16) : mword 32) ∗
             (if hasp
@@ -731,7 +731,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
       wp_dirlookup_tree_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                              γa γf cov logstart nib dev ip bm data dn
                              dpi ents fn hasp pofv pidv dq dqd dqn
-                             m K eb C b lks.
+                             m K eb b lks.
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
     intros HK Hlg Hbwf Hbcov Hszb Hdio Hj Hgs Ha0 Ha2 Heb Hlkb.
@@ -741,7 +741,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
               γa γf cov logstart nib dev ip bm data dn fn hasp pofv
-              pidv dq dqd dqn m K eb C b lks
+              pidv dq dqd dqn m K eb b lks
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
               Hdio Hj Hgs Ha0 Ha2 Heb Hlkb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv
