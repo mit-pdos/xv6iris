@@ -56,6 +56,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* bread's own frame is 48 bytes (6 slots); its deepest callee is
@@ -63,7 +64,7 @@ Import Defs.
 Definition K_bread : nat := 40%nat.
 
 Definition wp_bread_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -71,7 +72,7 @@ Definition wp_bread_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names) (V : bio_view Σ)
     (pidv dev bno : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bread in
   let pj := proc_addr j in
@@ -98,7 +99,7 @@ Definition wp_bread_sconf_body
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquires raise it to what sleep demands *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  This function acquires at
      level 0 and releases before returning, so it is push/pop-BALANCED: its
      own [acquire] mints [arm_pay 0 eb _], and at [eb = true] that IS the
@@ -143,7 +144,7 @@ Definition wp_bread_sconf_body
       ⌜callee_saved m mf
        /\ mf !!! Regidx (mword_of_int 10 : mword 5) = bnode k⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -156,7 +157,7 @@ Definition wp_bread_sconf_body
 
 Module Type BREAD.
   Parameter wp_bread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
@@ -164,8 +165,8 @@ Module Type BREAD.
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
-                          pidv dev bno dq m K eb C b lks.
+                          pidv dev bno dq m K eb b lks.
 End BREAD.

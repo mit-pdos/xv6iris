@@ -51,13 +51,13 @@ Section ProofKfree.
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
 
-      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
-    : wp_kfree_sconf_body γl γk lk fl m on n eb pcur C K b lks.
+      (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (K : nat) (b : bool) (lks : gset string)
+    : wp_kfree_sconf_body γl γk lk fl m on n eb pcur K b lks.
   Proof.
     cbv beta delta [wp_kfree_sconf_body].
     intros pcE p ret_tgt HK Hlk Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbmatch. symmetry in Hbmatch.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     (* the caller-supplied page precondition: validity + full ownership *)
@@ -505,14 +505,14 @@ Section ProofKfree.
        (frame push, saves, panic-check ALU, memset, and the auipc/addi/mv/jal
        run-up to acquire) each moved to a FRESH hart (CID1..CID21, CIDms,
        CID22..CID25), so acquire wants it at CID25. *)
-    iDestruct (cpu_own_transport CID CID25 n eb pcur C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID25 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) Kacq
-              n eb pcur C (K - 4)%nat b lks
+              n eb pcur (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hkmem] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hkmem]").
     all: try lkbelow.
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -630,7 +630,7 @@ Section ProofKfree.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Hbmatch) in "Hcg".
     iApply (Release.wp_release_sconf γl lk "kmem"%string (kmem_res γk fl) Rrel
-              n eb pcur C (K - 4)%nat ({["kmem"]} ∪ lks)
+              n eb pcur (K - 4)%nat ({["kmem"]} ∪ lks)
               ltac:(rewrite HRrela0 Hlk; apply bv_eq; vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hkmem] Htok HRres Hcnt Hpay").
@@ -757,7 +757,7 @@ Section ProofKfree.
     (* [Hcnt] was delivered at [CIDrel] by release's own [wp_next]; the six
        epilogue instructions above each moved to a FRESH hart (CIDe1..CIDe6),
        so kfree's own continuation wants it at CIDe6. *)
-    iDestruct (cpu_own_transport CIDrel CIDe6 n eb pcur C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe6 n eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Q5c with "Hcg Hcnt Hpc [%] Havail").

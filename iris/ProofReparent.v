@@ -51,6 +51,7 @@ Require Import SpecReparent.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]).  Written
@@ -120,7 +121,7 @@ Module ReparentProof (Wakeup : WAKEUP) : REPARENT.
 (* so [CID] can be a section variable.                                    *)
 (* ===================================================================== *)
 Section ProofReparentEnds.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00 .. +0x2a: carve the 6-slot frame, save ra/s0/s1..s4, set s0, park
@@ -595,7 +596,7 @@ End ProofReparentEnds.
 (* not express.                                                           *)
 (* ===================================================================== *)
 Section ProofReparentLoop.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
 
   Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId}
       
@@ -603,7 +604,7 @@ Section ProofReparentLoop.
       (ps : list (mword 64)) (dqi : dfrac)
       (vra vs0 vs1 vs2 vs3 vs4 : mword 64)
       (vs5 vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
+      (lvl av : nat) (eb : bool) (b : bool) (lks : gset string) :
     length γs = NPROC ->
     length ps = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
@@ -619,7 +620,7 @@ Section ProofReparentLoop.
       ∀ Mexit : regfile,
         ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
         sie_cap_gpr Mexit av b pme -∗
-        cpu_own lvl eb pme C b lks -∗
+        cpu_own lvl eb pme b lks -∗
         kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
         rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
         (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -628,7 +629,7 @@ Section ProofReparentLoop.
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜rpl_regs M spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       sie_cap_gpr M av b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
       rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -646,14 +647,14 @@ Section ProofReparentLoop.
                      ∀ Mexit : regfile,
                        ⌜ rpx_regs Mexit spF vs5 vs6 vs7 vs8 vs9 vs10 vs11 ⌝ -∗
                        sie_cap_gpr Mexit av b pme -∗
-                       cpu_own lvl eb pme C b lks -∗
+                       cpu_own lvl eb pme b lks -∗
                        kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x46)) -∗
                        rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                        (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
                        parents_own (rp_map pv ip ps) -∗
                        WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pme -∗
-                   cpu_own lvl eb pme C b lks -∗
+                   cpu_own lvl eb pme b lks -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.reparent + 0x34)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -671,7 +672,7 @@ Section ProofReparentLoop.
                  ∀ Mt : regfile,
                    ⌜ rpl_regs Mt spF pv vs5 vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                    sie_cap_gpr Mt av b pme -∗
-                   cpu_own lvl eb pme C b lks -∗
+                   cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.reparent + 0x2c)) -∗
                    rp_frame spF vra vs0 vs1 vs2 vs3 vs4 -∗
                    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -729,7 +730,7 @@ Section ProofReparentLoop.
           assert (Hfull : rp_upto pv ip (S k) ps = rp_map pv ip ps)
             by (apply rp_upto_all; rewrite Hpslen HkS; lia).
           iEval (rewrite Hfull) in "Hpar".
-          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
           iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("Hqx" $! Mt2c with "[] Hcg Hown Htext Hpc Hframe Hinit Hpar").
@@ -763,7 +764,7 @@ Section ProofReparentLoop.
           assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.reparent + 0x30) : mword 64) 4 = mword_of_int (KernelSyms.reparent + 0x34))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp34) in "Hpc".
-          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
           iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S k) Mt2c with "[%] [%] [%] Hqx Hcg Hown Htext Hpc Hframe Hinit Hpar").
@@ -904,7 +905,7 @@ Section ProofReparentLoop.
         assert (HM40ra : M40 !!! Regidx (mword_of_int 1 : mword 5)
                          = add_vec_int (mword_of_int (KernelSyms.reparent + 0x40) : mword 64) 4)
           by (rewrite /M40; apply upd_eq).
-        iDestruct (cpu_own_transport CIDk CIDp lvl eb pme C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDk CIDp lvl eb pme b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
         (* wakeup(initproc): everything it changes is invisible; [procs_inv] is
            persistent and the level round-trips. *)
@@ -915,7 +916,7 @@ Section ProofReparentLoop.
            pure passthroughs of the enclosing contract's -- reparent adds
            nothing to the held set, hence nothing to the premise. *)
         iApply (Wakeup.wp_wakeup_sconf (CID := CIDp)  M40 γs
-                  pme lvl av eb C b lks
+                  pme lvl av eb b lks
                   ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom)
                   Hlen
@@ -940,7 +941,7 @@ Section ProofReparentLoop.
                          = mword_of_int (KernelSyms.reparent + 0x2c))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt2c) in "Hpc".
-        iDestruct (cpu_own_transport CIDq CIDr lvl eb pme C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDq CIDr lvl eb pme b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
         iSpecialize ("Htail" $! CIDr with "[%]"); [wp_next_chain|].
         iApply ("Htail" $! Mw with "[%] Hcg Hown Hpc Hframe Hinit Hpar").
@@ -1024,7 +1025,7 @@ Section ProofReparentLoop.
         pose proof (rp_upto_step pv ip k ps v Hv) as Hstep.
         rewrite Hslot in Hstep.
         iEval (rewrite Hstep) in "Hpar".
-        iDestruct (cpu_own_transport CIDk CIDm lvl eb pme C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDk CIDm lvl eb pme b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
         iApply ("Htail" $! M34 with "[%] Hcg Hown Hpc Hframe Hinit Hpar").
@@ -1042,12 +1043,12 @@ End ProofReparentLoop.
 (* The whole function.                                                    *)
 (* ===================================================================== *)
 Section ProofReparent.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
-      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b lks.
+      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb b lks.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
     intros pcE pv rettgt HK Hdom Hlen Hlvl Hno.
@@ -1058,7 +1059,7 @@ Section ProofReparent.
     iApply (rp_prologue (CID := CID0) m K b pme ltac:(unfold K_reparent in HK; lia) Hdom
               with "Hcg Htext Hpc").
     iIntros (CIDpro Hspro M) "%Hpro Hcg Hpc Hframe".
-    iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* ---- the scan, with the epilogue as its exit continuation ---- *)
     iPoseProof (rp_loop (CID0 := CIDpro)  γs
@@ -1071,7 +1072,7 @@ Section ProofReparent.
                   (m !!! Regidx (mword_of_int 23 : mword 5)) (m !!! Regidx (mword_of_int 24 : mword 5))
                   (m !!! Regidx (mword_of_int 25 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5))
                   (m !!! Regidx (mword_of_int 27 : mword 5))
-                  lvl (K - 6)%nat eb C b lks
+                  lvl (K - 6)%nat eb b lks
                   Hlen Hpslen Hlvl ltac:(unfold K_reparent in HK; lia) Hno
                   with "Hpinv Hpanic") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
@@ -1091,7 +1092,7 @@ Section ProofReparent.
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))
                           = m !!! Regidx csp_rs1)
         by (rewrite Hecsp; apply frame_cancel_48).
-      iDestruct (cpu_own_transport CIDex CIDend lvl eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDex CIDend lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDend with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! Mf with "[%] Hcg Hown Htext [Hpc] Hinit Hpar").

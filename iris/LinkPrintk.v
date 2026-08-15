@@ -12,9 +12,10 @@
        level net-zero and makes no trace claim, which is exactly [n]/[bs] at
        their trivial instances.
      - [γl] and [uart_sent_sub γd []] come out of [printk_env] itself.
-     - [panic_wp_any] comes from [LinkPanicStub.panic_wp_any_holds] directly
-       -- the SAME assumed axiom [Hpanic : panic_wp] already traces to, so
-       this adds no new name to [Print Assumptions].
+     - there is NO panic credential to supply any more: acquire's
+       [if(holding(lk)) panic] arm is refuted (SpecAcquire.v), so nothing in
+       the printk cone asks for one and this file no longer reaches
+       [LinkPanicStub] at all.
      - the postcondition WEAKENS (drops the trace claim and the return-value
        fact), which is a plain [wp_next] reindex -- no new hart-transport
        needed since both sides share the caller's ambient [CID]. *)
@@ -29,9 +30,8 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
-Require Import WpLock DiskPtsto WpUart PanicStub.
+Require Import WpLock DiskPtsto WpUart.
 Require Import LinkConsputc LinkPrintint LinkAcquire LinkRelease ProofPrintk.
-Require Import LinkPanicStub.
 Require Import SpecPrintk.
 
 Module Printk := PrintkProof Consputc Printint Acquire Release.
@@ -40,22 +40,20 @@ Module PrintkGen : PRINTK_GEN.
   Lemma wp_printk_gen_sconf `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
-      (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool)
       (lks : gset string) :
-    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b lks.
+    wp_printk_gen_sconf_body γpr γd γv m0 K eb pj dqf f descs b lks.
   Proof.
     rewrite /wp_printk_gen_sconf_body /=.
     intros HK Hlen Hnonul Hkinds Hdlen Hbelow.
-    iIntros "Hcap Htext Hkdata Hpc Hpanic Hcpu Hpenv Hfmt Hdescs Hcont".
+    iIntros "Hcap Htext Hkdata Hpc Hcpu Hpenv Hfmt Hdescs Hcont".
     iDestruct "Hpenv" as "(#Hprlk & #Hdoff & #Hdev & [%γl #Htxl] & #Hsub0)".
-    iAssert (panic_wp_any) as "#Hpa".
-    { iApply panic_wp_any_holds. }
-    iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb C
+    iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb
               (dqf := dqf) f descs b pj lks
               ltac:(rewrite /printk_stack; lia)
               Hlen Hnonul Hkinds Hdlen ltac:(lia)
-              with "Hcap Hcpu Htext Hkdata Hpc Hpa Hfmt Hdescs Hprlk Hdev Htxl Hsub0").
+              with "Hcap Hcpu Htext Hkdata Hpc Hfmt Hdescs Hprlk Hdev Htxl Hsub0").
     all: try lkbelow.
     iIntros (CID2 Hpin).
     iDestruct ("Hcont" $! CID2 Hpin) as "Hcont2".

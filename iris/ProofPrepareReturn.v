@@ -65,7 +65,8 @@ Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UserPtTree.
+Require Import UserPtTree ProcPtOwn.
+Require Import KptTree.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import CodePrepareReturn.
@@ -102,10 +103,39 @@ Section ProofPrepareReturn.
     tf_page tfp ws -∗ ⌜length ws = TFWORDS⌝.
   Proof. iIntros "(%Hlen & _ & _)". done. Qed.
 
+  (* the trapframe page's own [page_valid], read off [proc_priv] without
+     consuming it -- [proc_pt_wf]'s last conjunct, the same projection
+     [ProofKforkParts.proc_priv_tfp_valid] takes.  A PURE-goal [iDestruct]
+     does not spend the resource, so [Hpv] is still whole for
+     [proc_priv_tf_upd] right afterward. *)
+  Local Lemma prr_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Proof.
+    iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
+  Qed.
+
+  (* [pt_node_claim tfp] is built INLINE at its one call site below, not as a
+     standalone lemma: [sie_cap_gpr]/[hw_config] are HART-INDEXED (every
+     [↦ᵣ] inside [hw_config] is per-hart), so a fresh lemma stated against
+     this section's own [CID] would pin the WRONG hart once the WP walk has
+     rebound it via intervening [wp_next] steps -- see durable-notes.md's
+     "hart trap" (the [iSpecialize: cannot instantiate] failure whose two
+     sides print identically).  Built from resources already threaded
+     through the walk at that point: [hw_config] peels off [Hcg]
+     persistently (no loss -- [IntrDefs.sie_cap_gpr_dup_hw_config]), and
+     [page_valid (page_base tfp)] is [prr_tfp_valid] above.  The mem-tier
+     convenience wrappers ([ProcInv.tf_page_word_mem]/[_upd_mem]) are what
+     prepare_return's four kernel-word writes and one epc read actually need
+     (their addresses are VA-tier loads/stores through the kernel identity
+     map), per [ProcInv.v]'s header on [tf_page_word_mem]. *)
+
   Lemma wp_prepare_return_sconf (γf : gname) (ks : mword 64) (pid : mword 32)
-      (V : pprivate) (m : regfile) (av : nat) (C : iProp Σ) (p : mword 64)
+      (V : pprivate) (m : regfile) (av : nat) (p : mword 64)
       (epc : mword 64) (b : bool) (lks : gset string)
-    : wp_prepare_return_sconf_body γf ks pid V m av C p epc b lks.
+    : wp_prepare_return_sconf_body γf ks pid V m av p epc b lks.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.
@@ -245,9 +275,9 @@ Section ProofPrepareReturn.
                        (sign_extend' 64 (mword_of_int 2094204 : mword 21))
                      = mword_of_int KernelSyms.myproc) by pcw.
     iEval (rewrite Hentry) in "Hpc".
-    iDestruct (cpu_own_transport CID CID5 0%nat b p C b
+    iDestruct (cpu_own_transport CID CID5 0%nat b p b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p C b lks
+    iApply (Myproc.wp_myproc_sconf M3 (av - 2)%nat 0%nat b p b lks
               prr_n0 ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID6 Hk6 msq A) "%Hmsq Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -267,7 +297,7 @@ Section ProofPrepareReturn.
     iDestruct (trap_csrs_ext_transport CID CID6 b p
                  ltac:(wp_next_chain) with "Hext") as "Hext".
     iApply (wp_intr_off_lvl0_s_sconf (mword_of_int (PRR + 0x0c)) b p A
-              (av - 2)%nat C with "Hcg Hcpu Hext Hpc Hi0c").
+              (av - 2)%nat with "Hcg Hcpu Hext Hpc Hi0c").
     (* THE BINDER INDEX IS THE ENTRY ONE.  The leaf's continuation is
        [wp_next b p] at the instruction's OWN index, and at [b = true] an
        interrupt can be taken ON this very instruction, so the hart may have
@@ -438,11 +468,18 @@ Section ProofPrepareReturn.
     (* =============================================================== *)
     (*  +0x30 .. +0x52: the four KERNEL slots.                          *)
     (* =============================================================== *)
+    iDestruct (prr_tfp_valid with "Hpv") as %Hpv_valid.
     iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hclose)".
     iDestruct (prr_tf_len with "Htfp") as %Hlen.
     (* one name for the trapframe page, folded into the three resources the
        accessor just handed out (and thus into every [Un] built below). *)
     set (tfp := ud_tfp (pv_upt V)).
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv_valid with "Hkmapb") as "#Hptc".
     assert (Hi0 : (tf_ksatp_idx < length (pv_tf V))%nat)
       by (rewrite Hlen; unfold TFWORDS, tf_ksatp_idx; lia).
     assert (Hi1 : (tf_ksp_idx < length (pv_tf V))%nat)
@@ -498,7 +535,8 @@ Section ProofPrepareReturn.
     assert (HU2a0 : rget U2 a0_idx = p).
     { rgne. rewrite /U2 upd_ne; [| reg_neq]. rewrite /U1 upd_ne; [| reg_neq].
       rewrite -HT9a0. rgne. reflexivity. }
-    iDestruct (tf_page_word_upd tfp (pv_tf V) tf_ksatp_idx w0 Hw0 with "Htfp")
+    iDestruct (tf_page_word_upd_mem tfp (pv_tf V) tf_ksatp_idx w0 ltac:(vm_compute; lia) Hw0
+                 with "Hptc Htfp")
       as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_00 tfp) -HU2a5) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x36)) a4_idx a5_idx
@@ -582,7 +620,8 @@ Section ProofPrepareReturn.
     assert (Hj1 : (tf_ksp_idx < length (<[tf_ksatp_idx := ksat]> (pv_tf V)))%nat)
       by (rewrite Hlen1; unfold TFWORDS, tf_ksp_idx; lia).
     destruct (lookup_lt_is_Some_2 _ _ Hj1) as [w1 Hw1].
-    iDestruct (tf_page_word_upd tfp _ tf_ksp_idx w1 Hw1 with "Htfp") as "(Hcell & Hback)".
+    iDestruct (tf_page_word_upd_mem tfp _ tf_ksp_idx w1 ltac:(vm_compute; lia) Hw1
+                 with "Hptc Htfp") as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_08 tfp) -HU6a4) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x40)) a5_idx a4_idx
               (mword_of_int 8 : mword 12) U6 (trap_res b + (av - 2))%nat w1 false
@@ -651,7 +690,8 @@ Section ProofPrepareReturn.
                        (<[tf_ksatp_idx := ksat]> (pv_tf V))))%nat)
       by (rewrite Hlen2; unfold TFWORDS, tf_ktrap_idx; lia).
     destruct (lookup_lt_is_Some_2 _ _ Hj2) as [w2 Hw2].
-    iDestruct (tf_page_word_upd tfp _ tf_ktrap_idx w2 Hw2 with "Htfp") as "(Hcell & Hback)".
+    iDestruct (tf_page_word_upd_mem tfp _ tf_ktrap_idx w2 ltac:(vm_compute; lia) Hw2
+                 with "Hptc Htfp") as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_16 tfp) -HU9a5) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x4c)) a4_idx a5_idx
               (mword_of_int 16 : mword 12) U9 (trap_res b + (av - 2))%nat w2 false
@@ -708,7 +748,8 @@ Section ProofPrepareReturn.
                          (<[tf_ksatp_idx := ksat]> (pv_tf V)))))%nat)
       by (rewrite Hlen3; unfold TFWORDS, tf_khartid_idx; lia).
     destruct (lookup_lt_is_Some_2 _ _ Hj4) as [w4 Hw4].
-    iDestruct (tf_page_word_upd tfp _ tf_khartid_idx w4 Hw4 with "Htfp")
+    iDestruct (tf_page_word_upd_mem tfp _ tf_khartid_idx w4 ltac:(vm_compute; lia) Hw4
+                 with "Hptc Htfp")
       as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_32 tfp) -HU11a5) in "Hcell".
     iApply (wp_csd_s_sconf (mword_of_int (PRR + 0x52)) a4_idx a5_idx
@@ -850,7 +891,8 @@ Section ProofPrepareReturn.
         try (unfold tf_khartid_idx, tf_ktrap_idx, tf_ksp_idx, tf_ksatp_idx,
                     tf_epc_idx; lia).
       exact Hepc. }
-    iDestruct (tf_page_word tfp _ tf_epc_idx epc Hepc4 with "Htfp") as "(Hcell & Hback)".
+    iDestruct (tf_page_word_mem tfp _ tf_epc_idx epc ltac:(vm_compute; lia) Hepc4
+                 with "Hptc Htfp") as "(Hcell & Hback)".
     iEval (rewrite -(prr_tf_addr_24 tfp) -HU15a5) in "Hcell".
     iApply (wp_cld_s_sconf (mword_of_int (PRR + 0x66)) a5_idx a5_idx
               (mword_of_int 24 : mword 12) U15 (trap_res b + (av - 2))%nat

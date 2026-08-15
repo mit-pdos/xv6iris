@@ -79,6 +79,7 @@ Require Import SpecClockintr.
 Require Import SpecConsoleintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -109,7 +110,7 @@ Definition devintr_ret (sc : mword 64) : mword 64 :=
 (* ===================================================================== *)
 
 Section DevintrCaps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -167,11 +168,11 @@ End DevintrCaps.
 Definition devintr_stack : nat := 40%nat.
 
 Definition wp_devintr_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
-    (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (dq : dfrac) (sc : mword 64) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.devintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -190,14 +191,14 @@ Definition wp_devintr_sconf_body
      where [lks = ∅]. *)
   locks_below lks "cons" ->
   sie_cap_gpr m av false p -∗
-  cpu_own lvl eb p C false lks -∗
+  cpu_own lvl eb p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
   devintr_caps γu γv γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
       sie_cap_gpr mf av false p -∗
-      cpu_own lvl eb p C false lks -∗
+      cpu_own lvl eb p false lks -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -205,11 +206,11 @@ Definition wp_devintr_sconf_body
 
 Module Type DEVINTR.
   Parameter wp_devintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)
-      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (dq : dfrac) (sc : mword 64) (lks : gset string),
-      wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p C dq sc lks.
+      wp_devintr_sconf_body γu γv γdk γtl γs pd pav pu m av lvl eb p dq sc lks.
 End DEVINTR.

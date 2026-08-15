@@ -39,18 +39,19 @@ Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* intr's own frame is 32 bytes (4 slots); its deepest callee is wakeup (18) *)
 Definition K_virtio_disk_intr : nat := 22%nat.
 
 Definition wp_virtio_disk_intr_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
-    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_intr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_virtio_disk_intr <= K)%nat ->
@@ -62,7 +63,7 @@ Definition wp_virtio_disk_intr_sconf_body
      once, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "virtio_disk" ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗ procs_inv γs -∗
   dev_inv γu γd -∗
@@ -72,18 +73,18 @@ Definition wp_virtio_disk_intr_sconf_body
     ∀ mf : regfile,
       ⌜callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf))⌝ -∗
       sie_cap_gpr mf K b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKINTR.
   Parameter wp_virtio_disk_intr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme C b lks.
+      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string),
+      wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme b lks.
 End VIRTIODISKINTR.

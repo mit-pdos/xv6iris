@@ -48,8 +48,9 @@ userinit, and kerneltrap via Kernelvec). What the proof taught, worth keeping:
   started. And because main never returns, NO `callee_saved` obligation is
   threaded anywhere — the only register fact crossing all sixteen calls is
   `tp = cid_word`.
-- Late SpecMain seam fixes the inventory table had missed: `cpu_own`'s `C`
-  must be `cpu_ctx_free` CONCRETELY (scheduler consumes it at that shape);
+- Late SpecMain seam fixes the inventory table had missed: `cpu_own` must be
+  accompanied by `cpu_ctx_free` CONCRETELY, as a sibling premise (scheduler
+  consumes it at that shape);
   `Persistent P` is an instance argument of `started_inv_store_au`; the SIE
   ghost's spare QUARTER (`ghost_var γ (1/4) 0`) is a top-level precondition
   conjunct (it is what `intr_inv_alloc_off` consumes and nothing else
@@ -364,6 +365,35 @@ real proof will demand, replaces exactly this one file plus its Axiom.
 (Typeclass note: the context deliberately drops `SpecMain`'s `!fileG Σ` —
 nothing in the statement needs it.)
 
+**WHAT PROVING IT NOW NEEDS, and what is already built.** userinit's body is
+`allocproc(); initproc = p; p->cwd = namei("/"); p->state = RUNNABLE;
+release(&p->lock)`, and three of the five are ready:
+
+* `allocproc` is proven and takes the COUNTED regime
+  (`design/proc-struct.md`, "The proc table's two regimes"): with
+  `procs_avail (Some (S k))` its empty-table arm is refutable, which is what
+  a caller that does not check the result requires (kernel-defects.md).
+  `BootShared.boot_shared_alloc` already mints `procs_avail (Some NPROC)` —
+  it is DROPPED there today, and threading it to main is the wiring left.
+* `namei("/")` is proven at its ROOT CORNER (`SpecNamex.NAMEX_ROOT` /
+  `SpecNamei.NAMEI_ROOT`, `ProofNamexRoot.v` / `ProofNameiRoot.v`). The
+  general contract is unusable at boot and not for want of plumbing: it
+  names a running process, an OPEN `log_op`, and the whole block layer,
+  none of which exists before `fsinit`. For a path of one `/` the walk's
+  loop never runs, so the corner assumes only the ICACHE.
+* `release` at RUNNABLE is `SpecForkretPark.forkret_park` plus
+  `SchedCtx.proc_slots_park`, exactly as `ProofKforkB5` does it.
+
+So what userinit's contract must take, and main must therefore pay, is: the
+`nextpid` lock (`is_lock γp alp_pid_lock "nextpid" nextpid_res` — procinit
+returns the `lk_fresh`, and the `nextpid` cell has to join
+`main_globals_raw`), `procs_avail (Some (S k))`, and the icache bundle
+(`is_itable2` / `itable_inv` / `ic_escrows` / one `iref_slot`).
+**THE ICACHE IS THE ONE THAT IS NOT READY**: `IcacheBoot.icache_boot` needs
+the stocked inode pool, which needs the fs BLOCK layer wired into main
+(fs-icache.md C7 owed (ii)). That is the gate on userinit, and it is the
+same gate `procs_inv`'s `ientry_raw`s are already waiting on.
+
 ### G4 — the payload arrives under a `▷` and nothing on the loop-exit path strips it
 
 Opening any invariant yields its body under a later, and `P` is persistent but
@@ -446,9 +476,11 @@ cid_word` (the tp/cid convention every callee in the kalloc cone requires), and
 `scheduler` needs `20 ≤ av` at the frame depth main calls it from. So
 `K_main = 52`.
 
-`cpu_own γ 0 false p0 cpu_ctx_free` threads the whole way: `kinit`, `kvminit`,
-`virtio_disk_init` each take `cpu_own γ 0 eb pp C` net-zero, and `scheduler`
-consumes it at exactly the boot shape.
+`cpu_ctx_free` threads the whole way ALONGSIDE `cpu_own γ 0 false p0` (a
+sibling premise now, not folded into `cpu_own`'s old `C` slot — that slot is
+gone): `kinit`, `kvminit`, `virtio_disk_init` thread `cpu_own γ 0 eb pp` net-zero
+and never touch `cpu_ctx_free`, which simply rides the ambient context
+unconsumed until `scheduler` picks it up at exactly the boot shape.
 
 Boot arm, the raw global inventory (each spinlock as
 `SpecProcinit.lk_raw`, which bundles the three cells `lk ↦₄ _`,
@@ -472,7 +504,7 @@ Boot arm, the raw global inventory (each spinlock as
 | `fileinit` | `lk_raw ftable` | `lk_fresh ftable "ftable"` |
 | `virtio_disk_init` | `lk_raw disk_lock`, `disk_{desc,avail,used} ↦₈`, 8 × `disk_free+j ↦ₘ`, `disk_inv γv` + the config-tracker half `disk_cfg_is γv ½ c0` at `⌜virtio_live c0 = false⌝`, `kalloc_env` with ≥3 pages | `vdi_post` |
 | `userinit` | G3 | — |
-| `scheduler` | `procs_inv γ Φ γs`, `cpu_own γ 0 false p0 cpu_ctx_free`, `trap_csrs`, `intr_handler_avail γ` | never returns |
+| `scheduler` | `procs_inv γ Φ γs`, `cpu_ctx_free`, `cpu_own γ 0 false p0`, `trap_csrs`, `intr_handler_avail γ` | never returns |
 
 Three assemblies main itself owes, none of them a callee call:
 

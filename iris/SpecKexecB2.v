@@ -51,18 +51,14 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
-Require Import HartTp.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
@@ -96,27 +92,18 @@ Require Import DirView.
 Require Import DirLinks.
 Require Import InodeLock.
 Require Import ProcInv.
-Require Import PtreeType.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
 Require Import FileInvDefs.
 Require Import SpecIput.
 Require Import SpecKexec.
-Require Import SpecMyproc.
-Require Import SpecBeginOp.
-Require Import SpecEndOp.
-Require Import SpecIlock.
-Require Import SpecReadi.
-Require Import SpecIunlockput.
 Require Import SpecDirlink.
-Require Import SpecNamei.
-Require Import SpecProcFreepagetable.
-Require Import SpecWalkaddr.
 Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -292,7 +279,7 @@ End KexecB2Frame.
 Section KexecB2Res.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
   Definition kxc_res
@@ -428,8 +415,8 @@ Section KexecB2Res.
       (cov : gset Z) (logstart : Z) (dev pidv : mword 32)
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap) (gilf gislf : gname) :
-    is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) -∗
-    sleeplocked gislf -∗
+    is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+    sleeplocked_q gislf sf -∗
     sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
     ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
     i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
@@ -556,7 +543,7 @@ End KexecB2Res.
 Definition kxc_bad324_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+      !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -569,7 +556,7 @@ Definition kxc_bad324_body
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-    (m Mt : regfile) (K : nat) (C : iProp Σ)
+    (m Mt : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string) :=
   (K_kexec <= K)%nat ->
@@ -603,7 +590,7 @@ Definition kxc_bad324_body
   um_below szf P.(ud_um) ->
   um_covered szf P.(ud_um) ->
   sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
-  cpu_own 0 true (proc_addr jp) C true lks -∗
+  cpu_own 0 true (proc_addr jp) true lks -∗
   kernel_text -∗
   panic_wp_any -∗
   pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
@@ -637,7 +624,7 @@ Definition kxc_bad324_body
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true lks -∗
+        cpu_own 0 true (proc_addr jp) true lks -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -663,7 +650,7 @@ Definition kxc_bad324_body
 Definition kxc_ls_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+      !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -676,7 +663,7 @@ Definition kxc_ls_body
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-    (m : regfile) (K : nat) (C : iProp Σ)
+    (m : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd)
     (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string) :=
@@ -725,7 +712,7 @@ Definition kxc_ls_body
   Ml !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) ->
   Ml !!! Regidx Rs11 = (mword_of_int 56 : mword 64) ->
   sie_cap_gpr Ml (K - 68)%nat true (proc_addr jp) -∗
-  cpu_own 0 true (proc_addr jp) C true lks -∗
+  cpu_own 0 true (proc_addr jp) true lks -∗
   kernel_text -∗
   panic_wp_any -∗
   pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
@@ -750,7 +737,7 @@ Definition kxc_ls_body
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true lks -∗
+        cpu_own 0 true (proc_addr jp) true lks -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -780,7 +767,7 @@ Definition kxc_ls_body
         Mx !!! Regidx Rs10 = (mword_of_int (Z.of_nat ip) : mword 64) /\
         Mx !!! Regidx Rs11 = (mword_of_int 56 : mword 64)⌝ -∗
       sie_cap_gpr Mx (K - 68)%nat true (proc_addr jp) -∗
-      cpu_own 0 true (proc_addr jp) C true lks -∗
+      cpu_own 0 true (proc_addr jp) true lks -∗
       pc_is (mword_of_int (KXB + 0x116) : mword 64) -∗
       kxc_res jp bn g gfs gi cn gf cov logstart bmapstart inodestart size dev
               used2 kf qf sf gyf inumf dnf bmf gilf gislf n2 plen pfun na avf
@@ -795,7 +782,7 @@ Definition kxc_ls_body
             ⌜callee_saved m mf⌝ -∗
             ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
             sie_cap_gpr mf K true (proc_addr jp) -∗
-            cpu_own 0 true (proc_addr jp) C true lks -∗
+            cpu_own 0 true (proc_addr jp) true lks -∗
             pc_is (ret_pc ra0) -∗
             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -817,7 +804,7 @@ Module Type KEXECB2.
   Parameter kxc_bad324 :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-        !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+        !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -830,19 +817,19 @@ Module Type KEXECB2.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m Mt : regfile) (K : nat) (C : iProp Σ)
+      (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szf : mword 64) (lks : gset string),
     kxc_bad324_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m Mt K C sp0 ra0 s00 s10 s20 pv av w63 w67
+      pidv V dqb dqs dqa m Mt K sp0 ra0 s00 s10 s20 pv av w63 w67
       ef P szf lks.
 
   Parameter kxc_ls :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-        !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+        !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -855,13 +842,13 @@ Module Type KEXECB2.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (C : iProp Σ)
+      (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w63 w65 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd)
       (ip : nat) (va : mword 64) (fz po : Z) (lks : gset string),
     kxc_ls_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m K C sp0 ra0 s00 s10 s20 pv av w63 w65 w67
+      pidv V dqb dqs dqa m K sp0 ra0 s00 s10 s20 pv av w63 w65 w67
       ef P ip va fz po lks.
 End KEXECB2.

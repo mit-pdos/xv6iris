@@ -35,22 +35,25 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile CalleeSaved KernelText.
-Require Import WpNext WpLock CpuOwn PanicStub.
-Require Import ProcGeom FdSlots SchedCtx.
+Require Import RegFile.
+Require Import WpLock.
+Require Import FdSlots.
+Require Import IcacheRef.
+Require Import IrefSlots.
+Require Import ProcAvail.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv BioInv.
-Require Import FsBlocks LogInv KernelDataInv.
-Require Import InodeInv InodeLock InodeRegion.
-Require Import IrefSlots IcacheRef IcacheInv IcacheEscrow.
-Require Import SpecIalloc SpecIlock SpecDirlink SpecCreate.
+Require Import DiskPtsto BioInv.
+Require Import FsBlocks LogInv.
+Require Import InodeRegion.
+Require Import IrefSlots IcacheRef IcacheEscrow.
 Require Import SpecCreateFreshTy.
+Require Import ProcAvail.
 
 Module CreateFreshTy : CREATE_FRESH_TY.
   Axiom create_fresh_ty :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -63,9 +66,9 @@ Module CreateFreshTy : CREATE_FRESH_TY.
       (kd : nat) (dqp : dfrac)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqs dqn : dfrac)
-      (Ma : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (Ma : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       create_fresh_ty_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γpr
                            cov logstart inodestart ninodes nib dev ty kd dqp
-                           u Sb pidv dq dqs dqn Ma K eb C b lks.
+                           u Sb pidv dq dqs dqn Ma K eb b lks.
 End CreateFreshTy.

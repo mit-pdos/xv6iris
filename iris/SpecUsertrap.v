@@ -110,6 +110,7 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
+Require Import ProcPtOwn.   (* [proc_pt] / [ud_norm] -- the bare residue's vocabulary *)
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
 Require Import BioInv.
@@ -121,8 +122,10 @@ Require Import KallocInv.
 Require Import IrefSlots InodeRegion.
 Require Import ProcGeom.
 Require Import TrampPt UptTree.
+Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
 Require Import UserPtTree UserExec.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -249,6 +252,20 @@ Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
+    (* [hw_config]/[minstret_inv], AT THE RESUMING HART.  Both are persistent
+       and ride at the head of [sconf] -- [wp_usertrap_body]'s own entry
+       premise hands them in as a free borrow (see its comment) on the
+       strength that "persistent costs the caller nothing", but that is only
+       true AT ONE HART: usertrap may cross to a different hart before it
+       returns (the whole reason [R] above is hart-indexed), and a caller's
+       pre-crossing copy is a DIFFERENT resource from the post-crossing one
+       (same shape, different hart index, indistinguishable on the page).
+       The proof already has the resuming hart's own copies on hand at this
+       exact point -- [ut_ret2] unpacks them straight out of [sconf] just
+       like [ut_dup_hw] does -- so exposing them here costs nothing new to
+       prove, only to thread through. *)
+    hw_config -∗
+    minstret_inv -∗
     R pt' ksp -∗
     WP (Loop : expr riscv_lang)).
 
@@ -291,7 +308,14 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      [mideleg]/[menvcfg] below, which usertrap needs at FULL ownership
      (it assembles [IntrDefs.sconf], hence [sie_cap_gpr], out of them for its
      own internal kernel-tier step lemmas) and must therefore borrow and
-     give back explicitly, exactly like every other loose cell here. *)
+     give back explicitly, exactly like every other loose cell here.
+     [usertrap_post] hands a copy back too, in spite of that -- NOT because
+     the call could otherwise lose them (a persistent proposition is never
+     consumed), but because usertrap may CROSS HARTS before it returns, and
+     the entry copy is a resource AT THE ENTRY HART, silent on any other
+     one.  A caller that needs [hw_config] again after the call (uservec's
+     tail does, to reach userret) needs it AT THE RESUMING HART, which only
+     [usertrap_post] itself is in a position to hand over. *)
   hw_config -∗ minstret_inv -∗
   hart_state ↦ᵣ HART_ACTIVE tt -∗
   cur_privilege ↦ᵣ Supervisor -∗
@@ -342,7 +366,7 @@ Module Type USERTRAP_RES.
   Parameter usertrap_res :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId},
       uptd -> mword 64 -> iProp Σ.
 
@@ -360,14 +384,112 @@ Module Type USERTRAP_RES.
      tail needs: open, convert its own [tf_pa] cells in, close. Concrete
      proof: [UsertrapRes.usertrap_res_tf_open], via [proc_priv_split] +
      [ut_own_priv]. *)
+  (* THE PARKED FORM: [usertrap_res] WITHOUT THE TRANSLATION SLOT.
+     [usertrap_res] owns [satp] (its internal [strans_inv] sits in the KPT
+     arm, i.e. [KptShare.tlb_res_pt]) -- right for the state usertrap RUNS
+     in, and impossible for anything parked across user execution, where
+     [UptTree.utlb_inv_pt] owns [satp] at the USER root instead.  Holding
+     both is contradictory, so a consumer that took [usertrap_res] beside a
+     user-mode table would be vacuous rather than wrong-looking.  uservec
+     therefore takes the PARKED residue, and its exit switch's own
+     [tlb_res_pt] is exactly what completes it; userret's entry switch takes
+     that back out.  Concrete: [UsertrapRes.ut_res_parked]. *)
+  Parameter usertrap_res_parked :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId},
+      uptd -> mword 64 -> iProp Σ.
+
+  (* uservec's move: the switch just installed the kernel table, so the
+     residue can be completed into the state usertrap consumes. *)
+  Parameter usertrap_res_tlb_close :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
+      usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
+
+  (* userret's move: its entry switch is about to install the USER table, so
+     it needs the kernel one back out first.  The root is existential --
+     nothing outside pins which table the slot holds, and userret is
+     parametric in it. *)
+  Parameter usertrap_res_tlb_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res pt ksp -∗
+      ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
+
+  (* THE BARE FORM: the parked residue WITHOUT THE USER ADDRESS SPACE.
+     [usertrap_res_parked] fixed ONE of four overlaps with the user tier
+     (satp).  The other three are all [proc_pt], which rides inside
+     [usertrap_res] via [ProcInv.proc_priv]: the user page-table TREE
+     ([ptree_own 2 (DfracOwn 1)]) and the user DATA PAGES, which
+     [UserPtTree.user_pt_inv] carries too.  So the parked form is still
+     unsatisfiable beside a user-mode frame, and it is the BARE form that
+     parks across user execution.  Concrete: [UsertrapRes.ut_res_bare].
+
+     What the bare form still HAS is everything the kernel genuinely owns
+     while user code runs -- including [p->pagetable]/[p->trapframe] (cells
+     that merely name the table) and the trapframe page itself (physical
+     tier, U = 0 leaf, unreachable from user mode).  That is why
+     [usertrap_res_tf_open] below is stated on THIS form: the trapframe is
+     available in exactly the window the address space is not. *)
+  Parameter usertrap_res_bare :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId},
+      uptd -> mword 64 -> iProp Σ.
+
+  (* uservec's move, one tier under [_tlb_close]: its exit switch converted
+     the user table back to a [pt_frame], and the pages never moved, so
+     [ProcPtOwn.user_pt_inv_open] rebuilds [proc_pt] and this reseals it
+     into the residue. *)
+  Parameter usertrap_res_pt_close :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
+
+  (* userret's move: the address space is about to be installed again, so
+     it comes back out, to be split into the tree the entry switch consumes
+     and the pages [ProcPtOwn.user_pt_inv_close] hands the user tier. *)
+  Parameter usertrap_res_pt_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
+
+  (* THE FOOTPRINT RENORMALISATION.  The bare residue reads its descriptor
+     only through [ud_root]/[ud_tfp]/[ud_um] -- [proc_pt], the one conjunct
+     whose user-side partner names [ud_data], is what it just gave up -- so
+     it may be re-keyed on [ProcPtOwn.ud_norm].  That is what lets the trap
+     loop hand the user tier a descriptor whose [udata_cov] side condition
+     holds by construction, which is the fact this file's [usertrap_post]
+     explains it cannot ask usertrap for. *)
+  Parameter usertrap_res_bare_norm :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
+
   Parameter usertrap_res_tf_open :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
-      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
-      usertrap_res pt ksp -∗
-      ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
-        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
+      (* THE CROSS-ROUND HISTORICAL FACT, bare and undischarged -- see
+         [ProcGeom.tf_kernel_words_ok]'s own header. *)
+      (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+      usertrap_res_bare pt ksp -∗
+      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+        (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
 End USERTRAP_RES.
 
 Module Type USERTRAP.
@@ -375,7 +497,7 @@ Module Type USERTRAP.
   Parameter wp_usertrap :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (pt : uptd) (j : nat)
       (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)

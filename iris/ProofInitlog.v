@@ -92,6 +92,7 @@ Require Import SpecInstallTrans SpecWriteHead.
 Require Import SpecInitlog.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -200,7 +201,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section InitlogDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
@@ -266,7 +267,7 @@ End InitlogDefs.
 (* ===================================================================== *)
 
 Section ProofInitlog.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -282,12 +283,12 @@ Section ProofInitlog.
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb C b lks.
+                            pidv dq dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1 Hbelow.
@@ -806,14 +807,14 @@ Section ProofInitlog.
       by (unfold LOGBLOCKS; lia).
     iEval (rewrite Hsplit1 bslots_op) in "Hslots".
     iDestruct "Hslots" as "[Hs1u Hslots]".
-    iDestruct (cpu_own_transport CID CID21 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID21 0 true pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
-              T3 (K - 6)%nat true C b
+              T3 (K - 6)%nat true b
               _ HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
               Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
@@ -964,13 +965,13 @@ Section ProofInitlog.
               B2 !!! Regidx c = (m !!! Regidx c : mword 64)).
     { intros c Hcs N2 N8 N9 N18 N19.
       rewrite /B2 upd_ne; [| regne]. exact (HB1cs c Hcs N2 N8 N9 N18 N19). }
-    iDestruct (cpu_own_transport CID22 CID26 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID22 CID26 0 true pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID26) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
-              (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj C
+              (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj
               bs_hdr bsd0 d0 b _ HKbl HA HB2a0
               Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
@@ -1048,7 +1049,7 @@ Section ProofInitlog.
       iSplitL "Hs1u"; [iExact "Hs1u" | iExact "Hs2u"]. }
     iAssert (lh_n_pa ↦₄ (mword_of_int (Z.of_nat 0%nat) : mword 32))%I
       with "[Hncell]" as "Hncell"; [iExact "Hncell"|].
-    iDestruct (cpu_own_transport CID27 CID29 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID27 CID29 0 true pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID26) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -1080,7 +1081,7 @@ Section ProofInitlog.
     iApply (InstallTrans.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
-              C2 (K - 6)%nat true C b True%I
+              C2 (K - 6)%nat true b True%I
               _ HKit Hgeomok Hj Hgl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               Hbelow
@@ -1184,7 +1185,7 @@ Section ProofInitlog.
     iDestruct "Hs2" as "[Hs1u Hs1v]".
     iAssert (lh_n_pa ↦₄ (mword_of_int (Z.of_nat 0%nat) : mword 32))%I
       with "[Hncell]" as "Hncell"; [iExact "Hncell"|].
-    iDestruct (cpu_own_transport CID30 CID33 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID30 CID33 0 true pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID33) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -1193,7 +1194,7 @@ Section ProofInitlog.
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
-              D2 (K - 6)%nat true C b
+              D2 (K - 6)%nat true b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ HKwh Hgeomok Hj Hgl Hshape0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
@@ -1491,7 +1492,7 @@ Section ProofInitlog.
     iAssert (bslots bn 2) with "[Hs1u Hs1v]" as "Hs2".
     { rewrite (_ : 2%nat = (1 + 1)%nat); [| lia]. rewrite bslots_op.
       iSplitL "Hs1u"; [iExact "Hs1u" | iExact "Hs1v"]. }
-    iDestruct (cpu_own_transport CID34 CID41 0 true pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID34 CID41 0 true pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID41 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hppid Hsbf Hs2 Hctx").

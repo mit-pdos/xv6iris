@@ -44,10 +44,11 @@ Require Import WpGpr.
 Require Import KernelText MstatusBits.
 Require Import SmodeCore.
 Require Import PtTree.
-Require Import KptTree UptTree UserretDefs.
+Require Import UptTree UserretDefs.
 Require Import KptExecMap.
 Require Import UserPtTree UserExec UserKernelBridge.
 Require Import KptShare.
+Require Import TrampPt.
 Require Import SpecUserret SpecUser.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -98,7 +99,7 @@ Section UserretUser.
     mie ↦ᵣ uc_mie C -∗
     mideleg ↦ᵣ uc_mideleg C -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
-    senvcfg ↦ᵣ (mword_of_int 0 : mword 64) -∗
+    senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     sepc ↦ᵣ sepc0 -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     tlb_res_pt kroot -∗

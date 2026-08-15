@@ -60,17 +60,18 @@ Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
 Require Import SpecConsoleintr.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 
 (* uartintr's own frame is 4 slots; the deepest callee is consoleintr at 32
    (wakeup wants 18, acquire and release 10). *)
 Definition uartintr_stack : nat := 36%nat.
 
-Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names)
      (γs : list gname)
-    (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
@@ -83,7 +84,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
      [locks_below_mono] recovers from this one bound. *)
   locks_below lks "cons" ->
   sie_cap_gpr m av b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   (* THE DEVICE, AND NOTHING ELSE.  The transmit lock is gone from this
      contract: ae96fd0's uartintr takes no lock and moves no device ghost --
@@ -108,17 +109,17 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
     ∀ mf : regfile,
       ⌜ callee_saved m mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap mf)) ⌝ -∗
       sie_cap_gpr mf av b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type UARTINTR.
   Parameter wp_uartintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names)
       (γs : list gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_uartintr_sconf_body γu γv γs m av lvl eb pme C b lks.
+      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (b : bool) (lks : gset string),
+      wp_uartintr_sconf_body γu γv γs m av lvl eb pme b lks.
 End UARTINTR.

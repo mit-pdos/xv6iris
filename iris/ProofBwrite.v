@@ -81,6 +81,7 @@ Require Import SpecBwrite.
 Require Import CodeBwrite.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -118,7 +119,7 @@ Local Ltac regne := reg_ne_side.
 Local Ltac bwidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section ProofBwrite.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_bwrite_sconf 
@@ -127,11 +128,11 @@ Section ProofBwrite.
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ) (lks : gset string)
     : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd b Q lks.
+                           pidv dev bno dq m K eb bs bsd b Q lks.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
@@ -318,7 +319,7 @@ Section ProofBwrite.
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.bwrite + 0x0e) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
     assert (HKhsl : (16 <= K - 4)%nat) by lia.
-    iDestruct (cpu_own_transport CID CID8 0 eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* [trap_csrs_ext]/[cpu_claim_ext] are NOT part of holdingsleep's own
        signature, so they simply RIDE ALONG in its frame; re-anchor them here
@@ -329,7 +330,7 @@ Section ProofBwrite.
     iDestruct (cpu_claim_ext_transport CID CID8 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextm") as "Hextm".
     iApply (HSL.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
-              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb C b _ HKhsl Hbelow
+              "buffer"%string (bown bn k) mA pj pidv (K - 4)%nat eb b _ HKhsl Hbelow
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanicany Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
@@ -420,7 +421,7 @@ Section ProofBwrite.
     { intros kk Hkk. rewrite HD3a0. exact (bnode_data_kdata k kk Hk Hkk). }
     assert (HKrw : (K_virtio_disk_rw <= K - 4)%nat)
       by (unfold K_virtio_disk_rw; lia).
-    iDestruct (cpu_own_transport CID9 CID13 0 eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID9 CID13 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* [Hextc]/[Hextm] were never handed to holdingsleep (not in its
        signature), so they are still stranded at [CID8] -- its own crossing
@@ -446,7 +447,7 @@ Section ProofBwrite.
     (* the pair back itself, exactly like [Hcnt]/[Hcg] above it never is.  *)
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu D3
-              (K - 4)%nat eb C bno (mword_of_int 0 : mword 32) bs bsd b
+              (K - 4)%nat eb bno (mword_of_int 0 : mword 32) bs bsd b
               Q
               _ HKrw Hbno Hkdata Hj Hgl
               with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanicany Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm").
@@ -630,7 +631,7 @@ Section ProofBwrite.
       by (apply Hfin; bwidx).
     assert (Cs11 : P4 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (apply Hfin; bwidx).
-    iDestruct (cpu_own_transport CID14 CID19 0 eb pj C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID14 CID19 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID14 CID19 eb pj ltac:(rewrite Hbm; wp_next_chain)
                  with "Hextc") as "Hextc".

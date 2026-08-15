@@ -73,6 +73,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* begin_op's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
@@ -81,7 +82,7 @@ Import Defs.
 Definition K_begin_op : nat := 26%nat.
 
 Definition wp_begin_op_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -89,7 +90,7 @@ Definition wp_begin_op_sconf_body
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.begin_op in
   let pj := proc_addr j in
@@ -106,7 +107,7 @@ Definition wp_begin_op_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0; the acquire raises it to what sleep demands *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  begin_op's own acquire
      mints the pay its interior sleeps need at [eb = true] (the complement is
      [emp] and the caller brings nothing); at [eb = false] the push_off frees
@@ -129,7 +130,7 @@ Definition wp_begin_op_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -141,7 +142,7 @@ Definition wp_begin_op_sconf_body
 
 Module Type BEGIN_OP.
   Parameter wp_begin_op_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
@@ -149,8 +150,8 @@ Module Type BEGIN_OP.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
-                             pidv dq m K eb C b lks.
+                             pidv dq m K eb b lks.
 End BEGIN_OP.

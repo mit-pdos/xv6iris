@@ -50,13 +50,13 @@ Section ProofKalloc.
   Lemma wp_kalloc_sconf
       (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile)
-      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) (lks : gset string)
-    : wp_kalloc_sconf_body γl γk fl m on n eb p C K b lks.
+      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (K : nat) (b : bool) (lks : gset string)
+    : wp_kalloc_sconf_body γl γk fl m on n eb p K b lks.
   Proof.
     cbv beta delta [wp_kalloc_sconf_body].
     intros pcE ret_tgt HK Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock Havail Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbmatch. symmetry in Hbmatch.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (kai_00 with "Htext") as "Hi00".
@@ -173,14 +173,14 @@ Section ProofKalloc.
     (* [Hcnt] was introduced at the function's ENTRY hart; the eight plain
        instructions above each moved to a FRESH hart (CID1..CID8), so
        acquire wants it at CID8. *)
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) mA
-              n eb p C (K - 4)%nat b lks
+              n eb p (K - 4)%nat b lks
               Hnoffpos
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -290,7 +290,7 @@ Section ProofKalloc.
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
       iApply (Release.wp_release_sconf γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
-                n eb p C (K - 4)%nat ({["kmem"]} ∪ lks)
+                n eb p (K - 4)%nat ({["kmem"]} ∪ lks)
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -423,7 +423,7 @@ Section ProofKalloc.
       assert (Hretf : ret_pc (P45 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HP45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iDestruct (cpu_own_transport CIDrel CIDe7 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDrel CIDe7 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! P45 with "Hcg Hcnt Hpc [%] [Havail]").
@@ -583,7 +583,7 @@ Section ProofKalloc.
          acquire/release pair compose back to [N]. *)
       iEval (rewrite Hbmatch) in "Hcg".
       iApply (Release.wp_release_sconf γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
-                n eb p C (K - 4)%nat ({["kmem"]} ∪ lks)
+                n eb p (K - 4)%nat ({["kmem"]} ∪ lks)
                 ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -783,7 +783,7 @@ Section ProofKalloc.
       assert (Hretf : ret_pc (Q45 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HQ45ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iDestruct (cpu_own_transport CIDrel CIDg6 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDrel CIDg6 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDg6 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! Q45 with "Hcg Hcnt Hpc [%] [Hpage Havail]").

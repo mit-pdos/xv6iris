@@ -50,17 +50,17 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 
-Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
@@ -121,7 +121,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      exactly the eb retune back to the caller's own state, now realized
      against the DISPATCHING hart's fresh [trap_csrs] (the entry stash is
      about the wrong hart's ghost). *)
-  cpu_own 1 eb pj emp false {["proc"]} -∗
+  cpu_own 1 eb pj false {["proc"]} -∗
   own_ctx (p_context pj) -∗
   (* THE HART TAG, WHOLE.  The parking thread merged the slot's half with its
      own claim's half at [SchedCtx.proc_slots_running], and the reclaiming
@@ -140,7 +140,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
          rides inside it, which is what the caller's own retune needs. *)
       trap_csrs -∗
-      cpu_own 1 eb pj emp false {["proc"]} -∗
+      cpu_own 1 eb pj false {["proc"]} -∗
       own_ctx (p_context pj) -∗
       hart_full j cpu_id -∗
       ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
@@ -148,66 +148,33 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)
-(*  ROUTE B, LEMMA (1): sched ENTERED AT noff >= 2 DIVERGES.              *)
+(*  THERE IS NO noff <> 1 CONTRACT, AND THAT IS THE POINT.                *)
 (* ===================================================================== *)
-(* sched() asserts [mycpu()->noff == 1] and calls panic("sched locks")
-   otherwise (proc.c).  A thread that reaches sched holding a SECOND
-   spinlock therefore never returns, so its contract is a bare
-   [WP (Loop)] with NO postcondition and NO [wp_next]: nothing past the
-   panic is reachable and there is no crossing.
+(* sched() panics ("sched locks") unless [mycpu()->noff == 1], and this file
+   used to publish a SECOND contract, [wp_sched_locks], entered at
+   noff >= 2: it took the branch, jumped to panic and consumed the caller's
+   [panic_wp_any].  It existed for exactly one client -- the LOCKED branch of
+   a NESTED [acquiresleep], through [SpecSleep.wp_sleep_nested] -- and that
+   client is gone: iput now takes [SpecAcquiresleep.wp_acquiresleep_nb_sconf],
+   which PROVES it does not sleep (claude-notes/projects/iput-acquiresleep.md).
+   The contract is deleted rather than left standing as an unused permission
+   to panic.
 
-   This is the bottom lemma of design fs-icache.md 13.12's Route B --
-   the route that makes iput's NESTED [acquiresleep(&ip->lock)] (fs.c:348,
-   taken while itable.lock is held) sound WITHOUT a liveness argument:
-   its sleeping branch runs into exactly this panic, and the caller's
-   [panic_wp_any] closes it.  REF-1 makes the divergence unreachable in
-   practice; we do not prove that, we permit it -- the ilock/iget live
-   panics are the precedent.
-
-   THE PREMISE SET IS MINIMAL -- exactly what the walk from sched+0x00 to
-   the [bne] at +0x30 consumes.  Everything [wp_sched_sconf_body] threads
-   for the swtch -- [park_pay], [trap_csrs], [own_ctx], [hart_full],
-   the [sched_vc] slot, the state/chan cells of [proc_held] -- is DROPPED:
-   the crossing is never reached, and the [p->state] read at +0x34 sits
-   past the branch.  [procs_inv] stays because the inlined
-   holding(&p->lock) at +0x14 needs the lock invariant, and [locked]
-   because that is what holding is told to expect and hands back.
-
-   The [cpu_own] index is the literal [false] for the same reason as in
-   [wp_sched_sconf_body]: the enabled arm demands noff = 0.  The slot [C]
-   is an ordinary caller frame and is simply dropped on the floor.       *)
-Definition wp_sched_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset string) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.sched in
-  let pj := proc_addr j in
-  (j < NPROC)%nat ->
-  γs !! j = Some γl ->
-  (16 <= av)%nat ->
-  (* myproc()'s inlined push_off/pop_off transiently reaches noff+1, and
-     the [bne] refutation needs the level to be a genuine int -- the same
-     bound [cpu_cells] already carries, restated so it is usable BEFORE
-     the bundle is opened (myproc consumes it whole). *)
-  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
-  sie_cap_gpr m av false pj -∗
-  kernel_text -∗ pc_is pcE -∗
-  procs_inv γs -∗
-  locked γl cpu_id -∗
-  (* THE POINT: a SECOND lock is held. *)
-  cpu_own (S (S n)) eb pj C false lks -∗
-  panic_wp_any -∗
-  WP (Loop : expr riscv_lang).
+   WHAT IS LEFT IS A REFUTATION.  [wp_sched_sconf] is now sched's ONLY
+   contract.  It demands [cpu_own 1] and takes NO [panic_wp_any], and its
+   proof discharges the [bne] at sched+0x30 from the level alone.  So no
+   proof in this tree can hand a WP to sched's entry PC at any level but 1,
+   and along the one it can hand, the panic's basic block is not reached --
+   nor are the three [unreachable()] checks around it (p->lock held,
+   state <> RUNNING, interrupts off), which the same contract refutes from
+   [proc_held], [park_ok st] and the entry index [false].  All four of
+   sched's failure exits are dead code in the verified kernel. *)
 
 Module Type SCHED.
   Parameter wp_sched_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),
       wp_sched_sconf_body γs j γl st ch m av eb.
-  Parameter wp_sched_locks :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) (lks : gset string),
-      wp_sched_locks_body γs j γl m av eb C n lks.
 End SCHED.

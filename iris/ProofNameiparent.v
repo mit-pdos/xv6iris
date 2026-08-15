@@ -63,6 +63,7 @@ Require Import SpecDirlookup.
 Require Import SpecNamex.
 Require Import SpecNameiparent.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -148,7 +149,7 @@ Local Ltac npidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 Section ProofNameiparentMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WALK IS THE SET FORM; the counted seal follows it. *)
@@ -168,12 +169,12 @@ Section ProofNameiparentMain.
       (nfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_nameiparent_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                 ga gf cov logstart bmapstart inodestart nib
                                 size dev used cwdv plen pfun nfun n Sb
-                                pidv dq dqb dqs dqc m K eb C b lks.
+                                pidv dq dqb dqs dqc m K eb b lks.
   Proof.
     cbv beta delta [wp_nameiparent_gen_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -351,13 +352,13 @@ Section ProofNameiparentMain.
     (* the path and the name buffer, re-addressed at namex's own registers *)
     iEval (rewrite -HR5a0) in "Hpath".
     iEval (rewrite -HR5a2) in "Hname".
-    iDestruct (cpu_own_transport CID CID7 0%nat eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID CID7 0%nat eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (NX.wp_namex_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used cwdv
-              plen pfun nfun true n Sb pidv dq dqb dqs dqc R5 (K - 2)%nat eb C b
+              plen pfun nfun true n Sb pidv dq dqb dqs dqc R5 (K - 2)%nat eb b
               _ Knx Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs
               ltac:(rewrite HR5a1; exact npi_a1_true) Heb
@@ -526,7 +527,7 @@ Section ProofNameiparentMain.
         split; [rewrite HP3a0; exact Hp1 | exact (Hp2 eq_refl)].
       - iDestruct "Hok" as "[%Hp Hsl]". iFrame "Hsl".
         iPureIntro. rewrite HP3a0. exact Hp. }
-    iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID8 CID12 0%nat eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P3 n' used' Sb' ok nf ipv w
@@ -561,12 +562,12 @@ Section ProofNameiparentMain.
       (nfun : nat -> bv 8)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_nameiparent_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun n
-                          pidv dq dqb dqs dqc m K eb C b lks.
+                          pidv dq dqb dqs dqc m K eb b lks.
   Proof.
     cbv beta delta [wp_nameiparent_sconf_body].
     intros pcE pjv pv nb ret_tgt pl L
@@ -582,7 +583,7 @@ Section ProofNameiparentMain.
     iApply (wp_nameiparent_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib
               size dev used cwdv plen pfun nfun n Sb0
-              pidv dq dqb dqs dqc m K eb C b
+              pidv dq dqb dqs dqc m K eb b
               _ HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen (walk_need_counted L n Hbud) Hj Hgs Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hkenv Hitb2 Hitbl Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog [Hcont]").
     iEval (rewrite /wp_next).

@@ -180,6 +180,7 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -231,7 +232,7 @@ Proof.
 Qed.
 
 Definition wp_readi_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -248,7 +249,7 @@ Definition wp_readi_sconf_body
     (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
     (V : pprivate)
     (pidv : mword 32) (dq dqd : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.readi in
   let pj := proc_addr j in
@@ -309,7 +310,7 @@ Definition wp_readi_sconf_body
      only -- bound this contract states. *)
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  readi never acquires
      anything itself -- its interior sleepers (bmap's bread, its own
      bread, brelse, either_copyout's copyout) all supply and consume the
@@ -391,7 +392,7 @@ Definition wp_readi_sconf_body
              = (mword_of_int (Z.of_nat tot) : mword 64)
            /\ tot = rd_clamp (di_size dn) off n)⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -414,7 +415,7 @@ Definition wp_readi_sconf_body
 
 Module Type READI.
   Parameter wp_readi_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -431,10 +432,10 @@ Module Type READI.
       (user : bool) (off n : nat) (dst_olds : nat -> bv 8)
       (V : pprivate)
       (pidv : mword 32) (dq dqd : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V
-                          pidv dq dqd m K eb C b lks.
+                          pidv dq dqd m K eb b lks.
 End READI.

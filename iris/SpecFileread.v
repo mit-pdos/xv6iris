@@ -181,6 +181,7 @@ Require Import FileInvDefs.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -330,7 +331,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
 Section SpecFileread.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
@@ -657,7 +658,7 @@ End SpecFileread.
 Definition wp_fileread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -665,7 +666,7 @@ Definition wp_fileread_sconf_body
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
     (fn : fread_names)                           (* the heavy arms' ghosts  *)
     (pidv : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string) :=
+    (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileread in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -691,7 +692,7 @@ Definition wp_fileread_sconf_body
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
@@ -717,7 +718,7 @@ Definition wp_fileread_sconf_body
       ⌜fileread_ret n r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv_core pj pidv (upd_upt V P') -∗
@@ -729,7 +730,7 @@ Module Type FILEREAD.
   Parameter wp_fileread_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)
@@ -737,6 +738,6 @@ Module Type FILEREAD.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool) (lks : gset string),
-      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b lks.
+      (m : regfile) (K : nat) (eb : bool) (n : Z) (b : bool) (lks : gset string),
+      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb n b lks.
 End FILEREAD.

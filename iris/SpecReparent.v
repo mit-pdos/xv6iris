@@ -62,13 +62,14 @@ Require Import IntrDefs WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 (* six frame slots of reparent's own, plus wakeup's 18. *)
 Definition K_reparent : nat := 24%nat.
 
-Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
      (m : regfile) (γs : list gname) (pme ip : mword 64)
-    (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.reparent in
   let pv : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -87,7 +88,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
      unchanged end to end and this premise is not re-established anywhere. *)
   locks_below lks "proc" ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗ procs_inv γs -∗
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
@@ -96,7 +97,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
     ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr Mf K b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       parents_own (rp_map pv ip ps) -∗
@@ -105,8 +106,8 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefsl
 
 Module Type REPARENT.
   Parameter wp_reparent_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)
-      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b lks.
+      (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb b lks.
 End REPARENT.

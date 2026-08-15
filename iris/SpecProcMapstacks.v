@@ -38,7 +38,7 @@ From Kernel Require KernelSyms.
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
      range; [lvl] is otherwise generic (the identity pin this replaced was
@@ -55,14 +55,14 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
      lower (kvmmap's own Spec exposes no locks_below premise). *)
   locks_below lks "kmem" ->
   sie_cap_gpr mm K b p -∗
-  cpu_own lvl eb p C b lks -∗ kernel_text -∗
+  cpu_own lvl eb p b lks -∗ kernel_text -∗
   pc_is (mword_of_int KernelSyms.proc_mapstacks) -∗
   ptree_own 2 (DfracOwn 1) t -∗
   kalloc_env γa on -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g : nat) (pas : nat -> mword 44),
     sie_cap_gpr mr K b p -∗
-    cpu_own lvl eb p C b lks -∗
+    cpu_own lvl eb p b lks -∗
     pc_is ret_tgt -∗
     ptree_own 2 (DfracOwn 1) t' -∗
     ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -80,6 +80,6 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
-      wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p on b lks.
 End PROC_MAPSTACKS.

@@ -530,7 +530,7 @@ Section ProofKerneltrapParts.
   Lemma kt_epi
       (m0 M : regfile) (sp0 ra0 s00 s10 s20 s30 vgap : mword 64)
       (ep epold : mword 64) (ms0 : mword 64)
-      (k lvl : nat) (C : iProp Σ) (va vb : mword 1) (lks : gset string) :
+      (k lvl : nat) (va vb : mword 1) (lks : gset string) :
     m0 !!! Regidx csp_rs1 = sp0 ->
     m0 !!! Regidx ra_idx = ra0 ->
     m0 !!! Regidx s0_idx = s00 ->
@@ -552,7 +552,7 @@ Section ProofKerneltrapParts.
     kt_thr m0 M ->
     sie_cap_gpr M k false p -∗
     sret_bits va vb -∗
-    cpu_own lvl false p C false lks -∗
+    cpu_own lvl false p false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.kerneltrap + 0x36) : mword 64) -∗
     sepc ↦ᵣ epold -∗
@@ -569,7 +569,7 @@ Section ProofKerneltrapParts.
         ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
         sie_cap_gpr_at ms_f mf (k + 6) false p -∗
         sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
-        cpu_own lvl false p C false lks -∗
+        cpu_own lvl false p false lks -∗
         sepc ↦ᵣ ep -∗
         pc_is (ret_pc ra0) -∗
         WP (Loop : expr riscv_lang) ) -∗

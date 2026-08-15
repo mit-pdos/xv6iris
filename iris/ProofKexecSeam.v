@@ -553,8 +553,8 @@ Section KexecBSeam.
       (kf : nat) (qf sf : Qp) (gyf : gname) (inumf : mword 32)
       (dnf : dinode) (bmf : blkmap)
       (gilf gislf : gname) : iProp Σ :=
-    (is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) ∗
-     sleeplocked gislf ∗
+    (is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string (ic_tok cn kf) (slh_tok (icfg_isl kf)) ∗
+     sleeplocked_q gislf sf ∗
      sl_pid (i_lock (ientry kf)) ↦₄ pidv ∗
      ic_deposit cn kf (DepShr sf dev inumf gyf) ∗
      i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev ∗
@@ -589,7 +589,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) : iProp Σ :=
@@ -612,7 +612,7 @@ Section KexecBSeam.
        um_covered (mword_of_int 0 : mword 64) P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a2) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -669,7 +669,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) : iProp Σ :=
@@ -695,7 +695,7 @@ Section KexecBSeam.
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x12c) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -740,7 +740,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (M : regfile) (K : nat) (C : iProp Σ)
+      (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szv : mword 64) : iProp Σ :=
@@ -759,7 +759,7 @@ Section KexecBSeam.
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1a4) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf ∗
      log_op g n2 ∗
@@ -795,7 +795,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (M : regfile) (K : nat) (C : iProp Σ)
+      (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szv : mword 64) : iProp Σ :=
@@ -811,7 +811,7 @@ Section KexecBSeam.
        um_covered szv P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x1ae) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      iref_slots 2 ∗
      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) ∗
      sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) ∗
@@ -907,7 +907,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (M : regfile) (K : nat) (C : iProp Σ)
+      (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
@@ -929,7 +929,7 @@ Section KexecBSeam.
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x21a) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
                sp0 ra0 s00 s10 s20 pv av
@@ -962,7 +962,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (M : regfile) (K : nat) (C : iProp Σ)
+      (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
@@ -983,7 +983,7 @@ Section KexecBSeam.
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x272) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
                sp0 ra0 s00 s10 s20 pv av
@@ -1041,7 +1041,7 @@ Section KexecBSeam.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (M : regfile) (K : nat) (C : iProp Σ)
+      (M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) : iProp Σ :=
@@ -1061,7 +1061,7 @@ Section KexecBSeam.
        um_below sz1 P.(ud_um) /\ um_covered sz1 P.(ud_um) ⌝ ∗
      pc_is (mword_of_int (KXB + 0x2a6) : mword 64) ∗
      sie_cap_gpr M (K - 68)%nat true (proc_addr jp) ∗
-     cpu_own 0 true (proc_addr jp) C true ∅ ∗
+     cpu_own 0 true (proc_addr jp) true ∅ ∗
      kxc_d_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf aslen afun pidv V dqb dqs dqa
                sp0 ra0 s00 s10 s20 pv av

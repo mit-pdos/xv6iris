@@ -85,20 +85,20 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 
-Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
+    (m : regfile) (av : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.yield in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))
@@ -107,17 +107,16 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   γs !! j = Some γl ->
   (20 <= av)%nat ->
   sie_cap_gpr m av eb pj -∗
-  cpu_own 0 eb pj C eb ∅ -∗
+  cpu_own 0 eb pj eb ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av eb pj -∗
-      cpu_own 0 eb pj C eb ∅ -∗
+      cpu_own 0 eb pj eb ∅ -∗
       pc_is ret_tgt -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
@@ -126,9 +125,9 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
 
 Module Type YIELD.
   Parameter wp_yield_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_yield_sconf_body γs j γl m av eb C.
+      (m : regfile) (av : nat) (eb : bool),
+      wp_yield_sconf_body γs j γl m av eb.
 End YIELD.

@@ -225,6 +225,7 @@ Require Import ProofKexecParts.
 Require Import ProofKexecTail.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -263,7 +264,7 @@ Module T := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
 Section KexecABody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.  (* NB: icacheG + icfg come from
               [fileG] -- see the header.  A standalone [!icacheG Σ] beside
               [!fileG Σ] is a SECOND instance and [ProcInv.cwd_ref] then does
               not match [SpecNamei]'s [inode_held]. *)
@@ -305,7 +306,7 @@ Section KexecABody.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
@@ -337,7 +338,7 @@ Section KexecABody.
     m !!! Regidx Ra0 = pv ->
     m !!! Regidx Ra1 = av ->
     sie_cap_gpr m K b (proc_addr jp) -∗
-    cpu_own 0 eb (proc_addr jp) C b lks -∗
+    cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
     panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -360,7 +361,7 @@ Section KexecABody.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) C b lks -∗
+          cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -389,14 +390,14 @@ Section KexecABody.
       ∀ (M32 : regfile) (used1 : gset Z) (ipv : mword 64) (n1 : nat),
         kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
                   used used1 plen pfun na avf aslen afun pidv V dqb dqs dqa
-                  m M32 K eb C b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
+                  m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
         wp_next (CID0 := CID) b (proc_addr jp) (fun (CIDx : CpuId) =>
           ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
             (entry spv szv' : mword 64),
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K b (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -420,7 +421,7 @@ Section KexecABody.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont32".
     (* ---- b = eb = true (see the header) ---- *)
-    iDestruct (kxc_sie_b_agree m 0%nat K eb b (proc_addr jp) C lks with "Hcg Hcnt") as %Houtb.
+    iDestruct (kxc_sie_b_agree m 0%nat K eb b (proc_addr jp) lks with "Hcg Hcnt") as %Houtb.
     subst eb. cbn in Houtb. subst b.
     (* depth 0 forces the held set empty, so begin_op's order premise ("log",
        3) needs no hypothesis of this lemma's own. *)
@@ -454,9 +455,9 @@ Section KexecABody.
     assert (HN1ra : N1 !!! Regidx Rra
                     = add_vec_int (mword_of_int (KXA + 0x20) : mword 64) 4)
       by (rewrite /N1; apply upd_eq).
-    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CIDj1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Myproc.wp_myproc_sconf N1 (K - 68)%nat 0%nat true (proc_addr jp) C true lks
+    iApply (Myproc.wp_myproc_sconf N1 (K - 68)%nat 0%nat true (proc_addr jp) true lks
               ltac:(vm_compute; reflexivity) ltac:(lia)
               with "Hcg Hcnt Htext Hpc").
     iIntros (CIDm Hsm ms M2) "%Hmsf Hcg Hcnt Hpc %Hmp".
@@ -497,10 +498,10 @@ Section KexecABody.
       by (rewrite /N3; apply upd_eq).
     assert (HN3s1 : N3 !!! Regidx Rs1 = (proc_addr jp))
       by (rewrite /N3 upd_ne; [exact HN2s1 | nz]).
-    iDestruct (cpu_own_transport CIDm CIDj2 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CIDm CIDj2 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
-              pidv (DfracOwn (1/4)) N3 (K - 68)%nat true C true lks
+              pidv (DfracOwn (1/4)) N3 (K - 68)%nat true true lks
               ltac:(unfold K_begin_op; lia) Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlogc Hppid Hprocs").
     all: try lkbelow.
@@ -548,7 +549,7 @@ Section KexecABody.
       by (rewrite /N5; apply upd_eq).
     assert (HN5a0 : N5 !!! Regidx Ra0 = pv)
       by (rewrite /N5 upd_ne; [exact HN4a0 | nz]).
-    iDestruct (cpu_own_transport CIDb CIDj3 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CIDb CIDj3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iEval (rewrite /cwd_ref) in "Hcref".
     (* namei names the path buffer by ITS OWN a0; ours is [pv]. *)
@@ -567,7 +568,7 @@ Section KexecABody.
     iApply (Namei.wp_namei_gen gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl
               ga gf cov logstart bmapstart inodestart nib size dev used
               (pv_cwd V) plen pfun MAXOPBLOCKS Sb0 pidv (DfracOwn (1/4)) dqb dqs
-              (DfracOwn 1) N5 (K - 68)%nat true C true lks
+              (DfracOwn 1) N5 (K - 68)%nat true true lks
               ltac:(unfold K_namei; lia) Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0
               Hbmc Hbml Hins0 Hcovb Hiregb Hcstr Hplen
               ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
@@ -642,7 +643,7 @@ Section KexecABody.
       iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd [Hcref] Hppid") as "Hpriv".
       { iEval (rewrite /cwd_ref). iExact "Hcref". }
       rewrite kxc_upd_cwd_id.
-      iDestruct (cpu_own_transport CIDn CIDz 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CIDn CIDz 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont32" $! CIDz with "[%]"); [wp_next_chain |].
       (* hand the exit back, re-anchored at [CIDz] (the crossing fact by NAME,
@@ -716,11 +717,11 @@ Section KexecABody.
       assert (HP1ra : P1 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KXA + 0x88) : mword 64) 4)
         by (rewrite /P1; apply upd_eq).
-      iDestruct (cpu_own_transport CIDn CIDj4 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CIDn CIDj4 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
-                true C true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+                true true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
                 with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
@@ -760,7 +761,7 @@ Section KexecABody.
       iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd [Hcref] Hppid") as "Hpriv".
       { iEval (rewrite /cwd_ref). iExact "Hcref". }
       rewrite kxc_upd_cwd_id.
-      iDestruct (cpu_own_transport CIDe1 CIDz2 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CIDe1 CIDz2 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       (* the register facts at +0x072 *)
       assert (HP2sp : P2 !!! Regidx csp_rs1 = pa_stk sp0 68).
@@ -777,7 +778,7 @@ Section KexecABody.
         exact (HM4thr r Hr Nsp Ns0 Ns1 Ns2). }
       iApply (T.kxc_exit_m1 (proc_addr jp) bn gfs ga gf cov logstart bmapstart inodestart
                 size used used1 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m P2 K true C true lks sp0 ra0 s00 s10 s20 pv av
+                dqb dqs dqa m P2 K true true lks sp0 ra0 s00 s10 s20 pv av
                 ltac:(lia) Hused1 Hsp Hra Hs0 Hs1 Hs2 HP2sp HP2a0 HP2thr
                 with "Hcg Hcnt Htext Hpc [Hframe] Hbm Hins Hbits Hka Hpriv
                       Hpath Hargv Hargs Hbs Hirs").
@@ -826,7 +827,7 @@ Section KexecABody.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m M32 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m M32 : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av ipv : mword 64) (n1 : nat) :
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
@@ -859,7 +860,7 @@ Section KexecABody.
               cov logstart inodestart nib dev -∗
     kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
               used used1 plen pfun na avf aslen afun pidv V dqb dqs dqa
-              m M32 K eb C b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
+              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1 -∗
     (* ---- kexec's OWN continuation: the +0x064 tail closes the -1 arm ---- *)
     wp_next b (proc_addr jp) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -867,7 +868,7 @@ Section KexecABody.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) C b lks -∗
+          cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -900,10 +901,10 @@ Section KexecABody.
         ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
         sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
-        cpu_own 0 eb (proc_addr jp) C b lks -∗
-        is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) -∗
-        sleeplocked gislf -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
+        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+        sleeplocked_q gislf sf -∗
         sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
         ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
@@ -934,7 +935,7 @@ Section KexecABody.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K b (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -962,7 +963,7 @@ Section KexecABody.
                            Hpriv & Hpath & Hargv & Hargs & Hframe)".
     destruct Hregs as (HM32sp & HM32s0 & HM32s1 & HM32s2 & HM32a0 & Hipvnz &
                        HM32thr).
-    iDestruct (kxc_sie_b_agree M32 0%nat (K - 68)%nat eb b (proc_addr jp) C lks
+    iDestruct (kxc_sie_b_agree M32 0%nat (K - 68)%nat eb b (proc_addr jp) lks
                  with "Hcg Hcnt") as %Houtb.
     subst eb. cbn in Houtb. subst b.
     (* depth 0 forces the held set empty, so the ilock/end_op order premises
@@ -1074,11 +1075,11 @@ Section KexecABody.
       by (rewrite /Q2; apply upd_eq).
     assert (HQ2a0 : Q2 !!! Regidx Ra0 = ientry k)
       by (rewrite /Q2 upd_ne; [exact HQ1a0 | nz]).
-    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Ilock.wp_ilock_sconf gs jp gl gu gd gk pd pav pu bn gfs gi cn
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
-              pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true C true lks
+              pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true true lks
               ltac:(unfold K_ilock; lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
@@ -1257,11 +1258,11 @@ Section KexecABody.
       rewrite /Q4 upd_ne; [| regne]. rewrite /Q3 upd_ne; [| regne].
       exact (HM1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     iEval (rewrite -HQ8a2) in "Helfb".
-    iDestruct (cpu_own_transport CIDil CID9 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CIDil CID9 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry k) bml datl dnl false 0%nat 64%nat fb V
-              pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true C true lks
+              pidv (DfracOwn (1/4)) (DfracOwn (1/2)) Q8 (K - 68)%nat true true lks
               ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity) Hjp Hgs HQ8a0
@@ -1433,7 +1434,7 @@ Section KexecABody.
         iEval (rewrite Htgt90) in "Hpc".
         iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
         rewrite kxc_upd_cwd_id.
-        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
@@ -1491,7 +1492,7 @@ Section KexecABody.
         iEval (rewrite Hpp064) in "Hpc".
         iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
         rewrite kxc_upd_cwd_id.
-        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CIDrd CID15 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
           with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
@@ -1520,7 +1521,7 @@ Section KexecABody.
                   gilk gislk ga gf cov logstart bmapstart inodestart nib size
                   dev used used1 k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                   plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                  m Q12 K C lks sp0 ra0 s00 s10 s20 pv av
+                  m Q12 K lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
                   with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
@@ -1562,7 +1563,7 @@ Section KexecABody.
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" $! (pv_cwd V) with "Hcwd Hcref Hppid") as "Hpriv".
       rewrite kxc_upd_cwd_id.
-      iDestruct (cpu_own_transport CIDrd CID11 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CIDrd CID11 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iAssert (ic_loaded gfs gi cov logstart k inum dnl bml)
         with "[Hdiat Hmeta Hmap Hblocks Hdlk]" as "Hload".
@@ -1590,7 +1591,7 @@ Section KexecABody.
                 gilk gislk ga gf cov logstart bmapstart inodestart nib size
                 dev used used1 k (q/2)%Qp (q/2)%Qp gy inum dnl bml n1
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                m Q9 K C lks sp0 ra0 s00 s10 s20 pv av
+                m Q9 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
                 with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
@@ -1634,7 +1635,7 @@ End KexecABody.
 Section KexecAMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -1677,7 +1678,7 @@ Section KexecAMain.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
     dev = icfg_dev ->
@@ -1709,7 +1710,7 @@ Section KexecAMain.
     m !!! Regidx Ra0 = pv ->
     m !!! Regidx Ra1 = av ->
     sie_cap_gpr m K b (proc_addr jp) -∗
-    cpu_own 0 eb (proc_addr jp) C b lks -∗
+    cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
     panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
@@ -1732,7 +1733,7 @@ Section KexecAMain.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) C b lks -∗
+          cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1765,10 +1766,10 @@ Section KexecAMain.
         ⌜ (iput_units <= n2)%nat /\ used2 ⊆ used ⌝ -∗
         pc_is (mword_of_int (KXA + 0x90) : mword 64) -∗
         sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
-        cpu_own 0 eb (proc_addr jp) C b lks -∗
-        is_sleeplock gilf gislf (i_lock (ientry kf)) "inode"%string
-                     (ic_tok cn kf) -∗
-        sleeplocked gislf -∗
+        cpu_own 0 eb (proc_addr jp) b lks -∗
+        is_sleeplock_gen gilf gislf (i_lock (ientry kf)) "inode"%string
+                     (ic_tok cn kf) (slh_tok (icfg_isl kf)) -∗
+        sleeplocked_q gislf sf -∗
         sl_pid (i_lock (ientry kf)) ↦₄ pidv -∗
         ic_deposit cn kf (DepShr sf dev inumf gyf) -∗
         i_dev (ientry kf) ↦₄{DfracOwn (1/2)} dev -∗
@@ -1803,7 +1804,7 @@ Section KexecAMain.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K b (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1828,7 +1829,7 @@ Section KexecAMain.
     iApply (kxc_a1 (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev used
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-              m K eb C b lks sp0 ra0 s00 s10 s20 pv av
+              m K eb b lks sp0 ra0 s00 s10 s20 pv av
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
@@ -1841,7 +1842,7 @@ Section KexecAMain.
     iApply (kxc_a2 (CID0 := CIDs) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev used used1
               plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-              m M32 K eb C b lks sp0 ra0 s00 s10 s20 pv av ipv n1
+              m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               with "Htext Hpanic Hfab Hseam Hexit Hcont90").

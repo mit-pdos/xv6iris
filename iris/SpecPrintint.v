@@ -64,7 +64,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 
 
@@ -74,7 +73,7 @@ Definition printint_stack : nat := 24%nat.
 
 Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-    (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string) :=
+    (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a1_idx : mword 5 := mword_of_int 11 in
   let pcE := mword_of_int KernelSyms.printint in
@@ -86,16 +85,15 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGho
   (* printint -> consputc -> uartputc_sync *)
   locks_below lks "uart" ->
   sie_cap_gpr m0 K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   dev_inv γd γv -∗
   is_txlock γl γd -∗
   uart_sent_sub γd bs -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr mf K b p -∗
-    cpu_own n eb p C b lks -∗
+    cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
     uart_sent_sub γd (bs ++ cs) -∗
@@ -106,6 +104,6 @@ Module Type PRINTINT.
   Parameter wp_printint_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
-      (bs : list (bv 8)) (n : nat) (eb : bool) (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string),
-      wp_printint_sconf_body γl γd γv m0 K bs n eb C b p lks.
+      (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string),
+      wp_printint_sconf_body γl γd γv m0 K bs n eb b p lks.
 End PRINTINT.

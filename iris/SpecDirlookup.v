@@ -143,6 +143,7 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -169,7 +170,7 @@ Definition T_DIR : mword 16 := mword_of_int 1.
 Definition wp_dirlookup_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -186,7 +187,7 @@ Definition wp_dirlookup_sconf_body
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlookup in
   let pj := proc_addr j in
@@ -218,7 +219,7 @@ Definition wp_dirlookup_sconf_body
      higher one follows by [locks_below_mono]. *)
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -255,7 +256,7 @@ Definition wp_dirlookup_sconf_body
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED *)
       i_dev ip ↦₄{dqd} dev -∗
@@ -287,7 +288,7 @@ Module Type DIRLOOKUP.
   Parameter wp_dirlookup_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -303,9 +304,9 @@ Module Type DIRLOOKUP.
       (fn : nat -> bv 8)
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
                               γa γf cov logstart nib dev ip bm data dn
-                              fn hasp pofv pidv dq dqd dqn m K eb C b lks.
+                              fn hasp pofv pidv dq dqd dqn m K eb b lks.
 End DIRLOOKUP.

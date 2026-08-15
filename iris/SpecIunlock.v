@@ -93,6 +93,7 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -103,7 +104,7 @@ Definition K_iunlock : nat := 26%nat.
 
 Definition wp_iunlock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-      !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname)
@@ -114,7 +115,7 @@ Definition wp_iunlock_sconf_body
     (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
     (dn' : dinode) (bm' : blkmap)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool) (p : mword 64)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlock in
   let ip : mword 64 := ientry k in
@@ -122,21 +123,23 @@ Definition wp_iunlock_sconf_body
   (K_iunlock <= K)%nat ->
   (* the entry is slot [k]: a0 = ip, and the null test dies here *)
   (k < NINODE)%nat ->
+
   m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
   (* THE FRESHNESS PREMISE: iunlock's own [holdingsleep] acquires and
      releases the sleeplock's inner "sleep lock" spinlock internally, so
      the caller must already hold only locks BELOW its rank. *)
   locks_below lks "sleep lock" ->
   sie_cap_gpr m K b p -∗
-  cpu_own 0 eb p C b lks -∗
+  cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
-  sleeplocked gisl -∗
+  sleeplocked_q gisl s -∗
   sl_pid (i_lock ip) ↦₄ pidv -∗
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
@@ -161,7 +164,7 @@ Definition wp_iunlock_sconf_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b p -∗
-      cpu_own 0 eb p C b lks -∗
+      cpu_own 0 eb p b lks -∗
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
       (* the caller's share, back whole, at ITS OWN fraction and device *)
@@ -172,7 +175,7 @@ Definition wp_iunlock_sconf_body
 Module Type IUNLOCK.
   Parameter wp_iunlock_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-             !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname)
@@ -183,8 +186,8 @@ Module Type IUNLOCK.
       (k : nat) (s : Qp) (g : gname) (dev inum : mword 32)
       (dn' : dinode) (bm' : blkmap)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool) (p : mword 64)
       (b : bool) (lks : gset string),
       wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k s g dev inum
-                            dn' bm' pidv dq m K eb p C b lks.
+                            dn' bm' pidv dq m K eb p b lks.
 End IUNLOCK.

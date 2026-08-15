@@ -81,6 +81,7 @@ Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 Require Import ConsoleInv.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
    (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
@@ -103,10 +104,10 @@ Section ConsoleCaps.
 
 End ConsoleCaps.
 
-Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
      (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
-    (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (consoleintr_stack <= K)%nat ->
   length γs = NPROC ->
@@ -124,7 +125,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
      obligation to supply. *)
   locks_below lks "cons" ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
   panic_wp_any -∗ procs_inv γs -∗
   dev_inv γu γv -∗
@@ -133,16 +134,16 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr Mf K b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is rettgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
        (γu : uart_names) (γv : disk_names) (m : regfile) (γs : list gname)
-      (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_consoleintr_sconf_body γu γv m γs pme lvl K eb C b lks.
+      (pme : mword 64) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_consoleintr_sconf_body γu γv m γs pme lvl K eb b lks.
 End CONSOLEINTR.

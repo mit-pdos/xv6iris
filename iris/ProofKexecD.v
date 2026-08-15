@@ -48,56 +48,40 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
+Require Import KptTree.
 Require Import CpuOwn.
-Require Import SleepLock.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import IcacheEscrow.
 Require Import ByteBuf.
-Require Import VcGen.
-Require Import W32Arith.
 Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
+Require Import TrampPt.
 Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import DirLinks.
-Require Import InodeLock.
 Require Import SchedCtx.
 Require Import DiskInv.
-Require Import PtTree.
-Require Import PtBuild.
-Require Import ProcPt.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
-Require Import FileInv.
+Require Import FileInvDefs.
 Require Import SpecKexec.
 Require Import SpecProcFreepagetable.
 Require Import SpecSafestrcpy.
@@ -624,14 +608,19 @@ Section KexecDCommit.
   (* ---- the small address/shape facts the commit block needs ---- *)
 
   (* every trapframe word this block writes, at one lemma: the [sd]'s own
-     12-bit displacement against [a_tf_word]'s [8*i] indexing. *)
+     12-bit displacement against [tf_pa]'s [8*i] indexing.  Concludes in
+     [tf_pa], not [a_tf_word]: every downstream consumer (tf_page_word_mem
+     and friends) is physical-native now, so stating it that way makes every
+     call site below line up with no further bridging. *)
   Lemma kxd_tf_addr (tfp : mword 44) (z : Z) (i : nat) :
+    (i < 512)%nat ->
     (sign_extend' 64 (mword_of_int z : mword 12) : mword 64)
       = mword_of_int (8 * Z.of_nat i) ->
     add_vec (page_base tfp) (sign_extend' 64 (mword_of_int z : mword 12))
-    = a_tf_word tfp i.
+    = tf_pa tfp (8 * Z.of_nat i).
   Proof.
-    intro Hz. rewrite Hz /a_tf_word /pa_add /add_vec_int.
+    intros Hi Hz. rewrite (tf_pa_eq_pa_add8 tfp i Hi).
+    rewrite Hz /pa_add /add_vec_int.
     f_equal. f_equal. lia.
   Qed.
 
@@ -882,7 +871,7 @@ Section KexecDCommit.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c q : nat) :
@@ -914,7 +903,7 @@ Section KexecDCommit.
     kernel_text -∗
     pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true ∅ -∗
+    cpu_own 0 true (proc_addr jp) true ∅ -∗
     kalloc_env ga None -∗
     kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
             plen pfun na avf aslen afun pidv
@@ -929,7 +918,7 @@ Section KexecDCommit.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1180,6 +1169,19 @@ Section KexecDCommit.
     assert (HF0s10 : mr !!! Regidx Rs10 = pv_sz V).
     { rewrite (callee_saved_lookup Hcsn Rs10 ltac:(vm_compute; reflexivity)).
       exact HE4s10. }
+    (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently) and
+       [page_valid] (the trapframe page's own well-formedness) -- what the
+       SD instructions below need to cross [tf_page_word_upd]'s physical-
+       native result to the mem tier they actually run at (kernel code
+       reaching the trapframe through its own mapping, not the trampoline's
+       physical entry/exit path). *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv_valid.
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the COMMIT's own three writes ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
@@ -1351,12 +1353,14 @@ Section KexecDCommit.
     { apply lookup_lt_is_Some_2. rewrite Htflen.
       unfold TFWORDS, tf_epc_idx. lia. }
     destruct Hw3 as [u3 Hu3].
-    iDestruct (tf_page_word_upd _ _ tf_epc_idx u3 Hu3 with "Htfp")
+    iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx u3
+                 ltac:(unfold tf_epc_idx; lia) Hu3 with "Hptc Htfp")
       as "(Hword3 & Htfback3)".
     assert (Haddr24 : add_vec (F3 !!! Regidx Ra5)
                         (sign_extend' 64 (mword_of_int 24 : mword 12))
-                      = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx).
+                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx)).
     { rewrite HF3a5. apply kxd_tf_addr.
+      { unfold tf_epc_idx. lia. }
       unfold tf_epc_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr24) in "Hword3".
     iApply (wp_csd_s_sconf (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
@@ -1414,12 +1418,14 @@ Section KexecDCommit.
     { apply lookup_lt_is_Some_2. rewrite length_insert Htflen.
       unfold TFWORDS, kxc_tf_sp_idx. lia. }
     destruct Hw6 as [u6 Hu6].
-    iDestruct (tf_page_word_upd _ _ kxc_tf_sp_idx u6 Hu6 with "Htfp")
+    iDestruct (tf_page_word_upd_mem _ _ kxc_tf_sp_idx u6
+                 ltac:(unfold kxc_tf_sp_idx; lia) Hu6 with "Hptc Htfp")
       as "(Hword6 & Htfback6)".
     assert (Haddr48 : add_vec (F4 !!! Regidx Ra5)
                         (sign_extend' 64 (mword_of_int 48 : mword 12))
-                      = a_tf_word (ud_tfp (pv_upt V)) kxc_tf_sp_idx).
+                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat kxc_tf_sp_idx)).
     { rewrite HF4a5. apply kxd_tf_addr.
+      { unfold kxc_tf_sp_idx. lia. }
       unfold kxc_tf_sp_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr48) in "Hword6".
     iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
@@ -1498,7 +1504,7 @@ Section KexecDCommit.
     assert (HF6s1 : F6 !!! Regidx Rs1 = (mword_of_int (Z.of_nat c) : mword 64))
       by (rewrite /F6 upd_ne; [exact HF5s1 | nz]).
     iApply (PFP.wp_proc_freepagetable_sconf ga F6 (pv_upt V) (K - 68)%nat true
-              (proc_addr jp) C 0%nat true ∅
+              (proc_addr jp) 0%nat true ∅
               ltac:(lia) ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
               HF6a0 ltac:(rewrite HF6a1; exact Hszmax)
               ltac:(rewrite HF6a1; exact Hbelold) (locks_below_empty _)
@@ -1732,7 +1738,7 @@ Section KexecDCommit.
               ltac:(lia) Hmsp Hmra Hms0 Hms1 Hms2 HG10sp HG10thr
               with "Hcg Htext Hpc Hfr").
     iIntros (CIDe Hse mf) "%Hcs %Hpres Hcg Hpc".
-    iDestruct (cpu_own_transport CID16 CIDe 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID16 CIDe 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (kxd_priv_exec with "Hpriv") as "Hpriv".
     (* the final [sp] is inside the image's top page, which is [kxc_stack_ok]'s
@@ -1846,7 +1852,7 @@ Section KexecDMain.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat) :
@@ -1865,7 +1871,7 @@ Section KexecDMain.
     kernel_text -∗
     kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-               M K C sp0 ra0 s00 s10 s20 pv av
+               M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P (pv_sz V) sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -1873,7 +1879,7 @@ Section KexecDMain.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1919,6 +1925,16 @@ Section KexecDMain.
     iPoseProof (kxc_2b8 with "Htext") as "Hi2b8".
     iPoseProof (kxc_2ba with "Htext") as "Hi2ba".
     iPoseProof (kxc_2be with "Htext") as "Hi2be".
+    (* [pt_node_claim], for the same reason as [kxd_phaseC]'s own commit
+       block above: [tf_page_word_upd]'s result is physical-native, and the
+       SD instruction here runs through the kernel's own mapping. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv_valid.
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
     (* ---- the process block, opened for the FIRST trapframe write ---- *)
     iDestruct (proc_priv_newspace with "Hpriv")
       as "(%Hszmax & %Hbelold & Hpsz & Hppt & Hptf & Hptold & Htfp & Hprivback)".
@@ -1962,12 +1978,14 @@ Section KexecDMain.
     assert (Hw15 : exists u15, pv_tf V !! tf_arg_idx 1 = Some u15).
     { apply lookup_lt_is_Some_2. rewrite Htflen. unfold TFWORDS, tf_arg_idx. lia. }
     destruct Hw15 as [u15 Hu15].
-    iDestruct (tf_page_word_upd _ _ (tf_arg_idx 1) u15 Hu15 with "Htfp")
+    iDestruct (tf_page_word_upd_mem _ _ (tf_arg_idx 1) u15
+                 ltac:(unfold tf_arg_idx; lia) Hu15 with "Hptc Htfp")
       as "(Hword & Htfback)".
     assert (Haddr120 : add_vec (D1 !!! Regidx Ra5)
                          (sign_extend' 64 (mword_of_int 120 : mword 12))
-                       = a_tf_word (ud_tfp (pv_upt V)) (tf_arg_idx 1)).
+                       = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat (tf_arg_idx 1))).
     { rewrite HD1a5. apply kxd_tf_addr.
+      { unfold tf_arg_idx. lia. }
       unfold tf_arg_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr120) in "Hword".
     iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2aa)) Rs2 Ra5
@@ -2115,7 +2133,7 @@ Section KexecDMain.
       iEval (rewrite Htgt2d2a) in "Hpc".
       iDestruct (kxd_last_at0 with "Hf66") as "Hf66".
       iDestruct ("Hmk" $! (pa_add pv 0) with "Hf66 Hpath") as "Hres".
-      iDestruct (cpu_own_transport CID0 CID5 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID0 CID5 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr5 : true = false \/ proc_addr jp = zero_reg ->
                       (CID5 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -2123,7 +2141,7 @@ Section KexecDMain.
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID5) jp bn gfs ga gf cov logstart bmapstart
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m D3 K C sp0 ra0 s00 s10 s20 pv av
+                dqb dqs dqa m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
                 ltac:(unfold K_kexec; lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
@@ -2248,7 +2266,7 @@ Section KexecDMain.
       iIntros (CID9 Hs9 Mf q') "%Hpres Hpc Hcg Hpath Hf66".
       destruct Hpres as (Hq' & Hfsp & Hfs0 & Hfs1 & Hfs2 & Hfs4 & Hfs5 & Hfs6 & Hfs10).
       iDestruct ("Hmk" $! (pa_add pv q') with "Hf66 Hpath") as "Hres".
-      iDestruct (cpu_own_transport CID0 CID9 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID0 CID9 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr9 : true = false \/ proc_addr jp = zero_reg ->
                       (CID9 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -2256,7 +2274,7 @@ Section KexecDMain.
                    with "Hcont") as "Hcont".
       iApply (kxd_commit (CID0 := CID9) jp bn gfs ga gf cov logstart bmapstart
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m Mf K C sp0 ra0 s00 s10 s20 pv av
+                dqb dqs dqa m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
                 ltac:(unfold K_kexec; lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal

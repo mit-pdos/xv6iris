@@ -49,6 +49,7 @@ Require Import CodeIunlockput.
 Require Import SpecIunlock SpecIput.
 Require Import SpecIunlockput.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -84,7 +85,7 @@ Definition iulp_sp (m M : regfile) : Prop :=
 Section ProofIunlockputMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE WALK IS THE GEN FORM (GR-2a finding 1).  iunlockput is a wrapper,
@@ -104,12 +105,12 @@ Section ProofIunlockputMain.
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb C b lks.
+                             crz e0 pidv dq dqb dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iunlockput_gen_body].
     intros pcE ip pj ret_tgt HK Hk Hcrb Hcru Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -265,7 +266,7 @@ Section ProofIunlockputMain.
     assert (HR4thr : iulp_thr m R4).
     { intros c Hcs N2 N8 N9.
       rewrite /R4 upd_ne; [| regne]. exact (HR3thr c Hcs N2 N8 N9). }
-    iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b
+    iDestruct (cpu_own_transport CID CID7 0%nat eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -273,7 +274,7 @@ Section ProofIunlockputMain.
     assert (Hfresh_sl : locks_below lks "sleep lock")
       by lkbelow.
     iApply (IU.wp_iunlock_sconf gs gfs gi cn gil gisl cov logstart k s gy dev inum
-              dn' bm' pidv dq R4 (K - 4)%nat eb pj C b lks
+              dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks
               ltac:(unfold K_iunlock; lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
               with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk Hstok Hpid Hppid
@@ -337,7 +338,7 @@ Section ProofIunlockputMain.
     assert (HR6thr : iulp_thr m R6).
     { intros c Hcs N2 N8 N9.
       rewrite /R6 upd_ne; [| regne]. exact (HR5thr c Hcs N2 N8 N9). }
-    iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj C b
+    iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* THE WIDE HOP: iunlock is not in the ALREADY-GENERALIZED set, so the
        complement is still at the entry hart CID -- span all the way from
@@ -351,7 +352,7 @@ Section ProofIunlockputMain.
                  with "Hcont") as "Hcont".
     iApply (IP.wp_iput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
-              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb C b lks
+              k (qi + s)%Qp inum n Sb crb cru crz e0 pidv dq dqb dqs R6 (K - 4)%nat eb b lks
               ltac:(unfold K_iput; lia) Hk Hcrb Hcru
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
@@ -546,7 +547,7 @@ Section ProofIunlockputMain.
     assert (Cs11 : P4 !!! Regidx (mword_of_int 27 : mword 5)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; iuidx).
-    iDestruct (cpu_own_transport CID11 CID16 0%nat eb pj C b
+    iDestruct (cpu_own_transport CID11 CID16 0%nat eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* iput IS generalized -- thread NORMALLY, matching cpu_own_transport's
        own span (fresh at iput's own return hart CID11). *)
@@ -584,12 +585,12 @@ Section ProofIunlockputMain.
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb C b lks.
+                               pidv dq dqb dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iunlockput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
@@ -603,7 +604,7 @@ Section ProofIunlockputMain.
     iApply (wp_iunlockput_gen gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
               cov logstart bmapstart inodestart nib size dev used
               k qi s gy inum dn' bm' n Sb0 false false false e00
-              pidv dq dqb dqs m K eb C b lks
+              pidv dq dqb dqs m K eb b lks
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh

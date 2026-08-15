@@ -140,11 +140,11 @@ Definition vdi_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γv : disk_names) (γa : gname)
     (m : regfile) (K : nat)
-    (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
+    (eb : bool) (pp : mword 64) (on : option nat)
     (ret_tgt c_cpu : mword 64) (lks : gset string) : iProp Σ :=
   ( ∀ (mr : regfile) (pd pav pu : mword 64),
     sie_cap_gpr mr K false pp -∗
-    cpu_own 0%nat eb pp C false lks -∗
+    cpu_own 0%nat eb pp false lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     ⌜ page_valid pd ⌝ -∗ ⌜ page_valid pav ⌝ -∗ ⌜ page_valid pu ⌝ -∗
@@ -188,7 +188,7 @@ Definition wp_virtio_disk_init_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γv : disk_names) (γa : gname)
     (m : regfile) (K : nat)
-    (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
+    (eb : bool) (pp : mword 64) (on : option nat)
     (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
     (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.virtio_disk_init in
@@ -210,7 +210,7 @@ Definition wp_virtio_disk_init_sconf_body
      the whole cone.  Mirrors SpecBfree.v's. *)
   locks_below lks "kmem" ->
   sie_cap_gpr m K false pp -∗
-  cpu_own 0%nat eb pp C false lks -∗
+  cpu_own 0%nat eb pp false lks -∗
   (* [kernel_data] supplies the "virtio_disk" string literal the auipc/addi
      pair points at -- the name handed to initlock. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
@@ -228,7 +228,7 @@ Definition wp_virtio_disk_init_sconf_body
   disk_avail ↦₈ pav0 -∗
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
-  vdi_post γv γa m K eb pp C on ret_tgt c_cpu lks -∗
+  vdi_post γv γa m K eb pp on ret_tgt c_cpu lks -∗
   WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKINIT.
@@ -236,9 +236,9 @@ Module Type VIRTIODISKINIT.
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
-      (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
+      (eb : bool) (pp : mword 64) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
       (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8) (lks : gset string),
-      wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
+      wp_virtio_disk_init_sconf_body γv γa m K eb pp on c0 vlock vname vcpu
                                      pd0 pav0 pu0 free0 lks.
 End VIRTIODISKINIT.

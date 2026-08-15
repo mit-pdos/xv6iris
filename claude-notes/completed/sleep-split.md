@@ -93,6 +93,13 @@ At every real call site `eb = true`, so `trap_csrs_ext true = emp` and
 
 ### THE ONE THING THE SPLIT COSTS: Route B is no longer a divergence
 
+> **SUPERSEDED — Route B and `wp_sleep_nested` are DELETED**
+> ([`../projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md)).
+> iput's nested `acquiresleep` is now proved not to block, so nothing enters
+> `sleep` holding a spinlock, and the lemma below went with the
+> `SpecSched.wp_sched_locks` it stood on. The cost this section describes was
+> real while it lasted; what it cost is now zero. Kept for the reasoning.
+
 Design [`fs-icache.md`](../design/fs-icache.md) 13.12's middle lemma said
 *sleep entered with a spinlock already held DIVERGES* — its own acquire takes
 noff to ≥ 2 and `sched` panics "sched locks" — and that is what made the
@@ -252,7 +259,7 @@ proof-level axiom and no admit:
 | | |
 |---|---|
 | `sleep_prepare` | `ProofSleepPrepare.v` / `LinkSleepPrepare.v` (new) |
-| `sleep` | `wp_sleep_sconf` **and** `wp_sleep_nested`; `SleepProof` sealed `: SLEEP` |
+| `sleep` | `wp_sleep_sconf` **and** `wp_sleep_nested`; `SleepProof` sealed `: SLEEP` (`wp_sleep_nested` has since been deleted — see the box above) |
 | `wakeup` | `ProofWakeup.v` / `ProofWakeupParts.v` / `LinkWakeup.v` |
 | `acquiresleep` | both contracts, including the reworked Route B |
 

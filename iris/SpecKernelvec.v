@@ -40,6 +40,7 @@ Require Import IntrDefs.
 Require Import WpLock FdSlots IrefSlots ProcGeom DiskPtsto WpUart.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -71,7 +72,7 @@ Proof. apply bv_eq. vm_compute. reflexivity. Qed.
    virtio_disk_init.  The stvec cell rides raw (that is what [trap_csrs_raw] is
    for) until the last credential is in hand. *)
 Definition kernelvec_handler_spec_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64) :=
@@ -84,7 +85,7 @@ Definition kernelvec_handler_spec_body
 
 Module Type KERNELVEC.
   Parameter kernelvec_handler_spec :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64),

@@ -52,6 +52,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* bwrite's own frame is 32 bytes (4 slots); its deepest callee is
@@ -59,7 +60,7 @@ Import Defs.
 Definition K_bwrite : nat := 38%nat.
 
 Definition wp_bwrite_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -67,7 +68,7 @@ Definition wp_bwrite_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (bs bsd : list (bv 8)) (b : bool)
     (Q : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
@@ -88,7 +89,7 @@ Definition wp_bwrite_sconf_body
   locks_below lks "sleep lock" ->
   sie_cap_gpr m K b pj -∗
   (* enters at noff 0 (rw's acquire raises it to what sleep demands) *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* WHAT THE PARK NEEDS, AND WHERE IT COMES FROM.  bwrite has NO acquire of
      its own -- it delegates entirely to virtio_disk_rw, and everything past
      that call sleeps, so a parking thread must hand [trap_csrs] and
@@ -137,7 +138,7 @@ Definition wp_bwrite_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -153,7 +154,7 @@ Definition wp_bwrite_sconf_body
 
 Module Type BWRITE.
   Parameter wp_bwrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
@@ -161,9 +162,9 @@ Module Type BWRITE.
       (pd pav pu : mword 64)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ) (lks : gset string),
       wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd b Q lks.
+                           pidv dev bno dq m K eb bs bsd b Q lks.
 End BWRITE.

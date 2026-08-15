@@ -62,8 +62,8 @@ Section KvminitBody.
      per-lemma binder" -- exactly this situation. *)
   Hypothesis wp_kvmmake :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string),
-      wp_kvmmake_sconf_body γa mm lvl K eb p C on b lks.
+      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string),
+      wp_kvmmake_sconf_body γa mm lvl K eb p on b lks.
 
   Ltac reg_neq :=
     lazymatch goal with
@@ -71,8 +71,8 @@ Section KvminitBody.
     end.
 
   Lemma wp_kvminit_sconf_gen (γa : gname) (mm : regfile)
-      (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :
-    wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks.
+      (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string) :
+    wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks.
   Proof.
     unfold wp_kvminit_sconf_body.
     intros Hlvl HK Hex Hlkbelow.
@@ -160,9 +160,9 @@ Section KvminitBody.
        at this function's entry hart; [cpu_own_transport] (CpuOwn.v) moves it
        to CID5 in one line, no case split on [b] -- exactly ProofKvmmap.v's
        two uses of the same lemma. ---- *)
-    iDestruct (cpu_own_transport CID CID5 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID5 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_kvmmake γa J 0%nat (K - 2)%nat eb p C (Some nb) b lks
+    iApply (wp_kvmmake γa J 0%nat (K - 2)%nat eb p (Some nb) b lks
               eq_refl HKmk
               ltac:(exists nb; split; [reflexivity | exact Hnbk])
               with "Hcg Hcnt Htext Hpc Henv").
@@ -252,7 +252,7 @@ Section KvminitBody.
     (* [cpu_own] again: it was delivered at CID6 by kvmmake's own [wp_next];
        six more plain instructions (auipc, sd, two cldsp, the sp pop, ret)
        have moved the hart to CID12. *)
-    iDestruct (cpu_own_transport CID6 CID12 0%nat eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID6 CID12 0%nat eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID12 with "[]"); [ iPureIntro; wp_next_chain | ].
     (* ---- hand the continuation kvmmake's post + the updated cell ---- *)
@@ -279,11 +279,11 @@ End KvminitBody.
 (* ===================================================================== *)
 Module KvminitProof (KMK : KVMMAKE) : KVMINIT.
   Definition wp_kvminit_sconf `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
-      : wp_kvminit_sconf_body γa mm lvl K eb p C on kpt0 b lks :=
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (kpt0 : mword 64) (b : bool) (lks : gset string)
+      : wp_kvminit_sconf_body γa mm lvl K eb p on kpt0 b lks :=
     (* eta-expand the module argument: passed bare, implicit-argument
        insertion would silently resolve [KMK.wp_kvmmake_sconf]'s [CID] at
        THIS definition's own ambient hart, defeating [wp_kvminit_sconf_gen]'s
        hypothesis (which needs it callable at ANY hart). *)
-    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa mm lvl K eb p C on kpt0 b lks.
+    wp_kvminit_sconf_gen (fun (CID' : CpuId) => KMK.wp_kvmmake_sconf (CID:=CID')) γa mm lvl K eb p on kpt0 b lks.
 End KvminitProof.

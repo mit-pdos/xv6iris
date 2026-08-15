@@ -39,6 +39,7 @@ Require Import SpecKilled.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeKilled.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -62,7 +63,7 @@ Proof. rewrite /p_killed. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
 Section ProofKilled.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation kl_s0 := (mword_of_int 8 : mword 5).
@@ -92,13 +93,13 @@ Section ProofKilled.
 
 
   Lemma wp_killed_sconf  (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_killed_sconf_body γs j γl m av n eb p C b lks.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_killed_sconf_body γs j γl m av n eb p b lks.
   Proof.
     cbv beta delta [wp_killed_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iDestruct (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* ===================== PROLOGUE (32-byte frame, 4 slots) ============ *)
@@ -221,13 +222,13 @@ Section ProofKilled.
     (* [Hcpu] was introduced at this function's ENTRY hart; the eight plain
        instructions above each moved to a fresh hart, so acquire wants it
        at [CID8]. *)
-    iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID8 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b lks
+              (proc_lock_res γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia)
               Hfresh
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
@@ -322,7 +323,7 @@ Section ProofKilled.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat ({["proc"]} ∪ lks)
+              (proc_lock_res γs γl (proc_addr j)) C4 n eb p (av - 4)%nat ({["proc"]} ∪ lks)
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".
@@ -503,7 +504,7 @@ Section ProofKilled.
     (* [Hcpu] came back from release at [CIDrel]; the seven plain epilogue
        instructions have each moved to a fresh hart, so [Hcont] -- specialized
        at the last one, [CIDe7] -- wants it there. *)
-    iDestruct (cpu_own_transport CIDrel CIDe7 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe7 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E5 kl with "[%] Hcg Hcpu Hpc").

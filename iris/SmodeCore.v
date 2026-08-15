@@ -1009,6 +1009,19 @@ Section SmodeCoreIris.
     iExact "Hk".
   Qed.
 
+  (* [senvcfg]'s own persistent conjunct, off the ambient config bundle --
+     [hw_config_kmap_claims]'s twin, same reason: a proof holding [hw_config]
+     (directly, or through [sconf]/[sie_cap_gpr]) reaches this without
+     destructuring [hw_config]'s eighteen conjuncts by position, and without
+     losing its own copy of [hw_config] in the process (both persistent). *)
+  Lemma hw_config_senvcfg : hw_config -∗ senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64).
+  Proof.
+    iIntros "H".
+    iDestruct "H" as (misa0 mseccfg0 pmar0 elp0)
+      "(_ & _ & _ & _ & _ & Hs & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _)".
+    iExact "Hs".
+  Qed.
+
   (* The ambient S-mode machine configuration, keyed by the SIE ghost name [γ].
      Bundles the config registers + all the pure config facts an S-mode kernel
      instruction relies on (SIE=0, MPRV=0, SXL, mie∧¬mdv=0, PBMTE, MXR=0, PMM

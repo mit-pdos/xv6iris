@@ -66,6 +66,7 @@ Require Import TimerCap.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -438,7 +439,8 @@ Section BootRun.
        to fund a trap. *)
     (∀ mf : regfile,
        sie_cap_gpr mf (kv_frame_slots + K_main)%nat false zero_reg -∗
-       cpu_own 0 false zero_reg cpu_ctx_free false ∅ -∗
+       cpu_ctx_free -∗
+       cpu_own 0 false zero_reg false ∅ -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
        (* THE TIMER CAPABILITY, allocated HERE rather than in main: it is
@@ -515,7 +517,7 @@ Section BootRun.
               with "Hhw Hmin Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
                     Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hlks Hctx")
-      as (mf) "(Hcap & Hcpu & Hg & Hraw)".
+      as (mf) "(Hcap & Hctx & Hcpu & Hg & Hraw)".
     (* the two cells this seam used to drop become the timer capability.  The
        fupd goes in front of a [WP (Loop)] goal, so peel it with [fupd_wp]
        first (and put the [iModIntro] back afterwards, or the next [iIntros]
@@ -524,7 +526,7 @@ Section BootRun.
     iMod (timer_cap_intro ⊤ (DfracOwn 1) mcounterenf stimecmpf HmcenTM
             with "Hmcen Hstc") as "#Htimc".
     iModIntro.
-    iApply ("Hcont" $! mf with "Hcap Hcpu Hg Hraw Htimc Hpc").
+    iApply ("Hcont" $! mf with "Hcap Hctx Hcpu Hg Hraw Htimc Hpc").
   Qed.
 
 End BootRun.
@@ -546,7 +548,7 @@ End BootRun.
 (* ====================================================================== *)
 
 Section BootSecondary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -566,13 +568,13 @@ Section BootSecondary.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
-    iIntros (mf) "Hcap Hcpu Hg Hraw #Htimc Hpc".
+    iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
               K_main_secondary_le eq_refl
-              with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Htimc Hraw").
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Htimc Hraw").
   Qed.
 
 End BootSecondary.
@@ -597,7 +599,7 @@ End BootSecondary.
 (* ====================================================================== *)
 
 Section BootPrimary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -642,7 +644,7 @@ Section BootPrimary.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
-    iIntros (mf) "Hcap Hcpu Hg Hraw #Htimc Hpc".
+    iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
@@ -650,7 +652,7 @@ Section BootPrimary.
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
-              with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
                     Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
                     Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s

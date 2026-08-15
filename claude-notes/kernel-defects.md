@@ -53,6 +53,41 @@ of silently reaching the store.
 The one-line source fix is to move the test above the loop's condition (or size
 the array `MAXARG + 1`), which would let the premise go.
 
+## UNREACHABLE, BY THE CALLER'S POSITION — `userinit` does not check
+## `allocproc`'s result, and stores through the returned pointer
+
+`userinit` is the only caller of `allocproc` that does not test for 0:
+
+```c
+p = allocproc();          /* returns 0 when every slot is in use */
+initproc = p;
+p->cwd = namei("/");      /* userinit+0x24: sd a0,336(s1) -- s1 = 0 */
+```
+
+With a full table the store addresses 336. `kfork`, the other caller,
+tests and returns -1.
+
+**Unreachable because of WHERE userinit runs, not because of anything it
+checks**: `main` calls it once, on hart 0, before `scheduler()` starts, so
+no process has ever been allocated and every one of the `NPROC` slots is
+UNUSED. Unreachability makes a defect safe, not correct (this file's rule),
+and a second caller — or a `userinit` moved after the first process exists —
+would make it live.
+
+**What it cost the proof, and why the answer was not a premise.** The store
+has no points-to on the null path, so the WP is STUCK, not merely ugly: the
+arm has to be refuted. Nothing in the proc table could express "some slot
+is UNUSED" — `ProcGeom.pstate_lock` holds BOTH halves of the state mirror
+exactly when `unclaimed st = true`, and `unclaimed UNUSED = true`, so no
+fragment pinning a slot at UNUSED can live outside that slot's lock. The
+answer is `ProcAvail.v`'s counted regime (design/proc-struct.md, "The proc
+table's two regimes"): a caller holding `procs_avail (Some (S k))` refutes
+the arm from `allocproc_post`'s own `⌜avail_zero op⌝`.
+
+The one-line source fix is `if (p == 0) panic("userinit");`, which would let
+the counted regime go — at the price of the relayout every source change
+costs (xv6-bump-playbook.md), and of diverging from the pinned `XV6_REV`.
+
 ## FIXED UPSTREAM (`117c0e7`) — an unchecked `nlink++` could wrap a link
 ## count to zero, in `create`'s mkdir arm and in `sys_link`
 

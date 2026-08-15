@@ -901,7 +901,7 @@ Section WpUaluUsretPt.
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    senvcfg ↦ᵣ senvcfg0 -∗
+    senvcfg ↦ᵣ□ senvcfg0 -∗
     sepc ↦ᵣ sepc0 -∗
     utlb_inv_pt uroot tfp um -∗
     pc_is va -∗
@@ -913,7 +913,7 @@ Section WpUaluUsretPt.
       mie ↦ᵣ mie_v -∗
       mideleg ↦ᵣ mdv0 -∗
       menvcfg ↦ᵣ menvcfg0 -∗
-      senvcfg ↦ᵣ senvcfg0 -∗
+      senvcfg ↦ᵣ□ senvcfg0 -∗
       sepc ↦ᵣ sepc0 -∗
       utlb_inv_pt uroot tfp um -∗
       pc_is (ret_pc sepc0) -∗
@@ -950,7 +950,7 @@ Section WpUaluUsretPt.
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid    with "Hreg Hsenv") as %Lsenv.
+    iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
     iDestruct (reg_valid    with "Hreg Hsepc") as %Lsepc.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     iDestruct (reg_valid_dq with "Hreg Help")  as %Lelp.

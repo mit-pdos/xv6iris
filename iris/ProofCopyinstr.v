@@ -908,7 +908,7 @@ Section ProofCopyinstr.
      (the in-page offset, and hence [1 <= n]) is re-derived from
      [ProcPtOwn.pgd_unsigned] on the spot, exactly as in copyin. *)
   Local Lemma cs_loop (γa : gname)
-      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (C : iProp Σ)
+      (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool)
       (dst spr : mword 64) (maxn : nat)
       (v10 v11 : mword 64) (b : bool) (pcur : mword 64) (lks : gset string) :
     (50 <= K)%nat ->
@@ -931,7 +931,7 @@ Section ProofCopyinstr.
     m !!! Regidx Rs11 = v11 ->
     locks_below lks "kmem" ->
     sie_cap_gpr m (K - 12)%nat b pcur -∗
-    cpu_own lvl eb pcur C b lks -∗
+    cpu_own lvl eb pcur b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x7c) : mword 64) -∗
     proc_pt Pc -∗
@@ -946,7 +946,7 @@ Section ProofCopyinstr.
       ⌜copyinstr_ret maxn g res⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr mj (K - 12)%nat b pcur -∗
-      cpu_own lvl eb pcur C b lks -∗
+      cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
@@ -976,7 +976,7 @@ Section ProofCopyinstr.
       ⌜copyinstr_ret maxn g res⌝ -∗
       ⌜uptd_ext_sz szv P P'⌝ -∗
       sie_cap_gpr mj (K - 12)%nat b pcur -∗
-      cpu_own lvl eb pcur C b lks -∗
+      cpu_own lvl eb pcur b lks -∗
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
@@ -1114,7 +1114,7 @@ Section ProofCopyinstr.
         ⌜mc !!! Regidx Rs10 = v10⌝ -∗
         ⌜mc !!! Regidx Rs11 = v11⌝ -∗
         sie_cap_gpr mc (K - 12)%nat b pcur -∗
-        cpu_own lvl eb pcur C b lks -∗
+        cpu_own lvl eb pcur b lks -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x8a) : mword 64) -∗
         page_own pa0 -∗
         (page_own pa0 -∗ proc_pt Pd) -∗
@@ -1316,7 +1316,7 @@ Section ProofCopyinstr.
           (* the answer: the buffer now holds a NUL-terminated string *)
           assert (Hcstr : bb_cstr (bb_upd g (done + i')%nat (mword_of_int 0 : mword 8))
                             (done + i')%nat) by (apply bb_cstr_upd; exact Hnulg).
-          iDestruct (cpu_own_transport CIDc CIDn3 lvl eb pcur C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDc CIDn3 lvl eb pcur b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
           iSpecialize ("HEXIT" $! CIDn3 with "[]"); [ iPureIntro; wp_next_chain | ].
           iApply ("HEXIT" $! Mo (mword_of_int 0 : mword 64) Pd
@@ -1486,7 +1486,7 @@ Section ProofCopyinstr.
                       ltac:(right; split; [exact cs_xor_0 | reflexivity])
                       with "Hcg Htext Hpc").
             iIntros (CIDd8 Hsd8 Mo) "%Hoa0 %Hothr Hcg Hpc".
-            iDestruct (cpu_own_transport CIDc CIDd8 lvl eb pcur C b ltac:(wp_next_chain)
+            iDestruct (cpu_own_transport CIDc CIDd8 lvl eb pcur b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
             iSpecialize ("HEXIT" $! CIDd8 with "[]"); [ iPureIntro; wp_next_chain | ].
             iApply ("HEXIT" $! Mo (mword_of_int (-1) : mword 64) Pd g
@@ -1537,7 +1537,7 @@ Section ProofCopyinstr.
             assert (Hf3 : (done + n + (rem - n) = maxn)%nat) by lia.
             assert (Hshift : b = false \/ pcur = zero_reg -> (CIDd6 : CPU) = (CID0 : CPU)) by wp_next_chain.
             iDestruct (wp_next_shift Hshift with "HEXIT") as "HEXIT".
-            iDestruct (cpu_own_transport CIDc CIDd6 lvl eb pcur C b ltac:(wp_next_chain)
+            iDestruct (cpu_own_transport CIDc CIDd6 lvl eb pcur b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
             iAssert (kalloc_env γa None) as "Henv".
             { iExists γk. iFrame "Hlock Havail Hpanic". }
@@ -1709,7 +1709,7 @@ Section ProofCopyinstr.
         by (rewrite /F5 upd_eq; reflexivity).
       iAssert (kalloc_env γa None) as "Henv".
       { iExists γk. iFrame "Hlock Havail Hpanic". }
-      iDestruct (cpu_own_transport CID0 CIDu6 lvl eb pcur C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID0 CIDu6 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (sie_cap_gpr_tp_pin (CIDx := CIDu6) F5 (K - 12)%nat b pcur with "Hcg") as "Hcg".
       assert (HF5tp : tp_pin F5 !!! Regidx Rtp = cid_word) by (rewrite upd_eq; reflexivity).
@@ -1719,7 +1719,7 @@ Section ProofCopyinstr.
         by (rewrite (tp_pin_ne (CIDx := CIDu6) F5 Ra1 ltac:(ridx_neq)); exact HF5a1).
       assert (HF5a2' : tp_pin F5 !!! Regidx Ra2 = va0)
         by (rewrite (tp_pin_ne (CIDx := CIDu6) F5 Ra2 ltac:(ridx_neq)); exact HF5a2).
-      iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 12)%nat lvl eb pcur C b
+      iApply (Vmfault.wp_vmfault_sconf γa (tp_pin F5) Pc szv (K - 12)%nat lvl eb pcur b
                 _ ltac:(lia) HF5tp HF5a0' HF5a1' Hszb Hlvl
                 with "Hcg Hcnt Htext Hpc Hpt Henv").
       all: try lkbelow.
@@ -1783,7 +1783,7 @@ Section ProofCopyinstr.
                   (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 40 : mword 8) ('b"0"))))
                 = mword_of_int (KernelSyms.copyinstr + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt8a) in "Hpc".
-        iDestruct (cpu_own_transport CIDvf CIDvf2 lvl eb pcur C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDvf CIDvf2 lvl eb pcur b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply ("CHUNK" $! CIDvf2 mv r (uptd_insert Pc (svpn_of va0) r)
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
@@ -1835,7 +1835,7 @@ Section ProofCopyinstr.
                 (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 8 : mword 11) ('b"0"))))
                 = mword_of_int (KernelSyms.copyinstr + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt4e) in "Hpc".
-      iDestruct (cpu_own_transport CIDvf CIDx2 lvl eb pcur C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDvf CIDx2 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDx2 with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! U1 (mword_of_int (-1) : mword 64) Pc f
@@ -1867,7 +1867,7 @@ Section ProofCopyinstr.
       assert (Hq8a : add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x88) : mword 64) 2
                      = mword_of_int (KernelSyms.copyinstr + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq8a) in "Hpc".
-      iDestruct (cpu_own_transport CID0 CIDv1 lvl eb pcur C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID0 CIDv1 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply ("CHUNK" $! CIDv1 mw (page_base (pte_ppn w)) Pc
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
@@ -1895,8 +1895,8 @@ Section ProofCopyinstr.
   Lemma wp_copyinstr_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (maxn : nat) (dst_olds : nat -> bv 8)
-      (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p C b lks.
+      (K lvl : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string)
+    : wp_copyinstr_sconf_body γa mm P szv maxn dst_olds K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_copyinstr_sconf_body].
     intros pcE dst ret_tgt HK Hroot Hsza1 Hmaxr Hmax64 Hszb Hlvl Hlkbelow.
@@ -1984,7 +1984,7 @@ Section ProofCopyinstr.
       iEval (rgne) in "Hpc".
       assert (Hretfin : ret_pc (Z3 !!! Regidx Rra) = ret_tgt) by (rewrite HZ3ra; reflexivity).
       iEval (rewrite Hretfin) in "Hpc".
-      iDestruct (cpu_own_transport CID CIDz5 lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID CIDz5 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDz5 with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! Z3 P dst_olds with "Hcg Hcnt Hpc Hpt Hdst [%] [%] [%]").
@@ -2324,9 +2324,9 @@ Section ProofCopyinstr.
       assert (HM8s11 : M8 !!! Regidx Rs11 = mm !!! Regidx Rs11) by lkp.
       assert (Hg1 : (maxn <= maxn)%nat) by lia.
       assert (Hg3 : (0 + maxn = maxn)%nat) by lia.
-      iDestruct (cpu_own_transport CID CIDp18 lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID CIDp18 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (cs_loop γa P szv K lvl eb C dst (pa_stk sp0 12) maxn
+      iApply (cs_loop γa P szv K lvl eb dst (pa_stk sp0 12) maxn
                 (mm !!! Regidx Rs10) (mm !!! Regidx Rs11) b p lks
                 HK Hmax64 Hszb Hlvl maxn 0%nat maxn CIDp18 P M8 dst_olds
                 Hg1 Hmax1 Hg3 (bb_nonul_0 dst_olds) (uptd_ext_sz_refl szv P)
@@ -2343,7 +2343,7 @@ Section ProofCopyinstr.
                 Hjsp Hja0 Hj10 Hj11
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12").
       iIntros (CIDf Hsf mf) "[%Hcsf %Hfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CIDj CIDf lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDj CIDf lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! mf P' g with "Hcg Hcnt Hpc Hpt Hdst [%] [%] [%]").

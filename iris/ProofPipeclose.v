@@ -70,6 +70,7 @@ Require Import CodePipeclose.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPipeclose.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Import Defs.
 
 Local Ltac peel n := do n (rewrite upd_ne; [| vm_compute; discriminate]).
@@ -81,7 +82,7 @@ Module PipecloseProof (Acquire : ACQUIRE_GEN) (Wakeup : WAKEUP)
                       (Kfree : KFREE) : PIPECLOSE.
 
 Section ProofPipeclose.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pipeG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !pipeG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
@@ -91,14 +92,14 @@ Section ProofPipeclose.
      it is exactly what makes release's derived exit index equal pipeclose's
      own [b].  (Identical helper in ProofFiledup.v / ProofBunpin.v.) *)
   Local Lemma sie_b_agree (m0 : regfile) (n0 K0 : nat) (eb0 b0 : bool)
-      (p0 : mword 64) (C0 : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m0 K0 b0 p0 -∗ cpu_own n0 eb0 p0 C0 b0 lks -∗
+      (p0 : mword 64) (lks : gset string) :
+    sie_cap_gpr m0 K0 b0 p0 -∗ cpu_own n0 eb0 p0 b0 lks -∗
     ⌜ b0 = match n0 with O => eb0 | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b0.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n0 as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb0; [ exfalso | done ].
@@ -108,9 +109,9 @@ Section ProofPipeclose.
   Lemma wp_pipeclose_sconf  (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
-      (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
+      (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (av : nat)
       (b : bool) (lks : gset string)
-    : wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme C av b lks.
+    : wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme av b lks.
   Proof.
     cbv beta delta [wp_pipeclose_sconf_body].
     intros pcE pi ret_tgt Hw Hav Hpos Hklk Hkfl Hno.
@@ -121,7 +122,7 @@ Section ProofPipeclose.
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero, tp_ok_cid_of).
     iIntros "Hcg Hown #Htext Hpc #Hpipe Href #Hkmem Havail #Hpinv #Hpanic Hcont".
-    iDestruct (sie_b_agree m n av eb b pme C lks with "Hcg Hown") as %Houtb.
+    iDestruct (sie_b_agree m n av eb b pme lks with "Hcg Hown") as %Houtb.
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
     iDestruct (is_pipe_valid with "Hpipe") as %Hpv.
@@ -280,7 +281,7 @@ Section ProofPipeclose.
                ⌜ callee_saved A4 M ⌝ -∗
                sie_cap_gpr (CID := CID0) M (av - 4)%nat b pme -∗
                pc_is (CID := CID0) (mword_of_int (KernelSyms.pipeclose + 0x36) : mword 64) -∗
-               cpu_own (CID := CID0) n eb pme C b lks -∗
+               cpu_own (CID := CID0) n eb pme b lks -∗
                (kalloc_avail γk on ∨ kalloc_avail γk (avail_inc on)) -∗
                WP (Loop : expr riscv_lang))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0]" as "EPI".
@@ -375,7 +376,7 @@ Section ProofPipeclose.
       iEval (rewrite Hra_final) in "Hpc".
       (* [cpu_own] arrived at [CID0]; six plain instructions moved us to
          [CIDe6], and [Hch] carries the rest of the chain back to entry. *)
-      iDestruct (cpu_own_transport CID0 CIDe6 n eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID0 CIDe6 n eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! E5 with "Hcg Hown Hpc [%] Hav").
@@ -416,13 +417,13 @@ Section ProofPipeclose.
     (* ================================================================= *)
     (* acquire -- against the caller's REFERENCE                          *)
     (* ================================================================= *)
-    iDestruct (cpu_own_transport CID CID9 n eb pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID9 n eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_gen_sconf γl "pipe" (pipe_res γp pi)
-              (pipe_ref γp w 1) (pipe_dead γl γp) A4 n eb pme C (av - 4)%nat b lks
+              (pipe_ref γp w 1) (pipe_dead γl γp) A4 n eb pme (av - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               ltac:(iApply pipe_ref_dead) ltac:(intro i; iApply locked_pre_dead)
-              with "Hcg Hown Htext Hpc [] Href Hpanic").
+              with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { iEval (rewrite Ha0A4). iExact "Hopen". }
     iIntros (CIDaq Hsaq ms M0) "%Hms Href Hcg Hpc %HcsM0 Hlocked Hres Hown Hpay".
@@ -442,7 +443,7 @@ Section ProofPipeclose.
                sie_cap_gpr M (trap_res b + (av - 4))%nat false pme -∗
                pc_is (mword_of_int (KernelSyms.pipeclose + 0x24) : mword 64) -∗
                (* inside the critical section: acquire added "pipe"'s rank *)
-               cpu_own (S n) eb pme C false ({["pipe"%string]} ∪ lks) -∗
+               cpu_own (S n) eb pme false ({["pipe"%string]} ∪ lks) -∗
                arm_pay n eb pme -∗
                locked γl cpu_id -∗
                pipe_res γp pi -∗
@@ -462,7 +463,7 @@ Section ProofPipeclose.
                  ⌜ callee_saved A4 M' ⌝ -∗
                  sie_cap_gpr M' (trap_res b + (av - 4))%nat false pme -∗
                  pc_is (mword_of_int (KernelSyms.pipeclose + 0x30) : mword 64) -∗
-                 cpu_own (S n) eb pme C false ({["pipe"%string]} ∪ lks) -∗
+                 cpu_own (S n) eb pme false ({["pipe"%string]} ∪ lks) -∗
                  arm_pay n eb pme -∗
                  locked γl cpu_id -∗
                  pipe_res γp pi -∗
@@ -473,7 +474,7 @@ Section ProofPipeclose.
                      ⌜ callee_saved A4 M' ⌝ -∗
                      sie_cap_gpr (CID := CIDx) M' (av - 4)%nat b pme -∗
                      pc_is (CID := CIDx) (mword_of_int (KernelSyms.pipeclose + 0x36) : mword 64) -∗
-                     cpu_own (CID := CIDx) n eb pme C b lks -∗
+                     cpu_own (CID := CIDx) n eb pme b lks -∗
                      kalloc_avail γk (avail_inc on) -∗
                      WP (LoopE gen_id CIDx : expr riscv_lang))))%I
         with "[EPI Havail]" as "TAILS".
@@ -519,7 +520,7 @@ Section ProofPipeclose.
            the acquire/release pair compose back to [N]. *)
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_gen_sconf γl pi "pipe" (pipe_res γp pi) (pipe_dead γl γp) emp%I
-                  V2 n eb pme C (av - 4)%nat ({["pipe"%string]} ∪ lks)
+                  V2 n eb pme (av - 4)%nat ({["pipe"%string]} ∪ lks)
                   HlkaV2 ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -672,7 +673,7 @@ Section ProofPipeclose.
       (* same re-spelling as at the other release: [b] IS [outb]. *)
       iEval (rewrite Houtb) in "Hcg".
       iApply (ReleaseCancel.wp_release_cancel_sconf γl pi "pipe" (pipe_res γp pi)
-                (pipe_dead γl γp) (pipe_bytes pi) K2 n eb pme C (av - 4)%nat
+                (pipe_dead γl γp) (pipe_bytes pi) K2 n eb pme (av - 4)%nat
                 ({["pipe"%string]} ∪ lks)
                 HlkaK2 ltac:(lia)
                 ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
@@ -729,16 +730,16 @@ Section ProofPipeclose.
       assert (Ha0K4 : K4 !!! Regidx (mword_of_int 10 : mword 5) = pi).
       { rewrite /K4 upd_ne; [| nz]. rewrite /K3 upd_eq. unfold regval_into_reg.
         rewrite Hs1mr. apply add_vec_zero_l. }
-      iDestruct (cpu_own_transport CIDrc CIDk2 n eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDrc CIDk2 n eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Kfree.wp_kfree_sconf γkl γk klk kfl K4 on n eb pme C (av - 4)%nat b lks
+      iApply (Kfree.wp_kfree_sconf γkl γk klk kfl K4 on n eb pme (av - 4)%nat b lks
                 ltac:(lia) Hklk Hkfl ltac:(lia)
                 (* release_cancel already handed the "pipe" rank back
                    ([Hsetback'] above), so [Hown] here carries plain [lks]
                    again; kfree's "kmem" (13) outranks "pipe" (7), so [Hno]
                    weakens straight across with no [_union_singleton] step. *)
                 ltac:(lkbelow)
-                with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail Hpanic").
+                with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
         iApply (pipe_bytes_page_own with "Hword Hcpu Hbytes"). }
@@ -759,7 +760,7 @@ Section ProofPipeclose.
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.pipeclose + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpcj36) in "Hpc".
-      iDestruct (cpu_own_transport CIDkf CIDkj n eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDkf CIDkj n eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply ("EPIF" $! CIDkj mk with "[%] [%] Hcg Hpc Hown Havail"); [wp_next_chain|].
       apply (callee_saved_trans A4 K4 mk); [| exact Hcsk].
@@ -841,7 +842,7 @@ Section ProofPipeclose.
       assert (Hwlvl : (Z.of_nat (S n) + 1 < 2 ^ 31)%Z) by lia.
       (* wakeup runs INSIDE pi->lock's critical section and is balanced, so it
          threads the acquired set unchanged. *)
-      iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb C false
+      iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb false
                 ({["pipe"%string]} ∪ lks)
                 HwK HwdomW Hlen Hwlvl Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpanic Hpinv").
@@ -909,7 +910,7 @@ Section ProofPipeclose.
       assert (Hwlvl : (Z.of_nat (S n) + 1 < 2 ^ 31)%Z) by lia.
       (* wakeup runs INSIDE pi->lock's critical section and is balanced, so it
          threads the acquired set unchanged. *)
-      iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb C false
+      iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb false
                 ({["pipe"%string]} ∪ lks)
                 HwK HwdomW Hlen Hwlvl Hfresh_proc
                 with "Hcg Hown Htext Hpc Hpanic Hpinv").

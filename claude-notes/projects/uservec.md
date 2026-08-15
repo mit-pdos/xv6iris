@@ -517,3 +517,189 @@ themselves**, not a value threaded alongside them. Concretely:
   target 'proofs'" — `proofs` is a ROOT-Makefile target (`Makefile:222`,
   `proofs: model kernel-rocq user-rocq $(IRIS)/CoqMakefile`), not an
   `iris/CoqMakefile` one; run it from the repo root, not `iris/`.
+
+## THE CHAINING ATTEMPT WAS VACUOUS — `usertrap_res` and `user_trap_frame`
+## cannot both be preconditions, and this is the dovetail, not plumbing
+
+A session took "chain uservec to USERTRAP and USERRET" as a plumbing task:
+give `wp_uservec_pt_body` both `user_trap_frame C pt Rut` and a
+`usertrap_res pt vksp` premise, open the trapframe out of the latter for the
+save walk, call `UT.wp_usertrap`, chain into `UR.wp_userret_pt`. The 44
+instruction walk went through, the crossing went through, and the whole thing
+looked like it was three plumbing bugs from done.
+
+**It was vacuous.** Mechanically checked, not argued — this compiles:
+
+```coq
+Lemma satp_double_owned (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) :
+  strans_inv -∗ strans_bit strans_bit_kpt -∗ utlb_inv_pt uroot tfp um -∗ False.
+```
+
+`usertrap_res` → `ut_res` → `ut_trap` → `strans_inv`, and `ut_trap` holds
+`strans_bit strans_bit_kpt` right beside it, so `strans_bit_agree` pins
+`strans_inv` to its KPT arm = `KptShare.tlb_res_pt` ⊇ `satp ↦ᵣ` at full
+fraction. `user_trap_frame` ⊇ `user_pt_inv` ⊇ `utlb_inv_pt` ⊇ `satp ↦ᵣ`, also
+full. Two owners, so the precondition is unsatisfiable and NO caller can ever
+apply the lemma — `durable-notes.md`'s own trap, hit for real.
+
+**And it is not one overlap, it is four — the whole user address space:**
+
+| resource | in `usertrap_res` via | in `user_inv` via |
+|---|---|---|
+| trapframe page | `proc_priv_core` → `tf_page` | `user_trap_frame`'s walk cells |
+| user page-table tree | `proc_pt_at` → `proc_pt` → `pt_frame` → `ptree_own 2 (DfracOwn 1)` | `utlb_inv_pt` → `ptree_own 2 (DfracOwn 1)` |
+| user data pages | `proc_pt` → `proc_pt_own` (= `upt_pages_own`) | `user_pt_inv` → `udata_own` |
+| satp / tlb | `ut_trap` → `strans_inv` → `tlb_res_pt` | `utlb_inv_pt` |
+
+These are the same underlying resources in two VIEWS: inert inside
+`proc_priv` while the kernel runs, live inside `user_pt_inv` while the user
+runs. uservec/userret IS the conversion between the views. That is exactly
+what §"What remains after this project" above already calls the three owed
+conversions, and what `SpecUsertrap.v`'s own header says in as many words:
+*"composing uservec -> usertrap -> userret ... owes three conversions"*, and
+that usertrap's boundary was ALREADY restated once because the trampoline-side
+shape "together with the kernel cone's `sie_cap` are UNSATISFIABLE, so proving
+it would have been vacuous."
+
+**So the lesson is not "I mis-plumbed a hypothesis".** It is: this edge is the
+dovetail, the dovetail is those conversions, and any spec that takes the
+kernel-side residue and the user-side frame as sibling premises is vacuous
+before a single instruction is stepped. Adding per-resource accessors
+(`usertrap_res_tf_open`, then `_tlb_open`/`_tlb_close`, then one for
+`pt_frame`, then one for `udata_own`) is rediscovering the table above one
+`False` at a time; the decomposition has to be one split — kernel-side residue
+∗ address-space view — with `ProcPtOwn`'s existing dovetail lemmas
+(`proc_pt_acc_rep0` / `proc_pt_rebuild` / `phys_bytes_udata` / the `page_own`
+conversions) doing the view change.
+
+**Latent consequence for the landed `Rut` threading** (§ above): `Rut` is
+abstract in `UserExec.v`, so the `User*.v` tower is fine, but the INTENDED
+instantiation `Rut pt := ∃ ksp, UT.usertrap_res pt ksp` is unsatisfiable for
+the same four reasons — `usertrap_res` cannot ride inside `user_inv` as-is. It
+is the REDUCED residue (no address space) that can be parked across user
+execution. Nothing has been proven false by this: the threading compiles and
+`Rut` is never instantiated yet. But the closure step must use the reduced
+form, not `usertrap_res`.
+
+**What was salvaged from the attempt** (branch
+`uservec-usertrap-userret-chain`): `UsertrapRes.v` gained `ut_trap_parked` /
+`ut_res_parked` (residue minus the translation slot, holding both
+`strans_bit` halves loose — a `ghost_var` at 1/2 each, so together full
+ownership of the bit = "nobody is using the slot") plus `ut_res_tlb_close` /
+`ut_res_tlb_open`, all PROVEN and compiling. They are one of the four columns
+and remain correct as far as they go; whether they survive the real
+decomposition depends on its shape.
+
+## THE DECOMPOSITION — DONE.  `ProofUservec.v` is PROVEN, and the user address
+## space is owned exactly once at every point of the chain
+
+The split above was carried out. `wp_uservec_pt` now compiles with a
+**satisfiable** precondition, chaining uservec -> USERTRAP -> USERRET.
+
+### The shape: three residues, two borrows, in one order
+
+```
+  ut_res          = ut_res_parked ∗ tlb_res_pt kroot      -- what usertrap RUNS on
+  ut_res_parked   = ut_res_bare   ∗ proc_pt pt            -- kernel-side, table parked
+  ut_res_bare     = <no address space at all>             -- what PARKS across user mode
+```
+
+`UsertrapRes.v`: `ut_trap_parked` / `ut_res_parked` (drop `strans_inv`) were
+already there; the new tier is `ut_own_nopt` / `ut_env_nopt` / `ut_res_bare`
+plus `ut_res_pt_close` / `ut_res_pt_open`.  Both borrows are exact — `_open`
+and `_close` are inverse — so nothing is lost or invented by the split.
+
+`ProcInv.v`: `proc_priv_nopt` = `proc_priv` minus `proc_pt`, with
+`proc_priv_split_pt` (a `⊣⊢`), `proc_priv_nopt_tf_open`, and
+`proc_priv_nopt_upt_irrel`.
+
+### Where each of the four overlaps went
+
+| resource | resolution |
+|---|---|
+| satp / tlb | `ut_trap_parked` drops `strans_inv`; the exit switch's own `tlb_res_pt kroot` closes it back (`ut_res_tlb_close`) |
+| user page-table tree | left the residue with `proc_pt`; the switch window (`wp_uservec_exit_pt` / `wp_userret_pt`) is the `pt_frame` <-> `utlb_inv_pt` conversion, which already existed |
+| user data pages | left the residue with `proc_pt`; `ProcPtOwn.proc_pt_own_udata` (already existed) is the whole conversion — the pages never move, only the indexing |
+| trapframe page | **NOT an overlap.** `tf_page` is physical-tier and its leaf has U = 0, so user mode cannot reach it and `user_pt_inv` never claims it.  It stays in `ut_res_bare`, which is why `usertrap_res_tf_open` is stated there |
+
+So conversion 2 of the "three owed conversions" was already built
+(`proc_pt_own_udata`, `ud_pas_cov`), and conversion 1 is the pt2 switch
+window.  What was missing was only the SPLIT that lets them be applied.
+
+### `ud_data`, and why the descriptor is renormalised
+
+`user_pt_inv P` owns its bytes at `P.(ud_data)`; the kernel tier owns the same
+pages at the DERIVED footprint `ud_pas P = um_pas (ud_um P)`, and `proc_pt`
+says nothing about `ud_data` at all (`proc_pt_data_irrel`).  `SpecUsertrap.v`
+already explains that usertrap CANNOT promise `udata_cov (ud_um pt')
+(ud_data pt')` — it never holds the resource.
+
+Resolution: `ProcPtOwn.ud_norm P := UPTD (ud_root P) (ud_tfp P) (ud_um P)
+(ud_pas P)`, and `user_pt_inv_close` produces `user_pt_inv (ud_norm P)`, whose
+`udata_cov` is free by `ud_pas_cov` and whose `upt_acc_wf` comes out of
+`proc_pt_wf`.  The residue is re-keyed to match by `ut_res_bare_norm`, which is
+sound because the bare residue reads its descriptor only through
+`ud_root`/`ud_tfp`/`ud_um` — `proc_pt` was the one conjunct that cared.
+`wp_uservec_pt_body` takes `ud_data pt = ud_pas pt` as a premise and
+`uservec_post` hands it back for `pt'`, so **the loop is closed under it**.
+
+### Two more premises, both loop-closed
+
+* `ud_data pt = ud_pas pt` (above).
+* `proc_pt_wf pt`.  `user_pt_inv` records only two of its five conjuncts
+  (`upt_map_wf` inside `utlb_inv_pt`, `upt_acc_wf` beside it); the other three
+  (`um_pages_valid`, `um_inj`, `page_valid (page_base tfp)`) are kernel-tier
+  facts the user-execution tier never needs and so never carries.  The switch
+  needs them because what it rebuilds is `proc_pt`.  `uservec_post` hands
+  `proc_pt_wf pt'` back, read straight out of the residue's own `proc_pt`.
+
+### THE CONTINUATION IS HART-GENERIC — this was a separate real bug
+
+`uservec_post` was stated at the entry hart.  usertrap PARKS (`wp_next true
+pj`), so every resource after that call is at the RESUMING hart, and the two
+print identically — the failure is an `iSpecialize` whose expected and given
+types look the same on screen.  `wp_uservec_pt_body` now mirrors
+`wp_usertrap_body` exactly: `URes : CpuId -> uptd -> mword 64 -> iProp Σ`, the
+precondition is `URes CID pt vksp`, and the continuation is
+`wp_next true (proc_addr j) (fun CID' => uservec_post (CID := CID') (URes CID')
+...)`.  The proof eliminates it at `CID2` with `proc_addr_nonzero j Hjlt`.
+
+### THE TABLE USERRET INSTALLS IS `pt'`, NOT `pt`
+
+Consequence of the split, and the second real bug it fixed.  The old tail fed
+userret's entry switch the `pt_frame` that uservec's own EXIT switch had
+parked — the table the trap came out of.  usertrap may replace the address
+space wholesale (exec does), so that frame is stale.  Now the exit frame goes
+INTO the residue before the call (`usertrap_res_pt_close`) and userret's frame
+comes OUT of whatever usertrap left there (`usertrap_res_pt_open` +
+`proc_pt_split`).  That is the whole reason the residue carries the address
+space across the kernel excursion instead of uservec framing it.
+
+### Also fixed on the way
+
+`wp_userret_pt` orders its 31 trapframe words the way the RESTORE WALK writes
+them, so the a0 slot (offset 112) is **last**, not tenth.  Every list at that
+call site — wand arguments, returned cells, `userret_gpr`'s arguments — follows
+that order; only `tf_page_close36`, this file's own lemma, is numeric.  And the
+`ms'` argument to `uservec_post` is `ms'`, not `sret_ms5 ms'` (the post applies
+`sret_ms5` itself).
+
+### On non-vacuity
+
+There is no mechanised satisfiability witness — there cannot be a cheap one.
+What there is instead is a RELATIVE consistency argument, fully mechanised:
+`ut_res_pt_open` / `ut_res_tlb_open` split `ut_res` into
+`ut_res_bare ∗ proc_pt pt ∗ tlb_res_pt kroot` and the `_close` pair puts it
+back, so the bare residue is satisfiable exactly when `ut_res` is — and
+`proc_pt pt` is what the switch converts into the user tier's view
+(`user_pt_inv_close`).  Beyond that: Iris is linear, so the fact that the
+1700-line proof still typechecks with ONE copy of the address space (where the
+vacuous version had two) is itself the check that every consumer now draws
+from the single owner.
+
+### Still open (unchanged by this)
+
+The outer Löb over trap rounds that discharges `UserExec.stvec_handler_wp` —
+i.e. folding USER in.  The `Rut` instantiation for it is now available and is
+`fun pt => ∃ ksp, UT.usertrap_res_bare pt ksp`; the note above about
+`usertrap_res` being unsatisfiable there stands, and the bare form is the fix.

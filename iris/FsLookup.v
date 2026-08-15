@@ -635,7 +635,7 @@ Definition wp_dirlookup_tree_body
   eb = true ->
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -666,7 +666,7 @@ Definition wp_dirlookup_tree_body
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* THE DIRECTORY COMES BACK UNTOUCHED, NODE FRAGMENT INCLUDED --
          [ents] is the SAME map it went in at.  That is (LP1): the lock

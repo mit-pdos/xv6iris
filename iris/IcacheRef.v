@@ -1204,6 +1204,47 @@ Section IcacheRef.
     (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum ∗
      slh_tok (icfg_isl k) q)%I.
 
+  (* ---- THE SHARE WITHOUT ITS SLEEPLOCK SLICE.
+
+     The escrow's checked-out arm and the entry's SLEEPLOCK both want a piece
+     of the depositor's share, and there is only one [s].  Splitting the
+     fraction is the wrong fix: [s] is what [ic_deposit] records, what ilock
+     returns and what iunlock consumes, so moving it would ripple into every
+     caller.  So the share DECOMPOSES instead -- the arm keeps the liveness
+     and identity slices at [s], the lock keeps the [slh_tok] slice at the
+     same [s] -- and these are the arm's halves.  See
+     claude-notes/projects/iput-acquiresleep.md. *)
+  Definition inode_shr_gen_bare (k : nat) (s : Qp) (dev inum : mword 32)
+      (g : gname) : iProp Σ :=
+    (inode_ident k (DfracOwn s) dev inum ∗ live_gen k s g)%I.
+
+  Definition inode_ref_gen_bare (k : nat) (q : Qp) (dev inum : mword 32)
+      (g : gname) : iProp Σ :=
+    (iref_frag k q ∗ live_gen k q g ∗ inode_ident k (DfracOwn q) dev inum)%I.
+
+  Lemma inode_shr_gen_bare_split k s dev inum g :
+    inode_shr_gen k s dev inum g ⊣⊢
+    inode_shr_gen_bare k s dev inum g ∗ slh_tok (icfg_isl k) s.
+  Proof.
+    rewrite /inode_shr_gen /inode_shr_gen_bare.
+    iSplit; [iIntros "($ & $ & $)" | iIntros "[[$ $] $]"].
+  Qed.
+
+  Lemma inode_ref_gen_bare_split k q dev inum g :
+    inode_ref_gen k q dev inum g ⊣⊢
+    inode_ref_gen_bare k q dev inum g ∗ slh_tok (icfg_isl k) q.
+  Proof.
+    rewrite /inode_ref_gen /inode_ref_gen_bare.
+    iSplit; [iIntros "($ & $ & $ & $)" | iIntros "[($ & $ & $) $]"].
+  Qed.
+
+  Global Instance inode_shr_gen_bare_timeless k s dev inum g :
+    Timeless (inode_shr_gen_bare k s dev inum g).
+  Proof. apply _. Qed.
+  Global Instance inode_ref_gen_bare_timeless k q dev inum g :
+    Timeless (inode_ref_gen_bare k q dev inum g).
+  Proof. apply _. Qed.
+
   Lemma inode_shr_gen_intro k s dev inum :
     inode_shr k s dev inum ⊣⊢ ∃ g : gname, inode_shr_gen k s dev inum g.
   Proof.

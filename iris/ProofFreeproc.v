@@ -195,9 +195,9 @@ Section ProofFreeproc.
       (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
-      (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string)
-    : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
+    : wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
   Proof.
     cbv beta delta [wp_freeproc_sconf_body].
     intros pcE pa ret_tgt HK Hilvl Ha0 Hlkbelow.
@@ -363,7 +363,7 @@ Section ProofFreeproc.
           /\ me !!! Regidx Rs1 = pa
           /\ fr_thr mm me ⌝ -∗
         sie_cap_gpr me (K - 4)%nat false pme -∗
-        cpu_own ilvl eb pme C false lks -∗
+        cpu_own ilvl eb pme false lks -∗
         pc_is (mword_of_int (FR + 0x22) : mword 64) -∗
         p_pagetable pa ↦₈ pgv -∗
         p_trapframe pa ↦₈ (zero_reg : mword 64) -∗
@@ -565,7 +565,7 @@ Section ProofFreeproc.
       iIntros (CIDzd Hszd) "Hcg Hpc".
       iEval (rgne) in "Hpc". iEval (rewrite Hrt) in "Hpc".
       (* ---- hand everything back ---- *)
-      iDestruct (cpu_own_transport CIDz CIDzd ilvl eb pme C false ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDz CIDzd ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2]
@@ -624,7 +624,7 @@ Section ProofFreeproc.
           /\ me !!! Regidx Rs1 = pa
           /\ fr_thr mm me ⌝ -∗
         sie_cap_gpr me (K - 4)%nat false pme -∗
-        cpu_own ilvl eb pme C false lks -∗
+        cpu_own ilvl eb pme false lks -∗
         pc_is (mword_of_int (FR + 0x14) : mword 64) -∗
         p_trapframe pa ↦₈ tfv -∗
         p_sz pa ↦₈ pv_sz V -∗
@@ -720,9 +720,9 @@ Section ProofFreeproc.
         assert (HB2ra : B2 !!! Regidx Rra
                         = add_vec_int (mword_of_int (FR + 0x1e) : mword 64) 4)
           by (rewrite /B2 upd_eq; reflexivity).
-        iDestruct (cpu_own_transport CIDp CIDp5 ilvl eb pme C false ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDp CIDp5 ilvl eb pme false ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
-        iApply (PFP.wp_proc_freepagetable_sconf γa B2 P (K - 4)%nat eb pme C ilvl false lks
+        iApply (PFP.wp_proc_freepagetable_sconf γa B2 P (K - 4)%nat eb pme ilvl false lks
                   Hcpf Hilvl HB2a0
                   ltac:(rewrite HB2a1; exact Hszr)
                   ltac:(rewrite HB2a1; exact Hbelow)
@@ -770,7 +770,7 @@ Section ProofFreeproc.
                           (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 4 : mword 8) ('b"0"))))
                         = mword_of_int (FR + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htg22) in "Hpc".
-        iDestruct (cpu_own_transport CIDp CIDp3 ilvl eb pme C false ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDp CIDp3 ilvl eb pme false ltac:(wp_next_chain)
                      with "Hcpu") as "Hcpu".
         iSpecialize ("ZERO" $! CIDp3 with "[%]"); [wp_next_chain|].
         iApply ("ZERO" $! B0 (zero_reg : mword 64) with "[%] Hcg Hcpu Hpc Hpg Htf Hsz").
@@ -838,19 +838,24 @@ Section ProofFreeproc.
                       = add_vec_int (mword_of_int (FR + 0x10) : mword 64) 4)
         by (rewrite /T1 upd_eq; reflexivity).
       (* the trapframe page, back as the anonymous bytes kfree wants *)
-      iDestruct (tf_page_to_page_own tfp ws with "Htfp") as "Hpage".
+      iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+      iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      iDestruct (tf_page_to_page_own tfp ws Htfval with "Hkmapb Htfp") as "Hpage".
       (* kfree is stated over the RAW kmem lock and count, not the bundle:
          open [kalloc_env] once here.  It is at [None], hence persistent, so
          nothing is lost by opening it. *)
       iDestruct "Henv" as (γk) "(#Hkmem & #Havail & #Hpanic)".
-      iDestruct (cpu_own_transport CID CID9 ilvl eb pme C false ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID CID9 ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iApply (KF.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
-                (mword_of_int (KernelSyms.kmem + 24)) T1 None ilvl eb pme C
+                (mword_of_int (KernelSyms.kmem + 24)) T1 None ilvl eb pme
                 (K - 4)%nat false lks
                 Hckf eq_refl eq_refl Hilvl
                 Hlkbelow
-                with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail Hpanic").
+                with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HT1a0; exact Htfval |].
         iEval (rewrite HT1a0). iExact "Hpage". }
@@ -896,7 +901,7 @@ Section ProofFreeproc.
                         (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 3 : mword 8) ('b"0"))))
                       = mword_of_int (FR + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htg14) in "Hpc".
-      iDestruct (cpu_own_transport CID CID8 ilvl eb pme C false ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID CID8 ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("PGT" $! CID8 with "[%]"); [wp_next_chain|].
       iApply ("PGT" $! T0 (zero_reg : mword 64) with "[%] Hcg Hcpu Hpc Htf Hsz").

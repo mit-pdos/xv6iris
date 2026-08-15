@@ -120,6 +120,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* install_trans's own frame is 10 slots ([c.addi sp,sp,-80] at +0x0c); its
@@ -127,7 +128,7 @@ Import Defs.
 Definition K_install_trans : nat := 50%nat.
 
 Definition wp_install_trans_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -141,7 +142,7 @@ Definition wp_install_trans_sconf_body
     (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (R : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.install_trans in
   let pj := proc_addr j in
@@ -174,7 +175,7 @@ Definition wp_install_trans_sconf_body
      with a lower bound, so this is the one premise its whole cone needs. *)
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  install_trans has NO
      acquire/release of its own -- it delegates entirely to bread/bwrite, so
      a parking thread must hand [trap_csrs]/[cpu_claim] across the crossing
@@ -245,7 +246,7 @@ Definition wp_install_trans_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -268,7 +269,7 @@ Definition wp_install_trans_sconf_body
 
 Module Type INSTALL_TRANS.
   Parameter wp_install_trans_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -282,9 +283,9 @@ Module Type INSTALL_TRANS.
       (n : nat) (W : list (mword 32)) (Lw : nat -> list (bv 8))
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (R : iProp Σ) (lks : gset string),
       wp_install_trans_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                   cov logstart dev recovering n W Lw L D
-                                  pidv dq m K eb C b R lks.
+                                  pidv dq m K eb b R lks.
 End INSTALL_TRANS.

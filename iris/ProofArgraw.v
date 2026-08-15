@@ -42,6 +42,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs WpLock.
 Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
+Require Import TrampPt KptTree.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import SpecMyproc.
@@ -415,13 +416,18 @@ Section ProofArgraw.
       apply bv_eq; vm_compute; reflexivity.
   Qed.
 
-  (* the [c.ld a0,<112+8k>(a5)] displacement lands on trapframe word 14+k *)
+  (* the [c.ld a0,<112+8k>(a5)] displacement lands on trapframe word 14+k.
+     Concludes in [tf_pa], not [a_tf_word]: [tf_page_word_mem] (what reads
+     the word out of [tf_page] now) is physical-native, and this fact's only
+     consumer is that read's own address-equality bridge. *)
   Lemma ar_arg_addr (tfp : mword 44) (k : nat) : (k < NARG)%nat ->
     add_vec (page_base tfp)
       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat k) : mword 5) ('b"000"))))
-    = a_tf_word tfp (tf_arg_idx k).
+    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx k)).
   Proof.
-    intro Hk. unfold NARG in Hk. rewrite /a_tf_word /tf_arg_idx /pa_add /add_vec_int.
+    intro Hk. unfold NARG in Hk.
+    rewrite (tf_pa_eq_pa_add8 tfp (tf_arg_idx k) ltac:(unfold tf_arg_idx; lia)).
+    rewrite /tf_arg_idx /pa_add /add_vec_int.
     destruct k as [|[|[|[|[|[|k']]]]]]; try lia; f_equal; apply bv_eq; vm_compute; reflexivity.
   Qed.
 
@@ -508,6 +514,7 @@ Section ProofArgraw.
     M !!! Regidx ar_a4 = mword_of_int ar_tbl ->
     M !!! Regidx ar_a0 = p ->
     M !!! Regidx csp_rs1 = pa_stk sp0 4 ->
+    page_valid (page_base tfp) ->
     kernel_text -∗ kernel_data -∗
     sie_cap_gpr M av' b p -∗
     pc_is (mword_of_int (KernelSyms.argraw + 0x22) : mword 64) -∗
@@ -539,8 +546,14 @@ Section ProofArgraw.
     ar_arm_body M 0%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
     iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iPoseProof (ar_table_word 0%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -603,11 +616,11 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<0%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    iDestruct (tf_page_word tfp ws (tf_arg_idx 0%nat) v Hws with "Htf") as "[Hw Hwback]".
+    iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 0%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 0%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))))
-                    = a_tf_word tfp (tf_arg_idx 0%nat))
+                    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 0%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 0%nat Hk)).
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off 0%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))) C0 av' v b
@@ -653,8 +666,14 @@ Section ProofArgraw.
     ar_arm_body M 1%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
     iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iPoseProof (ar_table_word 1%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -717,11 +736,11 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<1%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    iDestruct (tf_page_word tfp ws (tf_arg_idx 1%nat) v Hws with "Htf") as "[Hw Hwback]".
+    iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 1%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 1%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))))
-                    = a_tf_word tfp (tf_arg_idx 1%nat))
+                    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 1%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 1%nat Hk)).
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off 1%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))) C0 av' v b
@@ -767,8 +786,14 @@ Section ProofArgraw.
     ar_arm_body M 2%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
     iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iPoseProof (ar_table_word 2%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -831,11 +856,11 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<2%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    iDestruct (tf_page_word tfp ws (tf_arg_idx 2%nat) v Hws with "Htf") as "[Hw Hwback]".
+    iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 2%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 2%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))))
-                    = a_tf_word tfp (tf_arg_idx 2%nat))
+                    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 2%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 2%nat Hk)).
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off 2%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))) C0 av' v b
@@ -881,8 +906,14 @@ Section ProofArgraw.
     ar_arm_body M 3%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
     iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iPoseProof (ar_table_word 3%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -945,11 +976,11 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<3%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    iDestruct (tf_page_word tfp ws (tf_arg_idx 3%nat) v Hws with "Htf") as "[Hw Hwback]".
+    iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 3%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 3%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))))
-                    = a_tf_word tfp (tf_arg_idx 3%nat))
+                    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 3%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 3%nat Hk)).
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off 3%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))) C0 av' v b
@@ -995,8 +1026,14 @@ Section ProofArgraw.
     ar_arm_body M 4%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
     iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iPoseProof (ar_table_word 4%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -1059,11 +1096,11 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<4%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    iDestruct (tf_page_word tfp ws (tf_arg_idx 4%nat) v Hws with "Htf") as "[Hw Hwback]".
+    iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 4%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 4%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))))
-                    = a_tf_word tfp (tf_arg_idx 4%nat))
+                    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 4%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 4%nat Hk)).
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off 4%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))) C0 av' v b
@@ -1109,8 +1146,14 @@ Section ProofArgraw.
     ar_arm_body M 5%nat av' sp0 ra0 s00 s10 vgap p tfp ws v dqt b.
   Proof.
     cbv beta delta [ar_arm_body].
-    intros Hk Hws HMs1 HMa4 HMa0 HMsp.
+    intros Hk Hws HMs1 HMa4 HMa0 HMsp Hpv.
     iIntros "#Htext #Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap Hcont".
+    iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static tfp Hpv with "Hkmapb") as "#Hptc".
     iPoseProof (ar_table_word 5%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
@@ -1173,11 +1216,11 @@ Section ProofArgraw.
     (* c.ld a0,<112+8k>(a5) -- tf->a<5%nat>.  The word lives at the PHYSICAL
        tier inside [tf_page]; the load is a VA-tier one through the kernel
        identity map, so it crosses with [tf_word_to_mem] and back. *)
-    iDestruct (tf_page_word tfp ws (tf_arg_idx 5%nat) v Hws with "Htf") as "[Hw Hwback]".
+    iDestruct (tf_page_word_mem tfp ws (tf_arg_idx 5%nat) v ltac:(unfold tf_arg_idx; lia) Hws with "Hptc Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 5%nat Hk with "Htext") as "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))))
-                    = a_tf_word tfp (tf_arg_idx 5%nat))
+                    = tf_pa tfp (8 * Z.of_nat (tf_arg_idx 5%nat)))
       by (rewrite /C0 upd_eq; exact (ar_arg_addr tfp 5%nat Hk)).
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argraw + ar_ld_off 5%nat)) ar_a0 ar_a5
               (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))) C0 av' v b
@@ -1235,13 +1278,13 @@ Section ProofArgraw.
 
 
   Lemma wp_argraw_sconf
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool) (lks : gset string)
-    : wp_argraw_sconf_body m av n eb p C i tfp ws v dqt b lks.
+    : wp_argraw_sconf_body m av n eb p i tfp ws v dqt b lks.
   Proof.
     cbv beta delta [wp_argraw_sconf_body].
-    intros pcE ret_tgt Hi Ha0 Hargs Hn Hav.
+    intros pcE ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Htfp Htf Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
@@ -1344,8 +1387,8 @@ Section ProofArgraw.
     iEval (rewrite Hjmp) in "Hpc".
     assert (HA3ra : A3 !!! Regidx ar_ra = add_vec_int (mword_of_int (KernelSyms.argraw + 0x0c) : mword 64) 4)
       by (rewrite /A3 upd_eq; reflexivity).
-    iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p C b
+    iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p b
               _ Hn ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID8 Hs8 ms MF) "%Hms Hcg Hcpu Hpc %HcsMF".
     destruct HcsMF as [HcsMF HMFa0].
@@ -1483,13 +1526,13 @@ Section ProofArgraw.
     (* ================= the arm, applied ONCE at a symbolic index ======= *)
     iApply (ar_arm B4 i (av - 4)%nat sp0 (m !!! Regidx ar_ra) (m !!! Regidx ar_s0)
                    (m !!! Regidx ar_s1) vgap p tfp ws v dqt b
-              Hi Hargs HB4s1 HB4a4 HB4a0 HB4sp
+              Hi Hargs HB4s1 HB4a4 HB4a0 HB4sp Hpv
               with "Htext Hdata Hcg Hpc Htfp Htf Hr24 Hr16 Hr8 Hgap").
     iIntros (CID15 Hs15 Mf) "%HMf Hcg Hpc Htfp Htf".
     destruct HMf as (Hfsp & Hfs0 & Hfs1 & Hfa0 & Hfthr).
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    iDestruct (cpu_own_transport CID8 CID15 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iDestruct (cpu_own_transport CID8 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Mf with "[%] Hcg Hcpu Hpc Htfp Htf").
     split; [| exact Hfa0].

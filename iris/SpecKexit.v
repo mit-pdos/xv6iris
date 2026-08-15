@@ -131,6 +131,7 @@ Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -142,7 +143,7 @@ Definition K_kexit : nat := 74%nat.
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
@@ -157,7 +158,7 @@ Definition wp_kexit_sconf_body
     (bmapstart inodestart : Z) (nib : nat) (size : Z)
     (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
     (pid : mword 32) (V : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
@@ -188,7 +189,7 @@ Definition wp_kexit_sconf_body
   locks_below lks "log" ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE -- the whole
      point of the sweep.  usertrap calls kexit(-1) on paths that have not
      run intr_on(): the first killed(p) check runs before it, and the second
@@ -262,7 +263,7 @@ Definition wp_kexit_sconf_body
 (* (SpecProcinit.proc_ready_lock_res is the same kind of check.)             *)
 (* ---------------------------------------------------------------------- *)
 Section KexitSeals.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (V : pprivate) :
@@ -284,7 +285,7 @@ Module Type KEXIT.
   Parameter wp_kexit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-             !kallocG Σ, !irefslotG Σ, !iregG Σ}
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
@@ -299,10 +300,10 @@ Module Type KEXIT.
       (bmapstart inodestart : Z) (nib : nat) (size : Z)
       (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka
                           γi cn γtl bmapstart inodestart nib size dqb dqs us
-                          on fn m av eb C b lks pid V.
+                          on fn m av eb b lks pid V.
 End KEXIT.

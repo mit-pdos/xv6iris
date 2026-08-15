@@ -63,9 +63,9 @@ Section WpIntrOff.
 
   Lemma wp_intr_off_lvl0_s_sconf
       (pc : mword 64) (b : bool) (p : mword 64)
-      (m : regfile) (n : nat) (C : iProp Σ) (lks : gset string) :
+      (m : regfile) (n : nat) (lks : gset string) :
     sie_cap_gpr m n b p -∗
-    cpu_own 0%nat b p C b lks -∗
+    cpu_own 0%nat b p b lks -∗
     trap_csrs_ext b -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC)) -∗
@@ -76,7 +76,7 @@ Section WpIntrOff.
       (* the exit set is [lks] -- and at [b = true] the entry arm already
          forced [lks = ∅], which is exactly what the dismantled arm pays out
          ([WpSconfCsr.cpu_priv_pay_on] hands back [cpu_priv 0 true p ∅]). *)
-      cpu_own 0%nat false p C false lks -∗
+      cpu_own 0%nat false p false lks -∗
       trap_csrs -∗
       (* THE RUNNING CLAIM, on the same two-sided split as [trap_csrs_ext]
          above but in the OTHER direction: at [b = true] the dismantled arm
@@ -94,13 +94,13 @@ Section WpIntrOff.
       iIntros "Hcg Hcpu _ Hpc Hinstr Hcont".
       (* [b = true]: the arm's own conjunct pins the set empty, which is the
          set the arm pays back. *)
-      iDestruct "Hcpu" as "[%Hpure HC]". destruct Hpure as (_ & _ & ->).
-      iApply (wp_csrci_sstatus_x0_s_sconf pc m n true with "Hcg [] Hpc Hinstr [HC Hcont]").
+      iDestruct "Hcpu" as "%Hpure". destruct Hpure as (_ & _ & ->).
+      iApply (wp_csrci_sstatus_x0_s_sconf pc m n true with "Hcg [] Hpc Hinstr [Hcont]").
       { iPureIntro. exact (conj eq_refl eq_refl). }
       iIntros (CIDn Hk ms) "%Hmsf Hcg Hcnt Hcsrs Hclm Hcells Hpc".
       iDestruct (wp_next_at true p _ CIDn Hk with "Hcont") as "Hcont".
-      iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt HC] Hcsrs [Hclm] Hpc").
-      { rewrite /cpu_own /cpu_hart /cpu_priv_pay. iFrame "Hcells Hcnt HC". }
+      iApply ("Hcont" $! ms with "[%//] Hcg [Hcells Hcnt] Hcsrs [Hclm] Hpc").
+      { rewrite /cpu_own /cpu_hart /cpu_priv_pay. iFrame "Hcells Hcnt". }
       { rewrite /cpu_claim_pay. iExact "Hclm". }
     - (* ---- ALREADY DISABLED: a no-op; the caller brought the CSRs. ---- *)
       iIntros "Hcg Hcpu Hcsrs Hpc Hinstr Hcont".

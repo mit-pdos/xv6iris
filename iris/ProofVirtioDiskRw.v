@@ -47,7 +47,6 @@ Require Import CpuOwn FdSlots.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpUart.
 Require Import VirtioModel DiskPtsto DiskInv.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
 Require Import SpecVirtioDiskRw.
@@ -118,7 +117,7 @@ Section ProofVirtioDiskRw.
   (* =================================================================== *)
   Lemma wp_vdrw_p1
       (γd : disk_names) (γk : gname) (pd pav pu : mword 64)
-      (m : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool) (pj : mword 64)
       (bno : mword 32) (lks : gset string) :
     let sp0 : Arch.pa := m !!! Regidx csp_rs1 in
     let bp  : Arch.pa := m !!! Regidx Ra0 in
@@ -129,7 +128,7 @@ Section ProofVirtioDiskRw.
        phase's OWN [lks] is not enough, it must also reach P6's release. *)
     locks_below lks "virtio_disk" ->
     sie_cap_gpr m K eb pj -∗
-    cpu_own 0 eb pj C eb lks -∗
+    cpu_own 0 eb pj eb lks -∗
     (* NOT USED HERE: [wp_vdrw_p1] is pure prologue-plus-acquire, so the
        complement just RIDES ALONG, transported to the acquire-return hart
        exactly like [cpu_own] below, and handed to the continuation
@@ -137,7 +136,6 @@ Section ProofVirtioDiskRw.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x000) : mword 64) -∗
-    panic_wp_any -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     b_blockno bp ↦₄{DfracOwn (1/2)} bno -∗
     wp_next (CID0 := CID) true pj (fun (CID : CpuId) =>
@@ -154,7 +152,7 @@ Section ProofVirtioDiskRw.
            file list) continue this phase chain and almost certainly still
            thread the OLD bare [lks] through their own "holding the lock"
            cpu_own occurrences -- they need the matching fix, unverified here. *)
-        cpu_own 1 eb pj C false ({["virtio_disk"]} ∪ lks) -∗
+        cpu_own 1 eb pj false ({["virtio_disk"]} ∪ lks) -∗
         arm_pay 0 eb pj -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -168,7 +166,7 @@ Section ProofVirtioDiskRw.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 bp wr HK Hfresh.
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hlk Hbno Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlk Hbno Hcont".
     (* ---- the instruction facts ---- *)
     (* ---- +0x000  c.addi16sp sp,-96 : push the 12-slot frame ---- *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -558,12 +556,12 @@ Section ProofVirtioDiskRw.
     assert (HR11ra : R11 !!! Regidx Rra
                      = add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x032) : mword 64) 4)
       by (rewrite /R11; apply upd_eq).
-    iDestruct (cpu_own_transport CID CIDp21 0 eb pj C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CIDp21 0 eb pj eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
-              (disk_res γd pd pav pu) R11 0%nat eb pj C (K - 12)%nat eb lks
+              (disk_res γd pd pav pu) R11 0%nat eb pj (K - 12)%nat eb lks
               vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hfresh
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".

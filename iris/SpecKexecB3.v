@@ -31,22 +31,14 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
-Require Import HartTp.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn.
-Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
-Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import SleepLock.
 Require Import WpLock.
 Require Import PanicStub.
 Require Import FdSlots.
@@ -55,19 +47,12 @@ Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
 Require Import IcacheEscrow.
-Require Import ByteBuf.
-Require Import VcGen.
-Require Import W32Arith.
-Require Import ElfEnc.
-Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
@@ -76,37 +61,15 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
-Require Import DirView.
-Require Import DirLinks.
-Require Import InodeLock.
-Require Import SchedCtx.
-Require Import DiskInv.
-Require Import PtTree.
-Require Import PtBuild.
-Require Import ProcPt.
+Require Import ProcAvail.
+Require Import ProcInv.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
-Require Import UmCovered.
-Require Import FileInv.
-Require Import SpecIput.
+Require Import FileInvDefs.
 Require Import SpecKexec.
-Require Import SpecMyproc.
-Require Import SpecBeginOp.
-Require Import SpecEndOp.
-Require Import SpecIlock.
-Require Import SpecReadi.
-Require Import SpecIunlockput.
 Require Import SpecDirlink.
-Require Import SpecNamei.
-Require Import SpecProcFreepagetable.
-Require Import SpecProcPagetable.
-Require Import SpecWalkaddr.
-Require Import SpecFlags2perm.
-Require Import SpecUvmalloc.
-Require Import ProofKexecParts.
-Require Import ProofKexecTail.
 Require Import ProofKexecSeam.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -138,7 +101,7 @@ Notation Ra0 := (mword_of_int 10 : mword 5).
 Definition kxc_b2_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+      !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -151,7 +114,7 @@ Definition kxc_b2_body
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-    (m M : regfile) (K : nat) (C : iProp Σ)
+    (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64) :=
   (K_kexec <= K)%nat ->
@@ -178,7 +141,7 @@ Definition kxc_b2_body
             cov logstart inodestart nib dev -∗
   kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
              size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K C
+             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -190,7 +153,7 @@ Definition kxc_b2_body
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -209,7 +172,7 @@ Definition kxc_b2_body
     ∀ (M' : regfile) (used3 : gset Z) (P' : uptd) (szv' : mword 64),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                  used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
-                 M' K C sp0 ra0 s00 s10 s20 pv av
+                 M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -220,7 +183,7 @@ Definition kxc_b2_body
             ⌜callee_saved m mf⌝ -∗
             ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv2 na alen⌝ -∗
             sie_cap_gpr mf K true (proc_addr jp) -∗
-            cpu_own 0 true (proc_addr jp) C true ∅ -∗
+            cpu_own 0 true (proc_addr jp) true ∅ -∗
             pc_is (ret_pc ra0) -∗
             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -245,7 +208,7 @@ Definition kxc_b2_body
 Definition kxc_b2z_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+      !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
     (gs : list gname) (jp : nat) (gl : gname)
     (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
     (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -258,7 +221,7 @@ Definition kxc_b2z_body
     (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
     (afun : nat -> nat -> bv 8)
     (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-    (m M : regfile) (K : nat) (C : iProp Σ)
+    (m M : regfile) (K : nat)
     (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
     (ef : nat -> bv 8) (P : uptd) :=
   (K_kexec <= K)%nat ->
@@ -279,7 +242,7 @@ Definition kxc_b2z_body
             cov logstart inodestart nib dev -∗
   kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
              size dev used used2 kf qf sf gyf inumf dnf bmf gilf gislf n2
-             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K C
+             plen pfun na avf aslen afun pidv V dqb dqs dqa m M K
              sp0 ra0 s00 s10 s20 pv av
              (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
              (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
@@ -289,7 +252,7 @@ Definition kxc_b2z_body
     ∀ (M' : regfile) (used3 : gset Z),
       kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                  used used3 plen pfun na avf aslen afun pidv V dqb dqs dqa
-                 M' K C sp0 ra0 s00 s10 s20 pv av
+                 M' K sp0 ra0 s00 s10 s20 pv av
                  (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                  (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                  (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -301,7 +264,7 @@ Module Type KEXECB3.
   Parameter kxc_b2 :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-        !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+        !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -314,19 +277,19 @@ Module Type KEXECB3.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (i : nat) (szv : mword 64),
     kxc_b2_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av w67
+      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67
       ef P i szv.
 
   Parameter kxc_b2z :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
         !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-        !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
+        !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ} `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (jp : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname) (pd pav pu : mword 64)
       (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
@@ -339,11 +302,11 @@ Module Type KEXECB3.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd),
     kxc_b2z_body gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl gilf gislf
       ga gf cov logstart bmapstart inodestart nib size dev used used2
       kf qf sf gyf inumf dnf bmf n2 plen pfun na avf alen aslen afun
-      pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av w67 ef P.
+      pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av w67 ef P.
 End KEXECB3.

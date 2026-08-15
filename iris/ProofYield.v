@@ -55,6 +55,7 @@ Require Import KernelRvcDecode.
 Require Import CodeYield.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecYield.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -104,7 +105,7 @@ Module YieldProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Sched : SCHED) (Release
 (* its last instruction, so even the epilogue is hart-generic.             *)
 (* ===================================================================== *)
 Section YieldPostSched.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 
   (* generic register-map peel over the proof's [set]-chain (hit-first). *)
   Local Ltac yd_peel :=
@@ -113,23 +114,10 @@ Section YieldPostSched.
       | rewrite upd_ne; [| vm_compute; discriminate]
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
-  (* extract the opaque context-slot payload, leaving the bundle at slot
-     [emp] (what the sched call-site hands across the swtch).  It carries its
-     OWN hart binder: the call site is PAST an interrupts-enabled stretch, so
-     a lemma sharing an enclosing section's [Context CID] would silently pin
-     to the entry hart (porting guide, "a helper lemma sharing the enclosing
-     Section's Context"). *)
-  Lemma cpu_own_ctx_take `{GEN : GenId} `{CID0 : CpuId}
-      (n : nat) (eb : bool) (p : mword 64) (D : iProp Σ) (lks : gset string) :
-    cpu_own n eb p D false lks -∗ D ∗ cpu_own n eb p emp false lks.
-  Proof.
-    iIntros "[Hh HD]". iFrame "HD". rewrite cpu_own_off. iFrame "Hh".
-  Qed.
-
   Lemma yield_post_sched `{GEN : GenId} `{CID0 : CpuId}
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
-      (m msch : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m msch : regfile) (av : nat) (eb : bool)
       (sp0 spd vgap : mword 64) (lks : gset string) :
     let pj := proc_addr j in
     (20 <= av)%nat ->
@@ -160,11 +148,14 @@ Section YieldPostSched.
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    cpu_own 1 eb pj emp false ({["proc"]} ∪ lks) -∗
-    C -∗
+    cpu_own 1 eb pj false ({["proc"]} ∪ lks) -∗
     (* the cells swtch handed back; they go into the RUNNING lock at the
        release below, which is where the NEXT yield will find them. *)
     own_ctx (p_context pj) -∗
+    (* the slot's ALLOCATION MARKER: the RUNNING lock resource carries it
+       like every non-UNUSED arm, and the release below puts it back
+       ([ProcAvail.v]).  Persistent. *)
+    pslot_used_at pj -∗
     (* the hart tag, whole, at the hart the dispatch resumed us on: half goes
        back into [run_slot] at the release, half becomes this thread's own
        [cpu_claim]. *)
@@ -179,7 +170,7 @@ Section YieldPostSched.
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av eb pj -∗
-        cpu_own 0 eb pj C eb lks -∗
+        cpu_own 0 eb pj eb lks -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
@@ -188,7 +179,7 @@ Section YieldPostSched.
   Proof.
     intros pj Hav Hj Hspd Hsp0 Hsp_msch Hs1_msch
            Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27 Hfresh.
-    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpuemp HC Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
+    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpuemp Hown' #Hmk Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(4-k)]. *)
     assert (Hspd4 : pa_stk sp0 4 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -218,9 +209,9 @@ Section YieldPostSched.
     rewrite unclaimed_RUNNING.
     iDestruct (pstate_at_elim j (1/2) RUNNING Hj with "Hclm") as "Hclm".
     rewrite hart_split. iDestruct "Htag" as "[Htaga Htagb]".
-    (* re-inject the opaque context-slot payload into the returned bundle. *)
-    iAssert (cpu_own 1 eb (proc_addr j) C false ({["proc"]} ∪ lks)) with "[Hcpuemp HC]" as "Hcpu".
-    { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
+    (* [cpu_own] carries no context-slot payload any more, so what used to be
+       a re-injection is now just the bundle itself, unchanged. *)
+    iRename "Hcpuemp" into "Hcpu".
     (* +0x1c: c.mv a0,s1 : a0 := s1 = proc_addr j -- lock still held, so the
        hart is PINNED and [wp_next_off] collapses the binder. *)
     iPoseProof (ydi_1c with "Htext") as "Hi1c".
@@ -269,7 +260,7 @@ Section YieldPostSched.
        them without being handed them by a caller. *)
     iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown' Htaga Hvc']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, ch'. iFrame "Hstate Hpg Hchan Hpub".
-      iApply (proc_slots_running_intro γs j cpu_id Hj with "Htaga Hown' Hvc'"). }
+      iApply (proc_slots_running_intro γs j cpu_id Hj with "Htaga Hown' Hvc' Hmk"). }
     (* THE TRAP-CSR SPLIT.  release consumes [arm_pay 0 eb _] -- the set
        at [eb = true], nothing at [eb = false].  The complement is what this
        call was handed from outside and owes back to yield's caller; exactly
@@ -284,7 +275,7 @@ Section YieldPostSched.
     iEval (rewrite -(cpu_claim_ext_split eb pj)) in "Hclm".
     iDestruct "Hclm" as "[Hclmp Hclmx]".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
+              (proc_lock_res γs γl (proc_addr j)) D1 0 eb pj (av - 4)%nat
               ({["proc"]} ∪ lks) Hlka
               ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp]").
@@ -451,7 +442,7 @@ Section YieldPostSched.
       by (rewrite (Cthr (mword_of_int 26) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact Hmsch26).
     assert (Cs11 : E4 !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (rewrite (Cthr (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact Hmsch27).
-    iDestruct (cpu_own_transport CIDr CIDe5 0 eb pj C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDr CIDe5 0 eb pj eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* the trap CSRs the caller lent are PER-HART, so they transport rather
        than frame: [emp] at [eb = true], and at [eb = false] the epilogue
@@ -472,18 +463,18 @@ Section YieldPostSched.
 End YieldPostSched.
 
 Section ProofYield.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_yield_sconf 
       (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
-    : wp_yield_sconf_body γs j γl m av eb C.
+      (m : regfile) (av : nat) (eb : bool)
+    : wp_yield_sconf_body γs j γl m av eb.
   Proof.
     cbv beta delta [wp_yield_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hext Hclmx Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hext Hclmx Hcont".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
        at level 0 they are forced equal ([CpuOwn.cpu_own_eb_agree]), so there
        is nothing to derive and nothing to case-split on.  yield's own
@@ -582,9 +573,9 @@ Section ProofYield.
     iEval (rewrite Hpcmp) in "Hpc".
     assert (HA2ra : A2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)
       by (rewrite /A2 upd_eq; reflexivity).
-    iDestruct (cpu_own_transport CID CID6 0 eb pj C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID6 0 eb pj eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0 eb pj C eb
+    iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0 eb pj eb
               _ ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc").
@@ -627,14 +618,14 @@ Section ProofYield.
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.yield + 0x10) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
-    iDestruct (cpu_own_transport CID7 CID9 0 eb pj C eb ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID7 CID9 0 eb pj eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 0 eb pj C (av - 4)%nat eb ∅
+              (proc_lock_res γs γl (proc_addr j)) B1 0 eb pj (av - 4)%nat eb ∅
               ltac:(lia)
               ltac:(lia)
               (locks_below_empty "proc")
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
@@ -670,7 +661,7 @@ Section ProofYield.
        invariant: it takes all three from the lock it just took. *)
     iDestruct (proc_lock_res_elim γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
     iDestruct (proc_slots_running γs j CIDa st0 Hj with "Htag Hslot")
-      as "(-> & Htag & Hown & Hvc)".
+      as "(-> & Htag & Hown & Hvc & #Hmk)".
     (* the claim's half #2 joins the lock's tie into the WHOLE mirror, which
        is what the store to p->state below is allowed to move. *)
     iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
@@ -736,7 +727,7 @@ Section ProofYield.
     (* ------------------------------------------------------------------ *)
     assert (HC1ra : C1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.yield + 0x18) : mword 64) 4)
       by (rewrite /C1 upd_eq; reflexivity).
-    iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
+    iRename "Hcpu" into "Hcpuemp".
     (* sched's crossing wants the WHOLE trap-CSR set, unconditionally: those
        are per-hart registers and the park can move harts.  Half of it comes
        from acquire's own [arm_pay 0 eb _] (the set at [eb = true],
@@ -825,12 +816,12 @@ Section ProofYield.
     iEval (rewrite HcspA0 Hs0A0 -Hb2) in "Hr16".
     iEval (rewrite HcspA0 Hs1A0 -Hb3) in "Hr8".
     (* ONE application of the post-resume half, at the resuming hart. *)
-    iApply (yield_post_sched (CID0 := CIDs)  γs j γl ch' m msch av eb C sp0 spd vgap ∅
+    iApply (yield_post_sched (CID0 := CIDs)  γs j γl ch' m msch av eb sp0 spd vgap ∅
               ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
               Hsp_msch Hs1_msch
               Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
               (locks_below_empty "proc")
-              with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpuemp HC Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap
+              with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpuemp Hown' Hmk Htag' Hvc' Hr24 Hr16 Hr8 Hgap
                     [Hcont]").
     (* yield's own [wp_next true pj] obligation, re-anchored at the resuming
        hart -- [WpNext.wp_next_retarget], the transport for exactly this.  The

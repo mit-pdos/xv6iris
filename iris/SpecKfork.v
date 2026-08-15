@@ -174,6 +174,7 @@ Require Import SpecProcinit.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
@@ -184,14 +185,14 @@ Local Open Scope Z_scope.
 Definition K_kfork : nat := 56%nat.
 
 Definition kfork_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
-    (pme : mword 64) (C : iProp Σ)
+    (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) (lks : gset string) : iProp Σ :=
   ( sie_cap_gpr mr K b pme ∗
-    cpu_own lvl eb pme C b lks ∗
+    cpu_own lvl eb pme b lks ∗
     (* THE PARENT COMES BACK VERBATIM on every arm -- kfork only reads it.
        Its cwd reference comes back INSIDE it: idup halves the fraction on
        the success path and does not run at all on the two failure paths,
@@ -211,12 +212,12 @@ Definition kfork_post
       (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-    (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+    (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
     (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -236,7 +237,7 @@ Definition wp_kfork_sconf_body
      kalloc/uvmcopy's "kmem" all follow by [LockRank.locks_below_mono]. *)
   locks_below lks "wait_lock" ->
   sie_cap_gpr m K b pme -∗
-  cpu_own lvl eb pme C b lks -∗
+  cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   procs_inv γs -∗
@@ -246,25 +247,31 @@ Definition wp_kfork_sconf_body
   is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
   itable_inv -∗
   kalloc_env γa None -∗
+  (* THE PROC TABLE'S SEALED REGIME.  kfork allocates a proc, so it needs
+     [ProcAvail]'s authority to mint the new slot's allocation marker -- and
+     it takes the count-free arm, which is persistent and says nothing, so
+     kfork keeps allocproc's empty-table disjunct and handles it (the
+     [return -1]).  Only [userinit] runs in the counted regime.  *)
+  procs_avail None -∗
   proc_priv γf pme pid_p Vp -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
+      kfork_post γa γf cn lvl eb pme b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) lks -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
-      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64)
       (b : bool) (pid_p : mword 32) (Vp : pprivate) (lks : gset string),
       wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
-        m lvl K eb pme C b pid_p Vp lks.
+        m lvl K eb pme b pid_p Vp lks.
 End KFORK.

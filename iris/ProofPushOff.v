@@ -235,23 +235,20 @@ Section ProofPushOff.
      px lks] the code after the flip wants.  The middle conjunct pair is what
      [intr_count_pre true k ebx] asks for, so that one is projected out. *)
   Lemma po_own_split `{GEN : GenId} `{CIDx : CpuId} (k : nat) (ebx : bool)
-      (px : mword 64) (Cx : iProp Σ) (bx : bool) (lks : gset string) :
-    cpu_own k ebx px Cx bx lks -∗
+      (px : mword 64) (bx : bool) (lks : gset string) :
+    cpu_own k ebx px bx lks -∗
     ⌜ bx = true -> k = 0%nat /\ ebx = true /\ lks = ∅ ⌝ ∗
     intr_count_pre bx k ebx ∗
-    (if bx then emp else cpu_priv k ebx px lks) ∗
-    Cx.
+    (if bx then emp else cpu_priv k ebx px lks).
   Proof.
     destruct bx.
-    - iIntros "[%Hk HC]".
+    - iIntros "%Hk".
       iSplitR; [ iPureIntro; intros _; exact Hk |].
       iSplitR;
-        [ iPureIntro; destruct Hk as (Hk0 & Hkeb & _); exact (conj Hk0 Hkeb) |].
-      iSplitR; [ done | iExact "HC" ].
-    - iIntros "[[Hcells Hcnt] HC]".
+        [ iPureIntro; destruct Hk as (Hk0 & Hkeb & _); exact (conj Hk0 Hkeb) | done ].
+    - iIntros "[Hcells Hcnt]".
       iSplitR; [ iPureIntro; discriminate |].
-      iSplitL "Hcnt"; [ iExact "Hcnt" |].
-      iSplitL "Hcells"; [ iExact "Hcells" | iExact "HC" ].
+      iSplitL "Hcnt"; [ iExact "Hcnt" | iExact "Hcells" ].
   Qed.
 
   (* the cells the flip leaf did NOT free (b = false: the caller's own) have
@@ -616,9 +613,9 @@ Section ProofPushOff.
   (* ------------------------------------------------------------------- *)
   Lemma wp_push_off_sconf `{GEN : GenId} `{CID : CpuId}
       (m : regfile) (av : nat)
-      (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
+      (n : nat) (eb : bool) (p : mword 64) (b : bool)
       (lks : gset string)
-    : wp_push_off_sconf_body m av n eb p C b lks.
+    : wp_push_off_sconf_body m av n eb p b lks.
   Proof.
     cbv beta delta [wp_push_off_sconf_body].
     intros caller_ret Hnbound Hav.
@@ -694,8 +691,8 @@ Section ProofPushOff.
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.push_off + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.push_off + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* ---- 0x0a: csrrci a5,sstatus,2 -- THE FLIP, and the arm seam ---- *)
-    iDestruct (cpu_own_transport CID CID5 n eb p C b ltac:(wp_next_chain) with "Hown") as "Hown".
-    iDestruct (po_own_split n eb p C b lks with "Hown") as "(%Hbon & Hcnt & Hcells0 & HC)".
+    iDestruct (cpu_own_transport CID CID5 n eb p b ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (po_own_split n eb p b lks with "Hown") as "(%Hbon & Hcnt & Hcells0)".
     iPoseProof (poi_0a with "Htext") as "Hi0a".
     iApply (wp_csrci_sstatus_s_sconf (mword_of_int (KernelSyms.push_off + 0x0a)) (mword_of_int 15 : mword 5) n eb
               N1 (av - 4)%nat b
@@ -908,25 +905,23 @@ Section ProofPushOff.
       destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
       assert (Hav4 : (trap_res b + (av - 4) + 4)%nat = (trap_res b + av)%nat) by lia.
       iEval (rewrite Hav4) in "Hcg".
-      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hlks Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hlks Hcnt Hproc] [$Htcp $Hclm] Hpc [%]").
       { exact Hmsf. }
-      { (* cpu_own (S 0) eb p C false *)
+      { (* cpu_own (S 0) eb p false *)
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
-        iSplitL "Hnoff Hintena Hlks Hcnt Hproc".
-        { iSplitL "Hnoff Hintena Hlks Hproc".
-          { iSplitL "Hnoff Hintena Hproc"; [| iApply (cpu_locks_lvl_weaken with "Hlks"); lia ].
-            iSplitR. { iPureIntro. change (Z.of_nat (S 0)) with 1%Z. lia. }
-            iSplitL "Hnoff".
-            { assert (Hstore1 : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S 0)).
-              { change noff with (noff_val 0). apply push_storeval_succ. change (Z.of_nat 0) with 0%Z. lia. }
-              iEval (rewrite Hstore1) in "Hnoff". iExact "Hnoff". }
-            iSplitL "Hintena".
-            { assert (Hival : intena_val eb = po_intena_val mstatus0).
-              { symmetry. apply po_intena_val_bridge. apply Hsie. reflexivity. }
-              iEval (rewrite Hival). iExact "Hintena". }
-            iExact "Hproc". }
-          iExact "Hcnt". }
-        iExact "HC". }
+        iSplitL "Hnoff Hintena Hlks Hproc".
+        { iSplitL "Hnoff Hintena Hproc"; [| iApply (cpu_locks_lvl_weaken with "Hlks"); lia ].
+          iSplitR. { iPureIntro. change (Z.of_nat (S 0)) with 1%Z. lia. }
+          iSplitL "Hnoff".
+          { assert (Hstore1 : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S 0)).
+            { change noff with (noff_val 0). apply push_storeval_succ. change (Z.of_nat 0) with 0%Z. lia. }
+            iEval (rewrite Hstore1) in "Hnoff". iExact "Hnoff". }
+          iSplitL "Hintena".
+          { assert (Hival : intena_val eb = po_intena_val mstatus0).
+            { symmetry. apply po_intena_val_bridge. apply Hsie. reflexivity. }
+            iEval (rewrite Hival). iExact "Hintena". }
+          iExact "Hproc". }
+        iExact "Hcnt". }
       { unfold callee_saved. repeat split.
       - (* sp *)
         rewrite Hsp HcspN8 /spd /sp0 po_addv_assoc.
@@ -1085,22 +1080,20 @@ Section ProofPushOff.
       destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
       assert (Hav4 : (trap_res b + (av - 4) + 4)%nat = (trap_res b + av)%nat) by lia.
       iEval (rewrite Hav4) in "Hcg".
-      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hlks Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hlks Hcnt Hproc] [$Htcp $Hclm] Hpc [%]").
       { exact Hmsf. }
-      { (* cpu_own (S (S n')) eb p C false *)
+      { (* cpu_own (S (S n')) eb p false *)
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
-        iSplitL "Hnoff Hintena Hlks Hcnt Hproc".
-        { iSplitL "Hnoff Hintena Hlks Hproc".
-          { iSplitL "Hnoff Hintena Hproc"; [| iApply (cpu_locks_lvl_weaken with "Hlks"); lia ].
-            iSplitR. { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
-            iSplitL "Hnoff".
-            { assert (Hstoref : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S (S n'))).
-              { change noff with (noff_val (S n')). apply push_storeval_succ. exact Hnbound. }
-              iEval (rewrite Hstoref) in "Hnoff". iExact "Hnoff". }
-            iSplitL "Hintena". { iExact "Hintena". }
-            iExact "Hproc". }
-          iExact "Hcnt". }
-        iExact "HC". }
+        iSplitL "Hnoff Hintena Hlks Hproc".
+        { iSplitL "Hnoff Hintena Hproc"; [| iApply (cpu_locks_lvl_weaken with "Hlks"); lia ].
+          iSplitR. { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
+          iSplitL "Hnoff".
+          { assert (Hstoref : (autocast (T := mword) (subrange_vec_dec (sign_extend' 64 (subrange_vec_dec (add_vec (sign_extend' 64 noff) (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = noff_val (S (S n'))).
+            { change noff with (noff_val (S n')). apply push_storeval_succ. exact Hnbound. }
+            iEval (rewrite Hstoref) in "Hnoff". iExact "Hnoff". }
+          iSplitL "Hintena". { iExact "Hintena". }
+          iExact "Hproc". }
+        iExact "Hcnt". }
       { unfold callee_saved. repeat split.
       - (* sp *)
         rewrite Hsp HcspN5 /spd /sp0 po_addv_assoc.
@@ -1218,9 +1211,9 @@ Section ProofPushOff.
   (* whose own internal [wp_next true] discharge is simply forwarded as   *)
   (* pop_off's OWN [wp_next bexit] obligation ([bexit = true] there). *)
   Lemma wp_pop_off_sconf `{GEN : GenId} `{CID : CpuId}
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (lks : gset string)
-    : wp_pop_off_sconf_body m av n eb p C lks.
+    : wp_pop_off_sconf_body m av n eb p lks.
   Proof.
     cbv beta delta [wp_pop_off_sconf_body].
     intros pcE ret_tgt bexit Hav Hszlks.
@@ -1239,7 +1232,7 @@ Section ProofPushOff.
     iIntros "Hcg Hcpu Hap #Htext Hpc Hcont".
     iDestruct (arm_pay_parts with "Hap") as "[Htcp Hclm]".
     iEval (rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells) in "Hcpu".
-    iDestruct "Hcpu" as "((((%Hbound & Hnoff & Hint & Hproc) & Hlks) & Hcnt) & HC)".
+    iDestruct "Hcpu" as "(((%Hbound & Hnoff & Hint & Hproc) & Hlks) & Hcnt)".
     assert (Hcoup : neq_vec nv1 zero_reg = false <-> n = 0%nat)
       by (apply pop_nv1_zero_iff; exact Hbound).
     assert (Hnoffpos : zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false)
@@ -1512,25 +1505,23 @@ Section ProofPushOff.
       subst mf.
       (* still nested: neq nv1 0 = true, so n = S n'; the token rides
          through un-flipped, repacked one level lower. *)
-      iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc HC] Hpc [%]").
-      { (* cpu_own (S n') eb p C false *)
+      iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc] Hpc [%]").
+      { (* cpu_own (S n') eb p false *)
         rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
-        iSplitL "Hnoff Hint Hlks Htok Hproc".
-        { iSplitL "Hnoff Hint Hlks Hproc".
-          { iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
-            iSplitR.
-            { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
-            iSplitL "Hnoff".
-            { assert (Hdec : noff_val (S n') = storeval).
-              { symmetry. rewrite /storeval /nv1. change noffv with (noff_val (S (S n'))).
-                apply pop_storeval_pred. exact Hbound. }
-              iEval (rewrite Hdec). iExact "Hnoff". }
-            iSplitL "Hint". { iExact "Hint". }
-            iExact "Hproc". }
-          destruct eb.
-          - iApply (intr_count_pack_S_on with "Htok").
-          - iApply (intr_count_pack_S_off with "Htok"). }
-        iExact "HC". }
+        iSplitL "Hnoff Hint Hlks Hproc".
+        { iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
+          iSplitR.
+          { iPureIntro. rewrite Nat2Z.inj_succ in Hbound |- *. lia. }
+          iSplitL "Hnoff".
+          { assert (Hdec : noff_val (S n') = storeval).
+            { symmetry. rewrite /storeval /nv1. change noffv with (noff_val (S (S n'))).
+              apply pop_storeval_pred. exact Hbound. }
+            iEval (rewrite Hdec). iExact "Hnoff". }
+          iSplitL "Hint". { iExact "Hint". }
+          iExact "Hproc". }
+        destruct eb.
+        - iApply (intr_count_pack_S_on with "Htok").
+        - iApply (intr_count_pack_S_off with "Htok"). }
       unfold callee_saved. repeat split.
       + rewrite upd_eq HcspP6 Hsp0up. reflexivity.
       + do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
@@ -1692,21 +1683,19 @@ Section ProofPushOff.
         assert (Hav2 : (av - 2 + 2)%nat = av) by lia.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
-        iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc HC] Hpc [%]").
+        iApply ("Hcont" with "Hcg [Hnoff Hint Hlks Htok Hproc] Hpc [%]").
         { rewrite /cpu_own /cpu_hart /cpu_priv /cpu_cells.
-          iSplitL "Hnoff Hint Hlks Htok Hproc".
-          { iSplitL "Hnoff Hint Hlks Hproc".
-            { iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
-              iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
-              iSplitL "Hnoff".
-              { assert (Hdec : noff_val 0 = storeval).
-                { symmetry. rewrite /storeval /nv1. change noffv with (noff_val 1).
-                  apply pop_storeval_pred. exact Hbound. }
-                iEval (rewrite Hdec). iExact "Hnoff". }
-              iSplitL "Hint". { iExists intenav. iExact "Hint". }
-              iExact "Hproc". }
-            rewrite /intr_count. iExact "Htok". }
-          iExact "HC". }
+          iSplitL "Hnoff Hint Hlks Hproc".
+          { iSplitL "Hnoff Hint Hproc"; [| iApply (cpu_locks_lvl_relevel _ _ _ ltac:(exact Hszlks) with "Hlks") ].
+            iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
+            iSplitL "Hnoff".
+            { assert (Hdec : noff_val 0 = storeval).
+              { symmetry. rewrite /storeval /nv1. change noffv with (noff_val 1).
+                apply pop_storeval_pred. exact Hbound. }
+              iEval (rewrite Hdec). iExact "Hnoff". }
+            iSplitL "Hint". { iExists intenav. iExact "Hint". }
+            iExact "Hproc". }
+          rewrite /intr_count. iExact "Htok". }
         unfold callee_saved. repeat split.
         * rewrite upd_eq HcspP7 Hsp0up. reflexivity.
         * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).
@@ -1912,9 +1901,9 @@ Section ProofPushOff.
         iEval (rewrite Hav2) in "Hcg".
         subst mf.
         iSpecialize ("Hcont" $! CIDe with "[%]"); [wp_next_chain|].
-        iApply ("Hcont" with "Hcg [HC] Hpc [%]").
+        iApply ("Hcont" with "Hcg [] Hpc [%]").
         { rewrite (size_le_zero_empty lks Hszlks).
-          iApply (cpu_own_on_intro p C with "HC"). }
+          iApply (cpu_own_on_intro p). }
         unfold callee_saved. repeat split.
         * rewrite upd_eq HcspP7 Hsp0up. reflexivity.
         * do 3 (rewrite upd_ne; [| vm_compute; discriminate]).

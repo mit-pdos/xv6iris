@@ -125,7 +125,7 @@ Section UserKernelBridge.
     mie ↦ᵣ mie_v -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ menvcfg0 -∗
-    senvcfg ↦ᵣ senvcfg0 -∗
+    senvcfg ↦ᵣ□ senvcfg0 -∗
     sepc ↦ᵣ sepc0 -∗
     utlb_inv_pt uroot tfp um -∗
     pc_is (ret_pc sepc0) -∗
@@ -217,7 +217,7 @@ Section UserKernelBridge.
       medeleg ↦ᵣ{ uc_dqc C } uc_medeleg C ∗
       mip ↦ᵣ{ uc_dqc C } uc_mip C ∗
       menvcfg ↦ᵣ{ uc_dqc C } MENVCFG_S ∗
-      senvcfg ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 64) ∗
+      senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
       mstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 64) ∗
       sstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 32) ∗
       Rut pt.

@@ -38,8 +38,6 @@
 From Stdlib Require Import ZArith Lia List.
 Require Import LogInv.
 Require Import SpecIput.
-Require Import SpecIunlockput.
-Require Import SpecBmap.
 Require Import SpecWritei.
 Require Import SpecDirlink.
 Require Import SpecNamex.

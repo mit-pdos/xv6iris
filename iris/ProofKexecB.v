@@ -155,6 +155,7 @@ Require Import ProofKexecSeam.
 Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* A syscall-altitude goal carries [ProcInv.tf_page]'s 4096-conjunct big-op;
@@ -183,7 +184,7 @@ Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
 Section KexecBBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -230,7 +231,7 @@ Section KexecBBody.
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate)
       (dqb dqs dqa : dfrac)
-      (m M90 : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
+      (m M90 : regfile) (K : nat) (eb : bool) (b : bool)
       (lks : gset string)
       (sp0 ra0 s00 s10 s20 pv av : mword 64) :
     (K_kexec <= K)%nat ->
@@ -269,7 +270,7 @@ Section KexecBBody.
               cov logstart inodestart nib dev -∗
     pc_is (mword_of_int (KXB + 0x90) : mword 64) -∗
     sie_cap_gpr M90 (K - 68)%nat b (proc_addr jp) -∗
-    cpu_own 0 eb (proc_addr jp) C b lks -∗
+    cpu_own 0 eb (proc_addr jp) b lks -∗
     kxc_open gfs gi cn cov logstart dev pidv kf qf sf gyf inumf dnf bmf
               gilf gislf -∗
     log_op g n2 -∗
@@ -292,7 +293,7 @@ Section KexecBBody.
           ⌜callee_saved m mf⌝ -∗
           ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
           sie_cap_gpr mf K b (proc_addr jp) -∗
-          cpu_own 0 eb (proc_addr jp) C b lks -∗
+          cpu_own 0 eb (proc_addr jp) b lks -∗
           pc_is (ret_pc ra0) -∗
           sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
           sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -314,7 +315,7 @@ Section KexecBBody.
                    nib size dev used used2 kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V dqb dqs dqa
-                   m M K C sp0 ra0 s00 s10 s20 pv av
+                   m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -328,7 +329,7 @@ Section KexecBBody.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K b (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -351,7 +352,7 @@ Section KexecBBody.
                    nib size dev used used2 kf qf sf gyf inumf dnf bmf
                    gilf gislf n2
                    plen pfun na avf aslen afun pidv V dqb dqs dqa
-                   m M K C sp0 ra0 s00 s10 s20 pv av
+                   m M K sp0 ra0 s00 s10 s20 pv av
                    (m !!! Regidx Rs3) (m !!! Regidx Rs4) (m !!! Regidx Rs5)
                    (m !!! Regidx Rs6) (m !!! Regidx Rs7) (m !!! Regidx Rs8)
                    (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
@@ -366,7 +367,7 @@ Section KexecBBody.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K b (proc_addr jp) -∗
-              cpu_own 0 eb (proc_addr jp) C b lks -∗
+              cpu_own 0 eb (proc_addr jp) b lks -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -392,7 +393,7 @@ Section KexecBBody.
     iIntros "#Htext #Hpanic #Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins Hbits
              Hbs #Hka Hpriv Hpath Hargv Hargs Hframe Hcont Hcont1a2 Hcont12c".
     (* ---- convention 4: pin [b = eb = true] FIRST ---- *)
-    iDestruct (kxc_sie_b_agree M90 0%nat (K - 68)%nat eb b (proc_addr jp) C
+    iDestruct (kxc_sie_b_agree M90 0%nat (K - 68)%nat eb b (proc_addr jp)
                  with "Hcg Hcnt") as %Houtb.
     subst eb. cbn in Houtb. subst b.
     (* depth 0 forces the held set empty, so proc_pagetable's order premise
@@ -546,10 +547,10 @@ Section KexecBBody.
       by (rewrite /tfp /tfr; apply page_base_of_valid; exact Hpvtf).
     assert (Htfpeq : tfp = ud_tfp (pv_upt V)).
     { apply kxc_page_base_inj. rewrite Hbasetf. reflexivity. }
-    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CID3 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (PPT.wp_proc_pagetable_core ga G2 tfr (DfracOwn (1/4)) 0%nat
-              (K - 68)%nat true (proc_addr jp) C None true lks
+              (K - 68)%nat true (proc_addr jp) None true lks
               kxc_lvl0 ltac:(lia)
               (kxc_tf_align tfr Hpvtf) (kxc_tf_bound tfr Hpvtf)
               with "Hcg Hcnt Htext Hpc [Htfc] Hka").
@@ -842,7 +843,7 @@ Section KexecBBody.
         iIntros (CID15 Hsq15). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt1a2) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-        iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID4 CID15 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont1a2" $! CID15 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID15 true (proc_addr jp) _
@@ -1106,7 +1107,7 @@ Section KexecBBody.
         iIntros (CID24 Hsq24). iNext. iIntros "Hcg Hpc".
         iEval (rewrite Htgt12c) in "Hpc".
         iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-        iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID4 CID24 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hcont12c" $! CID24 with "[%]"); [wp_next_chain |].
         iDestruct (wp_next_retarget CID0 CID24 true (proc_addr jp) _
@@ -1235,7 +1236,7 @@ Section KexecBBody.
       iIntros (CID8 Hsq8). iNext. iIntros "Hcg Hpc".
       iEval (rewrite Htgt64) in "Hpc".
       iDestruct ("Hpvbk" with "Htfc") as "Hpriv".
-      iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID4 CID8 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hkeep)".
@@ -1251,7 +1252,7 @@ Section KexecBBody.
                 gilf gislf ga gf cov logstart bmapstart inodestart nib size
                 dev used used2 kf qf sf gyf inumf dnf bmf n2
                 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                m B1 K C lks sp0 ra0 s00 s10 s20 pv av
+                m B1 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
                 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HB1sp HB1s4 HB1thr
                 with "Hcg Hcnt Htext Hpanic Hpc Hfab Hslkk Hslkd Hslpid Hdep

@@ -367,8 +367,8 @@ Section ProofUartPutc.
   (* =================================================================== *)
   Lemma wp_uartputc_sconf (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8)) (n : nat) (eb : bool)
-      (C : iProp Σ) (b : bool) (p : mword 64) (lks : gset string)
-    : wp_uartputc_sconf_body γl γd γv m0 K bs n eb C b p lks.
+      (b : bool) (p : mword 64) (lks : gset string)
+    : wp_uartputc_sconf_body γl γd γv m0 K bs n eb b p lks.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
     intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hn Hfresh.
@@ -376,7 +376,7 @@ Section ProofUartPutc.
     assert (HK4 : (4 <= K)%nat) by lia.
     assert (Hav : (10 <= K - 4)%nat) by lia.
     pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Ht Hpc #Hpanic #Hdinv #Htxl #Hsubbs Hcont".
+    iIntros "Hcg Hcpu #Ht Hpc #Hdinv #Htxl #Hsubbs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iDestruct (is_txlock_lock with "Htxl") as "#Hlk".
     iDestruct (is_txlock_dlab with "Htxl") as "#Hoff".
@@ -506,10 +506,10 @@ Section ProofUartPutc.
       rewrite /G10 upd_ne; [| vm_compute; discriminate].
       rewrite /G0c upd_ne; [| vm_compute; discriminate]. exact HR3s1. }
     (* ===== acquire(&tx_lock) ===== *)
-    iDestruct (cpu_own_transport CID CIDp9 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CIDp9 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p C (K - 4)%nat b lks
-              Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
+    iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p (K - 4)%nat b lks
+              Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HG14a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
@@ -588,7 +588,7 @@ Section ProofUartPutc.
       apply kv_addv_zero. }
     (* ===== release(&tx_lock) ===== *)
     iEval (rewrite -Hbeq) in "Hcg".
-    iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p C (K - 4)%nat
+    iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γd) H3c n eb p (K - 4)%nat
               ({["uart"]} ∪ lks)
               Hlka Hav with "Hcg Ht Hpc Hlk Hlocked [Hown] Hcpu Hpay").
     { iApply (tx_res_intro γd (l ++ [sb]) with "Hown"). }
@@ -697,7 +697,7 @@ Section ProofUartPutc.
     assert (Hretf : ret_pc (Q46 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HQ46ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iDestruct (cpu_own_transport CIDrel CIDe5 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe5 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Q46 with "Hcg Hcpu Hpc [%] Hsubout").

@@ -101,14 +101,12 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import LockRank.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
@@ -123,8 +121,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import ByteBuf.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -142,6 +138,7 @@ Require Import SpecDirlink.    (* [ic_sleeplocks], [ireg_blocks_ok] *)
 Require Import SpecNamex.      (* [walk_need], [ROOTDEV] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -154,7 +151,7 @@ Definition K_sys_chdir : nat := 126%nat.
 
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ}.
+            !irefslotG Σ, !pavG Σ}.
 
   (* sys_chdir's result, keyed by the returned a0.  The -1 arm gives the
      process block back at the working directory it came in with; the 0 arm
@@ -173,7 +170,7 @@ End SpecSysChdir.
 Definition wp_sys_chdir_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname)                          (* ftable, kalloc      *)
@@ -189,7 +186,7 @@ Definition wp_sys_chdir_sconf_body
     (dqb dqs : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_chdir in
   let pj := proc_addr j in
@@ -226,7 +223,7 @@ Definition wp_sys_chdir_sconf_body
      ilock at "bcache", iunlock at "sleep lock", argstr at "kmem" -- is
      [locks_below ∅ _].  Taking the premise anyway would push an obligation
      out into [SpecSyscall] for nothing. *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation; it
      is threaded rather than framed because begin_op / ilock / iput /
@@ -272,7 +269,7 @@ Definition wp_sys_chdir_sconf_body
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -293,7 +290,7 @@ Module Type SYSCHDIR.
   Parameter wp_sys_chdir_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname)
       (gs : list gname) (j : nat) (gl : gname)
@@ -308,9 +305,9 @@ Module Type SYSCHDIR.
       (dqb dqs : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_chdir_sconf_body γf γa gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
-                              size dev used dqb dqs v pid V m K eb C b lks.
+                              size dev used dqb dqs v pid V m K eb b lks.
 End SYSCHDIR.

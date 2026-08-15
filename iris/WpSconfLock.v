@@ -316,7 +316,17 @@ Section WpSconfLock.
     pa = lock_cpu lk ->
     uint rd <> 0 ->
     rd_ok rd ->
-    (forall st : lock_state, ⊢ lock_auth γl st -∗ T -∗ ⌜phi (lk_cpu_val st)⌝) ->
+    (* THE VIEW PREMISE SEES THE HELD-SET FRAGMENT TOO, and that is what lets
+       a NON-holder decide the word.  In the [Some (i, true)] state the
+       invariant keeps [lk_in i s] beside the cell (WpLock.v's owner-field
+       block), so a caller whose evidence [T] is its own hart's held-set
+       authority can refute [i = cpu_id] and conclude the word is not this
+       hart's [struct cpu] -- which is what kills acquire's
+       [if(holding(lk)) panic] arm.  The premise does NOT hand the fragment
+       back: its conclusion is pure, so the proof mode keeps every hypothesis
+       it was given and the leaf puts the fragment straight back into the
+       invariant. *)
+    (forall st : lock_state, ⊢ lock_auth γl st -∗ lk_cpu_frag st s -∗ T -∗ ⌜phi (lk_cpu_val st)⌝) ->
     (⊢ T -∗ Dc -∗ False) ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
@@ -355,7 +365,7 @@ Section WpSconfLock.
          (WpLock.v's owner-field block). *)
       iEval (rewrite /lk_cpu_res) in "Hcpures".
       iDestruct "Hcpures" as "[Hcpu Hrest]".
-      iDestruct (Hview st with "Hg HT") as %Hphi.
+      iDestruct (Hview st with "Hg Hrest HT") as %Hphi.
       iModIntro. iExists (lk_cpu_val st).
       iSplitL "Hcpu"; [ rewrite -Hpacpu; iExact "Hcpu" | ].
       iIntros "Hcpu".
@@ -406,11 +416,87 @@ Section WpSconfLock.
     iApply (wp_ld_lkcpu_lockopen_gen true γl lk s R Dc pc rd rs1 imm m n
               Tc (fun _ => True) b
               Hpacpu Hrd Hrdok
-              ltac:(intro st; iIntros "_ _"; done) Href
+              ltac:(intro st; iIntros "_ _ _"; done) Href
               with "Hcg Hpc Hinstr Hlock HTc [Hcont]").
     iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "_ HTc Hcg Hpc".
     iApply ("Hcont" $! c CID1 with "[] HTc Hcg Hpc").
     iPureIntro. exact Hs1.
+  Qed.
+
+  (* THE SAME READ, BY A HART THAT PROVABLY DOES NOT HOLD THE LOCK.  The
+     evidence is this hart's held-set AUTHORITY plus [s ∉ lks]: were the lock
+     held BY THIS HART, the invariant would be keeping [lk_in cpu_id s]
+     beside the cell, which [cpu_locks_not_in] refutes.  So the recorded
+     owner is some OTHER hart's [struct cpu] -- or 0, in the free state and
+     in acquire's one-store window, and [cpus_ptr] is never 0 -- but never
+     this hart's.  holding() therefore returns 0, which is what makes
+     acquire's [if(holding(lk)) panic] arm DEAD CODE rather than something a
+     panic credential has to absorb (WpLock.v's owner-field block states the
+     theorem; this is where it is cashed).
+
+     The authority is threaded in and back out: it is not persistent, and its
+     owner -- [cpu_own] -- wants it back. *)
+  Lemma wp_cld_lkcpu_lockopen_notheld_s_sconf
+      (γl : gname) (lk : mword 64) (s : string) (R Tc Dc : iProp Σ)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
+      (m : regfile) (n : nat) (b : bool) (lks : gset string) :
+    let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
+    (* THE ENTRY HART, let-bound OUTSIDE the [wp_next] lambda -- the held-set
+       authority is about the hart that ran the read, and so is the [struct
+       cpu] pointer the answer is compared against.  Written literally inside
+       the continuation they would silently rebind to whichever hart the step
+       resumes on. *)
+    let h0 := cpu_id in
+    let cpuv := mycpu_ret cid_word in
+    pa = lock_cpu lk ->
+    uint rd <> 0 ->
+    rd_ok rd ->
+    s ∉ lks ->
+    (⊢ Tc -∗ Dc -∗ False) ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    lock_openable γl lk s R Dc -∗
+    Tc -∗
+    cpu_locks_at h0 lks -∗
+    ( ∀ c : mword 64,
+      wp_next b p (fun (CID : CpuId) =>
+        ⌜c <> cpuv⌝ -∗
+        Tc -∗
+        cpu_locks_at h0 lks -∗
+        sie_cap_gpr (<[Regidx rd := regval_into_reg c]> m) n b p -∗
+        pc_is (add_vec_int pc 2) -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros pa h0 cpuv Hpacpu Hrd Hrdok Hfresh Href.
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    (* the free / window states record 0, and no hart's [struct cpu] is 0 *)
+    assert (Hz : forall i : CPU, (zero_reg : mword 64) <> cpus_ptr i)
+      by (intro i; apply eq_vec_false_iff; apply cpus_ptr_nonzero).
+    iIntros "Hcg Hpc Hinstr #Hlock HTc Hlks Hcont".
+    iApply (wp_ld_lkcpu_lockopen_gen true γl lk s R Dc pc rd rs1 imm m n
+              (Tc ∗ cpu_locks_at h0 lks)%I
+              (fun c => c <> cpuv) b
+              Hpacpu Hrd Hrdok
+              ltac:(intro st; iIntros "Hg Hfrag [HTc Hlks]";
+                    unfold cpuv; rewrite -cpus_ptr_cid;
+                    destruct st as [[i []]|];
+                    [ rewrite lk_cpu_val_held /lk_cpu_frag;
+                      destruct (decide (i = h0)) as [Heqi|Hne];
+                      [ subst i;
+                        iDestruct (cpu_locks_not_in h0 lks s Hfresh with "Hlks Hfrag") as %[]
+                      | iPureIntro; intro Heq; exact (Hne (cpus_ptr_inj _ _ Heq)) ]
+                    | iPureIntro; exact (Hz h0)
+                    | iPureIntro; exact (Hz h0) ])
+              ltac:(iIntros "[HTc _]"; iApply Href; iExact "HTc")
+              with "Hcg Hpc Hinstr Hlock [HTc Hlks] [Hcont]").
+    { iFrame "HTc Hlks". }
+    iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "%Hc [HTc Hlks] Hcg Hpc".
+    iApply ("Hcont" $! c CID1 with "[] [%] HTc Hlks Hcg Hpc");
+      [ iPureIntro; exact Hs1 | exact Hc ].
   Qed.
 
   (* the same read as the HOLDER: the token pins the word to mycpu(), so
@@ -455,7 +541,7 @@ Section WpSconfLock.
               (locked γl h0)
               (fun c => c = cpuv) b
               Hpacpu Hrd Hrdok
-              ltac:(intro st; iIntros "Hg Htok"; unfold cpuv; rewrite -cpus_ptr_cid;
+              ltac:(intro st; iIntros "Hg _ Htok"; unfold cpuv; rewrite -cpus_ptr_cid;
                     iApply (locked_cpu_eq with "Hg Htok")) Href
               with "Hcg Hpc Hinstr Hlock Htok [Hcont]").
     iIntros (c). iEval (rewrite /wp_next). iIntros (CID1 Hs1) "%Hc Htok Hcg Hpc". subst c.

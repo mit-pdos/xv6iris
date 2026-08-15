@@ -378,7 +378,7 @@ Section ProofProcdumpLoop.
 
   Definition pdl_loop_body `{GEN : GenId} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
-      (C : iProp Σ) (lks : gset string) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
+      (lks : gset string) (fuel : nat) (CIDf : CpuId) : iProp Σ :=
     (∀ (j : nat) (M : regfile),
        ⌜ (NPROC - j <= fuel)%nat ⌝ -∗
        ⌜ (j < NPROC)%nat ⌝ -∗
@@ -387,12 +387,12 @@ Section ProofProcdumpLoop.
          ∀ (Mx : regfile),
            ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
            sie_cap_gpr Mx K' b p -∗
-           cpu_own 0%nat eb p C b lks -∗
+           cpu_own 0%nat eb p b lks -∗
            pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
            procdump_view -∗
            WP (Loop : expr riscv_lang)) -∗
        sie_cap_gpr M K' b p -∗
-       cpu_own 0%nat eb p C b lks -∗
+       cpu_own 0%nat eb p b lks -∗
        pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
        ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
        ([∗ list] k ∈ seq j (NPROC - j), proc_dump_slot (proc_addr k)) -∗
@@ -400,19 +400,19 @@ Section ProofProcdumpLoop.
 
   Definition pdl_adv_body `{GEN : GenId} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
-      (C : iProp Σ) (lks : gset string) (j : nat) (CIDa : CpuId) : iProp Σ :=
+      (lks : gset string) (j : nat) (CIDa : CpuId) : iProp Σ :=
     (∀ (Ma : regfile),
        ⌜ pd_regs_loop Ma spv j /\ pd_regs_hi m0 Ma ⌝ -∗
        wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
          ∀ (Mx : regfile),
            ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
            sie_cap_gpr Mx K' b p -∗
-           cpu_own 0%nat eb p C b lks -∗
+           cpu_own 0%nat eb p b lks -∗
            pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
            procdump_view -∗
            WP (Loop : expr riscv_lang)) -∗
        sie_cap_gpr Ma K' b p -∗
-       cpu_own 0%nat eb p C b lks -∗
+       cpu_own 0%nat eb p b lks -∗
        pc_is (mword_of_int (KernelSyms.procdump + 0x66)) -∗
        ([∗ list] k ∈ seq 0 (S j), proc_dump_slot (proc_addr k)) -∗
        ([∗ list] k ∈ seq (S j) (NPROC - S j), proc_dump_slot (proc_addr k)) -∗
@@ -420,7 +420,7 @@ Section ProofProcdumpLoop.
 
   Definition pdl_print_body `{GEN : GenId} (CID0 : CpuId)
       (spv p : mword 64) (m0 : regfile) (K' : nat) (eb b : bool)
-      (C : iProp Σ) (lks : gset string) (j : nat) (CIDp : CpuId) : iProp Σ :=
+      (lks : gset string) (j : nat) (CIDp : CpuId) : iProp Σ :=
     (∀ (Mp : regfile) (sptr : mword 64) (ss nm2 : string)
        (dq1 dq2 dq3 : dfrac) (st2 pid2 : mword 32),
        ⌜ pd_regs_loop Mp spv j /\ pd_regs_hi m0 Mp ⌝ -∗
@@ -432,12 +432,12 @@ Section ProofProcdumpLoop.
          ∀ (Mx : regfile),
            ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
            sie_cap_gpr Mx K' b p -∗
-           cpu_own 0%nat eb p C b lks -∗
+           cpu_own 0%nat eb p b lks -∗
            pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
            procdump_view -∗
            WP (Loop : expr riscv_lang)) -∗
        sie_cap_gpr Mp K' b p -∗
-       cpu_own 0%nat eb p C b lks -∗
+       cpu_own 0%nat eb p b lks -∗
        pc_is (mword_of_int (KernelSyms.procdump + 0x56)) -∗
        p_state (proc_addr j) ↦₄{dq1} st2 -∗
        p_pid (proc_addr j) ↦₄{dq2} pid2 -∗
@@ -448,7 +448,7 @@ Section ProofProcdumpLoop.
 
   Lemma wp_pd_loop `{GEN : GenId} `{CID0 : CpuId}
       (γpr : gname) (γd : uart_names) (γv : disk_names)
-      (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool) (C : iProp Σ)
+      (m0 : regfile) (spv p : mword 64) (K' : nat) (eb b : bool)
       (lks : gset string) :
     printk_gen_contract γpr γd γv ->
     (48 <= K')%nat ->
@@ -461,14 +461,14 @@ Section ProofProcdumpLoop.
       ∀ (Mx : regfile),
         ⌜ Mx !!! pdR 2 = spv /\ pd_regs_hi m0 Mx ⌝ -∗
         sie_cap_gpr Mx K' b p -∗
-        cpu_own 0%nat eb p C b lks -∗
+        cpu_own 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.procdump + 0x8e)) -∗
         procdump_view -∗
         WP (Loop : expr riscv_lang)) -∗
     ∀ (j : nat) (M : regfile),
       ⌜ (j < NPROC)%nat ⌝ -∗ ⌜ pd_regs_loop M spv j /\ pd_regs_hi m0 M ⌝ -∗
       sie_cap_gpr M K' b p -∗
-      cpu_own 0%nat eb p C b lks -∗
+      cpu_own 0%nat eb p b lks -∗
       pc_is (mword_of_int (KernelSyms.procdump + 0x6e)) -∗
       ([∗ list] k ∈ seq 0 j, proc_dump_slot (proc_addr k)) -∗
       ([∗ list] k ∈ seq j (NPROC - j), proc_dump_slot (proc_addr k)) -∗
@@ -478,7 +478,7 @@ Section ProofProcdumpLoop.
     iIntros "#Hkt #Hkd #Hpenv #Hpanic Hqexit".
     iAssert (∀ (fuel : nat),
       wp_next (CID0 := CID0) b p (fun (CIDf : CpuId) =>
-        pdl_loop_body CID0 spv p m0 K' eb b C lks fuel CIDf))%I
+        pdl_loop_body CID0 spv p m0 K' eb b lks fuel CIDf))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDf Hsf j M) "%Hfuel %Hj %Hregs Hqx Hcg Hown Hpc Hpre Hsuf".
@@ -512,7 +512,7 @@ Section ProofProcdumpLoop.
       (* THE ADVANCE JOIN, +0x66 .. +0x6a                                  *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDa : CpuId) =>
-        pdl_adv_body CID0 spv p m0 K' eb b C lks j CIDa))%I
+        pdl_adv_body CID0 spv p m0 K' eb b lks j CIDa))%I
         with "[]" as "#Hadv".
       { iModIntro. iIntros (CIDa Hsa Ma) "%Hra Hqx2 Hcg Hown Hpc Hpre2 Hsuf2".
         destruct Hra as [Hral Hrah].
@@ -565,7 +565,7 @@ Section ProofProcdumpLoop.
                              (sign_extend' 64 (mword_of_int 36 : mword 13))
                            = mword_of_int (KernelSyms.procdump + 0x8e)) by pcw.
           iEval (rewrite Htgt8e) in "Hpc".
-         iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p C b 
+         iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p b 
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("Hqx2" $! CIDc with "[%]"); [wp_next_chain|].
           iApply ("Hqx2" $! Ma66 with "[%] Hcg Hown Hpc [Hpre2]").
@@ -586,7 +586,7 @@ Section ProofProcdumpLoop.
                             (mword_of_int (KernelSyms.procdump + 0x6a) : mword 64) 4
                           = mword_of_int (KernelSyms.procdump + 0x6e)) by pcw.
           iEval (rewrite Hpp6e) in "Hpc".
-          iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p C b 
+          iDestruct (cpu_own_transport CIDa CIDc 0%nat eb p b 
                        ltac:(wp_next_chain) with "Hown") as "Hown".
           iSpecialize ("IHf" $! CIDc with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S j) Ma66 with "[%] [%] [%] Hqx2 Hcg Hown Hpc Hpre2 Hsuf2").
@@ -597,7 +597,7 @@ Section ProofProcdumpLoop.
       (* THE PRINT JOIN, +0x56 .. +0x64                                    *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDp : CpuId) =>
-        pdl_print_body CID0 spv p m0 K' eb b C lks j CIDp))%I
+        pdl_print_body CID0 spv p m0 K' eb b lks j CIDp))%I
         with "[]" as "#Hprint".
       { iModIntro.
         iIntros (CIDp Hsp Mp sptr ss nm2 dq1 dq2 dq3 st2 pid2)
@@ -694,16 +694,15 @@ Section ProofProcdumpLoop.
         (* the name cell, in the spelling a3 has *)
         iEval (rewrite -(pd_cur_name j)) in "Hnmc2".
         iPoseProof (pd_fmt_str with "Hkd") as "Hfmt".
-        iDestruct (cpu_own_transport CIDp CIDq3 0%nat eb p C b 
+        iDestruct (cpu_own_transport CIDp CIDq3 0%nat eb p b 
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iPoseProof (panic_wp_any_at CIDq3 with "Hpanic") as "Hpanic3".
-        iApply (Hpk CIDq3 P5c K' eb p C DfracDiscarded pd_fmt
+        iApply (Hpk CIDq3 P5c K' eb p DfracDiscarded pd_fmt
                   [PkANum; PkAStr DfracDiscarded ss; PkAStr dq3 nm2] b lks
                   ltac:(lia) pd_fmt_len pd_fmt_nonul
                   ltac:(rewrite pd_fmt_kinds; reflexivity)
                   ltac:(cbn [length]; lia)
                   Hfresh
-                  with "Hcg Hkt Hkd Hpc Hpanic3 Hown Hpenv [Hfmt] [Hnmc2]").
+                  with "Hcg Hkt Hkd Hpc Hown Hpenv [Hfmt] [Hnmc2]").
         all: try lkbelow.
         { rewrite Ha0_5c. iExact "Hfmt". }
         { iApply (pdl_descs_mk CIDq3 P5c sptr (pd_cur j) ss nm2 dq3
@@ -772,15 +771,14 @@ Section ProofProcdumpLoop.
           by (rewrite /P62; apply pdl_hi_upd;
               [vm_compute; reflexivity | exact Hrh60]).
         iPoseProof (pd_nl_str with "Hkd") as "Hnlstr".
-        iDestruct (cpu_own_transport CIDq4 CIDq6 0%nat eb p C b
+        iDestruct (cpu_own_transport CIDq4 CIDq6 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
-        iPoseProof (panic_wp_any_at CIDq6 with "Hpanic") as "Hpanic6".
-        iApply (Hpk CIDq6 P62 K' eb p C DfracDiscarded pd_nl [] b lks
+        iApply (Hpk CIDq6 P62 K' eb p DfracDiscarded pd_nl [] b lks
                   ltac:(lia) pd_nl_len pd_nl_nonul
                   ltac:(rewrite pd_nl_kinds; reflexivity)
                   ltac:(cbn [length]; lia)
                   Hfresh
-                  with "Hcg Hkt Hkd Hpc Hpanic6 Hown Hpenv [Hnlstr] []").
+                  with "Hcg Hkt Hkd Hpc Hown Hpenv [Hnlstr] []").
         all: try lkbelow.
         { rewrite Ha0_62. iExact "Hnlstr". }
         { done. }
@@ -878,7 +876,7 @@ Section ProofProcdumpLoop.
         iDestruct (pdl_slot_mk (proc_addr j) dqs dqp dqn st pid nm Hnm
                      with "Hst Hpid Hnmc") as "Hslot".
         iDestruct (pdl_prefix_step j with "Hpre Hslot") as "Hpre".
-        iDestruct (cpu_own_transport CIDf CID3 0%nat eb p C b
+        iDestruct (cpu_own_transport CIDf CID3 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iSpecialize ("Hadv" $! CID3 with "[%]"); [wp_next_chain|].
         iApply ("Hadv" $! H70 with "[%] Hqx Hcg Hown Hpc Hpre Hsuf").
@@ -944,7 +942,7 @@ Section ProofProcdumpLoop.
                          = mword_of_int (KernelSyms.procdump + 0x56)) by pcw.
         iEval (rewrite Htgt56) in "Hpc".
         iPoseProof (pd_qqq_str with "Hkd") as "Hqqq".
-        iDestruct (cpu_own_transport CIDf CID5 0%nat eb p C b
+        iDestruct (cpu_own_transport CIDf CID5 0%nat eb p b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iSpecialize ("Hprint" $! CID5 with "[%]"); [wp_next_chain|].
         iApply ("Hprint" $! H76 (mword_of_int pd_qqq_a : mword 64) pd_qqq nm
@@ -1111,7 +1109,7 @@ Section ProofProcdumpLoop.
                         = mword_of_int (KernelSyms.procdump + 0x56)) by pcw.
       iEval (rewrite Htgt56b) in "Hpc".
       iPoseProof (pd_state_str k Hk6 with "Hkd") as "Hsstr".
-      iDestruct (cpu_own_transport CIDf CID10 0%nat eb p C b
+      iDestruct (cpu_own_transport CIDf CID10 0%nat eb p b
                    ltac:(wp_next_chain) with "Hown") as "Hown".
       iSpecialize ("Hprint" $! CID10 with "[%]"); [wp_next_chain|].
       iApply ("Hprint" $! H86 (pd_state_p k) (pd_state_name k) nm

@@ -133,6 +133,7 @@ Require Import FsCrash.
 Require Import BitmapInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -143,7 +144,7 @@ Local Open Scope Z_scope.
 Definition K_balloc : nat := 58%nat.
 
 Definition wp_balloc_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -157,7 +158,7 @@ Definition wp_balloc_sconf_body
     (γpr : gname)
     (u : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
@@ -186,7 +187,7 @@ Definition wp_balloc_sconf_body
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  balloc holds no lock of its
      own -- every push_off/pop_off pair that can mint or spend an
      [arm_pay 0 eb _] lives inside bread (and, through it, acquiresleep /
@@ -239,7 +240,7 @@ Definition wp_balloc_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -305,7 +306,7 @@ Definition wp_balloc_sconf_body
    forgotten, and is unchanged: every existing caller keeps threading
    [log_op]. *)
 Definition wp_balloc_gen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -319,7 +320,7 @@ Definition wp_balloc_gen_body
     (γpr : gname)
     (u : nat) (cr : bool) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
   let pj := proc_addr j in
@@ -341,7 +342,7 @@ Definition wp_balloc_gen_body
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT.  Same pure-pass-through shape as
      [wp_balloc_sconf_body] above.  balloc holds no lock of its own, so it
      never inspects these: it carries them from entry to exit and hands
@@ -376,7 +377,7 @@ Definition wp_balloc_gen_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -412,7 +413,7 @@ Module Type BALLOC.
      set-forgetting instance at [cr = false], kept as its own parameter so
      that every existing caller is unchanged. *)
   Parameter wp_balloc_gen :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
@@ -426,14 +427,14 @@ Module Type BALLOC.
       (γpr : gname)
       (u : nat) (cr : bool) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_balloc_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr u cr Sb
-                         pidv dq dqb dqs m K eb C b lks.
+                         pidv dq dqb dqs m K eb b lks.
 
   Parameter wp_balloc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -447,9 +448,9 @@ Module Type BALLOC.
       (γpr : gname)
       (u : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u
-                           pidv dq dqb dqs m K eb C b lks.
+                           pidv dq dqb dqs m K eb b lks.
 End BALLOC.

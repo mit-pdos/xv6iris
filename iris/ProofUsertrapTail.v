@@ -71,6 +71,7 @@ Require Import ProofUsertrapParts.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -97,7 +98,7 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Section ProofUsertrapTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the syscall environment, an ordinary hart-free parameter here: the tail
      never touches it, it only hands it on.  See SpecSyscall's note. *)
@@ -116,7 +117,7 @@ Section ProofUsertrapTail.
      kexit does not want, and dropping it is right -- the syscalls' footprint
      belongs to a process that is going to run one. *)
   Lemma ut_kexit (N : ut_names) (V : pprivate) (m : regfile) (nx : nat)
-      (C : iProp Σ) (b : bool) (lks : gset string) :
+      (b : bool) (lks : gset string) :
     ut_wf N ->
     (K_kexit <= nx)%nat ->
     (* kexit's own cone bottoms out at "ftable" (1) -- the fileclose loop --
@@ -127,7 +128,7 @@ Section ProofUsertrapTail.
     kernel_text -∗
     pc_is (mword_of_int KernelSyms.kexit) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b lks -∗
+    ut_hold Rsys N V b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
@@ -142,7 +143,7 @@ Section ProofUsertrapTail.
               (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
               (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
-              None (un_fn N) m nx b C b _ (un_pid N) V
+              None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
               with "Hcg Hcpu Hcsrs Hclm Htext Hpc Hpi Hpa Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
@@ -155,7 +156,7 @@ End ProofUsertrapTail.
 Section UtRet2.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> iProp Σ).
 
@@ -173,7 +174,7 @@ Section UtRet2.
      the ambient [CID] IS the post-crossing hart and not one annotation is
      needed.  [ut_ret] below applies it at [(CID := CIDp)]. *)
   Lemma ut_ret2 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 mf : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (m0 mf : regfile) (av nx : nat) (b : bool)
       (uepc : mword 64) (vb : mword 1)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
@@ -196,7 +197,7 @@ Section UtRet2.
     pc_is (mword_of_int (UT + 0xb2)) -∗
     (* ---- exactly what prepare_return handed back ---- *)
     sie_cap_gpr mf (trap_res b + nx)%nat false (un_pj N) -∗
-    cpu_own 0%nat false (un_pj N) C false lks -∗
+    cpu_own 0%nat false (un_pj N) false lks -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ mepc_val uepc -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
@@ -515,8 +516,11 @@ Section UtRet2.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     (* [sconf] is destructured DIRECTLY here -- not via [sconf_priv_open],
        whose closer would re-park [mie]/[mideleg]/[menvcfg] rather than
-       hand them out loose (see [ut_trap]'s header comment). *)
-    iDestruct "Hsc" as "(_ & _ & Hpriv & Hmsx & Hmiex & Hmenvx)".
+       hand them out loose (see [ut_trap]'s header comment).  [hw_config]/
+       [minstret_inv] ride at the head, at THIS (the resuming) hart -- kept,
+       not discarded, since [usertrap_post] hands them back (see its
+       comment). *)
+    iDestruct "Hsc" as "(#Hhw & #Hmin & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (msg) "Hmsown".
     iDestruct (ut_exit_ms_ok msg with "Hmsown Hsret Hq4") as %Hretms2.
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsg)".
@@ -578,7 +582,7 @@ Section UtRet2.
               (kvi_satp_word (ud_root (pv_upt V))) (mepc_val uepc) scv stv mdv0
               with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                     Hhs Hpriv Hms Hscause Hstval Hsepc [Hstvec] Hpc [Hfile]
-                    Hmie Hmdl Hmenv [-]").
+                    Hmie Hmdl Hmenv Hhw Hmin [-]").
     - exact Hmaskx.
     - exact Htfpe.
     - exact Haccwf.
@@ -595,7 +599,7 @@ Section UtRet2.
          is what [sie_cap_gpr] was holding all along -- no [tp_pin_id] step. *)
       iExact "Hfile".
     - (* [ut_res] rebuilt at the exit hart *)
-      iExists N, V, av, C.
+      iExists N, V, av.
       iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; exact Hksp|].
       iSplitR; [iPureIntro; exact (conj Hj (conj Hjl (conj Hlen Hlg)))|].
@@ -624,7 +628,7 @@ End UtRet2.
 Section UtRet.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> iProp Σ).
 
@@ -632,7 +636,7 @@ Section UtRet.
   (* +0xae: jal prepare_return, then the second half at ITS hart.          *)
   (* ==================================================================== *)
   Lemma ut_ret (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (m0 m : regfile) (av nx : nat) (b : bool)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -648,7 +652,7 @@ Section UtRet.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xae)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b lks -∗
+    ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -690,12 +694,12 @@ Section UtRet.
       by (rewrite /M1 upd_eq; pcw).
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
-    iDestruct (cpu_own_transport CID CID1 0%nat b (un_pj N) C b
+    iDestruct (cpu_own_transport CID CID1 0%nat b (un_pj N) b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) V
-              M1 nx C (un_pj N) uepc b lks ltac:(unfold K_prepare_return; lia) Hepc
+              M1 nx (un_pj N) uepc b lks ltac:(unfold K_prepare_return; lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn Hcg Hcpu Hclmpay Hsepc Hscause Hstval
@@ -719,7 +723,7 @@ Section UtRet.
               (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))) with Vr.
     assert (HVrupt : pv_upt Vr = pv_upt V) by (rewrite /Vr; destruct V; reflexivity).
     iDestruct ("Hownback" $! Vr with "Hpv Hsy") as "Hown".
-    iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx C b uepc vb
+    iApply (ut_ret2 (CID := CIDp) Rsys N Vr pt ksp m0 mf av nx b uepc vb
               mie_v menvcfg0 lks
               Hwf' Hav Hnx ltac:(rewrite HVrupt; exact Htfpe) Hksp Hm0sp
               ltac:(rewrite (callee_saved_lookup Hcspr csp_rs1
@@ -739,7 +743,7 @@ End UtRet.
 Section UtA6.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> iProp Σ).
 
@@ -751,7 +755,7 @@ Section UtA6.
      dead code in the resource sense -- kexit never returns -- so the [c.li
      s2,0] is stepped and its value never read again. *)
   Lemma ut_a6 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (m0 m : regfile) (av nx : nat) (b : bool)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -772,7 +776,7 @@ Section UtA6.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xa6)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b lks -∗
+    ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -837,13 +841,13 @@ Section UtA6.
       by (rewrite /M2 upd_eq; pcw).
     assert (HcsM2 : ut_cs m0 M2)
       by (rewrite /M2; apply ut_cs_insert; [vm_compute; reflexivity | exact HcsM1]).
-    iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b
+    iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) b
                  ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (KI.wp_killed_sconf (CID := CID2) (un_s N) (un_j N) (un_l N)
-              M2 nx 0%nat b (un_pj N) C b lks
+              M2 nx 0%nat b (un_pj N) b lks
               HM2a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               ltac:(lkbelow)
-              with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+              with "Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
     iIntros (CID3 Hk3 mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hretac : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0xac))
@@ -932,7 +936,7 @@ Section UtA6.
                        (sign_extend' 64 (mword_of_int 2095486 : mword 21))
                      = mword_of_int KernelSyms.kexit) by pcw.
       iEval (rewrite Hkex) in "Hpc".
-      iDestruct (cpu_own_transport CID3 CID7 0%nat b (un_pj N) C b
+      iDestruct (cpu_own_transport CID3 CID7 0%nat b (un_pj N) b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID3 CID7 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -941,7 +945,7 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx C b lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
+                nx b lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -957,7 +961,7 @@ Section UtA6.
       assert (Hpae : add_vec_int (mword_of_int (UT + 0xac) : mword 64) 2
                      = mword_of_int (UT + 0xae)) by pcw.
       iEval (rewrite Hpae) in "Hpc".
-      iDestruct (cpu_own_transport CID3 CID4 0%nat b (un_pj N) C b
+      iDestruct (cpu_own_transport CID3 CID4 0%nat b (un_pj N) b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID3 CID4 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -965,7 +969,7 @@ Section UtA6.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID3 CID4 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID4) Rsys N V pt ksp m0 mf av nx C b
+      iApply (ut_ret (CID := CID4) Rsys N V pt ksp m0 mf av nx b
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv
@@ -981,7 +985,7 @@ End UtA6.
 Section UtFa.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> iProp Σ).
 
@@ -994,7 +998,7 @@ Section UtFa.
      them BACK -- it parks and resumes, so its crossing is real and everything
      has to be re-anchored on the far side. *)
   Lemma ut_fa (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ) (b : bool)
+      (m0 m : regfile) (av nx : nat) (b : bool)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -1010,7 +1014,7 @@ Section UtFa.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0xfc)) -∗
     sie_cap_gpr m nx b (un_pj N) -∗
-    ut_hold Rsys N V C b lks -∗
+    ut_hold Rsys N V b lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -1069,7 +1073,7 @@ Section UtFa.
                        (sign_extend' 64 (mword_of_int 8112 : mword 13))
                      = mword_of_int (UT + 0xae)) by pcw.
       iEval (rewrite Hpae) in "Hpc".
-      iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) C b
+      iDestruct (cpu_own_transport CID CID2 0%nat b (un_pj N) b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID CID2 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -1077,7 +1081,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID CID2 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID2) Rsys N V pt ksp m0 M1 av nx C b
+      iApply (ut_ret (CID := CID2) Rsys N V pt ksp m0 M1 av nx b
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HM1sp HM1s1 HcsM1
                 Hmiev Hmenvv
@@ -1121,7 +1125,7 @@ Section UtFa.
       assert (HcsM2 : ut_cs m0 M2)
         by (rewrite /M2; apply ut_cs_insert;
             [vm_compute; reflexivity | exact HcsM1]).
-      iDestruct (cpu_own_transport CID CID3 0%nat b (un_pj N) C b
+      iDestruct (cpu_own_transport CID CID3 0%nat b (un_pj N) b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID CID3 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -1129,8 +1133,8 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iEval (rewrite Hlkempty) in "Hcpu".
       iApply (YI.wp_yield_sconf (CID := CID3) (un_s N) (un_j N) (un_l N)
-                M2 nx b C Hj Hjl ltac:(lia)
-                with "Hcg Hcpu Htext Hpc Hpi Hpa Hcsrs Hclm [-]").
+                M2 nx b Hj Hjl ltac:(lia)
+                with "Hcg Hcpu Htext Hpc Hpi Hcsrs Hclm [-]").
       iIntros (CID4 Hk4 mf) "%Hcsy Hcg Hcpu Hpc Hcsrs Hclm".
       assert (Hret106 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0x106))
         by (rewrite HM2ra; pcw).
@@ -1156,7 +1160,7 @@ Section UtFa.
                        ltac:(vm_compute; reflexivity)); exact HM2s1).
       assert (Hcsmf : ut_cs m0 mf)
         by exact (ut_cs_trans m0 M2 mf HcsM2 (ut_cs_of_callee_saved _ _ Hcsy)).
-      iDestruct (cpu_own_transport CID4 CID5 0%nat b (un_pj N) C b
+      iDestruct (cpu_own_transport CID4 CID5 0%nat b (un_pj N) b
                    ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iDestruct (trap_csrs_ext_transport CID4 CID5 b (un_pj N)
                    ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
@@ -1164,7 +1168,7 @@ Section UtFa.
                    ltac:(wp_next_chain) with "Hclm") as "Hclm".
       iDestruct (wp_next_retarget CID4 CID5 true (un_pj N) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (ut_ret (CID := CID5) Rsys N V pt ksp m0 mf av nx C b
+      iApply (ut_ret (CID := CID5) Rsys N V pt ksp m0 mf av nx b
                 mie_v menvcfg0 lks
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp Hmfsp Hmfs1 Hcsmf
                 Hmiev Hmenvv

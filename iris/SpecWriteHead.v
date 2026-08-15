@@ -76,6 +76,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* write_head's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
@@ -83,7 +84,7 @@ Import Defs.
 Definition K_write_head : nat := 44%nat.
 
 Definition wp_write_head_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -95,7 +96,7 @@ Definition wp_write_head_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
     (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (Q : iProp Σ) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.write_head in
   let pj := proc_addr j in
@@ -113,7 +114,7 @@ Definition wp_write_head_sconf_body
      its cone touches a lower rank, so one premise covers both callees. *)
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -162,7 +163,7 @@ Definition wp_write_head_sconf_body
   ∀ (mf : regfile) (bs' : list (bv 8)),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -185,7 +186,7 @@ Definition wp_write_head_sconf_body
 
 Module Type WRITE_HEAD.
   Parameter wp_write_head_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -197,8 +198,8 @@ Module Type WRITE_HEAD.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (n : nat) (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (Q : iProp Σ) (lks : gset string),
       wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
-                               cov logstart dev n W L pidv dq m K eb C b Q lks.
+                               cov logstart dev n W L pidv dq m K eb b Q lks.
 End WRITE_HEAD.

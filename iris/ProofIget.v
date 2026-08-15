@@ -346,14 +346,14 @@ Section ProofIget.
   Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
@@ -406,17 +406,17 @@ Section ProofIget.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
     : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
-                         m n eb p C K b lks.
+                         m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
     intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
     unfold K_iget in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hcont".
-    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
+    iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     iPoseProof (igi_00 with "Htext") as "Hi00".
@@ -605,12 +605,12 @@ Section ProofIget.
       rewrite /R5 upd_ne; [| regne]. rewrite /R4 upd_ne; [| regne].
       rewrite /R3 upd_ne; [| regne]. rewrite /R2 upd_ne; [| regne].
       rewrite /R1 upd_ne; [reflexivity | regne]. }
-    iDestruct (cpu_own_transport CID CID13 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID13 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p C (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              n eb p (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -744,7 +744,7 @@ Section ProofIget.
                 c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 mt !!! Regidx c = m !!! Regidx c) ⌝ -∗
         sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
-        cpu_own (CID := CIDt) n eb p C b lks -∗
+        cpu_own (CID := CIDt) n eb p b lks -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
         IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
@@ -878,7 +878,7 @@ Section ProofIget.
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (P8 !!! Regidx Rra) = ret_tgt) by (rewrite HP8ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iDestruct (cpu_own_transport CIDt CIDt9 n eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
       iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href").
@@ -925,7 +925,7 @@ Section ProofIget.
     (*  through unchanged, and [b = false] keeps the hart pinned, so       *)
     (*  neither a [CpuId] nor the six stack cells ride the universal.      *)
     (* ================================================================= *)
-    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
+    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hipool & Hslots & Hpool)".
     iPoseProof (igi_34 with "Htext") as "Hi34".
     iPoseProof (igi_36 with "Htext") as "Hi36".
     iPoseProof (igi_3a with "Htext") as "Hi3a".
@@ -956,20 +956,21 @@ Section ProofIget.
                             /\ M !! e = None) ⌝ -∗
       sie_cap_gpr Mr (trap_res b + (K - 6))%nat false p -∗
       pc_is (mword_of_int (KernelSyms.iget + 0x44) : mword 64) -∗
-      cpu_own (S n) eb p C false ({["itable"]} ∪ lks) -∗
+      cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
       itable_half M -∗
       iref_slots_auth -∗
+      isl_pool M -∗
       ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
       iref_slot -∗
       TAILC -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (j Mr) "%Hfuel %Hj %Hreg %Hscan %Hemp Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2".
+      { iIntros (j Mr) "%Hfuel %Hj %Hreg %Hscan %Hemp Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2".
         exfalso. unfold NINODE in Hj, Hfuel. lia. }
-      iIntros (j Mr) "%Hfuel %Hj %Hreg %Hscan %Hemp Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2".
+      iIntros (j Mr) "%Hfuel %Hj %Hreg %Hscan %Hemp Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2".
       destruct Hreg as (HMs1 & HMa3 & HMs2 & HMs4 & HMsp & HMra & HMcs).
       (* ---- THE LOOP STEP, +0x3c / +0x40, shared by the three MISS
          entries (+0x4c taken, +0x52 taken, +0x36 taken) and by the
@@ -991,17 +992,18 @@ Section ProofIget.
                               /\ M !! e = None) ⌝ -∗
         sie_cap_gpr Ms (trap_res b + (K - 6))%nat false p -∗
         pc_is (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) -∗
-        cpu_own (S n) eb p C false ({["itable"]} ∪ lks) -∗
+        cpu_own (S n) eb p false ({["itable"]} ∪ lks) -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
         itable_half M -∗
         iref_slots_auth -∗
+        isl_pool M -∗
         ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
         ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
         iref_slot -∗
         TAILC -∗
         WP (Loop : expr riscv_lang))%I with "[]" as "Hstep".
-      { iIntros (Ms) "%Hsreg %Hscan' %Hemp' Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2".
+      { iIntros (Ms) "%Hsreg %Hscan' %Hemp' Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2".
         destruct Hsreg as (HSs1 & HSa3 & HSs2 & HSs4 & HSsp & HSra & HScs).
         (* +0x3c addi s1,s1,136 -- [IcacheRef.ientry_step] *)
         iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iget + 0x3c)) Rs1 Rs1
@@ -1250,23 +1252,25 @@ Section ProofIget.
             { rewrite (rget_ne V1 Ra5 ltac:(nz)) /V1 upd_eq.
               unfold regval_into_reg. pcw. }
             assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+            (* the slot's share authority, out of the LOCK's resource *)
+            iDestruct (isl_pool_acc_upd M e He with "Hipool") as "[Hisl Hislback]".
             iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
                       (mword_of_int 8 : mword 12) V1 (trap_res b + (K - 6))%nat
                       (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
+                       isl_slot (<[e := ((1/2/2)%Qp, 1%positive)]> M) e ∗
                        iref_tok e (1/2/2)%Qp ∗
                        ∃ g : gname, live_gen e (1/2) g ∗ ity_pending g)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                      with "Hcg Hpc Hi78 [Hhalf]").
+                      with "Hcg Hpc Hi78 [Hhalf Hisl]").
             { rewrite Hpa78 Hsv78.
               iInv "Hinv" as ">Hbody" "Hclose2".
-              iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells & Hlpool & Hipool)".
+              iDestruct "Hbody" as (M') "(Ha & %Hwf' & Hcells & Hlpool)".
               iDestruct (itable_half_agree with "Ha Hhalf") as %->.
               iDestruct (iref_cells_acc_upd M e He with "Hcells") as "[Hcell Hcback]".
               (* the recycled slot's liveness unit splits here, exactly as its
                  identity halves do below: 1/4 to the first reference, the rest
                  to the invariant's arm (design 14.6). *)
               iDestruct (live_pool_acc_upd M e He with "Hlpool") as "[Hlslot Hlback]".
-              iDestruct (isl_pool_acc_upd M e He with "Hipool") as "[Hislot Hiback]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
               (* THE GENERATION IS BORN HERE (design 17.2 piece 2 / 17.3 (B)):
@@ -1277,10 +1281,10 @@ Section ProofIget.
                  because at +0x72 the slot was not yet in [M] and no unit had
                  been split. *)
               iMod (iref_alloc_step M e (1/2/2)%Qp HMe ig_quarter_lt
-                      with "Hauth Hlslot Hislot")
-                as (gnew) "(Hauth & Hlslot & Hislot & Htok2 & Hlvh & Hpend)".
+                      with "Hauth Hlslot Hisl")
+                as (gnew) "(Hauth & Hlslot & Hisl & Htok2 & Hlvh & Hpend)".
               iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-              iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback Hislot Hiback]") as "_".
+              iMod ("Hclose2" with "[Ha Hcell Hcback Hlslot Hlback]") as "_".
               { iApply bi.later_intro. iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M). iFrame "Ha".
                 iSplitR.
                 { iPureIntro. destruct Hwf' as [Hdom Hcnt']. split.
@@ -1294,18 +1298,18 @@ Section ProofIget.
                 iSplitL "Hcell Hcback".
                 { iApply ("Hcback" $! ((1/2/2)%Qp, 1%positive)).
                   rewrite /iref_word lookup_insert. iExact "Hcell". }
-                iSplitL "Hlslot Hlback".
-                { iApply ("Hlback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
-                            with "[%] Hlslot").
-                  intros i Hi. rewrite lookup_insert_ne;
-                    [reflexivity | by apply not_eq_sym]. }
-                iApply ("Hiback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
-                          with "[%] Hislot").
+                iApply ("Hlback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
+                          with "[%] Hlslot").
                 intros i Hi. rewrite lookup_insert_ne;
                   [reflexivity | by apply not_eq_sym]. }
-              iModIntro. iFrame "Hhalf Htok2". iExists gnew. iFrame. }
+              iModIntro. iFrame "Hhalf Hisl Htok2". iExists gnew. iFrame. }
             iApply wp_next_off_intro.
-            iIntros "Hcg Hpc (Hhalf & Htok2 & (%gnew & Hlvh & Hpend))".
+            iIntros "Hcg Hpc (Hhalf & Hisl & Htok2 & (%gnew & Hlvh & Hpend))".
+            (* the slot's share authority goes back into the lock's resource *)
+            iDestruct ("Hislback" $! (<[e := ((1/2/2)%Qp, 1%positive)]> M)
+                         with "[%] Hisl") as "Hipool".
+            { intros i Hi. rewrite lookup_insert_ne;
+                [reflexivity | by apply not_eq_sym]. }
             assert (Hpp7c : add_vec_int (mword_of_int (KernelSyms.iget + 0x78) : mword 64) 4
                             = mword_of_int (KernelSyms.iget + 0x7c)) by pcw.
             iEval (rewrite Hpp7c) in "Hpc".
@@ -1360,7 +1364,7 @@ Section ProofIget.
               iDestruct "Hid1" as "[Hidd Hidn]".
               iFrame "Hidd Hidn Hgid2". iExact "Hislot". }
             iAssert (itable_res2 cn γfs γi cov logstart nib dev)
-              with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
+              with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
             { iExists (<[e := ((1/2/2)%Qp, 1%positive)]> M), (<[e := (dev, inum)]> ci).
               iFrame "Hhalf Hiauth".
               iSplitR; [| iSplitR].
@@ -1401,7 +1405,7 @@ Section ProofIget.
                   * rewrite lookup_insert in Hp1'. injection Hp1' as <-. reflexivity.
                   * rewrite lookup_insert_ne in Hp1'; [| by apply not_eq_sym].
                     exact (Hdv k1 p1 Hp1').
-              - iFrame "Hslots".
+              - iFrame "Hipool Hslots".
                 rewrite (ig_ci_inums_insert ci e dev inum Hcik) ig_pool_set.
                 iExact "Hpool". }
             assert (Hpp80 : add_vec_int (mword_of_int (KernelSyms.iget + 0x7c) : mword 64) 4
@@ -1465,7 +1469,7 @@ Section ProofIget.
             iEval (rewrite Houtb) in "Hcg".
             iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                       (itable_res2 cn γfs γi cov logstart nib dev) V4
-                      n eb p C (K - 6)%nat ({["itable"]} ∪ lks)
+                      n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                       ltac:(rewrite HV4a0; reflexivity) ltac:(lia)
                       with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
             { iExact "Hlock". }
@@ -1510,7 +1514,7 @@ Section ProofIget.
           assert (Hpp44 : add_vec_int (mword_of_int (KernelSyms.iget + 0x40) : mword 64) 4
                           = mword_of_int (KernelSyms.iget + 0x44)) by pcw.
           iEval (rewrite Hpp44) in "Hpc".
-          iApply ("IHf" $! (S j) N1 with "[%] [%] [%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
+          iApply ("IHf" $! (S j) N1 with "[%] [%] [%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2").
           + unfold NINODE in Hfuel, Hj, Hne |- *. lia.
           + unfold NINODE in Hj, Hne |- *. lia.
           + split; [exact HN1s1|]. split; [exact HN1a3|]. split; [exact HN1s2|].
@@ -1636,7 +1640,7 @@ Section ProofIget.
             [ done | done | | ].
           { rewrite /islot2 HMj Hcij. iFrame "Hiu Hgid".
             rewrite /islot_rest_at /inode_ident Eqj. iFrame. }
-          iApply ("Hstep" $! L2 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
+          iApply ("Hstep" $! L2 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2").
           - split; [exact HL2s1|]. split; [exact HL2a3|]. split; [exact HL2s2|].
             split; [exact HL2s4|]. split; [exact HL2sp|]. split; [exact HL2ra|].
             exact HL2cs.
@@ -1711,7 +1715,7 @@ Section ProofIget.
             [ done | done | | ].
           { rewrite /islot2 HMj Hcij. iFrame "Hiu Hgid".
             rewrite /islot_rest_at /inode_ident Eqj. iFrame. }
-          iApply ("Hstep" $! L3 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
+          iApply ("Hstep" $! L3 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2").
           - split; [exact HL3s1|]. split; [exact HL3a3|]. split; [exact HL3s2|].
             split; [exact HL3s4|]. split; [exact HL3sp|]. split; [exact HL3ra|].
             exact HL3cs.
@@ -1771,18 +1775,24 @@ Section ProofIget.
                         = i_ref (ientry j)).
         { rewrite (rget_ne L4 Rs1 ltac:(nz)) HL4s1. reflexivity. }
         assert (Hqv : (qj + qj'/2 < 1/2)%Qp) by (apply ig_frac_lt1; by apply Qp.sub_Some).
+        (* the slot's share authority, out of the LOCK's resource *)
+        iDestruct (isl_pool_acc_upd M j ltac:(lia) with "Hipool") as "[Hisl Hislback]".
         iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (trap_res b + (K - 6))%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
+                   isl_slot (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) j ∗
                    iref_tok j (qj'/2)%Qp)%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
-                  with "Hcg Hpc Hi58 [Hhalf]").
+                  with "Hcg Hpc Hi58 [Hhalf Hisl]").
         { rewrite Hpa58 Hstv.
           iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) M j qj (qj'/2)%Qp nj
-                  ltac:(solve_ndisj) HMj Hqv Hno1 with "Hinv Hhalf") as "[Hcell Hback2]".
+                  ltac:(solve_ndisj) HMj Hqv Hno1 with "Hinv Hhalf Hisl") as "[Hcell Hback2]".
           iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
-          iMod ("Hback2" with "Hcell") as "[Hhalf Htok2]". iModIntro. iFrame. }
-        iApply wp_next_off_intro. iIntros "Hcg Hpc [Hhalf Htok2]".
+          iMod ("Hback2" with "Hcell") as "(Hhalf & Hisl & Htok2)". iModIntro. iFrame. }
+        iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Hisl & Htok2)".
+        iDestruct ("Hislback" $! (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M)
+                     with "[%] Hisl") as "Hipool".
+        { intros i Hi. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
         (* the minted identity fraction comes out of the table's retained share *)
         iDestruct (inode_ident_split j (qj'/2) (qj'/2) dev inum) as "[Hsplit _]".
         iEval (rewrite Qp.div_2) in "Hsplit".
@@ -1796,9 +1806,9 @@ Section ProofIget.
           rewrite /islot_rest_at (ig_frac_rest qj qj' ltac:(by apply Qp.sub_Some)).
           rewrite /inode_ident. iFrame. }
         iAssert (itable_res2 cn γfs γi cov logstart nib dev)
-          with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
+          with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
         { iExists (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M), ci.
-          iFrame "Hhalf Hiauth Hpool".
+          iFrame "Hhalf Hiauth Hpool Hipool".
           iSplitR; [| iSplitR; [| iExact "Hslots"]].
           2:{ iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange & Hdv).
               split_and!; [| exact Hinj | exact Hrange | exact Hdv].
@@ -1879,7 +1889,7 @@ Section ProofIget.
         iEval (rewrite Houtb) in "Hcg".
         iApply (Release.wp_release_sconf γl itable_lock "itable"%string
                   (itable_res2 cn γfs γi cov logstart nib dev) L7
-                  n eb p C (K - 6)%nat ({["itable"]} ∪ lks)
+                  n eb p (K - 6)%nat ({["itable"]} ∪ lks)
                   ltac:(rewrite HL7a0; reflexivity) ltac:(lia)
                   with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
         { iExact "Hlock". }
@@ -1931,7 +1941,7 @@ Section ProofIget.
                   with "Hcg Hpc Hi68").
         iIntros (CIDh2 Hsh2). iApply bi.later_intro. iIntros "Hcg Hpc".
         iEval (rewrite Htgt8c) in "Hpc".
-        iDestruct (cpu_own_transport CIDr CIDh2 n eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CIDr CIDh2 n eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iEval (rewrite /TAILC) in "Hcont2".
         iSpecialize ("Hcont2" $! CIDh2 with "[]"); [ iPureIntro; wp_next_chain | ].
@@ -2023,7 +2033,7 @@ Section ProofIget.
           assert (Hpp3c2 : add_vec_int (mword_of_int (KernelSyms.iget + 0x3a) : mword 64) 2
                            = mword_of_int (KernelSyms.iget + 0x3c)) by pcw.
           iEval (rewrite Hpp3c2) in "Hpc".
-          iApply ("Hstep" $! L2 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
+          iApply ("Hstep" $! L2 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2").
           * split; [exact HL2s1|]. split; [exact HL2a3|]. split; [exact HL2s2|].
             split; [exact HL2s4|]. split; [exact HL2sp|]. split; [exact HL2ra|].
             exact HL2cs.
@@ -2042,7 +2052,7 @@ Section ProofIget.
                     with "Hcg Hpc Hi36").
           iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt3c3) in "Hpc".
-          iApply ("Hstep" $! L1 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
+          iApply ("Hstep" $! L1 with "[%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2").
           * split; [exact HL1s1|]. split; [exact HL1a3|]. split; [exact HL1s2|].
             split; [exact HL1s4|]. split; [exact HL1sp|]. split; [exact HL1ra|].
             exact HL1cs.
@@ -2054,7 +2064,7 @@ Section ProofIget.
             rewrite HL1s3. exact Hes3. }
     (* enter the scan at slot 0 with NINODE units of fuel *)
     iApply ("Hloop" $! NINODE 0%nat D5
-              with "[%] [%] [%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2").
+              with "[%] [%] [%] [%] [%] Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hipool Hslots Hpool Hislot Hcont2").
     - lia.
     - unfold NINODE; lia.
     - split; [exact HD5s1|]. split; [exact HD5a3|].

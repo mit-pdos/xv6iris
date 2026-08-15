@@ -56,6 +56,7 @@ Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
 Require Import IrefSlots.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -67,14 +68,14 @@ Local Open Scope Z_scope.
 Module ReleasesleepProof (Acquire : ACQUIRE) (Release : RELEASE) (Wakeup : WAKEUP) : RELEASESLEEP.
 
 Section ProofReleasesleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_releasesleep_gen_sconf
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb C b lks.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_releasesleep_gen_sconf_body γs γl γsl s R H q m pd pme av eb b lks.
   Proof.
     cbv beta delta [wp_releasesleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hno.
@@ -232,14 +233,14 @@ Section ProofReleasesleep.
     (* ===== acquire(&slk->lk): intr_count 0 -> 1, returns sl_res + locked ===== *)
     (* [Hown] was minted at the ENTRY hart; the ten prologue instructions each
        moved to a fresh one, so acquire wants it at CID10. *)
-    iDestruct (cpu_own_transport CID CID10 0%nat b pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID10 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) Kacq
-              0%nat b pme C (av - 4)%nat b lks
+              0%nat b pme (av - 4)%nat b lks
               ltac:(lia)
               ltac:(lia)
               Hno
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
     iIntros (CIDacq Hsacq ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hown Hpay".
@@ -308,7 +309,7 @@ Section ProofReleasesleep.
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
     (* wakeup runs INSIDE the sleeplock's inner critical section, so the set
        it threads (unchanged -- wakeup is balanced) is the acquired one. *)
-    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs pme 1%nat (trap_res b + (av - 4))%nat b C false
+    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs pme 1%nat (trap_res b + (av - 4))%nat b false
               ({["sleep lock"%string]} ∪ lks)
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
@@ -375,7 +376,7 @@ Section ProofReleasesleep.
     iDestruct (sl_res_close_free γsl slk R H q with "Hslkw Hslk Hha Hpid HRcaller") as "HRsl".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) Krel
-              0%nat b pme C (av - 4)%nat
+              0%nat b pme (av - 4)%nat
               ({["sleep lock"%string]} ∪ lks)
               ltac:(rewrite HKrela0; apply addv_sext0)
               ltac:(lia)
@@ -495,7 +496,7 @@ Section ProofReleasesleep.
     iEval (rewrite Hretf) in "Hpc".
     (* [Hown] came back at [CIDrel]; the six epilogue instructions each moved
        to a fresh hart, so releasesleep's continuation wants it at CIDe6. *)
-    iDestruct (cpu_own_transport CIDrel CIDe6 0%nat b pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe6 0%nat b pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! Q34 with "[%] Hcg Hown Hpc HHdep").
@@ -550,14 +551,14 @@ Section ProofReleasesleep.
   Lemma wp_releasesleep_sconf
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b lks.
+      (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb b lks.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Hav Hno.
     iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HR #Hpanic #Hpinv Hcont".
     iDestruct "Hslk" as (q) "Hslk".
-    iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb C b lks
+    iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb b lks
               Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk Hpid HR Hpanic Hpinv").
     iIntros (CIDf Hsf mf Hcs) "Hcg Hown Hpc _".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].

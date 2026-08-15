@@ -354,6 +354,7 @@ Require Import SpecDirlink.
 Require Import SpecIput.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -444,7 +445,7 @@ Proof. rewrite /dinode_wf /create_made /=. reflexivity. Qed.
 Section CreateSpec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
   (* THE LOCKED-INODE PAYOUT.  Exactly [SpecIunlock]'s / [SpecIunlockput]'s
@@ -457,8 +458,8 @@ Section CreateSpec.
       (k : nat) (qi s : Qp) (g : gname) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
     (∃ γil γisl : gname,
-       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) ∗
-       sleeplocked γisl ∗
+       is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) ∗
+       sleeplocked_q γisl s ∗
        sl_pid (i_lock (ientry k)) ↦₄ pidv ∗
        ic_deposit cn k (DepShr s dev inum g) ∗
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
@@ -476,8 +477,8 @@ Section CreateSpec.
      "Framing"). *)
   Lemma create_locked_mk cn γfs γi cov logstart dev pidv k qi s g inum dn bm
       γil γisl :
-    is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) -∗
-    sleeplocked γisl -∗
+    is_sleeplock_gen γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
+    sleeplocked_q γisl s -∗
     sl_pid (i_lock (ientry k)) ↦₄ pidv -∗
     ic_deposit cn k (DepShr s dev inum g) -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
@@ -501,7 +502,7 @@ End CreateSpec.
 Definition wp_create_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -520,7 +521,7 @@ Definition wp_create_sconf_body
     (u : nat) (Sb : gset Z)                           (* THE OP-WIDE LEDGER  *)
     (ns : nat)                                        (* the iref ledger     *)
     (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.create in
   let pj := proc_addr j in
@@ -581,7 +582,7 @@ Definition wp_create_sconf_body
   (* PARKING PREMISE (hart-generic scheduler protocol) *)
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the two persistent credentials ialloc's printk arm needs, and the
@@ -633,7 +634,7 @@ Definition wp_create_sconf_body
     (u' : nat) (Sb' : gset Z) (ns' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* everything structural comes back untouched *)
       sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
@@ -696,7 +697,7 @@ Module Type CREATE.
   Parameter wp_create_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -714,10 +715,10 @@ Module Type CREATE.
       (u : nat) (Sb : gset Z)
       (ns : nat)
       (pidv : mword 32) (dqb dqs dqbs dqn : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_create_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                            γa γf γpr cov logstart bmapstart inodestart nib
                            ninodes size dev used plen pfun ty major minor
-                           V u Sb ns pidv dqb dqs dqbs dqn m K eb C b lks.
+                           V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks.
 End CREATE.

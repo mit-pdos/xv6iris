@@ -54,6 +54,7 @@ Require Import PanicStub SpecWakeup SpecAcquire SpecRelease.
 Require Import CodeVirtioDiskIntr.
 Require Import SpecVirtioDiskIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -369,14 +370,14 @@ Section VtPrologue.
 
   Lemma wp_vt_prologue (γk : gname) (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av n : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :
+      (pme : mword 64) (b : bool) (lks : gset string) :
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     (22 <= av)%nat ->
     (* acquire's order premise -- see [wp_virtio_disk_intr_sconf] where it
        originates *)
     locks_below lks "virtio_disk" ->
     sie_cap_gpr m av b pme -∗
-    cpu_own n eb pme C b lks -∗
+    cpu_own n eb pme b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
     panic_wp_any -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -392,7 +393,7 @@ Section VtPrologue.
         sie_cap_gpr MA (trap_res b + (av - 4))%nat false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x1e) : mword 64) -∗
         locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-        cpu_own (S n) eb pme C false ({["virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
+        cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
         (* the frame: ra/s0/s1's entry values and the unused fourth slot *)
         pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
         pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
@@ -573,10 +574,10 @@ Section VtPrologue.
     { rewrite /A6 upd_ne; [| vm_compute; discriminate].
       rewrite /A5 upd_ne; [| vm_compute; discriminate].
       rewrite /A4 upd_ne; [| vm_compute; discriminate]. exact HA3s1. }
-    iDestruct (cpu_own_transport CID CID10 n eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CID10 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string (disk_res γd pd pav pu) A6
-              n eb pme C (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+              n eb pme (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
+              with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
     iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -641,7 +642,7 @@ Section VtEpilogue.
 
   Lemma wp_vt_epilogue (γk : gname) (γd : disk_names)
       (pd pav pu : mword 64) (m MB : regfile) (av n : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) (b : bool) (lks : gset string) :
+      (pme : mword 64) (sp0 : mword 64) (b : bool) (lks : gset string) :
     sp0 = m !!! Regidx csp_rs1 ->
     MB !!! Regidx csp_rs1
       = add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) ->
@@ -659,7 +660,7 @@ Section VtEpilogue.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-    cpu_own (S n) eb pme C false ({["virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
+    cpu_own (S n) eb pme false ({["virtio_disk"]} ∪ lks) -∗ arm_pay n eb pme -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗
@@ -668,7 +669,7 @@ Section VtEpilogue.
       ∀ MF : regfile,
         ⌜ callee_saved m MF ⌝ -∗
         sie_cap_gpr MF av b pme -∗
-        cpu_own n eb pme C b lks -∗
+        cpu_own n eb pme b lks -∗
         pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -750,7 +751,7 @@ Section VtEpilogue.
        the acquire/release pair compose back to [N]. *)
     iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
-              n eb pme C (av - 4)%nat ({["virtio_disk"]} ∪ lks)
+              n eb pme (av - 4)%nat ({["virtio_disk"]} ∪ lks)
               ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR] Hcnt Hpay").
     { iExact "Hlk". }
@@ -884,7 +885,7 @@ Section VtEpilogue.
       rewrite /E1 upd_ne; [| congruence].
       rewrite /E0 upd_ne; [| congruence].
       exact (HMBthr r Hr Ncsp N8 N9). }
-    iDestruct (cpu_own_transport CID1 CID6 n eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID1 CID6 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E6 with "[%] Hcg Hcnt Hpc").
     unfold callee_saved.
@@ -1898,7 +1899,7 @@ End VtSurgery.
 (* ===================================================================== *)
 
 Section VtBody.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -2643,30 +2644,30 @@ Definition vt_regs_ok (m MB : regfile) (sp0 : mword 64) : Prop :=
         MB !!! Regidx r = m !!! Regidx r).
 
 Section VtLoopDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Definition vt_exit (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av lvl : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
+      (pme : mword 64) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (∀ MB : regfile,
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
        sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
-       cpu_own (S lvl) eb pme C false ({["virtio_disk"]} ∪ lks) -∗
+       cpu_own (S lvl) eb pme false ({["virtio_disk"]} ∪ lks) -∗
        disk_res γd pd pav pu -∗
        WP (Loop : expr riscv_lang))%I.
 
   Definition vt_loop (γd : disk_names)
       (pd pav pu : mword 64) (m : regfile) (av lvl : nat) (eb : bool)
-      (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
+      (pme : mword 64) (sp0 : mword 64) (lks : gset string) : iProp Σ :=
     (∀ MB : regfile,
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
        sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
-       cpu_own (S lvl) eb pme C false ({["virtio_disk"]} ∪ lks) -∗
+       cpu_own (S lvl) eb pme false ({["virtio_disk"]} ∪ lks) -∗
        vt_loop_state γd pd pav pu -∗
-       vt_exit γd pd pav pu m av lvl eb pme C sp0 lks -∗
+       vt_exit γd pd pav pu m av lvl eb pme sp0 lks -∗
        WP (Loop : expr riscv_lang))%I.
 
 End VtLoopDefs.
@@ -2706,7 +2707,7 @@ Qed.
 (* ===================================================================== *)
 Module VtLoopProof (Wakeup : WAKEUP).
 Section VtLoopProof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -2723,7 +2724,7 @@ Section VtLoopProof.
 
   Lemma wp_vt_loop  (γs : list gname)
       (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
-      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64)
       (sp0 : mword 64) (lks : gset string) :
     (22 <= av)%nat -> length γs = NPROC -> (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     (* the loop enters with "virtio_disk" already held (the prologue's
@@ -2732,7 +2733,7 @@ Section VtLoopProof.
     locks_below lks "virtio_disk" ->
     kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
-    vt_loop γd pd pav pu m av lvl eb pme C sp0 lks.
+    vt_loop γd pd pav pu m av lvl eb pme sp0 lks.
   Proof.
     intros Hav Hlen Hlvl Hfresh.
     iIntros "#Htext #Hpanic #Hpi #Hdinv #Hgeom".
@@ -2809,7 +2810,7 @@ Section VtLoopProof.
     assert (Hwproc : locks_below ({["virtio_disk"]} ∪ lks) "proc").
     { lkbelow. }
     iApply (Wakeup.wp_wakeup_sconf W γs pme (S lvl)
-              (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb C false _ HwK HWdom Hlen Hwlvl
+              (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb false _ HwK HWdom Hlen Hwlvl
               Hwproc
               with "Hcg Hown Htext Hpc Hpanic Hpi").
     all: try lkbelow.
@@ -2994,7 +2995,7 @@ Module Epi := VtEpilogue Release.
 Module Lp  := VtLoopProof Wakeup.
 
 Section ProofVirtioDiskIntr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).
@@ -3012,9 +3013,9 @@ Section ProofVirtioDiskIntr.
   Lemma wp_virtio_disk_intr_sconf  (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64)
       (b : bool) (lks : gset string)
-    : wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme C b lks.
+    : wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme b lks.
   Proof.
     cbv beta delta [wp_virtio_disk_intr_sconf_body].
     intros pcE ret_tgt HK Hdom Hlen Hlvl Hfresh.
@@ -3023,7 +3024,7 @@ Section ProofVirtioDiskIntr.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpi #Hdinv #Hgeom #Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq.
     (* ===================== PROLOGUE + acquire ===================== *)
-    iApply (Pro.wp_vt_prologue γk γd pd pav pu m K lvl eb pme C b lks
+    iApply (Pro.wp_vt_prologue γk γd pd pav pu m K lvl eb pme b lks
               Hlvl1 HKav Hfresh
               with "Hcg Hown Htext Hpc Hpanic Hlk").
     iIntros (CIDa Hsa MA sp0) "%Hpro Hcg Hpc Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap".
@@ -3032,14 +3033,14 @@ Section ProofVirtioDiskIntr.
     iApply (wp_vt_isr γu γd MA (trap_res b + (K - 4))%nat pme with "Hcg Htext Hpc Hdinv").
     iIntros (MI) "%HMIthr Hcg Hpc".
     (* ---- the exit continuation, capturing the epilogue's resources ---- *)
-    iAssert (vt_exit (CID:=CIDa) γd pd pav pu m K lvl eb pme C sp0 lks)
+    iAssert (vt_exit (CID:=CIDa) γd pd pav pu m K lvl eb pme sp0 lks)
       with "[Hcont Htok Hpay Hr24 Hr16 Hr8 Hgap]" as "Hexit".
     { iIntros (MB) "%HregsB Hcg Hpc Hown HR".
       destruct HregsB as (HBcsp & HBs1 & HBthr).
       (* [vt_exit] is stated where [b] is not in scope, so it spells the window
          index with [outb]; [Hbeq] folds it back to [b] for the epilogue. *)
       iEval (rewrite Hbeq) in "Hcg".
-      iApply (Epi.wp_vt_epilogue (CID:=CIDa) γk γd pd pav pu m MB K lvl eb pme C sp0 b lks
+      iApply (Epi.wp_vt_epilogue (CID:=CIDa) γk γd pd pav pu m MB K lvl eb pme sp0 b lks
                 Hsp0 HBcsp HBthr HKav Hbeq Hfresh
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap").
       iIntros (CIDz Hsz MF HcsF) "Hcg Hown Hpc".
@@ -3080,7 +3081,7 @@ Section ProofVirtioDiskIntr.
       iIntros (ME nc) "%HMEthr %Hbnd #Hlbc Hcg Hpc Hpub Hidx".
       (* [vt_loop] also spells the window index with [outb]. *)
       iEval (rewrite -Hbeq) in "Hcg".
-      iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme C sp0 lks
+      iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme sp0 lks
                     HKav Hlen Hlvl Hfresh
                     with "Htext Hpanic Hpi Hdinv Hgeom") as "Hloop".
       iApply ("Hloop" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring] Hexit").

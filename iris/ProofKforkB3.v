@@ -264,7 +264,7 @@ Section KforkB3Proof.
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
       (Vp V0 : pprivate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
-      (C : iProp Σ) (sp0v s00v : mword 64) (lks : gset string) :
+      (sp0v s00v : mword 64) (lks : gset string) :
     (22 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
     pv_ofile V0 = replicate NOFILE (zero_reg : mword 64) ->
@@ -286,13 +286,13 @@ Section KforkB3Proof.
             Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
             kfkb3_thr m0 Mx⌝ -∗
           sie_cap_gpr Mx (rsv + (K - 8))%nat b pme -∗
-          cpu_own n eb pme C b lks -∗
+          cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr M (rsv + (K - 8))%nat b pme -∗
-      cpu_own n eb pme C b lks -∗
+      cpu_own n eb pme b lks -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Vp -∗
       proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
@@ -322,13 +322,13 @@ Section KforkB3Proof.
                 Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
                 kfkb3_thr m0 Mx⌝ -∗
               sie_cap_gpr Mx (rsv + (K - 8))%nat b pme -∗
-              cpu_own n eb pme C b lks -∗
+              cpu_own n eb pme b lks -∗
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Vp -∗
               proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
               WP (Loop : expr riscv_lang)) -∗
           sie_cap_gpr M (rsv + (K - 8))%nat b pme -∗
-          cpu_own n eb pme C b lks -∗
+          cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
@@ -350,7 +350,7 @@ Section KforkB3Proof.
             Mt !!! Regidx Rs3 = p_cwd pme /\ Mt !!! Regidx Rs4 = npa /\
             Mt !!! Regidx Rs5 = pme /\ kfkb3_thr m0 Mt⌝ -∗
           sie_cap_gpr Mt (rsv + (K - 8))%nat b pme -∗
-          cpu_own n eb pme C b lks -∗
+          cpu_own n eb pme b lks -∗
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) (S i)) -∗
@@ -442,7 +442,7 @@ Section KforkB3Proof.
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgta4) in "Hpc".
           iEval (rewrite Heos) in "Hpv2".
-          iDestruct (cpu_own_transport CIDta CID3 n eb pme C b ltac:(wp_next_chain) with "Hown")
+          iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
           iSpecialize ("Hqx" $! CID3 with "[%]"); [wp_next_chain|].
           iApply ("Hqx" $! T2 with "[%] Hcg Hown Hpc Hpv Hpv2").
@@ -463,7 +463,7 @@ Section KforkB3Proof.
           assert (Hpp96 : add_vec_int (mword_of_int (KF + 0x92) : mword 64) 4
                          = mword_of_int (KF + 0x96)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp96) in "Hpc".
-          iDestruct (cpu_own_transport CIDta CID3 n eb pme C b ltac:(wp_next_chain) with "Hown")
+          iDestruct (cpu_own_transport CIDta CID3 n eb pme b ltac:(wp_next_chain) with "Hown")
             as "Hown".
           iSpecialize ("IHf" $! CID3 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S i) T2 with "[%] [%] [%] Hqx Hcg Hown Hpc Hpv Hpv2").
@@ -538,7 +538,7 @@ Section KforkB3Proof.
         assert (HeqVV0 : pv_ofile Vp !! i = pv_ofile V0 !! i) by (rewrite Hvz' HV0i; reflexivity).
         iEval (rewrite (kfk_childV_step_null V0 (pv_ofile Vp) i HlenVp HlenV0 Hi HeqVV0))
           in "Hpv2".
-        iDestruct (cpu_own_transport CIDk CIDm n eb pme C b ltac:(wp_next_chain) with "Hown")
+        iDestruct (cpu_own_transport CIDk CIDm n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
         iApply ("Htail" $! L1 with "[%] Hcg Hown Hpc Hpv Hpv2").
@@ -606,11 +606,11 @@ Section KforkB3Proof.
         { intros r Hr Ncsp N0 N1 N2 N3 N4 N5.
           rewrite /L2 upd_ne; [| regne]. apply HL1thr; assumption. }
         assert (HL2a0k : L2 !!! Regidx Ra0 = fnode k) by (rewrite HL2a0; exact Hfn).
-        iDestruct (cpu_own_transport CIDk CIDn n eb pme C b ltac:(wp_next_chain) with "Hown")
+        iDestruct (cpu_own_transport CIDk CIDn n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
-        iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme C (rsv + (K - 8))%nat b
+        iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme (rsv + (K - 8))%nat b
                   _ HK14 Hn HL2a0k Hbelow
-                  with "Hcg Hown Htext Hpc Hft Hpanic Hfds Href").
+                  with "Hcg Hown Htext Hpc Hft Hfds Href").
         all: try lkbelow.
         iIntros (CIDo Hsto mr) "Hcg Hown Hpc %Hcsmr Hslota Hslotb".
         destruct Hcsmr as [Hcsmr Hmra0].
@@ -669,7 +669,7 @@ Section KforkB3Proof.
                          = mword_of_int (KF + 0x8e))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt8e') in "Hpc".
-        iDestruct (cpu_own_transport CIDo CIDq n eb pme C b ltac:(wp_next_chain) with "Hown")
+        iDestruct (cpu_own_transport CIDo CIDq n eb pme b ltac:(wp_next_chain) with "Hown")
           as "Hown".
         iSpecialize ("Htail" $! CIDq with "[%]"); [wp_next_chain|].
         iApply ("Htail" $! mr with "[%] Hcg Hown Hpc Hpv Hpv2").

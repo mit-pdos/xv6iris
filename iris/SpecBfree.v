@@ -88,6 +88,7 @@ Require Import FsCrash.
 Require Import BitmapInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -98,7 +99,7 @@ Local Open Scope Z_scope.
 Definition K_bfree : nat := 44%nat.
 
 Definition wp_bfree_gen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -111,7 +112,7 @@ Definition wp_bfree_gen_body
     (used : gset Z) (bno : mword 32) (bs : list (bv 8))
     (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
     (pidv : mword 32) (dq dqb : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
@@ -146,7 +147,7 @@ Definition wp_bfree_gen_body
      touches ranks lower.  One premise covers the whole cone. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
      release of its own -- it is a pure PASS-THROUGH to bread, which is
      push/pop-BALANCED and mints/spends the pair its own interior sleepers
@@ -215,7 +216,7 @@ Definition wp_bfree_gen_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -230,7 +231,7 @@ Definition wp_bfree_gen_body
   WP (Loop : expr riscv_lang).
 
 Definition wp_bfree_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -243,7 +244,7 @@ Definition wp_bfree_sconf_body
     (used : gset Z) (bno : mword 32) (bs : list (bv 8))
     (u : nat)
     (pidv : mword 32) (dq dqb : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bfree in
   let pj := proc_addr j in
@@ -278,7 +279,7 @@ Definition wp_bfree_sconf_body
      touches ranks lower.  One premise covers the whole cone. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, NOT THE BARE PAIR.  bfree does no acquire/
      release of its own -- it is a pure PASS-THROUGH to bread, which is
      push/pop-BALANCED and mints/spends the pair its own interior sleepers
@@ -328,7 +329,7 @@ Definition wp_bfree_sconf_body
   ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -347,7 +348,7 @@ Module Type BFREE.
      set-forgetting instance at [cr = false], kept as its own parameter so
      that balloc and every other caller is unchanged. *)
   Parameter wp_bfree_gen :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -360,14 +361,14 @@ Module Type BFREE.
       (used : gset Z) (bno : mword 32) (bs : list (bv 8))
       (u : nat) (cr : bool) (Sb : gset Z) (e0 : nat)
       (pidv : mword 32) (dq dqb : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_bfree_gen_body γs j γl γu γd γk pd pav pu bn γ γfs
                         cov logstart bmapstart size dev used bno bs u cr Sb e0
-                        pidv dq dqb m K eb C b lks.
+                        pidv dq dqb m K eb b lks.
 
   Parameter wp_bfree_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -380,9 +381,9 @@ Module Type BFREE.
       (used : gset Z) (bno : mword 32) (bs : list (bv 8))
       (u : nat)
       (pidv : mword 32) (dq dqb : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_bfree_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart bmapstart size dev used bno bs u
-                          pidv dq dqb m K eb C b lks.
+                          pidv dq dqb m K eb b lks.
 End BFREE.

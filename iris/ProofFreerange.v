@@ -59,7 +59,6 @@ Require Import CodeFreerange.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFreerange.
-Require Import PanicStub.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -101,7 +100,7 @@ Section ProofFreerange.
      rather than the section's ambient one, which callers have long since
      migrated away from). *)
   Lemma frepi `{CID0 : CpuId}
-      (m Me : regfile) (K ncnt : nat) (eb b : bool) (pcur : mword 64) (C : iProp Σ)
+      (m Me : regfile) (K ncnt : nat) (eb b : bool) (pcur : mword 64)
       (γl : gname) (γk : gname * gname) (onf : option nat) (lks : gset string) :
     let sp0 := m !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) in
@@ -116,7 +115,7 @@ Section ProofFreerange.
     locks_below lks "kmem" ->
     kernel_text -∗
     sie_cap_gpr Me (K - 6) b pcur -∗
-    cpu_own ncnt eb pcur C b lks -∗
+    cpu_own ncnt eb pcur b lks -∗
     pc_is (mword_of_int (KernelSyms.freerange + 0x3e)) -∗
     (pa_stk sp0 1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) -∗
     (pa_stk sp0 2) ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5) : mword 64) -∗
@@ -124,12 +123,11 @@ Section ProofFreerange.
     (∃ v : mword 64, (pa_stk sp0 4) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 5) ↦₈ v) -∗
     (∃ v : mword 64, (pa_stk sp0 6) ↦₈ v) -∗
-    panic_wp_any -∗
     kalloc_avail γk onf -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mr,
       sie_cap_gpr mr K b pcur -∗
-      cpu_own ncnt eb pcur C b lks -∗
+      cpu_own ncnt eb pcur b lks -∗
       pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
       kalloc_avail γk onf -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -144,7 +142,7 @@ Section ProofFreerange.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb3 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 3).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 #Hqcpu Havail Hcont".
+    iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 Havail Hcont".
     iPoseProof (fri_3e with "Htext") as "Hi3e".
     iPoseProof (fri_40 with "Htext") as "Hi40".
     iPoseProof (fri_42 with "Htext") as "Hi42".
@@ -236,7 +234,7 @@ Section ProofFreerange.
     (* [Hcnt] entered at CID0 and every one of the five plain epilogue
        instructions has moved to a fresh hart, so [Hcont] (specialized at the
        last one, [CIDf5]) wants it there. *)
-    iDestruct (cpu_own_transport CID0 CIDf5 ncnt eb pcur C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CIDf5 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDf5 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] Havail").
@@ -261,15 +259,15 @@ Section ProofFreerange.
   Lemma wp_freerange_sconf
       (γl : gname) (γk : gname * gname) (lk fl : mword 64)
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b lks.
+      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (b : bool) (lks : gset string)
+    : wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur b lks.
   Proof.
     cbv beta delta [wp_freerange_sconf_body].
     intros pcE pa_start pa_end ret_tgt s1entry
       HK Hncnt Hlk Hfl Hprun Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages #Hqcpu Havail Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpages Havail Hcont".
     assert (Hspr6 : spr = pa_stk sp0 6).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* the six frame-slot address bridges (spr-relative store offset -> pa_stk sp0 k) *)
@@ -490,10 +488,10 @@ Section ProofFreerange.
          shift point); the taken branch moved one hart further, to CID12. *)
       assert (Hshift12 : b = false \/ pcur = zero_reg -> (CID12 : CPU) = (CID11 : CPU)) by wp_next_chain.
       iDestruct (wp_next_shift Hshift12 with "Hcont") as "Hcont".
-      iDestruct (cpu_own_transport CID CID12 ncnt eb pcur C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID CID12 ncnt eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (frepi (CID0 := CID12) m R8 K ncnt eb b pcur C γl γk (Some 0%nat) lks ltac:(lia) ltac:(apply ret_pc_aligned) HR8sp HR8cs Hfresh
-                with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Hqcpu Havail Hcont").
+      iApply (frepi (CID0 := CID12) m R8 K ncnt eb b pcur γl γk (Some 0%nat) lks ltac:(lia) ltac:(apply ret_pc_aligned) HR8sp HR8cs Hfresh
+                with "Htext Hcg Hcnt Hpc Hra Hs0 Hs1 [Hslot4] [Hslot5] [Hslot6] Havail Hcont").
       { iExists vs20; iExact "Hslot4". }
       { iExists vs30; iExact "Hslot5". }
       { iExists vs40; iExact "Hslot6". }
@@ -616,7 +614,7 @@ Section ProofFreerange.
           /\ qs <> []
           /\ avail_inc_n on (length qs) = Some (length (p0 :: rest)) ⌝ -∗
         sie_cap_gpr (CID:=CID0) M (K - 6) b pcur -∗
-        cpu_own (CID:=CID0) ncnt eb pcur C b lks -∗
+        cpu_own (CID:=CID0) ncnt eb pcur b lks -∗
         pc_is (CID:=CID0) (mword_of_int (KernelSyms.freerange + 0x2a)) -∗
         ([∗ list] p ∈ qs, page_own p) -∗
         kalloc_avail γk on -∗
@@ -628,7 +626,7 @@ Section ProofFreerange.
         (pa_stk sp0 6) ↦₈ (m !!! Regidx (mword_of_int 20 : mword 5) : mword 64) -∗
         wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
           ∀ mr, sie_cap_gpr mr K b pcur -∗
-          cpu_own ncnt eb pcur C b lks -∗
+          cpu_own ncnt eb pcur b lks -∗
           pc_is ret_tgt -∗ ⌜ callee_saved m mr ⌝ -∗
           kalloc_avail γk (Some (length (p0 :: rest))) -∗
           WP (Loop : expr riscv_lang)) -∗
@@ -674,15 +672,15 @@ Section ProofFreerange.
         assert (HM2ra : M2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.freerange + 0x2e) : mword 64) 4) by (rewrite /M2; apply upd_eq).
         (* [Hcnt] entered this iteration at [CID0]; the two plain
            instructions above moved it to [CIDb2], where kfree wants it. *)
-        iDestruct (cpu_own_transport CID0 CIDb2 ncnt eb pcur C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport CID0 CIDb2 ncnt eb pcur b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         (* ---- kfree(p) ---- *)
-        iApply (Kfree.wp_kfree_sconf γl γk lk fl M2 on ncnt eb pcur C (K - 6) b lks
+        iApply (Kfree.wp_kfree_sconf γl γk lk fl M2 on ncnt eb pcur (K - 6) b lks
                   ltac:(lia)
                   Hlk Hfl
                   ltac:(lia)
                   Hfresh
-                  with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail Hqcpu").
+                  with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail").
         all: try lkbelow.
         { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HM2a0; exact Hpvq | rewrite HM2a0; iExact "Hpage"]. }
         iIntros (CIDkf Hskf mkf) "Hcg Hcnt Hpc %Hkfcs Havail".
@@ -809,11 +807,11 @@ Section ProofFreerange.
              entry [CID0] (via kfree's exit [CIDkf]) to the exit hart [CIDb7]. *)
           assert (Hshiftexit : b = false \/ pcur = zero_reg -> (CIDb7 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftexit with "Hcont") as "Hcont".
-          iDestruct (cpu_own_transport CIDkf CIDb7 ncnt eb pcur C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDkf CIDb7 ncnt eb pcur b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
-          iApply (frepi (CID0 := CIDb7) m N3 K ncnt eb b pcur C γl γk (Some (length (p0 :: rest))) lks ltac:(lia)
+          iApply (frepi (CID0 := CIDb7) m N3 K ncnt eb b pcur γl γk (Some (length (p0 :: rest))) lks ltac:(lia)
                     ltac:(apply ret_pc_aligned) HN3sp HN3cs Hfresh
-                    with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Hqcpu Havail Hcont").
+                    with "Htext Hcg Hcnt Hpc Hc1 Hc2 Hc3 [Hc4] [Hc5] [Hc6] Havail Hcont").
           { iExists _; iExact "Hc4". }
           { iExists _; iExact "Hc5". }
           { iExists _; iExact "Hc6". }
@@ -830,7 +828,7 @@ Section ProofFreerange.
           iEval (rewrite Htgt2a) in "Hpc".
           assert (Hshiftrec : b = false \/ pcur = zero_reg -> (CIDb4 : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftrec with "Hcont") as "Hcont".
-          iDestruct (cpu_own_transport CIDkf CIDb4 ncnt eb pcur C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDkf CIDb4 ncnt eb pcur b ltac:(wp_next_chain)
                        with "Hcnt") as "Hcnt".
           iApply ("IHf" $! CIDb4 M3 (q0 :: rest0') (avail_inc on) with "[] [] Hcg Hcnt Hpc Hpages Havail Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hcont").
           { iPureIntro. simpl in Hlen |- *. lia. }
@@ -842,7 +840,7 @@ Section ProofFreerange.
       (* [Hcnt] entered at the section's ambient hart; the eighteen plain
          instructions since (prologue + loop setup) have each moved it, so
          the loop's own entry hart [CID18] wants it re-transported. *)
-      iDestruct (cpu_own_transport CID CID18 ncnt eb pcur C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID CID18 ncnt eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* apply the loop at the entry (fuel = length of the page list) *)
       iApply ("Hloop" $! (length (p0 :: rest)) CID18 R11 (p0 :: rest) (Some 0%nat) with "[] [] Hcg Hcnt Hpc Hpages Havail Hra Hs0 Hs1 Hslot4 Hslot5 Hslot6 Hcont").

@@ -53,6 +53,11 @@ Require Import IntrDefs.
 Require Import HartTp.
 Require Import WpLock.
 Require Import ProcGeom.
+(* the proc table's two regimes: [pslot_used_at] is the marker
+   [proc_slots] carries on every arm but UNUSED.  EXPORTed because every
+   file that states [proc_slots] / [proc_lock_res] / [procs_inv] must bind
+   [pavG] (durable-notes.md, "Typeclass sweeps", trap one). *)
+Require Export ProcAvail.
 Require Import FdSlots.
 Require Export ProcInv.
 Require Import SwtchCtx.
@@ -82,7 +87,7 @@ Proof.
 Qed.
 
 Section SchedCtx.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
@@ -385,11 +390,24 @@ Section SchedCtx.
        hart_at pa (1/2) h ∗
        ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa)%I.
 
+  (* ---- THE ALLOCATION MARKER ([ProcAvail.v]).  PERSISTENT, and present on
+     every arm but UNUSED: it is what lets allocproc's scan accumulate a
+     record of every slot it passed while handing each slot's own copy back
+     with its lock, and so what lets a COUNTED caller refute the
+     empty-table exit.  ZOMBIE carries it -- a zombie slot is dormant but
+     ALLOCATED -- which is why the guard is [is_unused] and not
+     [negb (inv_dormant _)].
+
+     It costs the ordinary state changes nothing: [proc_slots_recast] is
+     restricted to [inv_dormant _ = false] on both sides, so its two states
+     are both allocated and the conjunct is literally the same proposition
+     on each. *)
   Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
     ((if needs_ctx st   then ▷ proc_ctx pa   else emp) ∗
      (if is_running st  then run_slot pa else emp) ∗
      (if inv_dormant st then proc_dormant pa st else emp) ∗
-     (if not_running st then hart_at_any pa else emp))%I.
+     (if not_running st then hart_at_any pa else emp) ∗
+     (if is_unused st   then emp else pslot_used_at pa))%I.
 
   Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
     (∃ (st : mword 32) (ch : mword 64),
@@ -426,9 +444,26 @@ Section SchedCtx.
   Proof.
     intros Hn Hr Hd Hd'.
     (* [is_running] is [negb not_running], so [Hr] fixes the new arm too --
-       recast needs no extra premise. *)
+       recast needs no extra premise.  Nor does the allocation marker: both
+       states are non-dormant, hence both allocated, so the last conjunct is
+       the SAME proposition on each side. *)
     rewrite /proc_slots (is_running_negb st) (is_running_negb st').
+    rewrite (is_unused_of_inv_dormant st Hd) (is_unused_of_inv_dormant st' Hd').
     rewrite Hn Hr Hd Hd'. iIntros "$".
+  Qed.
+
+  (* THE MARKER, READ OFF A SLOT THE SCAN IS PASSING.  Persistent, so the
+     slot keeps its own copy and goes straight back into its lock -- which
+     is what lets allocproc's scan end holding one for EVERY slot it
+     passed, and so lets a counted caller refute the empty-table exit
+     ([ProcAvail.v]). *)
+  Lemma proc_slots_marker (pa : mword 64) (st : mword 32) :
+    is_unused st = false ->
+    proc_slots pa st -∗ pslot_used_at pa ∗ proc_slots pa st.
+  Proof.
+    intros Hu. rewrite {1}/proc_slots Hu.
+    iIntros "(H1 & H2 & H3 & H4 & #Hm)". iFrame "Hm".
+    rewrite /proc_slots Hu. iFrame "H1 H2 H3 H4 Hm".
   Qed.
 
   (* allocproc's move: a slot found UNUSED yields the dormant block and the
@@ -438,18 +473,24 @@ Section SchedCtx.
   Lemma proc_slots_unused (pa : mword 64) :
     proc_slots pa UNUSED -∗ proc_dormant pa UNUSED ∗ hart_at_any pa.
   Proof.
-    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED is_running_UNUSED.
+    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED is_running_UNUSED
+            is_unused_UNUSED.
     rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-    iIntros "[_ [_ [$ $]]]".
+    iIntros "(_ & _ & $ & $ & _)".
   Qed.
 
   (* the converse: putting a slot BACK at UNUSED.  freeproc's post is exactly
      [proc_dormant _ UNUSED], so allocproc's failure tails rebuild the lock
      resource through this before they release. *)
+  (* Note what this does NOT take: the allocation marker.  Going back to
+     UNUSED is where the marker is DROPPED, which is exactly right --
+     freeproc gives a slot up, and [ProcAvail]'s authority never shrinks, so
+     a freed slot is simply never re-counted as available. *)
   Lemma proc_slots_unused_intro (pa : mword 64) :
     proc_dormant pa UNUSED -∗ hart_at_any pa -∗ proc_slots pa UNUSED.
   Proof.
-    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED is_running_UNUSED.
+    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED is_running_UNUSED
+            is_unused_UNUSED.
     rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
     iIntros "Hd Hp". iSplitR; [done|]. iSplitR; [done|]. iFrame "Hd Hp".
   Qed.
@@ -459,37 +500,42 @@ Section SchedCtx.
      and released the lock on, so its slot owns a real parked record exactly
      as RUNNABLE does.  Only the dormant and running guards are false. *)
   Lemma proc_slots_used (pa : mword 64) :
-    ▷ proc_ctx pa -∗ hart_at_any pa -∗ proc_slots pa USED.
+    ▷ proc_ctx pa -∗ hart_at_any pa -∗ pslot_used_at pa -∗ proc_slots pa USED.
   Proof.
     rewrite /proc_slots inv_dormant_USED not_running_USED is_running_USED
-            needs_ctx_USED.
-    iIntros "$ $".
+            needs_ctx_USED is_unused_USED.
+    iIntros "$ $ $".
   Qed.
 
   (* THE SCHEDULER'S TWO SLOT MOVES, spelled at the proc-lock end.
      Dispatch takes the receipt out of a parked slot (which also yields the
      saved context the scheduler is about to resume); reclaim puts it back
      into the state the parking proc left behind. *)
+  (* the marker comes back OUT here, and every caller that re-parks the slot
+     hands it straight to [proc_slots_park].  It is persistent, so nothing
+     has to thread it as a resource. *)
   Lemma proc_slots_dispatch (pa : mword 64) (st : mword 32) :
     needs_ctx st = true ->
-    proc_slots pa st -∗ ▷ proc_ctx pa ∗ hart_at_any pa.
+    proc_slots pa st -∗ ▷ proc_ctx pa ∗ hart_at_any pa ∗ pslot_used_at pa.
   Proof.
     intros Hn. rewrite /proc_slots Hn.
     rewrite (not_running_of_needs_ctx st Hn).
     rewrite (is_running_of_needs_ctx st Hn).
     rewrite (inv_dormant_of_needs_ctx st Hn).
-    iIntros "[$ [_ [_ $]]]".
+    rewrite (is_unused_of_needs_ctx st Hn).
+    iIntros "[$ [_ [_ [$ $]]]]".
   Qed.
 
   Lemma proc_slots_park (pa : mword 64) (st : mword 32) :
     needs_ctx st = true ->
-    ▷ proc_ctx pa -∗ hart_at_any pa -∗ proc_slots pa st.
+    ▷ proc_ctx pa -∗ hart_at_any pa -∗ pslot_used_at pa -∗ proc_slots pa st.
   Proof.
     intros Hn. rewrite /proc_slots Hn.
     rewrite (not_running_of_needs_ctx st Hn).
     rewrite (is_running_of_needs_ctx st Hn).
     rewrite (inv_dormant_of_needs_ctx st Hn).
-    iIntros "$ $".
+    rewrite (is_unused_of_needs_ctx st Hn).
+    iIntros "$ $ $".
   Qed.
 
   (* FORGETTING A PARKED RECORD DOWN TO ITS CELLS.  A [valid_context] owns
@@ -526,20 +572,24 @@ Section SchedCtx.
      state -- the case analysis lives here. *)
   Lemma proc_slots_park_gen (E : coPset) (pa : mword 64) (st : mword 32) :
     park_ok st = true ->
-    ▷ proc_ctx pa -∗ hart_at_any pa -∗ park_pay pa st ={E}=∗ proc_slots pa st.
+    ▷ proc_ctx pa -∗ hart_at_any pa -∗ pslot_used_at pa -∗ park_pay pa st
+    ={E}=∗ proc_slots pa st.
   Proof.
-    intros Hst. iIntros "Hctx Hpark Hpay".
-    apply park_ok_cases in Hst as [Hn | ->].
-    - iModIntro. rewrite /proc_slots Hn.
+    intros Hst. iIntros "Hctx Hpark #Hused Hpay".
+    pose proof (is_unused_of_park_ok st Hst) as Hu.
+    apply park_ok_cases in Hst as [Hn | Hz].
+    - iModIntro. rewrite /proc_slots Hn Hu.
       rewrite (inv_dormant_of_needs_ctx st Hn) (not_running_of_needs_ctx st Hn).
       rewrite (is_running_of_needs_ctx st Hn).
-      iFrame "Hctx". by iFrame "Hpark".
-    - rewrite /park_pay inv_dormant_ZOMBIE.
+      iFrame "Hctx Hpark". by iFrame "Hused".
+    - subst st. rewrite /park_pay inv_dormant_ZOMBIE.
       iMod (proc_ctx_own_ctx E pa with "Hctx") as "Hown".
-      iModIntro. rewrite /proc_slots not_running_ZOMBIE inv_dormant_ZOMBIE.
+      iModIntro. rewrite /proc_slots not_running_ZOMBIE inv_dormant_ZOMBIE
+                        is_unused_ZOMBIE.
       rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
       rewrite is_running_ZOMBIE.
-      iSplitR; [done|]. iSplitR; [done|]. iSplitR "Hpark"; [| iExact "Hpark"].
+      iSplitR; [done|]. iSplitR; [done|].
+      iSplitR "Hpark Hused"; [| iFrame "Hpark Hused"].
       iEval (rewrite proc_dormant_split). iFrame "Hpay Hown".
   Qed.
 
@@ -560,13 +610,14 @@ Section SchedCtx.
     hart_hlf j h -∗ proc_slots (proc_addr j) st -∗
     ⌜ st = RUNNING ⌝ ∗ hart_full j h ∗
     own_ctx (p_context (proc_addr j)) ∗
-    ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j).
+    ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j) ∗
+    pslot_used_at (proc_addr j).
   Proof.
     iIntros (Hj) "Hhlf Hslot".
     rewrite /proc_slots.
     (* first: refute [not_running], which is the whole argument. *)
     destruct (not_running st) eqn:Hnr.
-    { iDestruct "Hslot" as "(_ & _ & _ & Hany)".
+    { iDestruct "Hslot" as "(_ & _ & _ & Hany & _)".
       iDestruct (hart_at_any_elim j Hj with "Hany") as (h') "Hfull".
       rewrite /hart_full /hart_hlf /hart_own.
       by iDestruct (ghost_var_valid_2 with "Hhlf Hfull") as %[Hq _]. }
@@ -576,15 +627,16 @@ Section SchedCtx.
     { rewrite /not_running in Hnr.
       apply negb_false_iff, bool_decide_eq_true_1 in Hnr. exact Hnr. }
     subst st.
-    rewrite needs_ctx_RUNNING inv_dormant_RUNNING is_running_RUNNING.
-    iDestruct "Hslot" as "(_ & Harm & _ & _)".
+    rewrite needs_ctx_RUNNING inv_dormant_RUNNING is_running_RUNNING
+            is_unused_RUNNING.
+    iDestruct "Hslot" as "(_ & Harm & _ & _ & #Hused)".
     rewrite /run_slot.
     iDestruct "Harm" as "(Hown & (%h' & Hhlf' & Hrec))".
     iDestruct (hart_at_elim j (1/2) h' Hj with "Hhlf'") as "Hhlf'".
     iDestruct (hart_own_agree j (1/2) (1/2) h h' with "Hhlf Hhlf'") as %Hhh.
     subst h'.
     iSplitR; [done|].
-    rewrite hart_split. iFrame "Hhlf Hhlf' Hown Hrec".
+    rewrite hart_split. iFrame "Hhlf Hhlf' Hown Hrec". iFrame "Hused".
   Qed.
 
   (* the converse, for the release side: what a resumed thread deposits when
@@ -595,11 +647,13 @@ Section SchedCtx.
     hart_hlf j h -∗
     own_ctx (p_context (proc_addr j)) -∗
     ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j) -∗
+    pslot_used_at (proc_addr j) -∗
     proc_slots (proc_addr j) RUNNING.
   Proof.
-    iIntros (Hj) "Hhlf Hown Hrec". rewrite /proc_slots /run_slot.
-    rewrite needs_ctx_RUNNING inv_dormant_RUNNING not_running_RUNNING is_running_RUNNING.
-    iSplitR; [done|]. iSplitL; [| done].
+    iIntros (Hj) "Hhlf Hown Hrec #Hused". rewrite /proc_slots /run_slot.
+    rewrite needs_ctx_RUNNING inv_dormant_RUNNING not_running_RUNNING
+            is_running_RUNNING is_unused_RUNNING.
+    iSplitR; [done|]. iSplitR "Hused"; [| iSplitR; [done | iFrame "Hused"]].
     iFrame "Hown". iExists h. iFrame "Hrec".
     by iApply (hart_at_intro j (1/2) h Hj).
   Qed.

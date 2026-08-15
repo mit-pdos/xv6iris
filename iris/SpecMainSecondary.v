@@ -83,6 +83,7 @@ Require Import SpecMain.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import TimerCap.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 
 (* the secondary arm's stack budget: see the header.  Like [SpecMain.K_main]
    this is set by the SCHEDULER's trap reserve rather than by the arm's own
@@ -92,7 +93,7 @@ From Kernel Require KernelSyms.
 Definition K_main_secondary : nat := 100%nat.
 
 Section SpecMainSecondary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -148,7 +149,8 @@ Section SpecMainSecondary.
        provably cannot move under this contract, and (as on the boot arm) it
        needs no [wp_next] wrapper: it diverges, there is no continuation. *)
     sie_cap_gpr m K false p0 -∗
-    cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
+    cpu_ctx_free -∗
+    cpu_own 0 false p0 false ∅ -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
        own [intr_res] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
        The ghost is this hart's canonical [sie_gname] now, not a parameter. *)
@@ -173,7 +175,7 @@ End SpecMainSecondary.
 
 Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (m : regfile) (K : nat)

@@ -36,27 +36,20 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import StackBytes.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import SleepLock.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import IcacheEscrow.
 Require Import ByteBuf.
-Require Import VcGen.
 Require Import W32Arith.
-Require Import ElfEnc.
 Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
@@ -64,29 +57,19 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
-Require Import DirentEnc.
-Require Import PathElems.
 Require Import InodeInv.
 Require Import IrefSlots.
-Require Import IcacheRef.
-Require Import IcacheInv.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
-Require Import DinodeEnc.
-Require Import DirView.
-Require Import DirLinks.
-Require Import InodeLock.
 Require Import SchedCtx.
 Require Import DiskInv.
-Require Import PtTree.
 Require Import PtBuild.
 Require Import ProcPt.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import UmCovered.
-Require Import FileInv.
-Require Import SpecIput.
+Require Import FileInvDefs.
 Require Import SpecKexec.
 Require Import SpecMyproc.
 Require Import SpecBeginOp.
@@ -94,10 +77,8 @@ Require Import SpecEndOp.
 Require Import SpecIlock.
 Require Import SpecReadi.
 Require Import SpecIunlockput.
-Require Import SpecDirlink.
 Require Import SpecNamei.
 Require Import SpecProcFreepagetable.
-Require Import SpecProcPagetable.
 Require Import SpecWalkaddr.
 Require Import SpecFlags2perm.
 Require Import SpecUvmalloc.
@@ -113,7 +94,6 @@ Require Import ProofKexecSeam.
    statements -- add a [(B3 : KEXECB3)] functor argument to [KexecCProof]
    the way ProofKexecB3.v itself takes [(B2 : KEXECB2)], never a
    [Require Import ProofKexecB3.]. *)
-Require Import ProofKforkParts.
 Require Import CodeKexec.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -289,7 +269,7 @@ Section KexecCSetup.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (szv : mword 64) :
@@ -312,7 +292,7 @@ Section KexecCSetup.
     kernel_text -∗
     kxc_at_1ae jp bn gfs ga gf cov logstart bmapstart inodestart size
                used used2 plen pfun na avf aslen afun pidv V dqb dqs dqa
-               M K C sp0 ra0 s00 s10 s20 pv av
+               M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P szv -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -320,7 +300,7 @@ Section KexecCSetup.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -348,11 +328,11 @@ Section KexecCSetup.
         ⌜(8192 <= uint sz1)%Z⌝ -∗
         ( kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size
                      used2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                     M' K C sp0 ra0 s00 s10 s20 pv av
+                     M' K sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' (pv_sz V) sz1 0
           ∨ kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size
                        used2 plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                       M' K C sp0 ra0 s00 s10 s20 pv av
+                       M' K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' (pv_sz V) sz1 0 ) -∗
         (* THE EXIT, HANDED BACK.  A [wp_next] continuation is LINEAR, so a
            block that owns a failure path cannot also leave its successor
@@ -364,7 +344,7 @@ Section KexecCSetup.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true ∅ -∗
+              cpu_own 0 true (proc_addr jp) true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -448,10 +428,10 @@ Section KexecCSetup.
       by (rewrite /T0 upd_ne; [exact HMs2 | nz]).
     assert (HT0s6 : T0 !!! Regidx Rs6 = page_base P.(ud_root))
       by (rewrite /T0 upd_ne; [exact HMs6 | nz]).
-    iDestruct (cpu_own_transport CID0 CID1 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CID1 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Myproc.wp_myproc_sconf T0 (K - 68)%nat 0%nat true (proc_addr jp)
-              C true ∅ ltac:(lia) ltac:(lia) with "Hcg Hcnt Htext Hpc").
+ true ∅ ltac:(lia) ltac:(lia) with "Hcg Hcnt Htext Hpc").
     all: try lkbelow.
     iIntros (CID2 Hs2 ms M1) "%Hmsf Hcg Hcnt Hpc %HM1".
     destruct HM1 as [Hcs1 HM1a0].
@@ -841,7 +821,7 @@ Section KexecCSetup.
       by (rewrite (HYne Rs6 ltac:(nz)); exact HZ0s6).
     assert (HYsp : Y !!! Regidx csp_rs1 = pa_stk sp0 68)
       by (rewrite HYsp0 HZ0sp; reflexivity).
-    iDestruct (cpu_own_transport CID1 CID15 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID1 CID15 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* ---- the two premises uvmalloc's freshness/size clauses need,        *)
     (* carried straight from [kxc_at_1ae]'s own [um_below]/[um_covered szv] *)
@@ -858,7 +838,7 @@ Section KexecCSetup.
     assert (Hbelow_pground : um_below (pgroundup szv) P.(ud_um))
       by (apply (um_below_mono szv (pgroundup szv) P.(ud_um) Hpground_ge Hbelow)).
     iApply (Uvmalloc.wp_uvmalloc_sconf ga Y P 4 (K - 68)%nat true
-              (proc_addr jp) C true ∅ ltac:(lia) HYtp HYa0 HYa3
+              (proc_addr jp) true ∅ ltac:(lia) HYtp HYa0 HYa3
               ltac:(lia) uvm_perm_ok_22
               ltac:(rewrite HYa1 uint_unsigned; exact Hmaxpground)
               ltac:(right; rewrite HYa1; exact Hcov_pground)
@@ -953,7 +933,7 @@ Section KexecCSetup.
       (* [Hcont] is still anchored at THIS lemma's own [CID0] -- both must   *)
       (* be re-anchored at the hart we are actually at before handing        *)
       (* either into [kxc_bad_1d6] (durable-notes' "CHAINING TWO HALVES"). ---- *)
-      iDestruct (cpu_own_transport CID16 CID18 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID16 CID18 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr18 : true = false \/ proc_addr jp = zero_reg ->
                        (CID18 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -961,7 +941,7 @@ Section KexecCSetup.
                    with "Hcont") as "Hcont".
       iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                 size used used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m U0 K C ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv)
+                dqb dqs dqa m U0 K ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv)
                 ltac:(unfold K_kexec; lia) Hu2
                 Hmsp Hmra Hms0 Hms1 Hms2 HU0sp HU0s3 HU0s6
                 Hbelow_pground Hcov_pground
@@ -1176,7 +1156,7 @@ Section KexecCSetup.
         by (rewrite /Z1 upd_ne; [exact HU3s4 | nz]).
       assert (HZ1sp : Z1 !!! Regidx csp_rs1 = pa_stk sp0 68)
         by (rewrite /Z1 upd_ne; [exact HU3sp | nz]).
-      iDestruct (cpu_own_transport CID16 CID22 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID16 CID22 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (Uvmclear.wp_uvmclear_sconf Z1 P' (uvm_pte (Z.lor 4 18) rleaf)
                 (K - 68)%nat true (proc_addr jp)
@@ -1923,7 +1903,7 @@ Section KexecCExitM1.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (sz1 : mword 64) (c : nat)
@@ -1950,7 +1930,7 @@ Section KexecCExitM1.
     instr (mword_of_int (KXC + stub + 2) : mword 64) true (JAL (jimm, zreg)) -∗
     pc_is (mword_of_int (KXC + stub) : mword 64) -∗
     sie_cap_gpr M (K - 68)%nat true (proc_addr jp) -∗
-    cpu_own 0 true (proc_addr jp) C true ∅ -∗
+    cpu_own 0 true (proc_addr jp) true ∅ -∗
     kxc_c_res jp bn gfs ga gf cov logstart bmapstart inodestart size used2
               plen pfun na avf aslen afun pidv V dqb dqs dqa
               sp0 ra0 s00 s10 s20 pv av
@@ -1961,7 +1941,7 @@ Section KexecCExitM1.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2015,7 +1995,7 @@ Section KexecCExitM1.
                  with "Helf Hframe") as "Hframeat".
     iEval (rewrite -Hmw5 -Hmw6 -Hmw7 -Hmw8 -Hmw9 -Hmw10 -Hmw11 -Hmw12 -Hmw13)
       in "Hframeat".
-    iDestruct (cpu_own_transport CID0 CID2 0%nat true (proc_addr jp) C true
+    iDestruct (cpu_own_transport CID0 CID2 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     assert (Hcr2 : true = false \/ proc_addr jp = zero_reg ->
                      (CID2 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -2023,7 +2003,7 @@ Section KexecCExitM1.
                  with "Hcont") as "Hcont".
     iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
               size used2 used2 plen pfun na avf alen aslen afun pidv V
-              dqb dqs dqa m Mt K C ∅ sp0 ra0 s00 s10 s20 pv av P sz1
+              dqb dqs dqa m Mt K ∅ sp0 ra0 s00 s10 s20 pv av P sz1
               ltac:(unfold K_kexec; lia) ltac:(reflexivity)
               Hmsp Hmra Hms0 Hms1 Hms2 HMtsp HMts3 HMts6 Hbelow Hcov
               with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
@@ -2194,7 +2174,7 @@ Section KexecCLoop.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) :
@@ -2223,7 +2203,7 @@ Section KexecCLoop.
     kernel_text -∗
     kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-               M K C sp0 ra0 s00 s10 s20 pv av
+               M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
     (* ---- kexec's OWN continuation: the three early exits close it ---- *)
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
@@ -2232,7 +2212,7 @@ Section KexecCLoop.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2252,11 +2232,11 @@ Section KexecCLoop.
       ∀ (M' : regfile) (P' : uptd),
         ( kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                      plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                     M' K C sp0 ra0 s00 s10 s20 pv av
+                     M' K sp0 ra0 s00 s10 s20 pv av
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 (S c)
           ∨ kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                        plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                       M' K C sp0 ra0 s00 s10 s20 pv av
+                       M' K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 (S c) ) -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -2264,7 +2244,7 @@ Section KexecCLoop.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true ∅ -∗
+              cpu_own 0 true (proc_addr jp) true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2595,7 +2575,7 @@ Section KexecCLoop.
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P c sz1 alen
                    with "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs
                          Helf Hframe") as "Hres".
-      iDestruct (cpu_own_transport CID0 CID6 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID0 CID6 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr6 : true = false \/ proc_addr jp = zero_reg ->
                        (CID6 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -2603,7 +2583,7 @@ Section KexecCLoop.
                    with "Hcont") as "Hcont".
       iApply (kxc_c_exit_m1 (CID0 := CID6) jp bn gfs ga gf cov logstart
                 bmapstart inodestart size used2 plen pfun na avf alen aslen afun
-                pidv V dqb dqs dqa m T3 K C sp0 ra0 s00 s10 s20 pv av
+                pidv V dqb dqs dqa m T3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0x358
                 (sign_extend' 21 (concat_vec (mword_of_int 1854 : mword 11) ('b"0")))
                 ltac:(unfold K_kexec; lia) ltac:(lia) Hal
@@ -3077,7 +3057,7 @@ Section KexecCLoop.
       iEval (rewrite Hsplit big_sepL_app) in "Hargc".
       iDestruct "Hargc" as "[Hargc1 Hargc2]".
       iApply (Copyout.wp_copyout_sconf ga Z2 P sz1 (S (alen c)) (afun c)
-                (K - 68)%nat 0%nat true (proc_addr jp) C true ∅
+                (K - 68)%nat 0%nat true (proc_addr jp) true ∅
                 ltac:(lia) HZ2a0 HZ2a1
                 ltac:(rewrite HZ2a4; f_equal; lia)
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
@@ -3482,7 +3462,7 @@ Section KexecCLoop.
                     with "Hcg Hpc Hi268").
           iIntros (CID29 Hs29). iApply bi.later_intro. iIntros "Hcg Hpc".
           iEval (rewrite Htgt272') in "Hpc".
-          iDestruct (cpu_own_transport CID19 CID29 0%nat true (proc_addr jp) C true
+          iDestruct (cpu_own_transport CID19 CID29 0%nat true (proc_addr jp) true
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           assert (Hcr29 : true = false \/ proc_addr jp = zero_reg ->
                            (CID29 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -3535,7 +3515,7 @@ Section KexecCLoop.
              assert (Hpp26e : add_vec_int (mword_of_int (KXC + 0x26a) : mword 64) 4
                               = mword_of_int (KXC + 0x26e)) by pcw.
              iEval (rewrite Hpp26e) in "Hpc".
-             iDestruct (cpu_own_transport CID19 CID30 0%nat true (proc_addr jp) C true
+             iDestruct (cpu_own_transport CID19 CID30 0%nat true (proc_addr jp) true
                           ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
              assert (Hcr30 : true = false \/ proc_addr jp = zero_reg ->
                               (CID30 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -3543,7 +3523,7 @@ Section KexecCLoop.
                           with "Hcont") as "Hcont".
              iApply (kxc_c_exit_m1 (CID0 := CID30) jp bn gfs ga gf cov logstart
                        bmapstart inodestart size used2 plen pfun na avf alen aslen
-                       afun pidv V dqb dqs dqa m U4 K C sp0 ra0 s00 s10 s20 pv av
+                       afun pidv V dqb dqs dqa m U4 K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 sz1 (S c) 0x26e
                        (sign_extend' 21 (concat_vec (mword_of_int 1971 : mword 11) ('b"0")))
                        ltac:(unfold K_kexec; lia) ltac:(lia) Hal
@@ -3567,7 +3547,7 @@ Section KexecCLoop.
                        with "Hcg Hpc Hi26a").
              iIntros (CID30 Hs30). iApply bi.later_intro. iIntros "Hcg Hpc".
              iEval (rewrite Htgt21a') in "Hpc".
-             iDestruct (cpu_own_transport CID19 CID30 0%nat true (proc_addr jp) C true
+             iDestruct (cpu_own_transport CID19 CID30 0%nat true (proc_addr jp) true
                           ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
              assert (Hcr30 : true = false \/ proc_addr jp = zero_reg ->
                               (CID30 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -3620,7 +3600,7 @@ Section KexecCLoop.
                      w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 c sz1 alen
                      with "Hirs Hbm Hins Hbits Hbs Hka Hpt Hpriv Hpath Hargv Hargs
                            Helf Hframe") as "Hres".
-        iDestruct (cpu_own_transport CID19 CID21 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID19 CID21 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         assert (Hcr21 : true = false \/ proc_addr jp = zero_reg ->
                          (CID21 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -3628,7 +3608,7 @@ Section KexecCLoop.
                      with "Hcont") as "Hcont".
         iApply (kxc_c_exit_m1 (CID0 := CID21) jp bn gfs ga gf cov logstart
                   bmapstart inodestart size used2 plen pfun na avf alen aslen afun
-                  pidv V dqb dqs dqa m T13 K C sp0 ra0 s00 s10 s20 pv av
+                  pidv V dqb dqs dqa m T13 K sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 sz1 c 0x35c
                   (sign_extend' 21 (concat_vec (mword_of_int 1852 : mword 11) ('b"0")))
                   ltac:(unfold K_kexec; lia) ltac:(lia) Hal
@@ -3687,7 +3667,7 @@ Section KexecCArgvLoop.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m : regfile) (K : nat) (C : iProp Σ)
+      (m : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (oldsz sz1 : mword 64) :
@@ -3711,7 +3691,7 @@ Section KexecCArgvLoop.
     kernel_text -∗
     kxc_at_21a jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-               M K C sp0 ra0 s00 s10 s20 pv av
+               M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -3719,7 +3699,7 @@ Section KexecCArgvLoop.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -3738,7 +3718,7 @@ Section KexecCArgvLoop.
       ∀ (M' : regfile) (P' : uptd) (c' : nat),
         kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                    plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                   M' K C sp0 ra0 s00 s10 s20 pv av
+                   M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 c' -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -3746,7 +3726,7 @@ Section KexecCArgvLoop.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true ∅ -∗
+              cpu_own 0 true (proc_addr jp) true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -3780,7 +3760,7 @@ Section KexecCArgvLoop.
     iIntros "#Htext Hst Hcont Hout".
     iApply (kxc_argv_step (CID0 := CID0) jp bn gfs ga gf cov logstart
               bmapstart inodestart size used2 plen pfun na avf alen aslen afun
-              pidv V dqb dqs dqa m M K C sp0 ra0 s00 s10 s20 pv av
+              pidv V dqb dqs dqa m M K sp0 ra0 s00 s10 s20 pv av
               w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c
               HK Hcna (Halen_bound c Hcna) (Halen_cstr c Hcna)
               (Halen_4096 c Hcna) Hsz1ge Hnamax Hal
@@ -4018,7 +3998,7 @@ Section KexecCClose.
       (na : nat) (avf : nat -> mword 64) (alen aslen : nat -> nat)
       (afun : nat -> nat -> bv 8)
       (pidv : mword 32) (V : pprivate) (dqb dqs dqa : dfrac)
-      (m M : regfile) (K : nat) (C : iProp Σ)
+      (m M : regfile) (K : nat)
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 : mword 64)
       (ef : nat -> bv 8) (P : uptd) (oldsz sz1 : mword 64) (c : nat) :
@@ -4034,7 +4014,7 @@ Section KexecCClose.
     kernel_text -∗
     kxc_at_272 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-               M K C sp0 ra0 s00 s10 s20 pv av
+               M K sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P oldsz sz1 c -∗
     wp_next true (proc_addr jp) (fun (CID : CpuId) =>
     ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -4042,7 +4022,7 @@ Section KexecCClose.
         ⌜callee_saved m mf⌝ -∗
         ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
         sie_cap_gpr mf K true (proc_addr jp) -∗
-        cpu_own 0 true (proc_addr jp) C true ∅ -∗
+        cpu_own 0 true (proc_addr jp) true ∅ -∗
         pc_is (ret_pc ra0) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -4061,7 +4041,7 @@ Section KexecCClose.
       ∀ (M' : regfile) (P' : uptd),
         kxc_at_2a6 jp bn gfs ga gf cov logstart bmapstart inodestart size used2
                    plen pfun na avf alen aslen afun pidv V dqb dqs dqa
-                   M' K C sp0 ra0 s00 s10 s20 pv av
+                   M' K sp0 ra0 s00 s10 s20 pv av
                    w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P' oldsz sz1 c -∗
         wp_next (CID0 := CID) true (proc_addr jp) (fun (CIDy : CpuId) =>
           ∀ (mf : regfile) (used' : gset Z) (V' : pprivate)
@@ -4069,7 +4049,7 @@ Section KexecCClose.
               ⌜callee_saved m mf⌝ -∗
               ⌜kexec_ok V V' (mf !!! Regidx Ra0) entry spv szv' na alen⌝ -∗
               sie_cap_gpr mf K true (proc_addr jp) -∗
-              cpu_own 0 true (proc_addr jp) C true ∅ -∗
+              cpu_own 0 true (proc_addr jp) true ∅ -∗
               pc_is (ret_pc ra0) -∗
               sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
               sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -4567,7 +4547,7 @@ Section KexecCClose.
                    with "Helf HframeB") as "Hframeat".
       iEval (rewrite -Hmw5 -Hmw6 -Hmw7 -Hmw8 -Hmw9 -Hmw10 -Hmw11 -Hmw12 -Hmw13)
         in "Hframeat".
-      iDestruct (cpu_own_transport CID0 CID10 0%nat true (proc_addr jp) C true
+      iDestruct (cpu_own_transport CID0 CID10 0%nat true (proc_addr jp) true
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       assert (Hcr10 : true = false \/ proc_addr jp = zero_reg ->
                        (CID10 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -4575,7 +4555,7 @@ Section KexecCClose.
                    with "Hcont") as "Hcont".
       iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                 size used2 used2 plen pfun na avf alen aslen afun pidv V
-                dqb dqs dqa m X7 K C ∅ sp0 ra0 s00 s10 s20 pv av P sz1
+                dqb dqs dqa m X7 K ∅ sp0 ra0 s00 s10 s20 pv av P sz1
                 ltac:(unfold K_kexec; lia) ltac:(reflexivity)
                 Hmsp Hmra Hms0 Hms1 Hms2 HX7sp HX7s3 HX7s6 Hbelow Hcov
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
@@ -4826,7 +4806,7 @@ Section KexecCClose.
         change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hmax.
         change (2 ^ 38)%Z with 274877906944%Z. lia. }
       iApply (Copyout.wp_copyout_sconf ga X12 P sz1 (8 * S c)%nat ufun
-                (K - 68)%nat 0%nat true (proc_addr jp) C true ∅
+                (K - 68)%nat 0%nat true (proc_addr jp) true ∅
                 ltac:(lia) HX12a0 HX12a1
                 ltac:(rewrite HX12a4; f_equal; lia)
                 ltac:(change (2 ^ 64)%Z with 18446744073709551616%Z; lia)
@@ -4914,7 +4894,7 @@ Section KexecCClose.
         assert (Hpp2a6 : add_vec_int (mword_of_int (KXC + 0x2a2) : mword 64) 4
                          = mword_of_int (KXC + 0x2a6)) by pcw.
         iEval (rewrite Hpp2a6) in "Hpc".
-        iDestruct (cpu_own_transport CID16 CID17 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID16 CID17 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         assert (Hcr17 : true = false \/ proc_addr jp = zero_reg ->
                          (CID17 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -4960,7 +4940,7 @@ Section KexecCClose.
                      with "Helf HframeB") as "Hframeat".
         iEval (rewrite -Hmw5 -Hmw6 -Hmw7 -Hmw8 -Hmw9 -Hmw10 -Hmw11 -Hmw12 -Hmw13)
           in "Hframeat".
-        iDestruct (cpu_own_transport CID16 CID17 0%nat true (proc_addr jp) C true
+        iDestruct (cpu_own_transport CID16 CID17 0%nat true (proc_addr jp) true
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         assert (Hcr17 : true = false \/ proc_addr jp = zero_reg ->
                          (CID17 : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -4968,7 +4948,7 @@ Section KexecCClose.
                      with "Hcont") as "Hcont".
         iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                   size used2 used2 plen pfun na avf alen aslen afun pidv V
-                  dqb dqs dqa m X13 K C ∅ sp0 ra0 s00 s10 s20 pv av P2 sz1
+                  dqb dqs dqa m X13 K ∅ sp0 ra0 s00 s10 s20 pv av P2 sz1
                   ltac:(unfold K_kexec; lia) ltac:(reflexivity)
                   Hmsp Hmra Hms0 Hms1 Hms2 HX13sp HX13s3 HX13s6' Hbelow2 Hcov2
                   with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv

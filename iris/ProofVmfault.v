@@ -177,8 +177,8 @@ Section ProofVmfault.
   Lemma wp_vmfault_sconf
       (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_vmfault_sconf_body γa mm P szv K lvl eb p C b lks.
+      (b : bool) (lks : gset string)
+    : wp_vmfault_sconf_body γa mm P szv K lvl eb p b lks.
   Proof.
     cbv beta delta [wp_vmfault_sconf_body].
     intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
@@ -368,7 +368,7 @@ Section ProofVmfault.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs4 ->
                 mj !!! Regidx c = mm !!! Regidx c) ⌝ -∗
         sie_cap_gpr mj (K - 6)%nat b p -∗
-        cpu_own lvl eb p C b lks -∗
+        cpu_own lvl eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.vmfault + 0x10) : mword 64) -∗
         (∃ w3 w4 w5 : mword 64,
            pa_stk sp0 3 ↦₈ w3 ∗ pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
@@ -498,7 +498,7 @@ Section ProofVmfault.
       iIntros (Eret Hseret) "Hcg Hpc". iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (E4 !!! Regidx Rra) = ret_tgt) by (rewrite HE4ra; reflexivity).
       iEval (rewrite Hretf) in "Hpc".
-      iDestruct (cpu_own_transport CIDe Eret lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDe Eret lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! Eret with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! E4 with "Hcg Hcnt Hpc [%] [Hpost]").
@@ -538,7 +538,7 @@ Section ProofVmfault.
                       = mword_of_int (KernelSyms.vmfault + 0x10))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp10) in "Hpc".
-      iDestruct (cpu_own_transport CID C10 lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID C10 lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hepi" $! C10 with "[%]"); [wp_next_chain|].
       iApply ("Hepi" $! R3 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
@@ -838,12 +838,12 @@ Section ProofVmfault.
         rewrite /A1. rewrite upd_ne;
           [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
         apply HN1thr; assumption. }
-      iDestruct (cpu_own_transport CID Cka lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CID Cka lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-                A1 None lvl eb p C (K - 6)%nat b _
+                A1 None lvl eb p (K - 6)%nat b _
                 ltac:(lia) ltac:(reflexivity) Hlvl Hbelow
-                with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+                with "Hcg Hcnt Htext Hpc Hlock Havail").
       all: try lkbelow.
       iIntros (Ckr Hskr mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
       assert (Hret3e : ret_pc (A1 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x3e)).
@@ -960,7 +960,7 @@ Section ProofVmfault.
                 = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjt7a) in "Hpc".
         iDestruct (proc_pt_rebuild P t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
-        iDestruct (cpu_own_transport Ckr C10A lvl eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport Ckr C10A lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hepi" $! C10A with "[%]"); [wp_next_chain|].
         iApply ("Hepi" $! B3 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
@@ -1285,10 +1285,10 @@ Section ProofVmfault.
       (* ---- mappages(pagetable, va0, PGSIZE, mem, PTE_R|W|U) ----
          at the ambient [lvl]: mappages/walk are level-generic, and [Hlvl] is
          exactly the int-range fact their kalloc needs. *)
-      iDestruct (cpu_own_transport Ckr Cmg lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport Ckr Cmg lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Mappages.wp_mappages_sconf γa G6 t m_ad 1%nat 22 lvl (K - 6)%nat
-                eb p C None b _
+                eb p None b _
                 Hlvl ltac:(lia) HG6a0 Hmpva Hmppa Hmpsz ltac:(lia)
                 HG6a4 vmf_perm_ok22 Hmpvab Hmppab Hrep Hmpfresh
                 with "Hcg Hcnt Htext Hpc Hptree Henv2").
@@ -1390,7 +1390,7 @@ Section ProofVmfault.
                      with "Hkmapb Hptree Hpage Hown") as "Hpt".
         assert (Humnone : P.(ud_um) !! svpn_of va0 = None)
           by (exact (proj2 (proj2 (proj1 (proj1 Hview (svpn_of va0)) Hnone)))).
-        iDestruct (cpu_own_transport Cgr C10B lvl eb p C b ltac:(wp_next_chain)
+        iDestruct (cpu_own_transport Cgr C10B lvl eb p b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iSpecialize ("Hepi" $! C10B with "[%]"); [wp_next_chain|].
         iApply ("Hepi" $! S3 r with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
@@ -1486,13 +1486,13 @@ Section ProofVmfault.
         rewrite /F1. rewrite upd_ne;
           [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
         apply Hmgthr; assumption. }
-      iDestruct (cpu_own_transport Cgr Ckf lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport Cgr Ckf lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
-                (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p C (K - 6)%nat b lks
+                (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p (K - 6)%nat b lks
                 ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 Hlvl Hbelow
-                with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+                with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre HF2a0.
         iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }
@@ -1572,7 +1572,7 @@ Section ProofVmfault.
               = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjt72) in "Hpc".
       iDestruct (proc_pt_rebuild P t' m_ad Hwf Hview Hrep' Hbase'' with "Hptree Hown") as "Hpt".
-      iDestruct (cpu_own_transport Cfr C10C lvl eb p C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport Cfr C10C lvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hepi" $! C10C with "[%]"); [wp_next_chain|].
       iApply ("Hepi" $! F6 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").
@@ -1654,7 +1654,7 @@ Section ProofVmfault.
             = mword_of_int (KernelSyms.vmfault + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjt36) in "Hpc".
     iDestruct (proc_pt_rebuild P t m_ad Hwf Hview Hrep Hbase with "Hptree Hown") as "Hpt".
-    iDestruct (cpu_own_transport CID C10D lvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID C10D lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hepi" $! C10D with "[%]"); [wp_next_chain|].
     iApply ("Hepi" $! D2 (mword_of_int 0) with "[%] Hcg Hcnt Hpc [Hk3 Hk4 Hk5] [Hpt]").

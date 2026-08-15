@@ -39,16 +39,16 @@ Require Import SmodeCore.
 Require Import KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 
-Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
@@ -74,7 +74,8 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      exists to remove. *)
   (kv_frame_slots + 20 <= av)%nat ->
   sie_cap_gpr m av false p0 -∗
-  cpu_own 0 false p0 cpu_ctx_free false ∅ -∗
+  cpu_ctx_free -∗
+  cpu_own 0 false p0 false ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
@@ -82,7 +83,6 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      [acquire] it calls in the scan asks for [panic_wp_any], a resource
      quantified over EVERY hart, and one hart's copy does not yield it.  Same
      propagation as SpecMain / SpecKinit / SpecUserinit / kalloc_env. *)
-  panic_wp_any -∗
   (* ONE premise where there were two: [trap_csrs] now carries [intr_res] --
      the installed vector and its contract -- as its fifth member, so the
      scheduler's level-0 SIE flip gets the handler out of the same bundle it
@@ -92,7 +92,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
       wp_scheduler_sconf_body γs m av p0.

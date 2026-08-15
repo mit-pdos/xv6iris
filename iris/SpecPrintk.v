@@ -93,7 +93,6 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Export PrintkArgs.
 From Kernel Require KernelSyms.
 
@@ -110,7 +109,7 @@ Definition printk_stack : nat := 48%nat.
 Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))
-    (n : nat) (eb : bool) (C : iProp Σ) (dqf : dfrac)
+    (n : nat) (eb : bool) (dqf : dfrac)
     (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -136,9 +135,8 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
      [LockRank.locks_below_union_singleton]. *)
   locks_below lks "pr" ->
   sie_cap_gpr m0 K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   fmt ↦ₛ{ dqf } f -∗
   ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
   (* pr.lock protects nothing at all now: the transmitter it used to own moved
@@ -153,7 +151,7 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhost
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf cs,
     sie_cap_gpr mf K b p -∗
-    cpu_own n eb p C b lks -∗
+    cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0
       /\ mf !!! Regidx a0_idx = zero_reg ⌝ -∗
@@ -168,9 +166,9 @@ Module Type PRINTK.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
       (m0 : regfile) (K : nat) (bs : list (bv 8))
-      (n : nat) (eb : bool) (C : iProp Σ) {dqf : dfrac}
+      (n : nat) (eb : bool) {dqf : dfrac}
       (f : string) (descs : list pk_arg_desc) (b : bool) (p : mword 64) (lks : gset string),
-      wp_printk_sconf_body γpr γl γd γv m0 K bs n eb C dqf f descs b p lks.
+      wp_printk_sconf_body γpr γl γd γv m0 K bs n eb dqf f descs b p lks.
 End PRINTK.
 
 (* ========================================================================
@@ -235,7 +233,7 @@ End PrintkGen.
 Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γd : uart_names) (γv : disk_names)
-    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -258,9 +256,8 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   locks_below lks "pr" ->
   sie_cap_gpr m0 K b pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp -∗
   (* the interrupt level is left exactly as found: acquire/release pair *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   (* the general path's whole credential (persistent) *)
   printk_env γpr γd γv -∗
   fmt ↦ₛ{ dqf } f -∗
@@ -270,7 +267,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    cpu_own 0%nat eb pj C b lks -∗
+    cpu_own 0%nat eb pj b lks -∗
     fmt ↦ₛ{ dqf } f -∗
     ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -285,15 +282,15 @@ Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
     (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
   forall (CIDp : CpuId)
-    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-    wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv m0 K eb pj C dqf f descs b lks.
+    wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv m0 K eb pj dqf f descs b lks.
 
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (γpr : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64)
       {dqf : dfrac} (f : string) (descs : list pk_arg_desc) (b : bool) (lks : gset string),
-      wp_printk_gen_sconf_body γpr γd γv m0 K eb pj C dqf f descs b lks.
+      wp_printk_gen_sconf_body γpr γd γv m0 K eb pj dqf f descs b lks.
 End PRINTK_GEN.

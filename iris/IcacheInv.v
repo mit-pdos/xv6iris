@@ -731,6 +731,35 @@ Section IcacheGhost.
      any second one -- which is how iput's authority-side opening of the
      escrow kills the checked-out arm.  The count component's inclusion is
      the whole content: [(q1,1) ⋅ (q2,1) = (q1+q2, 2)]. *)
+  (* the same at the bare COUNT FRAGMENTS, which is all the proof reads.  An
+     opener that meets an escrow arm's reference cannot use the [iref_tok]
+     form any more: the arm holds [inode_ref_gen_bare], whose sleeplock slice
+     is in the entry's lock rather than in the arm
+     (claude-notes/projects/iput-acquiresleep.md). *)
+  Lemma iref_frag_two_lookup M k q1 q2 :
+    itable_half M -∗ iref_frag k q1 -∗ iref_frag k q2 -∗
+    ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.
+  Proof.
+    rewrite /itable_half /iref_frag. iIntros "Ha H1 H2".
+    assert (Hop : (◯ {[ k := (q1, 1%positive) ]} ⋅ ◯ {[ k := (q2, 1%positive) ]}
+                   : icacheUR)
+                  = ◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]}).
+    { rewrite -auth_frag_op singleton_op -pair_op frac_op. reflexivity. }
+    iAssert (own icfg_iref (◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]})) with "[H1 H2]" as "Hf".
+    { rewrite -Hop own_op. iFrame. }
+    iDestruct (own_valid_2 with "Ha Hf")
+      as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
+    iPureIntro.
+    apply singleton_included_l in Hincl as [y [Hy Hle]].
+    apply leibniz_equiv in Hy. destruct y as [qt n]. exists qt, n.
+    split; [exact Hy|].
+    apply Some_included in Hle as [Heq | Hlt].
+    - destruct Heq as [_ Hn]; cbn in Hn.
+      assert (Hn' : (2%positive : positive) = n) by exact Hn. lia.
+    - apply pair_included in Hlt as [_ Hn]; cbn in Hn.
+      apply pos_included in Hn. lia.
+  Qed.
+
   Lemma iref_tok_two_lookup M k q1 q2 :
     itable_half M -∗ iref_tok k q1 -∗ iref_tok k q2 -∗
     ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.
@@ -1008,8 +1037,7 @@ Section IcacheRefInv.
      [iref_live_load_au]. *)
   Definition itable_body : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
-       itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_cells M ∗ live_pool M ∗
-       isl_pool M)%I.
+       itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_cells M ∗ live_pool M)%I.
 
   Definition itable_inv : iProp Σ := inv icacheN itable_body.
 
@@ -1081,15 +1109,15 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE) "#Hinv Htok".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (iref_lookup with "Ha Htok") as %(qt & n & HMk & _ & _ & _).
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (iref_cells_acc M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iExists (iref_word M k). iFrame "Hcell".
     iIntros "Hcell".
-    iMod ("Hclose" with "[Ha Hcell Hback Hpool Hipool]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hpool]") as "_".
     { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
-      iFrame "Hpool Hipool". iApply ("Hback" with "Hcell"). }
+      iFrame "Hpool". iApply ("Hback" with "Hcell"). }
     iModIntro. iFrame "Htok". iPureIntro.
     exact (iref_word_live M k qt n Hwf HMk).
   Qed.
@@ -1114,13 +1142,13 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE Hk) "#Hinv Hhalf".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     iDestruct (iref_cells_acc M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iMod ("Hclose" with "[Ha Hcell Hback Hpool Hipool]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hpool]") as "_".
     { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
-      iFrame "Hpool Hipool". iApply ("Hback" with "Hcell"). }
+      iFrame "Hpool". iApply ("Hback" with "Hcell"). }
     iModIntro. iFrame.
   Qed.
 
@@ -1136,22 +1164,27 @@ Section IcacheRefInv.
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, n) ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv -∗ itable_half M -∗ iref_tok k q -∗
+    (* THE SLOT'S SHARE AUTHORITY comes from the CALLER, not from the
+       invariant: it lives in the itable LOCK's resource, and every step that
+       moves it runs under that lock.  iput is why -- it has to hold the
+       authoritative zero across a whole [acquiresleep] call, which no
+       invariant can survive (claude-notes/projects/iput-acquiresleep.md). *)
+    itable_inv -∗ itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
          itable_half (<[k := (qt, Pos.succ n)]> M) ∗
+         isl_slot (<[k := (qt, Pos.succ n)]> M) k ∗
          iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp).
   Proof.
-    iIntros (HE HMk Hno) "#Hinv Hhalf Htok".
+    iIntros (HE HMk Hno) "#Hinv Hhalf Htok Hislot".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iDestruct (isl_pool_acc_upd M k Hk with "Hipool") as "[Hislot Hipback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
     iMod (iref_dup_step M k q qt n HMk with "Hauth Htok Hislot")
@@ -1162,7 +1195,7 @@ Section IcacheRefInv.
         as (c) "[%Ec Hc]".
       by rewrite (live_slot_some (<[k := (qt, Pos.succ n)]> M) k qt (Pos.succ n) c
                     (lookup_insert M k (qt, Pos.succ n)) Ec). }
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback Hislot Hipback]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
     { iNext. iExists (<[k := (qt, Pos.succ n)]> M). iFrame "Ha".
       iSplitR.
       { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
@@ -1176,10 +1209,7 @@ Section IcacheRefInv.
       iSplitL "Hcell Hback".
       { iApply ("Hback" $! (qt, Pos.succ n)).
         rewrite /iref_word lookup_insert. iExact "Hcell". }
-      iSplitL "Hslot Hpback".
-      { iApply ("Hpback" $! (<[k := (qt, Pos.succ n)]> M) with "[%] Hslot").
-        intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      iApply ("Hipback" $! (<[k := (qt, Pos.succ n)]> M) with "[%] Hislot").
+      iApply ("Hpback" $! (<[k := (qt, Pos.succ n)]> M) with "[%] Hslot").
       intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     iModIntro. iFrame.
   Qed.
@@ -1205,28 +1235,28 @@ Section IcacheRefInv.
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv -∗ itable_half M -∗
+    itable_inv -∗ itable_half M -∗ isl_slot M k -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
          itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
+         isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
          iref_tok k qn).
   Proof.
-    iIntros (HE HMk Hq Hno) "#Hinv Hhalf".
+    iIntros (HE HMk Hq Hno) "#Hinv Hhalf Hislot".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iDestruct (isl_pool_acc_upd M k Hk with "Hipool") as "[Hislot Hipback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
     iMod (iref_incr_step M k qt n qn HMk Hq with "Hauth Hslot Hislot")
       as "(Hauth & Hslot & Hislot & Htok)".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback Hislot Hipback]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
     { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
       iSplitR.
       { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
@@ -1240,10 +1270,7 @@ Section IcacheRefInv.
       iSplitL "Hcell Hback".
       { iApply ("Hback" $! ((qt + qn)%Qp, Pos.succ n)).
         rewrite /iref_word lookup_insert. iExact "Hcell". }
-      iSplitL "Hslot Hpback".
-      { iApply ("Hpback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%] Hslot").
-        intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      iApply ("Hipback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%] Hislot").
+      iApply ("Hpback" $! (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) with "[%] Hslot").
       intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     iModIntro. iFrame.
   Qed.
@@ -1295,27 +1322,26 @@ Section IcacheRefInv.
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, Pos.succ n) ->
     (qt - q)%Qp = Some qr ->
-    itable_inv -∗ itable_half M -∗ iref_tok k q -∗
+    itable_inv -∗ itable_half M -∗ iref_tok k q -∗ isl_slot M k -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos n) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (<[k := (qr, n)]> M)).
+         itable_half (<[k := (qr, n)]> M) ∗ isl_slot (<[k := (qr, n)]> M) k).
   Proof.
-    iIntros (HE HMk Hsub) "#Hinv Hhalf Htok".
+    iIntros (HE HMk Hsub) "#Hinv Hhalf Htok Hislot".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iDestruct (isl_pool_acc_upd M k Hk with "Hipool") as "[Hislot Hipback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
     iMod (iref_close_step M k q qt n qr HMk Hsub with "Hauth Htok Hslot Hislot")
       as "(Hauth & Hslot & Hislot)".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback Hislot Hipback]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
     { iNext. iExists (<[k := (qr, n)]> M). iFrame "Ha".
       iSplitR.
       { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
@@ -1330,10 +1356,7 @@ Section IcacheRefInv.
       iSplitL "Hcell Hback".
       { iApply ("Hback" $! (qr, n)).
         rewrite /iref_word lookup_insert. iExact "Hcell". }
-      iSplitL "Hslot Hpback".
-      { iApply ("Hpback" $! (<[k := (qr, n)]> M) with "[%] Hslot").
-        intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-      iApply ("Hipback" $! (<[k := (qr, n)]> M) with "[%] Hislot").
+      iApply ("Hpback" $! (<[k := (qr, n)]> M) with "[%] Hslot").
       intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     iModIntro. iFrame.
   Qed.
@@ -1348,26 +1371,26 @@ Section IcacheRefInv.
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, 1%positive) ->
     itable_inv -∗ itable_half M -∗ iref_tok k qt -∗ live_frac k (1/2)%Qp -∗
+    isl_slot M k -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (delete k M)).
+         itable_half (delete k M) ∗ isl_slot (delete k M) k).
   Proof.
-    iIntros (HE HMk) "#Hinv Hhalf Htok Hh".
+    iIntros (HE HMk) "#Hinv Hhalf Htok Hh Hislot".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (iref_cells_acc_del M k Hk with "Hcells") as "[Hcell Hback]".
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hslot Hpback]".
-    iDestruct (isl_pool_acc_upd M k Hk with "Hipool") as "[Hislot Hipback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
     iMod (iref_close_last_step M k qt HMk with "Hauth Htok Hh Hslot Hislot")
       as "(Hauth & Hslot & Hislot)".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
-    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback Hislot Hipback]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hslot Hpback]") as "_".
     { iNext. iExists (delete k M). iFrame "Ha".
       iSplitR.
       { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
@@ -1378,10 +1401,7 @@ Section IcacheRefInv.
           rewrite lookup_delete_Some in Hi. destruct Hi as [_ Hi].
           by apply (Hcnt i qi). }
       iSplitL "Hcell Hback"; [iApply ("Hback" with "Hcell") |].
-      iSplitL "Hslot Hpback".
-      { iApply ("Hpback" $! (delete k M) with "[%] Hslot").
-        intros j Hj. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
-      iApply ("Hipback" $! (delete k M) with "[%] Hislot").
+      iApply ("Hpback" $! (delete k M) with "[%] Hslot").
       intros j Hj. rewrite lookup_delete_ne; [reflexivity | by apply not_eq_sym]. }
     iModIntro. iFrame.
   Qed.
@@ -1415,14 +1435,14 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE Hk) "#Hinv Hlv".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (live_pool_live_gen M k s g Hk with "Hlv Hpool") as %[[qt n] HMk].
     iDestruct (iref_cells_acc M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iExists (iref_word M k). iFrame "Hcell".
     iIntros "Hcell".
-    iMod ("Hclose" with "[Ha Hcell Hback Hpool Hipool]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hpool]") as "_".
     { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
-      iFrame "Hpool Hipool". iApply ("Hback" with "Hcell"). }
+      iFrame "Hpool". iApply ("Hback" with "Hcell"). }
     iModIntro. iFrame "Hlv". iPureIntro.
     exact (iref_word_live M k qt n Hwf HMk).
   Qed.
@@ -1437,14 +1457,14 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE Hk) "#Hinv Hlv".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M) "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (live_pool_live M k s Hk with "Hlv Hpool") as %[[qt n] HMk].
     iDestruct (iref_cells_acc M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iExists (iref_word M k). iFrame "Hcell".
     iIntros "Hcell".
-    iMod ("Hclose" with "[Ha Hcell Hback Hpool Hipool]") as "_".
+    iMod ("Hclose" with "[Ha Hcell Hback Hpool]") as "_".
     { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
-      iFrame "Hpool Hipool". iApply ("Hback" with "Hcell"). }
+      iFrame "Hpool". iApply ("Hback" with "Hcell"). }
     iModIntro. iFrame "Hlv". iPureIntro.
     exact (iref_word_live M k qt n Hwf HMk).
   Qed.
@@ -1475,7 +1495,7 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE HMk) "#Hinv Hhalf Hq Hh Hs".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody _]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >_ & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >_ & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (big_sepL_lookup (fun (_ : nat) (j : nat) => live_slot M j)
@@ -1532,7 +1552,7 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE HMk) "#Hinv Hhalf Hq Hh".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     iDestruct (live_pool_acc_upd M k Hk with "Hpool") as "[Hsl Hback]".
@@ -1547,9 +1567,9 @@ Section IcacheRefInv.
     iEval (rewrite -Hsum) in "Hg".
     rewrite live_gen_split. iDestruct "Hg" as "[Hqc' Hh']".
     rewrite live_gen_split. iDestruct "Hqc'" as "[Hq' Hc']".
-    iMod ("Hclose" with "[Ha Hcells Hback Hc' Hipool]") as "_".
+    iMod ("Hclose" with "[Ha Hcells Hback Hc']") as "_".
     { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
-      iFrame "Hcells". iSplitR "Hipool"; [| iFrame "Hipool" ].
+      iFrame "Hcells".
       iApply ("Hback" $! M with "[%] [Hc']").
       - intros j _. reflexivity.
       - rewrite (live_slot_some M k qt n c HMk Ec). iExists g'. iExact "Hc'". }
@@ -1569,11 +1589,11 @@ Section IcacheRefInv.
   Proof.
     iIntros (HE Hk) "#Hinv Hhalf Hlv".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
-    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool & >Hipool)".
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells & >Hpool)".
     iDestruct (itable_half_agree with "Ha Hhalf") as %->.
     iDestruct (live_pool_live M k s Hk with "Hlv Hpool") as %HMk.
-    iMod ("Hclose" with "[Ha Hcells Hpool Hipool]") as "_".
-    { iNext. iExists M. iFrame "Ha Hcells Hpool Hipool". iPureIntro. exact Hwf. }
+    iMod ("Hclose" with "[Ha Hcells Hpool]") as "_".
+    { iNext. iExists M. iFrame "Ha Hcells Hpool". iPureIntro. exact Hwf. }
     iModIntro. by iFrame.
   Qed.
 
@@ -1607,19 +1627,20 @@ Section IcacheRefInv.
     M !! k = Some (qt, n) ->
     (qt + qn < 1/2)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv -∗ itable_half M -∗ live_frac k s -∗
+    itable_inv -∗ itable_half M -∗ live_frac k s -∗ isl_slot M k -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
          itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
+         isl_slot (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) k ∗
          iref_tok k qn ∗ live_frac k s).
   Proof.
-    iIntros (HE HMk Hq Hno) "#Hinv Hhalf Hlv".
-    iMod (iref_incr_store_au Eo M k qt qn n HE HMk Hq Hno with "Hinv Hhalf")
+    iIntros (HE HMk Hq Hno) "#Hinv Hhalf Hlv Hislot".
+    iMod (iref_incr_store_au Eo M k qt qn n HE HMk Hq Hno with "Hinv Hhalf Hislot")
       as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
-    iMod ("Hback" with "Hcell") as "[Hhalf Htok]".
+    iMod ("Hback" with "Hcell") as "(Hhalf & Hislot & Htok)".
     iModIntro. iFrame.
   Qed.
 

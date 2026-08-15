@@ -212,6 +212,7 @@ Require Import SpecWritei.
 Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -435,7 +436,7 @@ Definition ireg_blocks_ok (inodestart : Z) (nib : nat)
 Section DirlinkSpec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
 
   (* Every entry's inode sleeplock, in the shape [IcacheBoot.icache_alloc]
      hands it out.  iput names ONE slot's lock; dirlink cannot know which
@@ -445,8 +446,8 @@ Section DirlinkSpec.
   Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
     ([∗ list] kk ∈ seq 0 NINODE,
        ∃ γil γisl : gname,
-         is_sleeplock γil γisl (i_lock (ientry kk)) "inode"%string
-                      (ic_tok cn kk))%I.
+         is_sleeplock_gen γil γisl (i_lock (ientry kk)) "inode"%string
+                          (ic_tok cn kk) (slh_tok (icfg_isl kk)))%I.
 
   Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
   Proof. apply _. Qed.
@@ -455,7 +456,7 @@ End DirlinkSpec.
 Definition wp_dirlink_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -475,7 +476,7 @@ Definition wp_dirlink_sconf_body
     (inum : mword 16)                                 (* the LINKED inum     *)
     (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
@@ -546,7 +547,7 @@ Definition wp_dirlink_sconf_body
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -599,7 +600,7 @@ Definition wp_dirlink_sconf_body
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
       i_dev ip ↦₄{dqd} dev -∗
@@ -701,7 +702,7 @@ Definition wp_dirlink_sconf_body
 Definition wp_dirlink_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -721,7 +722,7 @@ Definition wp_dirlink_gen_body
     (inum : mword 16)                                 (* the LINKED inum     *)
     (ncount : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.dirlink in
   let pj := proc_addr j in
@@ -799,7 +800,7 @@ Definition wp_dirlink_gen_body
      higher one follows by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   kernel_data -∗
@@ -852,7 +853,7 @@ Definition wp_dirlink_gen_body
     (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* ---- everything comes back, at the possibly-updated indices ---- *)
       i_dev ip ↦₄{dqd} dev -∗
@@ -970,7 +971,7 @@ Module Type DIRLINK.
   Parameter wp_dirlink_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -989,13 +990,13 @@ Module Type DIRLINK.
       (inum : mword 16)
       (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_dirlink_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                             γa γf γpr cov logstart inodestart nib bmapstart
                             size dev used ip dinum bm data dn dn0 fn inum
                             ncount pidv dq dqd dqn dqs dqb dqbs dqf
-                            m K eb C b lks.
+                            m K eb b lks.
 
   (* the SET-FORM contract; [wp_dirlink_sconf] above is its instance with
      the set forgotten, kept as its own parameter so that every existing
@@ -1003,7 +1004,7 @@ Module Type DIRLINK.
   Parameter wp_dirlink_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -1022,11 +1023,11 @@ Module Type DIRLINK.
       (inum : mword 16)
       (ncount : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs dqf : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_dirlink_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
                           γa γf γpr cov logstart inodestart nib bmapstart
                           size dev used ip dinum bm data dn dn0 fn inum
                           ncount Sb pidv dq dqd dqn dqs dqb dqbs dqf
-                          m K eb C b lks.
+                          m K eb b lks.
 End DIRLINK.

@@ -117,7 +117,6 @@ Require Import CalleeSaved.
 Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import PanicStub.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
@@ -138,7 +137,7 @@ Definition wp_idup_sconf_body
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
     (k : nat) (s : Qp) (dev inum : mword 32)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -153,11 +152,10 @@ Definition wp_idup_sconf_body
      the caller must already hold only locks BELOW "itable"'s rank. *)
   locks_below lks "itable" ->
   sie_cap_gpr m K b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
   (* A SHARE, not a reference -- see the header. *)
@@ -165,7 +163,7 @@ Definition wp_idup_sconf_body
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
-    cpu_own n eb p C b lks -∗
+    cpu_own n eb p b lks -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
@@ -186,8 +184,8 @@ Module Type IDUP.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
       wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
-                         m n eb p C K b lks.
+                         m n eb p K b lks.
 End IDUP.

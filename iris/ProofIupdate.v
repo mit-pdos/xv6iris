@@ -86,6 +86,7 @@ Require Import SpecBread SpecBrelse SpecLogWrite SpecMemmove.
 Require Import DinodeSlot.
 Require Import SpecIupdate.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -117,7 +118,7 @@ Local Ltac iuidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section IupdateDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   (* iupdate's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -298,12 +299,12 @@ Section IupdateDefs.
       (dn : dinode) (bm : blkmap) (u : nat) (Sbo : gset Z) (v : nat)
       (Pout : iProp Σ)
       (dev : mword 32) (pidv : mword 32) (dq dqd dqn dqs : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) : iProp Σ :=
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) : iProp Σ :=
     wp_next true (proc_addr j) (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
-        cpu_own 0 eb (proc_addr j) C b lks -∗
+        cpu_own 0 eb (proc_addr j) b lks -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb (proc_addr j) -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
@@ -382,7 +383,7 @@ Definition iu_sp (m M : regfile) : Prop :=
 (*  +0x66 .. +0x7c : log_write, brelse, and the epilogue.                 *)
 (* ===================================================================== *)
 Section IupdateTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
 
   Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
@@ -396,7 +397,7 @@ Section IupdateTail.
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (Pout : iProp Σ)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
+      (m M : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
     (K_iupdate <= K)%nat ->
     iu_sp m M ->
     iu_thr m M ->
@@ -410,7 +411,7 @@ Section IupdateTail.
        [locks_below_mono]. *)
     locks_below lks "log" ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
-    cpu_own 0 eb (proc_addr j) C b lks -∗
+    cpu_own 0 eb (proc_addr j) b lks -∗
     (* THE COMPLEMENT, PURE PASS-THROUGH: log_write and brelse are not in the
        ALREADY-GENERALIZED set, so neither touches it -- it rides untouched
        from here to the final [Hcont] specialization (one wide transport,
@@ -452,7 +453,7 @@ Section IupdateTail.
     iu_cont (CID0 := CID0) γfs bn γ inodestart ip inum dn bm
             (if cru then S u else u)
             (Sb ∪ {[IBLOCK inum inodestart]}) v Pout
-            dev pidv dq dqd dqn dqs j m K eb C b lks -∗
+            dev pidv dq dqd dqn dqs j m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hbelow.
@@ -512,7 +513,7 @@ Section IupdateTail.
     assert (HT1thr : iu_thr m T1).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T1 upd_ne; [| regne]. exact (HT0thr c Hcs N2 N8 N9 N18). }
-   iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) C b 
+   iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr j) b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
@@ -536,7 +537,7 @@ Section IupdateTail.
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
               cru Sb e0 v (⊤ ∖ ↑iregN) Pout
-              T1 0%nat eb (proc_addr j) C (K - 4)%nat b
+              T1 0%nat eb (proc_addr j) (K - 4)%nat b
               _ HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
@@ -608,13 +609,13 @@ Section IupdateTail.
     assert (HT3thr : iu_thr m T3).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /T3 upd_ne; [| regne]. exact (HT2thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr j) C b 
+    iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr j) b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
-              pidv dev bno dq T3 (K - 4)%nat eb (proc_addr j) C
+              pidv dev bno dq T3 (K - 4)%nat eb (proc_addr j)
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
               lks HKbl Hkk HT3a0
               (* brelse's bound is "bcache"(4); iu_tail's own is "log"(3),
@@ -831,7 +832,7 @@ Section IupdateTail.
     assert (Cs11 : P5 !!! Regidx (mword_of_int 27 : mword 5)
                   = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; iuidx).
-    iDestruct (cpu_own_transport CID6 CID12 0 eb (proc_addr j) C b 
+    iDestruct (cpu_own_transport CID6 CID12 0 eb (proc_addr j) b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     (* THE WIDE HOP: neither log_write nor brelse threads the complement, so
        it is still at CID0 (iu_tail's own entry hart) -- span all the way to
@@ -854,7 +855,7 @@ End IupdateTail.
 (*  memmove.                                                              *)
 (* ===================================================================== *)
 Section ProofIupdateMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ, !icacheG Σ, ICFG : icfg}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -878,7 +879,7 @@ Section ProofIupdateMain.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat) (Pout : iProp Σ)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : let pcE : mword 64 := mword_of_int KernelSyms.iupdate in
       let pj := proc_addr j in
@@ -899,7 +900,7 @@ Section ProofIupdateMain.
          the whole cone via [locks_below_mono]. *)
       locks_below lks "log" ->
       sie_cap_gpr m K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       kernel_text -∗ pc_is pcE -∗
@@ -933,7 +934,7 @@ Section ProofIupdateMain.
       ∀ mf : regfile,
           ⌜callee_saved m mf⌝ -∗
           sie_cap_gpr mf K b pj -∗
-          cpu_own 0 eb pj C b lks -∗
+          cpu_own 0 eb pj b lks -∗
           trap_csrs_ext eb -∗
           cpu_claim_ext eb pj -∗
           pc_is ret_tgt -∗
@@ -988,7 +989,7 @@ Section ProofIupdateMain.
     iAssert (iu_cont (CID0 := CID) γfs bn γ inodestart ip inum dn bm
                (if cru then S u else u)
                (Sb ∪ {[IBLOCK inum inodestart]}) v Pout
-               dev pidv dq dqd dqn dqs j m K eb C b lks)%I with "[Hcont]" as "Hcont";
+               dev pidv dq dqd dqn dqs j m K eb b lks)%I with "[Hcont]" as "Hcont";
       [rewrite /iu_cont; iExact "Hcont" |].
     iDestruct "Hmeta" as "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
     iPoseProof (iui_00 with "Htext") as "Hi00".
@@ -1307,7 +1308,7 @@ Section ProofIupdateMain.
     assert (HRAthr : iu_thr m RA).
     { intros c Hcs N2 N8 N9 N18.
       rewrite /RA upd_ne; [| regne]. exact (HR9thr c Hcs N2 N8 N9 N18). }
-    iDestruct (cpu_own_transport CID CID14 0 eb (proc_addr j) C b 
+    iDestruct (cpu_own_transport CID CID14 0 eb (proc_addr j) b 
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID CID14 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
@@ -1319,7 +1320,7 @@ Section ProofIupdateMain.
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
-              RA (K - 4)%nat eb C b
+              RA (K - 4)%nat eb b
               lks HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1
               (* bread's bound is "bcache"(4); iupdate's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
@@ -1908,7 +1909,7 @@ Section ProofIupdateMain.
     { exact (diblk_wf_insert ds (islot inum) dn Hdswf Hdnwf). }
     iDestruct ("Hheldback" with "Hbuf") as "Hheld".
     (* ---- into the tail ---- *)
-    iDestruct (cpu_own_transport CID15 CID36 0 eb (proc_addr j) C b
+    iDestruct (cpu_own_transport CID15 CID36 0 eb (proc_addr j) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (trap_csrs_ext_transport CID15 CID36 eb (proc_addr j)
                  ltac:(rewrite Hbm; wp_next_chain) with "Htc") as "Htc".
@@ -1921,7 +1922,7 @@ Section ProofIupdateMain.
     iApply (iu_tail (CID0 := CID36) γs j γfs γd bn γ cov logstart inodestart
               dev
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Pout
-              pidv dq dqd dqn dqs m mM K eb C b lks
+              pidv dq dqd dqn dqs m mM K eb b lks
               HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
@@ -1946,11 +1947,11 @@ Qed.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_gen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                           cov logstart inodestart nib dev ip inum dn dn0 bm u Sb
-                          pidv dq dqd dqn dqs m K eb C b lks.
+                          pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
@@ -1979,7 +1980,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb false e0 0%nat
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K eb C b lks
+              pidv dq dqd dqn dqs m K eb b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
@@ -2011,11 +2012,11 @@ Qed.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool) (e0 v : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_credgen_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
-                              pidv dq dqd dqn dqs m K eb C b lks.
+                              pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
@@ -2028,7 +2029,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 v
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K eb C b lks
+              pidv dq dqd dqn dqs m K eb b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hcrd Hop
@@ -2059,11 +2060,11 @@ Qed.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_cred_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                           pidv dq dqd dqn dqs m K eb C b lks.
+                           pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_cred_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
@@ -2084,7 +2085,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K true C b lks
+              pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
@@ -2121,11 +2122,11 @@ Qed.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                             cov logstart inodestart nib dev ip inum dn dn0 bm u
-                            pidv dq dqd dqn dqs m K eb C b lks.
+                            pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
@@ -2143,7 +2144,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb0 false e0 0%nat
               (ireg_out γi inum dn)
-              pidv dq dqd dqn dqs m K eb C b lks
+              pidv dq dqd dqn dqs m K eb b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
@@ -2178,11 +2179,11 @@ Qed.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_link_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                            cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                           pidv dq dqd dqn dqs m K eb C b lks.
+                           pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hbump Hgrd
@@ -2204,7 +2205,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at γi inum dn ∗ ilink (bv_unsigned inum))%I
-              pidv dq dqd dqn dqs m K true C b lks
+              pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
@@ -2242,11 +2243,11 @@ Qed.
       (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (Sb : gset Z) (cru : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
     : wp_iupdate_unlink_body γs j γl γu γd γk pd pav pu bn γ γfs γi
                              cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru
-                             pidv dq dqd dqn dqs m K eb C b lks.
+                             pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_unlink_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hda Hdirlen
@@ -2270,7 +2271,7 @@ Qed.
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
               (dinode_at γi inum dn)%I
-              pidv dq dqd dqn dqs m K true C b lks
+              pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop

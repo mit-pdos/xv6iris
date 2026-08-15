@@ -220,6 +220,7 @@ Require Import SpecDirlookup.
 Require Import SpecDirlink.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -305,10 +306,10 @@ Notation ROOTINO := InodeInv.ROOTINO.
 Definition namex_post
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
-    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ) (lks : gset string)
+    (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
     (used : gset Z) (cwdv : mword 64)
@@ -319,7 +320,7 @@ Definition namex_post
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -359,10 +360,10 @@ Definition namex_post
 Definition namex_postS
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (pj pv nb ret_tgt : mword 64) (pl : list (bv 8))
-    (m : regfile) (K : nat) (b eb : bool) (C : iProp Σ) (lks : gset string)
+    (m : regfile) (K : nat) (b eb : bool) (lks : gset string)
     (g : log_names) (gfs : fs_names) (bn : bio_names)
     (cov : gset Z) (logstart bmapstart inodestart size : Z)
     (used : gset Z) (cwdv : mword 64)
@@ -373,7 +374,7 @@ Definition namex_postS
      (ok : bool) (nf : nat -> bv 8) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       (* EVERYTHING LOANED COMES BACK *)
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -422,7 +423,7 @@ Definition namex_postS
 Definition wp_namex_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -441,7 +442,7 @@ Definition wp_namex_sconf_body
     (npar : bool)                                      (* the a1 flag         *)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
@@ -494,7 +495,7 @@ Definition wp_namex_sconf_body
   (* ORDER PREMISE: same cone, same bound, as the _gen body below. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -543,7 +544,7 @@ Definition wp_namex_sconf_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
-    namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb C lks
+    namex_post (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
                g gfs bn cov logstart bmapstart inodestart size used cwdv
                plen pfun npar n pidv dq dqb dqs dqc) -∗
   WP (Loop : expr riscv_lang).
@@ -568,7 +569,7 @@ Definition wp_namex_sconf_body
 Definition wp_namex_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -587,7 +588,7 @@ Definition wp_namex_gen_body
     (npar : bool)                                      (* the a1 flag         *)
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namex in
   let pj := proc_addr j in
@@ -646,7 +647,7 @@ Definition wp_namex_gen_body
      and the bcache/log ranks above it follow by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -695,7 +696,7 @@ Definition wp_namex_gen_body
      [eb = false] is reachable the [b] form would promise the caller it
      comes back on the hart it called from, which a park makes false. *)
   wp_next true pj (fun (CIDc : CpuId) =>
-    namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb C lks
+    namex_postS (CID := CIDc) pj pv nb ret_tgt pl m K b eb lks
                 g gfs bn cov logstart bmapstart inodestart size used cwdv
                 plen pfun npar n Sb pidv dq dqb dqs dqc) -∗
   WP (Loop : expr riscv_lang).
@@ -704,7 +705,7 @@ Module Type NAMEX.
   Parameter wp_namex_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -722,18 +723,18 @@ Module Type NAMEX.
       (npar : bool)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_namex_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun nfun npar n
-                          pidv dq dqb dqs dqc m K eb C b lks.
+                          pidv dq dqb dqs dqc m K eb b lks.
   (* the set-form contract; [wp_namex_sconf] is this at the [log_op]
      existential's own witness, with the grown set forgotten again. *)
   Parameter wp_namex_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -751,10 +752,111 @@ Module Type NAMEX.
       (npar : bool)
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_namex_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                         ga gf cov logstart bmapstart inodestart nib
                         size dev used cwdv plen pfun nfun npar n Sb
-                        pidv dq dqb dqs dqc m K eb C b lks.
+                        pidv dq dqb dqs dqc m K eb b lks.
 End NAMEX.
+
+(* ===================================================================== *)
+(*  THE ROOT CORNER: [namex("/", 0, name)]                                *)
+(*                                                                        *)
+(*  WHY A SECOND CONTRACT AND NOT AN INSTANCE OF THE FIRST.  The general  *)
+(*  contract above is a contract about a WALK: it takes the whole file-   *)
+(*  system fabric (the bio cache, the log, the inode region, the bitmap,  *)
+(*  the disk lock) and an OPEN transaction [log_op], it names the RUNNING *)
+(*  process (for [myproc()->cwd] on the relative arm, and because the     *)
+(*  walk can SLEEP), and it demands [eb = true].  None of that holds of   *)
+(*  the one caller that matters at BOOT.                                  *)
+(*                                                                        *)
+(*  [userinit] runs before there is a current process, before [fsinit]    *)
+(*  has read the superblock and before any transaction exists, and it     *)
+(*  calls [namei("/")].  A path of exactly one '/' has NO elements, so    *)
+(*  [skipelem] returns 0 on the first call and the walk's body never      *)
+(*  runs: the executed code is the prologue, the [*path == '/'] test, the *)
+(*  [iget(ROOTDEV, ROOTINO)] that arm makes, the four constant loads, the *)
+(*  leading-separator skip (one turn), the [nameiparent] test at +0x140,  *)
+(*  and the shared epilogue.  Nothing reads a disk block, nothing takes a *)
+(*  sleeplock, nothing can park -- so this contract is the ICACHE and     *)
+(*  nothing else, at an arbitrary [eb] / [b] / interrupt state, with no   *)
+(*  process named anywhere in it.                                         *)
+(*                                                                        *)
+(*  So the two are not a cross-product to be collapsed: they are two      *)
+(*  disjoint REGIMES of the same code, and the corner's whole point is    *)
+(*  that it assumes strictly less.  What it shares with the general       *)
+(*  contract -- the currency ([IcacheRef.inode_held]), the frame          *)
+(*  geometry, the epilogue -- it shares verbatim.                         *)
+(*                                                                        *)
+(*  THE PATH IS TWO BYTES AT AN ARBITRARY [dfrac].  namex reads index 0   *)
+(*  twice (at +0x22 and +0xf4) and index 1 once (at +0xfe) and never      *)
+(*  writes either, and the [name] buffer is untouched because no memmove  *)
+(*  runs -- which is why the buffer does not appear here at all.  The     *)
+(*  fraction is a parameter because [userinit]'s "/" is a .rodata string  *)
+(*  literal, i.e. [KernelDataInv.kernel_data]'s [↦ₘ□].                    *)
+(* ===================================================================== *)
+
+(* 12 slots for namex's own frame, over iget's 16. *)
+Definition K_namex_root : nat := 28%nat.
+
+Definition wp_namex_root_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
+      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+    (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+    (dqp : dfrac)
+    (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
+    (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.namex in
+  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in    (* a0 = path *)
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_namex_root <= K)%nat ->
+  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  dev = icfg_dev ->
+  nib = icfg_nib ->
+  dev = ROOTDEV ->
+  (0 < nib)%nat ->
+  (* a1 = 0: this is the [namei] side, so the +0x140 test takes the
+     "return ip" branch rather than nameiparent's iput. *)
+  m !!! Regidx (mword_of_int 11 : mword 5) = (zero_reg : mword 64) ->
+  (* iget acquires and releases "itable" internally *)
+  locks_below lks "itable" ->
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  itable_inv -∗
+  ic_escrows cn gfs gi cov logstart -∗
+  iref_slot -∗
+  (* the path: [pv] holds '/' and [pv+1] holds the terminator *)
+  pa_add pv 0 ↦ₘ{dqp} SLASH -∗
+  pa_add pv 1 ↦ₘ{dqp} NUL -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (ipv : mword 64),
+      ⌜ callee_saved m mr
+        /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
+      sie_cap_gpr mr K b p -∗
+      cpu_own n eb p b lks -∗
+      pc_is ret_tgt -∗
+      pa_add pv 0 ↦ₘ{dqp} SLASH -∗
+      pa_add pv 1 ↦ₘ{dqp} NUL -∗
+      inode_held ipv -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+Module Type NAMEX_ROOT.
+  Parameter wp_namex_root :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
+             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (dqp : dfrac)
+      (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string),
+      wp_namex_root_body gtl cn gfs gi cov logstart nib dev dqp
+                         m n K eb p b lks.
+End NAMEX_ROOT.

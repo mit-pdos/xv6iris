@@ -78,6 +78,7 @@ Require Import PanicStub.
 Require Import SpecSysExit.   (* [K_sys_exit]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -89,11 +90,11 @@ Import Defs.
 Definition K_syscall : nat := (4 + K_sys_exit)%nat.
 
 Definition wp_syscall_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (R : gname -> mword 64 -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-    (m : regfile) (av : nat) (C : iProp Σ)
+    (m : regfile) (av : nat)
     (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
   let pj := proc_addr j in
@@ -104,7 +105,7 @@ Definition wp_syscall_sconf_body
   (* INTERRUPTS ON, at push_off level 0 -- see the header: the [csrsi] that
      precedes the only call site, and what the parking entries need. *)
   sie_cap_gpr m av true pj -∗
-  cpu_own 0%nat true pj C true lks -∗
+  cpu_own 0%nat true pj true lks -∗
   (* [kernel_data] is the jump table itself ([syscalls] lives in .rodata) and
      argraw's below it; [procs_inv]/[panic_wp_any] are the proc array and the
      panic arms every acquire/release in the cone reaches. *)
@@ -122,7 +123,7 @@ Definition wp_syscall_sconf_body
          return value), and sbrk / exec / chdir / open move the rest. *)
       ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
       sie_cap_gpr mf av true pj -∗
-      cpu_own 0%nat true pj C true lks -∗
+      cpu_own 0%nat true pj true lks -∗
       R γf pj -∗
       proc_priv γf pj pid V' -∗
       pc_is ret_tgt -∗
@@ -149,14 +150,14 @@ Module Type SYSCALL.
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId},
       gname -> mword 64 -> iProp Σ.
   Parameter wp_syscall_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
-      (m : regfile) (av : nat) (C : iProp Σ)
+      (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl m av C pid V lks.
+      wp_syscall_sconf_body syscall_env γf γs j γl m av pid V lks.
 End SYSCALL.

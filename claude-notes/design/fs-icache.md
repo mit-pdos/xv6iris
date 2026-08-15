@@ -1584,7 +1584,22 @@ panics are the precedent.
 > still never reaches the free branch's postcondition — but its PROOF is
 > now a Löb loop rather than a divergence: sleep_prepare / release / sleep /
 > acquire, forever. REF-1 makes both unreachable at iput's call site just
-> the same. Route A (prove the lock free) was examined
+> the same.
+>
+> **ROUTE B IS RETIRED — all three lemmas are DELETED**, see
+> [`../projects/iput-acquiresleep.md`](../projects/iput-acquiresleep.md).
+> "We do not prove REF-1 makes it unreachable, we permit it" became "we prove
+> it": iput presents an authoritative zero for the inode slot's
+> may-hold-the-sleeplock share, which `wp_acquiresleep_nb_sconf` turns into a
+> proof that the lock is FREE — so the nested acquiresleep neither panics nor
+> loops, and it is Route A's conclusion reached by Route A's own means. `sl_res`'s
+> locked arm did have to grow a resource to refute by, exactly as predicted
+> below; what made it affordable is that the deposit is a FRACTION of a
+> per-object authority, so bio and every other user keeps its old contract
+> through `sl_untracked`. With Route B's lemmas gone, `panic("sched locks")`
+> has no contract that reaches it at all.
+>
+> Route A (prove the lock free) was originally examined
 and rejected: `sl_res`'s locked arm is a bare pure with no resource to
 refute by, and giving it one reparameterizes `is_sleeplock` for every
 user including bio.

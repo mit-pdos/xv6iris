@@ -112,14 +112,12 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import LockRank.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
@@ -134,8 +132,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
-Require Import ByteBuf.
-Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -155,6 +151,7 @@ Require Import SpecNamex.       (* [ROOTDEV] *)
 Require Import SpecCreate.      (* [create_slots], [create_units], [K_create] *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -179,7 +176,7 @@ End SpecSysMkdir.
 Definition wp_sys_mkdir_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γf : gname) (γa : gname) (γpr : gname)             (* ftable, kalloc, printk *)
@@ -196,7 +193,7 @@ Definition wp_sys_mkdir_sconf_body
     (dqb dqs dqbs dqn : dfrac)
     (v : mword 64)                                      (* syscall argument 0  *)
     (pid : mword 32) (V : pprivate)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_mkdir in
   let pj := proc_addr j in
@@ -239,7 +236,7 @@ Definition wp_sys_mkdir_sconf_body
   (* ENTERED WITH NO LOCK HELD, exactly as sys_chdir: the depth is pinned at
      ZERO, so [CpuOwn.cpu_own_zero_empty] DERIVES [lks = ∅] and every order
      goal the four callees raise is [locks_below ∅ _]. *)
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, THREADED.  [emp] at [eb = true] -- which this
      contract's own premise forces -- so no caller gains an obligation. *)
   trap_csrs_ext eb -∗
@@ -286,7 +283,7 @@ Definition wp_sys_mkdir_sconf_body
          in.  [uptd_ext] is argstr's own report, relayed. *)
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -311,7 +308,7 @@ Module Type SYSMKDIR.
   Parameter wp_sys_mkdir_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γa : gname) (γpr : gname)
       (gs : list gname) (j : nat) (gl : gname)
@@ -327,10 +324,10 @@ Module Type SYSMKDIR.
       (dqb dqs dqbs dqn : dfrac)
       (v : mword 64)
       (pid : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_sys_mkdir_sconf_body γf γa γpr gs j gl gu gd gk pd pav pu bn g gfs gi
                               cn gtl cov logstart bmapstart inodestart nib
                               ninodes size dev used ns dqb dqs dqbs dqn v
-                              pid V m K eb C b lks.
+                              pid V m K eb b lks.
 End SYSMKDIR.

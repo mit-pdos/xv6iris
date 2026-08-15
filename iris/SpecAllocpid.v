@@ -42,7 +42,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -62,7 +61,7 @@ Section SpecAllocpid.
 End SpecAllocpid.
 
 Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -74,15 +73,14 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Ge
      strictly below "nextpid" (12)). *)
   locks_below lks "nextpid" ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b lks -∗
+      cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -90,6 +88,6 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Ge
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_allocpid_sconf_body γp m av n eb p C b lks.
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (b : bool) (lks : gset string),
+      wp_allocpid_sconf_body γp m av n eb p b lks.
 End ALLOCPID.

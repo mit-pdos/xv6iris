@@ -114,6 +114,7 @@ Require Import SpecMyproc SpecIlock SpecStati SpecIunlock SpecCopyout.
 Require Import SpecFilestat.
 Require Import CodeFilestat ProofFilestatParts ProofBallocParts.
 From Kernel Require KernelSyms.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
 
@@ -154,7 +155,7 @@ Module FilestatProof (Myproc : MYPROC) (Ilock : ILOCK) (Stati : STATI)
 Section ProofFilestat.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -193,8 +194,8 @@ Section ProofFilestat.
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fstat_names)
       (pidv : mword 32) (V : pprivate)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C b lks.
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_filestat_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb b lks.
   Proof.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
@@ -391,9 +392,9 @@ Section ProofFilestat.
     assert (HR5ra : R5 !!! Regidx Rra
                     = add_vec_int (mword_of_int (FST + 0x10) : mword 64) 4)
       by (rewrite /R5; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID9 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+    iDestruct (cpu_own_transport CID CID9 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj C b
+    iApply (Myproc.wp_myproc_sconf R5 (K - 10)%nat 0%nat eb pj b
               _ fst_noff0 (fst_av_myproc K HK) with "Hcg Hcnt Htext Hpc").
     iIntros (CID10 Hs10 ms P0) "%Hms Hcg Hcnt Hpc %HcsP0".
     destruct HcsP0 as [HcsP0 HP0a0].
@@ -681,7 +682,7 @@ Section ProofFilestat.
         exact (HQ1thr c Hcs N2 N8 N9 N18 N20). }
       (* THE PID QUARTER, lent for the length of the ilock call *)
       iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
-      iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+      iDestruct (cpu_own_transport CID10 CID19 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       (* SpecIlock v4 names the share's GENERATION (design 17.3 (A)); the
          payload's slice already does, so nothing has to be introduced here. *)
@@ -693,7 +694,7 @@ Section ProofFilestat.
                 icfg_nib ikk (ssh/2)%Qp gsh
                 icfg_dev inm
                 pidv (DfracOwn (1/4)) (fsn_dqs fn)
-                Q3 (K - 10)%nat eb C b
+                Q3 (K - 10)%nat eb b
                 _ (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
@@ -963,14 +964,14 @@ Section ProofFilestat.
         rewrite /J1 upd_ne; [| regne].
         exact (Hmstthr c Hcs N2 N8 N9 N18 N19 N20). }
       iDestruct (proc_priv_core_pid pj pidv V with "Hpriv") as "[Hppid Hpivbk2]".
-      iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+      iDestruct (cpu_own_transport CIDil CID26 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Iunlock.wp_iunlock_sconf γs (fsn_fs fn) (fsn_ireg fn)
                 (fsn_ic fn) gil gisl
                 (fsn_cov fn) (fsn_logstart fn)
                 ikk (ssh/2)%Qp gsh icfg_dev inm
                 dnl bml
-                pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj C b lks
+                pidv (DfracOwn (1/4)) J2 (K - 10)%nat eb pj b lks
                 (fst_av_iunlock K HK) Hik
                 ltac:(rewrite HJ2a0; exact Hipk)
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
@@ -1162,10 +1163,10 @@ Section ProofFilestat.
                    with "Hstat Hhole") as "Hbuf".
       iDestruct (fst_bytes_name24 (pa_stk sp0 9) with "Hbuf") as (fbytes) "Hbuf".
       iEval (rewrite -HU6a3) in "Hbuf".
-      iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+      iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iApply (Copyout.wp_copyout_sconf γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
-                (K - 10)%nat 0%nat eb pj C b lks
+                (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
       all: try lkbelow.
@@ -1284,7 +1285,7 @@ Section ProofFilestat.
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10").
       iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+      iDestruct (cpu_own_transport CID32 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       iApply ("Hcont" $! mfin RV P' with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
@@ -1361,7 +1362,7 @@ Section ProofFilestat.
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10").
       iIntros (CIDe Hse mfin) "%Hcsr Hcg Hpc".
       destruct Hcsr as [Hcsf Hrv].
-      iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+      iDestruct (cpu_own_transport CID10 CIDe 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDe with "[]"); [iPureIntro; wp_next_chain|].
       assert (HVid : upd_upt V (pv_upt V) = V) by apply fst_upd_upt_id.

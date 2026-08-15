@@ -52,14 +52,14 @@ Require Import ProcGeom CpuOwn.
 Require Import WpLock.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import ProcPtOwn.
+Require Import PageGeom.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
 Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (dqt : dfrac) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.argraw in
@@ -71,8 +71,14 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* 4 slots for this frame, 10 for myproc's *)
   (14 <= av)%nat ->
+  (* the trapframe page's own well-formedness -- what the argument load's
+     physical-tier-to-mem-tier crossing needs (ProcInv.tf_page_word_mem),
+     since [tf_page] is physical-native and this load runs through the
+     kernel's own mapping. Not previously needed: before the physical-native
+     redesign, [tf_page]'s words WERE mem-tier already. *)
+  page_valid (page_base tfp) ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
@@ -81,7 +87,7 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = v ⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b lks -∗
+      cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       p_trapframe p ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
@@ -90,8 +96,8 @@ Definition wp_argraw_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 
 Module Type ARGRAW.
   Parameter wp_argraw_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool) (lks : gset string),
-      wp_argraw_sconf_body m av n eb p C i tfp ws v dqt b lks.
+      wp_argraw_sconf_body m av n eb p i tfp ws v dqt b lks.
 End ARGRAW.

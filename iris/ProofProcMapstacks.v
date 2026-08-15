@@ -115,7 +115,7 @@ Section ProofPMS.
   Lemma wp_proc_mapstacks_epilogue_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (g : nat)
+      (eb : bool) (p : mword 64) (on : option nat) (g : nat)
       (pas : nat -> mword 44) (b : bool) (lks : gset string) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
@@ -132,7 +132,7 @@ Section ProofPMS.
     pt_nodes tf = (pt_nodes t + g)%nat ->
     kvm_pas_ok pas ->
     (g <= kstacks_missing t)%nat ->
-    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
+    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x80)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -151,7 +151,7 @@ Section ProofPMS.
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗ pc_is ret_tgt -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
       kalloc_env γa (avail_sub on (64 + g')) -∗
@@ -369,7 +369,7 @@ Section ProofPMS.
        landed on [CIDe12] -- transport it there once before handing it
        to the continuation. *)
     assert (HcntCE : b = false \/ p = zero_reg -> (CIDe12 : CPU) = (CID : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CID CIDe12 lvl eb p C b HcntCE with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CIDe12 lvl eb p b HcntCE with "Hcnt") as "Hcnt".
     iApply ("Hcont" $! E11 tf g pas with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%] Hpages").
     { exact Hnodes. }
     { (* callee_saved mm E11 *)
@@ -423,7 +423,7 @@ Section ProofPMS.
   Lemma wp_proc_mapstacks_loop_sconf `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm : regfile) (t : ptree)
       (m0 : gmap (mword 27) (mword 64)) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (nb : nat) (rem : nat) (b : bool) (lks : gset string) :
+      (eb : bool) (p : mword 64) (nb : nat) (rem : nat) (b : bool) (lks : gset string) :
     forall (i : nat) (Mk : regfile) (tk : ptree) (gk : nat) (pas : nat -> mword 44),
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
@@ -457,7 +457,7 @@ Section ProofPMS.
     (* the loop's own kalloc call (+0x52) touches "kmem" (13); nothing else
        in its cone touches a lock (kvmmap's own Spec exposes no premise). *)
     locks_below lks "kmem" ->
-    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
+    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.proc_mapstacks + 0x52)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -476,7 +476,7 @@ Section ProofPMS.
        page_own (zero_extend' 64 (concat_vec (pas j) (zeros' 12 : mword 12)))) -∗
     wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (t' : ptree) (g' : nat) (pas' : nat -> mword 44),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗ pc_is ret_tgt -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗ pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g')%nat⌝ -∗
       kalloc_env γa (avail_sub (Some nb) (64 + g')) -∗
@@ -532,14 +532,14 @@ Section ProofPMS.
        [jal] above landed on [CIDl1] -- transport it there before feeding
        it to kalloc's own [cpu_own] premise. *)
     assert (HcntC0 : b = false \/ p = zero_reg -> (CIDl1 : CPU) = (CID : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CID CIDl1 lvl eb p C b HcntC0 with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CIDl1 lvl eb p b HcntC0 with "Hcnt") as "Hcnt".
     iApply (K.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
-              J (avail_sub (Some nb) (i + gk)) lvl eb p C (K - 10)%nat b lks
+              J (avail_sub (Some nb) (i + gk)) lvl eb p (K - 10)%nat b lks
               ltac:(lia)
               ltac:(reflexivity)
               Hlvl
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
     iIntros (CIDl2 Hsl2 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret56 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_mapstacks + 0x56)).
@@ -799,8 +799,8 @@ Section ProofPMS.
        arithmetic + [jal kvmmap] straight-line stretch above landed on
        [CIDl15] -- transport it there once, rather than per instruction. *)
     assert (HcntC1 : b = false \/ p = zero_reg -> (CIDl15 : CPU) = (CIDl2 : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CIDl2 CIDl15 lvl eb p C b HcntC1 with "Hcnt") as "Hcnt".
-    iApply (KM.wp_kvmmap_sconf γa Wk tk (kvm_stacks pas i m0) 1 6 lvl (K - 10)%nat eb p C (Some ((nb - (i + gk + 1))%nat)) b lks
+    iDestruct (cpu_own_transport CIDl2 CIDl15 lvl eb p b HcntC1 with "Hcnt") as "Hcnt".
+    iApply (KM.wp_kvmmap_sconf γa Wk tk (kvm_stacks pas i m0) 1 6 lvl (K - 10)%nat eb p (Some ((nb - (i + gk + 1))%nat)) b lks
               Hlvl ltac:(lia)
               HWka0
               ltac:(rewrite HWka1; unfold VA; apply va_i_align; exact Hilt)
@@ -968,8 +968,8 @@ Section ProofPMS.
       (* [Hcnt] was last refreshed at [CIDl16] by kvmmap's own postcondition;
          [+0x78 addi] and this branch's own crossing moved on to [CIDb1]. *)
       assert (HcntC2 : b = false \/ p = zero_reg -> (CIDb1 : CPU) = (CIDl16 : CPU)) by wp_next_chain.
-      iDestruct (cpu_own_transport CIDl16 CIDb1 lvl eb p C b HcntC2 with "Hcnt") as "Hcnt".
-      iApply (wp_proc_mapstacks_epilogue_sconf γa mm F1 t t' m0 K lvl eb p C (Some nb) (gk + g')%nat pas' b lks
+      iDestruct (cpu_own_transport CIDl16 CIDb1 lvl eb p b HcntC2 with "Hcnt") as "Hcnt".
+      iApply (wp_proc_mapstacks_epilogue_sconf γa mm F1 t t' m0 K lvl eb p (Some nb) (gk + g')%nat pas' b lks
                 Hlvl HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr1sp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr1_25)
@@ -1000,7 +1000,7 @@ Section ProofPMS.
     assert (Hchain2 : b = false \/ p = zero_reg -> (CIDb2 : CPU) = (CID : CPU)) by wp_next_chain.
     iDestruct (wp_next_shift Hchain2 with "Hcont") as "Hcont".
     assert (HcntC3 : b = false \/ p = zero_reg -> (CIDb2 : CPU) = (CIDl16 : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CIDl16 CIDb2 lvl eb p C b HcntC3 with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CIDl16 CIDb2 lvl eb p b HcntC3 with "Hcnt") as "Hcnt".
     iApply (IH CIDb2 (S i) F1 t' (gk + g')%nat pas' Hlvl HK ltac:(lia) ltac:(lia) Hnbig Hroot Hres
               ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr1sp)
               HF1s1
@@ -1027,8 +1027,8 @@ Section ProofPMS.
   Lemma wp_proc_mapstacks_sconf
       `{GEN : GenId} `{CID : CpuId} (γa : gname)
       (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
-    : wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b lks.
+      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
+    : wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_proc_mapstacks_sconf_body].
     intros ret_tgt Hlvl HK Hroot Hrep Hres Hnb Hbelow.
@@ -1356,7 +1356,7 @@ Section ProofPMS.
        own 31 plain-instruction leaves above each landed on a fresh,
        generic-[b] hart, ending at [CIDp31] -- transport it there once. *)
     assert (HcntCP : b = false \/ p = zero_reg -> (CIDp31 : CPU) = (CID : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CID CIDp31 lvl eb p C b HcntCP with "Hcnt") as "Hcnt".
+    iDestruct (cpu_own_transport CID CIDp31 lvl eb p b HcntCP with "Hcnt") as "Hcnt".
     (* [Hcont] (the top-level continuation) is likewise anchored at the
        function's ENTRY hart [CID]; the loop lemma's OWN implicit [CID]
        binder gets unified with [CIDp31] at this call site, so its
@@ -1365,7 +1365,7 @@ Section ProofPMS.
        that default printing cannot show. *)
     iDestruct (wp_next_shift HcntCP with "Hcont") as "Hcont".
     (* enter the loop at i = 0 *)
-    iApply (wp_proc_mapstacks_loop_sconf γa mm t m K lvl eb p C nb 64 b lks 0%nat P21 t 0%nat (fun _ => (mword_of_int 0 : mword 44))
+    iApply (wp_proc_mapstacks_loop_sconf γa mm t m K lvl eb p nb 64 b lks 0%nat P21 t 0%nat (fun _ => (mword_of_int 0 : mword 44))
               Hlvl HK ltac:(lia) ltac:(lia) Hnbig Hroot Hres
               HE_sp HE_s1 HE_s8 HE_s2 HE_s3 HE_s5 HE_s6 HE_s7
               ltac:(rewrite HE_s4; exact HE_a0)

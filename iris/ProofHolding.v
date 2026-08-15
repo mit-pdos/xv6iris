@@ -90,18 +90,18 @@ Section ProofHolding.
 
   Lemma wp_holding_lockinv_s_sconf
       (γl : gname) (lka : mword 64) (s : string) (R Tc Dc : iProp Σ)
-      (m : regfile) (n : nat) (p : mword 64)
-    : wp_holding_lockinv_s_sconf_body γl lka s R Tc Dc m n p.
+      (m : regfile) (n : nat) (p : mword 64) (lks : gset string)
+    : wp_holding_lockinv_s_sconf_body γl lka s R Tc Dc m n p lks.
   Proof.
     cbv beta delta [wp_holding_lockinv_s_sconf_body].
-    intros pcE lk ret_tgt Hlka Hn Href.
+    intros pcE lk ret_tgt Hlka Hn Hfresh Href.
     assert (Hlkeq : lk = lka).
     { rewrite -Hlka.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       symmetry. apply kv_addv_zero. }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hlock HTc Hcont".
+    iIntros "Hcg #Htext Hpc #Hlock HTc Hlks Hcont".
     iPoseProof (hi_00 with "Htext") as "Hi00".
     iPoseProof (hi_02 with "Htext") as "Hi02".
     (* ---- 0x00: c.lw a5,0(a0) through the lock invariant ---- *)
@@ -155,13 +155,13 @@ Section ProofHolding.
       assert (Hra_final : ret_pc (H2 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
         by (rewrite HraH2; reflexivity).
       iEval (rewrite Hra_final) in "Hpc".
-      iApply ("Hcont" $! H2 with "HTc Hcg Hpc [%]").
+      iApply ("Hcont" $! H2 with "HTc Hlks Hcg Hpc [%]").
       split.
       - assert (HH2w : H2 = apply_writes
           [ ((mword_of_int 10 : mword 5), regval_into_reg (mword_of_int 0 : mword 64));
             ((mword_of_int 15 : mword 5), regval_into_reg (sign_extend' 64 lockv)) ] m) by reflexivity.
         rewrite HH2w. apply callee_saved_apply_writes. repeat constructor.
-      - left. rewrite /H2. apply upd_eq. }
+      - rewrite /H2. apply upd_eq. }
     (* ===== SLOW path: locked -> compare lk->cpu against mycpu ===== *)
     iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.holding + 0x02)) (mword_of_int 3 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
               H1 n false
@@ -271,13 +271,17 @@ Section ProofHolding.
     assert (Hacpu : add_vec (S2 !!! Regidx (mword_of_int 10 : mword 5))
                       (sign_extend' 64 (mword_of_int 16 : mword 12)) = lock_cpu lka)
       by (rewrite Ha0S2 Hlkeq; reflexivity).
-    iApply (wp_cld_lkcpu_lockopen_s_sconf γl lka s R Tc Dc (mword_of_int (KernelSyms.holding + 0x12))
+    (* THE READ THAT DECIDES THE ANSWER.  The invariant's held state keeps
+       [lk_in i s] beside the owner word, so [Hfresh] refutes [i = cpu_id]
+       and the word cannot be this hart's [struct cpu] -- whence [a0 = 0]
+       below, and acquire's panic arm with it. *)
+    iApply (wp_cld_lkcpu_lockopen_notheld_s_sconf γl lka s R Tc Dc (mword_of_int (KernelSyms.holding + 0x12))
               (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
-              (mword_of_int 16 : mword 12) S2 (n - 4)%nat false
-              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Href
-              with "Hcg Hpc Hi12 Hlock HTc").
+              (mword_of_int 16 : mword 12) S2 (n - 4)%nat false lks
+              Hacpu ltac:(vm_compute; discriminate) ltac:(rdok) Hfresh Href
+              with "Hcg Hpc Hi12 Hlock HTc Hlks").
     iIntros (cpuv). iApply wp_next_off_intro.
-    iIntros "HTc Hcg Hpc".
+    iIntros "%Hcpuv HTc Hlks Hcg Hpc".
     set (S3 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg cpuv]> S2).
     change (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg cpuv]> S2) with S3.
     assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.holding + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.holding + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
@@ -352,13 +356,17 @@ Section ProofHolding.
         (zero_extend' 64 (bool_to_bit (zopz0zI_u (S5 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 1 : mword 12)))))]> S5) with S6.
     assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.holding + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.holding + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
-    (* the return value is 0 or 1 -- whichever way the compare went *)
-    assert (Ha0S6 : S6 !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)
-                 \/ S6 !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 1 : mword 64)).
+    (* THE RETURN VALUE IS 0, and [Hcpuv] is the whole reason: the owner word
+       this hart read is not its own [struct cpu], so the [sub] is nonzero and
+       the [sltiu] yields 0.  [Hmo_a0] is mycpu()'s postcondition -- a0 holds
+       [mycpu_ret cid_word] -- and [c.mv s1,a5] put the read word in s1. *)
+    assert (Ha0S6 : S6 !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)).
     { rewrite /S6 upd_eq /S5 upd_eq Hs1val.
-      destruct (eq_vec (add_vec zero_reg cpuv) (C !!! Regidx (mword_of_int 10 : mword 5))) eqn:Hcmp.
-      - right. apply seqz_sub_eq. exact Hcmp.
-      - left. apply seqz_sub_neq. exact Hcmp. }
+      apply seqz_sub_neq. apply eq_vec_false_iff.
+      rewrite add_vec_zero_l.
+      rewrite (_ : C !!! Regidx (mword_of_int 10 : mword 5) = mycpu_ret cid_word);
+        [ exact Hcpuv
+        | rewrite /C Hmo_a0; exact (f_equal mycpu_ret (rget_tp S4)) ]. }
     (* ---- 0x22/0x24/0x26: c.ldsp ra/s0/s1 ---- *)
     assert (HcspS6 : S6 !!! Regidx csp_rs1 = spdh).
     { rewrite /S6 upd_ne; [| vm_compute; discriminate].
@@ -467,7 +475,7 @@ Section ProofHolding.
     assert (Hra_final : ret_pc (S10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
       by (rewrite HS10ra; reflexivity).
     iEval (rewrite Hra_final) in "Hpc".
-    iApply ("Hcont" $! S10 with "HTc Hcg Hpc [%]").
+    iApply ("Hcont" $! S10 with "HTc Hlks Hcg Hpc [%]").
     split.
     - (* [sp]/[s0]/[s1] are saved-then-restored ACROSS the [mycpu] call (their
          mid-call value is the wrong one), so each is discharged on its own;

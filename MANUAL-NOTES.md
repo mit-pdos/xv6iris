@@ -14,7 +14,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - swtch spec
 - acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
 - kalloc/kfree separation-logic-style specs
-- kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None
+- kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None (same for allocproc)
 - re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
 - background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
@@ -73,6 +73,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - why kexec can't panic by calling uvmalloc(TRAPFRAME): will run out of memory before getting to such a high address
 - xv6 bug: scheduler did not reset intena, could miss process wakeup between loop and wfi
 - weak memory: expose internal steps of architecture model, expr gets Cycle which executes Sail monad, so every memory op is explicit and separate in trace
+- resources tracking possible sleeplock holders, to reason about iput's acquiresleep while holding itable.lock
 
 Big things that still need to be done/explored:
 

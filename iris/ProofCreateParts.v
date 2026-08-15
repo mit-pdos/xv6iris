@@ -46,7 +46,6 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import KernelText.
 Require Import KernelDataInv.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.

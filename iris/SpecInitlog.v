@@ -104,6 +104,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 (* initlog's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00); its
@@ -118,7 +119,7 @@ Definition K_initlog : nat := 56%nat.
 Definition log_name_str : Z := 0x80007518.
 
 Definition wp_initlog_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -134,7 +135,7 @@ Definition wp_initlog_sconf_body
     (vlock : mword 32) (vname vcpu : mword 64)
     (v_start v_dev v_nc v_n : mword 32)
     (pidv : mword 32) (dq dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.initlog in
   let pj := proc_addr j in
@@ -160,7 +161,7 @@ Definition wp_initlog_sconf_body
      "bcache" (4); [initlock] itself carries no order premise. *)
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -233,7 +234,7 @@ Definition wp_initlog_sconf_body
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the superblock fraction, untouched *)
@@ -248,7 +249,7 @@ Definition wp_initlog_sconf_body
 
 Module Type INITLOG.
   Parameter wp_initlog_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -263,10 +264,10 @@ Module Type INITLOG.
       (vlock : mword 32) (vname vcpu : mword 64)
       (v_start v_dev v_nc v_n : mword 32)
       (pidv : mword 32) (dq dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
-                            pidv dq dqs m K eb C b lks.
+                            pidv dq dqs m K eb b lks.
 End INITLOG.

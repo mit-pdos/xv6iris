@@ -93,7 +93,7 @@ Section ProofMappages.
   Lemma wp_mappages_epilogue_sconf `{CID0 : CpuId} (γa : gname)
       (mm Mf : regfile) (t tf : ptree)
       (m : gmap (mword 27) (mword 64)) (npages k : nat) (perm : Z) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (q : nat) (b : bool)
+      (eb : bool) (p : mword 64) (on : option nat) (q : nat) (b : bool)
       (lks : gset string) :
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
@@ -115,7 +115,7 @@ Section ProofMappages.
     ((k = npages /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0)
      \/ ((k < npages)%nat /\ Mf !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int (-1)
          /\ avail_zero (avail_sub on q))) ->
-    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
+    sie_cap_gpr Mf (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x9c)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -132,7 +132,7 @@ Section ProofMappages.
     kalloc_env γa (avail_sub on q) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -358,7 +358,7 @@ Section ProofMappages.
     { rewrite /E10 /E9 /E8 /E7 /E6 /E5 /E4 /E3 /E2 /E1.
       repeat (rewrite upd_ne; [| reg_neq]).
       reflexivity. }
-    iDestruct (cpu_own_transport CID0 CID11 lvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CID11 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E10 tf k q with "Hcg Hcnt Hpc Hptree [%] Henv [%] [%] [%] [%] [%] [%]").
@@ -411,7 +411,7 @@ Section ProofMappages.
   Lemma wp_mappages_loop_sconf `{CID0 : CpuId} (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (K lvl : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat)
+      (eb : bool) (p : mword 64) (on : option nat)
       (rem : nat) (b : bool) (lks : gset string) :
     forall (k : nat) (Mk : regfile) (tk : ptree) (consumed : nat),
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -454,7 +454,7 @@ Section ProofMappages.
     pt_nodes tk = (pt_nodes t + consumed)%nat ->
     (consumed + pt_missing tk (vpn_at vpn0 k) (npages - k) <= pt_missing t vpn0 npages)%nat ->
     locks_below lks "kmem" ->
-    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p C b lks -∗
+    sie_cap_gpr Mk (K - 10)%nat b p -∗ cpu_own lvl eb p b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.mappages + 0x3e)) -∗
     pa_stk sp0 1 ↦₈ (mm !!! Regidx (mword_of_int 1)) -∗
@@ -471,7 +471,7 @@ Section ProofMappages.
     kalloc_env γa (avail_sub on consumed) -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ (mr : regfile) (t' : ptree) (k' : nat) (g : nat),
-      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p C b lks -∗
+      sie_cap_gpr mr K b p -∗ cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
       ptree_own 2 (DfracOwn 1) t' -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗
@@ -614,10 +614,10 @@ Section ProofMappages.
       by (rewrite /W4' upd_ne; [exact HW4sp | reg_neq]).
     (* [Hcnt] entered this iteration at [CID0]; four plain instructions have
        moved the hart to [CIDa4], right where Walk is called. *)
-    iDestruct (cpu_own_transport CID0 CIDa4 lvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CIDa4 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* the walk call *)
-    iApply (Walk.wp_walk_sconf γa W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p C (avail_sub on consumed) b
+    iApply (Walk.wp_walk_sconf γa W4' tk (pt_insert_run m vpn0 ppn0 perm k) (K - 10)%nat lvl eb p (avail_sub on consumed) b
               _ Hlvl ltac:(lia)
               HW4'a0 HW4'a2
               ltac:(rewrite HW4'a1; rewrite uint_unsigned; rewrite Hvak_u; lia)
@@ -753,10 +753,10 @@ Section ProofMappages.
       iEval (rewrite Hpp9c) in "Hpc".
       assert (Hcrossn0 : b = false \/ p = zero_reg -> (CIDn2 : CPU) = (CID0 : CPU)) by wp_next_chain.
       assert (Hcrossnw : b = false \/ p = zero_reg -> (CIDn2 : CPU) = (CIDw : CPU)) by wp_next_chain.
-      iDestruct (cpu_own_transport CIDw CIDn2 lvl eb p C b Hcrossnw
+      iDestruct (cpu_own_transport CIDw CIDn2 lvl eb p b Hcrossnw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossn0 with "Hcont") as "Hcont".
-      iApply (wp_mappages_epilogue_sconf γa mm F1 t t' m npages k perm K lvl eb p C on (consumed + g)%nat b lks HK
+      iApply (wp_mappages_epilogue_sconf γa mm F1 t t' m npages k perm K lvl eb p on (consumed + g)%nat b lks HK
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmrsp)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr24)
                 ltac:(rewrite /F1; rewrite upd_ne; [| reg_neq]; exact Hmr25)
@@ -1015,10 +1015,10 @@ Section ProofMappages.
       assert (Hf27 : F1 !!! Regidx (mword_of_int 27 : mword 5) = mr !!! Regidx (mword_of_int 27 : mword 5)) by peel_reg.
       assert (Hcrossl0 : b = false \/ p = zero_reg -> (CIDl3 : CPU) = (CID0 : CPU)) by wp_next_chain.
       assert (Hcrosslw : b = false \/ p = zero_reg -> (CIDl3 : CPU) = (CIDw : CPU)) by wp_next_chain.
-      iDestruct (cpu_own_transport CIDw CIDl3 lvl eb p C b Hcrosslw
+      iDestruct (cpu_own_transport CIDw CIDl3 lvl eb p b Hcrosslw
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift Hcrossl0 with "Hcont") as "Hcont".
-      iApply (wp_mappages_epilogue_sconf γa mm F1 t tS m npages (S k) perm K lvl eb p C on (consumed + g)%nat b lks HK
+      iApply (wp_mappages_epilogue_sconf γa mm F1 t tS m npages (S k) perm K lvl eb p on (consumed + g)%nat b lks HK
                 (eq_trans Hfsp Hmrsp)
                 (eq_trans Hf24 Hmr24)
                 (eq_trans Hf25 Hmr25)
@@ -1130,7 +1130,7 @@ Section ProofMappages.
       lia. }
     assert (Hcrossm0 : b = false \/ p = zero_reg -> (CIDm3 : CPU) = (CID0 : CPU)) by wp_next_chain.
     assert (Hcrossmw : b = false \/ p = zero_reg -> (CIDm3 : CPU) = (CIDw : CPU)) by wp_next_chain.
-    iDestruct (cpu_own_transport CIDw CIDm3 lvl eb p C b Hcrossmw
+    iDestruct (cpu_own_transport CIDw CIDm3 lvl eb p b Hcrossmw
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift Hcrossm0 with "Hcont") as "Hcont".
     iApply (IH CIDm3 (S k) M12 tS (consumed + g)%nat
@@ -1160,8 +1160,8 @@ Section ProofMappages.
       (γa : gname)
       (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
-      (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) (lks : gset string)
-    : wp_mappages_sconf_body γa mm t m npages perm lvl K eb p C on b lks.
+      (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string)
+    : wp_mappages_sconf_body γa mm t m npages perm lvl K eb p on b lks.
   Proof.
     cbv beta delta [wp_mappages_sconf_body].
     intros va pa vpn0 ppn0 ret_tgt
@@ -1572,9 +1572,9 @@ Section ProofMappages.
     (* [Hcnt] entered at the function's own entry hart [CID] (never itself
        touched by any of the 25 plain prologue instructions above, since none
        of them mention [cpu_own]); the loop is entered at [CID25]. *)
-    iDestruct (cpu_own_transport CID CID25 lvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID25 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (wp_mappages_loop_sconf γa mm t m npages perm K lvl eb p C on npages b lks 0%nat P13 t 0%nat
+    iApply (wp_mappages_loop_sconf γa mm t m npages perm K lvl eb p on npages b lks 0%nat P13 t 0%nat
               Hlvl HK ltac:(lia) Hnp Hroot Hvaal Hpaal Hpermreg Hpok
               ltac:(rewrite uint_unsigned; exact Hvab)
               ltac:(rewrite uint_unsigned; exact Hpab) Hnone

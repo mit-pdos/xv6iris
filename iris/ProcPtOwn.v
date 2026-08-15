@@ -98,6 +98,8 @@ Require Import UptTree.
 Require Import UserPtTree.
 Require Import ProcPt.
 Require Import KallocInv.
+Require Import InstrBytes.
+Require Import PageFields.
 Require Export PageGeom.  (* [page_base] / [page_valid] are named by this file's consumers *)
 Require Import ProcGeom.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -418,6 +420,29 @@ Qed.
 
 (* the descriptor-level footprint (the field [uptd] no longer needs) *)
 Definition ud_pas (P : uptd) : gset Arch.pa := um_pas P.(ud_um).
+
+(* THE DESCRIPTOR WITH ITS FOOTPRINT FIELD RENORMALISED to the derived one.
+   [proc_pt] never reads [ud_data] ([proc_pt_data_irrel] below), so the
+   kernel tier cannot say what it is; [UserPtTree.user_pt_inv] does read it,
+   and needs [udata_cov] beside it.  The satp-switch bridge therefore hands
+   the user tier THIS descriptor, whose coverage side condition is free
+   ([ud_pas_cov]) -- see [user_pt_inv_close].  Idempotent, and a no-op on
+   the three real fields, which is what makes it invisible to everything
+   kernel-side. *)
+Definition ud_norm (P : uptd) : uptd :=
+  UPTD P.(ud_root) P.(ud_tfp) P.(ud_um) (ud_pas P).
+
+Lemma ud_norm_pas (P : uptd) : ud_data (ud_norm P) = ud_pas (ud_norm P).
+Proof. reflexivity. Qed.
+
+Lemma ud_norm_idem (P : uptd) : ud_norm (ud_norm P) = ud_norm P.
+Proof. reflexivity. Qed.
+
+Lemma ud_norm_id (P : uptd) : ud_data P = ud_pas P -> ud_norm P = P.
+Proof.
+  destruct P as [r t u d]. unfold ud_norm, ud_pas. cbn [ud_root ud_tfp ud_um ud_data].
+  intros <-. reflexivity.
+Qed.
 
 (* a table with no user memory -- what proc_pagetable() delivers -- has an
    empty footprint *)
@@ -2769,6 +2794,112 @@ Section ProcPt.
   Definition phys_page_own (ppn : mword 44) : iProp Σ :=
     ([∗ list] j ∈ seq 0 4096, phys_byte_any (pa_add (page_base ppn) j))%I.
 
+  (* THE PHYSICAL-TIER MIRROR of PageFields.v's page/byte/word carving
+     ([bwin_split], [bytes_word8], [page_field8], [page_words8] and their
+     [_back] converses), restated over [phys_byte_any]/[↦ₚ₈] instead of
+     [byte_any]/[↦₈].  [ProcInv.tf_page] uses this to be [tf_pa]/[↦ₚ₈]
+     NATIVELY -- the SAME tier uservec/userret's own low-level instruction
+     lemmas already use for the trapframe, per claude-notes -- rather than
+     round-tripping through the mem tier at the uservec/userret boundary.
+     [bwin_split]'s own proof ([by rewrite seq_app big_sepL_app]) is
+     tier-agnostic; only the byte/word assembly steps need restating. *)
+  Lemma phys_bwin_split (p : mword 64) (o a b : nat) :
+    ([∗ list] j ∈ seq o (a + b), phys_byte_any (pa_add p j)) ⊣⊢
+    ([∗ list] j ∈ seq o a, phys_byte_any (pa_add p j)) ∗
+    ([∗ list] j ∈ seq (o + a) b, phys_byte_any (pa_add p j)).
+  Proof. by rewrite seq_app big_sepL_app. Qed.
+
+  Lemma phys_bwin_rebase (p : mword 64) (o n : nat) :
+    ([∗ list] j ∈ seq o n, phys_byte_any (pa_add p j)) ⊣⊢
+    ([∗ list] j ∈ seq 0 n, phys_byte_any (pa_add (pa_add p o) j)).
+  Proof.
+    rewrite -{1}(Nat.add_0_r o) -fmap_add_seq big_sepL_fmap.
+    apply big_sepL_proper. intros k j _. by rewrite pa_add_add.
+  Qed.
+
+  Lemma phys_bytes_word8 (a : mword 64) :
+    is_aligned_paddr (Physaddr a) 8 = true ->
+    ([∗ list] j ∈ seq 0 8, phys_byte_any (pa_add a j)) ⊢ ∃ w : mword 64, a ↦ₚ₈ w.
+  Proof.
+    intro Hal. rewrite /phys_byte_any.
+    change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat.
+    iIntros "(H0 & H1 & H2 & H3 & H4 & H5 & H6 & H7 & _)".
+    iDestruct "H0" as (b0) "H0". iDestruct "H1" as (b1) "H1".
+    iDestruct "H2" as (b2) "H2". iDestruct "H3" as (b3) "H3".
+    iDestruct "H4" as (b4) "H4". iDestruct "H5" as (b5) "H5".
+    iDestruct "H6" as (b6) "H6". iDestruct "H7" as (b7) "H7".
+    set (bs := [b0;b1;b2;b3;b4;b5;b6;b7]).
+    set (w := Z_to_bv 64 (assemble_bytes bs) : mword 64).
+    iExists w.
+    rewrite /phys_word_pointsto.
+    iSplitR; [iPureIntro; exact Hal|].
+    assert (E0 : nth_byte w 0%nat = b0) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E1 : nth_byte w 1%nat = b1) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E2 : nth_byte w 2%nat = b2) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E3 : nth_byte w 3%nat = b3) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E4 : nth_byte w 4%nat = b4) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E5 : nth_byte w 5%nat = b5) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E6 : nth_byte w 6%nat = b6) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    assert (E7 : nth_byte w 7%nat = b7) by (subst w bs; apply nth_byte_assemble8; [reflexivity | lia]).
+    change (seq 0 8) with [0;1;2;3;4;5;6;7]%nat. simpl.
+    rewrite E0 E1 E2 E3 E4 E5 E6 E7. iFrame.
+  Qed.
+
+  Lemma phys_word8_bwin (a : mword 64) (w : mword 64) :
+    a ↦ₚ₈ w ⊢ [∗ list] j ∈ seq 0 8, phys_byte_any (pa_add a j).
+  Proof.
+    rewrite phys_word_pointsto_bytes. apply big_sepL_mono.
+    intros k j _. iIntros "H". by iExists (nth_byte w j).
+  Qed.
+
+  Lemma phys_page_field8 (p : mword 64) (o : nat) :
+    page_valid p -> (o + 8 <= 4096)%nat -> (8 | Z.of_nat o) ->
+    ([∗ list] j ∈ seq o 8, phys_byte_any (pa_add p j)) ⊢ ∃ w : mword 64, pa_add p o ↦ₚ₈ w.
+  Proof.
+    intros Hpv Ho Hdvd. rewrite phys_bwin_rebase.
+    apply phys_bytes_word8. apply (page_off_aligned p o 8 Hpv ltac:(lia) ltac:(lia));
+      [ exists 512; reflexivity | exact Hdvd ].
+  Qed.
+
+  Lemma phys_page_field8_back (p : mword 64) (o : nat) (w : mword 64) :
+    pa_add p o ↦ₚ₈ w ⊢ [∗ list] j ∈ seq o 8, phys_byte_any (pa_add p j).
+  Proof. rewrite phys_bwin_rebase. apply phys_word8_bwin. Qed.
+
+  Lemma phys_page_words8 (p : mword 64) (n : nat) :
+    page_valid p -> (8 * n <= 4096)%nat ->
+    ([∗ list] j ∈ seq 0 (8 * n), phys_byte_any (pa_add p j)) ⊢
+    ∃ ws : list (mword 64), ⌜length ws = n⌝ ∗
+      ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦ₚ₈ w).
+  Proof.
+    intro Hpv. induction n as [|n IH]; intro Hn.
+    - iIntros "_". iExists []. by iSplit.
+    - replace (8 * S n)%nat with (8 * n + 8)%nat by lia.
+      rewrite (phys_bwin_split p 0 (8 * n) 8).
+      iIntros "[Hpre Hlast]".
+      iDestruct (IH ltac:(lia) with "Hpre") as (ws) "[%Hlen Hws]".
+      rewrite Nat.add_0_l.
+      iDestruct (phys_page_field8 p (8 * n)%nat Hpv ltac:(lia)
+                   ltac:(exists (Z.of_nat n); lia) with "Hlast") as (w) "Hw".
+      iExists (ws ++ [w])%list.
+      iSplit; [iPureIntro; rewrite length_app Hlen /=; lia|].
+      rewrite big_sepL_app big_sepL_singleton Hlen. iFrame "Hws".
+      rewrite Nat.add_0_r. iExact "Hw".
+  Qed.
+
+  Lemma phys_page_words8_back (p : mword 64) (ws : list (mword 64)) :
+    ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦ₚ₈ w) ⊢
+    [∗ list] j ∈ seq 0 (8 * length ws), phys_byte_any (pa_add p j).
+  Proof.
+    induction ws as [|w ws IH] using rev_ind; [ by iIntros "_" | ].
+    replace (8 * length (ws ++ [w]))%nat with (8 * length ws + 8)%nat
+      by (rewrite length_app; cbn [length]; lia).
+    rewrite (phys_bwin_split p 0 (8 * length ws) 8) Nat.add_0_l.
+    rewrite big_sepL_app big_sepL_singleton Nat.add_0_r.
+    iIntros "[Hpre Hlast]".
+    iSplitL "Hpre"; [ by iApply IH | ].
+    iApply (phys_page_field8_back p (8 * length ws)%nat w with "Hlast").
+  Qed.
+
   (* the user pages the table hands the process *)
   Definition upt_pages_own (um : gmap (mword 27) (mword 64)) : iProp Σ :=
     ([∗ set] ppn ∈ um_ppns um, phys_page_own ppn)%I.
@@ -3012,6 +3143,24 @@ Section ProcPt.
     (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
      p_trapframe pa ↦₈ page_base P.(ud_tfp) ∗
      proc_pt P)%I.
+
+  (* JUST THE TWO CELLS.  They name the table but are not part of it: they
+     are ordinary [struct proc] words, owned by the kernel across user
+     execution, whereas [proc_pt] is the address space itself and must be
+     handed to the user tier at the satp switch (see [user_pt_inv_close]).
+     Splitting here is what lets a residue keep the cells and give up the
+     table. *)
+  Definition proc_pt_cells (pa : mword 64) (P : uptd) : iProp Σ :=
+    (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
+     p_trapframe pa ↦₈ page_base P.(ud_tfp))%I.
+
+  Lemma proc_pt_at_split (pa : mword 64) (P : uptd) :
+    proc_pt_at pa P ⊣⊢ proc_pt_cells pa P ∗ proc_pt P.
+  Proof.
+    rewrite /proc_pt_at /proc_pt_cells. iSplit.
+    - iIntros "(H1 & H2 & H3)". iFrame "H1 H2 H3".
+    - iIntros "((H1 & H2) & H3)". iFrame "H1 H2 H3".
+  Qed.
 
   (* [iFrame] must NOT search inside these.  [proc_pt] contains [pt_frame]
      and a big-op over the page footprint; letting the Frame instances unfold
@@ -3282,6 +3431,70 @@ Section ProcPt.
   Proof.
     intros Hr Ht Hu. rewrite /proc_pt /proc_pt_own /proc_pt_wf.
     rewrite Hr Ht Hu. reflexivity.
+  Qed.
+
+  Lemma proc_pt_norm (P : uptd) : proc_pt P ⊣⊢ proc_pt (ud_norm P).
+  Proof. apply proc_pt_data_irrel; reflexivity. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE SATP-SWITCH DOVETAIL.  [proc_pt] (parked, kernel view) and       *)
+  (* [UserPtTree.user_pt_inv] (installed, user view) are THE SAME         *)
+  (* RESOURCE.  They differ in exactly one conjunct -- [pt_frame] vs      *)
+  (* [utlb_inv_pt], and the switch window (TransPt.v) is what converts    *)
+  (* that one -- so the bridge here is the REST: the two cell-free        *)
+  (* halves, plus the footprint renormalisation the user tier's           *)
+  (* [ud_data] field needs.                                              *)
+  (*                                                                      *)
+  (* WHY THIS EXISTS AT ALL: a spec that takes the kernel-side residue    *)
+  (* (which contains [proc_pt], via [proc_priv]) BESIDE the user-side     *)
+  (* frame (which contains [user_pt_inv]) is claiming the user address    *)
+  (* space TWICE -- [ptree_own 2 (DfracOwn 1)] on both sides, and the     *)
+  (* pages on both sides -- so its precondition is unsatisfiable and it   *)
+  (* is vacuous.  See claude-notes/projects/uservec.md.                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* the parked bundle, split at the conjunct the switch converts *)
+  Lemma proc_pt_split (P : uptd) :
+    proc_pt P ⊣⊢
+    (⌜proc_pt_wf P⌝ ∗ pt_frame (upt_tree_spec P.(ud_root) P.(ud_tfp) P.(ud_um)))
+      ∗ proc_pt_own P.
+  Proof.
+    rewrite /proc_pt. iSplit.
+    - iIntros "(%Hwf & Htr & Hpg)". iFrame "Hpg". iSplitR; [done|]. iExact "Htr".
+    - iIntros "[(%Hwf & Htr) Hpg]". iSplitR; [done|]. iFrame "Htr Hpg".
+  Qed.
+
+  (* USER VIEW -> KERNEL VIEW.  The pages come back page-indexed; the tree
+     stays with the caller as [utlb_inv_pt] for the switch to consume.
+     The premise is the renormalisation: [user_pt_inv] owns its bytes at
+     the descriptor's [ud_data] field, and only at the DERIVED footprint
+     are they the pages [proc_pt_own] names. *)
+  Lemma user_pt_inv_open (P : uptd) :
+    ud_data P = ud_pas P ->
+    user_pt_inv P -∗
+    utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) ∗ proc_pt_own P.
+  Proof.
+    intros Hnorm. rewrite /user_pt_inv proc_pt_own_udata Hnorm.
+    iIntros "(Htlb & Hdat & _ & _)". iFrame "Htlb Hdat".
+  Qed.
+
+  (* KERNEL VIEW -> USER VIEW.  The descriptor comes out RENORMALISED --
+     that is what makes [udata_cov] free ([ud_pas_cov]); [upt_acc_wf] is
+     already a conjunct of [proc_pt_wf], so the user tier's two pure side
+     conditions are both discharged here rather than demanded of a caller
+     (see SpecUsertrap.v's note on why usertrap cannot state them). *)
+  Lemma user_pt_inv_close (P : uptd) :
+    proc_pt_wf P ->
+    utlb_inv_pt P.(ud_root) P.(ud_tfp) P.(ud_um) -∗
+    proc_pt_own P -∗
+    user_pt_inv (ud_norm P).
+  Proof.
+    intros (_ & Hacc & _ & _ & _).
+    rewrite /user_pt_inv.
+    unfold ud_norm; cbn [ud_root ud_tfp ud_um ud_data].
+    rewrite proc_pt_own_udata.
+    iIntros "Htlb Hdat". iFrame "Htlb Hdat".
+    iPureIntro. split; [exact (ud_pas_cov P) | exact Hacc].
   Qed.
 
   (* ------------------------------------------------------------------ *)

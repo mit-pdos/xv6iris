@@ -64,7 +64,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd SpecFdalloc.
@@ -111,7 +110,7 @@ Section SpecSysDup.
 End SpecSysDup.
 
 Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
-    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_dup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -133,17 +132,16 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
      is stated ∀-generically in [lks], so it has to be said. *)
   locks_below lks "ftable" ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the ftable lock, for filedup's ghost step *)
   is_ftable γl γf -∗
-  panic_wp_any -∗
   proc_priv γf p pid V -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b lks -∗
+      cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       sys_dup_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -152,7 +150,7 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
 Module Type SYSDUP.
   Parameter wp_sys_dup_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) (lks : gset string),
-      wp_sys_dup_sconf_body γl γf m av n eb p C v pid V b lks.
+      wp_sys_dup_sconf_body γl γf m av n eb p v pid V b lks.
 End SYSDUP.

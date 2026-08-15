@@ -51,7 +51,8 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UserPtTree.
+Require Import UserPtTree ProcPtOwn.
+Require Import KptTree TrampPt.
 Require Import KallocInv.
 Require Import PanicStub.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
@@ -68,6 +69,7 @@ Require Import ProofUsertrapTail.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -94,11 +96,24 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Section UtSysBlock.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* the trapframe page's own [page_valid], read off [proc_priv] without
+     consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
+     does not spend the resource (durable-notes.md), so [Hpv] is still
+     whole for [proc_priv_tf_upd] right afterward. *)
+  Local Lemma ut_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Proof.
+    iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
+  Qed.
+
   Lemma ut_90 (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ)
+      (m0 m : regfile) (av nx : nat)
       (mie_v menvcfg0 : mword 64) (lks : gset string) :
     ut_wf N ->
     (K_usertrap <= av)%nat ->
@@ -118,7 +133,7 @@ Section UtSysBlock.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x90)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    ut_hold (SY.syscall_env) N V C false lks -∗
+    ut_hold (SY.syscall_env) N V false lks -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗
     wp_next true (un_pj N)
@@ -169,9 +184,9 @@ Section UtSysBlock.
     assert (HcsM1 : ut_cs m0 M1)
       by (rewrite /M1; apply ut_cs_insert; [vm_compute; reflexivity | exact Hcs]).
     iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
-              M1 nx 0%nat false (un_pj N) C false lks
+              M1 nx 0%nat false (un_pj N) false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+              with "Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hret94 : ret_pc (M1 !!! Regidx Rra) = mword_of_int (UT + 0x94))
@@ -235,7 +250,7 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx C false lks Hwf' ltac:(unfold K_kexit; lia)
+                nx false lks Hwf' ltac:(unfold K_kexit; lia)
                 with "Htext Hpc Hcg [-]").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -264,8 +279,20 @@ Section UtSysBlock.
          [proc_priv_tf_upd] below consumes the block. *)
       iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
       destruct Hepcx as [uepc Hepc].
+      iDestruct (ut_tfp_valid with "Hpv") as %Hpv_valid.
       iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hpvback)".
-      iDestruct (tf_page_word_upd _ _ tf_epc_idx uepc Hepc with "Htfp")
+      (* [pt_node_claim], off [hw_config] (peeled from [Hcg] persistently)
+         and [Hpv_valid] -- the mem-tier convenience wrapper is what the
+         VA-tier [c.ld]/[c.sd] through the kernel identity map needs
+         (ProcInv.v's header on [tf_page_word_mem]). *)
+      iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhw Hcg]".
+      iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+        "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+          %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+          %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+      iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+      iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx uepc ltac:(vm_compute; lia) Hepc
+                   with "Hptc Htfp")
         as "(Hword & Htfback)".
       (* ---- +0x96: c.ld a4,88(s1) -- a4 := p->trapframe ---- *)
       assert (Haddrtf : add_vec (rget mf Rs1)
@@ -291,7 +318,7 @@ Section UtSysBlock.
         by (rgne; rewrite /S1 upd_eq; reflexivity).
       assert (Haddrw : add_vec (rget S1 Ra4)
                          (sign_extend' 64 (mword_of_int 24 : mword 12))
-                       = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx)
+                       = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
         by (rewrite HS1a4; apply prr_tf_addr_24).
       (* ---- +0x98: c.ld a5,24(a4) -- a5 := epc ---- *)
       iEval (rewrite -Haddrw) in "Hword".
@@ -328,7 +355,7 @@ Section UtSysBlock.
         rewrite /S1 upd_eq. reflexivity. }
       assert (Haddrw3 : add_vec (rget S3 Ra4)
                           (sign_extend' 64 (mword_of_int 24 : mword 12))
-                        = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx)
+                        = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
         by (rewrite HS3a4; apply prr_tf_addr_24).
       iEval (rewrite -Haddrw3) in "Hword".
       iApply (wp_csd_s_sconf (mword_of_int (UT + 0x9c)) Ra5 Ra4
@@ -348,7 +375,7 @@ Section UtSysBlock.
       assert (HV1upt : pv_upt V1 = pv_upt V)
         by (rewrite /V1; destruct V; reflexivity).
       (* ---- +0x9e: csrsi sstatus,2 -- intr_on(), and the reserve is paid ---- *)
-      iDestruct (ut_flip_pre (un_pj N) C with "Hcpu") as "(Hcnt & Hcells & HC)".
+      iDestruct (ut_flip_pre (un_pj N) with "Hcpu") as "(Hcnt & Hcells)".
       (* THE CARVE, and why it needs a NAME for the remainder.  The enabling
          leaf's pre index is [trap_res true + n], so the block's own [nx] has
          to be re-spelled that way -- and [rewrite] on an equation whose LHS is
@@ -405,13 +432,15 @@ Section UtSysBlock.
         apply ut_cs_insert; [vm_compute; reflexivity |].
         exact Hcsmf. }
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
-                S4 n2 C (un_pid N) V1 lks
+                S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; unfold K_syscall, K_sys_exit, K_kexit,
                                             kv_frame_slots; lia)
-                with "Hcg [HC] Htext Hkd Hpc Hpi Hpa Hsy Hpv [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hpa Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
-         at depth 0 makes that the set syscall's contract names. *)
-      { rewrite Hlkempty. iApply (cpu_own_on_intro (CID := CID1) (un_pj N) C with "HC"). }
+         at depth 0 makes that the set syscall's contract names.  It now
+         takes no premise at all -- [cpu_own] carries no caller frame to
+         fold in any more. *)
+      { rewrite Hlkempty. iApply cpu_own_on_intro. }
       iIntros (CID2 Hk2 mg V2) "%Hcsg %Htfg Hcg Hcpu Hsy Hpv Hpc".
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).
@@ -428,7 +457,7 @@ Section UtSysBlock.
       assert (Hcsmg : ut_cs m0 mg)
         by exact (ut_cs_trans m0 S4 mg HcsS4 (ut_cs_of_callee_saved _ _ Hcsg)).
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N V2 pt ksp m0 mg av
-                n2 C true
+                n2 true
                 mie_v menvcfg0 lks
                 Hwf' Hav ltac:(rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp

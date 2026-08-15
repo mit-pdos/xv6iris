@@ -33,7 +33,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import TicksInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -41,7 +40,7 @@ Import Defs.
 
 
 Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname)
-    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string) :=
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_uptime in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* the hart id is the ambient CpuId (acquire/release's cid convention) *)
@@ -54,16 +53,15 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
      call, so this contract is BALANCED and [lks] is unchanged end to end. *)
   locks_below lks "time" ->
   sie_cap_gpr m av b p -∗
-  cpu_own n eb p C b lks -∗
+  cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_tickslock γl -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (t : mword 32),
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = zero_extend' 64 t ⌝ -∗
       sie_cap_gpr mf av b p -∗
-      cpu_own n eb p C b lks -∗
+      cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -71,6 +69,6 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
 Module Type SYSUPTIME.
   Parameter wp_sys_uptime_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) (lks : gset string),
-      wp_sys_uptime_sconf_body γl m n eb p C av b lks.
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string),
+      wp_sys_uptime_sconf_body γl m n eb p av b lks.
 End SYSUPTIME.

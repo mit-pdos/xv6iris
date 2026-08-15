@@ -406,10 +406,10 @@ Section ProofEitherCopyout.
   Notation Ra4 := (mword_of_int 14 : mword 5).
 
   Lemma wp_either_copyout_sconf (γa : gname) (γf : gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyout_sconf_body γa γf m av lvl eb p C pid V user len
+    : wp_either_copyout_sconf_body γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
@@ -682,8 +682,8 @@ Section ProofEitherCopyout.
     (* [Hcpu] rode through the leaf steps untouched (only [Hcg]/[Hpc] are part
        of an ordinary leaf's own footprint), so it is still anchored at the
        ENTRY hart -- re-anchor it at [CID13] before crossing into myproc. *)
-    iDestruct (cpu_own_transport CID CID13 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p C b
+    iDestruct (cpu_own_transport CID CID13 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p b
               _ Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID14 Hs14 ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -879,9 +879,9 @@ Section ProofEitherCopyout.
       iEval (rewrite -HU5a3) in "Hsrc".
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyout. *)
-      iDestruct (cpu_own_transport CID14 CID20 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Copyout.wp_copyout_sconf γa U5 (pv_upt V) (pv_sz V) len src_bytes
-                (av - 6)%nat lvl eb p C b
+                (av - 6)%nat lvl eb p b
                 _ HK52 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hsrc").
       all: try lkbelow.
@@ -911,7 +911,7 @@ Section ProofEitherCopyout.
       iIntros (CID22 Hs22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through [ec_epi] untouched since copyout handed it back
          at [CID21]; re-anchor it at [CID22] before discharging [Hcont]. *)
-      iDestruct (cpu_own_transport CID21 CID22 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID21 CID22 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hsrc [Hres]").
       { exact Hcsf. }
@@ -1082,7 +1082,7 @@ Section ProofEitherCopyout.
       (* [Hcpu] rode through memmove and [ec_epi] untouched since myproc
          handed it back at [CID14]; re-anchor it at [CID23] before
          discharging [Hcont]. *)
-      iDestruct (cpu_own_transport CID14 CID23 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID14 CID23 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hsrc [Hdst]").
       { exact Hcsf. }
@@ -1122,10 +1122,10 @@ Section ProofEitherCopyin.
   Notation Ra4 := (mword_of_int 14 : mword 5).
 
   Lemma wp_either_copyin_sconf (γa : gname) (γf : gname)
-      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyin_sconf_body γa γf m av lvl eb p C pid V user len
+    : wp_either_copyin_sconf_body γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
@@ -1397,8 +1397,8 @@ Section ProofEitherCopyin.
     (* [Hcpu] rode through the leaf steps untouched (only [Hcg]/[Hpc] are part
        of an ordinary leaf's own footprint), so it is still anchored at the
        ENTRY hart -- re-anchor it at [CID13] before crossing into myproc. *)
-    iDestruct (cpu_own_transport CID CID13 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p C b _
+    iDestruct (cpu_own_transport CID CID13 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Myproc.wp_myproc_sconf R7 (av - 6)%nat lvl eb p b _
               Hlvl ltac:(lia) with "Hcg Hcpu Htext Hpc").
     iIntros (CID14 Hs14 ms Am) "%Hms Hcg Hcpu Hpc %HcsA".
     destruct HcsA as [HcsA HAa0].
@@ -1588,9 +1588,9 @@ Section ProofEitherCopyin.
       iEval (rewrite -HU5a2) in "Hdst".
       (* [Hcpu] rode through untouched since myproc handed it back at [CID14];
          re-anchor it at [CID20] before crossing into copyin. *)
-      iDestruct (cpu_own_transport CID14 CID20 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID14 CID20 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Copyin.wp_copyin_sconf γa U5 (pv_upt V) (pv_sz V) len dst_olds
-                (av - 6)%nat lvl eb p C b
+                (av - 6)%nat lvl eb p b
                 _ HK50 HU5a0 HU5a1 HU5a4 Hlen Hszb Hlvl
                 with "Hcg Hcpu Htext Hpc Hpt Henv Hdst").
       all: try lkbelow.
@@ -1620,7 +1620,7 @@ Section ProofEitherCopyin.
       iIntros (CID22 Hs22 mf) "[%Hcsf %Hfa0] Hcg Hpc".
       (* [Hcpu] rode through [ec_epi] untouched since copyin handed it back
          at [CID21]; re-anchor it at [CID22] before discharging [Hcont]. *)
-      iDestruct (cpu_own_transport CID21 CID22 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID21 CID22 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID22 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hres Hdst]").
       { exact Hcsf. }
@@ -1793,7 +1793,7 @@ Section ProofEitherCopyin.
       (* [Hcpu] rode through memmove and [ec_epi] untouched since myproc
          handed it back at [CID14]; re-anchor it at [CID23] before
          discharging [Hcont]. *)
-      iDestruct (cpu_own_transport CID14 CID23 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID14 CID23 lvl eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hsrc Hdst]").
       { exact Hcsf. }

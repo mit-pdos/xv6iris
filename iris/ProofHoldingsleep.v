@@ -67,9 +67,9 @@ Section ProofHoldingsleep.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
 
   Lemma wp_holdingsleep_gen_sconf
-      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_gen_sconf_body γl γsl s R H m p pidv av eb C dq b lks.
+      (γl γsl : gname) (s : string) (R : iProp Σ) (H : Qp -> iProp Σ) (q : Qp)
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string)
+    : wp_holdingsleep_gen_sconf_body γl γsl s R H q m p pidv av eb dq b lks.
   Proof.
     cbv beta delta [wp_holdingsleep_gen_sconf_body].
     intros pcE slk ret_tgt Hav Hfresh.
@@ -230,15 +230,15 @@ Section ProofHoldingsleep.
        instructions above each moved to a FRESH, universally quantified hart
        (CID1..CID10), so acquire wants it at CID10.  ONE line, no case split
        on [b] (see CpuOwn.cpu_own_transport). *)
-    iDestruct (cpu_own_transport CID CID10 0%nat b p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID10 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* acquire(&slk->lk): intr_count 0 -> 1; is_lock from the sleeplock. *)
     iApply (Acquire.wp_acquire_sconf γl "sleep lock"%string (sl_res_gen γsl slk R H) M5
-              0%nat b p C (av - 6)%nat b lks
+              0%nat b p (av - 6)%nat b lks
               ltac:(lia)
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HM5a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms A) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -246,7 +246,9 @@ Section ProofHoldingsleep.
       by (rewrite HM5ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     (* open sl_res with the caller's token: refute the free arm. *)
-    iDestruct (sl_res_open_held γsl slk R H with "HR Hsl") as "(Hsl & Hdep & Hcellex)".
+    iDestruct (sl_res_open_held_q γsl slk R H q with "HR Hsl")
+      as "(Hsl & Hha & HHq & Hcellex)".
+    iAssert (sl_dep γsl H) with "[Hha HHq]" as "Hdep"; [ iExists q; iFrame |].
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
     (* +0x18 c.lw a5,0(s1) : a5 := sext v *)
     iPoseProof (hsl_18 with "Htext") as "Hi18".
@@ -336,7 +338,7 @@ Section ProofHoldingsleep.
        Called at [b = false] (holding the lock, level 1): myproc's own
        [wp_next] index is the [false] we pass, so it collapses too -- the
        hart stays at [CIDacq] throughout, no transport needed. *)
-    iApply (Myproc.wp_myproc_sconf Bj (trap_res b + (av - 6))%nat 1%nat b p C false
+    iApply (Myproc.wp_myproc_sconf Bj (trap_res b + (av - 6))%nat 1%nat b p false
               ({["sleep lock"]} ∪ lks)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)
@@ -483,7 +485,7 @@ Section ProofHoldingsleep.
     iDestruct (sl_res_close_held γsl slk R H v Hvnz with "Hslk Hdep") as "HR2".
     (* release(&slk->lk): intr_count 1 -> 0. *)
     iApply (Release.wp_release_sconf γl (sl_lk slk) "sleep lock"%string (sl_res_gen γsl slk R H) D20
-              0%nat b p C (av - 6)%nat ({["sleep lock"]} ∪ lks)
+              0%nat b p (av - 6)%nat ({["sleep lock"]} ∪ lks)
               ltac:(rewrite HD20a0; apply addv_sext0)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlk] [Htok] [HR2] Hcnt Hpay").
@@ -689,7 +691,7 @@ Section ProofHoldingsleep.
        epilogue instructions above each moved to a FRESH hart (CIDe1..CIDe7),
        so holdingsleep's own continuation wants it at CIDe7.  ONE line, no
        case split on [b]. *)
-    iDestruct (cpu_own_transport CIDrel CIDe7 0%nat b p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDrel CIDe7 0%nat b p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe7 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! E2e with "[%] Hcg Hcnt Hpc Hsl Hpidfield Hpidproc").
@@ -714,9 +716,20 @@ Section ProofHoldingsleep.
   (* the untracked instance, which is what every existing caller takes *)
   Lemma wp_holdingsleep_sconf
       (γl γsl : gname) (s : string) (R : iProp Σ)
-      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) (lks : gset string)
-    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b lks.
-  Proof. exact (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked m p pidv av eb C dq b lks). Qed.
+      (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (dq : dfrac) (b : bool) (lks : gset string)
+    : wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb dq b lks.
+  Proof.
+    cbv beta delta [wp_holdingsleep_sconf_body].
+    intros pcE slk ret_tgt Hav Hbelow.
+    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidfield #Hpanic Hpidproc Hcont".
+    iDestruct "Hsl" as (q) "Hsl".
+    iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb dq b lks
+              Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidfield Hpanic Hpidproc").
+    iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidfield Hpidproc".
+    iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
+    iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidfield Hpidproc"); [ exact Hcs |].
+    iExists q. iExact "Hsl".
+  Qed.
 
 End ProofHoldingsleep.
 

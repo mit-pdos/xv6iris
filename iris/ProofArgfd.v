@@ -52,6 +52,7 @@ Require Import HartTp WpNext.
 Require Import ProcGeom CpuOwn.
 Require Import UserPtTree.
 Require Import FdSlots ProcInv.
+Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import SpecMyproc SpecArgint.
 Require Import SpecArgfd.
@@ -446,10 +447,10 @@ Section ProofArgfd.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_argfd_sconf (γf : gname)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) (lks : gset string)
-    : wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b lks.
+    : wp_argfd_sconf_body γf m av n eb p i v pid V oldfd oldf b lks.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].
     intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzf Hn Hav.
@@ -698,14 +699,15 @@ Section ProofArgfd.
     iEval (rewrite -HM6a1) in "Hs5hi".
     (* argint reads the trapframe pointer AND page out of [proc_priv] *)
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Hpage & Hpback)".
     (* ---- argint(n, &fd) ---- *)
     (* [Hcpu] came in at the entry hart; nine leaf steps may have moved us, so
        re-anchor it before argint's own [cpu_own] premise can take it. *)
-    iDestruct (cpu_own_transport CID CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf M6 (av - 6)%nat n eb p C i
+    iDestruct (cpu_own_transport CID CID10 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply (Argint.wp_argint_sconf M6 (av - 6)%nat n eb p i
               (ud_tfp (pv_upt V)) (pv_tf V) v (word_hi w5) (DfracOwn (1/4)) b
-              _ Hi HM6a0 Harg Hn ltac:(lia)
+              _ Hi HM6a0 Harg Hn ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfp Hpage Hs5hi").
     iIntros (CID11 Hk11 A) "%HcsA Hcg Hcpu Hpc Htfp Hpage Hs5hi".
     iDestruct ("Hpback" with "Htfp Hpage") as "Hpriv".
@@ -841,8 +843,8 @@ Section ProofArgfd.
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)
                      = add_vec_int (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) 4)
         by (rewrite /B upd_eq; reflexivity).
-      iDestruct (cpu_own_transport CID11 CID15 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Myproc.wp_myproc_sconf B (av - 6)%nat n eb p C b
+      iDestruct (cpu_own_transport CID11 CID15 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iApply (Myproc.wp_myproc_sconf B (av - 6)%nat n eb p b
                 _ Hn ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iIntros (CID16 Hk16 ms P) "%Hms Hcg Hcpu Hpc %HcsP".
@@ -1075,7 +1077,7 @@ Section ProofArgfd.
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HDsp HDa0 HthrD
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
         iIntros (CID25 Hk25 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-        iDestruct (cpu_own_transport CID16 CID25 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID16 CID25 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID25 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
         rewrite /argfd_post. iLeft. iFrame "Hfdcell Hfcell". iPureIntro.
@@ -1162,7 +1164,7 @@ Section ProofArgfd.
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HE1sp HE1a0 HthrE1
                   with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
         iIntros (CID28 Hk28 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-        iDestruct (cpu_own_transport CID16 CID28 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+        iDestruct (cpu_own_transport CID16 CID28 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
         iSpecialize ("Hcont" $! CID28 with "[%]"); [wp_next_chain|].
         iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
         rewrite /argfd_post. iRight. iExists fd, fv. iFrame "Hfdcell Hfcell". iPureIntro.
@@ -1225,7 +1227,7 @@ Section ProofArgfd.
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl eq_refl HFsp HFa0 HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hs3 Hs4 Hs5 Hs6").
       iIntros (CID17 Hk17 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID11 CID17 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+      iDestruct (cpu_own_transport CID11 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID17 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc Hpriv [Hfdcell Hfcell]"); [exact Hcsf|].
       rewrite /argfd_post. iLeft. iFrame "Hfdcell Hfcell". iPureIntro.

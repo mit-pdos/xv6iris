@@ -94,6 +94,7 @@ Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -112,13 +113,13 @@ Local Open Scope Z_scope.
 Definition consolewrite_stack : nat := 72%nat.
 
 Definition wp_consolewrite_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (γs : list gname) (j : nat) (γlp : gname)
     (γu : uart_names) (γv : disk_names) (γl : gname)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool)
     (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.consolewrite in
   let pj := proc_addr j in
@@ -143,7 +144,7 @@ Definition wp_consolewrite_sconf_body
   sie_cap_gpr m av b pj -∗
   (* noff = 0: the sleep inside uartwrite demands that tx_lock -- taken and
      released inside uartwrite's own loop -- be the only lock held. *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
@@ -166,7 +167,7 @@ Definition wp_consolewrite_sconf_body
       ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int r : mword 64)⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv_core pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -174,12 +175,12 @@ Definition wp_consolewrite_sconf_body
 
 Module Type CONSOLEWRITE.
   Parameter wp_consolewrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string),
-      wp_consolewrite_sconf_body γa γf γs j γlp γu γv γl m av eb C pid V n b lks.
+      wp_consolewrite_sconf_body γa γf γs j γlp γu γv γl m av eb pid V n b lks.
 End CONSOLEWRITE.

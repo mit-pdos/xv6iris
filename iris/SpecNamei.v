@@ -74,6 +74,7 @@ Require Import SpecDirlink.
 Require Import SpecNamex.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -84,7 +85,7 @@ Definition K_namei : nat := 106%nat.
 Definition wp_namei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -101,7 +102,7 @@ Definition wp_namei_sconf_body
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
   let pj := proc_addr j in
@@ -137,7 +138,7 @@ Definition wp_namei_sconf_body
   gs !! j = Some gl ->
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -172,7 +173,7 @@ Definition wp_namei_sconf_body
     (ok : bool) (ipv : mword 64),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -204,7 +205,7 @@ Definition wp_namei_sconf_body
 Definition wp_namei_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -221,7 +222,7 @@ Definition wp_namei_gen_body
     (plen : nat) (pfun : nat -> bv 8)                  (* the path buffer     *)
     (n : nat) (Sb : gset Z)
     (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.namei in
   let pj := proc_addr j in
@@ -259,7 +260,7 @@ Definition wp_namei_gen_body
   gs !! j = Some gl ->
   eb = true ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -294,7 +295,7 @@ Definition wp_namei_gen_body
     (ok : bool) (ipv : mword 64) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       pc_is ret_tgt -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -328,7 +329,7 @@ Module Type NAMEI.
   Parameter wp_namei_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -344,18 +345,18 @@ Module Type NAMEI.
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_namei_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n
-                          pidv dq dqb dqs dqc m K eb C b lks.
+                          pidv dq dqb dqs dqc m K eb b lks.
   (* the set-form contract; the counted one is this at the [log_op]
      existential's own witness. *)
   Parameter wp_namei_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -371,10 +372,84 @@ Module Type NAMEI.
       (plen : nat) (pfun : nat -> bv 8)
       (n : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs dqc : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_namei_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                           ga gf cov logstart bmapstart inodestart nib
                           size dev used cwdv plen pfun n Sb
-                          pidv dq dqb dqs dqc m K eb C b lks.
+                          pidv dq dqb dqs dqc m K eb b lks.
 End NAMEI.
+
+(* ===================================================================== *)
+(*  THE ROOT CORNER: [namei("/")].                                        *)
+(*                                                                        *)
+(*  A thin forward of [SpecNamex.wp_namex_root] -- namei's whole body is a *)
+(*  namex call -- and the regime is that contract's: no running process,   *)
+(*  no transaction, no file-system fabric beyond the inode cache, and any  *)
+(*  [eb] / [b].  See [SpecNamex.wp_namex_root_body]'s header for WHY there *)
+(*  are two contracts rather than one.                                    *)
+(*                                                                        *)
+(*  THE NAME BUFFER DOES NOT APPEAR, and here it is not even carved: the   *)
+(*  general proof carves the frame's two low slots into [name[14]] because *)
+(*  namex's memmoves write it, and on this path no memmove runs.  So the   *)
+(*  four frame slots stay four stack slots from the push to the pop.       *)
+(* ===================================================================== *)
+
+(* namei's own frame is 32 bytes (4 slots) over the corner's 28. *)
+Definition K_namei_root : nat := 32%nat.
+
+Definition wp_namei_root_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
+      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+    (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+    (dqp : dfrac)
+    (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
+    (b : bool) (lks : gset string) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.namei in
+  let pv := m !!! Regidx (mword_of_int 10 : mword 5) in    (* a0 = path *)
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_namei_root <= K)%nat ->
+  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  dev = icfg_dev ->
+  nib = icfg_nib ->
+  dev = ROOTDEV ->
+  (0 < nib)%nat ->
+  locks_below lks "itable" ->
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p b lks -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+  itable_inv -∗
+  ic_escrows cn gfs gi cov logstart -∗
+  iref_slot -∗
+  pa_add pv 0 ↦ₘ{dqp} SLASH -∗
+  pa_add pv 1 ↦ₘ{dqp} NUL -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile) (ipv : mword 64),
+      ⌜ callee_saved m mr
+        /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ipv ⌝ -∗
+      sie_cap_gpr mr K b p -∗
+      cpu_own n eb p b lks -∗
+      pc_is ret_tgt -∗
+      pa_add pv 0 ↦ₘ{dqp} SLASH -∗
+      pa_add pv 1 ↦ₘ{dqp} NUL -∗
+      inode_held ipv -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
+Module Type NAMEI_ROOT.
+  Parameter wp_namei_root :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
+             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
+      (dqp : dfrac)
+      (m : regfile) (n K : nat) (eb : bool) (p : mword 64)
+      (b : bool) (lks : gset string),
+      wp_namei_root_body gtl cn gfs gi cov logstart nib dev dqp
+                         m n K eb p b lks.
+End NAMEI_ROOT.

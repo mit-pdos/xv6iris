@@ -60,6 +60,7 @@ Require Import KallocInv KvmSpec.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 
 
 (* PROVISIONAL stack budget: 50 is what main() has available below its own
@@ -73,11 +74,11 @@ Definition K_userinit : nat := 50%nat.
 Definition userinit_pages : nat := 8%nat.
 
 Definition wp_userinit_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
-    (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (eb : bool) (pj : mword 64)
     (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.userinit in
   let ra_idx : mword 5 := mword_of_int 1 in
@@ -91,7 +92,7 @@ Definition wp_userinit_sconf_body
   (* [kernel_data] supplies the "initcode" / "/" string literals *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
   procs_inv γs -∗
@@ -103,7 +104,7 @@ Definition wp_userinit_sconf_body
     sie_cap_gpr mf K b pj -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 mf /\ mf !!! Regidx ra_idx = ra0 ⌝ -∗
-    cpu_own 0%nat eb pj C b lks -∗
+    cpu_own 0%nat eb pj b lks -∗
     kalloc_env γa (avail_sub on userinit_pages) -∗
     (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -111,11 +112,11 @@ Definition wp_userinit_sconf_body
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
-      (eb : bool) (pj : mword 64) (C : iProp Σ)
+      (eb : bool) (pj : mword 64)
       (on : option nat) (v0 : mword 64) (b : bool) (lks : gset string),
-      wp_userinit_sconf_body γa γs m0 K eb pj C on v0 b lks.
+      wp_userinit_sconf_body γa γs m0 K eb pj on v0 b lks.
 End USERINIT.

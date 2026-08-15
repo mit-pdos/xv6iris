@@ -230,7 +230,7 @@ Section SpecFreeproc.
       (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
-      (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string) :=
     let pcE : mword 64 := mword_of_int KernelSyms.freeproc in
     let pa := proc_addr j in
@@ -246,7 +246,7 @@ Section SpecFreeproc.
        own yet, so this is the whole cone this contract needs to state. *)
     locks_below lks "kmem" ->
     sie_cap_gpr mm K false pme -∗
-    cpu_own ilvl eb pme C false lks -∗
+    cpu_own ilvl eb pme false lks -∗
     kernel_text -∗
     pc_is pcE -∗
     proc_held cpu_id j γl st ch -∗
@@ -257,7 +257,7 @@ Section SpecFreeproc.
     wp_next false pme (fun (CID : CpuId) =>
       ∀ (mr : regfile),
       sie_cap_gpr mr K false pme -∗
-      cpu_own ilvl eb pme C false lks -∗
+      cpu_own ilvl eb pme false lks -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       proc_held cpu_id j γl UNUSED (zero_reg : mword 64) -∗
@@ -277,7 +277,7 @@ Module Type FREEPROC.
       (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
-      (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (K : nat) (eb : bool) (pme : mword 64)
       (ilvl : nat) (lks : gset string),
-      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl lks.
+      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme ilvl lks.
 End FREEPROC.

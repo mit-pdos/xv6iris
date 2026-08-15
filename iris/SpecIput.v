@@ -47,13 +47,16 @@
    Two below-icache blockers were found by tracing the proof forward and
    both are ruled on (design §13.12):
 
-     (B1) iput calls acquiresleep at noff = 1 (itable.lock held), and
-          SpecAcquiresleep demands [cpu_own 0 ...].  ROUTE B adopted: the
-          sleeping branch is panic("sched locks"), so it DIVERGES and
-          [panic_wp_any] -- which iput already carries -- closes it.
-          LANDED (ef035525): the truncate arm calls
-          [wp_acquiresleep_nested_sconf] at n := 0.  NOTHING in this
-          statement changes because of it.
+     (B1) iput calls acquiresleep at noff = 1 (itable.lock held), and the
+          blocking [SpecAcquiresleep] demands [cpu_own 0 ...].  SETTLED, and
+          not by the route this note first took: the truncate arm calls
+          [wp_acquiresleep_nb_sconf], the NON-BLOCKING contract, which never
+          reaches the sleeping branch at all -- REF-1 says no share of the
+          entry's "may hold" right exists, so nobody holds the lock
+          (claude-notes/projects/iput-acquiresleep.md).  The earlier plan
+          leaned on the sleeping branch being panic("sched locks"); that
+          contract is gone, because nothing that CAN sleep may be entered at
+          noff != 0.  NOTHING in this statement changes because of it.
 
      (B2) SpecItrunc's [forall i < MAXFILE, length (data i) = BSIZE] is not
           derivable: [data] is EXISTENTIAL inside [ic_loaded], and
@@ -101,6 +104,7 @@ Require Import IcacheEscrow.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -116,7 +120,7 @@ Definition iput_units : nat := 3%nat.
 
 Definition wp_iput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)          (* the running process *)
@@ -133,7 +137,7 @@ Definition wp_iput_sconf_body
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
@@ -175,7 +179,7 @@ Definition wp_iput_sconf_body
      NESTED one, which does not park; bread under itrunc/iupdate still
      does, so this premise stays.) *)
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
@@ -197,7 +201,12 @@ Definition wp_iput_sconf_body
   (* the inode region *)
   ireg_inv gi gfs inodestart nib -∗
   (* the entry's sleeplock, over the CHECKOUT TOKEN alone *)
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
+     the slot, keyed by the slot rather than by the lock -- which is what
+     lets iput, at [ip->ref == 1], prove the lock free instead of blocking
+     on it (claude-notes/projects/iput-acquiresleep.md). *)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   (* ---- THE REFERENCE BEING DESTROYED ---- *)
   inode_ref k q dev inum -∗
   (* ---- itrunc / iupdate's own resources ---- *)
@@ -222,7 +231,7 @@ Definition wp_iput_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement: [emp] at [eb = true], where iput's own
      acquire mints what the interior sleeps need; the real pair at
      [eb = false], where the caller holds it because the TRAP gave it
@@ -311,7 +320,7 @@ Definition ip_spend_w (w cru crz : bool) : nat :=
 
 Definition wp_iput_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)
@@ -328,7 +337,7 @@ Definition wp_iput_gen_body
     (k : nat) (q : Qp) (inum : mword 32)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iput in
   let ip : mword 64 := ientry k in
@@ -356,7 +365,7 @@ Definition wp_iput_gen_body
   (* THE FRESHNESS PREMISE -- see [wp_iput_sconf_body]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
@@ -367,7 +376,12 @@ Definition wp_iput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  (* TRACKED: what a holder deposits is a share of somebody's REFERENCE to
+     the slot, keyed by the slot rather than by the lock -- which is what
+     lets iput, at [ip->ref == 1], prove the lock free instead of blocking
+     on it (claude-notes/projects/iput-acquiresleep.md). *)
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k)
+                   (slh_tok (icfg_isl k)) -∗
   inode_ref k q dev inum -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -400,7 +414,7 @@ Definition wp_iput_gen_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z) (Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -429,7 +443,7 @@ Definition wp_iput_gen_body
 Module Type IPUT.
   Parameter wp_iput_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -443,11 +457,11 @@ Module Type IPUT.
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
-                          k q inum n pidv dq dqb dqs m K eb C b lks.
+                          k q inum n pidv dq dqb dqs m K eb b lks.
   (* the credited set-form contract; [wp_iput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness ([ip_spend_w w false false <= 2], and iput's own flush is the
@@ -455,7 +469,7 @@ Module Type IPUT.
      [LogInv.log_opS_named] opens; the paid-bitmap report is dropped. *)
   Parameter wp_iput_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -469,9 +483,9 @@ Module Type IPUT.
       (k : nat) (q : Qp) (inum : mword 32)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                        cov logstart bmapstart inodestart nib size dev used
-                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb C b lks.
+                       k q inum n Sb crb cru crz e0 pidv dq dqb dqs m K eb b lks.
 End IPUT.

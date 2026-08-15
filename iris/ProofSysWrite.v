@@ -68,6 +68,7 @@ Require Import IntrDefs HartTp WpNext WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import ProcInv.
 Require Import FdSlots ProcInv.
+Require Import ProofKforkParts.
 Require Import FileInvDefs.
 Require Import KallocInv.
 Require Import UserPtTree.
@@ -92,6 +93,7 @@ Require Import CodeSysWrite.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -144,7 +146,7 @@ Section ProofSysWrite.
   (* NO [!icacheG Σ]: [fileG] bundles it (SpecFilewrite.v's note). *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -336,8 +338,8 @@ Section ProofSysWrite.
   Lemma wp_sys_write_sconf
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (fn : fwrite_names) (pidv : mword 32) (V : pprivate) (v v2 : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb C b lks.
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
   Proof.
     cbv beta delta [wp_sys_write_sconf_body].
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Hfj Hfprocs
@@ -525,14 +527,15 @@ Section ProofSysWrite.
       by (rewrite /M5 upd_eq; reflexivity).
     (* argaddr wants the trapframe pointer fraction and the page, out of the
        block; the wand puts both back the instant it returns. *)
+    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
     iEval (rewrite -HM5a1) in "Hs5".
-    iDestruct (cpu_own_transport CID CID7 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+    iDestruct (cpu_own_transport CID CID7 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj C 1%nat
+    iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
-              ltac:(unfold argaddr_stack; lia)
+              ltac:(unfold argaddr_stack; lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
     iIntros (CID8 Hs8 A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs5".
     iEval (rewrite HM5a1) in "Hs5".
@@ -603,11 +606,11 @@ Section ProofSysWrite.
                     = add_vec_int (mword_of_int (KernelSyms.sys_write + 0x18) : mword 64) 4)
       by (rewrite /B3 upd_eq; reflexivity).
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfc & Htfp & Hpback)".
-    iDestruct (cpu_own_transport CID8 CID11 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+    iDestruct (cpu_own_transport CID8 CID11 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Argint.wp_argint_sconf B3 (av - 6)%nat 0%nat eb pj C 2%nat
+    iApply (Argint.wp_argint_sconf B3 (av - 6)%nat 0%nat eb pj 2%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v2 (word_hi w4) (DfracOwn (1/4)) b lks
-              ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia)
+              ltac:(unfold NARG; lia) HB3a0 Harg2 Hnoff ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp [Hs4hi]").
     { iEval (rewrite HB3a1). iExact "Hs4hi". }
     iIntros (CID12 Hs12 A1) "%HcsA1 Hcg Hcpu Hpc Htfc Htfp Hs4hi".
@@ -704,11 +707,11 @@ Section ProofSysWrite.
     assert (Hnzf : N4 !!! Regidx Ra2 <> (zero_reg : mword 64)).
     { rewrite HN4a2 sw_addr_f_base. apply stack_off_nonzero; [exact Hspb | lia]. }
     iEval (rewrite -HN4a2) in "Hs3".
-    iDestruct (cpu_own_transport CID12 CID16 0%nat eb pj C b ltac:(rewrite Hb; wp_next_chain)
+    iDestruct (cpu_own_transport CID12 CID16 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* ---- argfd(0, 0, &f).  [pfd] IS NULL and carries no resource --
        [SpecArgfd.ofd_out_null] is exactly this case. ---- *)
-    iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj C 0%nat v
+    iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
               ltac:(unfold argfd_stack; lia)
@@ -812,7 +815,7 @@ Section ProofSysWrite.
                 ltac:(lia) eq_refl eq_refl eq_refl HA3sp HA3a0 HthrA
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
       iIntros (CID21 Hs21 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
-     iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj C b 
+     iDestruct (cpu_own_transport CID17 CID21 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID21 with "[%]"); [wp_next_chain|].
       (* nothing ran, so the page table is its own extension *)
@@ -944,10 +947,10 @@ Section ProofSysWrite.
         as (kk qq Cf) "([%Hfvk %Hkk] & Href & Hcore & Howe)".
       assert (HS4a0' : S4 !!! Regidx Ra0 = fnode kk) by (rewrite HS4a0; exact Hfvk).
       iDestruct (write_env_frame γf fn Cf with "Henv Hdev") as "[Hfenv Hfback]".
-      iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj C b 
+      iDestruct (cpu_own_transport CID17 CID24 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filewrite.wp_filewrite_sconf γa γf γs j γlp kk qq Cf fn pidv V
-                S4 (av - 6)%nat eb C (sys_rw_count v2) b lks
+                S4 (av - 6)%nat eb (sys_rw_count v2) b lks
                 ltac:(unfold filewrite_stack, K_writei, consolewrite_stack; lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
@@ -999,7 +1002,7 @@ Section ProofSysWrite.
                 ltac:(lia) eq_refl eq_refl eq_refl HMfsp Hrva HthrF
                 with "Hcg Htext Hpc Hs1 Hs2 Hfcell Hs4 Hs5 Hs6").
       iIntros (CID26 Hs26 mg) "[%Hcsg %Hmga0] Hcg Hpc".
-      iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj C b 
+      iDestruct (cpu_own_transport CID25 CID26 0%nat eb pj b 
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID26 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mg rv P' used''

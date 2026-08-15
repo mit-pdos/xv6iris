@@ -67,8 +67,18 @@ Definition lock_ranks : list (string * nat) :=
   ; ("proc",         9)   (* every sleep_prepare / wakeup *)
   ; ("nextpid",     10)   (* allocproc -> allocpid *)
   ; ("kmem",        11)   (* allocproc -> kalloc, freeproc -> kfree *)
-  ; ("pr",          12)   (* panic -> printk *)
-  ; ("uart",        13)   (* printk -> consputc -> uartputc_sync *)
+  (* [pr] and [uart] are at the TOP, and that is forced by panic().  panic is
+     printk + printk + self-jump, so it takes pr.lock and, under it, tx_lock;
+     a panic arm reached while holding a lock ABOVE "pr" could not be
+     discharged by panic's own contract at all ([SpecPanic]'s
+     [locks_below lks "pr"] would be false), and in the real kernel it
+     deadlocks.  "Panic fires under nearly every lock, so nothing BELOW the
+     two leaves may sit above them" -- said in this file from the start, and
+     violated by [itable]/[ftable] until the panic splice needed it: [iget]
+     panics HOLDING itable.  Raising the two only WEAKENS every
+     [locks_below _ "pr"] obligation and strengthens none: nothing in xv6
+     acquires anything while holding uart, and the one lock taken under pr is
+     uart itself. *)
   (* THE TWO LEAVES, ABOVE [proc].  kfork takes np->lock from allocproc and
      then, STILL HOLDING IT, runs filedup over the fd table and idup on the
      cwd (kernel/proc.c:287-288), so there are real [proc -> ftable] and
@@ -79,6 +89,8 @@ Definition lock_ranks : list (string * nat) :=
      acquire-scan-release. *)
   ; ("itable",      14)
   ; ("ftable",      15)
+  ; ("pr",          16)   (* panic -> printk *)
+  ; ("uart",        17)   (* printk -> consputc -> uartputc_sync *)
   ].
 
 Fixpoint rank_lookup (l : list (string * nat)) (s : string) : nat :=

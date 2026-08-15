@@ -46,16 +46,16 @@ Section ProofKinit.
 
   Lemma wp_kinit_sconf
       (m : regfile)
-      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ)
+      (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64)
       (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (lks : gset string)
-    : wp_kinit_sconf_body m ps K ncnt eb pcur C vlock vname vcpu b lks.
+    : wp_kinit_sconf_body m ps K ncnt eb pcur vlock vname vcpu b lks.
   Proof.
     cbv beta delta [wp_kinit_sconf_body].
     intros pcE ret_tgt lk fl c_name c_cpu endaddr phystop s1entry
       HK Hncnt Hprun Hlkbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic Hlock Hname Hcpu Hflw Hpages Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hlock Hname Hcpu Hflw Hpages Hcont".
     (* the "kmem" string literal, read out of the kernel's data image *)
     assert (Hkmem : forall j bt, cstring_bytes "kmem"%string !! j = Some bt ->
                       KernelData.kernel_data !! (0x80007040 + Z.of_nat j)%Z = Some bt).
@@ -313,7 +313,7 @@ Section ProofKinit.
        [cpu_own_transport] moves it there in ONE line, no case split on [b] --
        initlock (just above) needed no such transport since its contract does
        not mention [cpu_own] at all. ---- *)
-    iDestruct (cpu_own_transport CID CID14 ncnt eb pcur C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID14 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads the count.
 
@@ -322,13 +322,12 @@ Section ProofKinit.
        panic_wp_any with it"); [SpecKinit.wp_kinit_sconf_body] now threads the
        same [panic_wp_any] (that sweep missed this one contract -- fixed
        above), so "Hpanic" hands it straight through with no conversion. *)
-    iApply (Freerange.wp_freerange_sconf γl γk lk fl R12 ps (K - 2) ncnt eb pcur C b lks
+    iApply (Freerange.wp_freerange_sconf γl γk lk fl R12 ps (K - 2) ncnt eb pcur b lks
               ltac:(lia) Hncnt
               ltac:(reflexivity) ltac:(reflexivity)
               ltac:(rewrite HR12a1 HR12a0; exact Hprun) Hlkbelow
-              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Hpanic] [Havail]").
+              with "Hcg Hcnt Htext Hpc Hkmem Hpages [Havail]").
     all: try lkbelow.
-    { iExact "Hpanic". }
     { iExact "Havail". }
     iIntros (CIDfr Hsfr mfr) "Hcg Hcnt Hpc %Hfrcs Havail".
     assert (Hpcfr : ret_pc (R12 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kinit + 0x2c)).
@@ -410,7 +409,7 @@ Section ProofKinit.
     (* [cpu_own] again: it was delivered at CIDfr by freerange's own [wp_next];
        four more plain instructions (the epilogue) have moved the hart to
        CID18. *)
-    iDestruct (cpu_own_transport CIDfr CID18 ncnt eb pcur C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDfr CID18 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID18 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! γl γk E3 with "Hcg Hcnt Hpc [%] Hkmem Havail").

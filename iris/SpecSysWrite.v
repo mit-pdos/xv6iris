@@ -111,6 +111,7 @@ Require Import SpecSysRead.
 Require Import SpecFilewrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -131,7 +132,7 @@ Definition sys_write_ret (V : pprivate) (v : mword 64) (n : Z) (r : mword 64) : 
 Section SpecSysWrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* THE ENVIRONMENT FILEWRITE'S [if] ACTUALLY ASKS FOR, out of the two
@@ -180,7 +181,7 @@ End SpecSysWrite.
 Definition wp_sys_write_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+      !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -188,7 +189,7 @@ Definition wp_sys_write_sconf_body
     (fn : fwrite_names)                          (* the file system's ghosts *)
     (pidv : mword 32) (V : pprivate)
     (v v2 : mword 64)                            (* syscall arguments 0, 2  *)
-    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :=
+    (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_write in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -214,7 +215,7 @@ Definition wp_sys_write_sconf_body
   eb = true ->
   sie_cap_gpr m av b pj -∗
   (* a syscall runs at push_off level 0 *)
-  cpu_own 0%nat eb pj C b lks -∗
+  cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filewrite's default arm is [panic("filewrite")], and its callees panic
      too; this is theirs *)
@@ -234,7 +235,7 @@ Definition wp_sys_write_sconf_body
       ⌜sys_write_ret V v (sys_rw_count v2) r⌝ -∗
       ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = r⌝ -∗
       sie_cap_gpr mf av b pj -∗
-      cpu_own 0%nat eb pj C b lks -∗
+      cpu_own 0%nat eb pj b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
       kalloc_env γa None -∗
@@ -248,7 +249,7 @@ Module Type SYSWRITE.
   Parameter wp_sys_write_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (γa : gname) (γf : gname)
@@ -256,6 +257,6 @@ Module Type SYSWRITE.
       (fn : fwrite_names)
       (pidv : mword 32) (V : pprivate)
       (v v2 : mword 64)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string),
-      wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb C b lks.
+      (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string),
+      wp_sys_write_sconf_body γa γf γs j γlp fn pidv V v v2 m av eb b lks.
 End SYSWRITE.

@@ -65,6 +65,7 @@ Require Import SpecWakeup.
 Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 (* wakeup's 7-entry callee-save frame, over [SpecWakeupParts.wk_fcell]: ra/s0
@@ -110,7 +111,7 @@ Definition wkl_regs (M : regfile) (spF chan : mword 64)
 Module WakeupProof (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUPPARTS) : WAKEUP.
 
 Section ProofWakeup.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ}.
   (* NO [Context `{GEN : GenId} `{CID : CpuId}]: the loop lemma is applied at the hart the
      prologue's own [wp_next] hands back, which a section variable could not
      express.  Every lemma below takes its own implicit [CID0]. *)
@@ -134,7 +135,7 @@ Section ProofWakeup.
   Definition wk_exit_body `{GEN : GenId}
       (pme spF : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
       (CID : CpuId) : iProp Σ :=
     (∀ Mexit : regfile,
        ⌜ Mexit !!! Regidx csp_rs1 = spF
@@ -146,7 +147,7 @@ Section ProofWakeup.
          /\ Mexit !!! Regidx (mword_of_int 27) = vs11
          /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mexit)) ⌝ -∗
        sie_cap_gpr Mexit av b pme -∗
-       cpu_own lvl eb pme C b lks -∗
+       cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x54)) -∗
        wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
        WP (Loop : expr riscv_lang))%I.
@@ -157,16 +158,16 @@ Section ProofWakeup.
   Definition wk_loop_body `{GEN : GenId}
       (pme spF chan : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
-      (av lvl : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
+      (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
       (CID0 : CpuId) (fuel : nat) (CID : CpuId) : iProp Σ :=
     (∀ (k : nat) (M : regfile),
        ⌜(NPROC - k <= fuel)%nat⌝ -∗ ⌜(k < NPROC)%nat⌝ -∗
        ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
        wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
          wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
-           vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb C b lks CIDq) -∗
+           vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CIDq) -∗
        sie_cap_gpr M av b pme -∗
-       cpu_own lvl eb pme C b lks -∗
+       cpu_own lvl eb pme b lks -∗
        kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
        wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
        WP (Loop : expr riscv_lang))%I.
@@ -178,7 +179,7 @@ Section ProofWakeup.
      carries no [wp_next]/hart binder of its own. *)
   Definition wk_rel_body `{GEN : GenId}
       (γs : list gname) (γk : gname) (pme spF chan : mword 64)
-      (av lvl k : nat) (eb b : bool) (C : iProp Σ)
+      (av lvl k : nat) (eb b : bool)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (CID : CpuId) : iProp Σ :=
     (∀ (Mr : regfile),
        ⌜ Mr !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k /\
@@ -208,7 +209,7 @@ Section ProofWakeup.
       (γs : list gname) (spF pme chan : mword 64)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (lvl : nat) (av : nat)
-      (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string) :
+      (eb : bool) (b : bool) (lks : gset string) :
     length γs = NPROC ->
     (* the acquire/release + myproc push_off keep the transient +1 in range *)
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
@@ -223,11 +224,11 @@ Section ProofWakeup.
        at whatever hart the scan ended on. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
       wk_exit_body pme spF vra vs0 vs1 vs2 vs3 vs4 vs5
-        vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb C b lks CID) -∗
+        vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜wkl_regs M spF chan vs6 vs7 vs8 vs9 vs10 vs11 k⌝ -∗
       sie_cap_gpr M av b pme -∗
-      cpu_own lvl eb pme C b lks -∗
+      cpu_own lvl eb pme b lks -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.wakeup + 0x38)) -∗
       wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
       WP (Loop : expr riscv_lang).
@@ -240,7 +241,7 @@ Section ProofWakeup.
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                  wk_loop_body pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
-                   vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb C b lks CID0 fuel CID))%I
+                   vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID0 fuel CID))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDk Hsk k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc Hframe".
@@ -257,7 +258,7 @@ Section ProofWakeup.
                  ∀ Mt : regfile,
                    ⌜ wkl_regs Mt spF chan vs6 vs7 vs8 vs9 vs10 vs11 k ⌝ -∗
                    sie_cap_gpr Mt av b pme -∗
-                   cpu_own lvl eb pme C b lks -∗
+                   cpu_own lvl eb pme b lks -∗
                    pc_is (mword_of_int (KernelSyms.wakeup + 0x30)) -∗
                    wk_frame spF vra vs0 vs1 vs2 vs3 vs4 vs5 -∗
                    WP (Loop : expr riscv_lang)))%I
@@ -305,7 +306,7 @@ Section ProofWakeup.
                              (sign_extend' 64 (mword_of_int 32 : mword 13)) = mword_of_int (KernelSyms.wakeup + 0x54))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgt54) in "Hpc".
-          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
           iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("Hqx" $! Mt30 with "[] Hcg Hown Htext Hpc Hframe").
@@ -338,7 +339,7 @@ Section ProofWakeup.
           assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.wakeup + 0x34) : mword 64) 4 = mword_of_int (KernelSyms.wakeup + 0x38))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp38) in "Hpc".
-          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme C b ltac:(wp_next_chain)
+          iDestruct (cpu_own_transport CIDt CIDt2 lvl eb pme b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
           iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
           iApply ("IHf" $! (S k) Mt30 with "[%] [%] [%] Hqx Hcg Hown Htext Hpc Hframe").
@@ -400,14 +401,14 @@ Section ProofWakeup.
       (* acquire(&proc[k]->lock): cpu_own lvl -> S lvl; returns locked +
          proc_lock_res + pay.  NOTE the slot may be the CALLER'S OWN -- nothing
          here or below needs to know, see the file header. *)
-      iDestruct (cpu_own_transport CIDk CIDe lvl eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDk CIDe lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf (CID := CIDe) γk "proc"%string (proc_lock_res γs γk (proc_addr k)) M3a
-                lvl eb pme C av b lks
+                lvl eb pme av b lks
                 ltac:(lia)
                 ltac:(lia)
                 Hfresh
-                with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
+                with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -458,7 +459,7 @@ Section ProofWakeup.
       (* the p++ tail at 0x30.                                            *)
       (* Stated at the FIXED hart CIDf -- the whole stretch is at [false]. *)
       (* =============================================================== *)
-      iAssert (wk_rel_body γs γk pme spF chan av lvl k eb b C
+      iAssert (wk_rel_body γs γk pme spF chan av lvl k eb b
                  vs6 vs7 vs8 vs9 vs10 vs11 CIDf)%I
         with "[Hown Hpay Hframe Htail]"
         as "Hrel".
@@ -513,7 +514,7 @@ Section ProofWakeup.
            so that the acquire/release pair composes back to [av]. *)
         iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
-                  lvl eb pme C av ({["proc"]} ∪ lks)
+                  lvl eb pme av ({["proc"]} ∪ lks)
                   Hlka2
                   ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay").
@@ -853,8 +854,8 @@ Section ProofWakeup.
   Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId}
       
       (m : regfile) (γs : list gname) (pme : mword 64)
-      (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) (lks : gset string)
-    : wp_wakeup_sconf_body m γs pme lvl K eb C b lks.
+      (lvl K : nat) (eb : bool) (b : bool) (lks : gset string)
+    : wp_wakeup_sconf_body m γs pme lvl K eb b lks.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hlvl Hfresh.
@@ -864,7 +865,7 @@ Section ProofWakeup.
               with "Hcg Htext Hpc").
     iIntros (CIDpro Hspro M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM19 & HM20 & HM21 & HM18 & HMcsp & HM1 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
-    iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* ---- the loop, with the epilogue as its exit continuation ---- *)
     iPoseProof (wp_wakeup_loop_sconf (CID0 := CIDpro)  γs spF pme
@@ -876,7 +877,7 @@ Section ProofWakeup.
                   (m !!! Regidx (mword_of_int 22 : mword 5)) (m !!! Regidx (mword_of_int 23 : mword 5))
                   (m !!! Regidx (mword_of_int 24 : mword 5)) (m !!! Regidx (mword_of_int 25 : mword 5))
                   (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) lvl
-                  (K - 8)%nat eb C b lks
+                  (K - 8)%nat eb b lks
                   Hlen Hlvl ltac:(lia) Hfresh
                   with "Hpinv Hpanic") as "Hloop".
     iSpecialize ("Hloop" with "[Hf0 Hcont]").
@@ -904,7 +905,7 @@ Section ProofWakeup.
       (* the epilogue's restored sp equals the caller's sp0 (the -64/+60+4 cancel) *)
       assert (Hspcancel : add_vec (Mexit !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) = sp0)
         by (rewrite Hecsp; subst spF sp0; apply frame_cancel_64).
-      iDestruct (cpu_own_transport CIDex CIDend lvl eb pme C b ltac:(wp_next_chain)
+      iDestruct (cpu_own_transport CIDex CIDend lvl eb pme b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iSpecialize ("Hcont" $! CIDend with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! Mf with "[%] Hcg Hown Htext [Hpc]").

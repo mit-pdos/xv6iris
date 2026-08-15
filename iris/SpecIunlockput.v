@@ -97,6 +97,7 @@ Require Import IcacheEscrow.
 Require Import SpecIput.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -107,7 +108,7 @@ Definition K_iunlockput : nat := 64%nat.
 
 Definition wp_iunlockput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -125,7 +126,7 @@ Definition wp_iunlockput_sconf_body
     (dn' : dinode) (bm' : blkmap)
     (n : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
@@ -155,7 +156,7 @@ Definition wp_iunlockput_sconf_body
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
@@ -172,9 +173,9 @@ Definition wp_iunlockput_sconf_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
-  sleeplocked gisl -∗
+  sleeplocked_q gisl s -∗
   sl_pid (i_lock ip) ↦₄ pidv -∗
   ic_deposit cn k (DepShr s dev inum gy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -207,7 +208,7 @@ Definition wp_iunlockput_sconf_body
   ∀ (mf : regfile) (n' : nat) (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -234,7 +235,7 @@ Definition wp_iunlockput_sconf_body
 (* ===================================================================== *)
 Definition wp_iunlockput_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -252,7 +253,7 @@ Definition wp_iunlockput_gen_body
     (dn' : dinode) (bm' : blkmap)
     (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
     (pidv : mword 32) (dq dqb dqs : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iunlockput in
   let ip : mword 64 := ientry k in
@@ -285,7 +286,7 @@ Definition wp_iunlockput_gen_body
      follows by [locks_below_mono]. *)
   locks_below lks "log" ->
   sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b lks -∗
+  cpu_own 0 eb pj b lks -∗
   (* the trap-CSR complement, threaded straight from iput's own precondition
      (SpecIput.v): [emp] at [eb = true], where iput's own acquire mints what
      its interior sleeps need; the real pair at [eb = false], where the
@@ -302,9 +303,9 @@ Definition wp_iunlockput_gen_body
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
-  is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
+  is_sleeplock_gen gil gisl (i_lock ip) "inode"%string (ic_tok cn k) (slh_tok (icfg_isl k)) -∗
   (* ---- THE HOLDER'S BUNDLE (SpecIunlock's precondition) ---- *)
-  sleeplocked gisl -∗
+  sleeplocked_q gisl s -∗
   sl_pid (i_lock ip) ↦₄ pidv -∗
   ic_deposit cn k (DepShr s dev inum gy) -∗
   i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
@@ -344,7 +345,7 @@ Definition wp_iunlockput_gen_body
   ∀ (mf : regfile) (n' : nat) (used' Sb' : gset Z) (w : bool),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b lks -∗
+      cpu_own 0 eb pj b lks -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       pc_is ret_tgt -∗
@@ -372,7 +373,7 @@ Definition wp_iunlockput_gen_body
 Module Type IUNLOCKPUT.
   Parameter wp_iunlockput_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -387,18 +388,18 @@ Module Type IUNLOCKPUT.
       (dn' : dinode) (bm' : blkmap)
       (n : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iunlockput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                                gil gisl cov logstart bmapstart inodestart nib
                                size dev used k qi s gy inum dn' bm' n
-                               pidv dq dqb dqs m K eb C b lks.
+                               pidv dq dqb dqs m K eb b lks.
   (* the credited set-form contract; [wp_iunlockput_sconf] is this at
      [crb := cru := crz := false], derived at the [log_op] existential's own
      witness and at the birth epoch [LogInv.log_opS_named] opens. *)
   Parameter wp_iunlockput_gen :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
@@ -413,10 +414,10 @@ Module Type IUNLOCKPUT.
       (dn' : dinode) (bm' : blkmap)
       (n : nat) (Sb : gset Z) (crb cru crz : bool) (e0 : nat)
       (pidv : mword 32) (dq dqb dqs : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_iunlockput_gen_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl
                              gil gisl cov logstart bmapstart inodestart nib
                              size dev used k qi s gy inum dn' bm' n Sb crb cru
-                             crz e0 pidv dq dqb dqs m K eb C b lks.
+                             crz e0 pidv dq dqb dqs m K eb b lks.
 End IUNLOCKPUT.

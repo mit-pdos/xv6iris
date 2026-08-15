@@ -87,7 +87,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      [lks'] the resumer invents) is what left the seam unprovable: a
      migratable record's resumption is a different critical section, so
      nothing would tie the two sets together. *)
-  cpu_own 1 eb p emp false {["proc"]} -∗
+  cpu_own 1 eb p false {["proc"]} -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
   ▷ valid_context P An newc p -∗
@@ -98,7 +98,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
       ⌜adm Ao h⌝ -∗
       ⌜callee_img m = callee_img m0⌝ -∗
       sie_cap_gpr (CID := h) m av false p -∗
-      cpu_own (CID := h) 1 eb' p emp false {["proc"]} -∗
+      cpu_own (CID := h) 1 eb' p false {["proc"]} -∗
       pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ (A' : ctx_adm) (cret : mword 64),

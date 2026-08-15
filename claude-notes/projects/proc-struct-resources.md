@@ -79,6 +79,21 @@ the evidence for every offset. This file is only the worklist.
 
 ## Next
 
+- [x] **S0 — the proc table's COUNTED regime** (`ProcAvail.v`; design in
+      [`../design/proc-struct.md`](../design/proc-struct.md), "The proc
+      table's two regimes"). `allocproc` now threads `procs_avail` exactly as
+      it threads `kalloc_env`, mints the found slot's persistent marker out
+      of it, and reports `⌜avail_zero op⌝` on the empty-table arm — which is
+      what lets a caller that does not check the result (userinit,
+      ../kernel-defects.md) refute it. `proc_slots` carries the marker on
+      every arm but UNUSED; `proc_slots_recast` is neutral, so the ordinary
+      state changes paid nothing and only allocproc/freeproc/kfork/the
+      parking proofs moved. Threaded through kfork → sys_fork as
+      `procs_avail None`. **Left: main does not yet thread
+      `procs_avail (Some NPROC)`** — `BootShared.boot_shared_alloc` mints it
+      and drops it, because nothing consumes the counted regime until
+      userinit is proved ([`main-boot.md`](main-boot.md) §G3).
+
 - [x] **S1 — the `proc_lock_res` swap** (done). `SchedCtx.v` gained
       `proc_pub` (killed + xstate + the invariant's permanent half of the pid
       cell, existentially bundled so growing the invariant costs each caller

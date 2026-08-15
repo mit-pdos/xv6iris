@@ -690,8 +690,8 @@ cost. It isn't:
 
 ```coq
 Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) : iProp Σ :=
-  ((if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p) ∗ C)%I.
+    (b : bool) : iProp Σ :=
+  if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p.
 ```
 
 `cpu_hart` is *also* what the thread carries once interrupts are off, so a
@@ -1071,6 +1071,54 @@ cells rather than the lock (it acquires nothing).
 `wait_lock_addr` lives in `SpecProcinit.v` — procinit is what initialises the
 lock — which is why `SpecKwait.v` requires that file; moving the constant into
 `WaitInv.v` with a `Require Export` would be tidier.
+
+## The proc table's two regimes (`ProcAvail.v`)
+
+`allocproc` returns 0 on a full table and `userinit` does not check
+(kernel-defects.md), so a caller has to be able to REFUTE the empty-table
+arm. `kalloc`'s shape, transplanted:
+
+| | |
+|---|---|
+| `procs_avail (Some n)` | BOOT. The exclusive authority, "at least `n` slots are UNUSED". While anyone holds it no other thread can allocate or free a proc (two `●` at one gname do not compose) — `KallocInv`'s "no concurrency during early boot". At `Some (S k)` allocproc CANNOT return 0. |
+| `procs_avail None` | STEADY STATE. The authority has moved into an invariant; the count is gone forever and allocproc may fail. Persistent, so every later caller threads it free. `procs_avail_seal` is one-way. |
+
+**THE MARKER IS ON THE ALLOCATED SIDE, AND IT IS PERSISTENT.** `pslot_used j`
+is `own pav_name (◯ {[j]})` over `authUR (gsetUR nat)`, carried by
+`SchedCtx.proc_slots` on every arm except UNUSED. Three things follow, and
+each is why the obvious "free token" is wrong:
+
+1. **A scan can accumulate it.** allocproc releases each slot's lock before
+   moving to the next, so an exclusive token read out of a slot would go
+   straight back in and the scan would end holding nothing. A persistent one
+   is kept, so after `NPROC` slots the scan holds `◯ (set_seq 0 NPROC)` — and
+   that is what a positive free count contradicts (`procs_avail_full`).
+2. **Passing a slot through costs nothing.** `proc_slots_recast` is
+   restricted to `inv_dormant st = false` on BOTH sides, so its two states are
+   both allocated and the conjunct is literally the same proposition on each.
+   Only the two functions that genuinely move a slot in or out of UNUSED —
+   allocproc and freeproc — ever see it.
+3. **The guard is `is_unused`, not `negb (inv_dormant _)`.** A ZOMBIE slot is
+   dormant but ALLOCATED, and allocproc's scan walks straight past it; a
+   marker keyed on dormancy would break the accumulation at exactly the slots
+   the scan must not stop at.
+
+**Where it has to be threaded**, and nowhere else: allocproc mints it on the
+found arm (from `procs_avail`, and only there — the two freeproc tails put
+the slot back at UNUSED and must not spend a slot of the count); kfork
+carries it to the RUNNABLE park; sleep/yield read it out of
+`proc_slots_running` and hand it to `proc_slots_running_intro`; the scheduler
+takes it out at `proc_slots_dispatch` and puts it back at
+`proc_slots_park_gen`; kwait's `kw_slots_zombie` returns it. Everything else
+uses `proc_slots_recast` and is untouched.
+
+**The gname is CANONICAL** (`pavG` carries it, `pavGpreS` is the functor
+half), so `proc_slots` / `proc_lock_res` / `procs_inv` keep their arity and
+no call site moved — at the price of the class sweep the durable notes
+describe, whose trap one (an unimported class becomes a fresh VARIABLE, and
+the error names something else entirely) fired across ~200 files here. It is
+minted in `BootShared.boot_shared_alloc` and handed out existentially, for
+`irefNameG`'s reason.
 
 ## The one hole to be honest about
 

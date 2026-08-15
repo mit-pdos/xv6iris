@@ -70,6 +70,7 @@ Require Import CodeConsolewrite.
 Require Import SpecConsolewrite.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 
 Import Defs.
 Local Open Scope Z_scope.
@@ -117,7 +118,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section CwBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : RiscvLang.GenId}.
 
@@ -270,7 +271,7 @@ Section CwBodies.
   (* ---- the function's own exit, as a [wp_next] at the entry hart ---- *)
 
   Definition cw_ret `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
-      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
+      (eb : bool) (pid : mword 32) (V : pprivate) (n : Z) (lks : gset string) : iProp Σ :=
     (wp_next (CID0 := CID0) true (proc_addr jp) (fun (CID : CpuId) =>
        ∀ (mf : regfile) (r : Z) (P' : uptd),
          ⌜callee_saved m0 mf⌝ -∗
@@ -278,7 +279,7 @@ Section CwBodies.
          ⌜(0 <= r <= Z.max 0 n)%Z⌝ -∗
          ⌜mf !!! Regidx Ra0 = (mword_of_int r : mword 64)⌝ -∗
          sie_cap_gpr mf av true (proc_addr jp) -∗
-         cpu_own 0%nat eb (proc_addr jp) C true lks -∗
+         cpu_own 0%nat eb (proc_addr jp) true lks -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          proc_priv_core (proc_addr jp) pid (upd_upt V P') -∗
          WP (Loop : expr riscv_lang)))%I.
@@ -286,10 +287,10 @@ Section CwBodies.
   (* the loop re-enters its own continuation at a MOVED descriptor; both the
      extension and the record compose, so the exit weakens along the loop. *)
   Lemma cw_ret_weaken `{CID0 : CpuId} (jp : nat) (m0 : regfile) (av : nat)
-      (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) (P1 : uptd) (n : Z) (lks : gset string) :
+      (eb : bool) (pid : mword 32) (V : pprivate) (P1 : uptd) (n : Z) (lks : gset string) :
     uptd_ext (pv_upt V) P1 ->
-    cw_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
-    cw_ret (CID0 := CID0) jp m0 av eb C pid (upd_upt V P1) n lks.
+    cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid (upd_upt V P1) n lks.
   Proof.
     intro Hext. rewrite /cw_ret /wp_next.
     iIntros "H" (CID) "%Hg".
@@ -306,7 +307,7 @@ Section CwBodies.
   (*  +0x96 .. +0xa0 -- THE EPILOGUE.  All three exits reach it.          *)
   (* =================================================================== *)
   Lemma cw_epi `{CID : CpuId} (CID0 : CPU)
-      (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -319,11 +320,11 @@ Section CwBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
     sie_cap_gpr M (av - 16)%nat true pj -∗
-    cpu_own 0%nat eb pj C true lks -∗
+    cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x96)) -∗
     proc_priv_core pj pid V -∗
     cw_saved sp0 m0 -∗ cw_rest sp0 -∗
-    cw_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMs1 HMcs Hr Hav Heb Hcr.
@@ -460,7 +461,7 @@ Section CwBodies.
               | rewrite Hoth; [ first [exact K2|exact K3|exact K4|exact K5|exact K6
                                       |exact K7|exact K8|exact K9|exact K10|exact K11]
                               | reg_neq | reg_neq | reg_neq | reg_neq | reg_neq ] ]. }
-    iDestruct (cpu_own_transport CID CID6 0%nat eb pj C true ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID6 0%nat eb pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     rewrite /cw_ret.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
@@ -500,7 +501,7 @@ Section CwBodies.
   (*  +0x6c .. +0x7e -- THE LOOP EXIT: i = n, restore s2..s10 and jump    *)
   (* =================================================================== *)
   Lemma cw_exit_done `{CID : CpuId} (CID0 : CPU)
-      (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -515,11 +516,11 @@ Section CwBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
     sie_cap_gpr M (av - 16)%nat true pj -∗
-    cpu_own 0%nat eb pj C true lks -∗
+    cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x6c)) -∗
     proc_priv_core pj pid V -∗
     cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-    cw_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMs1 HMs11 Hr Hav Heb Hal Hcr.
@@ -715,7 +716,7 @@ Section CwBodies.
               with "Hcg Hpc Hi7e").
     iIntros (CIDj Hsj). iApply bi.later_intro. iIntros "Hcg Hpc".
     iEval (rewrite Hjt) in "Hpc".
-    iApply (cw_epi (CID := CIDj) CID0 jp m0 R8 av eb C sp0 pid V n r lks
+    iApply (cw_epi (CID := CIDj) CID0 jp m0 R8 av eb sp0 pid V n r lks
               Hm0sp HR8sp Hs1v Hhi Hr Hav Heb ltac:(wp_next_chain)
               with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest Hcont").
   Qed.
@@ -723,7 +724,7 @@ Section CwBodies.
   (*  +0x84 .. +0x94 -- THE COPY-FAILED EXIT: restore s2..s10, fall through *)
   (* =================================================================== *)
   Lemma cw_exit_break `{CID : CpuId} (CID0 : CPU)
-      (jp : nat) (m0 M : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (jp : nat) (m0 M : regfile) (av : nat) (eb : bool)
       (sp0 : mword 64) (pid : mword 32) (V : pprivate) (n r : Z) (lks : gset string) :
     let pj := proc_addr jp in
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -738,11 +739,11 @@ Section CwBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗
     sie_cap_gpr M (av - 16)%nat true pj -∗
-    cpu_own 0%nat eb pj C true lks -∗
+    cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (CW + 0x84)) -∗
     proc_priv_core pj pid V -∗
     cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-    cw_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
+    cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hm0sp HMsp HMs1 HMs11 Hr Hav Heb Hal Hcr.
@@ -926,7 +927,7 @@ Section CwBodies.
     iDestruct (cw_rest_of sp0 m0 Hal with "[S4 S5 S6 S7 S8 S9 S10 S11 S12] Hbuf")
       as "Hrest".
     { rewrite /cw_spill. iFrame "S4 S5 S6 S7 S8 S9 S10 S11 S12". }
-    iApply (cw_epi (CID := CIDl8) CID0 jp m0 R8 av eb C sp0 pid V n r lks
+    iApply (cw_epi (CID := CIDl8) CID0 jp m0 R8 av eb sp0 pid V n r lks
               Hm0sp HR8sp Hs1v Hhi Hr Hav Heb ltac:(wp_next_chain)
               with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest Hcont").
   Qed.
@@ -941,7 +942,7 @@ Section CwBodies.
   Lemma cw_loop (mrem : nat) (CID0 : CPU)
       (γa γf : gname) (γs : list gname) (jp : nat) (γlp γl : gname)
       (γu : uart_names) (γv : disk_names)
-      (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m0 : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (n : Z) (sp0 src : mword 64) (lks : gset string) :
     (jp < NPROC)%nat -> γs !! jp = Some γlp -> length γs = NPROC ->
     (n < 2 ^ 31)%Z ->
@@ -968,7 +969,7 @@ Section CwBodies.
       locks_below lks "proc" ->
       kernel_text -∗
       sie_cap_gpr M (av - 16)%nat true (proc_addr jp) -∗
-      cpu_own 0%nat eb (proc_addr jp) C true lks -∗
+      cpu_own 0%nat eb (proc_addr jp) true lks -∗
       pc_is (mword_of_int (CW + 0x5e)) -∗
       proc_priv_core (proc_addr jp) pid V -∗
       kalloc_env γa None -∗
@@ -977,7 +978,7 @@ Section CwBodies.
       procs_inv γs -∗
       panic_wp_any -∗
       cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
-      cw_ret (CID0 := CID0) jp m0 av eb C pid V n lks -∗
+      cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hj Hjlp Hlens Hn31 Hav Heb Hm0sp Hal.
@@ -1130,10 +1131,10 @@ Section CwBodies.
       rewrite /cw_buf H32 bytes_own_app.
       iDestruct "Hbuf" as "[Hb1 Hb2]".
       iDestruct (bytes_own_name nnN buf with "Hb1") as (fb) "Hb1".
-     iDestruct (cpu_own_transport CIDb CIDc6 0%nat eb pj C true 
+     iDestruct (cpu_own_transport CIDb CIDc6 0%nat eb pj true 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EitherCopyin.wp_either_copyin_sconf γa γf B6 (av - 16)%nat 0%nat
-                eb pj C pid V true nnN (fun _ => bv_0 8) fb true lks
+                eb pj pid V true nnN (fun _ => bv_0 8) fb true lks
                 ltac:(unfold consolewrite_stack, either_copyin_stack in *; lia)
                 ltac:(rewrite HB6a1; vm_compute; reflexivity)
                 ltac:(rewrite HB6a3 HnnN; reflexivity)
@@ -1252,10 +1253,10 @@ Section CwBodies.
                         = add_vec_int (mword_of_int (CW + 0x52) : mword 64) 4)
           by (rewrite /D3 upd_eq; reflexivity).
         iDestruct (cw_priv_pid pj pid (upd_upt V P1) with "Hpriv") as "[Hpid Hpback]".
-        iDestruct (cpu_own_transport CIDc7 CIDcb 0%nat eb pj C true 
+        iDestruct (cpu_own_transport CIDc7 CIDcb 0%nat eb pj true 
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (Uartwrite.wp_uartwrite_sconf γu γv γs jp γlp γl D3 (av - 16)%nat
-                  eb C nnN fb' (DfracOwn 1) true pid (DfracOwn (1/2)) lks
+                  eb nnN fb' (DfracOwn 1) true pid (DfracOwn (1/2)) lks
                   Hj Hjlp ltac:(rewrite HD3a1 HnnN; reflexivity)
                   ltac:(rewrite HnnN; lia)
                   ltac:(unfold consolewrite_stack, uartwrite_stack in *; lia) Heb
@@ -1343,9 +1344,9 @@ Section CwBodies.
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5a").
           iApply bi.later_intro. iIntros (CIDce Hsce) "Hcg Hpc".
           iEval (rewrite Htgt) in "Hpc".
-          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb C pid V P1 n lks Hext1
+          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid V P1 n lks Hext1
                        with "Hcont") as "Hcont".
-          iApply (cw_exit_done (CID := CIDce) CID0 jp m0 F1 av eb C sp0 pid
+          iApply (cw_exit_done (CID := CIDce) CID0 jp m0 F1 av eb sp0 pid
                     (upd_upt V P1) n (nn + i)%Z lks
                     Hm0sp ltac:(destruct HF1regs as (Y1 & _); exact Y1)
                     HF1s1 HF1s11 ltac:(lia) Hav Heb Hal ltac:(wp_next_chain)
@@ -1361,7 +1362,7 @@ Section CwBodies.
           assert (Pbk : add_vec_int (mword_of_int (CW + 0x5a) : mword 64) 4
                         = mword_of_int (CW + 0x5e)) by pcw.
           iEval (rewrite Pbk) in "Hpc".
-          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb C pid V P1 n _ Hext1
+          iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid V P1 n _ Hext1
                        with "Hcont") as "Hcont".
           iApply (IH CIDce F1 (upd_upt V P1) (nn + i)%Z
                     ltac:(lia) ltac:(lia) HF1regs HF1s11 ltac:(wp_next_chain) Hbelow
@@ -1383,9 +1384,9 @@ Section CwBodies.
         { rewrite /cw_buf H32 bytes_own_app.
           iDestruct (bytes_own_of_name nnN buf fb' with "Hb1") as "Hb1".
           iSplitL "Hb1"; [iExact "Hb1" | iExact "Hb2"]. }
-        iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb C pid V P1 n lks Hext1
+        iDestruct (cw_ret_weaken (CID0 := CID0) jp m0 av eb pid V P1 n lks Hext1
                      with "Hcont") as "Hcont".
-        iApply (cw_exit_break (CID := CIDc8) CID0 jp m0 mf1 av eb C sp0 pid
+        iApply (cw_exit_break (CID := CIDc8) CID0 jp m0 mf1 av eb sp0 pid
                   (upd_upt V P1) n i lks
                   Hm0sp Csp Cs1 Hs11c ltac:(lia) Hav Heb Hal ltac:(wp_next_chain)
                   with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hspill Hbuf Hcont"). }
@@ -1518,9 +1519,9 @@ Section CwBodies.
   Lemma wp_consolewrite_sconf `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (jp : nat) (γlp : gname)
       (γu : uart_names) (γv : disk_names) (γl : gname)
-      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool) (lks : gset string)
-    : wp_consolewrite_sconf_body γa γf γs jp γlp γu γv γl m av eb C pid V n b lks.
+    : wp_consolewrite_sconf_body γa γf γs jp γlp γu γv γl m av eb pid V n b lks.
   Proof.
     cbv beta delta [wp_consolewrite_sconf_body].
     (* [Hbelow] is SpecConsolewrite.v's own [locks_below lks (lock_rank
@@ -1684,7 +1685,7 @@ Section CwBodies.
       { rewrite /cw_rest. cbn [seq].
         iFrame "F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16".
         all: try done. }
-      iApply (cw_epi (CID := CID8) CID jp m A2 av eb C sp0 pid V n 0 lks
+      iApply (cw_epi (CID := CID8) CID jp m A2 av eb sp0 pid V n 0 lks
                 Hspm HA2sp HA2s1 HA2hi ltac:(lia) Hav Heb ltac:(wp_next_chain)
                 with "Ht Hcg Hcnt Hpc Hpriv Hsaved Hrest [Hcont]").
       (* [n <= 0]: the loop never runs, so [cw_epi] here never touches a
@@ -1977,7 +1978,7 @@ Section CwBodies.
         with "[F13 F14 F15 F16]" as "Hbs".
       { cbn [seq]. iFrame "F16 F15 F14 F13". all: try done. }
       iDestruct (slotsn_bytes_own sp0 16 4 ltac:(lia) with "Hbs") as "[%Hal Hbuf]".
-      iApply (cw_loop (Z.to_nat n) CID γa γf γs jp γlp γl γu γv m av eb C pid n sp0
+      iApply (cw_loop (Z.to_nat n) CID γa γf γs jp γlp γl γu γv m av eb pid n sp0
                 (m !!! Regidx Ra1) lks
                 Hj Hjlp Hlens ltac:(exact (proj2 Hnr))
                 Hav Heb Hspm Hal

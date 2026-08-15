@@ -106,14 +106,14 @@ Section ProofIdup.
      presentations of the same SIE state, and the ghost eighth they share
      pins the relationship.  Read once at entry, it is what lets release's
      derived exit index equal idup's own (symmetric) [b]. *)
-  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) (lks : gset string) :
-    sie_cap_gpr m K0 b p -∗ cpu_own n eb p C b lks -∗
+  Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (lks : gset string) :
+    sie_cap_gpr m K0 b p -∗ cpu_own n eb p b lks -∗
     ⌜ b = match n with O => eb | S _ => false end ⌝.
   Proof.
     iIntros "Hcg Hcnt". destruct b.
-    - iDestruct "Hcnt" as "[%Hb _]". destruct Hb as (-> & -> & _). done.
+    - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n as [|n']; [ | done ].
-      iDestruct "Hcnt" as "[[_ Hint] _]".
+      iDestruct "Hcnt" as "[_ Hint]".
       iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb; [ exfalso | done ].
@@ -124,17 +124,17 @@ Section ProofIdup.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (k : nat) (s : Qp) (dev inum : mword 32)
-      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
     : wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
-                         m n eb p C K b lks.
+                         m n eb p K b lks.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
     intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
     unfold K_idup in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hpanic Hislot Href Hcont".
-    iDestruct (sie_b_agree m n K eb b p C lks with "Hcg Hcnt") as %Houtb.
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv Hislot Href Hcont".
+    iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     iPoseProof (idi_00 with "Htext") as "Hi00".
@@ -286,13 +286,13 @@ Section ProofIdup.
       rewrite /R4 upd_ne; [| vm_compute; discriminate]. exact HR3s1. }
     assert (HmAra : mA !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.idup + 0x14) : mword 64) 4)
       by (rewrite /mA; apply upd_eq).
-    iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID CID9 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p C (K - 4)%nat b lks
+              n eb p (K - 4)%nat b lks
               HnZ ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -305,7 +305,7 @@ Section ProofIdup.
     assert (Hms1 : macq !!! Regidx Rs1 = ientry k)
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 9) ltac:(vm_compute; reflexivity)); exact HmAs1).
     (* ===== the critical section (literal [false], no hart threading) ===== *)
-    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
+    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hipool & Hslots & Hpool)".
     (* THE SHARE FINDS THE SLOT.  [iref_lookup] read the entry off a COUNT
        fragment, which names its own slot in [dom M]; a share has none, and
        what stands in for it is the LIVENESS slice: the invariant holds a free
@@ -412,6 +412,9 @@ Section ProofIdup.
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.idup + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.idup + 0x1c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
+    (* the slot's share authority comes out of the LOCK's resource, which
+       this proof holds; it goes back at the grown map below. *)
+    iDestruct (isl_pool_acc_upd M k Hk with "Hipool") as "[Hisl Hislback]".
     (* +0x1c c.sw a5,8(s1) : ip->ref = ref+1.  The ghost step rides along
        inside the SAME invariant opening -- that is the atomicity. *)
     assert (Hpa2 : add_vec (rget D2 Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
@@ -420,17 +423,25 @@ Section ProofIdup.
     iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (trap_res b + (K - 4))%nat
               (itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
+               isl_slot (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) k ∗
                iref_tok k (qr/2)%Qp ∗ live_frac k s)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hhalf Hrlive]").
+              with "Hcg Hpc Hi1c [Hhalf Hrlive Hisl]").
     { rewrite Hpa2 Hstv.
       iMod (iref_upgrade_store_au (⊤ ∖ ↑minstretN) M k qt (qr/2)%Qp s cnt
-              ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive")
+              ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive Hisl")
         as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Hlv)". iModIntro. iFrame. }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Ht1 & Hrlive)".
+      iMod ("Hback" with "Hcell") as "(Hhalf & Hisl & Ht1 & Hlv)".
+      iModIntro. iFrame. }
+    iApply wp_next_off_intro.
+    iIntros "Hcg Hpc (Hhalf & Hisl & Ht1 & Hrlive)".
+    (* the slot's share authority goes back into the lock's resource at the
+       grown map *)
+    iDestruct ("Hislback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M)
+                 with "[%] Hisl") as "Hipool".
+    { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     (* rebuild the lock's resource at the new map.  The caller's SHARE rides
        straight through -- neither of its two slices moved -- and what does
        get split is the TABLE's retained identity: half to the new reference,
@@ -444,8 +455,9 @@ Section ProofIdup.
     { intros j Hj. reflexivity. }
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid".
       rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
-    iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
-    { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
+    iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hipool Hslots Hpool]" as "HRres".
+    { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci.
+      iFrame "Hhalf Hiauth Hpool Hipool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
       2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
              already live, so §13.2/§13.9/§13.11's four clauses are
@@ -530,7 +542,7 @@ Section ProofIdup.
        acquire/release pair compose back to [N]. *)
     iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) D5
-              n eb p C (K - 4)%nat ({["itable"]} ∪ lks)
+              n eb p (K - 4)%nat ({["itable"]} ∪ lks)
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
@@ -659,7 +671,7 @@ Section ProofIdup.
     iEval (rgne) in "Hpc".
     assert (Hretf : ret_pc (P5 !!! Regidx Rra) = ret_tgt) by (rewrite HP5ra; reflexivity).
     iEval (rewrite Hretf) in "Hpc".
-    iDestruct (cpu_own_transport CIDr CIDe6 n eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDr CIDe6 n eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
     iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive Hrslh] [Ht1 Hid2]").

@@ -76,7 +76,8 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UserPtTree.
+Require Import UserPtTree ProcPtOwn.
+Require Import KptTree.
 Require Import TrampPt.
 Require Import KallocInv.
 Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
@@ -92,11 +93,14 @@ Require Import SpecPrintk.
 Require Import SpecKernelvec.
 Require Import SpecSyscall SpecSysExit.
 Require Import SpecUsertrap UsertrapRes.
+Require Import KptShare.   (* [tlb_res_pt] -- the translation slot the parked residue drops *)
+Require Import ProcPtOwn.  (* [proc_pt] / [ud_norm] -- the bare residue drops the address space *)
 Require Import ProofUsertrapParts ProofPrepareReturnParts.
 Require Import ProofUsertrapTail ProofUsertrapArms ProofUsertrapSys.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import ProcAvail.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -131,9 +135,22 @@ Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Section UtEntry.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (Rsys : gname -> mword 64 -> iProp Σ).
+
+  (* the trapframe page's own [page_valid], read off [proc_priv] without
+     consuming it -- [proc_pt_wf]'s last conjunct.  A PURE-goal [iDestruct]
+     does not spend the resource (durable-notes.md), so [Hpv] is still
+     whole for [proc_priv_tf_upd] right afterward. *)
+  Local Lemma ut_entry_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Proof.
+    iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
+  Qed.
 
   (* THE BOUNDARY'S RAW MACHINE STATE IN, THE KERNEL CONE'S STATE OUT.
      [UsertrapRes.ut_trap_open] is the resource half and is already proven --
@@ -142,7 +159,7 @@ Section UtEntry.
      PINNED trap-CSR set ([ut_csrs_raw]) rather than [trap_csrs]: see the
      header. *)
   Lemma ut_entry (N : ut_names) (V : pprivate) (ksp : mword 64)
-      (m : regfile) (av : nat) (C : iProp Σ)
+      (m : regfile) (av : nat)
       (ms_v sc_v stval_v sepc_v : mword 64)
       (mie_v mdv0 menvcfg0 : mword 64) :
     usertrap_entry_ms ms_v ->
@@ -170,14 +187,14 @@ Section UtEntry.
     (* the trap enters from USERSPACE, which holds no kernel lock, so the
        held set here is the literal [∅] -- the same one the continuation
        below names. *)
-    ut_trap (un_pj N) ksp av C ∅ -∗
+    ut_trap (un_pj N) ksp av ∅ -∗
     ut_env Rsys N V -∗
     (∀ (M : regfile) (V' : pprivate),
        ⌜M !!! Regidx csp_rs1 = pa_stk ksp 4⌝ -∗ ⌜M !!! Regidx Rs1 = un_pj N⌝ -∗
        ⌜M !!! Regidx Ra0 = un_pj N⌝ -∗ ⌜ut_cs m M⌝ -∗ ⌜pv_upt V' = pv_upt V⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
        sie_cap_gpr M (av - 4)%nat false (un_pj N) -∗
-       cpu_own 0%nat false (un_pj N) C false ∅ -∗ cpu_claim (un_pj N) -∗
+       cpu_own 0%nat false (un_pj N) false ∅ -∗ cpu_claim (un_pj N) -∗
        ut_csrs_raw sepc_v sc_v stval_v -∗ ut_env Rsys N V' -∗
        (* THE FRAME, which this block is what CREATES: the four slots the
           prologue's [c.sdsp]s filled.  Not in the note's printed exit
@@ -196,7 +213,7 @@ Section UtEntry.
     unfold K_syscall, K_sys_exit, K_kexit in Hks.
     iIntros "#Htext Hpc #Hhw #Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
              Hmie Hmdl Hmenv Hgpr Htrap Henv Hcont".
-    iDestruct (ut_trap_open (un_pj N) ksp av C m ms_v mie_v mdv0 menvcfg0 ∅
+    iDestruct (ut_trap_open (un_pj N) ksp av m ms_v mie_v mdv0 menvcfg0 ∅
                  Hmsf Hsie Hspp Hspie Hsp Htp Hmiev Hmask Hmenvv
                  with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Hgpr Htrap")
       as "(Hcg & Hcpu & Hclm & Hq & Hkpt & Hsret)".
@@ -451,7 +468,7 @@ Section UtEntry.
       by (rewrite /M7 upd_ne; [exact HM6sp | reg_neq]).
     assert (HM7ra : M7 !!! Regidx Rra = mword_of_int (UT + 0x26))
       by (rewrite /M7 upd_eq; pcw).
-    iApply (MP.wp_myproc_sconf M7 (av - 4)%nat 0%nat false (un_pj N) C false _
+    iApply (MP.wp_myproc_sconf M7 (av - 4)%nat 0%nat false (un_pj N) false _
               ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
     iApply wp_next_off_intro.
@@ -487,8 +504,19 @@ Section UtEntry.
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
     destruct Hepcx as [uepc Hepc].
+    iDestruct (ut_entry_tfp_valid with "Hpv") as %Hpv_valid.
     iDestruct (proc_priv_tf_upd with "Hpv") as "(Htfc & Htfp & Hpvback)".
-    iDestruct (tf_page_word_upd _ _ tf_epc_idx uepc Hepc with "Htfp")
+    (* [pt_node_claim], off [Hhw] (already a top-level, persistent premise of
+       [ut_entry]) and [Hpv_valid] -- the mem-tier convenience wrapper is
+       what the VA-tier [c.ld]/[c.sd] through the kernel identity map needs
+       (ProcInv.v's header on [tf_page_word_mem]). *)
+    iDestruct "Hhw" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
+        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
+        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    iPoseProof (pt_node_claim_from_static (ud_tfp (pv_upt V)) Hpv_valid with "Hkmapb") as "#Hptc".
+    iDestruct (tf_page_word_upd_mem _ _ tf_epc_idx uepc ltac:(vm_compute; lia) Hepc
+                 with "Hptc Htfp")
       as "(Hword & Htfback)".
     assert (Haddrtf : add_vec (rget S1 Ra0)
                         (sign_extend' 64 (mword_of_int 88 : mword 12))
@@ -533,7 +561,7 @@ Section UtEntry.
     { rgne. rewrite /S3 upd_ne; [| reg_neq]. rewrite /S2. apply upd_eq. }
     assert (Haddrw : add_vec (rget S3 Ra5)
                        (sign_extend' 64 (mword_of_int 24 : mword 12))
-                     = a_tf_word (ud_tfp (pv_upt V)) tf_epc_idx)
+                     = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat tf_epc_idx))
       by (rewrite HS3a5; apply prr_tf_addr_24).
     assert (Hp2e : add_vec_int (mword_of_int (UT + 0x2a) : mword 64) 4
                    = mword_of_int (UT + 0x2e)) by pcw.
@@ -627,7 +655,7 @@ End UtEntry.
 Section UtDispatch.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* [hw_config] + [minstret_inv], both persistent, out of the ambient
@@ -649,10 +677,10 @@ Section UtDispatch.
 
   (* THE FOLD, once, for the four outgoing routes.  This is the only place in
      the whole walk where [intr_handler_spec kernelvec] is needed. *)
-  Local Lemma ud_hold (N : ut_names) (V : pprivate) (C : iProp Σ)
+  Local Lemma ud_hold (N : ut_names) (V : pprivate)
       (ep sc st : mword 64) :
     intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
-    cpu_own 0%nat false (un_pj N) C false ∅ -∗
+    cpu_own 0%nat false (un_pj N) false ∅ -∗
     cpu_claim (un_pj N) -∗
     sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ st -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
@@ -660,7 +688,7 @@ Section UtDispatch.
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     strans_bit strans_bit_kpt -∗
     ut_env SY.syscall_env N V -∗
-    ut_hold SY.syscall_env N V C false ∅.
+    ut_hold SY.syscall_env N V false ∅.
   Proof.
     iIntros "#Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Henv".
     iAssert (ut_csrs_raw ep sc st)
@@ -680,7 +708,7 @@ Section UtDispatch.
   Qed.
 
   Lemma ut_dispatch (N : ut_names) (V : pprivate) (pt : uptd) (ksp : mword 64)
-      (m0 m : regfile) (av nx : nat) (C : iProp Σ)
+      (m0 m : regfile) (av nx : nat)
       (ep sc st : mword 64)
       (mie_v menvcfg0 : mword 64) :
     printk_gen_contract (un_pr N) (un_u N) (un_v N) ->
@@ -699,7 +727,7 @@ Section UtDispatch.
     kernel_text -∗
     pc_is (mword_of_int (UT + 0x30)) -∗
     sie_cap_gpr m nx false (un_pj N) -∗
-    cpu_own 0%nat false (un_pj N) C false ∅ -∗
+    cpu_own 0%nat false (un_pj N) false ∅ -∗
     cpu_claim (un_pj N) -∗
     ut_csrs_raw ep sc st -∗
     ut_env SY.syscall_env N V -∗
@@ -789,12 +817,12 @@ Section UtDispatch.
                        (sign_extend' 64 (mword_of_int 90 : mword 13))
                      = mword_of_int (UT + 0x90)) by pcw.
       iEval (rewrite Hj90) in "Hpc".
-      iAssert (ut_hold SY.syscall_env N V C false ∅)
+      iAssert (ut_hold SY.syscall_env N V false ∅)
         with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
-      { iApply (ud_hold N V C ep sc st with
+      { iApply (ud_hold N V ep sc st with
                   "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
         rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-      iApply (S.ut_90 N V pt ksp m0 D2 av nx C
+      iApply (S.ut_90 N V pt ksp m0 D2 av nx
                 mie_v menvcfg0 ∅
                 Hwf' Hav Hnx Htfpe Hksp Hm0sp HD2sp HD2s1 HD2a0 HcsD2
                 Hmiev Hmenvv
@@ -836,7 +864,7 @@ Section UtDispatch.
             [vm_compute; reflexivity | exact HcsD2]).
       iApply (DE.wp_devintr_sconf (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                 (un_pd N) (un_pav N) (un_pu N)
-                D3 nx 0 false (un_pj N) C (DfracOwn 1) sc ∅
+                D3 nx 0 false (un_pj N) (DfracOwn 1) sc ∅
                 Hlen ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
                 ltac:(unfold devintr_stack; lia)
                 with "Hcg Hcpu Htext Hpc Hsc Hdc [-]").
@@ -888,12 +916,12 @@ Section UtDispatch.
                             (concat_vec (mword_of_int 85 : mword 8) ('b"0"))))
                        = mword_of_int (UT + 0xea)) by pcw.
         iEval (rewrite Hjea) in "Hpc".
-        iAssert (ut_hold SY.syscall_env N V C false ∅)
+        iAssert (ut_hold SY.syscall_env N V false ∅)
           with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
-        { iApply (ud_hold N V C ep sc st with
+        { iApply (ud_hold N V ep sc st with
                     "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
           rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-        iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx C
+        iApply (A.ut_e8 SY.syscall_env N V pt ksp m0 D4 av nx
                   mie_v menvcfg0 ∅
                   Hwf' Hav Hnx Htfpe Hksp Hm0sp HD4sp HD4s1 HcsD4
                   Hmiev Hmenvv
@@ -963,12 +991,12 @@ Section UtDispatch.
                            (sign_extend' 64 (mword_of_int 136 : mword 13))
                          = mword_of_int (UT + 0xd0)) by pcw.
           iEval (rewrite Hjd0) in "Hpc".
-          iAssert (ut_hold SY.syscall_env N V C false ∅)
+          iAssert (ut_hold SY.syscall_env N V false ∅)
             with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
-          { iApply (ud_hold N V C ep sc st with
+          { iApply (ud_hold N V ep sc st with
                       "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
             rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-          iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx C
+          iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D6 av nx
                     mie_v menvcfg0 ∅
                     Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD6sp HD6s1 HcsD6
                     Hmiev Hmenvv
@@ -1039,12 +1067,12 @@ Section UtDispatch.
                               (sign_extend' 64 (mword_of_int 126 : mword 13))
                             = mword_of_int (UT + 0xd0)) by pcw.
              iEval (rewrite Hjd0') in "Hpc".
-             iAssert (ut_hold SY.syscall_env N V C false ∅)
+             iAssert (ut_hold SY.syscall_env N V false ∅)
                with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
-             { iApply (ud_hold N V C ep sc st with
+             { iApply (ud_hold N V ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-             iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx C
+             iApply (A.ut_d0 SY.syscall_env N V pt ksp m0 D8 av nx
                        mie_v menvcfg0 ∅
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv
@@ -1059,12 +1087,12 @@ Section UtDispatch.
              assert (Hp56 : add_vec_int (mword_of_int (UT + 0x52) : mword 64) 4
                             = mword_of_int (UT + 0x56)) by pcw.
              iEval (rewrite Hp56) in "Hpc".
-             iAssert (ut_hold SY.syscall_env N V C false ∅)
+             iAssert (ut_hold SY.syscall_env N V false ∅)
                with "[Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt Hown]" as "Hhold".
-             { iApply (ud_hold N V C ep sc st with
+             { iApply (ud_hold N V ep sc st with
                          "Hih Hcpu Hclm Hep Hsc Hst Hstv Hq Hsret Hkpt [Hown]").
                rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"]. }
-             iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx C
+             iApply (A.ut_56 SY.syscall_env N V pt ksp m0 D8 av nx
                        mie_v menvcfg0 ∅
                        Hpk Hwf' Hav Hnx Htfpe Hksp Hm0sp HD8sp HD8s1 HcsD8
                        Hmiev Hmenvv
@@ -1091,24 +1119,80 @@ End UtDispatch.
 Definition usertrap_res
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !iregG Σ}
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
   ut_res SY.syscall_env.
+
+Definition usertrap_res_parked
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
+  ut_res_parked SY.syscall_env.
+
+Lemma usertrap_res_tlb_close
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+  usertrap_res_parked pt ksp -∗ tlb_res_pt kroot -∗ usertrap_res pt ksp.
+Proof. exact (ut_res_tlb_close SY.syscall_env pt ksp kroot). Qed.
+
+Lemma usertrap_res_tlb_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res pt ksp -∗
+  ∃ kroot : mword 44, tlb_res_pt kroot ∗ usertrap_res_parked pt ksp.
+Proof. exact (ut_res_tlb_open SY.syscall_env pt ksp). Qed.
+
+Definition usertrap_res_bare
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} : uptd -> mword 64 -> iProp Σ :=
+  ut_res_bare SY.syscall_env.
+
+Lemma usertrap_res_pt_close
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗ proc_pt pt -∗ usertrap_res_parked pt ksp.
+Proof. exact (ut_res_pt_close SY.syscall_env pt ksp). Qed.
+
+Lemma usertrap_res_pt_open
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_parked pt ksp -∗ proc_pt pt ∗ usertrap_res_bare pt ksp.
+Proof. exact (ut_res_pt_open SY.syscall_env pt ksp). Qed.
+
+Lemma usertrap_res_bare_norm
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
+  usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
+Proof. exact (ut_res_bare_norm SY.syscall_env pt ksp). Qed.
 
 Lemma usertrap_res_tf_open
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-      !kallocG Σ, !irefslotG Σ, !iregG Σ}
-    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) :
-  usertrap_res pt ksp -∗
-  ∃ ws : list (mword 64), tf_page (ud_tfp pt) ws ∗
-    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res pt ksp).
-Proof. exact (ut_res_tf_open SY.syscall_env pt ksp). Qed.
+      !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+    `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44) :
+  (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+  usertrap_res_bare pt ksp -∗
+  ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗ tf_page (ud_tfp pt) ws ∗
+    (∀ ws' : list (mword 64), tf_page (ud_tfp pt) ws' -∗ usertrap_res_bare pt ksp).
+Proof. exact (ut_res_bare_tf_open SY.syscall_env pt ksp kroot). Qed.
 
 Section UtSeal.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
-            !kallocG Σ, !irefslotG Σ, !iregG Σ}.
+            !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* printk's contract, as the [Prop] the arms take -- from the functor
@@ -1116,9 +1200,9 @@ Section UtSeal.
   Local Lemma ut_printk (γpr : gname) (γd : uart_names) (γv : disk_names) :
     printk_gen_contract γpr γd γv.
   Proof.
-    intros CIDp m0 K eb pj Cc dqf f descs b.
-    exact (PK.wp_printk_gen_sconf (CID := CIDp) γpr γd γv m0 K eb pj Cc
-             (dqf := dqf) f descs b).
+    intros CIDp m0 K eb pj dqf f descs b lks.
+    exact (PK.wp_printk_gen_sconf (CID := CIDp) γpr γd γv m0 K eb pj
+             (dqf := dqf) f descs b lks).
   Qed.
 
   Lemma wp_usertrap (pt : uptd) (j : nat) (m : regfile)
@@ -1134,17 +1218,17 @@ Section UtSeal.
     (* SCOPED: a bare [rewrite] would unfold [ut_res] inside the crossing's
        [usertrap_post] too, and the blocks state it folded. *)
     iEval (rewrite /usertrap_res /ut_res) in "HR".
-    iDestruct "HR" as (N V av C) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
+    iDestruct "HR" as (N V av) "(%Hupt & %Hksp & %Hwf & %Hav & Htrap & Henv)".
     assert (Hpjnz : pj <> (zero_reg : mword 64))
       by exact (proc_addr_nonzero j Hj).
     iDestruct (wp_next_true_swap pj (un_pj N) _ Hpjnz with "Hcont") as "Hcont".
-    iApply (ut_entry SY.syscall_env N V ksp m av C ms_v sc_v stval_v sepc_v
+    iApply (ut_entry SY.syscall_env N V ksp m av ms_v sc_v stval_v sepc_v
               mie_v mdv0 menvcfg0
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
                     Hmie Hmdl Hmenv Hgpr Htrap Henv [Hcont]").
     iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
-    iApply (ut_dispatch N V' pt ksp m M av (av - 4)%nat C sepc_v sc_v stval_v
+    iApply (ut_dispatch N V' pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0
               (ut_printk (un_pr N) (un_u N) (un_v N)) Hwf Hav
               (trap_res_off (av - 4)%nat)
