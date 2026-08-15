@@ -349,7 +349,10 @@ Definition board_ok (hid : mword 64) (rs : regstate) : Prop :=
   /\ register_lookup mhartid rs = hid
   /\ register_lookup mie rs = boot_w64 0
   /\ register_lookup mideleg rs = boot_w64 0
-  /\ register_lookup senvcfg rs = boot_w64 0.
+  /\ register_lookup senvcfg rs = boot_w64 0
+  (* the board's tenth write: [reset_stateen] stops at the M-mode four *)
+  /\ register_lookup sstateen0 rs
+     = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32).
 
 Lemma exec_board_init (hid : mword 64) (s0 : mstate) (rs : regstate) :
   pfin s0 (board_ok hid) (board_init hid pma_boot) rs.
@@ -750,14 +753,19 @@ Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
   (* the spec's own [reset_pmp], derived per entry over the open file (§3) --
      no longer a patched value *)
   /\ pmp_all_off (register_lookup pmpcfg_n rs)
-  /\ register_lookup senvcfg rs = boot_w64 0.
+  /\ register_lookup senvcfg rs = boot_w64 0
+  (* mstateen0 from the spec's own [reset_stateen]; sstateen0 from the board
+     (the reset chain never writes it) -- see [RiscvLang.reset_regs] *)
+  /\ register_lookup mstateen0 rs = boot_w64 0
+  /\ register_lookup sstateen0 rs
+     = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32).
 
 Lemma exec_init_model (hid : mword 64) (s0 : mstate) (rs : regstate) :
   board_ok hid rs ->
   pfin s0 (post_ok hid) (init_model_at "" plat_hook) rs.
 Proof.
   intros (Hmisa & Hmstat & Hmsec & Hmenv & Hhtif & Hpma & Hpcr & Hmhid
-          & Hmie & Hmdl & Hsenv).
+          & Hmie & Hmdl & Hsenv & Hsse).
   unfold init_model_at.
   refine (px_step _ _ _ true _ _ _ (exec_config_is_valid rs _ _ Hpma) _).
   unfold reset_at, plat_hook.
@@ -799,7 +807,16 @@ Proof.
     by (rewrite (Hfr mideleg ltac:(vm_compute; reflexivity)); lkres; reflexivity).
   assert (Hsenv' : register_lookup senvcfg rsp = boot_w64 0)
     by (rewrite (Hfr senvcfg ltac:(vm_compute; reflexivity)); lkres; reflexivity).
-  clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid Hmie Hmdl Hsenv.
+  (* NO [Hmse'] here: [reset_stateen] runs AFTER [reset_pmp], so at [rsp]
+     mstateen0 is still the power-on garbage.  Its zero is established by the
+     end-of-chain [lkres] below, off [reset_stateen]'s own write.
+     [sstateen0] IS pinned already -- no line of the chain touches it, so it
+     is still the board's value, carried by [Hsse]. *)
+  assert (Hsse' : register_lookup sstateen0 rsp
+                  = (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32))
+    by (rewrite (Hfr sstateen0 ltac:(vm_compute; reflexivity)); lkres;
+        first [ reflexivity | assumption | apply bv_eq; vm_compute; reflexivity ]).
+  clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid Hmie Hmdl Hsenv Hsse.
   peel.
   apply px_done. unfold post_ok. split_and!; lkres;
     first [ reflexivity | assumption | apply bv_eq; vm_compute; reflexivity ].
@@ -813,7 +830,7 @@ Lemma exec_init_boot_requirements (hid : mword 64) (s0 : mstate) (rs : regstate)
   post_ok hid rs -> pfin s0 (post_ok hid) (init_boot_requirements tt) rs.
 Proof.
   intros (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec & Hmenv
-          & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp & Hsenv).
+          & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp & Hsenv & Hmse & Hsse).
   unfold init_boot_requirements. peel.
   apply px_done. unfold post_ok. split_and!; lkres;
     first [ reflexivity | assumption ].
@@ -855,6 +872,7 @@ Proof.
   destruct (Huniq _ _ Hrun) as [_ Heq].
   injection Heq as Heq. subst rs1.
   destruct Hpost as (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec
-                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp & Hsenv).
+                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl & Hpmp & Hsenv
+                     & Hmse & Hsse).
   unfold reset_regs. split_and!; assumption.
 Qed.

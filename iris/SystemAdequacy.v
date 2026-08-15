@@ -280,7 +280,7 @@ Qed.
    This is the ONE place in the tree that names a concrete [icfg].) *)
 Local Instance adequacy_icfg : icfg :=
   MkIcfg 1%positive (mword_of_int 0 : mword 32) 0%nat 1%positive 1%positive
-         (LogInv.MkLogNames 1%positive 1%positive 1%positive 1%positive)
+         (LogDefs.MkLogNames 1%positive 1%positive 1%positive 1%positive)
          0 (fun _ => 1%positive) (fun _ => 1%positive).
 
 Definition xv6Σ : gFunctors :=

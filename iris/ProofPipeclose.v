@@ -333,7 +333,7 @@ Section ProofPipeclose.
       iEval (rewrite Hpc3e) in "Hpc".
       assert (HcspE4 : E4 !!! Regidx csp_rs1 = spr) by (rewrite /E4 upd_ne; [exact HcspE3 | nz]).
       assert (Hsp0up : add_vec spr (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-      { rewrite /spr /sp0 po_addv_assoc.
+      { rewrite /spr /sp0 add_vec_assoc.
         assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                               (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
           by (apply bv_eq; vm_compute; reflexivity).

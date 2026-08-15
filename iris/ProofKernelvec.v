@@ -1183,7 +1183,7 @@ Proof.
   assert (Hr : kv_sp1 m
                = add_vec (m !!! Regidx csp_rs1)
                          (sign_extend' 64 (caddi16sp_imm kv_imm1))) by reflexivity.
-  rewrite Hr po_addv_assoc H. unfold pa_stk, add_vec_int. reflexivity.
+  rewrite Hr add_vec_assoc H. unfold pa_stk, add_vec_int. reflexivity.
 Qed.
 
 Lemma kv_slot_addr0 (m : regfile) :
@@ -1746,7 +1746,7 @@ Section KernelvecHandler.
     assert (Hspcanc : add_vec (kv_sp1 Me)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6)))
                       = m !!! Regidx csp_rs1).
-    { unfold kv_sp1, regval_into_reg. rewrite po_addv_assoc kv_cancel.
+    { unfold kv_sp1, regval_into_reg. rewrite add_vec_assoc kv_cancel.
       rewrite kv_addv_zero. exact Hsppin. }
     iDestruct (gpr_file_ext (CID := CIDn) _ (tp_pin m)
                  (kv_file_restore (CID := CIDn) m Me mf (kv_sp1 Me)

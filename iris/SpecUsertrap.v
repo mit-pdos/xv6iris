@@ -479,6 +479,43 @@ Module Type USERTRAP_RES.
       `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
       usertrap_res_bare pt ksp -∗ usertrap_res_bare (ud_norm pt) ksp.
 
+  (* THE PER-HART CSRs, borrowed out of the parked residue.  [IntrDefs.
+     hart_csrs] -- [sscratch] at an arbitrary value, [medeleg] at
+     [MEDELEG_S], the two state-enable pins at zero -- lives in [cpu_priv],
+     hence inside the [cpu_own] this residue already carries, because that
+     is the bundle a migration re-delivers.  Two consumers, both needing the
+     bare form: uservec borrows [sscratch] across its save walk (its own
+     [csrw sscratch,a0] at +0x00 writes it and the [csrr] at +0x76 reads it
+     back, so a value-agnostic invariant would not serve), and the trap loop
+     hands the three pinned cells to [UserExec.user_cfg] for the user phase,
+     parking the closer wand in their place.  Concrete:
+     [UsertrapRes.ut_res_bare_csrs_open]. *)
+  Parameter usertrap_res_csrs_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64),
+      usertrap_res_bare pt ksp -∗
+      hart_csrs ∗ (hart_csrs -∗ usertrap_res_bare pt ksp).
+
+  (* ... AND BOTH AT ONCE, which is what uservec needs: its save walk holds
+     the trapframe page open across the same stretch its [csrw sscratch,a0] /
+     [csrr t0,sscratch] pair holds the [sscratch] cell.  Each single accessor
+     consumes the whole sealed residue, so neither composes with the other's
+     remainder -- simultaneous borrows of a sealed bundle come out of ONE
+     opener.  Concrete: [UsertrapRes.ut_res_bare_tf_csrs_open]. *)
+  Parameter usertrap_res_tf_csrs_open :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
+      `{GEN : GenId} `{CID : CpuId} (pt : uptd) (ksp : mword 64) (kroot : mword 44),
+      (forall ws : list (mword 64), length ws = TFWORDS -> tf_kernel_words_ok kroot ksp ws) ->
+      usertrap_res_bare pt ksp -∗
+      ∃ ws : list (mword 64), ⌜tf_kernel_words_ok kroot ksp ws⌝ ∗
+        tf_page (ud_tfp pt) ws ∗ hart_csrs ∗
+        (∀ ws' : list (mword 64),
+           tf_page (ud_tfp pt) ws' -∗ hart_csrs -∗ usertrap_res_bare pt ksp).
+
   Parameter usertrap_res_tf_open :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

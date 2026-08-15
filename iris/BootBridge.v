@@ -382,6 +382,15 @@ Section BootBridge.
        adequacy mint, folded straight into [cpu_own] and never named again --
        from here on the set rides inside [IntrDefs.cpu_hart]. *)
     lk_auth cpu_id ∅ -∗
+    (* THE FOUR PER-HART CSRs that ride in [IntrDefs.hart_csrs], i.e. inside
+       [cpu_own] -- the bundle that crosses a migration, which is why they
+       are parked there rather than threaded.  [medeleg] arrives at the value
+       [start()] wrote ([legalize_medeleg] ignores the old one, so it is the
+       closed constant [MEDELEG_S]); the other three are not looked at. *)
+    (∃ v : mword 64, sscratch ↦ᵣ v) -∗
+    medeleg ↦ᵣ MEDELEG_S -∗
+    mstateen0 ↦ᵣ (mword_of_int 0 : mword 64) -∗
+    sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) -∗
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
@@ -394,7 +403,7 @@ Section BootBridge.
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hmieval Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
              Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
-             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hlks Hctx".
+             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hlks Hssc Hmedl Hmse Hsse Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
     { iPureIntro. apply (bool_decide_unpack _). by compute. }
@@ -444,9 +453,16 @@ Section BootBridge.
       as "[Hspp1 Hspp2]".
     iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez Hmieval eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
-    (* --- cpus[cid] --- *)
-    iDestruct (cpu_own_init_boot p0 nv iv Hnv
-                 with "Hnoff Hint He2 Hproc Hlks") as "Hcpu".
+    (* --- cpus[cid].  The three never-written CSRs are FROZEN here: they are
+       read by the user tier ([UserExec.user_cfg]) and held by the kernel
+       residue ([IntrDefs.hart_csrs]), and at an owned fraction those two
+       would claim the same cells. --- *)
+    iDestruct "Hssc" as (sscr) "Hssc".
+    iMod (reg_pointsto_persist medeleg _ _ with "Hmedl") as "#Hmedl".
+    iMod (reg_pointsto_persist mstateen0 _ _ with "Hmse") as "#Hmse".
+    iMod (reg_pointsto_persist sstateen0 _ _ with "Hsse") as "#Hsse".
+    iDestruct (cpu_own_init_boot p0 nv iv sscr MEDELEG_S Hnv eq_refl
+                 with "Hnoff Hint He2 Hproc Hlks Hssc Hmedl Hmse Hsse") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY
        carries this hart's id there and IS its own pin ([tp_pin_id]). --- *)
     assert (Htpm : Mf !!! Regidx Rtp = cid_word_of cpu_id).

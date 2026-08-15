@@ -64,9 +64,9 @@ Lemma sched_reconcile2 (sh a b c d : mword 64) :
   add_vec a (add_vec sh b) = add_vec (add_vec c sh) d.
 Proof.
   intro H.
-  rewrite (add_vec64_comm sh b). rewrite <- (po_addv_assoc a b sh).
+  rewrite (add_vec64_comm sh b). rewrite <- (add_vec_assoc a b sh).
   rewrite (add_vec64_comm (add_vec a b) sh).
-  rewrite (add_vec64_comm c sh). rewrite (po_addv_assoc sh c d).
+  rewrite (add_vec64_comm c sh). rewrite (add_vec_assoc sh c d).
   assert (Hab : add_vec a b = add_vec c d) by (apply bv_eq; exact H).
   rewrite Hab. reflexivity.
 Qed.
@@ -87,7 +87,7 @@ Proof.
   { apply bv_eq. rewrite H.
     unfold mword_of_int, Values.to_word, get_word. cbn.
     rewrite Z_to_bv_unsigned. reflexivity. }
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc. rewrite Heq. reflexivity.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc. rewrite Heq. reflexivity.
 Qed.
 
 Lemma sched_sstatus_clear (ms : mword 64) :
@@ -438,7 +438,7 @@ Section SchedPostSwtch.
     assert (Hspd6 : pa_stk sp0 6 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hpopsp : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0).
-    { rewrite -Hspd po_addv_assoc.
+    { rewrite -Hspd add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite HAB. apply kv_addv_zero. }

@@ -650,6 +650,22 @@ prove `bare ∗ <address space> ⊣⊢ full` as an exact open/close pair.  Then 
 view conversion is a separate, already-existing lemma
 (`ProcPtOwn.proc_pt_own_udata`, the pt2 switch window) applied once.
 
+**IT RECURS AT EVERY *ENTRY* TO A LOOP WHOSE ROUNDS ARE ALREADY RIGHT, and
+that is the case that survives longest.**  `SpecUserretClosed`'s theorem took
+the residue `usertrap_res_bare pt ksp` AND the trapframe's 31 save slots
+(`tf_pa (ud_tfp pt) off ↦ₚ₈{dqm}`) as sibling premises -- and the residue owns
+that page in full, through `proc_priv_nopt` → `ProcInv.tf_page`.  Every LOOP
+round was fine (`wp_uservec_pt` opens the page out of the residue, hands
+userret the slots, takes them back, closes), so nothing downstream was wrong;
+only the ENTRY was, and it stayed wrong until a caller (forkret) actually had
+to supply both.  The tell is the same one: two premises written by different
+tiers, one of them a sealed `_res`.  The fix is the same shape too -- the
+entry opens the page out of the residue ITSELF and takes a CLOSER
+(`31 cells -∗ Rut pt`) where the naked `Rut pt` used to be, so the bundle is
+completed at the one point the slots are back in hand.  **A `-∗` premise is
+how a linear resource that a callee borrows and returns should be threaded;
+a bare conjunct beside it is how it gets claimed twice.**
+
 ## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
 
 Strengthening a lemma's HYPOTHESIS weakens the lemma, so it stays provable from

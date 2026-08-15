@@ -14,8 +14,10 @@
    beyond userret's guarantees are the CELLS userret never touched (they
    stay kernel-owned across the whole trampoline): the two remaining trap
    CSRs [scause]/[stval] (stale until the next trap writes them), the four
-   config CSRs userret does not thread ([stvec]/[medeleg]/[mip] and the
-   [mstateen0]/[sstateen0] state-enable pins), and the user data pages'
+   config CSRs userret does not thread ([stvec]/[medeleg] and the
+   [mstateen0]/[sstateen0] state-enable pins; [mip] is NOT among them --
+   it lives in [MinstretInv.clock_inv] and is borrowed per step, see
+   [UserExec.ucfg]), and the user data pages'
    bytes [udata_own] with their coverage / access-classification facts.
 
    THE ONE PURE OBLIGATION is [user_mstatus_ok (sret_ms5 mstatus0)] -- the
@@ -85,7 +87,7 @@ Section UserKernelBridge.
   Lemma userret_to_user_inv
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
       (mstatus0 sepc0 sc_v stval_v mie_v mdv0 menvcfg0 senvcfg0 : mword 64)
-      (stv medeleg_v mip_v : mword 64)
+      (stv medeleg_v : mword 64)
       (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (mstateen0v : mword 64) (sstateen0v : mword 32)
       (g : regfile) :
@@ -104,7 +106,6 @@ Section UserKernelBridge.
     uc_mie C = mie_v ->
     uc_mideleg C = mdv0 ->
     uc_medeleg C = medeleg_v ->
-    uc_mip C = mip_v ->
     (* page-table-descriptor fields pinned to the userret roots *)
     ud_root pt = uroot ->
     ud_tfp pt = tfp ->
@@ -134,21 +135,22 @@ Section UserKernelBridge.
     scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗
     stvec ↦ᵣ stv -∗
-    medeleg ↦ᵣ medeleg_v -∗
-    mip ↦ᵣ mip_v -∗
-    mstateen0 ↦ᵣ mstateen0v -∗
-    sstateen0 ↦ᵣ sstateen0v -∗
+    (* PERSISTENT: never written after M-mode boot, and the kernel residue
+       ([IntrDefs.hart_csrs]) holds the same three -- see [user_cfg]. *)
+    medeleg ↦ᵣ□ medeleg_v -∗
+    mstateen0 ↦ᵣ□ mstateen0v -∗
+    sstateen0 ↦ᵣ□ sstateen0v -∗
     (* ---- the user data pages ---- *)
     udata_own pt.(ud_data) -∗
     (* ---- the exclusive usertrap-residue conjunct [user_inv] now carries ---- *)
     Rut pt -∗
     user_inv C pt Rut.
   Proof.
-    intros HSXL HMXR HFS HVS HTVM HTSR Hdqc Hstvec Hmie Hmdl Hmedl Hmip
+    intros HSXL HMXR HFS HVS HTVM HTSR Hdqc Hstvec Hmie Hmdl Hmedl
       Hroot Htfp Hum Hmenv Hsenv Hmse Hsse Hcov Hacc.
     subst menvcfg0 senvcfg0 mstateen0v sstateen0v.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc Hgpr
-             Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata Hrut".
+             Hsc Hstval Hstvec Hmedl Hmse Hsse Hdata Hrut".
     iDestruct "Hpc" as "[Hpcc Hnpc]".
     unfold user_inv.
     iExists (HART_ACTIVE tt), (sret_ms5 mstatus0), sc_v, stval_v, sepc0,
@@ -169,11 +171,11 @@ Section UserKernelBridge.
       iFrame "Hutlb Hdata".
       rewrite Hum in Hcov Hacc.
       iPureIntro. split; [exact Hcov | exact Hacc]. }
-    iSplitL "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse".
+    iSplitL "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse".
     { (* user_cfg *)
       unfold user_cfg.
-      rewrite Hdqc Hstvec Hmie Hmdl Hmedl Hmip.
-      iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
+      rewrite Hdqc Hstvec Hmie Hmdl Hmedl.
+      iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
     (* Rut pt *)
     iFrame "Hrut".
   Qed.
@@ -214,12 +216,11 @@ Section UserKernelBridge.
       stvec ↦ᵣ{ uc_dqc C } uc_stvec C ∗
       mie ↦ᵣ{ uc_dqc C } uc_mie C ∗
       mideleg ↦ᵣ{ uc_dqc C } uc_mideleg C ∗
-      medeleg ↦ᵣ{ uc_dqc C } uc_medeleg C ∗
-      mip ↦ᵣ{ uc_dqc C } uc_mip C ∗
+      medeleg ↦ᵣ□ uc_medeleg C ∗
       menvcfg ↦ᵣ{ uc_dqc C } MENVCFG_S ∗
       senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
-      mstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 64) ∗
-      sstateen0 ↦ᵣ{ uc_dqc C } (mword_of_int 0 : mword 32) ∗
+      mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) ∗
+      sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) ∗
       Rut pt.
   Proof.
     iIntros "H".
@@ -231,10 +232,10 @@ Section UserKernelBridge.
     iDestruct "Hupt" as "(Hutlb & Hdata & %Hcov & %Hacc)".
     unfold user_cfg.
     iDestruct "Hcfg" as
-      "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmse & Hsse)".
+      "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
     iExists ms_v, sc_v, stval_v, sepc_v, g.
     iFrame "Hhs Hpriv Hms Hsc Hstval Hsepc Hpcc Hnpc Hgpr
-            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse Hrut".
+            Hutlb Hdata Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse Hrut".
     iPureIntro. split; [exact Hok | split; [exact Hcov | exact Hacc]].
   Qed.
 

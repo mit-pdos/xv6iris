@@ -36,8 +36,9 @@ Require Import RiscvLang.   (* [GenId]/[gen_id]: [log_ctx]'s swap receipt *)
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks.
+Require Export LogDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -58,7 +59,6 @@ Local Open Scope Z_scope.
 (* ------------------------------------------------------------------ *)
 
 Definition MAXOPBLOCKS : nat := 10%nat.
-Definition LOGBLOCKS : nat := 30%nat.
 
 Definition log_addr : mword 64 := mword_of_int KernelSyms.log.
 Definition log_pa : Arch.pa := log_addr.
@@ -70,15 +70,6 @@ Definition l_dev     : Arch.pa := pa_add log_pa 36.
 Definition l_ncommit : Arch.pa := pa_add log_pa 40.
 Definition lh_block (i : nat) : Arch.pa := pa_add log_pa (48 + 4 * i)%nat.
 Definition lh_n_pa   : Arch.pa := pa_add log_pa 44.
-
-(* the on-disk block-number layout, from the superblock the boot client
-   read: the header at [logstart], the LOGBLOCKS slots right after. *)
-Definition log_hdr_bno (logstart : Z) : Z := logstart.
-Definition log_slot_bno (logstart : Z) (i : nat) : Z :=
-  logstart + 1 + Z.of_nat i.
-Definition log_region_set (logstart : Z) : gset Z :=
-  list_to_set ((fun i => log_slot_bno logstart i) <$> seq 0 LOGBLOCKS)
-  ∪ {[ log_hdr_bno logstart ]}.
 
 (* ------------------------------------------------------------------ *)
 (*  Pure vocabulary the log.c CONTRACTS need (Spec*.v, stage 2).        *)
@@ -95,11 +86,6 @@ Definition log_region_set (logstart : Z) : gset Z :=
    clean-image premise [hdr_n = 0] and write_head's [hdr_n = n]).  The
    full (n, W) on-disk encoding is stage 4's business -- see
    claude-notes/design/fs-log.md, "Stage 4 -- the crash side". *)
-Definition hdr_n (bs : list (bv 8)) : Z := assemble_bytes (take 4 bs).
-
-Lemma hdr_n_nonneg (bs : list (bv 8)) : 0 <= hdr_n bs.
-Proof. rewrite /hdr_n. apply assemble_bytes_bound. Qed.
-
 Lemma hdr_n_lt (bs : list (bv 8)) : hdr_n bs < 2 ^ 32.
 Proof.
   rewrite /hdr_n.
@@ -206,14 +192,6 @@ Definition logΣ : gFunctors :=
   #[ghost_mapΣ nat op_entry; GFunctor (authR (gsetUR (nat * Z)))].
 Global Instance subG_logΣ {Σ} : subG logΣ Σ -> logG Σ.
 Proof. solve_inG. Qed.
-
-Record log_names := MkLogNames {
-  ln_lk  : gname;   (* the "log" spinlock *)
-  ln_ops : gname;   (* the ledger: op id -> (budget, logged set, birth epoch) *)
-  ln_ep  : gname;   (* the BATCH EPOCH, a mono_nat: bumped at every commit *)
-  ln_lg  : gname;   (* the append registry: which (epoch, block) pairs were
-                       appended.  Fragments are the persistent [logged_at]. *)
-}.
 
 (* the sum of all remaining budgets -- the SETS play no part in the tie *)
 Definition op_sum (om : gmap nat op_entry) : nat :=
@@ -693,11 +671,6 @@ Section LogInv.
   (*  that no statement above this file grows a binder for it.            *)
   (* ---------------------------------------------------------------- *)
 
-  (* the whole variable, as the era boot bundle mints it: no custody has
-     been taken yet, so both halves are the era's *)
-  Definition log_mirror_full : iProp Σ :=
-    (∃ M : log_mirror, ghost_var mirror_name 1 M)%I.
-
   (* THE ERA'S HALF AT A RECORDED HEADER PICTURE.  [h] is the ON-DISK
      header's [FsCrash.hdr_dec] reading, and it is the ONLY field a WAL fupd
      ever reads out of the mirror: the log-fill kind needs a CLEAN header,
@@ -710,13 +683,6 @@ Section LogInv.
      Kept ONE definition, indexed by [h], because the commit and clear kinds
      move the picture: [log_mirror_clean] is its [(0, [])] instance and
      [log_batch] therefore reads exactly as before. *)
-  Definition log_mirror_at (h : nat * list Z) : iProp Σ :=
-    (∃ M : log_mirror,
-       ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = h⌝)%I.
-
-  Global Instance log_mirror_at_timeless h : Timeless (log_mirror_at h).
-  Proof. rewrite /log_mirror_at. apply _. Qed.
-
   Definition log_mirror_clean : iProp Σ := log_mirror_at (0%nat, []).
 
   (* ---------------------------------------------------------------- *)

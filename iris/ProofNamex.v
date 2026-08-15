@@ -1338,6 +1338,7 @@ Section ProofNamexMain.
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi01a").
     iIntros (CID14 Hq14) "Hcg Hpc".
+    iClear "Hi000 Hi002 Hi004 Hi006 Hi008 Hi00a Hi00c Hi00e Hi010 Hi012 Hi014 Hi016 Hi018 Hi01a".
     pose (R2 := <[Regidx Rs0 := regval_into_reg
                   (add_vec (R1 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 24 : mword 8))))]> R1).
@@ -1628,6 +1629,7 @@ Section ProofNamexMain.
       iApply (wp_cret_s_sconf (mword_of_int (NX + 0x78)) Rra P13 K b
                 ltac:(nz) with "Hcg Hpc Hj78").
       iIntros (CIDT14 HqT14) "Hcg Hpc".
+      iClear "Hj5c Hj5e Hj60 Hj62 Hj64 Hj66 Hj68 Hj6a Hj6c Hj6e Hj70 Hj72 Hj74 Hj76 Hj78".
       iEval (rgne) in "Hpc".
       assert (Hretf : ret_pc (P13 !!! Regidx Rra : mword 64) = ret_tgt)
         by (rewrite CPra; reflexivity).
@@ -5217,6 +5219,7 @@ Section ProofNamexMain.
               R6 (K - 12)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
               with "Hcg Hpc Hi026").
     iIntros (CID19 Hq19) "Hcg Hpc".
+    iClear "Hi01c Hi01e Hi020 Hi022 Hi026".
     pose (R7 := <[Regidx Ra5 := regval_into_reg (mword_of_int 47 : mword 64)]> R6).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (mword_of_int 47 : mword 64))
       by (rewrite /R7; apply upd_eq).
@@ -5280,6 +5283,7 @@ Section ProofNamexMain.
                 ltac:(rewrite Htgt048; vm_compute; reflexivity)
                 with "Hcg Hpc Hi02a").
       iIntros (CID20 Hq20). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iClear "Hi02a".
       iEval (rewrite Htgt048) in "Hpc".
       (* +0x48 c.li a1,1 *)
       iApply (wp_cli_s_sconf (mword_of_int (NX + 0x48)) Ra1 (mword_of_int 1 : mword 6)
@@ -5367,6 +5371,7 @@ Section ProofNamexMain.
                 ltac:(rewrite Htgt03c; vm_compute; reflexivity)
                 with "Hcg Hpc Hi052").
       iIntros (CIDA2 HqA2). iApply bi.later_intro. iIntros "Hcg Hpc".
+      iClear "Hi048 Hi04a Hi04c Hi050 Hi052".
       iEval (rewrite Htgt03c) in "Hpc".
       (* ---- the register facts iget's [callee_saved] carries over ---- *)
       assert (HA4sp : A4 !!! Regidx csp_rs1 = pa_stk sp0 12).
@@ -5522,6 +5527,7 @@ Section ProofNamexMain.
                 ltac:(rgne; rgne; rewrite HR7a4 HR7a5; exact (nx_slash_ne _ Hsl0))
                 with "Hcg Hpc Hi02a").
       iIntros (CID20 Hq20) "Hcg Hpc".
+      iClear "Hi02a".
       assert (Hpp02e : add_vec_int (mword_of_int (NX + 0x2a) : mword 64) 4
                        = mword_of_int (NX + 0x2e)) by pcw.
       iEval (rewrite Hpp02e) in "Hpc".
@@ -5615,6 +5621,7 @@ Section ProofNamexMain.
       iApply (wp_cmv_s_sconf (mword_of_int (NX + 0x3a)) Rs4 Ra0 mid (K - 12)%nat b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi03a").
       iIntros (CIDBm1 HqBm1) "Hcg Hpc". iEval (rgne) in "Hcg".
+      iClear "Hi02e Hi032 Hi036 Hi03a".
       pose (B4 := <[Regidx Rs4 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (mid !!! Regidx Ra0))]> mid).
       assert (HB4s4 : B4 !!! Regidx Rs4 = ientry ck).

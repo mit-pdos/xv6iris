@@ -186,17 +186,17 @@ Section ProofReparentEnds.
     iDestruct "C5" as (v5) "Hc5". iDestruct "C6" as (v6) "Hc6".
     (* the six cells at [pa_stk sp0 1..6] are [rp_fcell spF 5..0] *)
     assert (Hb5 : pa_stk sp0 1 = rp_fcell spF 5).
-    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb4 : pa_stk sp0 2 = rp_fcell spF 4).
-    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb3 : pa_stk sp0 3 = rp_fcell spF 3).
-    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb2 : pa_stk sp0 4 = rp_fcell spF 2).
-    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb1 : pa_stk sp0 5 = rp_fcell spF 1).
-    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb0 : pa_stk sp0 6 = rp_fcell spF 0).
-    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hb5) in "Hc1". iEval (rewrite Hb4) in "Hc2". iEval (rewrite Hb3) in "Hc3".
     iEval (rewrite Hb2) in "Hc4". iEval (rewrite Hb1) in "Hc5". iEval (rewrite Hb0) in "Hc6".
     assert (Hra : R1 !!! Regidx (mword_of_int 1 : mword 5) = m !!! Regidx (mword_of_int 1)) by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
@@ -535,17 +535,17 @@ Section ProofReparentEnds.
     { rewrite Hwv HspE6. symmetry. unfold sp0, pa_stk, add_vec_int.
       apply frame_cancel. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb5 : rp_fcell spF 5 = pa_stk sp0 1).
-    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb4 : rp_fcell spF 4 = pa_stk sp0 2).
-    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb3 : rp_fcell spF 3 = pa_stk sp0 3).
-    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb2 : rp_fcell spF 2 = pa_stk sp0 4).
-    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb1 : rp_fcell spF 1 = pa_stk sp0 5).
-    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb0 : rp_fcell spF 0 = pa_stk sp0 6).
-    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold rp_fcell, sp0, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iAssert (stack_own sp0 6) with "[Hf5 Hf4 Hf3 Hf2 Hf1 Hf0]" as "Hframe".
     { rewrite stack_own_slots. cbn [seq].
       iSplitL "Hf5"; [iEval (rewrite -Hb5); iExists _; iExact "Hf5"|].

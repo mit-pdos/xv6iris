@@ -104,7 +104,7 @@ Lemma ct_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 6%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 6%nat) o = pa_stk X k.
 Proof.
-  intro H. unfold pa_stk, add_vec_int. rewrite po_addv_assoc H. reflexivity.
+  intro H. unfold pa_stk, add_vec_int. rewrite add_vec_assoc H. reflexivity.
 Qed.
 
 Local Ltac reg_neq :=
@@ -448,7 +448,7 @@ Section CtBodies.
     (* +0x116  c.addi16sp sp,+48 : the pop *)
     assert (Hspv : add_vec (E3 !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6))) = sp0).
-    { rewrite HE3sp. unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { rewrite HE3sp. unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 6%nat)) : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 3 : mword 6)))
                    = (mword_of_int 0 : mword 64)); [| pcw].
@@ -2658,7 +2658,7 @@ Section ProofConsoleintr.
     (* ---- +0x008 c.addi4spn s0,sp,48 : the frame pointer ---- *)
     assert (Hs0v : add_vec (pa_stk sp0 6%nat)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))) = sp0).
-    { unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 6%nat)) : mword 64)
                      (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8)))
                    = (mword_of_int 0 : mword 64)); [| pcw].

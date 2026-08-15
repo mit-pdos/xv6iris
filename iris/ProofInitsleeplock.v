@@ -406,7 +406,7 @@ Section ProofInitsleeplock.
     set (E5 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E4).
     assert (Hsp0up : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite /spd /sp0 po_addv_assoc.
+    { rewrite /spd /sp0 add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                             (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).

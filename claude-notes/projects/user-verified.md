@@ -118,8 +118,10 @@ user stack is ordinary bytes in `M`.
   obligation OBL for the real (no-pending-interrupt) step, conclude
   `WP Loop {{Φ}}`.  Internals: `iLöb` over a `∀ CID`-quantified statement;
   each round applies `wp_exec_step_minstret` at mask
-  `⊤ ∖ ↑minstretN ∖ ↑wireN`, opens `wire_inv`, peels this hart's pins, and
-  case-splits `u_dispatch`:
+  `⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN`, opens `wire_inv`, peels this hart's
+  pins, borrows `mip` from `clock_inv` (`UserExec.clock_mip_acc`; `ucfg` has
+  no `uc_mip` field, so the dispatch value is per-step), and case-splits
+  `u_dispatch`:
   - `Some (i, Supervisor)` → `uv_interrupt_branch` → hand the concrete frame
     to `uv_intr_wp` (from the persistent cap); its resume wand is discharged
     by the (▷-stripped) Löb IH at the resuming hart — same pc, same M, same

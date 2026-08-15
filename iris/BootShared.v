@@ -883,7 +883,7 @@ Section BootAlloc.
             (boot_regs_of_facts g Hbf h) with "Hcl Hcert Hregs") as
       "(Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp & Hmede & Hmdl &
         Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec & Hsepc & Hscause & Hstval &
-        Hseip & Hmeip)".
+        Hssc & Hmse & Hsse & Hseip & Hmeip)".
     iModIntro. iFrame "Hseip Hmeip".
     iDestruct "Hint" as (iv) "Hint".
     iExists iv.
@@ -891,7 +891,8 @@ Section BootAlloc.
             /spie_gname /cpu_ctx_free /cid_word.
     iEval (rewrite /own_ctx) in "Hctx".
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
-            Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hword Hstk
+            Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hssc Hmse Hsse
+            Hword Hstk
             Hs1 Hs2 Hg2 Hg4a Hg4b Hspp1 Hspie1 Hspp2 Hspie2 Hnoff Hint Hproc
             Hlks Hctx".
   Qed.

@@ -51,6 +51,11 @@ Require Import Pt4kWalk CommonWalk PtTree KptPt TrampPt KMap.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInvDefs.
+Require Export ProcDefs.
+(* [Typeclasses Opaque] is compilation-local: repeat the declaration here so
+   broad [iFrame] calls do not unfold the 4 KiB [tf_page] big-op imported
+   from [ProcDefs]. *)
+Typeclasses Opaque tf_words tf_tail tf_page.
 (* [IcacheRef.inode_held]: what [p->cwd] owns, and [IrefSlots.iref_slots]:
    the supply a dormant block parks.  Exported, because a consumer of
    [proc_priv] that has to name the reference should not have to know which
@@ -104,15 +109,6 @@ Qed.
    owns both cells and pins them to [page_base (ud_root …)] / [page_base
    (ud_tfp …)], so a separate value here could only be dead weight or
    disagree.  The descriptor [pv_upt] determines both. *)
-Record pprivate := MkPPriv {
-  pv_sz    : mword 64;
-  pv_upt   : uptd;                (* the user page table AND trapframe ppn *)
-  pv_tf    : list (mword 64);     (* the trapframe's 36 words, length TFWORDS *)
-  pv_ofile : list (mword 64);     (* length NOFILE *)
-  pv_cwd   : mword 64;
-  pv_name  : list (bv 8);         (* length PNAMELEN *)
-}.
-
 (* functional update of one fd slot -- fdalloc / sys_close / kexit. *)
 Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (<[fd := v]> (pv_ofile V)) (pv_cwd V) (pv_name V).
@@ -186,26 +182,14 @@ Section ProcInv.
   (* =================================================================== *)
   (* The scalar private cells.                                           *)
   (* =================================================================== *)
-  Definition pname_cells (pa : mword 64) (dq : dfrac) (bs : list (bv 8)) : iProp Σ :=
-    ([∗ list] i ↦ b ∈ bs, p_name pa i ↦ₘ{dq} b)%I.
-
   (* the SCALAR private cells.  pagetable and trapframe are absent: those two
      cells belong to [ProcPtOwn.proc_pt_at], which rides beside this in
      [proc_priv]. *)
-  Definition proc_fields (pa : mword 64) (dq : dfrac) (V : pprivate) : iProp Σ :=
-    (p_sz pa        ↦₈{dq} pv_sz V ∗
-     p_cwd pa       ↦₈{dq} pv_cwd V ∗
-     ⌜length (pv_name V) = PNAMELEN⌝ ∗
-     pname_cells pa dq (pv_name V))%I.
-
   (* =================================================================== *)
   (* p->ofile[fd]: the cell, plus the reference it names.                *)
   (* =================================================================== *)
   (* Bare cells, no validity clause: what the DORMANT bundle holds (every
      slot is null there, so there is no reference to describe). *)
-  Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
-    ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
-
   (* [irefNameG] carries the itable's reference authority CANONICALLY --
      there is exactly one itable per system, and threading its gname would
      put a filesystem ghost NAME on [proc_priv], hence on the thirty-three
@@ -493,19 +477,6 @@ Section ProcInv.
      userret).  Each access site converts with
      [RiscvPtsto.phys_to_mem_claim] / [mem_to_phys_claim], the same idiom
      the software page-table walks already use for PT slots. *)
-  Definition tf_words (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
-    ([∗ list] i ↦ w ∈ ws, tf_pa tfp (8 * Z.of_nat i) ↦ₚ₈ w)%I.
-
-  (* the page beyond the struct: 288 .. 4095, contents irrelevant *)
-  Definition tf_tail (tfp : mword 44) : iProp Σ :=
-    ([∗ list] j ∈ seq (Z.to_nat TFBYTES) (4096 - Z.to_nat TFBYTES),
-       ∃ b : bv 8, pa_add (page_base tfp) j ↦ₚ b)%I.
-
-  Definition tf_page (tfp : mword 44) (ws : list (mword 64)) : iProp Σ :=
-    (⌜length ws = TFWORDS⌝ ∗ tf_words tfp ws ∗ tf_tail tfp)%I.
-
-  Typeclasses Opaque tf_words tf_tail tf_page.
-
   Lemma tf_page_length (tfp : mword 44) (ws : list (mword 64)) :
     tf_page tfp ws -∗ ⌜length ws = TFWORDS⌝.
   Proof. rewrite /tf_page. iIntros "(%Hlen & _ & _)". done. Qed.
@@ -1927,60 +1898,6 @@ Section ProcInv.
      fact [word4_pointsto_agree] already gives.  Keeping [st] and [pid] both
      out makes [proc_slots] a function of the state alone, which is what makes
      [proc_slots_recast] hold in BOTH directions within a guard class. *)
-  Definition proc_dormant (pa : mword 64) (st : mword 32) : iProp Σ :=
-    (∃ (V : pprivate) (pid : mword 32),
-       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
-        pv_cwd V = (zero_reg : mword 64) /\
-        uint (pv_sz V) <= uvm_maxsz⌝ ∗
-       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
-       proc_fields pa (DfracOwn 1) V ∗
-       ofile_cells pa (pv_ofile V) ∗
-       (* a dormant process still OWNS its NOFILE units -- every descriptor
-          is null, so it holds all of them itself.  Parking them here rather
-          than making allocproc conjure them is what keeps the supply
-          conserved across the whole UNUSED -> live -> ZOMBIE cycle. *)
-       ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
-       (* ... and its ALLOWANCE, the FDSPARE units a syscall borrows for a
-          reference in flight (FdSlots.v).  Parked here for the same reason
-          and with the same effect: [FDSLOTS] is now exactly what the NPROC
-          dormant blocks hold between them, so boot routes the WHOLE supply
-          and nothing is left over. *)
-       fd_slots FDSPARE ∗
-       (* ... and the SAME accounting for inode references, one supply over.
-          The [1] is the CWD'S OWN UNIT: a dormant block is at [pv_cwd = 0]
-          in both its states, so it holds no reference and therefore holds
-          the free unit itself.  [IREFSPARE] is the allowance for references
-          a syscall keeps in LOCALS before they reach a home.  That
-          disjunction -- either a live cwd reference with a unit parked
-          against it in the itable, or a null cwd and the unit here -- is
-          what makes [IrefSlots.IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]
-          literally true rather than merely plausible. *)
-       iref_slots (1 + IREFSPARE) ∗
-       own_ctx (p_context pa) ∗
-       (* The address-space cells, keyed on WHICH dormant state -- tied to
-          [st], not a free disjunction.  A ZOMBIE still owns a live user
-          table and trapframe page, which is precisely what wait()/freeproc
-          reclaim; by UNUSED freeproc has kfree'd both and zeroed the two
-          cells.  So the ZOMBIE -> UNUSED step genuinely MOVES resources,
-          which is why [proc_slots_recast] deliberately does not cover the
-          dormant class. *)
-       (* A ZOMBIE additionally carries the [p->sz]-bounds-the-user-map
-          coherence conjunct [proc_priv] has.  It is not decoration: it is
-          proc_freepagetable's one real premise, so without it the ZOMBIE
-          block could not be handed to freeproc at all -- which is the whole
-          purpose of the arm ([SpecFreeproc.fp_of_dormant_zombie]).  It costs
-          nothing to establish: kexit reduces a live [proc_priv], which has
-          the same conjunct, and no landed proof produces a ZOMBIE.  The
-          OTHER two facts freeproc's [Some] arm used to demand are gone --
-          the size bound is now [proc_dormant]'s own [uint sz <= uvm_maxsz]
-          (SpecUvmfree.v), and the root page's [page_valid] is derived from
-          the table itself ([ProcPtOwn.proc_pt_root_valid]). *)
-       (if bool_decide (st = ZOMBIE)
-        then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
-             proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
-        else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
-             p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
-
   (* ------------------------------------------------------------------- *)
   (* THE SAME BLOCK WITHOUT ITS CONTEXT CELLS.                            *)
   (*                                                                      *)
@@ -1997,36 +1914,6 @@ Section ProcInv.
   (* is what keeps [proc_dormant] the ONE shape procinit / allocproc /     *)
   (* freeproc see.                                                        *)
   (* ------------------------------------------------------------------- *)
-  Definition proc_dormant_noctx (pa : mword 64) (st : mword 32) : iProp Σ :=
-    (∃ (V : pprivate) (pid : mword 32),
-       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
-        pv_cwd V = (zero_reg : mword 64) /\
-        uint (pv_sz V) <= uvm_maxsz⌝ ∗
-       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
-       proc_fields pa (DfracOwn 1) V ∗
-       ofile_cells pa (pv_ofile V) ∗
-       ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
-       fd_slots FDSPARE ∗
-       iref_slots (1 + IREFSPARE) ∗
-       (if bool_decide (st = ZOMBIE)
-        then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
-             proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
-        else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
-             p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
-
-  Lemma proc_dormant_split (pa : mword 64) (st : mword 32) :
-    proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
-  Proof.
-    iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Haddr".
-      iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hctx Haddr".
-      iPureIntro; exact Hfacts.
-  Qed.
-
-
   (* The UNUSED block WITHOUT its fd-slot units: what procinit is handed for
      each process before the supply is distributed.  Nothing in procinit
      touches these cells (the BSS is already zero); the units are the one
@@ -2260,10 +2147,4 @@ Section ProcInv.
   (* =================================================================== *)
   (* kstack: write-once at procinit, hence persistent.                    *)
   (* =================================================================== *)
-  Definition is_kstack (pa : mword 64) (ks : mword 64) : iProp Σ :=
-    p_kstack pa ↦₈□ ks.
-
-  Global Instance is_kstack_persistent pa ks : Persistent (is_kstack pa ks).
-  Proof. rewrite /is_kstack /word_pointsto /mem_pointsto. apply _. Qed.
-
 End ProcInv.

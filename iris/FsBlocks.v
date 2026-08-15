@@ -43,7 +43,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types.
 Require Import RiscvPtsto.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Local Open Scope Z_scope.
 
 Class fsLogG (Σ : gFunctors) := FsLogG {

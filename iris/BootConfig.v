@@ -335,7 +335,14 @@ Definition boot_D_named : list register :=
     (sig_seip : register); (sig_meip : register);
     (tlb : register); (stvec : register);
     (sepc : register); (scause : register); (stval : register);
-    (senvcfg : register) ].
+    (senvcfg : register);
+    (* the three the trampoline / the user-mode tier own but no boot code
+       writes: [sscratch] (uservec's a0 scratch) and the two state-enable
+       pins.  They have to be in the domain even though nothing writes them
+       -- a register outside this set has NO CELL in the era, so a spec that
+       asks for one is unsatisfiable.  All three park in
+       [IntrDefs.hart_csrs], inside [cpu_own]. *)
+    (sscratch : register); (mstateen0 : register); (sstateen0 : register) ].
 
 Definition boot_D_list : list register := boot_D_named ++ boot_gpr_list.
 
@@ -538,6 +545,9 @@ Section BootRegs.
       scause ↦ᵣ register_lookup scause rs ∗
       stval ↦ᵣ register_lookup stval rs ∗
       senvcfg ↦ᵣ register_lookup senvcfg rs ∗
+      sscratch ↦ᵣ register_lookup sscratch rs ∗
+      mstateen0 ↦ᵣ register_lookup mstateen0 rs ∗
+      sstateen0 ↦ᵣ register_lookup sstateen0 rs ∗
       ([∗ list] r ∈ boot_gpr_list, r ↦ᵣ register_lookup r rs).
   Proof.
     rewrite boot_reg_list /boot_D_list big_sepL_app.
@@ -545,9 +555,10 @@ Section BootRegs.
     iDestruct "Hn" as "(H1 & H2 & H3 & H4 & H5 & H6 & H7 & H8 & H9 & H10 &
                         H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                         H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
-                        H29 & H30 & H31 & H32 & H33 & H34 & _)".
+                        H29 & H30 & H31 & H32 & H33 & H34 & H35 & H36 & H37 & _)".
     iFrame "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
-            H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33 H34".
+            H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 H32 H33 H34
+            H35 H36 H37".
   Qed.
 
   (* the register FILE a reset hart's GPRs form: x0 reads zero (the [gpr_pt]

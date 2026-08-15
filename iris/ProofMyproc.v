@@ -73,7 +73,7 @@ Local Lemma mp_load_reconcile (tp0 : mword 64) :
   add_vec (add_vec (mycpu_a5 tp0) mp_A4C) mp_L48 = mycpu_ret tp0.
 Proof.
   rewrite mycpu_ret_split.
-  rewrite po_addv_assoc.
+  rewrite add_vec_assoc.
   assert (Hc : add_vec mp_A4C mp_L48 = mp_CPUSC)
     by (unfold mp_A4C, mp_L48, mp_CPUSC; apply bv_eq; vm_compute; reflexivity).
   rewrite Hc. apply add_vec64_comm.
@@ -527,7 +527,7 @@ Section ProofMyproc.
     set (E4 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3).
     assert (Hsp0up : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite /spd /sp0 po_addv_assoc.
+    { rewrite /spd /sp0 add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                             (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).

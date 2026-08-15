@@ -185,22 +185,53 @@ Section CpuOwn.
   (* boot entry: raw cells + the SIE eighth at '0' + this hart's held-lock
      authority, which adequacy mints at the EMPTY set (a hart that has not
      run an instruction holds no locks).  [iv] arbitrary. *)
-  Lemma cpu_own_init_boot (p : mword 64) (nv iv : mword 32) :
+  (* [medeleg] arrives at the value [start()] left, which is the pinned
+     [IntrDefs.MEDELEG_S]; the other three cells' values are not looked at. *)
+  Lemma cpu_own_init_boot (p : mword 64) (nv iv : mword 32)
+      (sscr mdl : mword 64) :
     nv = noff_val 0 ->
+    mdl = MEDELEG_S ->
     a_cpu_noff cid_word ↦₄ nv -∗
     a_cpu_int cid_word ↦₄ iv -∗
     intr_off_tok -∗
     cur_proc p -∗
     lk_auth cpu_id ∅ -∗
+    sscratch ↦ᵣ sscr -∗
+    medeleg ↦ᵣ□ mdl -∗
+    mstateen0 ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
+    sstateen0 ↦ᵣ□ (mword_of_int 0 : mword 32) -∗
     cpu_own 0 false p false ∅.
   Proof.
-    intros ->. iIntros "Hnoff Hint Htok Hproc Hlk".
+    intros -> ->. iIntros "Hnoff Hint Htok Hproc Hlk Hssc Hmdl Hmse Hsse".
     iSplitR "Htok"; [| iApply (intr_count_init_off with "Htok") ].
-    iSplitR "Hlk";
-      [| iApply (cpu_locks_lvl_intro 0 ∅); [ rewrite size_empty; lia
-         | iApply (cpu_locks_intro_empty with "Hlk") ] ].
-    iSplitR. { iPureIntro. vm_compute. reflexivity. }
-    iFrame "Hnoff Hproc". iExists iv. iExact "Hint".
+    iSplitR "Hlk Hssc Hmdl Hmse Hsse".
+    { iSplitR. { iPureIntro. vm_compute. reflexivity. }
+      iFrame "Hnoff Hproc". iExists iv. iExact "Hint". }
+    iSplitL "Hlk".
+    { iApply (cpu_locks_lvl_intro 0 ∅); [ rewrite size_empty; lia
+      | iApply (cpu_locks_intro_empty with "Hlk") ]. }
+    iSplitL "Hssc". { iExists sscr. iExact "Hssc". }
+    iFrame "Hmdl Hmse Hsse".
+  Qed.
+
+  (* THE PER-HART CSRs, IN AND OUT.  [hart_csrs] (IntrDefs.v) is a conjunct
+     of [cpu_priv], so at the DISABLED index it is inside this bundle -- and
+     that is the whole point of parking it here: the trampoline reaches
+     [sscratch] through the residue that carries [cpu_own], and the trap loop
+     hands the three pinned cells to [UserExec.user_cfg] for the user phase
+     and gets them back on the next trap.  At [b = true] the payload is in
+     [sie_arm]'s enabled arm instead, so this accessor is stated at [false]
+     like the locks one above. *)
+  Lemma cpu_own_csrs_open (n : nat) (eb : bool) (p : mword 64)
+      (lks : gset string) :
+    cpu_own n eb p false lks -∗
+    hart_csrs ∗ (hart_csrs -∗ cpu_own n eb p false lks).
+  Proof.
+    iIntros "Hh".
+    iEval (rewrite /cpu_own /cpu_hart /cpu_priv) in "Hh".
+    iDestruct "Hh" as "((Hcells & Hlks & Hcsrs) & Hcnt)".
+    iFrame "Hcsrs". iIntros "Hcsrs".
+    rewrite /cpu_own /cpu_hart /cpu_priv. iFrame "Hcells Hlks Hcsrs Hcnt".
   Qed.
 
   (* ===================================================================== *)
@@ -232,10 +263,10 @@ Section CpuOwn.
       iPureIntro. done.
     - iIntros "Hh".
       iEval (rewrite /cpu_hart /cpu_priv) in "Hh".
-      iDestruct "Hh" as "((Hcells & Hlvl) & Hcnt)".
+      iDestruct "Hh" as "((Hcells & Hlvl & Hcsrs) & Hcnt)".
       iDestruct (cpu_locks_lvl_elim with "Hlvl") as "[Hlks %Hsz]".
       iSplitR; [ iPureIntro; exact Hsz | ].
-      rewrite /cpu_hart /cpu_priv. iFrame "Hcells Hcnt".
+      rewrite /cpu_hart /cpu_priv. iFrame "Hcells Hcsrs Hcnt".
       iApply (cpu_locks_lvl_intro n lks Hsz with "Hlks").
   Qed.
 
@@ -263,11 +294,11 @@ Section CpuOwn.
   Proof.
     iIntros "Hh".
     iEval (rewrite /cpu_hart /cpu_priv) in "Hh".
-    iDestruct "Hh" as "((Hcells & Hlvl) & Hcnt)".
+    iDestruct "Hh" as "((Hcells & Hlvl & Hcsrs) & Hcnt)".
     iDestruct (cpu_locks_lvl_elim with "Hlvl") as "[Hlks %Hsz]".
     iFrame "Hlks". iSplitR; [ iPureIntro; exact Hsz | ].
     iIntros (lks' Hsz') "Hlks".
-    rewrite /cpu_own /cpu_hart /cpu_priv. iFrame "Hcells Hcnt".
+    rewrite /cpu_own /cpu_hart /cpu_priv. iFrame "Hcells Hcsrs Hcnt".
     iApply (cpu_locks_lvl_intro n lks' Hsz' with "Hlks").
   Qed.
 

@@ -867,7 +867,7 @@ Section ProofProcFreepagetable.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3).
     assert (Hsp0up : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))
                      = sp0).
-    { rewrite /spd /sp0 po_addv_assoc.
+    { rewrite /spd /sp0 add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6)))
                     = mword_of_int 0)

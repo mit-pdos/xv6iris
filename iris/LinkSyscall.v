@@ -34,23 +34,41 @@ Require Import RegFile.
    typeclass-sweep traps). *)
 Require Import WpLock FdSlots IrefSlots.
 Require Import FileInvDefs.
+Require Import BioInv.
+Require Import SpecFileclose.
+Require Import KallocInv.
+Require Import DiskPtsto DiskInv.
+Require Import WpUart.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import InodeRegion.
 Require Import ProcInv.
 Require Import SpecSyscall.
 Require Import ProcAvail.
 
 Module Syscall : SYSCALL.
   (* hart-free, as the interface requires -- see SpecSyscall's note on
-     [syscall_env]: usertrap frames this across [true]-indexed steps. *)
+     [syscall_env]: usertrap frames this across [true]-indexed steps.
+     [emp] remains an honest stand-in even after the five shared families
+     moved out to explicit parameters (see SpecSyscall.v's header): what is
+     left inside [syscall_env] is the icache/inode-region invariants, the
+     superblock cells and [bitmap_res] -- still entirely unassumed here. *)
   Definition syscall_env
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId}
     (γf : gname) (pj : mword 64) : iProp Σ := emp%I.
 
   Axiom wp_syscall_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+      (bn : bio_names) (fn : fclose_names) (us : gset Z)
+      (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl m av pid V lks.
+      wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
 End Syscall.

@@ -92,7 +92,7 @@ Section UvInterruptBranch.
       (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile)
       (M : gmap Z (bv 8))
       (mst : mword 64) (mi : bool) (misa0 : type_of_register misa) (elpv : mword 1)
-      (meip seip : mword 1) :
+      (mip_v : mword 64) (meip seip : mword 1) :
     user_mstatus_ok ms_v ->
     eq_vec (_get_Misa_S misa0) ('b"1") = true ->
     eq_vec elpv (landing_pad_bits_backwards LP_EXPECTED) = false ->
@@ -103,12 +103,12 @@ Section UvInterruptBranch.
     register_lookup elp σ.(sregs) = elpv ->
     register_lookup misa σ.(sregs) = misa0 ->
     register_lookup PC σ.(sregs) = va ->
-    register_lookup mip σ.(sregs) = uc_mip C ->
+    register_lookup mip σ.(sregs) = mip_v ->
     register_lookup sig_meip σ.(sregs) = meip ->
     register_lookup sig_seip σ.(sregs) = seip ->
     register_lookup mie σ.(sregs) = uc_mie C ->
     register_lookup mideleg σ.(sregs) = uc_mideleg C ->
-    u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C) = Some (i, Supervisor) ->
+    u_dispatch mip_v meip seip (uc_mie C) (uc_mideleg C) = Some (i, Supervisor) ->
     mstate_interp σ -∗
     (minstret ↦ᵣ mst) -∗ (R_bool minstret_increment ↦ᵣ mi) -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -142,7 +142,7 @@ Section UvInterruptBranch.
     assert (Hdisp_a : exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
                       = Some (Some (i, Supervisor), set_reg σ (R_bool minstret_increment) b)).
     { rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
-                 (uc_mip C) (uc_mie C) (uc_mideleg C) meip seip
+                 mip_v (uc_mie C) (uc_mideleg C) meip seip
                  ltac:(rewrite exec_currentlyEnabled_S; rewrite (T misa _ Lmisa eq_refl);
                        rewrite HmisaS; reflexivity)
                  (T mip _ Lmip eq_refl) (T sig_meip _ Lmeip eq_refl)
@@ -227,7 +227,7 @@ Section UvStepEngine.
        utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
        umem pt M -∗ user_cfg C -∗
        mstate_interp σ -∗ minstret_inv_body -∗
-       |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
+       |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
           ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
           ▷ (mstate_interp s' ∗ minstret_inv_body ∗
              WP (Loop : expr riscv_lang)))%I.
@@ -252,7 +252,7 @@ Section UvStepEngine.
     iDestruct "Hamb" as "(#Hhw & #Hmin & #Hwinv)".
     iDestruct "Hregs" as (ms_v sc_v stval_v sepc_v)
       "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc)".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) with "Hmin").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN) with "Hmin").
     iIntros (σ) "Hint Hbody".
     (* borrow the wires for this step *)
     iInv "Hwinv" as ">Hwbody" "Hclosew".
@@ -260,8 +260,14 @@ Section UvStepEngine.
     iDestruct (big_sepS_delete _ _ cpu_id with "Hwires") as "[[Hseip Hmeip] Hwrest]";
       [ apply elem_of_fin_to_set |].
     set (meip := meipf cpu_id). set (seip := seipf cpu_id).
+    (* ... and borrow [mip] from [clock_inv] the same way: the clock tick
+       writes it, so no frame may own it across a step (UserExec.ucfg) *)
+    iPoseProof "Hmin" as "#Hmin'".
+    iDestruct "Hmin'" as "#(_ & Hclock & _)".
+    iMod (clock_mip_acc (⊤ ∖ ↑minstretN ∖ ↑wireN) ltac:(solve_ndisj) with "Hclock")
+      as (mip_v) "[Hmip Hclosec]".
     iDestruct "Hint" as "[Hreg [Hmem Hdev]]".
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hcfgrest)".
     iPoseProof "Hhw" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & #Help & #Hsenv & %HmisaS & _ & _ & _ & _ & _ & _ & %Help_ne & _)".
     iDestruct (reg_valid_dq with "Hreg Hmeip") as %Lmeip.
@@ -278,14 +284,14 @@ Section UvStepEngine.
     iDestruct (reg_valid_dq with "Hreg Hpc") as %Lpc.
     iAssert (mstate_interp σ) with "[Hreg Hmem Hdev]" as "Hint".
     { iFrame "Hreg Hmem Hdev". }
-    iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hcfgrest". }
-    destruct (u_dispatch (uc_mip C) meip seip (uc_mie C) (uc_mideleg C)) as [[i p]|] eqn:Hd.
+    iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hcfgrest]" as "Hcfg".
+    { iFrame "Hstvec Hmie Hmdl Hmedl Hcfgrest". }
+    destruct (u_dispatch mip_v meip seip (uc_mie C) (uc_mideleg C)) as [[i p]|] eqn:Hd.
     - (* ---- a pending delegated interrupt: absorb it ---- *)
       pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
       iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (uv_interrupt_branch C pt (⊤ ∖ ↑minstretN ∖ ↑wireN) σ i
-              ms_v sc_v stval_v sepc_v pc m M mst mi misa0 elp0 meip seip
+      iMod (uv_interrupt_branch C pt (⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN) σ i
+              ms_v sc_v stval_v sepc_v pc m M mst mi misa0 elp0 mip_v meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd
               with "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
@@ -299,6 +305,7 @@ Section UvStepEngine.
         iApply ("IH" $! CID' with "Hcg Hpc' Hobl"). }
       iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
       iNext. iDestruct "Hrest" as "(Hint & Hbody & HWP)".
+      iMod ("Hclosec" with "Hmip") as "_".
       iMod ("Hclosew" with "[Hseip Hmeip Hwrest]") as "_".
       { iNext. iExists seipf, meipf.
         iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
@@ -316,7 +323,7 @@ Section UvStepEngine.
         { intros r v Hv Hne. rewrite ?sregs_set_reg.
           rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
         rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
-                   (uc_mip C) (uc_mie C) (uc_mideleg C) meip seip
+                   mip_v (uc_mie C) (uc_mideleg C) meip seip
                    ltac:(rewrite exec_currentlyEnabled_S; rewrite (Tb misa _ Lmisa eq_refl);
                          rewrite HmisaS; reflexivity)
                    (Tb mip _ Lmip eq_refl) (Tb sig_meip _ Lmeip eq_refl)
@@ -329,6 +336,7 @@ Section UvStepEngine.
         as (s') "[%Hexec Hrest]".
       iModIntro. iExists s'. iSplitR. { iPureIntro. exact Hexec. }
       iNext. iDestruct "Hrest" as "(Hint & Hbody & HWP)".
+      iMod ("Hclosec" with "Hmip") as "_".
       iMod ("Hclosew" with "[Hseip Hmeip Hwrest]") as "_".
       { iNext. iExists seipf, meipf.
         iApply (big_sepS_delete _ _ cpu_id); [ apply elem_of_fin_to_set |].
@@ -680,7 +688,7 @@ Section UvRetirePost.
        nextPC ↦ᵣ uv_next jt (add_vec_int pc k) -∗
        gpr_file (uv_upd m wr) -∗
        WP (Loop : expr riscv_lang)) -∗
-    |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
+    |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
          WP (Loop : expr riscv_lang)).
@@ -817,7 +825,7 @@ Section UvRetireFunnel.
     iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmse & Hsse)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
     iDestruct (reg_valid_dq with "Hreg Hmse") as %Lmse.
@@ -831,8 +839,8 @@ Section UvRetireFunnel.
     iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
     subst misa0.
     iAssert (user_cfg C)
-      with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
+      with "[Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse]" as "Hcfg".
+    { iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
     (* ---- the minstret prelude: minstret_increment := should_inc ---- *)
     destruct (exec_should_inc_minstret_Some
                 (register_lookup cur_privilege sg.(sregs)) sg) as [b Hsi].
@@ -1079,7 +1087,7 @@ Section UvEcallPost.
     umem pt M -∗ user_cfg C -∗
     minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ b -∗
     Ψ (uint (m !!! Regidx a7_idx)) m pc M -∗
-    |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
+    |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
          WP (Loop : expr riscv_lang)).
@@ -1205,7 +1213,7 @@ Section UvEcall.
     iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
     iDestruct (reg_valid_dq with "Hreg Hsc") as %Lsc.
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmse & Hsse)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
     iDestruct (reg_valid_dq with "Hreg Hstvec") as %Lstvec.
     iDestruct (reg_valid_dq with "Hreg Hmedl") as %Lmedl.
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
@@ -1221,8 +1229,8 @@ Section UvEcall.
     iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
     subst misa0.
     iAssert (user_cfg C)
-      with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
+      with "[Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse]" as "Hcfg".
+    { iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
     destruct (exec_should_inc_minstret_Some
                 (register_lookup cur_privilege sg.(sregs)) sg) as [b Hsi].
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".

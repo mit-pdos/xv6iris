@@ -342,7 +342,7 @@ Section ProofArgraw.
       by (rewrite /T3 upd_ne; [exact HT2sp | vm_compute; discriminate]).
     (* +0x32: c.addi16sp sp,32 -- the frame pop *)
     assert (Hup : add_vec (pa_stk sp0 4) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       assert (HAB : add_vec (mword_of_int (-8 * 4)%Z : mword 64)
                             (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).

@@ -211,7 +211,8 @@ Definition reset_vector : mword 64 := SailStdpp.Values.mword_of_int 0x80000000.
 (* NOT HERE, on purpose -- every one of these is DERIVED by [init_model] over *)
 (* arbitrary garbage ([BootReset.exec_init_model]): PC, nextPC,               *)
 (* cur_privilege, hart_state, misa's extension bits, elp, mcause, the vector  *)
-(* CSRs, the stateen family, the TLB.  And pmpcfg is NOT here either -- the    *)
+(* CSRs, the M-mode stateen four, the TLB.  (The S-mode [sstateen0] IS here:  *)
+(* [reset_stateen] writes mstateen0..3 and nothing else.)  And pmpcfg is NOT here either -- the    *)
 (* spec's own [reset_pmp] establishes what [reset_regs] asks of it            *)
 (* ([pmp_all_off]), per entry, over an arbitrary power-on vector              *)
 (* ([BootReset.exec_reset_pmp]).  THIS LIST IS THEREFORE THE WHOLE OF WHAT A  *)
@@ -244,7 +245,12 @@ Definition board_regs (pma : list PMA_Region) : M unit :=
   write_reg mideleg (SailStdpp.Values.mword_of_int 0) >>
   (* senvcfg: like mseccfg/menvcfg, [reset_sys] never touches it, so its
      power-on value is a board obligation too -- see the bullet below. *)
-  write_reg senvcfg (SailStdpp.Values.mword_of_int 0).
+  write_reg senvcfg (SailStdpp.Values.mword_of_int 0) >>
+  (* sstateen0: the spec's [reset_stateen] zeroes the M-mode four
+     (mstateen0..3) and STOPS, so the S-mode word is a board obligation on
+     the same footing as the three above.  Its M-mode sibling [mstateen0] is
+     NOT here, because [reset_stateen] does establish that one. *)
+  write_reg sstateen0 (SailStdpp.Values.mword_of_int 0 : mword 32).
 
 Definition board_init (hid : mword 64) (pma : list PMA_Region) : M unit :=
   board_wired hid >> board_regs pma.

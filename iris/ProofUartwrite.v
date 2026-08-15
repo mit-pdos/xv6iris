@@ -141,7 +141,7 @@ Lemma uw_slot_bridge (X : mword 64) (o : mword 64) (k : nat) :
   add_vec (mword_of_int (- (8 * Z.of_nat 10%nat))) o = mword_of_int (- (8 * Z.of_nat k)) ->
   add_vec (pa_stk X 10%nat) o = pa_stk X k.
 Proof.
-  intro H. unfold pa_stk, add_vec_int. rewrite po_addv_assoc H. reflexivity.
+  intro H. unfold pa_stk, add_vec_int. rewrite add_vec_assoc H. reflexivity.
 Qed.
 
 (* the signed comparisons, on literal counts (pipewrite's [pw_geb_s0]). *)
@@ -638,7 +638,7 @@ Section UwBodies.
     { iApply (uw_frame_stack_own sp0 m0 with "Hsv Hs10"). }
     assert (Hpopv : add_vec (E9 !!! Regidx csp_rs1)
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))) = sp0).
-    { rewrite HE9sp /spd. unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+    { rewrite HE9sp /spd. unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
       rewrite (_ : add_vec (mword_of_int (- (8 * Z.of_nat 10%nat)) : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6)))
                    = (mword_of_int 0 : mword 64)); [| pcw].

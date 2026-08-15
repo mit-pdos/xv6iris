@@ -1102,5 +1102,17 @@
   "procdump",
   "pdi_",
   2
+ ],
+ [
+  "CodeForkret.v",
+  "forkret",
+  "fkr_",
+  2
+ ],
+ [
+  "CodeSyscall.v",
+  "syscall",
+  "syci_",
+  2
  ]
 ]

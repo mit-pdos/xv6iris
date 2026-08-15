@@ -92,7 +92,7 @@ Lemma kfk_frm1 (X : mword 64) :          (* 56(sp) : saved ra *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000")))
   = pa_stk X 1.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
@@ -100,7 +100,7 @@ Lemma kfk_frm2 (X : mword 64) :          (* 48(sp) : saved s0 *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))
   = pa_stk X 2.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
@@ -108,7 +108,7 @@ Lemma kfk_frm3 (X : mword 64) :          (* 40(sp) : saved s1 *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
   = pa_stk X 3.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
@@ -116,7 +116,7 @@ Lemma kfk_frm4 (X : mword 64) :          (* 32(sp) : saved s2 *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
   = pa_stk X 4.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
@@ -124,7 +124,7 @@ Lemma kfk_frm5 (X : mword 64) :          (* 24(sp) : saved s3 *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
   = pa_stk X 5.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
@@ -132,7 +132,7 @@ Lemma kfk_frm6 (X : mword 64) :          (* 16(sp) : saved s4 *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
   = pa_stk X 6.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
@@ -140,7 +140,7 @@ Lemma kfk_frm7 (X : mword 64) :          (*  8(sp) : saved s5 *)
   add_vec (pa_stk X 8) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
   = pa_stk X 7.
 Proof.
-  unfold pa_stk, add_vec_int. rewrite po_addv_assoc.
+  unfold pa_stk, add_vec_int. rewrite add_vec_assoc.
   apply f_equal. apply bv_eq; vm_compute; reflexivity.
 Qed.
 

@@ -161,12 +161,31 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
     ⌜ud_data pt' = ud_pas pt'⌝ -∗
     ⌜proc_pt_wf pt'⌝ -∗
     ⌜and_vec MIE_S (not_vec mdv0) = zeros' 64⌝ -∗
+    (* THE EXIT mstatus FACTS, straight off [usertrap_post].  Without them a
+       caller holds [mstatus ↦ᵣ sret_ms5 ms'] at a wholly abstract [ms'] and
+       cannot re-establish [UserExec.user_mstatus_ok] -- so it cannot rebuild
+       [user_inv] for the next round, which is the whole point of the post.
+       [usertrap_ret_ms] carries exactly the six pins
+       [user_mstatus_ok_sret_ms5] consumes (SXL / MXR / FS / VS / TVM / TSR),
+       plus the two the sret itself needs. *)
+    ⌜usertrap_ret_ms ms'⌝ -∗
+    ⌜upt_acc_wf (ud_um pt')⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ User -∗
     mstatus ↦ᵣ sret_ms5 ms' -∗
     mie ↦ᵣ MIE_S -∗
     mideleg ↦ᵣ mdv0 -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
+    (* THE VECTOR, and it is a ROUND TRIP rather than a parked cell.  [stvec]
+       is not free: while the kernel runs it must point at kernelvec to take
+       interrupts, so it is owned there by [IntrDefs.sie_cap] (inside
+       [intr_res], which usertrap's [csrw stvec,kernelvec] at +0x1e folds and
+       prepare_return's [csrci] unfolds).  uservec therefore may NOT hold the
+       cell back across its call -- usertrap NEEDS it, loose, and takes it as
+       its own premise -- so what comes back here is what [usertrap_post]
+       hands over at the resuming hart, at [TRAMPOLINE] again.  From there
+       the trap loop puts it into the next round's [UserExec.user_cfg]. *)
+    stvec ↦ᵣ (mword_of_int TRAMPOLINE : mword 64) -∗
     senvcfg ↦ᵣ□ (mword_of_int 0 : mword 64) -∗
     (* usertrap never touches these after its own return -- held loose,
        framed the whole way through userret, and handed back unchanged *)
@@ -194,6 +213,17 @@ Definition uservec_post `{!riscvGS Σ, !sieG Σ}
        claude-notes/completed/usertrap.md.  Folding this bundle into the
        user-mode loop is USER-module work, not this spec's. *)
     URes pt' vksp -∗
+    (* THE TWO AMBIENT-HART PERSISTENT BUNDLES, AT THE RESUMING HART.  Both
+       are per-hart -- [hw_config]'s cells and the body of [minstret_inv]'s
+       invariant are this hart's -- so a caller's pre-crossing copy is a
+       DIFFERENT resource from the one it needs after usertrap's park, and
+       the two print identically.  [usertrap_post] hands them back for
+       exactly this reason (see its own note); passing them on costs nothing
+       to prove and is what lets the next round of the trap loop reach
+       [SpecUser.wp_user_exec_closed], which takes both.  [wire_inv] needs no
+       such treatment: it is all-harts (WireInv.v) and rides for free. *)
+    hw_config -∗
+    minstret_inv -∗
     WP (Loop : expr riscv_lang)).
 Global Typeclasses Opaque uservec_post.
 
@@ -207,7 +237,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
        HART RESUMED.  Same shape, same reason, as [wp_usertrap_body]'s [R]. *)
     (URes : CpuId -> uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ) (kroot : mword 44)
-    (j : nat) (sscr0 : mword 64) (vksp : mword 64) :=
+    (j : nat) (vksp : mword 64) :=
   (* stvec points at the trampoline base *)
   uc_stvec C = mword_of_int TRAMPOLINE ->
   (* the kernel owns the config cells outright at this join (same fact the
@@ -272,8 +302,11 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ}
   kmap_at tramp_vpn tramp_ppn KP_rx -∗
   (* the machine, exactly as the trap delivers it *)
   user_trap_frame C pt Rut -∗
-  (* the kernel-side resources parked while user code ran *)
-  sscratch ↦ᵣ sscr0 -∗
+  (* the kernel-side resources parked while user code ran.  [sscratch] is
+     NOT among them: it lives in [IntrDefs.hart_csrs], inside the residue
+     below, and the proof borrows it from there ([usertrap_res_tf_csrs_open])
+     -- a separate premise would be BOTH unsatisfiable (the residue owns the
+     cell, so a caller cannot hold a second one) and unmintable. *)
   kpt_inv kroot -∗
   (* usertrap's own kernel-internal bundle, for THIS trap round -- the ONE
      owner of the trapframe (SpecUsertrap.v's header), opened once at the
@@ -306,7 +339,7 @@ Module Type USERVEC.
              !kallocG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (C : ucfg) (pt : uptd) (Rut : uptd -> iProp Σ)
-      (kroot : mword 44) (j : nat) (sscr0 : mword 64) (vksp : mword 64),
+      (kroot : mword 44) (j : nat) (vksp : mword 64),
       (* THE BARE RESIDUE, not [usertrap_res] and not even the parked form.
          [usertrap_res] and this spec's own [user_trap_frame] premise claim
          THE SAME FOUR RESOURCES -- satp/tlb, the user page-table tree, the
@@ -321,5 +354,5 @@ Module Type USERVEC.
          the same two moves in reverse.  See
          claude-notes/projects/uservec.md. *)
       wp_uservec_pt_body (fun h : CpuId => usertrap_res_bare (CID := h))
-        C pt Rut kroot j sscr0 vksp.
+        C pt Rut kroot j vksp.
 End USERVEC.

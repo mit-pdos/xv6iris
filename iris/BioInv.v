@@ -77,6 +77,7 @@ Require Import SleepLock.
 Require Import BufOwn.
 Require Import DiskPtsto.
 Require Import BcacheInv.
+Require Export BioDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -95,70 +96,6 @@ Definition brefcnt (k : nat) : Arch.pa := pa_add (bpa k) 64.
 (* ------------------------------------------------------------------ *)
 (*  The reference-count algebra (FileInv's Arc algebra, verbatim)       *)
 (* ------------------------------------------------------------------ *)
-
-Definition bioUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
-
-(* the finite reference-slot supply that bounds every count (FdSlots.v's
-   conservation recipe, private to the bio layer).  1024 is comfortable --
-   the honest bound is a handful of references per process plus the log's
-   pinned blocks -- and far below 2^31. *)
-Definition BSLOTS : nat := 1024%nat.
-Definition bioslotUR : ucmra := authUR natUR.
-
-Class bioG (Σ : gFunctors) := BioG {
-  bio_inG :: inG Σ bioUR;
-  bioslot_inG :: inG Σ bioslotUR;
-}.
-Definition bioΣ : gFunctors := #[GFunctor bioUR; GFunctor bioslotUR].
-Global Instance subG_bioΣ {Σ} : subG bioΣ Σ -> bioG Σ.
-Proof. solve_inG. Qed.
-
-(* every ghost name of the layer, as one record (uart_names precedent):
-   the bcache spinlock's gname, the count authority, the slot supply, and
-   per buffer the inner-sleeplock pair (γl, γsl), the checkout token's
-   gname and the recycle token's gname. *)
-Record bio_names := MkBioNames {
-  bn_lk   : gname;                (* the "bcache" spinlock               *)
-  bn_auth : gname;                (* ● (gmap nat (frac * positive))      *)
-  bn_slot : gname;                (* the bslot supply                    *)
-  bn_slk  : nat -> gname * gname; (* buffer k's sleeplock (γl, γsl)      *)
-  bn_own  : nat -> gname;         (* buffer k's checkout token           *)
-  bn_mid  : nat -> gname;         (* buffer k's recycle token            *)
-}.
-
-(* THE CLIENT VIEW the whole layer is parametric over: the disk ghost the
-   covered blocks' [disk_block] fragments live at, the ONE covered device,
-   the covered block-number range, and the two opaque content payloads.
-   The log layer instantiates the payloads with its logged-view ghost
-   halves (claude-notes/design/fs-log.md); bio itself never opens them.
-   [bv_cov] must not contain 0 (binit leaves every buffer's blockno cell
-   at 0) -- [bio_init] takes that as a premise. *)
-Record bio_view (Σ : gFunctors) := MkBioView {
-  bv_gd    : disk_names;
-  bv_dev   : SailStdpp.Values.mword 32;
-  bv_cov   : gset Z;
-  bv_clean : Z -> list (bv 8) -> iProp Σ;
-  bv_dirty : Z -> list (bv 8) -> iProp Σ;
-  (* the payloads must be TIMELESS: they ride the escrow, whose every open
-     happens inside a store's atomic update with no step left to absorb a
-     ▷ (the disk_inv precedent -- completed/crash.md M5b).  No real client
-     payload is hurt: "bs is the logical content" is ghost state. *)
-  bv_clean_tl : forall b bs, Timeless (bv_clean b bs);
-  bv_dirty_tl : forall b bs, Timeless (bv_dirty b bs);
-}.
-Arguments bv_gd {Σ} _.
-Arguments bv_dev {Σ} _.
-Arguments bv_cov {Σ} _.
-Arguments bv_clean {Σ} _.
-Arguments bv_dirty {Σ} _.
-Arguments bv_clean_tl {Σ} _ _ _.
-Arguments bv_dirty_tl {Σ} _ _ _.
-Arguments MkBioView {Σ} _ _ _ _ _ _ _.
-
-Global Instance bio_view_clean_timeless {Σ} (V : bio_view Σ) b bs :
-  Timeless (bv_clean V b bs) := bv_clean_tl V b bs.
-Global Instance bio_view_dirty_timeless {Σ} (V : bio_view Σ) b bs :
-  Timeless (bv_dirty V b bs) := bv_dirty_tl V b bs.
 
 (* the count component's [⋅] IS [Pos.add] (FileInv.pos_op_add, restated so
    this file does not pull the whole file table in). *)
@@ -294,8 +231,6 @@ Section BioInv.
   Qed.
 
   (* ---- the slot supply ---- *)
-  Definition bslots (bn : bio_names) (n : nat) : iProp Σ :=
-    own (bn_slot bn) (◯ n).
   Definition bslot (bn : bio_names) : iProp Σ := bslots bn 1.
   Definition bslots_auth (bn : bio_names) : iProp Σ :=
     own (bn_slot bn) (● BSLOTS).

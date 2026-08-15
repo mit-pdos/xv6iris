@@ -818,7 +818,7 @@ Section VtEpilogue.
     set (E6 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E5 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E5).
     assert (Hsp0up : add_vec spd (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = sp0).
-    { rewrite /spd po_addv_assoc.
+    { rewrite /spd add_vec_assoc.
       assert (HAB : add_vec (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                             (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))) = mword_of_int 0)
         by (apply bv_eq; vm_compute; reflexivity).
@@ -1569,7 +1569,7 @@ Lemma vt_addv_pa (p : mword 64) (X Y : mword 64) (k : nat) :
   add_vec X Y = (mword_of_int (Z.of_nat k) : mword 64) ->
   add_vec (add_vec X p) Y = (pa_add p k : SailStdpp.Values.mword 64).
 Proof.
-  intro H. rewrite (add_vec64_comm X p) po_addv_assoc H.
+  intro H. rewrite (add_vec64_comm X p) add_vec_assoc H.
   unfold pa_add, add_vec_int. reflexivity.
 Qed.
 

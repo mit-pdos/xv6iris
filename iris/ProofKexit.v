@@ -265,17 +265,17 @@ Section KexitPro.
     iDestruct "C3" as (v3) "Hc3". iDestruct "C4" as (v4) "Hc4".
     iDestruct "C5" as (v5) "Hc5". iDestruct "C6" as (v6) "Hc6".
     assert (Hb5 : pa_stk sp0 1 = kx_fcell spF 5).
-    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb4 : pa_stk sp0 2 = kx_fcell spF 4).
-    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb3 : pa_stk sp0 3 = kx_fcell spF 3).
-    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb2 : pa_stk sp0 4 = kx_fcell spF 2).
-    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb1 : pa_stk sp0 5 = kx_fcell spF 1).
-    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     assert (Hb0 : pa_stk sp0 6 = kx_fcell spF 0).
-    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite po_addv_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    { unfold kx_fcell, spF, pa_stk, add_vec_int. rewrite add_vec_assoc. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hb5) in "Hc1". iEval (rewrite Hb4) in "Hc2". iEval (rewrite Hb3) in "Hc3".
     iEval (rewrite Hb2) in "Hc4". iEval (rewrite Hb1) in "Hc5". iEval (rewrite Hb0) in "Hc6".
     assert (Hpp02 : add_vec_int (mword_of_int KernelSyms.kexit : mword 64) 2 = mword_of_int (KX + 0x02)) by (apply bv_eq; vm_compute; reflexivity).

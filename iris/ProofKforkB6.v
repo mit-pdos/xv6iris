@@ -416,7 +416,7 @@ Section KforkPrologue.
            freeproc's [fp_rest] wants exactly that and nothing sharper. *)
         (∃ (ks : mword 64) (rest : list (mword 64)),
            ⌜length rest = 12%nat⌝ ∗
-           ProcInv.is_kstack npa ks ∗
+           ProcDefs.is_kstack npa ks ∗
            SwtchCtx.ctx_cells (p_context npa)
              (* [SpecAllocproc.forkret_pc]; [SpecForkretPark.v] duplicates the
                 constant rather than importing it, so B5's premise names the

@@ -124,6 +124,9 @@ Section ProofEntry.
     - exact Hsatpf.
     - exact (st_pmp_open pmpcfg0 pmpaddr00 Hpmp).
     - exact (ti_mcen1_TM mcounteren0).
+    - (* [legalize_medeleg] ignores its old-value argument, so the value
+         start() wrote IS the closed constant. *)
+      reflexivity.
   Qed.
 
 End ProofEntry.

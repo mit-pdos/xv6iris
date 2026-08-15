@@ -48,7 +48,8 @@ Require Import RiscvLang.   (* [GenId]/[gen_id], for the seam section's permit *
 Require Import VirtioModel.
 Require Import RiscvPtsto.
 Require Import WpLock.
-Require Import LogInv.
+Require Export BioDefs.  (* preserve [BSIZE] for existing importers *)
+Require Import LogDefs.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -73,8 +74,6 @@ Local Open Scope Z_scope.
 (* When the [state_interp] conjunct lands, [fs_blocks] moves down to       *)
 (* VirtioModel.v verbatim (it is iris-free and uses only [disk_read]).     *)
 (* ---------------------------------------------------------------------- *)
-
-Definition BSIZE : nat := 1024%nat.     (* xv6 kernel/fs.h *)
 
 Definition fs_blocks (dk : Z -> bv 8) : Z -> list (bv 8) :=
   fun b => disk_read dk (b * Z.of_nat BSIZE) BSIZE.
@@ -121,7 +120,7 @@ Qed.
 (* 1b. The FULL header decode.                                             *)
 (*                                                                         *)
 (* [struct logheader] is [int n; int block[LOGBLOCKS];] -- a run of         *)
-(* little-endian 32-bit words.  [LogInv.hdr_n] already decodes the FIRST    *)
+(* little-endian 32-bit words.  [LogDefs.hdr_n] already decodes the FIRST   *)
 (* one (all stages 1-3 ever needed); this is the whole thing, and           *)
 (* [hdr_dec_n] is the bridge that says the two agree on it.                 *)
 (*                                                                         *)
@@ -142,7 +141,7 @@ Definition hdr_dec (bs : list (bv 8)) : nat * list Z :=
 Lemma le_word_0 (bs : list (bv 8)) : le_word bs 0 = hdr_n bs.
 Proof. rewrite /le_word /hdr_n Nat.mul_0_r drop_0 //. Qed.
 
-(* THE BRIDGING LEMMA: the full decoder's [n] IS [LogInv.hdr_n]. *)
+(* THE BRIDGING LEMMA: the full decoder's [n] IS [LogDefs.hdr_n]. *)
 Lemma hdr_dec_n (bs : list (bv 8)) : Z.of_nat (hdr_dec bs).1 = hdr_n bs.
 Proof.
   rewrite /hdr_dec /= le_word_0. apply Z2Nat.id, hdr_n_nonneg.
@@ -159,7 +158,7 @@ Proof. intros Hn. rewrite /hdr_dec le_word_0 Hn //. Qed.
 (* ---------------------------------------------------------------------- *)
 (* 1c. The recovery relation.                                              *)
 (*                                                                         *)
-(* Stated in LogInv's own geometry vocabulary ([log_hdr_bno],               *)
+(* Stated in LogDefs' own geometry vocabulary ([log_hdr_bno],              *)
 (* [log_slot_bno], [log_region_set]), so the log proofs and this file       *)
 (* cannot drift apart on where the log lives.                              *)
 (* ---------------------------------------------------------------------- *)

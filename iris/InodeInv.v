@@ -61,6 +61,7 @@ Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Export IcacheRef.   (* the in-core scalar fields + the reference *)
+Require Export InodeDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
@@ -473,9 +474,6 @@ Qed.
    Spec file must not depend on another function's Spec: [SpecReadi.v] used to
    require [SpecWritei.v] for this definition alone, which coupled readi's
    contract to writei's. *)
-Definition file_byte (data : nat -> list (bv 8)) (k : nat) : bv 8 :=
-  data (k `div` BSIZE)%nat !!! (k `mod` BSIZE)%nat.
-
 (* Two [data]s that agree block by block agree byte by byte -- the step every
    "nothing else moved" argument takes. *)
 Lemma file_byte_block (data data' : nat -> list (bv 8)) (k : nat) :

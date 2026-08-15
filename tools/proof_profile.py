@@ -10,7 +10,9 @@ where the wall-clock goes:
     lines that `make TIMED=1` prints (this is the number that gates the build:
     it INCLUDES the async `Qed` rocqworker, which `coqc -time` does not);
   * longest dependency chains  -- the critical path(s) through the require DAG
-    (from coqdep's `.CoqMakefile.d`), each node weighted by its per-file wall;
+    (from coqdep's `.CoqMakefile.d`), each node weighted by its per-file wall
+    and each edge annotated with the weak-import closure ratio computed from
+    the build's `.glob` files;
   * parallelism over time      -- a step plot (SVG, no external deps) of how many
     iris compiles are in flight at each instant, reconstructed from `.vo` mtimes
     (finish) and the per-file wall (start = finish - wall).
@@ -31,10 +33,13 @@ missing inputs degrade to a partial report rather than a crash.
 
 import argparse
 import glob
+import importlib.util
 import os
 import re
 import sys
 from collections import defaultdict
+
+WEAK_IMPORT_FRACTION = 0.10
 
 # ---------------------------------------------------------------------------
 # parsing
@@ -170,6 +175,64 @@ def path_to(end, pred):
         cur = pred.get(cur)
     chain.reverse()
     return chain
+
+
+def load_weak_import_annotations(iris_dir):
+    """Run the canonical weak-import analyzer and return edge annotations.
+
+    The analyzer remains a standalone script under ``iris/`` because it is
+    useful independently of CI.  Loading it here keeps the profiler's ratios,
+    declaration grouping, transitive-import suppression, and expected-edge
+    policy exactly aligned with that script.  Failure is informational: the
+    ordinary build profile remains available with an explanatory note.
+    """
+    script = os.path.abspath(os.path.join(iris_dir, "find_weak_imports.py"))
+    if not os.path.isfile(script):
+        return {}, "`find_weak_imports.py` was not found"
+
+    module_name = "_proof_profile_find_weak_imports"
+    iris_abs = os.path.abspath(iris_dir)
+    added_path = iris_abs not in sys.path
+    if added_path:
+        sys.path.insert(0, iris_abs)
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, script)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot load {script}")
+        module = importlib.util.module_from_spec(spec)
+        # dataclasses resolves the defining module through sys.modules while
+        # decorating the imported classes.
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        result = module.analyze(
+            iris_abs,
+            max_fraction=WEAK_IMPORT_FRACTION,
+            include_export=True,
+        )
+        annotations = {
+            edge: detail.annotation()
+            for edge, detail in result.edge_weaknesses.items()
+        }
+        note = None
+        if result.skipped_files:
+            note = (
+                f"weakness analysis skipped {len(result.skipped_files)} "
+                "file(s) with missing or stale `.glob` data"
+            )
+        return annotations, note
+    except Exception as error:  # informational report: degrade, do not fail CI
+        return {}, f"weakness analysis unavailable: {type(error).__name__}: {error}"
+    finally:
+        if added_path:
+            sys.path.remove(iris_abs)
+
+
+def chain_edge_annotation(chain, index, annotations):
+    """Annotation for ``chain[index] -> chain[index - 1]``."""
+    if index == 0:
+        return "— (chain root)"
+    edge = (chain[index], chain[index - 1])
+    return annotations.get(edge, "unknown — edge not measured")
 
 
 def offset_to_line(iris_dir, cache, fbase, off):
@@ -393,6 +456,7 @@ def main():
     real, cpu, dropped = parse_build_log(args.build_log)
     deps, targets = parse_deps(deps_path)
     stmts, n_timing = parse_timings(iris)
+    weak_annotations, weak_note = load_weak_import_annotations(iris)
 
     # ---- analyses ----
     finish, pred = critical_path(deps, targets, real)
@@ -456,11 +520,28 @@ def main():
 
     md.append("\n### Longest dependency chain (critical path)\n")
     if chain:
+        md.append(
+            "Each row after the root is a direct import from that row's file "
+            "to the previous row. Weakness is the imported declaration closure "
+            f"divided by all declarations in that previous file; **weak** means "
+            f"≤{WEAK_IMPORT_FRACTION:.0%}. `already transitive` means the direct "
+            "edge adds no serialization because another import already reaches "
+            "the same file.\n"
+        )
+        if weak_note:
+            md.append(f"_Note: {weak_note}._\n")
         rows, cum = [], 0.0
-        for n in chain:
+        for index, n in enumerate(chain):
             cum += real.get(n, 0.0)
-            rows.append([f"{real.get(n, 0.0):.1f}", f"{cum:.1f}", f"`{n}`"])
-        md.append(md_table(["wall", "cum", "file"], rows))
+            rows.append([
+                f"{real.get(n, 0.0):.1f}",
+                f"{cum:.1f}",
+                f"`{n}`",
+                chain_edge_annotation(chain, index, weak_annotations),
+            ])
+        md.append(md_table(
+            ["wall", "cum", "file", "dependency weakness"], rows
+        ))
         # other long chains: top files by their own critical depth, off this path
         others = [(finish[n], n) for n in finish if n not in onpath]
         others.sort(reverse=True)
@@ -504,9 +585,15 @@ def main():
                     f"{'  [crit]' if name in onpath else ''}\n")
         f.write("\n== critical path ==\n")
         cum = 0.0
-        for n in chain:
+        if weak_note:
+            f.write(f"weakness note: {weak_note}\n")
+        for index, n in enumerate(chain):
             cum += real.get(n, 0.0)
-            f.write(f"{real.get(n,0.0):8.2f}  cum {cum:8.2f}  {n}\n")
+            annotation = chain_edge_annotation(chain, index, weak_annotations)
+            f.write(
+                f"{real.get(n,0.0):8.2f}  cum {cum:8.2f}  {n}  "
+                f"[{annotation}]\n"
+            )
 
     print(report_md)
     return 0

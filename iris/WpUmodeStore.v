@@ -456,7 +456,7 @@ Section UvRetirePostState.
     ▷ (P -∗
        hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ npc -∗ nextPC ↦ᵣ npc -∗
        WP (Loop : expr riscv_lang)) -∗
-    |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
+    |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
          WP (Loop : expr riscv_lang)).
@@ -550,7 +550,7 @@ Section WpUmodeStore.
        PC ↦ᵣ add_vec_int pc k -∗ nextPC ↦ᵣ add_vec_int pc k -∗
        gpr_file m -∗
        WP (Loop : expr riscv_lang)) -∗
-    |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
+    |={⊤ ∖ ↑minstretN ∖ ↑wireN ∖ ↑clockN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
          WP (Loop : expr riscv_lang)).
@@ -705,7 +705,7 @@ Section WpUmodeStore.
     iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
     iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hmenv & Hsenv & Hmse & Hsse)".
+    iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmenv & Hsenv & Hmse & Hsse)".
     iDestruct (reg_valid_dq with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid_dq with "Hreg Hsenv") as %Lsenv.
     iDestruct (reg_valid_dq with "Hreg Hmse") as %Lmse.
@@ -719,8 +719,8 @@ Section WpUmodeStore.
     iDestruct (reg_valid_dq with "Hreg Help") as %Lelp.
     subst misa0.
     iAssert (user_cfg C)
-      with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse]" as "Hcfg".
-    { iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
+      with "[Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse]" as "Hcfg".
+    { iFrame "Hstvec Hmie Hmdl Hmedl Hmenv Hsenv Hmse Hsse". }
     (* ---- the minstret prelude ---- *)
     destruct (exec_should_inc_minstret_Some
                 (register_lookup cur_privilege sg.(sregs)) sg) as [b Hsi].

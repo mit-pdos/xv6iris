@@ -97,7 +97,7 @@ Section KforkB7.
      pure" rule, so this can be read off [Htfp] without losing it. *)
   Lemma kfkb7_tf_len (tfp : mword 44) (ws : list (mword 64)) :
     tf_page tfp ws -∗ ⌜length ws = TFWORDS⌝.
-  Proof. iIntros "(%Hlen & _ & _)". done. Qed.
+  Proof. rewrite /tf_page. iIntros "(%Hlen & _ & _)". done. Qed.
 
   (* =================================================================== *)
   (*  THE BLOCK.                                                          *)
