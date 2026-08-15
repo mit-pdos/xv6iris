@@ -2893,6 +2893,7 @@ Section ProofPiperead.
                   Ra5 Ra4 L8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite HL8a4 HL8a5; exact Hstill) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi60").
+        iClear "Hi34 Hi38 Hi3a Hi3c Hi40 Hi42 Hi44 Hi48 Hi4a Hi4e Hi52 Hi54 Hi58 Hi5c Hi60".
         (* THE ONE SITE IN THIS FILE THAT STILL NEEDS A REAL [iNext]: the Löb
            back edge below applies "IH" and "HEX", so the [▷] has to come off
            THOSE, not just off the goal.  Stripping [▷ sched_vc] with them is
@@ -2913,6 +2914,7 @@ Section ProofPiperead.
       iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x60)) (mword_of_int 8148 : mword 13)
                 Ra5 Ra4 L8 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HL8a4 HL8a5; exact Hstill) with "Hcg Hpc Hi60").
+      iClear "Hi34 Hi38 Hi3a Hi3c Hi40 Hi42 Hi44 Hi48 Hi4a Hi4e Hi52 Hi54 Hi58 Hi5c Hi60".
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       assert (Hw64 : add_vec_int (mword_of_int (KernelSyms.piperead + 0x60) : mword 64) 4 = mword_of_int (KernelSyms.piperead + 0x64))
         by (apply bv_eq; vm_compute; reflexivity).
@@ -2960,6 +2962,7 @@ Section ProofPiperead.
                 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")))
                 L8 (trap_res true + (av - 12))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6a").
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iClear "Hi64 Hi66 Hi68 Hi6a".
       assert (Hj84 : add_vec (mword_of_int (KernelSyms.piperead + 0x6a) : mword 64)
                        (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0"))))
                      = mword_of_int (KernelSyms.piperead + 0x84)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3029,6 +3032,7 @@ Section ProofPiperead.
                 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")))
                 W0 (trap_res true + (av - 12))%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi72").
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
+      iClear "Hi00 Hi02 Hi04 Hi06 Hi08 Hi0a Hi0c Hi0e Hi10 Hi12 Hi14 Hi16 Hi18 Hi1c Hi1e Hi20 Hi24 Hi28 Hi2c Hi30 Hi6c Hi6e Hi70 Hi72".
       assert (Hj84b : add_vec (mword_of_int (KernelSyms.piperead + 0x72) : mword 64)
                         (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0"))))
                       = mword_of_int (KernelSyms.piperead + 0x84)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3043,6 +3047,7 @@ Section ProofPiperead.
               Ra5 Ra4 W0 (trap_res true + (av - 12))%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HW0a4 HW0a5; exact Hdisp) with "Hcg Hpc Hi30").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
+    iClear "Hi00 Hi02 Hi04 Hi06 Hi08 Hi0a Hi0c Hi0e Hi10 Hi12 Hi14 Hi16 Hi18 Hi1c Hi1e Hi20 Hi24 Hi28 Hi2c Hi30".
     assert (Hd34 : add_vec_int (mword_of_int (KernelSyms.piperead + 0x30) : mword 64) 4 = mword_of_int (KernelSyms.piperead + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hd34) in "Hpc".

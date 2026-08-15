@@ -2368,6 +2368,7 @@ Section WriteiLoop.
                 ltac:(rgne; exact Hbeqz) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi8e").
       iApply bi.later_intro. iIntros (CIDa6 Hqa6) "Hcg Hpc".
+      iClear "Hi82 Hi86 Hi88 Hi8c Hi8e".
       assert (Htgtbc : add_vec (mword_of_int (WI + 0x8e) : mword 64)
                 (sign_extend' 64 (sign_extend' 13
                    (concat_vec (mword_of_int 23 : mword 8) ('b"0"))))
@@ -2447,6 +2448,7 @@ Section WriteiLoop.
                 B1 (K - 14)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgne; exact Hbeqz) with "Hcg Hpc Hi8e").
       iIntros (CIDa6 Hqa6) "Hcg Hpc".
+      iClear "Hi82 Hi86 Hi88 Hi8c Hi8e".
       assert (Hpp : add_vec_int (mword_of_int (WI + 0x8e) : mword 64) 2
                     = mword_of_int (WI + 0x90)) by pcw.
       iEval (rewrite Hpp) in "Hpc". clear Hpp.
@@ -2654,6 +2656,7 @@ Section WriteiLoop.
       iApply (wp_cmv_s_sconf (mword_of_int (WI + 0xa6)) Rs10 Ra4
                 E4 (K - 14)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia6").
       iIntros (CIDa14 Hqa14) "Hcg Hpc".
+      iClear "Hi90 Hi94 Hi98 Hi9a Hi9e Hia2 Hia6".
       set (E5 := <[Regidx Rs10 := regval_into_reg
                     (add_vec (zero_reg : mword 64) (rget E4 Ra4))]> E4).
       assert (HE5s10 : E5 !!! Regidx Rs10
@@ -2879,6 +2882,7 @@ Section WriteiLoop.
                   ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi60").
         iIntros (CIDb8 Hqb8) "Hcg Hpc".
+        iClear "Hi4c Hi50 Hi54 Hi58 Hi5a Hi5c Hi5e Hi60".
         set (D8 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (WI + 0x60) : mword 64) 4)]> D7).
         assert (Htgtec : add_vec (mword_of_int (WI + 0x60) : mword 64)
@@ -3030,6 +3034,7 @@ Section WriteiLoop.
                     ltac:(rgne; rgne; rewrite Hr0 HEs8; vm_compute; reflexivity)
                     with "Hcg Hpc Hi64").
           iIntros (CIDc1 Hqc1) "Hcg Hpc".
+          iClear "Hi64".
           assert (Hpp : add_vec_int (mword_of_int (WI + 0x64) : mword 64) 4
                         = mword_of_int (WI + 0x68)) by pcw.
           iEval (rewrite Hpp) in "Hpc". clear Hpp.
@@ -3381,6 +3386,7 @@ Section WriteiLoop.
                             apply Nat.leb_le; lia)
                       ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi7e").
             iApply bi.later_intro. iIntros (CIDc11 Hqc11) "Hcg Hpc".
+            iClear "Hi68 Hi6a Hi6e Hi70 Hi74 Hi78 Hi7c Hi7e".
             assert (Htgtbc : add_vec (mword_of_int (WI + 0x7e) : mword 64)
                       (sign_extend' 64 (mword_of_int 62 : mword 13))
                     = mword_of_int (WI + 0xbc)) by pcw.
@@ -3481,6 +3487,7 @@ Section WriteiLoop.
                             apply Nat.leb_gt; lia)
                       with "Hcg Hpc Hi7e").
             iIntros (CIDc11 Hqc11) "Hcg Hpc".
+            iClear "Hi68 Hi6a Hi6e Hi70 Hi74 Hi78 Hi7c Hi7e".
             assert (Hpp : add_vec_int (mword_of_int (WI + 0x7e) : mword 64) 4
                           = mword_of_int (WI + 0x82)) by pcw.
             iEval (rewrite Hpp) in "Hpc". clear Hpp.
@@ -3551,6 +3558,7 @@ Section WriteiLoop.
                     ltac:(rgne; rgne; rewrite Hrm1 HEs8; vm_compute; reflexivity)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64").
           iApply bi.later_intro. iIntros (CIDd1 Hqd1) "Hcg Hpc".
+          iClear "Hi64".
           assert (Htgtb0 : add_vec (mword_of_int (WI + 0x64) : mword 64)
                     (sign_extend' 64 (mword_of_int 76 : mword 13))
                   = mword_of_int (WI + 0xb0)) by pcw.
@@ -3694,6 +3702,7 @@ Section WriteiLoop.
                     ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hib8").
           iIntros (CIDd6 Hqd6) "Hcg Hpc".
+          iClear "Hib0 Hib2 Hib6 Hib8".
           set (J4 := <[Regidx Rra := regval_into_reg
                         (add_vec_int (mword_of_int (WI + 0xb8) : mword 64) 4)]> J3).
           assert (Htgtbl : add_vec (mword_of_int (WI + 0xb8) : mword 64)
@@ -3865,6 +3874,7 @@ Section WriteiLoop.
                         apply Nat.leb_le; lia)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia8").
         iApply bi.later_intro. iIntros (CIDa15 Hqa15) "Hcg Hpc".
+        iClear "Hia8 Hiac Hiae".
         assert (Htgt4c : add_vec (mword_of_int (WI + 0xa8) : mword 64)
                   (sign_extend' 64 (mword_of_int 8100 : mword 13))
                 = mword_of_int (WI + 0x4c)) by pcw.
@@ -3904,6 +3914,7 @@ Section WriteiLoop.
                   E6 (K - 14)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hiae").
         iIntros (CIDa17 Hqa17). iApply bi.later_intro. iIntros "Hcg Hpc".
+        iClear "Hia8 Hiac Hiae".
         assert (Htgt4c : add_vec (mword_of_int (WI + 0xae) : mword 64)
                   (sign_extend' 64 (sign_extend' 21
                      (concat_vec (mword_of_int 1999 : mword 11) ('b"0"))))
@@ -4881,6 +4892,7 @@ Section WriteiMain.
               U3 (K - 14)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4a").
     iIntros (CIDp17 Hqp17). iApply bi.later_intro. iIntros "Hcg Hpc".
+    iClear "Hi00 Hi02 Hi06 Hi08 Hi0a Hi0c Hi0e Hi10 Hi12 Hi14 Hi16 Hi18 Hi1a Hi1c Hi1e Hi20 Hi22 Hi26 Hi2a Hi2e Hi32 Hi34 Hi38 Hi3a Hi3c Hi3e Hi40 Hi42 Hi44 Hi48 Hi4a Hiee Hif0 Hife Hi100 Hi102 Hi104".
     assert (Htgt82 : add_vec (mword_of_int (WI + 0x4a) : mword 64)
               (sign_extend' 64 (sign_extend' 21
                  (concat_vec (mword_of_int 28 : mword 11) ('b"0"))))
@@ -5025,4 +5037,3 @@ Section WriteiMain.
 End WriteiMain.
 
 End WriteiProof.
-
