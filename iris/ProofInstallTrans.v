@@ -1860,7 +1860,7 @@ Section InstallTransBlocks.
               B9 0%nat eb (proc_addr j) (K - 10)%nat eb lks
               (it_Kbunpin K HK) it_noff0 Hk2 HB9a0
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hbio Hpanic Hbref").
+              with "Hcg Hcnt Htext Hpc Hbio Hbref").
     all: try lkbelow.
     iIntros (CIDb4 Hsb4 mf5) "Hcg Hcnt Hpc %Hcs5 Hu3".
     assert (Hpcb0 : ret_pc (B9 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0xb0)).

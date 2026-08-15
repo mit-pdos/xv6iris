@@ -110,7 +110,6 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   cpu_own 0 eb pj eb ∅ -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>

@@ -648,7 +648,7 @@ Section ProofVirtioDiskRwB.
                   Hj Hjl ltac:(rewrite HB3a0; vm_compute; reflexivity) vdrwb_lvl1
                   ltac:(pose proof (vdrw_K22 K HK); lia)
                   ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpinv Hpanic").
+                  with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc". rgall.
         assert (Hr0a0 : ret_pc (B3 !!! Regidx Rra)
@@ -774,7 +774,7 @@ Section ProofVirtioDiskRwB.
         iApply (Sleep.wp_sleep_sconf γs j γl C4 (K - 12)%nat eb lks
                   Hj Hjl ltac:(pose proof (vdrw_K22 K HK); lia)
                   ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").
+                  with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
         all: try lkbelow.
         (* SLEEP RETURNS ON HART [CIDsl]. *)
         iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpc Hextc Hextm". rgall.
@@ -850,7 +850,7 @@ Section ProofVirtioDiskRwB.
         iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
                   (disk_res γd pd pav pu) D3 0%nat eb (proc_addr j) (K - 12)%nat eb lks
                   vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hbelow
-                  with "Hcg Hown Htext Hpc [] Hpanic").
+                  with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hlk". }
         iIntros (CIDaq Hsaq msA mfa) "_ Hcg Hpc %Hacs Htok HR Hown Hpay". rgall.

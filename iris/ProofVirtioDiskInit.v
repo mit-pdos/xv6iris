@@ -1581,7 +1581,7 @@ Section ProofVirtioDiskInit.
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               B39 (Some nb) 0%nat eb pp (K - 4)%nat false _ Hc14
               ltac:(reflexivity) ltac:(vm_compute; reflexivity) Hkmem
-              with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
+              with "Hcg Hcpu Htext Hpc Hklock Havl").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mk1) "Hcg Hcpu Hpc %Hk1cs Hkpost".
@@ -1656,7 +1656,7 @@ Section ProofVirtioDiskInit.
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               C3 (Some (nb - 1)%nat) 0%nat eb pp (K - 4)%nat false _ Hc14
               ltac:(reflexivity) ltac:(vm_compute; reflexivity) Hkmem
-              with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
+              with "Hcg Hcpu Htext Hpc Hklock Havl").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mk2) "Hcg Hcpu Hpc %Hk2cs Hkpost".
@@ -1708,7 +1708,7 @@ Section ProofVirtioDiskInit.
     iApply (AK.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               D2 (Some (nb - 2)%nat) 0%nat eb pp (K - 4)%nat false _ Hc14
               ltac:(reflexivity) ltac:(vm_compute; reflexivity) Hkmem
-              with "Hcg Hcpu Htext Hpc Hklock Havl Hpanic").
+              with "Hcg Hcpu Htext Hpc Hklock Havl").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mk3) "Hcg Hcpu Hpc %Hk3cs Hkpost".

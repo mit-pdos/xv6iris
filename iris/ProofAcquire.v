@@ -213,8 +213,9 @@ Section ProofAcquire.
      exactly what the held-set insert consumes, and nothing in the run below
      looks at a rank.  The BELOW tier is a corollary (next lemma); see
      SpecAcquire.v's header for why the order is policy rather than a proof
-     obligation.  [#Hpanic] STAYS in both -- neither premise kills the
-     [holding] arm. *)
+     obligation.  [Hfresh] now does DOUBLE DUTY: it also decides the
+     [if(holding(lk)) panic] check, so neither tier carries a panic
+     credential any more. *)
   Lemma wp_acquire_gen_fresh_sconf
       (γl : gname) (s : string) (R Tc Dc : iProp Σ)
       (m : regfile)
@@ -224,7 +225,7 @@ Section ProofAcquire.
     cbv beta delta [wp_acquire_gen_fresh_sconf_body wp_acquire_gen_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh Href Hrefpre.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hown #Htext Hpc #Hlock HTc #Hpanic Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hlock HTc Hcont".
     (* THE ENTRY BOUND, taken before push_off raises the level: after the push
        the bundle offers only [size lks <= S n], one too weak to add a rank.
        It is pure, so it survives the push in the Coq context. *)
@@ -406,10 +407,20 @@ Section ProofAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 s R Tc Dc B2 (trap_res b + (av - 4))%nat p
-              Hlkb ltac:(lia) Href
-              with "Hcg Htext Hpc Hlock HTc").
-    iIntros (mh) "HTc Hcg Hpc %Hmh".
+    (* THE EVIDENCE THAT KILLS THE PANIC ARM.  holding() decides its answer
+       by reading [lk->cpu] inside the lock invariant, and the invariant's
+       held state keeps [lk_in i s] beside that word (WpLock.v).  So this
+       hart's own held-set authority -- which is sitting inside [cpu_own],
+       and which [Hfresh] says omits [s] -- refutes [i = cpu_id]: the word is
+       not this hart's [struct cpu], and holding() returns 0.  The authority
+       is handed over and comes straight back; [cpu_own] is rebuilt at the
+       SAME set, so nothing else in this proof notices. *)
+    iDestruct (cpu_own_locks_swap with "Hown") as "[Hlks [%Hsz0 Hownback0]]".
+    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 s R Tc Dc B2 (trap_res b + (av - 4))%nat p lks
+              Hlkb ltac:(lia) Hfresh Href
+              with "Hcg Htext Hpc Hlock HTc Hlks").
+    iIntros (mh) "HTc Hlks Hcg Hpc %Hmh".
+    iDestruct ("Hownback0" $! lks ltac:(exact Hsz0) with "Hlks") as "Hown".
     destruct Hmh as [Hcsh Ha0h].
     destruct Hcsh as (Hcsph & Hs0h & Hs1h & Hs2h & Hs3h & Hs4h & Hs5h & Hs6h & Hs7h & Hs8h & Hs9h & Hs10h & Hs11h).
     iEval (rewrite upd_eq) in "Hpc".
@@ -438,55 +449,10 @@ Section ProofAcquire.
     assert (Htgt34 : add_vec (mword_of_int (KernelSyms.acquire + 0x18) : mword 64)
               (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 14 : mword 8) ('b"0"))))
             = mword_of_int (KernelSyms.acquire + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
-    destruct Ha0h as [Ha0h | Ha0h].
-    2:{ (* ===== holding() said 1: this hart already holds it -- panic() ===== *)
-      assert (Ha0B3t : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = true)
-        by (rewrite HB3a0v Ha0h; vm_compute; reflexivity).
-      iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.acquire + 0x18)) (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
-                B3 (trap_res b + (av - 4))%nat false
-                ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
-                ltac:(rgne; exact Ha0B3t)
-                ltac:(rewrite Htgt34; vm_compute; reflexivity)
-                with "Hcg Hpc Hi18").
-      iApply wp_next_off_intro.
-      iNext. iIntros "Hcg Hpc".
-      iEval (rewrite Htgt34) in "Hpc".
-      iPoseProof (aqi_34 with "Htext") as "Hi34".
-      iPoseProof (aqi_38 with "Htext") as "Hi38".
-      iPoseProof (aqi_3c with "Htext") as "Hi3c".
-      (* +0x34 auipc a0 / +0x38 addi a0 : the message pointer *)
-      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.acquire + 0x34)) (mword_of_int 10 : mword 5) (mword_of_int 6 : mword 20)
-                B3 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi34").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      set (P1 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (mword_of_int (KernelSyms.acquire + 0x34) : mword 64) (auipc_off (mword_of_int 6 : mword 20)))]> B3).
-      assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.acquire + 0x34) : mword 64) 4 = mword_of_int (KernelSyms.acquire + 0x38))
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp38) in "Hpc".
-      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.acquire + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
-                (mword_of_int 0x45a : mword 12) P1 (trap_res b + (av - 4))%nat false
-                ltac:(vm_compute; discriminate) ltac:(rdok)
-                with "Hcg Hpc Hi38").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      set (P2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-          (add_vec (P1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0x45a : mword 12)))]> P1).
-      assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.acquire + 0x38) : mword 64) 4 = mword_of_int (KernelSyms.acquire + 0x3c))
-        by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpp3c) in "Hpc".
-      (* +0x3c jal panic : never returns *)
-      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquire + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 2096158 : mword 21)
-                P2 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi3c").
-      iApply wp_next_off_intro.
-      iIntros "Hcg Hpc".
-      assert (Hpcpn : add_vec (mword_of_int (KernelSyms.acquire + 0x3c) : mword 64) (sign_extend' 64 (mword_of_int 2096158 : mword 21))
-                      = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hpcpn) in "Hpc".
-      iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpan".
-      iApply ("Hpan" $! _ _ false with "Htext Hpc Hcg"). }
+    (* holding() returned 0 -- PROVABLY, [Ha0h] -- so the [c.bnez] at +0x18
+       falls through and the [jal panic] at +0x3c is DEAD CODE.  There is no
+       second arm to close and no panic credential in this contract; see
+       SpecAcquire.v's header. *)
     (* ===== holding() said 0: the c.bnez falls through to the loop ===== *)
     assert (Ha0B3 : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = false).
     { rewrite HB3a0v Ha0h. vm_compute. reflexivity. }
@@ -857,10 +823,10 @@ Section OfGen.
   Proof.
     cbv beta delta [wp_acquire_fresh_sconf_body wp_acquire_pre_body].
     intros pcE lk0 ret_tgt Hpos Hav Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hlock #Hpanic Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hlock Hcont".
     iApply (G.wp_acquire_gen_fresh_sconf γl s R emp%I False%I m n eb p av b lks
               Hpos Hav Hfresh (lock_refute_False _) (fun i => lock_refute_False _)
-              with "Hcg Hown Htext Hpc [] [] Hpanic").
+              with "Hcg Hown Htext Hpc [] []").
     { iApply (is_lock_openable with "Hlock"). }
     { done. }
     iIntros (CIDg Hsg ms mfin) "%Hms _ Hcg Hpc %Hcs Htok HRes Hown Hpay".

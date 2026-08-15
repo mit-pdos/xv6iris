@@ -951,7 +951,7 @@ Section ProofBrelse.
     iApply (Aq.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) U3
               0%nat b p (K - 4)%nat b lks
               ltac:(vm_compute; reflexivity) ltac:(lia) Hbelow
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HU3a0). iExact "Hlock". }
     (* acquire returns with interrupts OFF ([sie_cap_gpr _ _ false _]), so the

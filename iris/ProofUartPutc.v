@@ -509,7 +509,7 @@ Section ProofUartPutc.
     iDestruct (cpu_own_transport CID CIDp9 n eb p b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γd) G14 n eb p (K - 4)%nat b lks
-              Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk] Hpanic").
+              Hn Hav Hfresh with "Hcg Hcpu Ht Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HG14a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".

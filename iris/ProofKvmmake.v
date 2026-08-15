@@ -1082,7 +1082,7 @@ Section KvmmakeBody.
               ltac:(reflexivity)
               ltac:(vm_compute; reflexivity)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     iIntros (CID7 Hs7 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.kvmmake + 0x0e)).
     { rewrite /J upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }

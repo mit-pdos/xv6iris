@@ -5681,7 +5681,7 @@ Section ProofNamexMain.
                 ck (cq/2)%Qp dev cinum
                 B3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kid ltac:(vm_compute; reflexivity) Hckl HB3a0 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hpanic Hisl1 Hcshr").
+                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hisl1 Hcshr").
       all: try lkbelow.
       iIntros (CIDid Hqid mid) "Hcg Hcnt Hpc %Hidp Hcshr (%qn & Href)".
       destruct Hidp as [Hcsid Hida0].

@@ -157,7 +157,6 @@ Definition wp_idup_sconf_body
   kernel_text -∗ pc_is pcE -∗
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
-  panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
   (* A SHARE, not a reference -- see the header. *)

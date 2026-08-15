@@ -431,7 +431,7 @@ Section ProofScheduler.
     cbv beta delta [wp_scheduler_sconf_body].
     intros pcE Hp0 Hav. subst p0.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hfree Hcpu #Htext Hpc #Hprocs #Hpanic Hcsrs".
+    iIntros "Hcg Hfree Hcpu #Htext Hpc #Hprocs Hcsrs".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hprocs" as "[%H _]". iPureIntro. exact H. }
     (* split the entry cpu bundle: the proc cell comes out for the c->proc
@@ -1164,7 +1164,7 @@ Section ProofScheduler.
       iApply (Acquire.wp_acquire_sconf γl "proc"%string
                 (proc_lock_res γs γl (proc_addr jj)) M1 0 ebc zero_reg n ebc ∅
                 ltac:(lia) ltac:(pose proof (sc_res_le ebc); lia) Hnoproc
-                with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+                with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
       { iEval (rewrite HM1a0). iExact "Hislock". }
       (* acquire's crossing index is its ENTRY [ebc] (a trap can land on its

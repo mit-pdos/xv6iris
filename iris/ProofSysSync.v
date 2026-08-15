@@ -738,7 +738,7 @@ Section SsBodies.
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl A1
               (trap_res eb + (K - 4))%nat 1%nat eb false ({["log"]} ∪ lks)
               Hj Hjl HA1nz ss_noff2 ltac:(pose proof (ss_K22 K HK); lia) Hbeloweproc
-              with "Hcg Hown Htext Hpc Hpinv Hpanic").
+              with "Hcg Hown Htext Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc".
     assert (Hp44 : ret_pc (A1 !!! Regidx Rra) = mword_of_int (SS + 0x44))
@@ -820,7 +820,7 @@ Section SsBodies.
     iDestruct (cpu_claim_ext_transport CID CIDj eb pj ltac:(wp_next_chain) with "Hclmx") as "Hclmx".
     iApply (Sleep.wp_sleep_sconf γs j γl A4 (K - 4)%nat eb lks Hj Hjl
               ltac:(pose proof (ss_K22 K HK); lia) Hbelowproc
-              with "Hcg Hown Htext Hpc Hpinv Hpanic Htcx Hclmx").
+              with "Hcg Hown Htext Hpc Hpinv Htcx Hclmx").
     all: try lkbelow.
     iIntros (CIDs Hss2 mfs) "%Hscs Hcg Hown Hpc Htcx Hclmx".
     assert (Hp4e : ret_pc (A4 !!! Regidx Rra) = mword_of_int (SS + 0x4e))
@@ -869,7 +869,7 @@ Section SsBodies.
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) A6 0%nat eb pj (K - 4)%nat eb lks
               ss_noff1 ltac:(pose proof (ss_K10 K HK); lia) Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
     iIntros (CIDa Hsa msA mfa) "%Hmsf Hcg Hpc %Hacs Htok Hres Hown Hpay".
@@ -1292,7 +1292,7 @@ Section ProofSysSync.
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string (log_res γ bn γfs cov logstart) Maq
               0%nat eb pj (K - 4)%nat eb lks
               ss_noff1 ltac:(pose proof (ss_K10 K HK); lia) Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
     iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".

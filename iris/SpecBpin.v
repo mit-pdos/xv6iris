@@ -61,7 +61,6 @@ Definition wp_bpin_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
-  panic_wp_any -∗
   (* THE premise that makes the unchecked [refcnt++] safe *)
   bslot bn -∗
   wp_next b p (fun (CID : CpuId) =>

@@ -407,7 +407,7 @@ Section ProofWakeup.
                 ltac:(lia)
                 ltac:(lia)
                 Hfresh
-                with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
+                with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM3a_a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".

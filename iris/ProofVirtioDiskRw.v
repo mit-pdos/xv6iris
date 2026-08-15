@@ -563,7 +563,7 @@ Section ProofVirtioDiskRw.
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string
               (disk_res γd pd pav pu) R11 0%nat eb pj (K - 12)%nat eb lks
               vdrw_noff0 ltac:(pose proof (vdrw_K10 K HK); lia) Hfresh
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { rgall. iEval (rewrite HR11a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms M) "_ Hcg Hpc %HcsM Htok HR Hown Hpay".

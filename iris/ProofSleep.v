@@ -497,7 +497,7 @@ Section ProofSleepBody.
     cbv beta delta [wp_sleep_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hext Hclmx Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hext Hclmx Hcont".
     (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON.  swtch is contracted to
        run with p->lock and nothing else held (SpecSwtch.v pins
        [{["proc"]}] on both sides), which is xv6's own
@@ -655,7 +655,7 @@ Section ProofSleepBody.
               ltac:(lia)
               ltac:(lia)
               Hno
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal

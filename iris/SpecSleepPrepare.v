@@ -86,7 +86,6 @@ Definition wp_sleep_prepare_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdsl
   cpu_own n eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗

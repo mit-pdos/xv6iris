@@ -576,7 +576,7 @@ Section VtPrologue.
     iDestruct (cpu_own_transport CID CID10 n eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γk "virtio_disk"%string (disk_res γd pd pav pu) A6
               n eb pme (av - 4)%nat b lks ltac:(exact Hn) ltac:(lia) Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hlk". }
     iIntros (CID11 Hs11 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".

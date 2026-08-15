@@ -682,7 +682,7 @@ Section ProofFreerange.
                   Hlk Hfl
                   ltac:(lia)
                   Hfresh
-                  with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail Hqcpu").
+                  with "Hcg Hcnt Htext Hpc Hkmem [Hpage] Havail").
         all: try lkbelow.
         { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HM2a0; exact Hpvq | rewrite HM2a0; iExact "Hpage"]. }
         iIntros (CIDkf Hskf mkf) "Hcg Hcnt Hpc %Hkfcs Havail".

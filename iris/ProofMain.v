@@ -1479,7 +1479,7 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
     iApply (Scheduler.wp_scheduler_sconf γs SS n p0 Hp0 ltac:(lia)
-              with "Hcg Hfree Hcpu Htext Hpc Hpinv Hpanic Htcsr").
+              with "Hcg Hfree Hcpu Htext Hpc Hpinv Htcsr").
   Qed.
 
   (* =================================================================== *)

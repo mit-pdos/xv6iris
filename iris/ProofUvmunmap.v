@@ -1139,7 +1139,7 @@ Section ProofUvmunmap.
     iApply (Kfree.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)
               (mword_of_int (KernelSyms.kmem + 24)) B6 None ilvl eb p (K - 8)%nat b lks
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
     all: try lkbelow.
     { rewrite /kfree_pre HB6a0.
       iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }

@@ -57,7 +57,6 @@ Definition wp_bunpin_sconf_body
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   bio_ctx bn V -∗
-  panic_wp_any -∗
   (* the reference being surrendered *)
   bref bn k q dev bno -∗
   wp_next b p (fun (CID : CpuId) =>

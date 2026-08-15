@@ -490,7 +490,7 @@ Section ProofFreewalk.
               (mword_of_int (KernelSyms.kmem + 24)) E1 None ilvl eb p (K - 6)%nat b lks
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity) Hilvl
               Hfresh
-              with "Hcg Hcnt Htext Hpc Hlock [Hpre] Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock [Hpre] Havail").
     all: try lkbelow.
     { rewrite HE1a0. iExact "Hpre". }
     iIntros (CIDkf Hskf mk) "Hcg Hcnt Hpc %Hkcs _".

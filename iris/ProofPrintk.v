@@ -8249,7 +8249,7 @@ Section ProofPrintk.
     iDestruct (wp_next_retarget CID CIDa3 b p _ ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acquire.wp_acquire_sconf (CID := CIDa3) γpr "pr"%string (emp : iProp Σ) A3
               n eb p (K - 24)%nat b lks ltac:(lia) ltac:(lia) Hbelow
-              with "Hcg Hcnt Htext Hpc [] Hpan").
+              with "Hcg Hcnt Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA3a0). iExact "Hlk". }
     iIntros (CIDacq Hstacq ms mfin) "%Hms Hcg Hpc %HcsA Hlkd Hemp Hcnt Hpay".

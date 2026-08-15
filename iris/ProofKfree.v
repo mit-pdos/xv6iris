@@ -57,7 +57,7 @@ Section ProofKfree.
     cbv beta delta [wp_kfree_sconf_body].
     intros pcE p ret_tgt HK Hlk Hfl Hnoffpos Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hkmem Hpre Havail Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbmatch. symmetry in Hbmatch.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     (* the caller-supplied page precondition: validity + full ownership *)
@@ -512,7 +512,7 @@ Section ProofKfree.
               Hnoffpos
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hkmem] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hkmem]").
     all: try lkbelow.
     { iEval (rewrite HKacqa0 -Hlk). iExact "Hkmem". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

@@ -890,7 +890,7 @@ Section UwBodies.
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Q2 (av - 10)%nat 0%nat true true lks
                 Hj Hjlp ltac:(rewrite HQ2a0; vm_compute; reflexivity) ltac:(lia)
                 ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
-                with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+                with "Hcg Hcnt Ht Hpc Hpinv").
       all: try lkbelow.
       iIntros (CIDp Hsp' MP) "%HcsP Hcg Hcnt Hpc".
       iEval (rewrite HQ2ra P50) in "Hpc".
@@ -933,7 +933,7 @@ Section UwBodies.
                 0%nat true pj (av - 10)%nat true lks ltac:(lia)
                 ltac:(unfold uartwrite_stack in Hav; lia)
                 ltac:(lkbelow)
-                with "Hcg Hcnt Ht Hpc [Hlk] Hpanic").
+                with "Hcg Hcnt Ht Hpc [Hlk]").
       all: try lkbelow.
       { iEval (rewrite HQ4a0). iExact "Hlk". }
       iIntros (CIDacq Hsacq ms MA) "%Hmsf Hcg Hpc %HcsA Htok HR Hcnt Hpay".
@@ -1050,7 +1050,7 @@ Section UwBodies.
                      with "Hcnt") as "Hcnt".
         iApply (Sleep.wp_sleep_sconf γs j γlp K3 (av - 10)%nat true lks Hj Hjlp
                   ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
-                  with "Hcg Hcnt Ht Hpc Hpinv Hpanic [] []").
+                  with "Hcg Hcnt Ht Hpc Hpinv [] []").
         all: try lkbelow.
         { rewrite /trap_csrs_ext. done. }
         { rewrite /cpu_claim_ext. done. }

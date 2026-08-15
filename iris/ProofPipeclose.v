@@ -422,7 +422,7 @@ Section ProofPipeclose.
               (pipe_ref γp w 1) (pipe_dead γl γp) A4 n eb pme (av - 4)%nat b lks
               ltac:(lia) ltac:(lia) Hno
               ltac:(iApply pipe_ref_dead) ltac:(intro i; iApply locked_pre_dead)
-              with "Hcg Hown Htext Hpc [] Href Hpanic").
+              with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { iEval (rewrite Ha0A4). iExact "Hopen". }
     iIntros (CIDaq Hsaq ms M0) "%Hms Href Hcg Hpc %HcsM0 Hlocked Hres Hown Hpay".
@@ -738,7 +738,7 @@ Section ProofPipeclose.
                    again; kfree's "kmem" (13) outranks "pipe" (7), so [Hno]
                    weakens straight across with no [_union_singleton] step. *)
                 ltac:(lkbelow)
-                with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail Hpanic").
+                with "Hcg Hown Htext Hpc Hkmem [Hword Hcpu Hbytes] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre. iEval (rewrite Ha0K4). iSplitR; [done|].
         iApply (pipe_bytes_page_own with "Hword Hcpu Hbytes"). }

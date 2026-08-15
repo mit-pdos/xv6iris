@@ -81,7 +81,6 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_ftable γl γf -∗
-  panic_wp_any -∗
   (* the new reference needs somewhere to live: one fd slot goes into the
      table and comes back out of fileclose. *)
   fd_slot -∗

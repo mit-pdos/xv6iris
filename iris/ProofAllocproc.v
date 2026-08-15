@@ -835,7 +835,7 @@ Section ProofAllocproc.
       iApply (Acquire.wp_acquire_sconf (CID := CIDl2) γl "proc"%string
                 (proc_lock_res γs γl (proc_addr k)) L2 lvl eb pme (K - 4)%nat b lks
                 (ap_lvl1 lvl Hlvl) ltac:(pose proof (ap_K10 K HK); lia) Hbelow
-                with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+                with "Hcg Hcpu Htext Hpc [Hislock]").
       all: try lkbelow.
       { iEval (rewrite HL2a0). iExact "Hislock". }
       iIntros (CIDf Hsf ms macq) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".
@@ -948,7 +948,7 @@ Section ProofAllocproc.
         iApply (Allocpid.wp_allocpid_sconf (CID := CIDf) γp F1 (trap_res b + (K - 4))%nat (S lvl) eb pme false
                   ({["proc"]} ∪ lks)
                   (ap_lvlS lvl Hlvl) ltac:(pose proof (ap_K14 K HK); lia) (ap_below_nextpid lks Hbelow)
-                  with "Hcg Hcpu Htext Hpc Hpidlk Hpanic").
+                  with "Hcg Hcpu Htext Hpc Hpidlk").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mfa) "%Hcsfa Hcg Hcpu Hpc".
         assert (Hp3c : ret_pc (F1 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x3c))
@@ -1046,7 +1046,7 @@ Section ProofAllocproc.
                   ({["proc"]} ∪ lks)
                   ltac:(pose proof (ap_K14 K HK); lia) ltac:(reflexivity) (ap_lvlS lvl Hlvl)
                   (ap_below_kmem lks Hbelow)
-                  with "Hcg Hcpu Htext Hpc Hkmem Havail Hpanic").
+                  with "Hcg Hcpu Htext Hpc Hkmem Havail").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mka) "Hcg Hcpu Hpc %Hcska Hkpost".
         assert (Hp46 : ret_pc (F3 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x46))

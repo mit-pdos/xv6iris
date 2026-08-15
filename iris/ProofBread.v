@@ -2713,7 +2713,7 @@ Section ProofBread.
               0%nat eb pj (K - 6)%nat eb lks
               ltac:(vm_compute; reflexivity) ltac:(unfold K_bread in HK; lia)
               Hbelow
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HR7a0). iExact "Hlock". }
     (* acquire returns with interrupts OFF, so the whole bget interior below

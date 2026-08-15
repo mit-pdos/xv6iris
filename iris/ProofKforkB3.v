@@ -610,7 +610,7 @@ Section KforkB3Proof.
           as "Hown".
         iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme (rsv + (K - 8))%nat b
                   _ HK14 Hn HL2a0k Hbelow
-                  with "Hcg Hown Htext Hpc Hft Hpanic Hfds Href").
+                  with "Hcg Hown Htext Hpc Hft Hfds Href").
         all: try lkbelow.
         iIntros (CIDo Hsto mr) "Hcg Hown Hpc %Hcsmr Hslota Hslotb".
         destruct Hcsmr as [Hcsmr Hmra0].

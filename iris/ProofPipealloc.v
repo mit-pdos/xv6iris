@@ -872,7 +872,7 @@ Section ProofPipealloc.
                  with "Hcnt") as "Hcnt".
     iApply (Filealloc.wp_filealloc_sconf γfl γf mA n eb p (K - 6)%nat b lks
               ltac:(lia) Hnoffpos ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslota").
+              with "Hcg Hcnt Htext Hpc Hftab Hslota").
     all: try lkbelow.
     iIntros (CID12 Hs12 mB) "Hcg Hcnt Hpc %HcsB Hpost0".
     assert (Hpc1c : ret_pc (mA !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x1c))
@@ -978,7 +978,7 @@ Section ProofPipealloc.
                  with "Hcnt") as "Hcnt".
     iApply (Filealloc.wp_filealloc_sconf γfl γf mC n eb p (K - 6)%nat b lks
               ltac:(lia) Hnoffpos ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hftab Hpanic Hslotb").
+              with "Hcg Hcnt Htext Hpc Hftab Hslotb").
     all: try lkbelow.
     iIntros (CID16 Hs16 mD) "Hcg Hcnt Hpc %HcsD Hpost1".
     assert (Hpc24 : ret_pc (mC !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x24))
@@ -1143,7 +1143,7 @@ Section ProofPipealloc.
                  pipealloc's kalloc call is balanced and never nests under a
                  held "ftable". *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hkmem Hav Hpanic").
+              with "Hcg Hcnt Htext Hpc Hkmem Hav").
     all: try lkbelow.
     iIntros (CID21 Hs21 mF) "Hcg Hcnt Hpc %HcsF Hkp".
     assert (Hpc30 : ret_pc (mE !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0x30))

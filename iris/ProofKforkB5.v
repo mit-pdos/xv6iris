@@ -327,7 +327,7 @@ Section ProofKforkB5.
     iApply (AQ.wp_acquire_sconf (CID := CID4) γw "wait_lock"%string WaitInv.wait_res
               M5 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh
-              with "Hcg Hown Htext Hpc [Hwl] Hpanic").
+              with "Hcg Hown Htext Hpc [Hwl]").
     all: try lkbelow.
     { iEval (rewrite HM5a0). iExact "Hwl". }
     iIntros (CID5 Hs5 ms mr5) "%Hms5 Hcg Hpc %Hcs_5_r5 Htokw Hwaitres Hown Hpay".
@@ -482,7 +482,7 @@ Section ProofKforkB5.
     iApply (AQ.wp_acquire_sconf (CID := CID8) γl "proc"%string (SchedCtx.proc_lock_res γs γl (proc_addr j))
               M10 lvl eb pme (K - 8)%nat b lks Hlvl (kfkb5_stack_ok K HK)
               Hfresh_proc
-              with "Hcg Hown Htext Hpc [Hpinv] Hpanic").
+              with "Hcg Hown Htext Hpc [Hpinv]").
     all: try lkbelow.
     { iEval (rewrite HM10a0). iApply (SchedCtx.procs_inv_lookup γs j γl Hgl with "Hpinv"). }
     iIntros (CID9 Hs9 ms2 mr9) "%Hms9 Hcg Hpc %Hcs_10_r9 Htok2 HR2 Hown Hpay".

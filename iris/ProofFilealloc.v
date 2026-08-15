@@ -188,7 +188,7 @@ Section ProofFilealloc.
     intros pcE ret_tgt HK HnZ Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hfdslot Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock Hfdslot Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -332,7 +332,7 @@ Section ProofFilealloc.
     iApply (Acquire.wp_acquire_sconf γl "ftable"%string (ftable_res γf) mA
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia) Hbelow
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

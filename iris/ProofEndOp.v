@@ -1281,7 +1281,7 @@ Section EndOpBlocks.
               (log_res γ bn γfs cov logstart) E4 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HE4a0). iExact "Hlock". }
     iIntros (CIDb1 Hsb1 ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres Hcnt Hpay".
@@ -3993,7 +3993,7 @@ Section ProofEndOp.
               (log_res γ bn γfs cov logstart) R6 0%nat eb (proc_addr j)
               (K - 8)%nat eb lks eo_noff0 ltac:(pose proof (eo_Klk K HK); lia)
               Hbelow
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hlock". }
     iIntros (CIDq Hsq ms macq) "%Hmsfacts Hcg Hpc %Hacq Htok HRres Hcnt Hpay".

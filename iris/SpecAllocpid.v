@@ -77,7 +77,6 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Ge
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗

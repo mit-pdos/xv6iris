@@ -57,7 +57,6 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_tickslock γl -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (t : mword 32),
       ⌜ callee_saved m mf /\

@@ -349,7 +349,7 @@ Section ProofSysDup.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab #Hpanic Hpriv Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab Hpriv Hcont".
     iDestruct (proc_priv_ofile_len with "Hpriv") as %Hoflen.
     iPoseProof (sdi_00 with "Htext") as "Hi00".
     iPoseProof (sdi_02 with "Htext") as "Hi02".
@@ -994,7 +994,7 @@ Section ProofSysDup.
     (* THE UNIT fdalloc RELEASED IS WHAT PAYS FOR THE HIGHER COUNT *)
     iApply (Filedup.wp_filedup_sconf γl γf k q Cf G2 n eb p (av - 6)%nat b lks
               ltac:(lia) Hn ltac:(rewrite HG2a0 Hfvk; reflexivity) Hftno
-              with "Hcg Hcpu Htext Hpc Hftab Hpanic Hunit Href").
+              with "Hcg Hcpu Htext Hpc Hftab Hunit Href").
     all: try lkbelow.
     iIntros (CID23 Hk23 G3) "Hcg Hcpu Hpc [%HcsG3 %HG3a0] Href0 Href1".
     assert (Hpc36 : ret_pc (G2 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x36))

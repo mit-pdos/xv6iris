@@ -610,7 +610,7 @@ Section ProofIget.
     iApply (Acquire.wp_acquire_sconf γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
               n eb p (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

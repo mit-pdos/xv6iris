@@ -531,7 +531,7 @@ Section ProofUvmalloc.
               B1 None 0%nat eb p (K - 10)%nat b
               _ HKka ltac:(reflexivity) ltac:(vm_compute; reflexivity)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
     iIntros (CIDu2 Hsu2 mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
     assert (Hret3a : ret_pc (B1 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmalloc + 0x3a)).
@@ -1399,7 +1399,7 @@ Section ProofUvmalloc.
               HKka ltac:(reflexivity) ltac:(reflexivity)
               ltac:(vm_compute; reflexivity)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }

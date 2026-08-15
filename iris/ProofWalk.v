@@ -824,7 +824,7 @@ Section ProofWalk.
               ltac:(reflexivity)
               Hlvl
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
     iIntros (CIDa3 Hsa3 mr) "Hcg Hcnt Hpc %Hkcs Hkpost".
     (* the return pc: +0x7a *)

@@ -7,11 +7,16 @@
    token, which PINS [lk->cpu] at this hart's [struct cpu] -- so release needs
    nothing else.
 
-   A caller does NOT have to prove it is not already holding the lock: it
-   supplies [panic_wp] (SpecPanic.v) instead, and acquire's
-   [if(holding(lk)) panic] arm is discharged by that contract.  So the spec
-   reads "acquire either returns holding the lock, or panics" -- exactly what
-   the C code promises for a hart that violates the no-reentrance rule.
+   THE CALLER DOES PROVE IT IS NOT ALREADY HOLDING THE LOCK, and it proves it
+   with the premise it was already carrying.  acquire's
+   [if(holding(lk)) panic("acquire")] arm used to be discharged by a panic
+   credential -- so the spec read "acquire either returns holding the lock, or
+   panics".  It now reads "acquire returns holding the lock", because the arm
+   is DEAD: holding() decides its answer from [lk->cpu] inside the lock
+   invariant, whose held state keeps [lk_in i s] beside that word, and this
+   hart's held-set authority (inside [cpu_own], with [s ∉ lks]) refutes
+   [i = cpu_id].  See WpLock.v's owner-field block, which states the theorem,
+   and [WpSconfLock.wp_cld_lkcpu_lockopen_notheld_s_sconf], which cashes it.
 
    ==================================================================== *)
 (*  TWO TIERS OF HELD-SET PRECONDITION, AND WHY BOTH EXIST.
@@ -54,14 +59,15 @@
    not FRESH, is what a FUNCTION contract states; FRESH is for the one call
    site that cannot state a bound.
 
-   NEITHER TIER KILLS THE [if(holding(lk)) panic] ARM, and [panic_wp_any]
-   therefore stays in both.  The refutation needs the held-set FRAGMENT
-   ([WpLock.lk_cpu_frag]) in scope where [holding]'s read decides [phi], and
-   [WpSconfLock.wp_ld_lkcpu_lockopen_gen]'s view premise is handed only
-   [lock_auth γl st] and the caller's token -- not the fragment, which is not
-   persistent and would have to be borrowed and returned inside the invariant
-   open.  That leaf change plus a [SpecHolding] variant concluding [a0 = 0] is
-   a separate piece of work. *)
+   EITHER TIER KILLS THE [if(holding(lk)) panic] ARM, and neither carries a
+   panic credential.  Both give [s ∉ lks] (BELOW via
+   [LockRank.locks_below_not_elem]), and that is exactly what the refutation
+   consumes: [wp_ld_lkcpu_lockopen_gen]'s view premise now also sees the
+   invariant's held-set fragment [WpLock.lk_cpu_frag], so the read at
+   holding+0x12 concludes the owner word is not this hart's, and
+   [SpecHolding]'s first contract concludes [a0 = 0] outright.  The fragment
+   never leaves the invariant: the premise's conclusion is pure, so the proof
+   mode keeps it and the leaf closes with it. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -78,7 +84,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
@@ -118,7 +123,6 @@ Definition wp_acquire_gen_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : G
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lk0 s R Dc -∗
   Tc -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗
@@ -193,7 +197,6 @@ Definition wp_acquire_pre_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lk0 s R -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (ms : mword 64) (mfin : regfile),
     ⌜ sconf_ms_facts ms ⌝ -∗

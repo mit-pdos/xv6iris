@@ -1157,7 +1157,7 @@ Section ProofUvmcopy.
     iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
               B3 None ilvl eb p (K - 10)%nat b
               _ HKka ltac:(reflexivity) Hilvl Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
     iIntros (CIDl12 Hsl12 mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
     assert (Hret44 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (KernelSyms.uvmcopy + 0x44)).
@@ -1652,7 +1652,7 @@ Section ProofUvmcopy.
               (mword_of_int (KernelSyms.kmem + 24)) F2 None ilvl eb p (K - 10)%nat b
               _ HKka ltac:(reflexivity) ltac:(reflexivity)
               Hilvl Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
     all: try lkbelow.
     { rewrite /kfree_pre HF2a0.
       iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }

@@ -1812,7 +1812,7 @@ Section ProofPipewrite.
     iApply (AcquireGen.wp_acquire_gen_sconf γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
               (pipe_dead γl γp) B3 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
               ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
-              with "Hcg Hown Htext Hpc [] Href Hpanic").
+              with "Hcg Hown Htext Hpc [] Href").
     all: try lkbelow.
     { rgall. iEval (rewrite Ha0B3). iExact "Hopen". }
     iIntros (CIDaq Hsaq ms2 M1) "%Hms2 Href Hcg Hpc %HcsM1 Hlocked Hres Hown Hpay". rgall.
@@ -2192,7 +2192,7 @@ Section ProofPipewrite.
           iApply (Killed.wp_killed_sconf γs j γlp L3 (trap_res true + (av - 14))%nat 1%nat true (proc_addr j) false
                     ({["pipe"]} ∪ lks)
                     Ha0L3 Hj Hjlp Hlvl1 Hav14 ltac:(lkbelow)
-                    with "Hcg Hown Htext Hpc Hpinv Hpanic").
+                    with "Hcg Hown Htext Hpc Hpinv").
           all: try lkbelow.
           iApply wp_next_off_intro. iIntros (K0 kl) "%Hkfacts Hcg Hown Hpc". rgall.
           destruct Hkfacts as [Hkcs Hka0].
@@ -2429,7 +2429,7 @@ Section ProofPipewrite.
                         (trap_res true + (av - 14))%nat 1%nat true false
                         ({["pipe"]} ∪ lks)
                         Hj Hjlp ltac:(rewrite Ha0G2; exact (pw_pnwrite_nz pi Hpv)) Hlvl1 Hav14 ltac:(lkbelow)
-                        with "Hcg Hown Htext Hpc Hpinv Hpanic").
+                        with "Hcg Hown Htext Hpc Hpinv").
               all: try lkbelow.
               iApply wp_next_off_intro. iIntros (Msp) "%Hspcs Hcg Hown Hpc". rgall.
               iEval (rewrite HraG2) in "Hpc".
@@ -2512,7 +2512,7 @@ Section ProofPipewrite.
                  pair out of the enabled SIE arm. *)
               iApply (Sleep.wp_sleep_sconf γs j γlp G5 (av - 14)%nat true lks
                         Hj Hjlp ltac:(lia) Hbelowproc
-                        with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").
+                        with "Hcg Hown Htext Hpc Hpinv [] []").
               all: try lkbelow.
               { rewrite /trap_csrs_ext. done. }
               { rewrite /cpu_claim_ext. done. }
@@ -2559,7 +2559,7 @@ Section ProofPipewrite.
               iApply (AcquireGen.wp_acquire_gen_sconf γl "pipe" (pipe_res γp pi) (pipe_ref γp w q)
                         (pipe_dead γl γp) G7 0%nat true pj (av - 14)%nat true _ Hlvl0 Hav10 Hbelow
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
-                        with "Hcg Hown Htext Hpc [] Href Hpanic").
+                        with "Hcg Hown Htext Hpc [] Href").
               all: try lkbelow.
               { rgall. iEval (rewrite Ha0G7). iExact "Hopen". }
               iIntros (CIDsl Hssl ms4 Ms) "%Hms4 Href Hcg Hpc %Hcsaq2 Hlocked Hres Hown Hpay". rgall.

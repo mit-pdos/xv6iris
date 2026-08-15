@@ -185,7 +185,7 @@ Section UtSysBlock.
     iApply (KI.wp_killed_sconf (un_s N) (un_j N) (un_l N)
               M1 nx 0%nat false (un_pj N) false lks
               HM1a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+              with "Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hret94 : ret_pc (M1 !!! Regidx Rra) = mword_of_int (UT + 0x94))

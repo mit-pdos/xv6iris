@@ -1828,7 +1828,7 @@ Section ProofConsoleread.
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
               ltac:(lkbelow)
-              with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+              with "Hcg Hcnt Ht Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mkl kl) "[%Hcskl %Hkla0] Hcg Hcnt Hpc". rgall.
     iEval (rewrite HW2ra) in "Hpc".
@@ -1994,7 +1994,7 @@ Section ProofConsoleread.
               ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
                     unfold consoleread_stack in Hav; lia)
               ltac:(lkbelow)
-              with "Hcg Hcnt Ht Hpc Hpinv Hpanic").
+              with "Hcg Hcnt Ht Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (msp) "%Hcssp Hcg Hcnt Hpc". rgall.
     iEval (rewrite HS2ra) in "Hpc".
@@ -2079,7 +2079,7 @@ Section ProofConsoleread.
     iApply (Sleep.wp_sleep_sconf γs jp γlp S5 (av - 12)%nat true lks Hjp Hjl
               ltac:(unfold consoleread_stack in Hav; lia)
               ltac:(lkbelow)
-              with "Hcg Hcnt Ht Hpc Hpinv Hpanic [] []").
+              with "Hcg Hcnt Ht Hpc Hpinv [] []").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
@@ -2128,7 +2128,7 @@ Section ProofConsoleread.
               (proc_addr jp) (av - 12)%nat true lks cr_lvl0
               ltac:(unfold consoleread_stack in Hav; lia)
               Hbelow
-              with "Hcg Hcnt Ht Hpc [] Hpanic").
+              with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HS7a0). iExact "Hlk". }
     iIntros (CIDq2 Hsq2 ms2 maq) "%Hms2 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.
@@ -2755,7 +2755,7 @@ Section ProofConsoleread.
     iApply (Acquire.wp_acquire_sconf γc "cons"%string cons_res P8 0%nat true pj
               (av - 12)%nat true lks cr_lvl0 ltac:(unfold consoleread_stack in Hav; lia)
               Hbelow
-              with "Hcg Hcnt Ht Hpc [] Hpanic").
+              with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.

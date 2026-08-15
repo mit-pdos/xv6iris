@@ -539,7 +539,7 @@ Section ProofPMS.
               ltac:(reflexivity)
               Hlvl
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hqcpu").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
     iIntros (CIDl2 Hsl2 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret56 : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.proc_mapstacks + 0x56)).

@@ -323,7 +323,7 @@ Section ProofFileclose.
     iApply (Acquire.wp_acquire_sconf γfl "ftable"%string (ftable_res γf) mA
               n eb p (K - 8)%nat b lks
               HnZ ltac:(lia) ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

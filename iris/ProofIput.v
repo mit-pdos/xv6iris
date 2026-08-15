@@ -1376,7 +1376,7 @@ Section ProofIput.
               0%nat eb pj (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hitab]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hitab". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".
@@ -2546,7 +2546,7 @@ Section ProofIput.
               0%nat eb pj (K - 4)%nat eb lks
               ltac:(lia) ltac:(lia)
               Hitbelow
-              with "Hcg Hcnt Htext Hpc [Hitab] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hitab]").
     all: try lkbelow.
     { iEval (rewrite HJ9a0). iExact "Hitab". }
     iIntros (CIDac2 Hsac2 ms2 macq2) "%Hmsf2 Hcg Hpc %Hap2 Htok HRres2 Hcnt Hpay".

@@ -98,7 +98,7 @@ Section ProofKilled.
     cbv beta delta [wp_killed_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iDestruct (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* ===================== PROLOGUE (32-byte frame, 4 slots) ============ *)
@@ -227,7 +227,7 @@ Section ProofKilled.
               (proc_lock_res γs γl (proc_addr j)) B1 n eb p (av - 4)%nat b lks
               Hn ltac:(lia)
               Hfresh
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB1a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsf Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".

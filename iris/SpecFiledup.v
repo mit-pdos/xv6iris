@@ -88,7 +88,6 @@ Definition wp_filedup_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, 
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   is_ftable γl γf -∗
-  panic_wp_any -∗
   (* THE precondition that makes [f->ref++] safe: the duplicate needs a
      descriptor to live in, and there are only FDSLOTS of those. *)
   fd_slot -∗

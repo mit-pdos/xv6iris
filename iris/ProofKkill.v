@@ -287,7 +287,7 @@ Section ProofKkill.
       iApply (Acquire.wp_acquire_sconf (CID := CIDb) γk "proc"%string
                 (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme av b lks
                 ltac:(lia) ltac:(lia) Hno
-                with "Hcg Hown Htext Hpc [Hlockk] Hpanic").
+                with "Hcg Hown Htext Hpc [Hlockk]").
       all: try lkbelow.
       { iEval (rewrite HM22a0). iExact "Hlockk". }
       iIntros (CIDf Hsf ms Macq) "%Hms Hcg Hpc %Hpins Htok HR Hown Hpay".

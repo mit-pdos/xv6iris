@@ -855,7 +855,7 @@ Section ProofFreeproc.
                 (K - 4)%nat false lks
                 Hckf eq_refl eq_refl Hilvl
                 Hlkbelow
-                with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail Hpanic").
+                with "Hcg Hcpu Htext Hpc Hkmem [Hpage] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre. iSplitR; [iPureIntro; rewrite HT1a0; exact Htfval |].
         iEval (rewrite HT1a0). iExact "Hpage". }

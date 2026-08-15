@@ -413,7 +413,7 @@ Section ProofUvmcreate.
               ltac:(reflexivity)
               Hlvl
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+              with "Hcg Hcnt Htext Hpc Hlock Havail").
     all: try lkbelow.
     iIntros (CID7 Hs7 mr0) "Hcg Hcnt Hpc %Hkcs0 Hkpost".
     assert (Hret0e : ret_pc (J !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.uvmcreate + 0x0e)).

@@ -365,8 +365,7 @@ Section ProofKerneltrap.
         iEval (rewrite Hlkempty) in "Hcpu".
         iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
-                  with "Hcg Hcpu Htext Hpc Hprocs Hpanic
-                        [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm]").
+                  with "Hcg Hcpu Htext Hpc Hprocs [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm]").
         (* THE HANDLER RESOURCE GOES INTO THE PARK, as the fifth member of
            [trap_csrs] -- and comes back out of yield's post as the RESUMING
            hart's.  It used to be a persistent credential framed around the

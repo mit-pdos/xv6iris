@@ -82,7 +82,7 @@ Section ProofSleepPrepare.
     cbv beta delta [wp_sleep_prepare_sconf_body].
     intros pcE pj chan ret_tgt Hj Hgl Hchan Hn Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iDestruct (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* ===================== PROLOGUE (32-byte frame, 4 slots) ============ *)
@@ -253,7 +253,7 @@ Section ProofSleepPrepare.
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
               (proc_lock_res γs γl (proc_addr j)) B2 n eb pj (av - 4)%nat b lks
               Hn ltac:(lia) Hno
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HB2a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".

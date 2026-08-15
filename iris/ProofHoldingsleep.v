@@ -238,7 +238,7 @@ Section ProofHoldingsleep.
               ltac:(lia)
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HM5a0). iExact "Hlk". }
     iIntros (CIDacq Hsacq ms A) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".

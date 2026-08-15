@@ -503,7 +503,7 @@ Section ProofClockintr.
                 ltac:(lia)
                 ltac:(lia)
                 Hbelow
-                with "Hcg Hcnt Htext Hpc [Hlkl] Hpanic").
+                with "Hcg Hcnt Htext Hpc [Hlkl]").
       all: try lkbelow.
       { iEval (rewrite HB2a0). iExact "Hlkl". }
       iApply wp_next_off_intro.

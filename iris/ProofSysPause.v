@@ -1240,7 +1240,7 @@ Section SpBodies.
     iApply (Killed.wp_killed_sconf γs j γl L1 (trap_res true + (av - 8))%nat 1%nat eb (proc_addr j) false
               ({["time"]} ∪ lks)
               HL1a0 Hj Hjl Hn1 ltac:(lia) Hfresh_proc
-              with "Hcg Hown Htext Hpc Hpinv Hpanic").
+              with "Hcg Hown Htext Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfk kl) "%Hkf Hcg Hown Hpc".
     destruct Hkf as (Hkcs & Hka0).
@@ -1335,7 +1335,7 @@ Section SpBodies.
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γl L3
                 (trap_res eb + (av - 8))%nat 1%nat eb false ({["time"]} ∪ lks)
                 Hj Hjl HL3nz Hn1 Hpav Hfresh_proc
-                with "Hcg Hown Htext Hpc Hpinv Hpanic").
+                with "Hcg Hown Htext Hpc Hpinv").
       all: try lkbelow.
       iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc".
       assert (Hl5a : ret_pc (L3 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x5a))
@@ -1422,7 +1422,7 @@ Section SpBodies.
                    with "Hown") as "Hown".
       iApply (Sleep.wp_sleep_sconf γs j γl L6 (av - 8)%nat eb lks Hj Hjl ltac:(lia)
                 ltac:(lkbelow)
-                with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").
+                with "Hcg Hown Htext Hpc Hpinv [] []").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
       { rewrite Heb /cpu_claim_ext. done. }
@@ -1474,7 +1474,7 @@ Section SpBodies.
       iDestruct (cpu_own_transport CIDs CIDn 0 eb (proc_addr j) eb ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res L8 0%nat eb (proc_addr j)
-                (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc [] Hpanic").
+                (av - 8)%nat eb lks Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
       all: try lkbelow.
       { iEval (rewrite HL8a0). iExact "Hlk2". }
       iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok HR Hown Hpay".
@@ -1582,7 +1582,7 @@ Section SpBodies.
     iDestruct (cpu_own_transport CID CIDq3 0 eb pj true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γt "time"%string ticks_res Q2 0%nat eb pj (av - 8)%nat true lks
-              Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc [] Hpanic").
+              Hn0 ltac:(lia) Hfresh with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HQ2a0). iExact "Hlk2". }
     iIntros (CIDa Hsa msA Macq) "%HmsA Hcg Hpc %HcsQ2 Htok HR Hown Hpay".

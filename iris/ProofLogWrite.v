@@ -845,7 +845,7 @@ Section LogWriteBlocks.
               (trap_res b + (K - 4))%nat false ({["log"]} ∪ lks)
               ltac:(unfold K_log_write in HK; lia)
               ltac:(rewrite Nat2Z.inj_succ; lia) Hk HA2a0 Hnobc2
-              with "Hcg Hcnt Htext Hpc Hbio Hpanic Hslot").
+              with "Hcg Hcnt Htext Hpc Hbio Hslot").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mb) "Hcg Hcnt Hpc %Hbppins Href".
@@ -1965,7 +1965,7 @@ Section ProofLogWrite.
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) mA n eb p (K - 4)%nat b lks
               ltac:(lia) ltac:(unfold K_log_write in HK; lia) Hno
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

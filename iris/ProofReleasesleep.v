@@ -239,7 +239,7 @@ Section ProofReleasesleep.
               ltac:(lia)
               ltac:(lia)
               Hno
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HKacqa0). iExact "Hlockinv". }
     iIntros (CIDacq Hsacq ms Macq) "%Hms Hcg Hpc %Hpins HtokL HRsl Hown Hpay".

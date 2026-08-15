@@ -137,7 +137,6 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the ftable lock, for filedup's ghost step *)
   is_ftable γl γf -∗
-  panic_wp_any -∗
   proc_priv γf p pid V -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,

@@ -469,7 +469,7 @@ Section ProofYield.
     cbv beta delta [wp_yield_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hext Hclmx Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hext Hclmx Hcont".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
        at level 0 they are forced equal ([CpuOwn.cpu_own_eb_agree]), so there
        is nothing to derive and nothing to case-split on.  yield's own
@@ -620,7 +620,7 @@ Section ProofYield.
               ltac:(lia)
               ltac:(lia)
               (locks_below_empty "proc")
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal

@@ -133,7 +133,7 @@ Section ProofIdup.
     intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
     unfold K_idup in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hpanic Hislot Href Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv Hislot Href Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -292,7 +292,7 @@ Section ProofIdup.
               n eb p (K - 4)%nat b lks
               HnZ ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CIDacq Hsacq ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

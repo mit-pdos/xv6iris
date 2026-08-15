@@ -902,7 +902,7 @@ Section KexitPark.
     iApply (Acquire.wp_acquire_sconf (CID := CIDw) γw "wait_lock"%string wait_res
               P2 0 eb pj av b lks ltac:(lia) ltac:(lia)
               Hfresh
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP2a0). iExact "Hwl". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD: index [false] throughout. *)
@@ -1116,7 +1116,7 @@ Section KexitPark.
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(lia)
               Hfresh_proc
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP8a0). iExact "Hislock". }
     iApply wp_next_off_intro.

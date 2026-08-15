@@ -854,7 +854,7 @@ Section BoBodies.
               (trap_res eb + (K - 4))%nat 1%nat eb false
               ({["log"]} ∪ lks) Hj Hjl HA1nz bo_noff2 ltac:(pose proof (bo_K22 K HK); lia)
               HbelowA1
-              with "Hcg Hown Htext Hpc Hpinv Hpanic").
+              with "Hcg Hown Htext Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfp) "%HApcs Hcg Hown Hpc".
     assert (HAp3 : ret_pc (A1 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x2a))
@@ -947,7 +947,7 @@ Section BoBodies.
     iApply (Sleep.wp_sleep_sconf γs j γl A4 (K - 4)%nat eb lks Hj Hjl
               ltac:(pose proof (bo_K22 K HK); lia)
               HbelowA4
-              with "Hcg Hown Htext Hpc Hpinv Hpanic Htcx Hclmx").
+              with "Hcg Hown Htext Hpc Hpinv Htcx Hclmx").
     all: try lkbelow.
     iIntros (CIDAs HAss mfs) "%HAscs Hcg Hown Hpc Htcx Hclmx".
     assert (HAp6 : ret_pc (A4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x34))
@@ -996,7 +996,7 @@ Section BoBodies.
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) A6 0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HA6a0). iExact "Hislock". }
     iIntros (CIDAa HAsa msA mfa) "%HAms Hcg Hpc %HAacs Htok Hres Hown Hpay".
@@ -1120,7 +1120,7 @@ Section BoBodies.
               (trap_res eb + (K - 4))%nat 1%nat eb false
               ({["log"]} ∪ lks) Hj Hjl HB1nz bo_noff2 ltac:(pose proof (bo_K22 K HK); lia)
               HbelowB1
-              with "Hcg Hown Htext Hpc Hpinv Hpanic").
+              with "Hcg Hown Htext Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mfp) "%HBpcs Hcg Hown Hpc".
     assert (HBp3 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x5a))
@@ -1209,7 +1209,7 @@ Section BoBodies.
     iApply (Sleep.wp_sleep_sconf γs j γl B4 (K - 4)%nat eb lks Hj Hjl
               ltac:(pose proof (bo_K22 K HK); lia)
               HbelowB4
-              with "Hcg Hown Htext Hpc Hpinv Hpanic Htcx Hclmx").
+              with "Hcg Hown Htext Hpc Hpinv Htcx Hclmx").
     all: try lkbelow.
     iIntros (CIDBs HBss mfs) "%HBscs Hcg Hown Hpc Htcx Hclmx".
     assert (HBp6 : ret_pc (B4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x64))
@@ -1258,7 +1258,7 @@ Section BoBodies.
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) B6 0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HB6a0). iExact "Hislock". }
     iIntros (CIDBa HBsa msA mfa) "%HBms Hcg Hpc %HBacs Htok Hres Hown Hpay".
@@ -1975,7 +1975,7 @@ Section ProofBeginOp.
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string (log_res γ bn γfs cov logstart) Maq
               0%nat eb pj (K - 4)%nat eb lks
               bo_noff1 ltac:(pose proof (bo_K10 K HK); lia) Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iExact "Hislock". }
     iIntros (CIDa Hsa ms Macq) "%Hmsf Hcg Hpc %Hcsacq Htok Hres Hown Hpay".

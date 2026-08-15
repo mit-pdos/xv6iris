@@ -2234,7 +2234,7 @@ Section ProofKwait.
                   (proc_lock_res γs γk (proc_addr kk)) S2 1%nat eb pme (trap_res eb + (K - 10))%nat false
                   ({["wait_lock"]} ∪ lks)
                   kw_ilvl1 ltac:(pose proof (kw_K10 K HK); lia) Hfresh_proc
-                  with "Hcg Hown Htext Hpc [Hlkk] Hpanic").
+                  with "Hcg Hown Htext Hpc [Hlkk]").
         all: try lkbelow.
         { iEval (rewrite HS2a0). iExact "Hlkk". }
         iApply wp_next_off_intro.
@@ -2595,7 +2595,7 @@ Section ProofKwait.
       iApply (Killed.wp_killed_sconf γs jj γl T1 (trap_res eb + (K - 10))%nat 1%nat eb
                 (proc_addr jj) false ({["wait_lock"]} ∪ lks)
                 HT1a0 Hjj Hgl kw_ilvl1 ltac:(pose proof (kw_K14 K HK); lia) Hfresh_proc
-                with "Hcg Hown Htext Hpc Hpinv Hpanic").
+                with "Hcg Hown Htext Hpc Hpinv").
       all: try lkbelow.
       iApply wp_next_off_intro. iIntros (mfk kl) "%Hkf Hcg Hown Hpc".
       destruct Hkf as (Hkcs & Hka0).
@@ -2684,7 +2684,7 @@ Section ProofKwait.
                   (trap_res eb + (K - 10))%nat 1%nat eb false
                   ({["wait_lock"]} ∪ lks)
                   Hjj Hgl HT3nz kw_ilvl1 ltac:(pose proof (kw_K14 K HK); lia) Hfresh_proc
-                  with "Hcg Hown Htext Hpc Hpinv Hpanic").
+                  with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (mfp) "%Hpcs Hcg Hown Hpc".
         assert (Hpde : ret_pc (T3 !!! Regidx Rra) = mword_of_int (KW + 0xde))
@@ -2776,7 +2776,7 @@ Section ProofKwait.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         iApply (Sleep.wp_sleep_sconf γs jj γl T6 (K - 10)%nat eb lks Hjj Hgl
                   ltac:(pose proof (kw_K22 K HK); lia) Hfresh_proc0
-                  with "Hcg Hown Htext Hpc Hpinv Hpanic [] []").
+                  with "Hcg Hown Htext Hpc Hpinv [] []").
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
@@ -2835,7 +2835,7 @@ Section ProofKwait.
         iApply (Acquire.wp_acquire_sconf γw "wait_lock"%string wait_res T8
                   0%nat eb (proc_addr jj) (K - 10)%nat eb lks
                   kw_ilvl0 ltac:(pose proof (kw_K10 K HK); lia) Hbelow
-                  with "Hcg Hown Htext Hpc [] Hpanic").
+                  with "Hcg Hown Htext Hpc []").
         all: try lkbelow.
         { iEval (rewrite HT8a0). iExact "Hlk". }
         iIntros (CIDa Hsa msA mfa) "%HmsA Hcg Hpc %Hacs Htok Hres Hown Hpay".
@@ -3386,7 +3386,7 @@ Section ProofKwaitMain.
                  with "Hown") as "Hown".
     iApply (Acquire.wp_acquire_sconf γw "wait_lock"%string wait_res P7 0%nat eb pj
               (av - 10)%nat eb lks kw_ilvl0 ltac:(pose proof (kw_K10 av Hav); lia) Hbelow
-              with "Hcg Hown Htext Hpc [Hlk] Hpanic").
+              with "Hcg Hown Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HP7a0). iExact "Hlk". }
     iIntros (CID19 Hs19 msa Macq) "%Hmsa Hcg Hpc %Hacs Htok Hres Hown Hpay".

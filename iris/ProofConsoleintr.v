@@ -2756,7 +2756,7 @@ Section ProofConsoleintr.
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γc "cons"%string cons_res P5 lvl eb pme
               (K - 6)%nat b lks ltac:(lia) ltac:(unfold consoleintr_stack in HK; lia) Hbelow
-              with "Hcg Hcnt Ht Hpc [] Hpanic").
+              with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP5a0). iExact "Hlk". }
     iIntros (CIDaq Hsaq ms0 maq) "%Hms0 Hcg Hpc %Hcsaq Hlocked Hres Hcnt Hpay". rgall.

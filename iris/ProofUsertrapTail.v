@@ -846,7 +846,7 @@ Section UtA6.
               M2 nx 0%nat b (un_pj N) b lks
               HM2a0 Hj Hjl ltac:(vm_compute; reflexivity) ltac:(lia)
               ltac:(lkbelow)
-              with "Hcg Hcpu Htext Hpc Hpi Hpa [-]").
+              with "Hcg Hcpu Htext Hpc Hpi [-]").
     all: try lkbelow.
     iIntros (CID3 Hk3 mf kl) "[%Hcskl %Hkla0] Hcg Hcpu Hpc".
     assert (Hretac : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0xac))
@@ -1133,7 +1133,7 @@ Section UtFa.
       iEval (rewrite Hlkempty) in "Hcpu".
       iApply (YI.wp_yield_sconf (CID := CID3) (un_s N) (un_j N) (un_l N)
                 M2 nx b Hj Hjl ltac:(lia)
-                with "Hcg Hcpu Htext Hpc Hpi Hpa Hcsrs Hclm [-]").
+                with "Hcg Hcpu Htext Hpc Hpi Hcsrs Hclm [-]").
       iIntros (CID4 Hk4 mf) "%Hcsy Hcg Hcpu Hpc Hcsrs Hclm".
       assert (Hret106 : ret_pc (M2 !!! Regidx Rra) = mword_of_int (UT + 0x106))
         by (rewrite HM2ra; pcw).

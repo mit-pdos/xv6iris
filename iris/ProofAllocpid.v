@@ -102,7 +102,7 @@ Section ProofAllocpid.
     intros pcE ret_tgt Hn Hav Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hislock #Hpanic Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hislock Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq. symmetry in Hbeq.
     (* ===================== PROLOGUE (generic b) ===================== *)
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -238,7 +238,7 @@ Section ProofAllocpid.
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γp "nextpid"%string nextpid_res A4 n eb p (av - 4)%nat b lks
               Hn ltac:(pose proof (apid_K10 av Hav); lia) Hbelow
-              with "Hcg Hcpu Htext Hpc [Hislock] Hpanic").
+              with "Hcg Hcpu Htext Hpc [Hislock]").
     all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hislock". }
     iIntros (CIDacq Hsacq ms macq0) "%Hmsf Hcg Hpc %Hcsacq Hlocked HR Hcpu Hpay".

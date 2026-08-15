@@ -843,7 +843,7 @@ Section ProofVmfault.
       iApply (Kalloc.wp_kalloc_sconf γa γk (mword_of_int (KernelSyms.kmem + 24))
                 A1 None lvl eb p (K - 6)%nat b _
                 ltac:(lia) ltac:(reflexivity) Hlvl Hbelow
-                with "Hcg Hcnt Htext Hpc Hlock Havail Hpanic").
+                with "Hcg Hcnt Htext Hpc Hlock Havail").
       all: try lkbelow.
       iIntros (Ckr Hskr mk) "Hcg Hcnt Hpc %Hkcs Hkpost".
       assert (Hret3e : ret_pc (A1 !!! Regidx Rra) = mword_of_int (KernelSyms.vmfault + 0x3e)).
@@ -1492,7 +1492,7 @@ Section ProofVmfault.
                 (mword_of_int (KernelSyms.kmem + 24)) F2 None lvl eb p (K - 6)%nat b lks
                 ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
                 Hlvl Hbelow
-                with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail Hpanic").
+                with "Hcg Hcnt Htext Hpc Hlock [Hpage] Havail").
       all: try lkbelow.
       { rewrite /kfree_pre HF2a0.
         iSplitR; [iPureIntro; exact Hpv | iExact "Hpage"]. }

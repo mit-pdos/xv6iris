@@ -83,7 +83,6 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      [acquire] it calls in the scan asks for [panic_wp_any], a resource
      quantified over EVERY hart, and one hart's copy does not yield it.  Same
      propagation as SpecMain / SpecKinit / SpecUserinit / kalloc_env. *)
-  panic_wp_any -∗
   (* ONE premise where there were two: [trap_csrs] now carries [intr_res] --
      the installed vector and its contract -- as its fifth member, so the
      scheduler's level-0 SIE flip gets the handler out of the same bundle it

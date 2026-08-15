@@ -128,7 +128,7 @@ Section ProofBpin.
     intros pcE ret_tgt HK Hnoffpos Hk Ha0 Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hctx #Hpanic Hbslot Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hctx Hbslot Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     iDestruct (bio_ctx_lock with "Hctx") as "#Hlock".
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -280,7 +280,7 @@ Section ProofBpin.
     iApply (Acquire.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) mA
               n eb p (K - 4)%nat b lks
               Hnoffpos ltac:(lia) Hbelow
-              with "Hcg Hcnt Htext Hpc [Hlock] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
     iIntros (CID10 Hs10 ms macq) "%Hmsfacts Hcg Hpc %Hacqpins Htok HRres Hcnt Hpay".

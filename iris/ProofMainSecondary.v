@@ -717,7 +717,7 @@ Section ProofMainSecondary.
     (* fold the boot cells and the handler resource built at +0x36 into the
        [trap_csrs] the scheduler consumes. *)
     iApply (Scheduler.wp_scheduler_sconf γs Q4 n p0 Hp0 ltac:(lia)
-              with "Hcg Hfree Hcpu Htext Hpc Hpinv Hpanic [Htcsr Hintr Hkpt]").
+              with "Hcg Hfree Hcpu Htext Hpc Hpinv [Htcsr Hintr Hkpt]").
     iApply (trap_csrs_of_raw with "Htcsr Hintr Hkpt").
   Qed.
 

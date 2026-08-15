@@ -933,7 +933,7 @@ Section AslBodies.
               ({["sleep lock"]} ∪ lks)
               Hj Hjpl Hchan ltac:(lia) ltac:(lia)
               ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpinv Hpanic").
+              with "Hcg Hown Htext Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (mfp) "%Hspcs Hcg Hown Hpc".
@@ -1034,7 +1034,7 @@ Section AslBodies.
               lks   (* the release above already cancelled the singleton *)
               Hj Hjpl ltac:(lia)
               ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpinv Hpanic Hextc Hextm").
+              with "Hcg Hown Htext Hpc Hpinv Hextc Hextm").
     all: try lkbelow.
     (* SLEEP RETURNS ON HART [CIDs]. *)
     iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpc Hextc Hextm".
@@ -1083,7 +1083,7 @@ Section AslBodies.
               ltac:(lia)
               ltac:(lia)
               Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HL7a0). iApply (is_sleeplock_gen_lock with "Hslk"). }
     iIntros (CIDq Hsq ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -1297,7 +1297,7 @@ Section ProofAcquiresleep.
               ltac:(lia)
               ltac:(lia)
               Hbelow
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     all: try lkbelow.
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_gen_lock with "Hslk"). }
     iIntros (CID11 Hs11 ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".
@@ -1663,7 +1663,7 @@ Section ProofAcquiresleep.
               ltac:(lia)
               ltac:(lia)
               Hfresh
-              with "Hcg Hown Htext Hpc [] Hpanic").
+              with "Hcg Hown Htext Hpc []").
     { iEval (rewrite HMaqa0). iApply (is_sleeplock_gen_lock with "Hslk"). }
     iApply wp_next_off_intro.
     iIntros (ms_a Macq) "%Hms_a Hcg Hpc %Hpins Htok HR Hown Hpay".

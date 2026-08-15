@@ -122,7 +122,7 @@ Section ProofSysUptime.
     cbv beta delta [wp_sys_uptime_sconf_body].
     intros pcE ret_tgt Htp Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     iDestruct (is_tickslock_lock with "Hlock") as "#Hlk".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
@@ -258,7 +258,7 @@ Section ProofSysUptime.
               ltac:(exact Hn)
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [Hlk] Hpanic").
+              with "Hcg Hcnt Htext Hpc [Hlk]").
     all: try lkbelow.
     { iEval (rewrite HA4a0). iExact "Hlk". }
     iIntros (CID9 Hs9 ms MA) "%Hms Hcg Hpc %HcsA Htok HR Hcnt Hpay".
