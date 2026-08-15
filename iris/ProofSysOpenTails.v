@@ -98,6 +98,7 @@ Require Import ProcInv.
 Require Import IregLinkNz.
 Require Import SpecEndOp.
 Require Import SpecIput.
+Require Import SpecIunlock.
 Require Import SpecIunlockput.
 Require Import SpecFileclose.
 Require Import CodeSysOpen.
@@ -118,8 +119,8 @@ Local Ltac regne :=
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
-Module SysOpenTails (Iunlockput : IUNLOCKPUT) (EndOp : END_OP)
-                    (Fileclose : FILECLOSE).
+Module SysOpenTails (Iunlock : IUNLOCK) (Iunlockput : IUNLOCKPUT)
+                    (EndOp : END_OP) (Fileclose : FILECLOSE).
 
 Section ProofSysOpenTails.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -1884,6 +1885,366 @@ Section ProofSysOpenTails.
     { exact Hcsf. }
     { exact Ha0f. }
     { exact Huse. }
+  Qed.
+
+
+  (* ================================================================== *)
+  (*  ARM S (+0xb8 .. +0xc8): THE SUCCESS TAIL.                          *)
+  (*                                                                    *)
+  (*    mv a0,s1 ; jal iunlock ; jal end_op ; mv a0,s3 ;                  *)
+  (*    c.ldsp s1,168 ; c.ldsp s2,160 ; c.ldsp s3,152                     *)
+  (*                                                                    *)
+  (*  and then it FALLS INTO the epilogue at +0xca -- the only arm that   *)
+  (*  reloads all three callee-saved registers, because it is the only    *)
+  (*  one that reaches the bottom of the function with all three spilled. *)
+  (*                                                                    *)
+  (*  iunlock, NOT iunlockput, AND THAT IS THE LEDGER SENTENCE OF THE     *)
+  (*  WHOLE SYSCALL.  The [+1] inode reference is not released here: it   *)
+  (*  has already been parked in [f->ip] as [FileInvDefs.inode_pay] by    *)
+  (*  the field stores above, so what comes back out of iunlock is the    *)
+  (*  generation-ERASED share [inode_shr k s dev inum] and NOT an         *)
+  (*  [iref_slot].  That is the same sentence as sys_chdir's [p->cwd],    *)
+  (*  one descriptor further along, and it is why sys_open's allowance is *)
+  (*  spend-at-most rather than conserved.                                *)
+  (*                                                                    *)
+  (*  So this tail moves NO bitmap, NO buffer pool and NO reference       *)
+  (*  ledger: iunlock takes none of them and end_op retires whatever the  *)
+  (*  operation has left.  The retained parent [inode_ref_short] rides in *)
+  (*  the WALK's closure, untouched -- it is not iunlock's business.      *)
+  (*                                                                    *)
+  (*  a0 IS THE DESCRIPTOR, WRITTEN AFTER end_op.  Unlike every failure   *)
+  (*  arm's [c.li a0,-1] this is a [c.mv a0,s3], so the value is a        *)
+  (*  PARAMETER here and the walk supplies fdalloc's literal.             *)
+  (* ================================================================== *)
+  Lemma so_tail_s `{GEN : GenId} `{CID0 : CpuId}
+      (gs : list gname) (jx : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names) (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gil gisl : gname)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (kk : nat) (s : Qp) (gy : gname) (inum : mword 32)
+      (dn : dinode) (bm : blkmap)
+      (fdw : mword 64)
+      (u : nat) (pidv : mword 32) (dq : dfrac)
+      (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
+      (b : bool) (lks : gset string) (w6 w23 w24 : mword 64)
+      (bp : nat -> bv 8) :
+    (K_iunlock <= K - 24)%nat -> (K_end_op <= K - 24)%nat ->
+    (24 <= K)%nat -> ((K - 24) + 24 = K)%nat ->
+    (kk < NINODE)%nat ->
+    log_geom_ok cov logstart ->
+    (jx < NPROC)%nat -> gs !! jx = Some gl ->
+    lks = ∅ ->
+    sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
+    so_sp sp0 M -> so_thr m M ->
+    (M !!! Regidx Rs1 : mword 64) = ientry kk ->
+    (M !!! Regidx Rs3 : mword 64) = fdw ->
+    so_al sp0 ->
+    sie_cap_gpr M (K - 24) b (proc_addr jx) -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
+    trap_csrs_ext eb -∗
+    cpu_claim_ext eb (proc_addr jx) -∗
+    kernel_text -∗ pc_is (mword_of_int (SO + 0xb8)) -∗
+    panic_wp_any -∗
+    bio_ctx bn (fs_view gfs gd dev cov) -∗
+    log_ctx g bn gfs cov logstart dev -∗
+    fs_crash_seam cov logstart -∗
+    gen_cert -∗
+    itable_inv -∗
+    ic_escrow cn gfs gi cov logstart kk -∗
+    is_sleeplock_gen gil gisl (i_lock (ientry kk)) "inode"%string (ic_tok cn kk) (slh_tok (icfg_isl kk)) -∗
+    sleeplocked_q gisl s -∗
+    sl_pid (i_lock (ientry kk)) ↦₄ pidv -∗
+    ic_deposit cn kk (DepShr s dev inum gy) -∗
+    i_dev (ientry kk) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry kk) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry kk) ↦₄ valid_word true -∗
+    ic_loaded gfs gi cov logstart kk inum dn bm -∗
+    ity_shot gy (di_type dn) -∗
+    p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+    procs_inv gs -∗
+    dev_inv gu gd -∗
+    disk_geom gd pd pav pu -∗
+    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    log_op g u -∗
+    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+    (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+    (pa_stk sp0 6) ↦₈ w6 -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 22) jj ↦ₘ bp jj) -∗
+    (pa_stk sp0 23) ↦₈ w23 -∗
+    (pa_stk sp0 24) ↦₈ w24 -∗
+    wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
+      ∀ mf : regfile,
+        ⌜callee_saved m mf⌝ -∗
+        ⌜(mf !!! Regidx Ra0 : mword 64) = fdw⌝ -∗
+        sie_cap_gpr mf K b (proc_addr jx) -∗
+        cpu_own 0 eb (proc_addr jx) b lks -∗
+        trap_csrs_ext eb -∗
+        cpu_claim_ext eb (proc_addr jx) -∗
+        pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
+        p_pid (proc_addr jx) ↦₄{dq} pidv -∗
+        inode_shr kk s dev inum -∗
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HKiu HKeo HK24 Kpop Hkk Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
+           HMs3 Hal.
+    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen
+              #Hitinv #Hesck #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
+              Hload #Hshot Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4
+              Hf5 Hf6 HbP H23 H24 Hcont".
+    iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
+    iPoseProof (soi_0b8 with "Htext") as "Hi0".
+    iPoseProof (soi_0ba with "Htext") as "Hi1".
+    iPoseProof (soi_0be with "Htext") as "Hi2".
+    iPoseProof (soi_0c2 with "Htext") as "Hi3".
+    iPoseProof (soi_0c4 with "Htext") as "Hi4".
+    iPoseProof (soi_0c6 with "Htext") as "Hi5".
+    iPoseProof (soi_0c8 with "Htext") as "Hi6".
+    (* ===== +0xb8 c.mv a0,s1 ===== *)
+    iApply (wp_cmv_s_sconf (CID := CID0) (mword_of_int (SO + 0xb8)) Ra0 Rs1
+              M (K - 24)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0").
+    iIntros (CID1 Hq1) "Hcg Hpc".
+    set (M1 := <[Regidx Ra0 := regval_into_reg
+                  (add_vec zero_reg (M !!! Regidx Rs1))]> M).
+    assert (HM1a0 : (M1 !!! Regidx Ra0 : mword 64) = ientry kk).
+    { etransitivity; [ rewrite /M1; apply upd_eq |].
+      rewrite add_vec_zero_l. exact HMs1. }
+    assert (HM1sp : so_sp sp0 M1)
+      by (rewrite /so_sp /M1 upd_ne; [exact HMsp | nz]).
+    assert (HM1s3 : (M1 !!! Regidx Rs3 : mword 64) = fdw)
+      by (rewrite /M1 upd_ne; [exact HMs3 | nz]).
+    assert (HM1thr : so_thr m M1).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /M1 upd_ne; [| regne].
+      exact (HMthr c Hc N2 N8 N9 N18 N19). }
+    assert (Hpp1 : add_vec_int (mword_of_int (SO + 0xb8) : mword 64) 2
+                   = mword_of_int (SO + 0xba)) by pcw.
+    iEval (rewrite Hpp1) in "Hpc".
+    (* ===== +0xba jal ra,iunlock ===== *)
+    iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SO + 0xba)) Rra
+              (mword_of_int 2089270 : mword 21) M1 (K - 24)%nat b
+              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi1").
+    iIntros (CID2 Hq2) "Hcg Hpc".
+    set (M2 := <[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (SO + 0xba) : mword 64) 4)]> M1).
+    assert (Hjiu : add_vec (mword_of_int (SO + 0xba) : mword 64)
+                     (sign_extend' 64 (mword_of_int 2089270 : mword 21))
+                   = mword_of_int KernelSyms.iunlock) by pcw.
+    iEval (rewrite Hjiu) in "Hpc".
+    assert (HM2ra : (M2 !!! Regidx Rra : mword 64)
+                    = add_vec_int (mword_of_int (SO + 0xba) : mword 64) 4)
+      by (rewrite /M2; apply upd_eq).
+    assert (HM2a0 : (M2 !!! Regidx Ra0 : mword 64) = ientry kk)
+      by (rewrite /M2 upd_ne; [exact HM1a0 | nz]).
+    assert (HM2sp : so_sp sp0 M2)
+      by (rewrite /so_sp /M2 upd_ne; [exact HM1sp | nz]).
+    assert (HM2s3 : (M2 !!! Regidx Rs3 : mword 64) = fdw)
+      by (rewrite /M2 upd_ne; [exact HM1s3 | nz]).
+    assert (HM2thr : so_thr m M2).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /M2 upd_ne; [| regne].
+      exact (HM1thr c Hc N2 N8 N9 N18 N19). }
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iApply (Iunlock.wp_iunlock_sconf (CID := CID2) gs gfs gi cn gil gisl
+              cov logstart kk s gy dev inum dn bm pidv dq M2 (K - 24)%nat eb
+              (proc_addr jx) b lks
+              HKiu Hkk HM2a0
+              ltac:(rewrite Hlkempty; apply locks_below_empty)
+              with "Hcg Hown Htext Hpc Hpanic Hitinv Hesck Hslkk Hslkd Hslpid
+                    Hpid Hprocs Hdep Hidev Hiinum Hivalid Hload Hshot").
+    iIntros (CID3 Hq3 miu) "%Hcsiu Hcg Hown Hpc Hpid Hshr".
+    assert (Hpc2 : ret_pc (M2 !!! Regidx Rra : mword 64)
+                   = mword_of_int (SO + 0xbe)) by (rewrite HM2ra; pcw).
+    iEval (rewrite Hpc2) in "Hpc".
+    assert (Hiusp : so_sp sp0 miu).
+    { rewrite /so_sp (callee_saved_lookup Hcsiu csp_rs1 ltac:(vm_compute; reflexivity)).
+      exact HM2sp. }
+    assert (Hius3 : (miu !!! Regidx Rs3 : mword 64) = fdw).
+    { rewrite (callee_saved_lookup Hcsiu Rs3 ltac:(vm_compute; reflexivity)).
+      exact HM2s3. }
+    assert (Hiuthr : so_thr m miu).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite (callee_saved_lookup Hcsiu c Hc).
+      exact (HM2thr c Hc N2 N8 N9 N18 N19). }
+    iDestruct (trap_csrs_ext_transport CID0 CID3 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID0 CID3 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    (* ===== +0xbe jal ra,end_op ===== *)
+    iApply (wp_jal_s_sconf (CID := CID3) (mword_of_int (SO + 0xbe)) Rra
+              (mword_of_int 2091826 : mword 21) miu (K - 24)%nat b
+              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi2").
+    iIntros (CID4 Hq4) "Hcg Hpc".
+    set (M3 := <[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (SO + 0xbe) : mword 64) 4)]> miu).
+    assert (Hjeo : add_vec (mword_of_int (SO + 0xbe) : mword 64)
+                     (sign_extend' 64 (mword_of_int 2091826 : mword 21))
+                   = mword_of_int KernelSyms.end_op) by pcw.
+    iEval (rewrite Hjeo) in "Hpc".
+    assert (HM3ra : (M3 !!! Regidx Rra : mword 64)
+                    = add_vec_int (mword_of_int (SO + 0xbe) : mword 64) 4)
+      by (rewrite /M3; apply upd_eq).
+    assert (HM3sp : so_sp sp0 M3)
+      by (rewrite /so_sp /M3 upd_ne; [exact Hiusp | nz]).
+    assert (HM3s3 : (M3 !!! Regidx Rs3 : mword 64) = fdw)
+      by (rewrite /M3 upd_ne; [exact Hius3 | nz]).
+    assert (HM3thr : so_thr m M3).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /M3 upd_ne; [| regne].
+      exact (Hiuthr c Hc N2 N8 N9 N18 N19). }
+    iDestruct (cpu_own_transport CID3 CID4 0 eb (proc_addr jx) b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (trap_csrs_ext_transport CID3 CID4 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID3 CID4 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
+              g gfs cov logstart dev u pidv dq M3 (K - 24)%nat eb b lks
+              HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
+              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    Hpid Hprocs Hdev Hgeo Hdlk Hop").
+    iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
+    assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
+                   = mword_of_int (SO + 0xc2)) by (rewrite HM3ra; pcw).
+    iEval (rewrite Hpc3) in "Hpc".
+    assert (Heosp : so_sp sp0 meo).
+    { rewrite /so_sp (callee_saved_lookup Hcseo csp_rs1 ltac:(vm_compute; reflexivity)).
+      exact HM3sp. }
+    assert (Heos3 : (meo !!! Regidx Rs3 : mword 64) = fdw).
+    { rewrite (callee_saved_lookup Hcseo Rs3 ltac:(vm_compute; reflexivity)).
+      exact HM3s3. }
+    assert (Heothr : so_thr m meo).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite (callee_saved_lookup Hcseo c Hc).
+      exact (HM3thr c Hc N2 N8 N9 N18 N19). }
+    (* ===== +0xc2 c.mv a0,s3 : THE DESCRIPTOR ===== *)
+    iApply (wp_cmv_s_sconf (CID := CID5) (mword_of_int (SO + 0xc2)) Ra0 Rs3
+              meo (K - 24)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi3").
+    iIntros (CID6 Hq6) "Hcg Hpc".
+    set (P1 := <[Regidx Ra0 := regval_into_reg
+                  (add_vec zero_reg (meo !!! Regidx Rs3))]> meo).
+    assert (HP1a0 : (P1 !!! Regidx Ra0 : mword 64) = fdw).
+    { etransitivity; [ rewrite /P1; apply upd_eq |].
+      rewrite add_vec_zero_l. exact Heos3. }
+    assert (HP1sp : so_sp sp0 P1)
+      by (rewrite /so_sp /P1 upd_ne; [exact Heosp | nz]).
+    assert (HP1thr : so_thr m P1).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /P1 upd_ne; [| regne].
+      exact (Heothr c Hc N2 N8 N9 N18 N19). }
+    assert (Hpp4 : add_vec_int (mword_of_int (SO + 0xc2) : mword 64) 2
+                   = mword_of_int (SO + 0xc4)) by pcw.
+    iEval (rewrite Hpp4) in "Hpc".
+    (* ===== +0xc4 c.ldsp s1,168(sp) ===== *)
+    assert (Hd3 : add_vec (P1 !!! Regidx csp_rs1 : mword 64)
+                    (zero_extend' 64 (concat_vec (mword_of_int 21 : mword 6) ('b"000")))
+                  = pa_stk sp0 3) by (rewrite HP1sp; apply so_frm3).
+    iApply (wp_cldsp_s_sconf (CID := CID6) (mword_of_int (SO + 0xc4))
+              (mword_of_int 21 : mword 6) Rs1 P1 (K - 24)%nat
+              (m !!! Regidx Rs1 : mword 64) b ltac:(nz) ltac:(rdok)
+              with "Hcg Hpc Hi4 [Hf3]").
+    { iEval (rewrite Hd3). iExact "Hf3". }
+    iIntros (CID7 Hq7) "Hcg Hpc Hf3".
+    iEval (rewrite Hd3) in "Hf3".
+    set (P2 := <[Regidx Rs1 := regval_into_reg
+                  (m !!! Regidx Rs1 : mword 64)]> P1).
+    assert (HP2s1 : (P2 !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64))
+      by (rewrite /P2; apply upd_eq).
+    assert (HP2a0 : (P2 !!! Regidx Ra0 : mword 64) = fdw)
+      by (rewrite /P2 upd_ne; [exact HP1a0 | nz]).
+    assert (HP2sp : so_sp sp0 P2)
+      by (rewrite /so_sp /P2 upd_ne; [exact HP1sp | nz]).
+    assert (HP2thr : so_thr m P2).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /P2 upd_ne; [| regne].
+      exact (HP1thr c Hc N2 N8 N9 N18 N19). }
+    assert (Hpp5 : add_vec_int (mword_of_int (SO + 0xc4) : mword 64) 2
+                   = mword_of_int (SO + 0xc6)) by pcw.
+    iEval (rewrite Hpp5) in "Hpc".
+    (* ===== +0xc6 c.ldsp s2,160(sp) ===== *)
+    assert (Hd4 : add_vec (P2 !!! Regidx csp_rs1 : mword 64)
+                    (zero_extend' 64 (concat_vec (mword_of_int 20 : mword 6) ('b"000")))
+                  = pa_stk sp0 4) by (rewrite HP2sp; apply so_frm4).
+    iApply (wp_cldsp_s_sconf (CID := CID7) (mword_of_int (SO + 0xc6))
+              (mword_of_int 20 : mword 6) Rs2 P2 (K - 24)%nat
+              (m !!! Regidx Rs2 : mword 64) b ltac:(nz) ltac:(rdok)
+              with "Hcg Hpc Hi5 [Hf4]").
+    { iEval (rewrite Hd4). iExact "Hf4". }
+    iIntros (CID8 Hq8) "Hcg Hpc Hf4".
+    iEval (rewrite Hd4) in "Hf4".
+    set (P3 := <[Regidx Rs2 := regval_into_reg
+                  (m !!! Regidx Rs2 : mword 64)]> P2).
+    assert (HP3s2 : (P3 !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64))
+      by (rewrite /P3; apply upd_eq).
+    assert (HP3s1 : (P3 !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64))
+      by (rewrite /P3 upd_ne; [exact HP2s1 | nz]).
+    assert (HP3a0 : (P3 !!! Regidx Ra0 : mword 64) = fdw)
+      by (rewrite /P3 upd_ne; [exact HP2a0 | nz]).
+    assert (HP3sp : so_sp sp0 P3)
+      by (rewrite /so_sp /P3 upd_ne; [exact HP2sp | nz]).
+    assert (HP3thr : so_thr m P3).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /P3 upd_ne; [| regne].
+      exact (HP2thr c Hc N2 N8 N9 N18 N19). }
+    assert (Hpp6 : add_vec_int (mword_of_int (SO + 0xc6) : mword 64) 2
+                   = mword_of_int (SO + 0xc8)) by pcw.
+    iEval (rewrite Hpp6) in "Hpc".
+    (* ===== +0xc8 c.ldsp s3,152(sp) ===== *)
+    assert (Hd5 : add_vec (P3 !!! Regidx csp_rs1 : mword 64)
+                    (zero_extend' 64 (concat_vec (mword_of_int 19 : mword 6) ('b"000")))
+                  = pa_stk sp0 5) by (rewrite HP3sp; apply so_frm5).
+    iApply (wp_cldsp_s_sconf (CID := CID8) (mword_of_int (SO + 0xc8))
+              (mword_of_int 19 : mword 6) Rs3 P3 (K - 24)%nat
+              (m !!! Regidx Rs3 : mword 64) b ltac:(nz) ltac:(rdok)
+              with "Hcg Hpc Hi6 [Hf5]").
+    { iEval (rewrite Hd5). iExact "Hf5". }
+    iIntros (CID9 Hq9) "Hcg Hpc Hf5".
+    iEval (rewrite Hd5) in "Hf5".
+    set (P4 := <[Regidx Rs3 := regval_into_reg
+                  (m !!! Regidx Rs3 : mword 64)]> P3).
+    assert (HP4s3 : (P4 !!! Regidx Rs3 : mword 64) = (m !!! Regidx Rs3 : mword 64))
+      by (rewrite /P4; apply upd_eq).
+    assert (HP4s1 : (P4 !!! Regidx Rs1 : mword 64) = (m !!! Regidx Rs1 : mword 64))
+      by (rewrite /P4 upd_ne; [exact HP3s1 | nz]).
+    assert (HP4s2 : (P4 !!! Regidx Rs2 : mword 64) = (m !!! Regidx Rs2 : mword 64))
+      by (rewrite /P4 upd_ne; [exact HP3s2 | nz]).
+    assert (HP4a0 : (P4 !!! Regidx Ra0 : mword 64) = fdw)
+      by (rewrite /P4 upd_ne; [exact HP3a0 | nz]).
+    assert (HP4sp : so_sp sp0 P4)
+      by (rewrite /so_sp /P4 upd_ne; [exact HP3sp | nz]).
+    assert (HP4thr : so_thr m P4).
+    { intros c Hc N2 N8 N9 N18 N19. rewrite /P4 upd_ne; [| regne].
+      exact (HP3thr c Hc N2 N8 N9 N18 N19). }
+    assert (Hpp7 : add_vec_int (mword_of_int (SO + 0xc8) : mword 64) 2
+                   = mword_of_int (SO + 0xca)) by pcw.
+    iEval (rewrite Hpp7) in "Hpc".
+    (* ===== THE FALL-THROUGH INTO THE EPILOGUE ===== *)
+    iDestruct (cpu_own_transport CID5 CID9 0 eb (proc_addr jx) b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (trap_csrs_ext_transport CID5 CID9 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID5 CID9 eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID9)
+                 ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iApply (so_epilogue (CID0 := CID9) m P4 sp0 K b (proc_addr jx)
+              (m !!! Regidx Rs1 : mword 64) (m !!! Regidx Rs2 : mword 64)
+              (m !!! Regidx Rs3 : mword 64) w6 w23 w24 bp
+              HK24 Kpop Hsp0 HP4sp HP4thr HP4s1 HP4s2 HP4s3 Hal
+              with "Hcg Htext Hpc Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbP H23 H24
+                    [Hown Htce Hcce Hpid Hshr Hcont]").
+    iEval (rewrite /wp_next).
+    iIntros (CIDy) "%Hqy". iIntros (mf) "%Hcsf %Ha0f Hcg Hpc".
+    iDestruct (cpu_own_transport CID9 CIDy 0 eb (proc_addr jx) b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iDestruct (trap_csrs_ext_transport CID9 CIDy eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Htce") as "Htce".
+    iDestruct (cpu_claim_ext_transport CID9 CIDy eb (proc_addr jx)
+                 ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
+    iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+    iApply ("Hcont" $! mf with "[%] [%] Hcg Hown Htce Hcce Hpc Hpid Hshr").
+    { exact Hcsf. }
+    { rewrite Ha0f. exact HP4a0. }
   Qed.
 
 End ProofSysOpenTails.
