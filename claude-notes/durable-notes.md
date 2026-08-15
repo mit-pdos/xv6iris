@@ -388,6 +388,55 @@ it, so a loop body that intros it exclusively cannot instantiate its own
 `IH`; the error is `iSpecialize: "Hkenv" not found`, which names the
 hypothesis and not the reason.
 
+### THE SAME MISMATCH IN A `set`/`change` IS SILENT, AND IT SURFACES AS A HANG
+
+The trap above is about two terms that fail to UNIFY. The register-map
+abbreviation every straight-line walk builds hits the same `rget`-vs-`!!!`
+distinction one level down, where nothing fails at all:
+
+```coq
+(* WRONG: the leaf hands the map back at [rget], not [!!!] *)
+set (C3 := <[Regidx Ra5 := regval_into_reg (add_vec (C2 !!! Regidx Ra5) (C2 !!! Regidx Ra4))]> C2).
+change (… same …) with C3.
+```
+
+`wp_cadd_s_sconf`, `wp_addi4_s_sconf` and their siblings spell the written
+value at the HART-INDEXED read (`rget m r`), so a `set` written with `!!!`
+finds **no occurrence to fold**, and `change A with B` **succeeds vacuously**
+when `A` does not occur. The proofmode hypothesis therefore keeps the
+unfolded, `rget`-spelled map while every later step passes the abbreviation.
+Nothing reports it — and the `assert`s about the new name still prove fine,
+because they never touch the hypothesis.
+
+**The two forms are CONVERTIBLE, so this degrades instead of failing, and the
+degradation is superlinear.** `regfile` is a function and `rget` only reroutes
+`tp`, so conversion succeeds — but it must normalise the whole insert chain
+down to the symbolic entry map at every nested read. One nesting level costs
+~0.1 s; two never return. **So the previous instruction compiling fine is not
+evidence the spelling is right** — it is the same bug one level cheaper. The
+symptom is an `iApply` that reads as an infinite loop with no error message,
+several instructions AFTER the mis-spelled `set`.
+
+The one-line localiser, which separates "the term I wrote does not match the
+hypothesis" from everything else and costs milliseconds:
+
+```coq
+iAssert (<the premise, spelled out>) with "[Hcg]" as "Hcg". { iExact "Hcg". }
+```
+
+A fast `iAssert` and a hanging `iExact` is the mismatch, positively
+identified. Fix by spelling the `set`/`change` in `rget` form and adding the
+`rgne` normalisations the surrounding `assert`s then need;
+`ProofUvmunmap.v:600` / `ProofUvmdealloc.v:722` instead follow every such leaf
+with `iEval (rgne) in "Hcg"`, which is the same fix taken at the hypothesis.
+
+**A section-level lemma whose conclusion is `WP Loop` cannot be applied after
+a hart crossing.** `Loop` names `cpu_id`, so the statement is rigid at the
+section hart while the goal moved with the walk's `wp_next`s. Give such a
+lemma its own `` `{CIDh : CpuId} `` binder shadowing the section's
+(`ProofArgraw.ar_join` is the shape); the error is `iApply: cannot apply
+(WP Loop)`, which names neither hart.
+
 Hart-FREE, despite appearances: `stack_own` (physical stack memory),
 `mem_pointsto` and the whole `word_pointsto` family (memory is shared),
 `ghost_var_agree` and the other generic Iris lemmas, and every
@@ -960,6 +1009,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - Value/frame binders must be `mword 64` (annotate; `add_vec` demands `mword n` and won't unify a `bv 64` binder even though `mword 64 ≡ bv 64`). Same trap for a value introduced from an EXISTENTIAL resource (`iDestruct "HR" as (t) "Hcell"` on a `∃ t : mword 32, a ↦₄ t` invariant body): `t` arrives as `bv 32`, so `sign_extend' 64 t` fails with "has type bv 32 while it is expected to have type mword ?n" — ascribe `(t : mword 32)` at every use (the ascription leaves no mark, so `change`/`set` terms still match the leaf's output). Decode-fact immediates must be the decoder's POSITIVE RESIDUE (−2016 → 2080; the signed literal fails `bv_is_wf`). Model names need `Defs.` qualification (`Defs.bind`/`Defs.read_reg`/`Defs.assert_exp'`; `rv64d_types.Read_plain`) or they resolve to raw Prompt_monad versions that won't unify with `M = Defs.monad`. A `.` immediately before `(*` parses as `.(` projection — leave a space.
 - **A `nat`-ASCRIBED `Definition` WHOSE BODY IS AN `if`/`match` DOES NOT PUSH THE SCOPE INTO ITS BRANCHES.** Under the tree's usual `Local Open Scope Z_scope`, `Definition c (b : bool) : nat := if b then 0 else 1` fails with *"The term `0` has type `Z` while it is expected to have type `nat`"* — the return ascription constrains the `if` as a whole, but each branch is elaborated in the ambient scope first. Write the literals `0%nat` / `1%nat` per branch, and `(… + …)%nat` on any arithmetic. The same definition written with a bare literal body (`:= 3`) is fine, which is what makes this look arbitrary.
 - `lia` cannot evaluate `2^n`/`bv_modulus`/`bv_half_modulus` — `assert (… = <literal>) as -> by (vm_compute; reflexivity)` first. In heavy-import WP files (WpSmodeGpr+SmodeCore+program_logic) `bitvector.tactics` sets a zify hook that makes `lia` return "Cannot find witness" on trivial bounds — prefer explicit `Z.le_lt_trans`/`Z.add_le_mono_r`/`Nat2Z.is_nonneg`. The hook arrives TRANSITIVELY (dropping `bitvector.tactics` from your own imports does not help), and what trips it is a goal mentioning `bv_unsigned`: so when a proof needs real arithmetic, factor the arithmetic into a lemma over plain `Z` variables and feed it the `bv_unsigned` values (`ProofMemmove.mm_overlap_arith`), where `lia` works normally. Widths appear as `MachineWord.Z_idx n`, so `change (Z.sub 57 12) with 45` (or `change (bv_modulus 27)` won't match `bv_modulus (Z_idx 27)`) before a rewrite; conversion beats rewrite for closed masks; `and_vec` needs `unfold word_binop, with_word', with_word` before `bv_and_unsigned` matches. Use `apply f_equal` (single-arg) not `f_equal` on `add_vec` bv-address equalities (over-splits into the wf proof); same for `mword_of_int a = mword_of_int b` — `f_equal` there leaves a goal `lia` then fails on, so `assert (a = b) by lia; rewrite` it instead. Regidx disequality: `intro He; injection He as He2; vm_compute in He2; congruence`.
+- **TWO `bv_signed`s WHOSE WIDTH INDICES DIFFER ONLY UP TO CONVERSION ARE DISTINCT ATOMS TO `lia`.** `bv_signed (w : mword (MachineWord.Z_idx (31 - 0 + 1)))` and `bv_signed (w : mword (Z_idx 32))` are the same type up to conversion and print identically, but zify abstracts them as two unrelated atoms, so a hypothesis that IS the goal yields "Cannot find witness". Close it with `exact` (or `change` the width first) — reaching for a stronger arithmetic tactic never helps, because the arithmetic was never the problem. Its sibling: an `(MachineWord.Z_idx a <= MachineWord.Z_idx b)%N` side condition is opaque to `lia` for the same reason; close it with `apply N.leb_le; vm_compute; reflexivity`.
 - **`bv_unsigned` silently elaborates at the wrong width over `Arch.pa`.** `pa_add` lands in `Arch.pa`, whose width is an unreduced `Z_idx (if xlen =? 32 then … else …)` match, so an `assert` stated as `bv_unsigned (pa_add p j) = …` gets `bv_unsigned` at THAT width and then fails to `rewrite` in a goal stated at width 64 — the two print identically, so the error reads "Found no subterm matching" on a term you can see in the goal. Ascribe: `bv_unsigned (pa_add p j : mword 64)`.
 - **A stored value that itself contains an insert-lookup derails `rewrite upd_ne`/`upd_eq`.** Several leaves write a value computed from the same map (`c.addi4spn`'s `add_vec (m1 !!! Regidx csp_rs1) …`, an slli's `shift_bits_left (m2 !!! Regidx a2_idx) …`), so the NEW map contains `(<[k := v]> f) !!! j` inside itself; ssreflect then matches that occurrence instead of the peel you meant, and you get an unprovable side goal (`Regidx 2 <> Regidx 2`) or a `discriminate` failure ("No primitive equality found"). Two fixes, both worth preferring to a bare peel: pass the value to the leaf as its explicit `wval` (`wp_slli_s_sconf`/`wp_add_s_sconf` take one) so the stored term is closed, or `iEval (rewrite <the lookup fact>) in "Hcg"` BEFORE naming the map with `set`. Pinning the instance (`rewrite (upd_ne _ (Regidx k) (Regidx j))`) also works.
 - **AN `is_Some` PROBE DOES NOT MEASURE A MODEL EVALUATION — FORCING A FIELD IS THE COST.** `exec <program> (MState rs0 …)` checked only for `match … with Some _ => true end` is cheap even over an open `rs0` (the architectural reset: **1.2 s / 650 MB**) because it applies no `regstate` FIELD, so every `register_set` closure stays an unforced accumulator. The instant you ask for `register_lookup r` of the result — which is what every consumer-facing fact does — the field chain is forced and it explodes: `PC`, `nextPC`, `cur_privilege`, `hart_state` and `elp` each hit a 100 s timeout at ~4 GB on that same reset. So measure the fact you actually need, never `is_Some`; and `native_compute` is not an escape (the build passes `-native-compiler no`). The escape is symbolic peeling with the tower kept FOLDED (`exec_bind0_Some` / `exec_write_reg` / `irrelevant_register_set` / `register_lookup_set`).
