@@ -697,57 +697,35 @@ back, so the bare residue is satisfiable exactly when `ut_res` is — and
 vacuous version had two) is itself the check that every consumer now draws
 from the single owner.
 
-## The loop-closure plan (scoped, not built)
+## The loop-closure plan — BUILT
 
-Target: `SpecUserretClosed` — userret's spec with no user-mode-WP premise
-and no `stvec_handler_wp`, entered where forkret enters the loop.
+`SpecUserretClosed.v` / `ProofUserretClosed.v` / `LinkUserretClosed.v`:
+userret's contract with no premise about user-mode execution and no
+`stvec_handler_wp`. Entered where forkret enters (`pc_is (uva 0x9c)`), it
+runs forever. Axioms: the 5 platform stubs + funext + the 2 U-mode
+reservation effects + ONE assumed callee (`Syscall.wp_syscall_sconf`,
+usertrap's own).
 
-- **The handler contract is already taken under a later.**
-  `wp_user_exec`/`wp_user_exec_active`/`wp_user_exec_full`/
-  `SpecUser.wp_user_exec_closed` and `UserretUser.wp_userret_user` all take
-  `▷ stvec_handler_wp` — sound because the trap frame reaches the handler
-  only through the step obligation, whose continuations are under a `▷`. So
-  the Löb goes on `stvec_handler_wp` (∀ hart, `C`, `pt`) and uservec keeps
-  chaining usertrap and userret as it does; splitting uservec at the userret
-  point would need the same `▷` and rewrite ProofUservec's tail, so it buys
-  nothing.
-- **The back edge needs cells at the RESUMING hart.** uservec's continuation
-  is `wp_next true (proc_addr j)`, `j < NPROC`, so it is hart-generic and
-  entry-hart `↦ᵣ` cells are useless. `uservec_post` is missing five, to
-  rebuild `user_cfg` at `CID'`:
-  - `stvec` is a ROUND TRIP, not a parked cell: it is not free, since while
-    the kernel runs it must point at kernelvec to take interrupts, and it is
-    owned there by `sie_cap` (inside `intr_res`, folded by usertrap's `csrw
-    stvec,kernelvec` and unfolded by prepare_return). uservec therefore may
-    NOT hold it across its call — usertrap needs it, loose, as its own
-    premise — so `uservec_post` hands back what `usertrap_post` returns at
-    the resuming hart, and the loop puts that into the next round's
-    `user_cfg`.
-  - `sscratch`/`medeleg`/`mstateen0`/`sstateen0` ride in
-    `IntrDefs.hart_csrs`, a conjunct of `cpu_priv`: they cross a migration
-    with `cpu_hart`, and `UsertrapRes.ut_trap` already carries
-    `cpu_own ... false`, so they sit inside `usertrap_res`'s parked and bare
-    forms for free. `medeleg` is pinned at `MEDELEG_S`, which gives `uc_del`.
-    The access path is built: `usertrap_res_csrs_open` (the CSRs alone, for
-    the loop's `user_cfg` handoff) and `usertrap_res_tf_csrs_open` (the
-    trapframe page AND the CSRs, which is what uservec needs -- its save walk
-    and its `csrw`/`csrr sscratch` pair overlap). `SpecUservec` no longer
-    takes a `sscratch` cell: that premise was both unmintable and, once the
-    residue owns the cell, unsatisfiable beside the residue premise.
-    `uservec_post` hands `hw_config` and `minstret_inv` back at `CID'` too --
-    both are ambient-hart (the cells of the one, the invariant body of the
-    other), so a pre-crossing copy is a different resource; `wire_inv` is
-    all-harts and needs no such treatment. The three pinned cells do NOT go
-    through the post: the loop opens them off the residue itself with
-    `usertrap_res_csrs_open` and parks the closer wand, so `Rut` carries the
-    wand plus the loose `sscratch` cell across user execution.
-  - `mstateen0`/`sstateen0` are pinned at zero, which is what `user_cfg`
-    wants: `reset_regs` carries both -- `mstateen0` derived from the spec's
-    own `reset_stateen`, `sstateen0` from `ArchReset.board_regs`, that file's
-    platform-assumption list, since `reset_stateen` stops at the M-mode
-    four.
-- `Rut` is `fun p => ∃ ksp, usertrap_res_bare p ksp`.
-
-Order: (R2) `uservec_post` grows `stvec`/`hw_config`/`minstret_inv` + the
-frozen-cell premise + `sscratch_inv`; (R3) the Löb and
-`SpecUserretClosed`/`ProofUserretClosed`/`LinkUserretClosed`.
+- **The Löb is on `stvec_handler_wp`**, ∀ hart, ∀ `ucfg`, ∀ `uptd`, with
+  `hw_config`/`minstret_inv` as premises (both ambient-hart, so they cannot
+  be fixed outside the ∀). `wp_uservec_pt` already chains usertrap and
+  userret, so one round is ONE application of it: trap frame in, User-mode
+  machine out at the resuming hart. The body rebuilds `user_inv` there and
+  hands the next round's contract to `SpecUser`'s WP, which takes it under
+  the `▷` that IS the Löb hypothesis.
+- **uservec must not be handed the residue twice.** It takes the trap frame
+  AND the residue as separate premises, and `Rut` parks the residue INSIDE
+  the frame — so the loop opens the frame, takes the residue out, and
+  rebuilds the frame at `Rut := fun _ => emp` for uservec. Its post does not
+  mention `Rut`, so nothing is lost.
+- **The `ucfg` record is rebuilt every round**: `mideleg`'s value is a
+  genuine existential of usertrap's exit, so only the record's SHAPE is
+  loop-invariant (`loop_ok`). `loop_ucfg`'s three proof fields come from
+  stvec's pinned value, the post's own mask fact, and `medeleg_S_delegates`
+  — a closed computation over the twelve `user_exc` kinds. That one needs
+  the exception's PAYLOAD destructed first (`exceptionType_bits_forwards`
+  matches on it, so with a variable there the whole thing is stuck).
+- Still outside: `SpecUservec`'s two bare gaps (the SPIE=1 / `sconf_ms_facts`
+  mstatus gap and the trapframe kernel-words gap) are passed through
+  verbatim, and `loop_ok` is a premise of the entry. Both are the same
+  obligations one level down, not new ones.

@@ -109,6 +109,8 @@ ProofUsertrapParts.v
 UsertrapAux.v
 UserretUser.v
 LinkUserretUser.v
+SpecUserretClosed.v
+ProofUserretClosed.v
 SRegime.v
 PtBuild.v
 KvmSpec.v
@@ -1135,3 +1137,4 @@ ProofSysLinkParts.v
 ProofSysLinkTails.v
 ProofSysLink.v
 LinkSysLink.v
+LinkUserretClosed.v
