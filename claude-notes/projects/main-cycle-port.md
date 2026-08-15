@@ -99,6 +99,28 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    (`wp_hart_restart` hands out both ticks); the tick=true tail's extra
    `tick_clock` stretch is leaf-side (three clock_inv chops + ∀-reads),
    like the rest of the tail.
+0f. **The decode gap (open — the last design item before the leaf).**
+   A leaf's encoding word `w` is EXISTENTIAL inside `instr`, and decode
+   branches on `w`'s bits — so the functional batch (hsil2) is a STUCK
+   TERM through decode at symbolic `w`, and no cursor fact computes.  The
+   old route used `instr`'s ∀σ-conditional exec fact
+   (`∀ σ, conforming σ → exec (decode_fetch r) σ = Some (i, σ)`) — a
+   relational fact, exactly the right currency.  Resolution: a new derived
+   rule `wp_hart_exec_span` consuming that fact directly: for a
+   WRITE-FREE, state-preserving sub-monad, WP (bind mm K) reduces to
+   WP (K i) with frames intact — proven by mchild-induction where each
+   read node re-applies the ∀σ fact at the machine's own σ (the values
+   cannot matter: the result is σ-independent), and conformance (the Dro
+   pins) survives interference because it is framed.  The write-freeness
+   side condition is genuinely needed (an unowned register write cannot
+   re-establish the reg auth) and is NOT derivable from the ∀σ fact; it
+   goes in the same epistemic slot as the weak branch's `sail_live_st`
+   (per-instruction, decoder-checkable, declared where needed): prove
+   `decode_fetch` write-freeness once if the decoder's structure permits
+   (conversion-collapse of the encdec towers, as HartMDispatch found for
+   currentlyEnabled), else per-class instances in the Phase C catalogue.
+   The execute phase needs NO such fact — its registers are all framed,
+   hsil2 covers it (symprobe-verified for the ALU class).
 1. **The pinned-text fetch rule** (spike F7): derive from
    `wp_hart_ram_read` + `↦ₓ□` facts (`text_valid` per byte → `read_bytes`
    via `read_bytes_ne`/`read_bytes_spec`/`bv_eq_of_bytes`).  Shape it
