@@ -9841,3 +9841,75 @@ A/B/C via `so_tail_a` / `so_tail_b` / `so_tail_c`), then
 `LinkSysOpen.v`, the `_CoqProject` rows SAME-COMMIT and the coverage flip
 (expect 185/190, sysfile.c 15/16).  Gate for the seal: `Print Assumptions`
 = the standing six + `create_fresh_ty`, nothing else.
+
+### S7-open STEP 7d — the O_CREATE ARM LANDS, and with it the CONTINUATION
+### ADAPTER.  What is left is the ELSE arm, the prologue and the seal
+
+`so_cont0` names the SYSCALL's own exit continuation (at the process state
+argstr has already grown); `so_cont` is that one strengthened with the
+join's two extra clauses.  **The adapter between them is six lines inside
+`so_entry_c`** — `used'` is simply dropped (the syscall claims no bitmap
+ordering, because create allocates) and the iref interval is re-derived from
+create's `S ns' <= ns` plus the join's `ns1 <= ns'' <= S ns1`.  That guard
+is not a convenience: without it the syscall's `ns - sys_open_slots <= ns''`
+does not survive the join's `+1`.
+
+`so_entry_c` (+0x38 .. +0x48 and ARM A-FAIL) is `ProofSysMkdir`'s create
+call site with a different tail.  The T_DIR witness the join demands is
+FREE here — create was called with T_FILE and its report refutes T_DIR at a
+literal (`so_tdir_zne`).
+
+**TRAP: A `true`-CROSSING CALLEE BREAKS THE trap-CSR TRANSPORT CHAIN, AND
+THE FIX IS NOT A TRANSPORT.**  `trap_csrs_ext_transport` / `cpu_claim_ext_transport`
+need `eb = false ∨ p = zero_reg -> CIDb = CIDa`, and past a callee whose own
+`wp_next` index is the literal `true` (create, namei, ilock, itrunc, the two
+op brackets) the chain facts only give `p = zero_reg -> …`, so
+`wp_next_chain` fails with **"No applicable tactic" AT THE TRANSPORT** —
+nowhere near the callee.  At `eb = true` both complements are `emp`: hand
+them to the next block as `[] []` and discharge with
+`rewrite Heb /trap_csrs_ext; done`, exactly as `ProofSysMkdir` does across
+create.  (A `b`-crossing callee — filealloc, fdalloc — transports fine, which
+is why `so_alloc` needed no such thing.)
+
+### THE EXACT NEXT ACTION (S7-open)
+
+1. **`so_entry_n`** — the ELSE arm, +0xdc .. +0xfa, plus ARMs B-FAIL
+   (`so_tail_b`) and C-FAIL (`so_tail_c`).  Statement = `so_entry_c`'s with
+   `log_opS g MAXOPBLOCKS Sb` and `iref_slots ns` in and `so_cont0` out.
+   Its body:
+   * +0xdc `addi a0,s0,-176`; +0xe0 `jal namei` — `Namei.wp_namei_gen`, which
+     takes `iref_slots 2` EXACTLY, so split `iref_slots ns` into `2` and the
+     rest (`iref_slots_split`) and recombine after; it also takes
+     `p_cwd pj ↦₈{dqc} cwdv` + `inode_held cwdv`, i.e.
+     `ProcInv.proc_priv_split_cwd`'s payout, and the pid quarter.
+     `ProofSysLink.v`:1221 is the worked call site.
+   * +0xe4 `c.mv s1,a0`; +0xe6 `c.beqz a0 -> +0x10c` = ARM B-FAIL.
+   * +0xe8 `jal ilock` — a0 is STILL namei's return, so no reload.
+     **BLOCKER 2's ANSWER, and it is four lines:** shed namei's
+     `inode_held ipv` with `IcacheRef.inode_held_shed` (giving
+     `inode_held_short ipv s ∗ inode_shr_held ipv s` at a fresh `s`), name
+     the parent's generation with `inode_ref_short_gen_intro` and the
+     share's with `inode_shr_gen_intro`, and pin the two together with
+     `inode_ref_short_shr_gen_agree`.  ilock then takes
+     `inode_shr_gen k s dev inum g` and reports at that same `g`.
+   * +0xec `lh a4,68(s1)`; +0xf0 `c.li a5,1`; +0xf2 `bne -> +0x4a` (the
+     JOIN, via `so_join`, with the T_DIR premise discharged by
+     `so_tdir_zne`).
+   * +0xf6 `lw a5,-180(s0)`; +0xfa `c.beqz a5 -> +0x5e` — **note the
+     target: `so_alloc`, not `so_join`.**  The premise `so_join`/`so_alloc`
+     want (`di_type = T_DIR -> om = 0`) is EARNED here, by
+     `so_omode_eqz` + `so_dir_forced`.
+   * +0xfc = ARM C-FAIL (`so_tail_c`).
+2. **`so_entry`** — +0x00 .. +0x36: the prologue and `so_frame_carve`,
+   argint (`ProcInv.proc_priv_tf`, `ProofSysExit.v`:262 is the worked call
+   site — sys_exit writes the SAME shape, an `int` in a slot's upper word),
+   argstr, ARM 0's `bltz` straight to `so_epilogue`, begin_op, the
+   `lw`/`andi 512`/`c.beqz` O_CREATE split, then `so_entry_c` or `so_entry_n`.
+   The omode slot is SPLIT here (`so_omode_split`) and the split halves are
+   what every block below carries; `word_pointsto_aligned_p` takes the
+   slot-23 alignment BEFORE the split, which is the `Hal23` premise the
+   four blocks below already ask for.
+3. **`wp_sys_open_sconf`** = `so_entry` sealed against `SYSOPEN`, then
+   `LinkSysOpen.v`, the `_CoqProject` rows SAME-COMMIT and the coverage
+   flip (expect 185/190, sysfile.c 15/16).  Gate: `Print Assumptions` = the
+   standing six + `create_fresh_ty`, nothing else.
