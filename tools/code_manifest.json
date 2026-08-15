@@ -1108,5 +1108,11 @@
   "forkret",
   "fkr_",
   2
+ ],
+ [
+  "CodeSyscall.v",
+  "syscall",
+  "syci_",
+  2
  ]
 ]

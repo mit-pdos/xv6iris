@@ -464,6 +464,26 @@ Section UsertrapRes.
       (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
       (un_nib N) (un_size N) (un_dqb N) (un_dqs N).
 
+  (* THE ONE FIELD A SYSCALL CALL CAN MOVE.  [SpecSyscall.wp_syscall_sconf_body]
+     hands [fileclose_bm (un_fn N) (un_us N)] to the dispatch table (see its
+     header) and gets back [fileclose_bm (un_fn N) us'] for a possibly SMALLER
+     [us'] -- [SYSCLOSE]'s own postcondition re-indexes it the same way.  No
+     other field of [ut_names] moves across that call, so this is the only
+     update function this record needs. *)
+  Definition upd_us (N : ut_names) (us : gset Z) : ut_names :=
+    MkUtNames (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
+      (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
+      (un_tk N) (un_pr N) (un_bn N) (un_lg N) (un_fs N) (un_cov N)
+      (un_logstart N) (un_dev N) (un_ip N) (un_dqi N) (un_kl N) (un_ka N)
+      (un_i N) (un_cn N) (un_tl N) (un_bmapstart N) (un_inodestart N)
+      (un_nib N) (un_size N) (un_dqb N) (un_dqs N) us (un_ks N) (un_pid N).
+
+  Lemma un_fn_upd_us (N : ut_names) (us : gset Z) : un_fn (upd_us N us) = un_fn N.
+  Proof. reflexivity. Qed.
+
+  Lemma upd_us_id (N : ut_names) : upd_us N (un_us N) = N.
+  Proof. destruct N; reflexivity. Qed.
+
   (* the pure side conditions every callee below usertrap shares.  Bundled
      for the same reason the names are: each block lemma needs all four and
      none of them is about the block. *)
@@ -601,6 +621,39 @@ Section UsertrapRes.
     iIntros "(Hb & Hbm & Hip & Hfd & Hir & Hpv & Hsy)".
     iFrame "Hpv Hsy". iIntros (V') "Hpv Hsy".
     rewrite /ut_own. iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
+  Qed.
+
+  (* [ut_own]'s SEVEN raw conjuncts, straight back into [ut_own (upd_us N
+     us)] -- the rebuild [ProofUsertrapSys.v]'s syscall block needs after
+     [wp_syscall_sconf]'s crossing hands the six unmoved pieces back plus a
+     (possibly smaller) [fileclose_bm] set.  A DEDICATED lemma, proved here
+     against a SEVEN-hypothesis context, rather than an inline
+     [rewrite /ut_own /N2 ...; iFrame.] at the call site: the same shape
+     with the caller's own ~100-hypothesis proof state behind it makes
+     [iFrame]'s search degenerate (durable-notes.md's "failing tactic looks
+     like a hang" family -- this one is a slow, not a failing, tactic, but
+     the fix is the same: keep the reconstruction in a small lemma). *)
+  Lemma ut_own_rebuild_us (Rsys : gname -> mword 64 -> iProp Σ) (N : ut_names)
+      (V : pprivate) (us : gset Z) :
+    bslots (un_bn N) 3 -∗
+    fileclose_bm (un_fn N) us -∗
+    (mword_of_int KernelSyms.initproc : mword 64) ↦₈{un_dqi N} (un_ip N) -∗
+    fd_slots FDSPARE -∗
+    iref_slots IREFSPARE -∗
+    proc_priv (un_f N) (un_pj N) (un_pid N) V -∗
+    Rsys (un_f N) (un_pj N) -∗
+    ut_own Rsys (upd_us N us) V.
+  Proof.
+    rewrite /ut_own.
+    assert (un_bn (upd_us N us) = un_bn N) as -> by reflexivity.
+    assert (un_fn (upd_us N us) = un_fn N) as -> by reflexivity.
+    assert (un_dqi (upd_us N us) = un_dqi N) as -> by reflexivity.
+    assert (un_ip (upd_us N us) = un_ip N) as -> by reflexivity.
+    assert (un_f (upd_us N us) = un_f N) as -> by reflexivity.
+    assert (un_pj (upd_us N us) = un_pj N) as -> by reflexivity.
+    assert (un_pid (upd_us N us) = un_pid N) as -> by reflexivity.
+    iIntros "Hb Hbm Hip Hfd Hir Hpv Hsy".
+    iFrame "Hb Hbm Hip Hfd Hir Hpv Hsy".
   Qed.
 
   (* THE TRAPFRAME BORROW, at the [proc_priv] level.  [proc_fields] /

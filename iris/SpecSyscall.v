@@ -28,12 +28,36 @@
    usertrap's own contract for no gain: usertrap does not touch any of it,
    it only hands it over.
 
-   So it is ONE ABSTRACT PARAMETER, [syscall_env γf pj], exactly as
-   [SpecUsertrap.v]'s original boundary statement abstracted its
-   kernel-internal resources.  Consumers thread it opaquely; the eventual
-   proof DEFINES it (as the union above, indexed by the ghost names the
-   table's entries want) without churning a single caller.  What the
-   contract does say concretely is the part usertrap actually depends on:
+   MOST of that union is therefore still ONE ABSTRACT PARAMETER,
+   [syscall_env γf pj], exactly as [SpecUsertrap.v]'s original boundary
+   statement abstracted its kernel-internal resources: consumers thread it
+   opaquely, and [ProofSyscall.v] defines it (as the union of whatever is
+   NOT listed below, indexed by the ghost names the table's entries want)
+   without churning usertrap's own proof.
+
+   FIVE FAMILIES ARE PULLED OUT AS EXPLICIT PARAMETERS INSTEAD, and this is
+   not an inconsistency with the paragraph above -- it is forced by a
+   SHARING constraint [syscall_env] cannot express on its own.
+   [UsertrapRes.ut_own] already threads [bslots]/[fileclose_bm]/the
+   [initproc] cell/[fd_slots]/[iref_slots] to fund usertrap's OWN direct
+   [kexit] calls on the killed-before/killed-after arms (both of which run
+   OUTSIDE this call, never through [syscall_env]).  [SpecSysExit.v]'s own
+   contract needs exactly the same five families for the SAME physical
+   pool, reached only when the dispatch table selects [SYS_exit] -- so if
+   [syscall_env] carried an independent copy of any of them, [ut_res]'s
+   existential would be asking for TWO disjoint fundings of one pool, which
+   no boot-time construction could discharge (durable-notes.md's "two
+   owners of one address space" trap, in ghost-resource form: `own γ (◯ n)
+   ∗ own γ (◯ n)` is not [False], but it silently doubles the authority a
+   real allocation would have to supply).  So these five ride through
+   [syscall()] itself on the SAME channel [ut_own] already uses for them,
+   in and out, exactly like [proc_priv] -- not through [syscall_env].
+   Everything else in the union genuinely has no competing outer copy
+   ([UsertrapRes.v] never mentions the icache/inode-region invariants, the
+   superblock cells, or [bitmap_res] at all), so it stays inside the
+   still-abstract [syscall_env].
+
+   What the contract does say concretely is the part usertrap actually depends on:
 
      - the process block goes in and comes back, at a MOVED record [V'] --
        every syscall may write [p->trapframe->a0] (the return value), and
@@ -75,6 +99,22 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.
 Require Import PanicStub.
+Require Import BioInv.        (* [bio_names], for [bslots] *)
+Require Import SpecFileclose. (* [fclose_names], [fileclose_bm] -- the five
+                                  shared families, see the header *)
+(* The classes the widened binder list now generalizes over
+   ([kallocG]/[bioG]/[diskGhostG]/[uartGhostG]/[fsLogG]/[logG]/[fsCrashG]/
+   [iregG]) -- [Require Import SpecFileclose]/[SpecSysExit] does not put
+   them in scope transitively, and backtick generalization then silently
+   invents fresh binders with those names (durable-notes.md's typeclass-sweep
+   trap: the tell is [UNDEFINED EVARS]/"unresolved implicit arguments"
+   naming exactly these). *)
+Require Import KallocInv.
+Require Import DiskPtsto DiskInv.
+Require Import WpUart.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import InodeRegion.
 Require Import SpecSysExit.   (* [K_sys_exit]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -90,10 +130,14 @@ Import Defs.
 Definition K_syscall : nat := (4 + K_sys_exit)%nat.
 
 Definition wp_syscall_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !pavG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (R : gname -> mword 64 -> iProp Σ)
     (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+    (bn : bio_names) (fn : fclose_names) (us : gset Z)
+    (ip : mword 64) (dqi : dfrac)
     (m : regfile) (av : nat)
     (pid : mword 32) (V : pprivate) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.syscall in
@@ -112,11 +156,20 @@ Definition wp_syscall_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
   panic_wp_any -∗
-  (* everything the twenty-two entries consume, abstractly -- see header *)
+  (* THE FIVE FAMILIES [ut_own] ALSO holds -- see the header for why they
+     ride here rather than inside [R].  [sys_exit] (reached through the
+     table) is the only entry that draws on them; the other twenty-one
+     simply frame them across their own call. *)
+  bslots bn 3 -∗
+  fileclose_bm fn us -∗
+  (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+  fd_slots FDSPARE -∗
+  iref_slots IREFSPARE -∗
+  (* everything else the twenty-two entries consume, abstractly -- header *)
   R γf pj -∗
   proc_priv γf pj pid V -∗
   wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (V' : pprivate),
+    ∀ (mf : regfile) (V' : pprivate) (us' : gset Z),
       ⌜ callee_saved m mf ⌝ -∗
       (* THE TRAPFRAME PAGE IS THE ONE THING THAT CANNOT MOVE.  Everything
          else in the record may: [pv_tf] always does (the a0 slot is the
@@ -124,6 +177,14 @@ Definition wp_syscall_sconf_body
       ⌜ ud_tfp (pv_upt V') = ud_tfp (pv_upt V) ⌝ -∗
       sie_cap_gpr mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
+      bslots bn 3 -∗
+      (* [us] may shrink -- [SYSCLOSE]'s own postcondition re-indexes it the
+         same way ([fileclose_fs_env]'s [∃ us', ...]), and this call is the
+         one place that arm's [us'] has to be threaded back out to. *)
+      fileclose_bm fn us' -∗
+      (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
+      fd_slots FDSPARE -∗
+      iref_slots IREFSPARE -∗
       R γf pj -∗
       proc_priv γf pj pid V' -∗
       pc_is ret_tgt -∗
@@ -150,14 +211,20 @@ Module Type SYSCALL.
      mcounteren/stimecmp -- and which usertrap therefore carries in the
      hart-generic [UsertrapRes.devintr_caps_any] form instead.) *)
   Parameter syscall_env :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId},
       gname -> mword 64 -> iProp Σ.
   Parameter wp_syscall_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !irefslotG Σ, !pavG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !irefslotG Σ, !pavG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γf : gname) (γs : list gname) (j : nat) (γl : gname)
+      (bn : bio_names) (fn : fclose_names) (us : gset Z)
+      (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body syscall_env γf γs j γl m av pid V lks.
+      wp_syscall_sconf_body syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
 End SYSCALL.
