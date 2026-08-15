@@ -9286,6 +9286,71 @@ slot beside its `fpay_tok`, minted from the BSS's zeroed cells inside
 is, and not a family threaded through any environment.  The ftable lock is
 still unwired at boot, so nothing calls it yet.
 
+### S7-open STEP 2 — `SpecSysOpen.v` AND `ProofSysOpenParts.v` LAND.  The
+### contract needed nothing R-open-1b did not already give it, and the
+### frame carve is UNIFORM even though the register saves are shrink-wrapped
+
+**THE CONTRACT IS `SpecSysMkdir`'s PLUS THE FILE LAYER.**  R-open-1b adds no
+premise (the two cells never leave the slot), so the additions are exactly
+`is_ftable γfl γf`, one `fd_slot`, argument 1 for `argint`, and a
+postcondition keyed on the returned descriptor —
+`sys_open_post`, whose failure arm hands `proc_priv` back unchanged and whose
+success arm is `fd_frees (pv_ofile W) = fd :: l` with the slot named
+existentially.  **One `fd_slot` in, one out, on every one of the eight arms**:
+filealloc consumes it, fdalloc hands it back, filealloc's failure arm hands it
+straight back, and ARM F-FAIL's `fileclose` hands it back after fdalloc
+refused.  No `fclose_names` and no closing environment, because that
+`fileclose` is at FD_NONE where `fileclose_env_none` gives the environment for
+free.
+
+**THE SHRINK-WRAPPING DOES NOT REACH THE CARVE.**  `stack_own` is `∃ w`-shaped
+PER SLOT, so `so_frame_carve` / `so_frame_join` are uniform; what is
+arm-dependent is which of the five saved slots the WALK can still prove holds
+the entry value of its register, which is why `so_epilogue` takes slots 3, 4,
+5, 6 at existential contents and only ra and s0 by name.  The epilogue is four
+instructions and does NOT set `a0` (unlike sys_link's `c.mv a0,a5`): each arm
+writes its own return value, so the lemma reports `mf a0 = M a0` and the arms
+supply the literal.
+
+**THE OMODE CELL IS THE ONE 4-BYTE VIEW.**  `omode` is an `int` at `s0-180` =
+the UPPER word of slot 23, so `so_omode_split` / `so_omode_join` wrap
+`InstrBytes.word_pointsto_split4` at exactly one slot; the lower word is the
+`int fd` gcc never spilled and rides through arbitrary.  Every other narrow
+access is `lh`/`lhu` on inode fields (already `↦₂` in `inode_meta`) or the `sh`
+into `f->major` (already `↦₂` in `file_fields`), which is why the deferred
+hoist of `word4_pointsto_split2` out of `ProofSysMknod` STILL has no second
+consumer.
+
+**THREE TRAPS, ALL OF WHICH READ AS SOMETHING ELSE.**
+
+* **`vm_compute` ON A GOAL WITH A FREE ADDRESS KILLS THE PROCESS WITH
+  "Fatal error: allocation failure during minor GC".**  `so_omode`'s goal is
+  `add_vec X <imm> = pa_add (pa_stk X 23) 4` with `X` free, and the bytecode
+  evaluator unfolds the whole 64-bit adder against it.  It reads as a memory
+  limit or a `-j` artefact and is neither; `coqc -time` names the sentence in
+  one run.  **Compose the shifts SYMBOLICALLY first** (`InstrBytes.avi_assoc`,
+  then `unfold add_vec_int; f_equal`) and what is left is CLOSED.  The
+  `stk_push` / `stk_pop` idiom already does this, which is why every other
+  frame lemma in the cluster is fine.
+* **`unfold` WALKS ITS ARGUMENT LIST ONCE, so a constant a LATER entry
+  EXPOSES stays folded.**  `SpecFileclose.fileclose_stack` is `8 + K_iput`, so
+  `unfold …, K_iput, …, fileclose_stack` leaves a folded `K_iput` behind and
+  the `lia` after it fails with **"Cannot find witness"** — which reads like an
+  arithmetic gap and is an unfolding-order one.  Put the composite BEFORE the
+  constant it names.
+* **`callee_saved` HAS THIRTEEN COMPONENTS AND s3 IS THE FIFTH.**  sys_open
+  moves one more callee-saved register than sys_link, so the handover's
+  `split_and!` bracket list needs `exact Cs3` in position five and one fewer
+  `apply Hfin`; getting it wrong reports **"No applicable tactic"** at the
+  bracket rather than a type error.
+
+**WHAT IS LEFT:** the walk (`ProofSysOpen*.v`), the tails, `LinkSysOpen.v`,
+their `_CoqProject` rows and the coverage flip.  The omode BIT cluster
+(`& O_CREATE`, `& O_WRONLY`, `& O_RDWR`, `& O_TRUNC`, and the `snez` that
+computes `f->writable`) is deliberately NOT in the parts file yet: its exact
+term shapes come out of the walk's instruction lemmas, and a leaf file is
+cheap to extend.
+
 ### THE BUMP RE-DERIVATION (`XV6_REV` -> `f60ff58`) — **sys_open DID NOT
 ### RESHAPE.**  Every symbol-relative offset, the frame, and the register
 ### allocation are byte-identical; only the base moved, by `+0xe`
