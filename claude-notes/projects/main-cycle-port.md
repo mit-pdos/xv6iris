@@ -90,7 +90,9 @@ self-enforcing batch boundaries, the tick-family shape) live there, not here.
    C replays the pattern for the S-mode fetch (walk events multiply the
    residuals).  Candidates: apply-transitivity chains instead of
    rewrite-in-big-goal, or `abstract` on the heavy sub-goals.
-0e. **The tick generalization pass** (mechanical, after `mfetch_char`
+0e. **[DONE — `mseg1_charK`/`mfetch_charK` land tail-generic over `KT`,
+   originals kept byte-identical as instances, 5-axiom-clean.]**
+   Original entry: **The tick generalization pass** (mechanical, after `mfetch_char`
    lands): `mseg1_char`/`mseg2_start`/`mfetch_char` are pinned at
    `riscv_step false`, but the tick's `if` node sits BEYOND every
    characterized stretch (in the tail), so the statements and proofs
