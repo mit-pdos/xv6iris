@@ -202,7 +202,7 @@ Section ProofFilestat.
     cbv beta delta [wp_filestat_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
        [true] here -- which is what keeps the hart-chains uniform now that
@@ -700,7 +700,7 @@ Section ProofFilestat.
                 _ (fst_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                 ltac:(rewrite HQ3a0; exact Hipk)
                 Hbelow
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitbl Hesc Hireg
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
                       Hslk Hshr Hsb Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hbslot").
       all: try lkbelow.
@@ -983,7 +983,7 @@ Section ProofFilestat.
                 (* iunlock's bound is "sleep lock"(6); filestat's own is
                    "bcache"(4), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
+                with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                       Hheld Hslpid Hppid Hprocs
                       Hdep Hidev Hinum Hvalid Hlk Hshot").
       all: try lkbelow.

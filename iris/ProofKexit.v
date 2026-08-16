@@ -22,7 +22,8 @@
      six frame cells are never reloaded and the six stack slots are never
      given back: [kx_frame] is EXISTENTIAL in the saved values (nothing will
      ever read them) and is simply carried to the [jal sched], where the
-     post-resume arm drops it into [panic_wp_any] along with everything else.
+     post-resume arm drops it into the diverging panic along with everything
+     else.
      The same is true of [own_ctx] and the hart tag -- they go in and do not
      come back, which is the whole difference between this park and yield's.
 
@@ -83,7 +84,6 @@ Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
 Require Import BitmapInv DinodeEnc InodeInv.
 Require Import SpecFileclose SpecReparent SpecWakeup.
 Require Import SpecBeginOp SpecEndOp SpecIput.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import SpecPanic.
@@ -435,7 +435,6 @@ Section KexitLoop.
     locks_below lks "log" ->
     kernel_text -∗ kernel_data -∗
     is_ftable γft γf -∗
-    panic_wp_any -∗
     panic_env -∗
     (* the exit continuation: control at [begin_op]'s call site, every
        descriptor null.
@@ -479,7 +478,7 @@ Section KexitLoop.
       WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.
-    iIntros "#Htext #Hkd #Hft #Hpanic #Hpe Hqexit".
+    iIntros "#Htext #Hkd #Hft #Hpe Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
                  ∀ (fd : nat) (M : regfile) (V : pprivate),
@@ -755,7 +754,7 @@ Section KexitLoop.
         { rewrite Hfnj Hfndq Hfnpid. iExact "Hpidq". }
         iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
-                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpanic Hpe Href Hfcenv").
+                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpe Href Hfcenv").
         all: try lkbelow.
         iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
@@ -867,7 +866,7 @@ Section KexitPark.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
-    procs_inv γs -∗ panic_wp_any -∗
+    procs_inv γs -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
@@ -882,7 +881,7 @@ Section KexitPark.
   Proof.
     intros pj Hj Hgl Hav Hregs Hof Hcwd Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
-    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl Hinit Hsp Hir Hpriv".
+    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hwl Hinit Hsp Hir Hpriv".
     (* THE SCHED CROSSING NEEDS THE EXACT SINGLETON: swtch is contracted at
        [{["proc"]}] on both sides (SpecSwtch.v), xv6's own
        [panic("sched locks")] discipline.  [kx_park] enters at depth 0, so the
@@ -1034,7 +1033,7 @@ Section KexitPark.
               ({["wait_lock"]} ∪ lks)
               ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
               Hfresh_proc
-              with "Hcg Hown Htext Hpc Hpanic Hprocs Hinit Hpar").
+              with "Hcg Hown Htext Hpc Hprocs Hinit Hpar").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (Mrp) "[%Hcsr %Hdomr] Hcg Hown Htext2 Hpc Hinit Hpar".
@@ -1103,7 +1102,7 @@ Section KexitPark.
               ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen
               ltac:(lia)
               Hfresh_proc
-              with "Hcg Hown Htext Hpc Hpanic Hprocs").
+              with "Hcg Hown Htext Hpc Hprocs").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (Mwk) "[%Hcsw %Hdomw] Hcg Hown Htext3 Hpc".
@@ -1437,7 +1436,7 @@ Section KexitRest.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb pj -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
-    procs_inv γs -∗ panic_wp_any -∗ panic_env -∗
+    procs_inv γs -∗ panic_env -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1465,7 +1464,7 @@ Section KexitRest.
     intros pj Hj Hgl Hav Hgeom Hregs Hof Hcdev Hcnib
            Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanic #Hpanenv #Hwl".
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
     iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hslks Hsbb Hsbi Hbmres".
     iIntros "Hinit Hsp Hir Hpriv".
@@ -1524,7 +1523,7 @@ Section KexitRest.
               ltac:(lia) Hj Hgl
               (* "log" (3) outranks "itable" (2), [Hfresh]'s own bound. *)
               ltac:(lkbelow)
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hlog Hpidq Hprocs").
+              with "Hcg Hown Htce Hcce Htext Hpc Hlog Hpidq Hprocs").
     all: try lkbelow.
     iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Htce Hcce Hpc Hpidq Hop".
     assert (Hpc50 : ret_pc (Q0 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1593,7 +1592,7 @@ Section KexitRest.
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
               Hfresh
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpanenv Hbio Hlog Hitab Hitinv Hescrow
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hitab Hitinv Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
@@ -1641,7 +1640,7 @@ Section KexitRest.
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb b lks
               ltac:(lia) Hgeom Hj Hgl
               Hfresh_log
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpanenv Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanenv Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
     all: try lkbelow.
     iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1693,7 +1692,7 @@ Section KexitRest.
               ltac:(cbn [upd_cwd pv_ofile]; exact Hof)
               ltac:(cbn [upd_cwd pv_cwd]; reflexivity)
               Hfresh_wl
-              with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hpanic Hwl Hinit Hsp Hir Hpriv").
+              with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hwl Hinit Hsp Hir Hpriv").
   Qed.
 
 End KexitRest.
@@ -1730,7 +1729,7 @@ Section ProofKexit.
     cbv beta delta [wp_kexit_sconf_body].
     intros pcE pj Hfn Hj Hgl HK Hgeom Hfresh. subst fn.
     
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanic #Hpanenv #Hwl #Hft".
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanenv #Hwl #Hft".
     iIntros "#Hkmem Hav0".
     iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl #Hicenv Hbm".
     iIntros "Hinit Hsp Hir Hpriv".
@@ -2051,7 +2050,7 @@ Section ProofKexit.
                     (av - 6)%nat eb b lks Hj eq_refl eq_refl eq_refl
                     ltac:(lia)
                     Hfresh
-                    with "Htext Hkd Hft Hpanic Hpanenv") as "Hloop".
+                    with "Htext Hkd Hft Hpanenv") as "Hloop".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hframe]").
       { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
         iDestruct "Hfenv" as (usx) "Hfenv".
@@ -2071,7 +2070,7 @@ Section ProofKexit.
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
                   ltac:(lkbelow)
-                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hprocs Hpanic Hpanenv Hwl
+                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hprocs Hpanenv Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hslks Hsbb Hsbi Hbmres
                         Hinit Hsp Hir Hpriv"). }

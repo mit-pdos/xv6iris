@@ -24,7 +24,7 @@
    recursion is structurally bounded by the description, and [ptree_own]
    is indexed by exactly the same [lvl].  Sv39 tables enter at [lvl = 2].
 
-   THE PANIC ARM IS DEAD, not discharged by [panic_wp].  [pt_free_ok lvl t]
+   THE PANIC ARM IS DEAD, not discharged by a panic credential.  [pt_free_ok lvl t]
    (PtFree.v §1) says every slot is either the literal zero word or a valid
    pointer to a node the description owns, so the [andi a4,a5,14 / bnez]
    test at +0x32 never fires.  That is the honest precondition: freewalk

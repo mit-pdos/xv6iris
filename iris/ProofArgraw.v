@@ -19,7 +19,7 @@
      entry costs one alignment fact; the [kernel_data] lookups discharge by
      [vm_compute] despite the 18k-entry map.
    * the spec's [i < NARG] precondition refutes the [bltu a5,s1,panic] arm
-     via [wp_bltu_fall_s_sconf], so argraw carries NO [panic_wp] hypothesis.
+     via [wp_bltu_fall_s_sconf], so argraw carries no panic credential.
 
    Shape: everything through the [bltu] is uniform in [i]; then a six-way
    [destruct] makes the table address, the loaded entry and the jump target

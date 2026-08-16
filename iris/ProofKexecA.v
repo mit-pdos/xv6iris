@@ -178,7 +178,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.   (* [is_sleeplock]: the nightly dead-import sweep re-pointed the chain that used to carry it *)
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -341,7 +340,6 @@ Section KexecABody.
     sie_cap_gpr m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kalloc_env ga None -∗
@@ -419,7 +417,7 @@ Section KexecABody.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
     
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont32".
     (* ---- b = eb = true (see the header) ---- *)
     iDestruct (kxc_sie_b_agree m 0%nat K eb b (proc_addr jp) lks with "Hcg Hcnt") as %Houtb.
@@ -504,7 +502,7 @@ Section KexecABody.
     iApply (BeginOp.wp_begin_op_sconf gs jp gl bn g gfs cov logstart dev
               pidv (DfracOwn (1/4)) N3 (K - 68)%nat true true lks
               ltac:(lia) Hjp Hgs
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlogc Hppid Hprocs").
+              with "Hcg Hcnt [] [] Htext Hpc Hlogc Hppid Hprocs").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
     { rewrite /cpu_claim_ext. done. }
@@ -575,7 +573,7 @@ Section KexecABody.
               ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
                     destruct (length (path_elems (bview plen pfun))); lia)
               Hjp Hgs eq_refl
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcwd Hcref Hpath Hbs Hirs Hlog").
     iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
@@ -723,7 +721,7 @@ Section KexecABody.
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
                 true true lks ltac:(lia) Hlg Hjp Hgs
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcrash Hcert
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -856,7 +854,6 @@ Section KexecABody.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_a2 jp bn g gfs ga gf cov logstart bmapstart inodestart size
@@ -957,7 +954,7 @@ Section KexecABody.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2.
     pose proof HK as HK'. 
-    iIntros "#Htext #Hpanic #Hfab Hseam Hcont Hcont90".
+    iIntros "#Htext #Hfab Hseam Hcont Hcont90".
     rewrite /kxc_at_a2.
     iDestruct "Hseam" as "(%Hregs & Hpc & Hcg & Hcnt & %Hn1 & Hlog & Hheld &
                            Hirs & %Hused1 & Hbits & Hbs & Hbm & Hins & #Hka &
@@ -1082,7 +1079,7 @@ Section KexecABody.
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true true lks
               ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitinv Hesck Hireg Hslkk
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1269,7 +1266,7 @@ Section KexecABody.
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity) Hjp Hgs HQ8a0
               ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3' HQ8a4'
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hka Hidev Hmeta Hmap Hblocks
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hka Hidev Hmeta Hmap Hblocks
                     [Helfb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1532,7 +1529,7 @@ Section KexecABody.
                   m Q12 K lks sp0 ra0 s00 s10 s20 pv av
                   HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                   Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ12sp HQ12s4 HQ12thr
-                  with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
+                  with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
                         Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
         { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
@@ -1605,7 +1602,7 @@ Section KexecABody.
                 m Q9 K lks sp0 ra0 s00 s10 s20 pv av
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib' Hcovb Hiu
                 Hjp Hgs Hused1 Hsp Hra Hs0 Hs1 Hs2 HQ9sp HQ9s4 HQ9thr
-                with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
+                with "Hcg Hcnt Htext Hpc [] Hslkk Hslkd Hslpid Hdep
                       Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
       { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
@@ -1723,7 +1720,6 @@ Section KexecAMain.
     sie_cap_gpr m K b (proc_addr jp) -∗
     cpu_own 0 eb (proc_addr jp) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KXA : mword 64) -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kalloc_env ga None -∗
@@ -1835,7 +1831,7 @@ Section KexecAMain.
   Proof.
     intros HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
            Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2 Ha0 Ha1.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont Hcont90".
     iApply (kxc_a1 (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf
               cov logstart bmapstart inodestart nib size dev used
@@ -1844,7 +1840,7 @@ Section KexecAMain.
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hcstr Hplen Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
               Ha0 Ha1
-              with "Hcg Hcnt Htext Hpc Hpanic Hfab Hka Hbm Hins Hbits Hpriv
+              with "Hcg Hcnt Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont [Hcont90]").
     (* ---- the seam at +0x032: [kxc_a2] takes it verbatim ---- *)
     iIntros (CIDs Hss M32 used1 ipv n1) "Hseam Hexit".
@@ -1856,7 +1852,7 @@ Section KexecAMain.
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv n1
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb
               Hiregb Hjp Hgs Heb Hsp Hra Hs0 Hs1 Hs2
-              with "Htext Hpanic Hfab Hseam Hexit Hcont90").
+              with "Htext Hfab Hseam Hexit Hcont90").
   Qed.
 
 End KexecAMain.

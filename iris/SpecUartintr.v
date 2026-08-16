@@ -51,7 +51,6 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -96,7 +95,6 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   dev_inv γu γv -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
   procs_inv γs -∗
-  panic_wp_any -∗
   (* CONSOLEINTR'S OWN CREDENTIAL, and the one premise the rx loop adds.
      The handler itself touches neither lock; [console_caps] is passed
      straight through to [consoleintr], which takes cons.lock and -- through

@@ -526,7 +526,7 @@ Section ProofFreeDesc.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (ra0 := (m !!! Regidx ra_idx : mword 64)).
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Hpi #Hdp Hfree Hva Hvl Hvf Hvn Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc Hpi #Hdp Hfree Hva Hvl Hvf Hvn Hcont".
     (* ===================== PROLOGUE (16-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))
@@ -810,7 +810,7 @@ Section ProofFreeDesc.
               pme lvl (K - 2)%nat eb b
               _ HKw HE2dom Hlen Hlvl
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hpi").
+              with "Hcg Hcnt Htext Hpc Hpi").
     all: try lkbelow.
     iIntros (CIDw Hdw MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
     destruct HcsW as [HcsW HdomW].

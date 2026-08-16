@@ -603,7 +603,7 @@ Section ProofPiperead.
     set (chaddr := add_vec s0v (sign_extend' 64 (mword_of_int 4015 : mword 12))).
     assert (Hcpune : eq_vec (zero_reg : mword 64) (mycpu_ret cid_word) = false)
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv Hcont".
     (* piperead's contract pins depth 0, so the held set is FORCED empty.
        Keep the equation rather than substituting it: the script still names
        [lks] in a dozen argument lists, and the interrupts-on arms hand back
@@ -1457,7 +1457,7 @@ Section ProofPiperead.
         iApply (Wakeup.wp_wakeup_sconf X2 γs pj 1%nat (trap_res true + (av - 12))%nat true false
                   ({["pipe"]} ∪ lks)
                   HwK HwdomX Hlen pr_lvl1 ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                  with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
         iEval (rewrite HX2ra) in "Hpc".

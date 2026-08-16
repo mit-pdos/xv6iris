@@ -351,7 +351,7 @@ Section ProofSysFstat.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): filestat
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic #Hpenv Hpriv #Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -807,7 +807,7 @@ Section ProofSysFstat.
       iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S3 (av - 4)%nat eb b lks
                 ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpenv Href Hcore Hkenv Hprocs Hfenv").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID20 Hs20 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".

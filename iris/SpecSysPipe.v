@@ -203,7 +203,7 @@ Definition wp_sys_pipe_sconf_body
   is_ftable γfl γf -∗
   (* the kmem lock, the sealed page count and panic's contract: pipealloc
      needs the allocator and copyout needs it again for vmfault, and every
-     acquire on the way needs [panic_wp] *)
+     acquire on the way has its own panic arm *)
   kalloc_env γa None -∗
   proc_priv γf p pid V -∗
   (* the syscall's own allowance -- two references may be live in locals

@@ -74,7 +74,7 @@
    shape at exactly that instruction: the allocated shape falls through on
    [inode_ok]'s type conjunct, and the free shape branches to +0xa2, runs
    the three-instruction [panic("ilock: no type")] call, and closes with
-   [SpecPanic.panic_wp_any].  Nothing else in the proof case-splits on the
+   [SpecPanic]'s own contract.  Nothing else in the proof case-splits on the
    shape -- the loads, the memmove and the brelse touch only the BUFFER's
    bytes and the entry's own cells, never the file's blocks. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -132,7 +132,6 @@ Require Import IcacheEscrow.
 Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import CodeIlock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import WpUart.
@@ -729,7 +728,6 @@ Section IlockLoad.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x36) : mword 64) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     ireg_inv gi gfs inodestart nib -∗
@@ -783,7 +781,7 @@ Section IlockLoad.
     assert (HMs2 : M !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64))
       by (apply Hthr; iuidx).
     pose proof (il_thr6_of_5 m M Hthr) as Hthr6.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
               #Hdlock Hframe Hppid Hidev Hinumc Hsb Hsl
               Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]. *)
@@ -1013,7 +1011,7 @@ Section IlockLoad.
               L7 (K - 4)%nat eb b
               _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
               Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
     iIntros (CID9 Hq9 mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1163,7 +1161,7 @@ Section IlockLoad.
        just been decoded off the buffer, and [dn] is fixed for the rest of
        this arm.  It is spent HERE rather than on each completing branch
        because the [ip->type == 0] branch diverges through
-       [SpecPanic.panic_wp_any] and owes nothing either way -- one [iMod]
+       [SpecPanic]'s own contract and owes nothing either way -- one [iMod]
        covers both the pool bundle and §16.4's claim box. *)
     iMod (ity_shoot g (di_type dn) with "Hpend") as "#Hshot".
     iModIntro.
@@ -1786,7 +1784,7 @@ Section IlockLoad.
               (diblk_bytes ds) bsd0 d0b b
               _ HKbl Hkk HH1a0
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hheld").
     all: try lkbelow.
     iIntros (CID33 Hq33 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl".
     assert (Hpc94 : ret_pc (H1 !!! Regidx Rra : mword 64)
@@ -2070,7 +2068,7 @@ Section ProofIlockMain.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (il_entry_nonzero k Hk)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hitbl #Hesc #Hireg #Hslk
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hitbl #Hesc #Hireg #Hslk
               Href Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -2322,7 +2320,7 @@ Section ProofIlockMain.
               (* acquiresleep's bound is "sleep lock"(6); ilock's own is
                  "bcache"(4), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hrs Hpanic Hppid Hprocs").
+              with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hrs Hppid Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa], handing the complement
@@ -2456,7 +2454,7 @@ Section ProofIlockMain.
                 pidv dq dqs m Q1 K eb b lks
                 HK HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
                       Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont").
   Qed.

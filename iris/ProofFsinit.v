@@ -39,7 +39,7 @@
    [printk] arms balloc and ialloc have), so a contract that promises to
    return has to refute it: [bv_unsigned v_magic = FSMAGIC] is what does,
    against the [lui a5,0x10203 / addi a5,a5,64] literal at +0x38/+0x3c.
-   [panic_wp_any] still rides for the callees' own arms, so no PANIC functor
+   The panic credentials still ride for the callees' own arms, so no PANIC functor
    is instantiated here or in LinkFsinit.v.
 
    THIRTY-FIVE BUFFER SLOTS, AND THE ONE HELD BACK.  The contract enters with
@@ -575,7 +575,7 @@ Section FsinitMain.
     assert (Hbnolt : (uint bno < 2147483648)%Z) by (rewrite Hbnou; lia).
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hseam #Hgen
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv #Hbio #Hseam #Hgen
               Hmirror Hfsb Hsbold #Hireg #Hitb2 #Hitbl #Hesc #Hslks Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
@@ -801,7 +801,7 @@ Section FsinitMain.
               (* bread's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1168,7 +1168,7 @@ Section FsinitMain.
               (* brelse's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs [Hheld]").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs [Hheld]").
     all: try lkbelow.
     { rewrite /bio_locked. iExact "Hheld". }
     iIntros (CID20 Hq20 mR) "%Hcsbl Hcg Hcnt Hpc Hppid Hslot".
@@ -1392,7 +1392,7 @@ Section FsinitMain.
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpanenv Hbio Hseam Hgen Hmirror
+              with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hseam Hgen Hmirror
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34").
@@ -1469,7 +1469,7 @@ Section FsinitMain.
               ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0 eq_refl
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hpenv Hbio Hlctx Hseam
+              with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx Hseam
                     Hgen Hni Hist Hbms Hireg Hitb2 Hitbl Hesc Hslks Hbm Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
     all: try lkbelow.

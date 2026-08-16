@@ -81,7 +81,6 @@ Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecForkretPark.
 Require Import SpecAcquire SpecRelease.
-Require Import PanicStub.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -171,7 +170,6 @@ Section ProofKforkB5.
     IntrDefs.arm_pay lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
-    panic_wp_any -∗
     SchedCtx.procs_inv γs -∗
     WpLock.is_lock γw SpecProcinit.wait_lock_addr "wait_lock"%string WaitInv.wait_res -∗
     SchedCtx.proc_held cpu_id j γl USED ch -∗
@@ -197,7 +195,7 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9 Hfresh.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hwl Hheld Hhart Hpriv #Hmk Hfd Hirsp Hks Hctx Hcont".
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpinv #Hwl Hheld Hhart Hpriv #Hmk Hfd Hirsp Hks Hctx Hcont".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
     (* on the raw context allocproc left, before releasing.               *)

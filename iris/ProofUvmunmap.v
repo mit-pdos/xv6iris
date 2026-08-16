@@ -532,7 +532,7 @@ Section ProofUvmunmap.
              Hsp Hs2 Hs3 Hs4 Hs5 Hs6 Hthr Hbelow;
       [ destruct (Nat.nle_succ_0 0 Hrem) |].
     iIntros "Hcg Hcnt #Htext Hpc Hptree Hown Henv Hcont".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
@@ -663,7 +663,7 @@ Section ProofUvmunmap.
                      = mword_of_int (KernelSyms.uvmunmap + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp50) in "Hpc".
       iAssert (kalloc_env γa None) as "Henv2".
-      { iExists γk. iFrame "Hlock Havail Hpanic". }
+      { iExists γk. iFrame "Hlock Havail". }
       iDestruct (cpu_own_transport CIDt CIDw ilvl eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDw) ltac:(wp_next_chain)

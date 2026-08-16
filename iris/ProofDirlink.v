@@ -102,11 +102,9 @@ Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import PanicStub.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import DirView.
-Require Import PanicStub.
 Require Import SpecReadi SpecStrncpy SpecWritei SpecIput.
 Require Import CodeDirlink.
 Require Import SpecDirlookup.
@@ -1341,7 +1339,7 @@ Section ProofDirlinkMain.
        the second is the full directory and is routed below. *)
     assert (Hk0fit : Z.of_nat (16 * k0)%nat <= 274432)
       by exact (Z.le_trans _ _ _ Hk0le Hszb').
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlog #Hkenv
+    iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlog #Hkenv
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
               #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hop Hcont".
@@ -1785,7 +1783,7 @@ Section ProofDirlinkMain.
               HR7a0
               ltac:(cbn [negb]; rewrite HR7a2 dlk_zero_moi; exact (eq_vec_refl _))
               Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                     Hitb2 Hitbl Hesc Hislot").
     all: try lkbelow.
@@ -1876,7 +1874,7 @@ Section ProofDirlinkMain.
                 Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le _ _ ncount Hnc)) Hj Hgs
                 HE1a0
                 Hbelow
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitb2 Hitbl Hesck
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl [] Hop").
       all: try lkbelow.
@@ -2368,7 +2366,7 @@ Section ProofDirlinkMain.
                   ltac:(cbn [negb]; rewrite HV6a1 dlk_zero_moi;
                         exact (eq_vec_refl _))
                   HV6a3 HV6a4
-                  with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
+                  with "Hcg Hcnt [] [] Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr
                         Hiregi Hdat Hsrc Hprocs Hdev Hgeom Hdlk Hbsl
                         Hop").
@@ -2988,7 +2986,7 @@ Section ProofDirlinkMain.
                     (* readi's own floor is "bcache"(4); dirlink's is
                        "itable"(2), and [locks_below_mono] weakens it. *)
                     ltac:(lkbelow)
-                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
@@ -3512,7 +3510,7 @@ Section ProofDirlinkMain.
            Hstab Hnlk Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb
            Hcinb Hbmgeo Hpkc
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlog #Hkenv
+    iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlog #Hkenv
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
               #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hop Hcont".
@@ -3530,7 +3528,7 @@ Section ProofDirlinkMain.
               HK Htype Hbmcov Hszb Hinums Hstab Hnlk Hlg Hbmwf Hholes
               Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
               Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb (Hncg _ _) Hj Hgs Ha0 Ha2 Heb Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
+              with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
                     Hiregi Hdat Hppid Hprocs Hdev Hgeom Hdlk Hbsl
                     Hitb2 Hitbl Hesc Hslks Hislot Hop [Hcont]").

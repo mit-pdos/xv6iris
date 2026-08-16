@@ -36,7 +36,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -112,7 +111,6 @@ Definition wp_virtio_disk_rw_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   (* the disk fabric *)
   dev_inv γu γd -∗

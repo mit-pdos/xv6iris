@@ -37,7 +37,7 @@
    globals are gone and uartputc_sync now takes the [tx_lock] SPINLOCK around
    each byte, so consputc's contract no longer threads flag cells or the
    transmitter token: what printint carries in their place is the ordinary
-   spinlock-caller accounting ([cpu_own] in and out UNCHANGED, [panic_wp_any],
+   spinlock-caller accounting ([cpu_own] in and out UNCHANGED,
    the [n + 1 < 2^31] transient bound) plus the persistent [is_txlock].
 
    THAT SIMPLIFIES THE PRINT LOOP.  Its induction used to thread the LINEAR

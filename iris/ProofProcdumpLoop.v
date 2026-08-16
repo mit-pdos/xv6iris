@@ -49,7 +49,6 @@ Require Import WpLock.
 Require Import DiskPtsto WpUart.
 Require Import ProcGeom.
 Require Import PrintkFmt.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import SpecProcdump.
 Require Import ProcdumpAux.
@@ -455,7 +454,7 @@ Section ProofProcdumpLoop.
     (* procdump's own cone touches no lock directly -- printk (rank "pr") is
        the only callee, and it is the whole order premise. *)
     locks_below lks "pr" ->
-    kernel_text -∗ kernel_data -∗ printk_env γpr γd γv -∗ panic_wp_any -∗
+    kernel_text -∗ kernel_data -∗ printk_env γpr γd γv -∗
     (* THE EXIT CONTINUATION, at the epilogue entry, taken as a PREMISE *)
     wp_next (CID0 := CID0) b p (fun (CIDq : CpuId) =>
       ∀ (Mx : regfile),
@@ -475,7 +474,7 @@ Section ProofProcdumpLoop.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hpk HK Hfresh.
-    iIntros "#Hkt #Hkd #Hpenv #Hpanic Hqexit".
+    iIntros "#Hkt #Hkd #Hpenv Hqexit".
     iAssert (∀ (fuel : nat),
       wp_next (CID0 := CID0) b p (fun (CIDf : CpuId) =>
         pdl_loop_body CID0 spv p m0 K' eb b lks fuel CIDf))%I

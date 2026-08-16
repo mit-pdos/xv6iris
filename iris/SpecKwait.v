@@ -121,7 +121,6 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
-Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -162,7 +161,6 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain sleep parks into *)
   procs_inv γs -∗
-  panic_wp_any -∗
   (* the running-thread bundle sleep needs *)
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

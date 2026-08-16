@@ -78,7 +78,6 @@ Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import WpUart.

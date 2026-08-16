@@ -45,7 +45,6 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInvDefs ProcInv.
 Require Import PipeInvDefs.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -106,7 +105,6 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   kalloc_env γa None -∗
   (* the running-thread bundle (SpecSleep.v) *)
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗

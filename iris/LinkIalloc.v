@@ -14,8 +14,8 @@
    exit, refuted from the contract's [1 < ninodes] exactly as balloc's
    [beqz a5] at the same offset is refuted from [0 < size] -- is refuted
    inside the proof, so no panic contract is instantiated here.  The
-   [panic_wp_any] resource the contract takes is threaded to bread,
-   log_write, brelse and iget and never consumed locally.
+   [kernel_data] / [panic_env] the contract takes are threaded to bread,
+   log_write, brelse and iget, whose own panic arms are theirs.
 
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  ialloc's
    no-inodes arm IS LIVE and calls printk on its GENERAL path, and
@@ -26,8 +26,8 @@
    ([SpecPrintk.printk_gen_contract]), which keeps the count at the
    standing six -- but that is NOT self-containment: ialloc's six are
    modulo a THREADED printk obligation that its callers must eventually
-   discharge, exactly the standing that [SpecPanic.panic_wp_any] already
-   has throughout this tree.  This is SpecBalloc.v's arrangement verbatim;
+   discharge, exactly the standing that [SpecPanic]'s own credentials
+   already have throughout this tree.  This is SpecBalloc.v's arrangement verbatim;
    a reader who takes the six for "depends on nothing else" is misreading
    it.                                                                    *)
 Require Import LinkBread LinkLogWrite LinkBrelse LinkMemsetArray LinkIget

@@ -38,7 +38,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
@@ -77,7 +76,6 @@ Definition wp_brelse_sconf_body
   sie_cap_gpr m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗

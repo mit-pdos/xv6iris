@@ -325,7 +325,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -452,7 +451,6 @@ Definition create_fresh_ty_body
   sie_cap_gpr Ma K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is (mword_of_int (KernelSyms.create + 0xa4) : mword 64) -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗

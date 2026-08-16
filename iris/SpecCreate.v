@@ -318,7 +318,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -583,7 +582,6 @@ Definition wp_create_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the two persistent credentials ialloc's printk arm needs, and the
      rodata image the "." / ".." literals live in *)
   kernel_data -∗

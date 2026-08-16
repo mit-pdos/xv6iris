@@ -53,7 +53,7 @@
    is either the literal zero word (V clear, +0x30 taken) or a valid POINTER
    (V set and R|W|X clear, so +0x30 and +0x36 both fall through).
    [fw_ok] is that dichotomy per slot, phrased over [fw_kid] so the two arms
-   never have to case on [lvl] itself.  [SpecPanic.panic_wp] is not needed
+   never have to case on [lvl] itself.  A panic credential is not needed
    anywhere in this file. *)
 Set Printing Depth 40.
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -428,7 +428,7 @@ Section ProofFreewalk.
     intros spr HK Hilvl Hmmsp Hjsp Hjs3 Hjthr Hfresh.
     iIntros "Hcg Hcnt #Htext Hpc Hpre #Henv Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hcont".
     iDestruct "Hk6" as (u6) "Hk6".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iPoseProof (fwi_48 with "Htext") as "Hi48".
     iPoseProof (fwi_4a with "Htext") as "Hi4a".
     iPoseProof (fwi_4e with "Htext") as "Hi4e".

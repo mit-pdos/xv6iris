@@ -64,12 +64,10 @@ Require Import SmodeCore.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import KptShare KptExecMap KvmMap.
-Require Import PanicStub.
 Require Import StartedInv.
 Require Import SpecPrintk.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
 Require Import KallocInv.
-Require Import PanicStub.
 (* [dev_ncpu], the PLIC's modelled hart count, for plicinithart's premise *)
 Require Import DevModel.
 Require Import DiskPtsto WpUart.
@@ -156,8 +154,7 @@ Section SpecMainSecondary.
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗
     (* HART-GENERIC, as on the boot arm: this arm reaches scheduler(), whose
-       acquire wants [panic_wp_any], and one hart's copy does not yield it. *)
-    panic_wp_any -∗
+       acquire wants them hart-generically. *)
     (* the handover channel, at the CONCRETE deposit *)
     started_inv (main_deposit γd γv) -∗
     (* this hart's own translation and trap resources *)

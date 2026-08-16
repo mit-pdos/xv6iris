@@ -16,7 +16,6 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
 Require Import IntrDefs WpNext.
@@ -57,7 +56,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslot
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
-  panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗

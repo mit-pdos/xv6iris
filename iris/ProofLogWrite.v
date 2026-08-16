@@ -82,7 +82,6 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import BreadLru.
 Require Import FsBlocks LogInv.
 Require Import CodeLogWrite.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecBpin.
 Require Import SpecLogWrite.
 From Kernel Require KernelSyms.
@@ -767,7 +766,6 @@ Section LogWriteBlocks.
     sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x66) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
@@ -794,7 +792,7 @@ Section LogWriteBlocks.
     assert (Hnobc2 : locks_below ({["log"]} ∪ lks) "bcache")
       by (exact (locks_below_union_singleton lks "log" "bcache"
                    Hlt Hble)).
-    iIntros "Hcg #Htext Hpc #Hpanic #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc Hncell Hclose Hcont".
+    iIntros "Hcg #Htext Hpc #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc Hncell Hclose Hcont".
     iPoseProof (lwi_66 with "Htext") as "Hi66".
     iPoseProof (lwi_68 with "Htext") as "Hi68".
     iPoseProof (lwi_6c with "Htext") as "Hi6c".
@@ -1011,7 +1009,6 @@ Section LogWriteBlocks.
     sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x94) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
@@ -1031,7 +1028,7 @@ Section LogWriteBlocks.
   Proof.
     intros HK Hnoff Hbeq Hk Hnl Hinl Ha0 Hregs Ha5v Ha2v Hno.
     pose proof Hregs as (Hsp & Hs1v & Hthr).
-    iIntros "Hcg #Htext Hpc #Hpanic #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc Hcell Hncell Hcl Hcont".
+    iIntros "Hcg #Htext Hpc #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc Hcell Hncell Hcl Hcont".
     iPoseProof (lwi_94 with "Htext") as "Hi94".
     iPoseProof (lwi_98 with "Htext") as "Hi98".
     iPoseProof (lwi_9c with "Htext") as "Hi9c".
@@ -1231,7 +1228,7 @@ Section LogWriteBlocks.
                    bs bsd Fb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (lw_pin (CID0 := cpu_id) bn γ γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl
                 m B6 K n eb p b lks HK Hnoff Hbeq Hk Hnl Ha0 HB6regs Hno
-                with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
+                with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
                       Hncell Hclose Hcont").
     - (* i < n: fall through to the release *)
       iDestruct "Hcl" as "[_ Hcl]".
@@ -1283,7 +1280,6 @@ Section LogWriteBlocks.
     sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x52) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
@@ -1301,7 +1297,7 @@ Section LogWriteBlocks.
   Proof.
     intros HK Hnoff Hbeq Hk Hnl Ha0 Hregs Ha2v Hno.
     pose proof Hregs as (Hsp & Hs1v & Hthr).
-    iIntros "Hcg #Htext Hpc #Hpanic #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc Hcell Hncell Hcl Hcont".
+    iIntros "Hcg #Htext Hpc #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc Hcell Hncell Hcl Hcont".
     iPoseProof (lwi_52 with "Htext") as "Hi52".
     iPoseProof (lwi_54 with "Htext") as "Hi54".
     iPoseProof (lwi_58 with "Htext") as "Hi58".
@@ -1464,7 +1460,7 @@ Section LogWriteBlocks.
         exact (Hthr c Hcs N2 N8 N9). }
     iApply (lw_pin (CID0 := CID0) bn γ γfs γd cov logstart dev k pidv bno bs bsd Fb Bud nl
               m G6 K n eb p b lks HK Hnoff Hbeq Hk Hnl Ha0 HG6regs Hno
-              with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
+              with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
                     Hncell Hclose Hcont").
   Qed.
 
@@ -1510,7 +1506,6 @@ Section LogWriteBlocks.
     sie_cap_gpr M (trap_res b + (K - 4))%nat false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.log_write + 0x44) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
@@ -1532,7 +1527,7 @@ Section LogWriteBlocks.
       iIntros (i M Hi Hfuel Hprev Hregs Ha5v Ha4v Ha2v Ha1v);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hs1v & Hthr).
-    iIntros "Hcg #Htext Hpc #Hpanic #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc HW Hjunk Hncell Hcl Hcont".
+    iIntros "Hcg #Htext Hpc #Hbio #Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc HW Hjunk Hncell Hcl Hcont".
     iPoseProof (lwi_44 with "Htext") as "Hi44".
     iPoseProof (lwi_46 with "Htext") as "Hi46".
     iPoseProof (lwi_4a with "Htext") as "Hi4a".
@@ -1613,7 +1608,7 @@ Section LogWriteBlocks.
       iApply (lw_blk94 (CID0 := cpu_id) bn γ γfs γd cov logstart dev k pidv bno bs bsd Fb Bud
                 nl i bno m S1 K n eb p b lks HK Hnoff Hbeq Hk Hnl ltac:(lia) Ha0
                 HS1regs HS1a5 HS1a2 Hno
-                with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
+                with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
                       Hcell Hncell Hcl94 Hcont").
     - (* ---- no hit here: bump and loop ---- *)
       assert (Hcmp : eq_vec (rget S1 Ra3) (rget S1 Ra1) = false).
@@ -1722,7 +1717,7 @@ Section LogWriteBlocks.
         iApply (lw_app52 (CID0 := CID0) bn γ γfs γd cov logstart dev k pidv bno bs bsd Fb Bud
                   nl jk m S3 K n eb p b lks HK Hnoff Hbeq Hk Hnl Ha0 HS3regs HS3a2
                   Hno
-                  with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
+                  with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
                         Hjunk Hncell Hcl52 Hcont").
       + (* another entry to test: back to +0x44 *)
         assert (Hcmp2 : neq_vec (rget S3 Ra2) (rget S3 Ra5) = true).
@@ -1746,7 +1741,7 @@ Section LogWriteBlocks.
         assert (Hi' : (S i < nl)%nat) by (clear - Hi Hmore; lia).
         assert (Hf' : (nl - S i <= fuel)%nat) by (clear - Hi Hfuel Hmore; lia).
         iApply ("IH" $! (S i) S3 Hi' Hf' Hprev' HS3regs HS3a5 HS3a4 HS3a2 HS3a1
-                  with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
+                  with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hslot Hbnoc
                         HW Hjunk Hncell Hcl Hcont").
   Qed.
 
@@ -1781,7 +1776,7 @@ Section ProofLogWrite.
     pose (Bud := (log_opSwe γ (if cr then S u else u) (Sb ∪ {[uint bno]})
                     (uint bno) vlb e0)%I).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot #Hvlb #Hcredit Hop Hau Hheld Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hlctx Hbslot #Hvlb #Hcredit Hop Hau Hheld Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
     iDestruct "Hlctx" as "#Hlctx2".
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx"; [iExact "Hlctx2"|].
@@ -2620,7 +2615,7 @@ Section ProofLogWrite.
                 0%nat 0%nat jk m T6 K n eb p b lks
                 ltac:(exact HK) ltac:(exact Hnoff) ltac:(exact Hbeq) Hk
                 ltac:(lia) ltac:(lia) Ha0 HT6regs HT6a5 HT6a2 Hno
-                with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hbslot Hbnoc
+                with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hbslot Hbnoc
                       Hjhead Hncell Hcl94 Hcont").
     - (* ---- lh.n >= 1: set up and run the scan ---- *)
       assert (Hcmp : zopz0zKzJ_s (zero_reg : mword 64) (rget T6 Ra2) = false).
@@ -2731,7 +2726,7 @@ Section ProofLogWrite.
                 ltac:(lia) ltac:(lia) Ha0 Hno
                 0%nat TA ltac:(lia) ltac:(lia) ltac:(intros j Hj; exfalso; lia)
                 HTAregs HTAa5 HTAa4 HTAa2 HTAa1
-                with "Hcg Htext Hpc Hpanic Hbio Hlctx Hcnt Hpay Htok Hframe Hbslot Hbnoc
+                with "Hcg Htext Hpc Hbio Hlctx Hcnt Hpay Htok Hframe Hbslot Hbnoc
                       HW Hjhead Hncell Hcl Hcont").
   Qed.
 
@@ -2755,7 +2750,7 @@ Section ProofLogWrite.
   Proof.
     cbv beta delta [wp_log_write_gene_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hno.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot #Hcred Hop Hfsb Hheld Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hlctx Hbslot #Hcred Hop Hfsb Hheld Hcont".
     (* the anchor at 0: a lower bound of zero is the unit, so this form costs
        its callers no epoch anchor of their own *)
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
@@ -2763,7 +2758,7 @@ Section ProofLogWrite.
               bs bsl bsd d u cr Sb e0 0%nat ⊤ (fsblock γfs (uint bno) bs)%I
               m n eb p K b lks
               HK Hnoff Hk Ha0 Hcovbno Hnotlog Hno
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hlb0 Hcred Hop [Hfsb] Hheld [Hcont]").
     all: try lkbelow.
     2: { iIntros (CIDx) "%Hchain".
          iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
@@ -2800,7 +2795,7 @@ Section ProofLogWrite.
   Proof.
     cbv beta delta [wp_log_write_gen_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hcredit Hno.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot Hop Hfsb Hheld Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hlctx Hbslot Hop Hfsb Hheld Hcont".
     (* THE CREDIT, IN ITS OWN-SET FORM (fs-log.md §G.19).  This form's
        premise is the PURE one it always was, and [log_credit_own] is the
        whole conversion: the birth epoch is opened here (the group form
@@ -2812,7 +2807,7 @@ Section ProofLogWrite.
     iApply (wp_log_write_gene bn γ γfs γd cov logstart dev k pidv bno
               bs bsl bsd d u cr Sb e0 m n eb p K b lks
               HK Hnoff Hk Ha0 Hcovbno Hnotlog Hno
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hcred Hop Hfsb Hheld [Hcont]").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hcred Hop Hfsb Hheld [Hcont]").
     all: try lkbelow.
     (* the epoch and the witness are DROPPED here, which is what keeps every
        landed [wp_log_write_gen] caller byte-stable: only the epoch-exposed
@@ -2844,12 +2839,12 @@ Section ProofLogWrite.
   Proof.
     cbv beta delta [wp_log_write_sconf_body].
     intros pcE ret_tgt HK Hnoff Hk Ha0 Hcovbno Hnotlog Hno.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hbslot Hop Hfsb Hheld Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio #Hlctx Hbslot Hop Hfsb Hheld Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     iApply (wp_log_write_gen bn γ γfs γd cov logstart dev k pidv bno
               bs bsl bsd d u false Sb m n eb p K b lks
               HK Hnoff Hk Ha0 Hcovbno Hnotlog ltac:(discriminate) Hno
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hbslot Hop Hfsb Hheld [Hcont]").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hbslot Hop Hfsb Hheld [Hcont]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mr) "Hsie Hcnt Hpc %Hcs HopS Hfsb Hlk Hslot".

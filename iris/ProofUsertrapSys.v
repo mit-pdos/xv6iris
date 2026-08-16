@@ -54,13 +54,12 @@ Require Import ProcGeom.
 Require Import UserPtTree ProcPtOwn.
 Require Import KptTree TrampPt.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash.
 Require Import BioDefs.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
-Require Import SchedCtx PanicStub.
+Require Import SchedCtx.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
 Require Import SpecSyscall SpecSysExit.
@@ -154,10 +153,8 @@ Section UtSysBlock.
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
-    { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+    { iDestruct "Hcaps" as "(_ & $ & _)". }
     iPoseProof (uti_090 with "Htext") as "Hi90".
     iPoseProof (uti_094 with "Htext") as "Hi94".
     (* ---- +0x90: jal killed ---- *)
@@ -440,7 +437,7 @@ Section UtSysBlock.
                 (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
                 Hj Hjl ltac:(rewrite Hn2; lia)
-                with "Hcg [] Htext Hkd Hpc Hpi Hpa Hbs Hbm Hip Hfd Hir Hsy Hpv [-]").
+                with "Hcg [] Htext Hkd Hpc Hpi Hbs Hbm Hip Hfd Hir Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
          takes no premise at all -- [cpu_own] carries no caller frame to

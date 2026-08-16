@@ -40,7 +40,6 @@ Require Import KernelText.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -138,7 +137,6 @@ Definition kxc_b2_body
   m !!! Regidx Rs1 = s10 ->
   m !!! Regidx Rs2 = s20 ->
   kernel_text -∗
-  panic_wp_any -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -239,7 +237,6 @@ Definition kxc_b2z_body
   (jp < NPROC)%nat ->
   gs !! jp = Some gl ->
   kernel_text -∗
-  panic_wp_any -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kxc_at_1a2 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib

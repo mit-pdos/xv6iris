@@ -158,12 +158,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
   proof's file split, and the whole-trap-loop Löb theorem
   (`SpecUserretClosed`), which is now built.
-- **[`panic.md`](projects/panic.md)** — `panic()`, proven AND SPLICED: every
-  live arm links against `SpecPanic`. Read it for the arm recipe and its six
-  traps, how to derive a message's address (the old table had one wrong), why
-  an arm inside a critical section changes its caller's push_off premise, and
-  the one thing left — retiring `PanicStub.v`, a pure deletion that drops an
-  axiom from adequacy.
+- **[`panic.md`](projects/panic.md)** — `panic()`, proven, spliced and the
+  placeholder RETIRED: adequacy is down to one assumed Link. Kept as a
+  reference for the arm recipe and its six traps, how to derive a message's
+  address, why an arm inside a critical section changes its caller's push_off
+  premise — and, in the last two sections, how to delete a resource that 200
+  files name without reflowing all of them.
 - **[`console.md`](projects/console.md)** — console.c, 5/5 functions proven
   and linked: the `cons` module's own state in `ConsoleInv.v` and why its
   resource is deliberately unconstrained, consoleintr's block decomposition,

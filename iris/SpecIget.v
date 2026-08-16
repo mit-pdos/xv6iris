@@ -112,7 +112,7 @@
    [ref > 0] and none of them this inode -- and no premise a caller could
    state would rule it out, because whether the table is full is a fact
    about every OTHER process's open files.  So on that arm iget diverges
-   through [SpecPanic.panic_wp_any] and this postcondition speaks only for
+   through [SpecPanic]'s own contract and this postcondition speaks only for
    the calls that return.  That is sound in a partial-correctness WP and it
    is the honest statement; the proof file says at which instruction (+0x6a,
    [beq s3,zero]) it is taken.
@@ -142,7 +142,6 @@ Require Import CalleeSaved.
 Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import DiskPtsto.
@@ -197,7 +196,6 @@ Definition wp_iget_sconf_body
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
   ic_escrows cn γfs γi cov logstart -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
-  panic_wp_any -∗
   (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
      is the console bundle printk needs.  Note the arm fires while iget
      HOLDS itable.lock, which is why "itable" ranks below "pr". *)

@@ -41,7 +41,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -90,7 +89,6 @@ Definition wp_acquiresleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   is_sleeplock_gen γl γsl slk s R H -∗
   (* THE DEPOSIT, spent into the lock and recovered by releasesleep *)
   H q -∗
-  panic_wp_any -∗
   p_pid pj ↦₄{dq} pidv -∗
   procs_inv γs -∗
   wp_next true pj (fun (CID : CpuId) =>
@@ -140,7 +138,6 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   is_sleeplock γl γsl slk s R -∗
-  panic_wp_any -∗
   (* the caller's own pid (read-only fraction) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
@@ -242,7 +239,6 @@ Definition wp_acquiresleep_nb_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_sleeplock_gen γl γsl slk s R (slh_tok γt) -∗
   (* THE EVIDENCE THAT THE LOCK IS FREE *)
   slh_auth γt None -∗
-  panic_wp_any -∗
   p_pid pj ↦₄{dq} pidv -∗
   wp_next false pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),

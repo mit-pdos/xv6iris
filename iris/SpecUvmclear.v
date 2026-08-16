@@ -19,7 +19,7 @@
    root, same trapframe, same page set ([um_ppns] is unchanged, which is why
    the ownership conjunct is literally the same resource).
 
-   THE PANIC ARM IS DEAD, not discharged by [panic_wp].  The vpn is mapped
+   THE PANIC ARM IS DEAD, not discharged by a panic credential.  The vpn is mapped
    (a precondition), so the no-alloc walk reaches level 0 and returns a slot
    address inside a page-table node -- which is a kalloc page, hence above
    [kmem_lo], hence nonzero.  That last step is a payoff of
@@ -46,7 +46,7 @@
    where the parent's A/D bits are copied to a DIFFERENT page).
 
    LIGHTEST CONTRACT IN THE FILE: the no-alloc walk needs no [cpu_own], no
-   [kalloc_env] and no [panic_wp], and uvmclear allocates and frees
+   [kalloc_env] and no panic credential, and uvmclear allocates and frees
    nothing -- so neither does this. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.

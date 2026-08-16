@@ -155,7 +155,7 @@ Section ProofIunlockMain.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hitbl #Hesc #Hslk Hstok Hpid Hppid
+    iIntros "Hcg Hcnt #Htext Hpc #Hitbl #Hesc #Hslk Hstok Hpid Hppid
               #Hprocs Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
     iEval (rewrite Hipe) in "Hidev".
     iEval (rewrite Hipe) in "Hinumc".
@@ -376,7 +376,7 @@ Section ProofIunlockMain.
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R6 p pidv (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
     all: try lkbelow.
     { iEval (rewrite HR6a0). iExact "Hslk". }
     { iEval (rewrite HR6a0). iExact "Hpid". }
@@ -532,7 +532,7 @@ Section ProofIunlockMain.
               (ic_tok cn k) (slh_tok (icfg_isl k)) s R9 pidv p (K - 4)%nat eb b lks
               ltac:(lia)
               Hfresh
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hpanic Hprocs").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hprocs").
     all: try lkbelow.
     { iEval (rewrite HR9a0). iExact "Hslk". }
     { iEval (rewrite HR9a0). iExact "Hpid". }

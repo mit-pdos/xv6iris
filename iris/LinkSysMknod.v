@@ -15,8 +15,8 @@
 
    panic is NOT a module here.  Every panic sys_mknod can reach is inside a
    callee -- argraw's out-of-range arm included, which is why the index
-   premises are [i < NARG] and not a branch; the [panic_wp_any] resource
-   the contract takes is threaded down and never consumed locally.
+   premises are [i < NARG] and not a branch; the [kernel_data] / [panic_env]
+   the contract takes are threaded down to the callees' own arms.
 
    So this cone's assumption count is the five platform axioms plus funext,
    plus [create_fresh_ty].  (It also used to carry

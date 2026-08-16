@@ -99,7 +99,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -537,7 +536,6 @@ Definition wp_dirlookup_tree_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   kalloc_env γa None -∗
@@ -636,7 +634,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
     intros HK Hlg Hbwf Hbcov Hszb Hdio Hj Hgs Ha0 Ha2 Heb Hlkb.
-    iIntros "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap Hfdir
+    iIntros "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap Hfdir
              Hname Hpoff Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
              Hitb2 Hitbl Hesc Hisl Hcont".
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
@@ -645,7 +643,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
               pidv dq dqd dqn m K eb b lks
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
               Hdio Hj Hgs Ha0 Ha2 Heb Hlkb
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv
                     Hidev Hmeta Hmap Hblocks Hname Hpoff
                     Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
                     Hitb2 Hitbl Hesc Hisl").

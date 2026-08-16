@@ -32,7 +32,7 @@
        (c)), and [UartTxInv.is_txlock γl γd], which every byte below needs.
        With them comes the ordinary spinlock-caller accounting: [cpu_own]
        threaded net-zero (printk leaves the interrupt level as it found it),
-       [panic_wp_any] for acquire's "already holding" arm, and a transient
+       and a transient
        bound on [noff] -- [+2] here, not [+1], because printk holds pr.lock
        while the cone below takes tx_lock.
 
@@ -289,7 +289,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
 
 (* printk's general contract as a PROP, so a caller can carry it as a
    HYPOTHESIS rather than instantiate a functor -- the [Prop] twin of
-   [SpecPanic.panic_wp_any], and the same idiom [ProofBmap.balloc_contract]
+   [SpecPanic]'s own credentials, and the same idiom [ProofBmap.balloc_contract]
    uses.  [LinkPrintk.printk_gen_contract_holds] proves it unconditionally, so
    a holder pays nothing beyond the standing platform/stdlib axioms. *)
 Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}

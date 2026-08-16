@@ -41,7 +41,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -100,7 +99,6 @@ Definition wp_bwrite_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
   p_pid pj ↦₄{dq} pidv -∗

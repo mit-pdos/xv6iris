@@ -21,8 +21,8 @@
      ledger at [ns' + 1 <= ns].
 
    panic is NOT a module here.  Every panic sys_mkdir can reach is inside a
-   callee; the [panic_wp_any] resource the contract takes is threaded down
-   and never consumed locally.
+   callee; the [kernel_data] / [panic_env] the contract takes are threaded
+   down to the callees' own arms.
 
    So this cone's assumption count is the five platform axioms plus funext,
    plus [create_fresh_ty].  (It also used to carry

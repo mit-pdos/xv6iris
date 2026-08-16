@@ -119,7 +119,7 @@ Section ProofIunlockputMain.
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
-    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
@@ -279,7 +279,7 @@ Section ProofIunlockputMain.
               dn' bm' pidv dq R4 (K - 4)%nat eb pj b lks
               ltac:(lia) Hk ltac:(rewrite HR4a0; exact Hipe)
               Hfresh_sl
-              with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk Hstok Hpid Hppid
+              with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk Hstok Hpid Hppid
                     Hprocs Hdep Hidev Hinumc Hvalid Hlk Hshot").
     all: try lkbelow.
     iIntros (CID8 Hq8 mU) "%HcsU Hcg Hcnt Hpc Hppid Hshr".
@@ -360,7 +360,7 @@ Section ProofIunlockputMain.
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
               Hfresh
-              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hnlz Hlogop").
     all: try lkbelow.
@@ -598,7 +598,7 @@ Section ProofIunlockputMain.
     cbv beta delta [wp_iunlockput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
-    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
@@ -611,7 +611,7 @@ Section ProofIunlockputMain.
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
-              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hpar
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").

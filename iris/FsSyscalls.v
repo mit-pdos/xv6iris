@@ -117,7 +117,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -223,7 +222,7 @@ Section FsBundles.
       (γfs : fs_names) (γi : gname) (cn : ic_names) (gtl : gname)
       (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       : iProp Σ :=
-    (kernel_text ∗ kernel_data ∗ panic_wp_any ∗
+    (kernel_text ∗ kernel_data ∗
      printk_env γpr γu γd ∗ ⌜printk_gen_contract γpr γu γd⌝ ∗
      bio_ctx bn (fs_view γfs γd dev cov) ∗
      log_ctx glog bn γfs cov logstart dev ∗
@@ -376,7 +375,7 @@ Module FsSysMkdir (M : SYSMKDIR).
     destruct Hg as [Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
                     Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
     iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
-    iDestruct "Hw" as "(Htext & Hdata & Hpanic & Hpr & %Hprg & Hbio & Hlogc &
+    iDestruct "Hw" as "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
                         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
                         Hesc & Hisl & Hireg & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
@@ -387,7 +386,7 @@ Module FsSysMkdir (M : SYSMKDIR).
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus Hprg Hns Hj Hgs
               eq_refl Htf
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpr Hbio Hlogc
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpr Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
                     Hireg Hsbn Hsbi Hsbs Hsbb Hbm Hkenv Hprocs Hir Hpriv").
     { rewrite /trap_csrs_ext. done. }
@@ -532,7 +531,7 @@ Module FsSysChdir (M : SYSCHDIR).
     destruct Hg as [Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
                     Histnn Hcb Hbg Hib Hn1 Hn2 Hn3 Hus].
     iIntros "Hcg Hown Hpc Hw Hres Hpriv Hcont".
-    iDestruct "Hw" as "(Htext & Hdata & Hpanic & Hpr & %Hprg & Hbio & Hlogc &
+    iDestruct "Hw" as "(Htext & Hdata & Hpr & %Hprg & Hbio & Hlogc &
                         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
                         Hesc & Hisl & Hireg & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
@@ -542,7 +541,7 @@ Module FsSysChdir (M : SYSCHDIR).
               size dev used dqb dqs v pid V m K true b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlogc
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
                     Hireg Hsbb Hsbi Hbm Hkenv Hprocs Hir Hpriv").
     { rewrite /trap_csrs_ext. done. }

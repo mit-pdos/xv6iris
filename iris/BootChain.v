@@ -57,7 +57,7 @@ Require Import BootConfig BootBridge PowerBoot.
 Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv DevModel.
-Require Import WpUart DiskPtsto PanicStub.
+Require Import WpUart DiskPtsto.
 Require Import WpLock KallocInv FdSlots.
 Require Import FileInvDefs.
 Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
@@ -554,7 +554,7 @@ End BootRun.
 (* boot supply and is where the shared allocation lands.                     *)
 (*                                                                        *)
 (* The three inputs beside the per-hart bundle are all PERSISTENT and all    *)
-(* SHARED: the image ([kernel_text] / [kernel_data]), [panic_wp_any], and    *)
+(* SHARED: the image ([kernel_text] / [kernel_data]) and                     *)
 (* the handover channel [started_inv (main_deposit γd γv Φ)] -- which the    *)
 (* client allocates ONCE, at that concrete payload, and hands to all eight   *)
 (* harts (main-boot's outstanding [P] choice, settled).                      *)
@@ -573,13 +573,12 @@ Section BootSecondary.
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
-    panic_wp_any -∗
     started_inv (main_deposit γd γv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
+    iIntros "#Htext #Hdata Hres #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
@@ -587,7 +586,7 @@ Section BootSecondary.
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
               K_main_secondary_le eq_refl
-              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hpanic Hstarted Htimc Hraw").
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Htimc Hraw").
   Qed.
 
 End BootSecondary.
@@ -635,7 +634,6 @@ Section BootPrimary.
     kernel_text -∗
     kernel_data -∗
     boot_hart_res rs iv dq -∗
-    panic_wp_any -∗
     started_inv (main_deposit γd γv) -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
@@ -654,7 +652,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hpark Hpst
+    iIntros "#Htext #Hdata Hres #Hstarted Hlk Hgl Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hctx Hcpu Hg Hraw #Htimc Hpc".
@@ -665,7 +663,7 @@ Section BootPrimary.
               (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
-              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
+              with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted [] Hlk Hgl
                     Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
                     Htimc Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s

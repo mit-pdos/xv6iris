@@ -35,7 +35,7 @@
    ([sie_cap_intro_bare]), converts entry's PHYSICAL stack region to the
    VA tier the capability owns, and builds [cpu_own] out of the cpus[0]
    struct cells.  The MEMORY-IMAGE half of main's precondition
-   (kernel_text / kernel_data / panic_wp / started_inv / the locks / the
+   (kernel_text / kernel_data / started_inv / the locks / the
    globals / the device tokens / the pages) is NOT this file's business.
 
    THE INPUTS THAT ARE NOT ENTRY'S POST.  Three groups, all of which the

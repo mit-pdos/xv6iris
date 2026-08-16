@@ -95,7 +95,6 @@ Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import SpecAllocpid.
-Require Import PanicStub.
 Require Import LockRank.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -260,7 +259,6 @@ Definition wp_allocproc_sconf_body
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
@@ -296,7 +294,6 @@ Definition wp_allocproc_core_body
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗

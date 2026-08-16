@@ -19,7 +19,7 @@
      acquire / release   [ConsoleInv.is_conslock]
      consputc            [WpUart.dev_inv] ∗ [UartTxInv.is_txlock] ∗ a
                          [UartTxInv.uart_sent_sub] to extend
-     wakeup              [procs_inv] ∗ [panic_wp_any]
+     wakeup              [procs_inv]
 
    ALL OF THEM ARE PERSISTENT, which is what makes the ripple cheap: the two
    lock credentials and the trace baseline are bundled here as
@@ -71,7 +71,6 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -126,7 +125,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslot
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
-  panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
   dev_inv γu γv -∗
   console_caps γu -∗
   wp_next b pme (fun (CID : CpuId) =>

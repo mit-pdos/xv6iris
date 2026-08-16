@@ -112,7 +112,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -242,7 +241,6 @@ Definition wp_sys_exec_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* ---- the file system, as kexec's own bundle: thirteen persistent
          resources this function only relays ---- *)
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl

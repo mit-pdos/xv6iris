@@ -130,7 +130,7 @@ Section SystemBoot.
     intro Hbf. iIntros "Hres".
     iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd Hir Hpav γd γv)
-      "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
+      "(%Hdimg & #Htext & #Hdata & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
@@ -156,7 +156,7 @@ Section SystemBoot.
         iApply (boot_hart_primary (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  with "Htext Hdata Hh0 Hpanic Hstarted Hlk Hgl Hpark Hpst
+                  with "Htext Hdata Hh0 Hstarted Hlk Hgl Hpark Hpst
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
@@ -166,7 +166,7 @@ Section SystemBoot.
       iApply (boot_hart_secondary (CID := FS c)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
-                with "Htext Hdata Hh Hpanic Hstarted"). }
+                with "Htext Hdata Hh Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].
     iSplitR;
       [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].

@@ -168,7 +168,7 @@ End KERNELTRAP_RETURNS.
                                         recognises.
 
    THE POINT OF DOING IT THIS WAY IS THE AXIOM LEDGER.  Closing the third arm
-   with [panic_wp_any] instead would have been easy, but printk's general
+   with a panic instead would have been easy, but printk's general
    (non-panic) path is UNPROVEN, so a live edge to it would put
    [wp_printk_gen_sconf] in the cone -- proving kerneltrap would then trade
    one sanctioned assumed contract for another.  With [Hsc] the cone is

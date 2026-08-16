@@ -82,7 +82,6 @@ Require Import IntrDefs.
 Require Import LockRank.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -2422,7 +2421,7 @@ Section SysExecFree.
         [exact (HM1cs c Hc) |
          apply not_eq_sym; apply is_cs_idx_true_neq;
            [vm_compute; reflexivity | exact Hc]]. }
-    iDestruct "Hka" as (γk) "(#Hlk & #Hav & #Hpanic)".
+    iDestruct "Hka" as (γk) "(#Hlk & #Hav)".
     iDestruct (cpu_own_transport CID0 CID3 0%nat eb pj b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (bb_page_of_named (pg k) (afun k) with "Hpage") as "Hpage".
@@ -2499,7 +2498,7 @@ Section SysExecFree.
       iDestruct (wp_next_retarget CID0 CID6 b pj _ Hcr with "Hout") as "Hout".
       iApply (IH CID6 M3 (S k) ltac:(lia) ltac:(lia) ltac:(lia) HM3s1 HM3s4
                 with "Htext [] Hpc Hcg Hcnt Harr Hpgs [Hout]").
-      { iExists γk. iFrame "Hlk Hav Hpanic". }
+      { iExists γk. iFrame "Hlk Hav". }
       { rewrite /wp_next. iIntros (CIDx) "%Hcx".
         iSpecialize ("Hout" $! CIDx with "[%]"); [exact Hcx |].
         iIntros (M' pcx) "%Hpcx %Hthr Hpc' Hcg' Hcnt' Harr'".
@@ -3067,7 +3066,7 @@ Section SysExecStep.
     iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %HR) & Hpc & Hcg & Hcnt & Hpriv
                          & Hcarry & F59 & F60 & Harr & Hpgs)".
     iAssert (kalloc_env γa None) as "#Hka2"; [iExact "Hka" |].
-    iDestruct "Hka2" as (γk) "(#Hlk & #Hav & #Hpanic)".
+    iDestruct "Hka2" as (γk) "(#Hlk & #Hav)".
     iPoseProof (sxi_056 with "Htext") as "Hi56".
     iPoseProof (sxi_05a with "Htext") as "Hi5a".
     iPoseProof (sxi_05c with "Htext") as "Hi5c".
@@ -4664,7 +4663,7 @@ Section SysExecBreak.
     ireg_blocks_ok inodestart nib cov logstart ->
     (jp < NPROC)%nat -> gs !! jp = Some gl ->
     b = true -> eb = true ->
-    kernel_text -∗ panic_wp_any -∗
+    kernel_text -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kalloc_env γa None -∗
@@ -4697,7 +4696,7 @@ Section SysExecBreak.
     intros HK Hlb Hsp0 Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
            Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl Hbt Hebt.
     destruct (sx_kb K HK) as (Kkx & Kar & Kaa & Kfa & Kfs & K14 & K2 & K60 & Kpop).
-    iIntros "#Htext #Hpanic #Hfab #Hka Hbmp Hisp Hbmr Hbs Hir Hst".
+    iIntros "#Htext #Hfab #Hka Hbmp Hisp Hbmr Hbs Hir Hst".
     rewrite /sx_body.
     iDestruct "Hst" as "((%Hi32 & %Hext & %Hok & %HR) & Hpc & Hcg & Hcnt &
                          Hpriv & Hcarry & F59 & F60 & Harr & Hpgs)".
@@ -4860,7 +4859,7 @@ Section SysExecBreak.
               ltac:(intros j Hj; pose proof (proj1 (proj2 (proj2 (Hok j Hj))));
                     lia)
               Hjp Hgl Hbt Hebt
-              with "Hcg Hcnt Htext Hpc Hpanic Hfab Hka Hbmp Hisp Hbmr Hpriv
+              with "Hcg Hcnt Htext Hpc Hfab Hka Hbmp Hisp Hbmr Hpriv
                     Hpb Havf Hpgs Hbs Hir").
     iIntros (CID8 Hq8 mf used' V' entry spv szv') "%Hcsf %Hkok Hcg Hcnt Hpc
              Hbmp Hisp %Husub Hbmr Hka2 Hpriv Hpb Havf Hpgs Hbs Hir".
@@ -4978,7 +4977,7 @@ Section SysExecWhole.
     intros HK Hdev Hnib Hg Hist Hroot Hnib0 Hlg Hsize Hbm0 Hbmc Hbml Hist0
            Hcb Hireg Hjp Hgl Hebt Harg0 Harg1.
     subst eb.
-    iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hpanic #Hfab Hbmp Hisp Hbmr
+    iIntros "Hcg Hcnt Htcx Hccx #Htext #Hdata Hpc #Hfab Hbmp Hisp Hbmr
              Hbs #Hka Hir Hpriv Hcont".
     (* ---- the interrupt index, and the held-lock set ---- *)
     iDestruct (sie_b_agree m 0%nat K true b (proc_addr j) lks
@@ -5066,7 +5065,7 @@ Section SysExecWhole.
                 M3 P3 i3 pg3 al3 af3
                 HK Hlb eq_refl Hplen Hpcstr Halp Hdev Hnib Hg Hist Hroot Hnib0
                 Hlg Hsize Hbm0 Hbmc Hbml Hist0 Hcb Hireg Hjp Hgl eq_refl eq_refl
-                with "Htext Hpanic Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hbrk").
+                with "Htext Hfab Hka Hbmp Hisp Hbmr Hbs Hir Hbrk").
       iIntros (CID4 Hq4 mf used' V' entry spv szv')
         "%Hcs %Hkok %Husub %Hext3 Hcg Hcnt Hpc Hbmp Hisp Hbmr Hbs Hir Hpriv".
       iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain |].

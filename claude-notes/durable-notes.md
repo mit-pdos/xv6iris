@@ -1364,17 +1364,20 @@ The number goes up; that is the real one.
 ## The adequacy-print baseline (GR-36, 2026-08-16)
 
 `Print Assumptions xv6_power_adequacy_xv6Σ` (SystemAdequacy.v, printed by
-every CI build since 85c21e9f) must show EXACTLY these eight, and merge
+every CI build since 85c21e9f) must show EXACTLY these seven, and merge
 rounds diff against this list textually, not by count:
 
-1. `LinkUserinit.Userinit.wp_userinit_sconf`   (assumed-Link)
-2. `LinkPanicStub.PanicAssumed.panic_wp_holds` (assumed-Link)
-3. `FunctionalExtensionality.functional_extensionality_dep`
-4. `valid_reservation`    (rv64d extern)
-5. `plat_term_write`      (rv64d extern)
-6. `match_reservation`    (rv64d extern)
-7. `load_reservation`     (rv64d extern)
-8. `cancel_reservation`   (rv64d extern)
+1. `LinkUserinit.Userinit.wp_userinit_sconf`   (assumed-Link — the ONLY one)
+2. `FunctionalExtensionality.functional_extensionality_dep`
+3. `valid_reservation`    (rv64d extern)
+4. `plat_term_write`      (rv64d extern)
+5. `match_reservation`    (rv64d extern)
+6. `load_reservation`     (rv64d extern)
+7. `cancel_reservation`   (rv64d extern)
+
+`LinkPanicStub.PanicAssumed.panic_wp_holds` was the second assumed Link and
+is gone: `panic()` is proven and every arm links against `SpecPanic`, so the
+placeholder was deleted outright (`claude-notes/projects/panic.md`).
 
 A NEW entry = an axiom leaked into the boot cone: stop and investigate.
 A MISSING assumed-Link = someone proved it: celebrate, then update this

@@ -133,7 +133,7 @@
    a functor argument.  See SpecBalloc.v's "READ THIS BEFORE TRUSTING THE
    STANDING SIX": carrying it as a hypothesis keeps [Print Assumptions] at the
    standing six, but the six are then modulo a THREADED printk obligation,
-   exactly as [SpecPanic.panic_wp_any] is.                                 *)
+   exactly as [SpecPanic]'s own credentials are.                                 *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -150,7 +150,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import FdSlots.
@@ -250,7 +249,6 @@ Definition wp_ireclaim_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials *)
   kernel_data -∗
   printk_env γpr γu γd -∗

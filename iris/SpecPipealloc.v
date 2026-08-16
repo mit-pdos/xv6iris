@@ -69,7 +69,6 @@ Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import WpNext.
-Require Import PanicStub.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -186,7 +185,6 @@ Definition wp_pipealloc_sconf_body
   is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) -∗
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
-  panic_wp_any -∗
   panic_env -∗
   (* pipealloc creates TWO references, so it needs two fd slots -- one per
      end of the pipe.  Both come back from the fileclose calls on the error

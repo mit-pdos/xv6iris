@@ -632,7 +632,7 @@ Section ProofCopyin.
         Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
@@ -955,7 +955,7 @@ Section ProofCopyin.
                          = mword_of_int (KernelSyms.copyin + 0x5a)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp5a) in "Hpc".
           iAssert (kalloc_env γa None) as "Henv".
-          { iExists γk. iFrame "Hlock Havail Hpanic". }
+          { iExists γk. iFrame "Hlock Havail". }
           (* every premise pre-asserted and passed BY NAME (optimization.md's
              inline-[ltac:] rule) *)
           assert (HG3sp : G3 !!! Regidx csp_rs1 = spr) by lkp.
@@ -1234,7 +1234,7 @@ Section ProofCopyin.
                     = add_vec_int (mword_of_int (KernelSyms.copyin + 0x70) : mword 64) 4)
       by (rewrite /V5 upd_eq; reflexivity).
     iAssert (kalloc_env γa None) as "Henv".
-    { iExists γk. iFrame "Hlock Havail Hpanic". }
+    { iExists γk. iFrame "Hlock Havail". }
     iDestruct (cpu_own_transport CID0 CIDv4 lvl eb p b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* vmfault's contract still wants the RAW tp premise (its kalloc/acquire

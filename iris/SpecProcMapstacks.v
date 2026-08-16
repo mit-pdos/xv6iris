@@ -35,7 +35,7 @@ From Kernel Require KernelSyms.
    non-boot caller.  The budget exceeds 64 (the leaf pages) plus
    [kstacks_missing t] (the naive-sum UPPER BOUND on the tables the 64 walks
    graft -- see KvmMap; the proof telescopes it), so every kalloc-null /
-   kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
+   kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (on : option nat) (b : bool) (lks : gset string) :=

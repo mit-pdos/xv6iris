@@ -31,7 +31,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
@@ -69,7 +68,6 @@ Definition wp_releasesleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !f
   sleeplocked_q γsl q -∗
   sl_pid slk ↦₄ pd -∗
   R -∗
-  panic_wp_any -∗
   (* wakeup's resources *)
   procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
@@ -110,7 +108,6 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pd -∗
   R -∗
-  panic_wp_any -∗
   (* wakeup's resources *)
   procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>

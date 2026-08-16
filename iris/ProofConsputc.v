@@ -30,7 +30,7 @@
    WHAT THE CALLEE NOW WANTS.  uartputc_sync takes [tx_lock] around its
    poll/store pair, so every call is a full acquire/release pair: this proof
    threads [cpu_own] net-zero through each of them (transported to the call's
-   own hart), carries [panic_wp_any] for acquire's "already holding" arm, and
+   own hart), and
    passes the persistent [is_txlock] rather than any transmitter token.  The
    trace claim is the SUBLIST form, chained one call at a time -- which is why
    the backspace arm's join needs [app_assoc]: what comes out of the third call

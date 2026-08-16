@@ -15,7 +15,7 @@
    THE CONTRACT IS EXACTLY THE UNION OF ITS TWO CALLEES', with nothing of
    its own: argint's trapframe resources (a read fraction of [p->trapframe]
    plus the whole [tf_page], and the pure fact naming which word argument 0
-   is), and kkill's [procs_inv] + [panic_wp] + the [length γs = NPROC] the
+   is), and kkill's [procs_inv] + the [length γs = NPROC] the
    scan's bound needs.  The destination cell is carved out of sys_kill's own
    frame, so it does not appear here.
 
@@ -47,7 +47,6 @@ Require Import ProcDefs.
 Require Import FileInvDefs.
 Require Import PageGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -80,7 +79,6 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   tf_page tfp ws -∗
   (* kkill's *)
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (rv : mword 64),
       ⌜ callee_saved m mf /\

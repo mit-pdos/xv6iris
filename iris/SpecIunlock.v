@@ -76,7 +76,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
@@ -131,7 +130,6 @@ Definition wp_iunlock_sconf_body
   sie_cap_gpr m K b p -∗
   cpu_own 0 eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the [ref] words, and the entry's content escrow *)
   itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗

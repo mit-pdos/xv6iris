@@ -65,7 +65,7 @@
    hypothesis keeps all three at the standing six, but that is NOT
    self-containment: balloc's six are modulo a THREADED printk obligation
    that its callers must eventually discharge, exactly the standing that
-   [SpecPanic.panic_wp_any] already has throughout this tree.  A reader who
+   [SpecPanic]'s own credentials already have throughout this tree.  A reader who
    takes the six for "depends on nothing else" is misreading it.
 
    THE BITMAP RIDES THROUGH THE CONTRACT.  balloc reads BOTH superblock
@@ -117,7 +117,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import FdSlots.
@@ -200,7 +199,6 @@ Definition wp_balloc_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the general printk path's two PERSISTENT credentials, for the
      out-of-blocks arm *)
   kernel_data -∗
@@ -352,7 +350,6 @@ Definition wp_balloc_gen_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗

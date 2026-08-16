@@ -59,7 +59,6 @@ Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import SpecAcquire SpecRelease.
-Require Import PanicStub.
 Require Import SpecKkill.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import CodeKkill.
@@ -197,7 +196,6 @@ Section ProofKkill.
        per-slot non-membership the ghost step needs. *)
     locks_below lks "proc" ->
     procs_inv γs -∗
-    panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [kkill+0x52],
        at whatever hart the scan ended on, with a0 = 0 or -1. *)
     wp_next (CID0 := CID0) b pme (fun (CIDq : CpuId) =>
@@ -215,7 +213,7 @@ Section ProofKkill.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hlvl Hav Hno.
-    iIntros "#Hpinv #Hpanic Hqexit".
+    iIntros "#Hpinv Hqexit".
     (* BOUNDED loop: ordinary Coq induction on a [fuel] bounding the
        remaining iterations [NPROC - k].  The exit continuation is a
        PREMISE of the statement (fdalloc's rule), so the IH keeps its
@@ -866,7 +864,7 @@ Section ProofKkillMain.
     cbv beta delta [wp_kkill_sconf_body].
     intros pcE ret_tgt Hlen Hn Hav Hno.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     iPoseProof (kki_00 with "Htext") as "Hi00".
     iPoseProof (kki_02 with "Htext") as "Hi02".
@@ -1276,7 +1274,7 @@ Section ProofKkillMain.
                  with "Hcpu") as "Hcpu".
     iPoseProof (wp_kkill_loop (CID0 := CID12)  γs m (pa_stk sp0 6)
                   (add_vec zero_reg (M2 !!! Regidx Ra0)) p n (av - 6)%nat eb b lks
-                  Hlen Hn ltac:(lia) Hno with "Hprocs Hpanic Hqexit") as "Hscan".
+                  Hlen Hn ltac:(lia) Hno with "Hprocs Hqexit") as "Hscan".
     iApply ("Hscan" $! 0%nat M7 with "[%] [%] Hcg Hcpu Htext Hpc").
     - unfold NPROC; lia.
     - unfold kkl_regs.

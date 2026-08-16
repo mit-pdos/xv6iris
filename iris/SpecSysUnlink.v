@@ -104,7 +104,7 @@
    * ITS SHORT-READ ARM IS A PANIC.  [readi] is EXACT, so
      [!= sizeof(de)] is reachable only where 16 does not divide the
      directory's size; the arm needs no multiple-of-16 invariant, it is
-     closed by [panic_wp_any] and never returns.
+     discharged against [SpecPanic] and never returns.
 
    ==== WHAT THIS CONTRACT IS ABOUT =====================================
 
@@ -217,7 +217,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -342,7 +341,6 @@ Definition wp_sys_unlink_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
   bio_ctx bn (fs_view gfs gd dev cov) -∗

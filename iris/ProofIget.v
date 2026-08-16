@@ -109,7 +109,6 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIget.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import WpUart.
@@ -474,7 +473,7 @@ Section ProofIget.
     intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hpanic #Hpenv Hislot Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hpenv Hislot Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).

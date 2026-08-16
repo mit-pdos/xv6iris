@@ -428,10 +428,9 @@ Section ProofUvmalloc.
       intros i CID0 Pi M av Hsum Hrem Hav Hext Hdom Hleaf Hsp Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Hthr;
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Henv Hk3 Hk5 Hk8 Hexit".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iAssert (kalloc_env γa None) as "#Henv".
-    { iExists γk. iSplitR; [iExact "Hlock" |].
-      iSplitR; [iExact "Havail" | iExact "Hpanic"]. }
+    { iExists γk. iSplitR; [iExact "Hlock" |]. iExact "Havail". }
     (* ---- the arithmetic of THIS iteration, all up front ---- *)
     assert (Hin : (i < n)%nat) by (clear -Hsum Hrem; lia).
     pose proof (proj2 (Hnchar i) Hin) as Hain.

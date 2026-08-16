@@ -51,13 +51,12 @@ Require Import IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpLock.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import KptShare.
 Require Import CpuOwn SchedCtx FdSlots.
 Require Import FileInvDefs.
 Require Import DevModel DiskPtsto WpUart.
 Require Import PrintkFmt.
-Require Import PanicStub StartedInv.
+Require Import StartedInv.
 Require Import SpecCpuid SpecPrintk.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
@@ -437,7 +436,7 @@ Section ProofMainSecondary.
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) :
     (48 <= n)%nat ->
-    sie_cap_gpr m n false p0 -∗ kernel_text -∗ kernel_data -∗ panic_wp -∗
+    sie_cap_gpr m n false p0 -∗ kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
@@ -451,7 +450,7 @@ Section ProofMainSecondary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn.
-    iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hfree Hcpu #Hpenv Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu #Hpenv Hcont".
     iPoseProof (mni_20 with "Htext") as "Hi20".
     iPoseProof (mni_24 with "Htext") as "Hi24".
     iPoseProof (mni_26 with "Htext") as "Hi26".
@@ -576,7 +575,7 @@ Section ProofMainSecondary.
        [tick_hart] is [cpuid() == 0] and a secondary never keeps time. *)
     cid_word <> (zero_reg : mword 64) ->
     p0 = zero_reg ->
-    sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp_any -∗
+    sie_cap_gpr m n false p0 -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
@@ -600,7 +599,7 @@ Section ProofMainSecondary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hcidne Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hdlock #Hgeom #Htimc".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hccaps #Hdlock #Hgeom #Htimc".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -667,7 +666,7 @@ Section ProofMainSecondary.
       apply eq_vec_false_iff. exact Hcidne. }
     iAssert (devintr_caps γd γv γk γk γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
-      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hpanic". }
+      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γk γs pd pav pu
                   Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
@@ -736,10 +735,9 @@ Section ProofMainSecondary.
     cbv beta delta [wp_main_secondary_sconf_body].
     intros pcE Hcid Hdc HK Hp0.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Htimc Hhart".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Htimc Hhart".
     (* printk wants the ambient form; the scheduler join wants the generic one
        (its acquire does), so keep both. *)
-    iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iApply (ms_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc %Ha4".
@@ -750,11 +748,11 @@ Section ProofMainSecondary.
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev & _ & _)".
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
-              with "Hcg Htext Hkdata Hpanic Hpc Hfree Hcpu Hpenv").
+              with "Hcg Htext Hkdata Hpc Hfree Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hfree Hcpu".
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hcid Hp0
-              with "Hcg Htext Hpany Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
+              with "Hcg Htext Hpc Hfree Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
                     Hccaps Hdlock Hgeom Htimc").
   Qed.
 

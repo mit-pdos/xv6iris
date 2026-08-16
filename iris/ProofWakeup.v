@@ -62,7 +62,6 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import ProcGeom.
 Require Import SpecWakeup.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
@@ -219,7 +218,6 @@ Section ProofWakeup.
     locks_below lks "proc" ->
     procs_inv γs -∗
     (* acquire's "already holding" arm sits above panic() *)
-    panic_wp_any -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x54],
        at whatever hart the scan ended on. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
@@ -234,7 +232,7 @@ Section ProofWakeup.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hlvl Hav Hfresh.
-    iIntros "#Hpinv #Hpanic Hqexit".
+    iIntros "#Hpinv Hqexit".
     (* BOUNDED loop: ordinary Coq induction on a [fuel] bounding the remaining
        iterations [NPROC - k] -- no Löb needed.  The body is a [wp_next b]
        so the induction hypothesis is re-enterable at a migrated hart. *)
@@ -859,7 +857,7 @@ Section ProofWakeup.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hlvl Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
     iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
@@ -879,7 +877,7 @@ Section ProofWakeup.
                   (m !!! Regidx (mword_of_int 26 : mword 5)) (m !!! Regidx (mword_of_int 27 : mword 5)) lvl
                   (K - 8)%nat eb b lks
                   Hlen Hlvl ltac:(lia) Hfresh
-                  with "Hpinv Hpanic") as "Hloop".
+                  with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hf0 Hcont]").
     { (* exit continuation = epilogue at wakeup+0x54 *)
       iIntros (CIDex Hsex Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)

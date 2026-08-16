@@ -7,7 +7,8 @@
    panic site (+0x6e "log.committing") is DEAD -- an op token in hand forces
    log.outstanding >= 1, and log_res's ⌜cmt = true -> out = 0⌝ then forces
    committing = 0, so the [c.bnez] at +0x24 falls through and the arm is
-   never reached.  The [panic_wp_any] end_op threads is its CALLEES'. *)
+   never reached.  The [kernel_data] / [panic_env] end_op threads are its
+   CALLEES' -- bread's "bget: no buffers" is the live one. *)
 Require Import LinkAcquire LinkRelease LinkWakeup LinkBread LinkBwrite
                LinkBrelse LinkMemmove LinkWriteHead LinkInstallTrans ProofEndOp.
 

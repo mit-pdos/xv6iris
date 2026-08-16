@@ -89,7 +89,6 @@ Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -152,7 +151,6 @@ Definition wp_consolewrite_sconf_body
   dev_inv γu γv -∗
   is_txlock γl γu -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   (* THE CROSSING IS [true], NOT [b] -- consolewrite reaches a park, so the
      porting guide's rule applies: a parking function's [wp_next] index is
      [true] unconditionally.  With [eb = true] above and [cpu_own_eb_agree]

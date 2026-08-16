@@ -28,8 +28,8 @@
    [eq_vec]/[neq_vec] refutation premises, and it DOES carry what any spinlock
    caller carries -- [cpu_own] threaded net-zero (the acquire/release pair
    inside each uartputc_sync leaves the interrupt level as it found it), the
-   transient-increment bound on [noff], and [panic_wp_any] for acquire's
-   "already holding" arm.
+   transient-increment bound on [noff].  Acquire's "already holding" arm is
+   refuted, so nothing panic-related is threaded.
 
    THE TRANSMITTER IS NOT THREADED.  It is [tx_lock]'s resource
    ([UartTxInv.tx_res]), taken and given back inside each callee, so

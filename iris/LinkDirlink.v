@@ -15,9 +15,10 @@
    panic is NOT a module here.  dirlink's one panic -- panic("dirlink read")
    at +0x60 -- is DEAD: the contract's GRANULARITY premise makes every loop
    readi full-length ([ProofDirlookupParts.dlk_rd_clamp_full]), so the
-   [bne a0,s3] at +0x3e always falls through.  The [panic_wp_any] resource
-   the contract takes is threaded to dirlookup / readi / iput / writei and
-   never consumed locally.
+   [bne a0,s3] at +0x3e always falls through.  dirlink's OWN arm,
+   panic("dirlink read") at +0x68, is discharged against [Panic] below; the
+   [kernel_data] / [panic_env] it takes also feed dirlookup / readi / iput /
+   writei, whose arms are theirs.
 
    So this cone's assumption count stays at the five platform axioms plus
    funext. *)

@@ -57,7 +57,8 @@
                   owes nothing.
    * FD_INODE  -> ilock's, readi's and iunlock's: the icache seam, the block
                   cache and disk fabric, and the off-borrow invariant.
-   * anything else -> nothing; the arm is [panic], closed by [panic_wp_any].
+   * anything else -> nothing; the arm is [panic], discharged against
+     [SpecPanic] out of [kernel_data] + [panic_env] below.
 
    ==== THE FS ENVIRONMENT IS CONTENT-INDEPENDENT (fs-sysfile S4') =======
 
@@ -148,7 +149,6 @@ Require Import KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -516,7 +516,7 @@ Section SpecFileread.
   Qed.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
-     reader nothing -- the arm is [panic], and [panic_wp_any] closes it. *)
+     reader nothing -- the arm is [panic], discharged against [SpecPanic]. *)
   Lemma fileread_env_none γf fn Cf :
     fc_type Cf = FD_NONE -> ⊢ fileread_env γf fn Cf.
   Proof.
@@ -698,7 +698,6 @@ Definition wp_fileread_sconf_body
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* WHAT THE DEFAULT ARM COSTS.  [f->type] outside {FD_PIPE, FD_DEVICE,
      FD_INODE} reaches [panic("fileread")], and panic is an ordinary call:
      the literal comes out of [kernel_data] and the console credentials

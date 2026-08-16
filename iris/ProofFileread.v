@@ -79,7 +79,6 @@ Require Import FileInvDefs.
 Require Import PipeInvDefs.
 Require Import KallocInv.
 Require Import ProcPtOwn.
-Require Import PanicStub.
 Require Import ProcInv.
 Require Import WpUart DiskPtsto FsBlocks LogInv.
 Require Import BioDefs.
@@ -96,7 +95,6 @@ Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
    name is meant here except through the two contracts. *)
 Require Import DinodeEnc.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import SpecPanic.
@@ -406,7 +404,7 @@ Section ProofFileread.
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb Hbelow.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -891,7 +889,7 @@ Section ProofFileread.
         iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb pidv V n b
                   _ Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
-                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
+                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
         all: try lkbelow.
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
         iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
@@ -1451,7 +1449,7 @@ Section ProofFileread.
                           (fr_av_cons K HK) Heb
                           ltac:(lkbelow)
                           with "Hcg Hcnt Htext Hpc Hconslk Hpriv Hkenv
-                                Hprocs Hpanic").
+                                Hprocs").
                 all: try lkbelow.
                 iIntros (CIDcr Hscr mf r P') "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
                                               Hpriv".
@@ -1810,7 +1808,7 @@ Section ProofFileread.
                        I2 (K - 6)%nat eb b
                        _ (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
-                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitbl Hesc Hireg
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
              all: try lkbelow.
@@ -2046,7 +2044,7 @@ Section ProofFileread.
                        _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
                        HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4' Hbelow
-                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").
              all: try lkbelow.
@@ -2220,7 +2218,7 @@ Section ProofFileread.
                           lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
-                          with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
+                          with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
                 all: try lkbelow.
@@ -2499,7 +2497,7 @@ Section ProofFileread.
                           lks (fr_av_iunlock K HK) Hik
                           ltac:(rewrite HN2a0; exact Hipk)
                           ltac:(lkbelow)
-                          with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesc Hslk
+                          with "Hcg Hcnt Htext Hpc Hitbl Hesc Hslk
                                 Hheld Hslpid Hppid Hprocs
                                 Hdep Hidev Hinum Hvalid Hlk Hshot").
                 all: try lkbelow.
@@ -2578,7 +2576,7 @@ Section ProofFileread.
                 { iApply (fr_env_out_fs fn Cf Htyi). rewrite /fileread_fs_out.
                   iFrame "Hsb Hbslot". }
           -- (* ================ NOT A FILE AT ALL: panic ==========
-                [SpecPanic.panic_wp_any] closes the arm; panic never
+                [SpecPanic] discharges the arm; panic never
                 returns, so there is nothing after the [jal]. *)
              iPoseProof (fri_9e with "Htext") as "Hi9e".
              iPoseProof (fri_a2 with "Htext") as "Hia2".

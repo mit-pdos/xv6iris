@@ -94,7 +94,7 @@
    rest.  Same premise, same spelling, as SpecReparent.v's.
 
    NOTE the panic arm is NOT ruled out.  kexit's caller does not have to
-   prove [p <> initproc]: [panic] never returns, so the [panic_wp_any]
+   prove [p <> initproc]: [panic] never returns, so the no-postcondition
    convention closes that arm at zero cost (SpecPanic.v), and the honest
    reading of the contract is "exits the calling process, or panics".  The
    same convention closes the [panic("zombie exit")] that follows sched --
@@ -130,7 +130,6 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] -- procinit is what makes it *)
@@ -211,7 +210,6 @@ Definition wp_kexit_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗
-  panic_wp_any -∗
   panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)

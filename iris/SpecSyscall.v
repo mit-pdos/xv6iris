@@ -113,7 +113,6 @@ Require Import UserPtTree.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import IrefSlots.
-Require Import PanicStub.
 Require Import BioInv.        (* [bio_names], for [bslots] *)
 Require Import SpecFileclose. (* [fclose_names], [fileclose_bm] -- the five
                                   shared families, see the header *)
@@ -166,11 +165,10 @@ Definition wp_syscall_sconf_body
   sie_cap_gpr m av true pj -∗
   cpu_own 0%nat true pj true lks -∗
   (* [kernel_data] is the jump table itself ([syscalls] lives in .rodata) and
-     argraw's below it; [procs_inv]/[panic_wp_any] are the proc array and the
+     argraw's below it; [procs_inv] is the proc array and the
      panic arms every acquire/release in the cone reaches. *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   (* THE FIVE FAMILIES [ut_own] ALSO holds -- see the header for why they
      ride here rather than inside [R].  [sys_exit] (reached through the
      table) is the only entry that draws on them; the other twenty-one

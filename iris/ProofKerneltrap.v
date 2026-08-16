@@ -359,7 +359,7 @@ Section ProofKerneltrap.
         (* the proc's lock ghost, and the trap CSRs the crossing carries:
            at [eb = false] yield takes them from US, because there is no
            enabled arm to dismantle. *)
-        iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdisk & #Htimer & #Htick & #Hprocs & #Hpanic)".
+        iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdisk & #Htimer & #Htick & #Hprocs)".
         (* [j < NPROC] and [length γs = NPROC] give a slot ghost for proc j *)
         assert (Hjl : (j < length γs)%nat) by (rewrite Hlen; exact Hj).
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].

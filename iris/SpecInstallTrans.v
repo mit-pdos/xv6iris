@@ -91,7 +91,7 @@
    install_trans sleeps (bread, bwrite, brelse), so it threads the full
    running-process bundle exactly as SpecBread.v does, plus the disk fabric;
    it enters and returns at noff 0.  It has no panic site of its own, but
-   its callees' arms want [panic_wp_any]. *)
+   its callees' arms want them. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -108,7 +108,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -187,7 +186,6 @@ Definition wp_install_trans_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* NOT [log_ctx]: this helper holds no lock -- see LogInv.log_frozen *)

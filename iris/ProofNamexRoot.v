@@ -134,7 +134,7 @@ Section ProofNamexRoot.
     cbv beta delta [wp_namex_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Ha1 Hbelow.
     destruct (nxr_kb K HK) as (Kig & K12 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
     iPoseProof (nxi_000 with "Htext") as "Hi000".
     iPoseProof (nxi_002 with "Htext") as "Hi002".
     iPoseProof (nxi_004 with "Htext") as "Hi004".
@@ -540,7 +540,7 @@ Section ProofNamexRoot.
     iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpanic Hpenv Hisl").
+              with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hisl").
     iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href".
     destruct Higp as (Hcsig & Hkig & Higa0).
     assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).

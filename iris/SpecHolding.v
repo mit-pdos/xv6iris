@@ -19,7 +19,7 @@
 
    THE EVIDENCE-FREE FORM IS GONE.  It concluded [a0 = 0 ∨ a0 = 1] -- all a
    caller with no evidence at all can know -- and its only client was
-   acquire, which had to close the 1 arm with [PanicStub.panic_wp_any].
+   acquire, which had to close the 1 arm with the placeholder panic credential.
    Since the held-set authority is already inside acquire's [cpu_own], the
    evidence costs the call site nothing and the arm goes away instead.
 

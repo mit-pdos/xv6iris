@@ -42,7 +42,7 @@
        itself is inside the lock's resource ([TicksInv.ticks_res]), which is
        why the loop's [c.lw a5,0(s1)] is legal.
      - the running-thread bundle sleep needs: [procs_inv], [own_ctx],
-       the ▷-guarded parked scheduler, and [panic_wp].
+       and the ▷-guarded parked scheduler.
 
    NOT here: [arm_pay].  sleep is not push/pop-balanced and does want
    the level-0 pay, but sys_pause's OWN acquire(&tickslock) is what produces
@@ -83,7 +83,6 @@ Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import PageGeom.
 Require Import TicksInv.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -129,7 +128,6 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_tickslock γt -∗
   (* the running-thread bundle killed() and sleep() need *)
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : mword 64),
       ⌜ callee_saved m mf /\

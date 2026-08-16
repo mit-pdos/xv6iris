@@ -72,7 +72,6 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import PanicStub.
 Require Import SpecIdup.
 Require Import SpecSafestrcpy.
 Require Import ProofKforkParts.
@@ -242,7 +241,6 @@ Section KforkB4Proof.
     cpu_own lvl eb pme false lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
-    panic_wp_any -∗
     is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
     itable_inv -∗
     (* the child's iref units: the [1] is what [idup] spends here, and
@@ -272,7 +270,7 @@ Section KforkB4Proof.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hms5 Hms4 Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hir Hparent Hchild Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hitb #Hitinv Hir Hparent Hchild Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".

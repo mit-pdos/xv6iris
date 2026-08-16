@@ -19,7 +19,7 @@
                                                 the only entry with no
                                                 process indexing at all;
      k =  3  sys_wait    (`sysc_arm_wait`)   -- the process triple, plus
-                                                `procs_inv`/`panic_wp_any`,
+                                                `procs_inv`,
                                                 `kalloc_env` and the
                                                 "wait_lock" lock; it PARKS,
                                                 and it moves `pv_upt`;
@@ -271,7 +271,6 @@ Require Import IrefSlots FdSlots.
 Require Import FileInvDefs FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import ProcAvail.
@@ -800,7 +799,6 @@ Section SyscallVocab.
         cone reaches -- both persistent, both already held by the capstone,
         and between them what most table entries need beyond [proc_priv] *)
      procs_inv γs ∗
-     panic_wp_any ∗
      syscall_env γf pj bn fn ∗
      bslots bn 3 ∗
      fileclose_bm fn us ∗
@@ -1389,7 +1387,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     (* the table entry's address IS [sys_getpid]'s entry pc *)
     assert (Hpce : (mword_of_int (sysc_target 11) : mword 64)
@@ -1458,7 +1456,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 12) : mword 64)
                    = mword_of_int KernelSyms.sys_sbrk) by reflexivity.
@@ -1513,7 +1511,7 @@ Section SyscallArms.
      sleeps on the wait lock, so its own crossing may resume the process on
      another hart -- and the first that needs the process TRIPLE ([γs]/[j]/
      [γl], with the running process addressed as [proc_addr j]) plus
-     [procs_inv]/[panic_wp_any].  Everything else it wants is in
+     [procs_inv].  Everything else it wants is in
      [syscall_env]: [kalloc_env] and the "wait_lock" lock.  It moves the
      private block's page-table descriptor (the reaped child's pages are
      freed through it), and [uptd_ext_sz] is what pins the trapframe page. *)
@@ -1529,7 +1527,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 3) : mword 64)
                    = mword_of_int KernelSyms.sys_wait) by reflexivity.
@@ -1547,7 +1545,7 @@ Section SyscallArms.
     (* ---- the call ---- *)
     iApply (SysWait.wp_sys_wait_sconf γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
               Hj Hgamma Hv0 ltac:(lia) eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hprocs Hpanic Hwaitlk Hkalloc Hpriv").
+              with "Hcg Hcpu Htext Hdata Hpc Hprocs Hwaitlk Hkalloc Hpriv").
     iIntros (CIDy Hsy mf P' rv) "%Hcs %Hext Hcg Hcpu Hpc Hpriv".
     destruct Hcs as [Hcs _].
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt V)).
@@ -1607,7 +1605,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 14) : mword 64)
                    = mword_of_int KernelSyms.sys_uptime) by reflexivity.
@@ -1648,7 +1646,7 @@ Section SyscallArms.
      [pv_tf V] as an opaque existential: its [argint] wants
      [p_trapframe ↦₈{dq}] and the whole [tf_page] SEPARATELY, which is
      exactly what [ProcInv.proc_priv_tf] lends (at the quarter fraction) and
-     takes back.  Beyond that it is [procs_inv] + [panic_wp_any] (kkill's
+     takes back.  Beyond that it is [procs_inv] (kkill's
      scan) and the [length γs = NPROC] that scan's bound needs, which
      [procs_inv] itself carries. *)
   Lemma sysc_arm_kill (γf : gname) (pj : mword 64)
@@ -1662,7 +1660,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 6) : mword 64)
                    = mword_of_int KernelSyms.sys_kill) by reflexivity.
@@ -1679,7 +1677,7 @@ Section SyscallArms.
     iApply (SysKill.wp_sys_kill_sconf γs M (av - 4)%nat 0%nat true pj
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (DfracOwn (1/4)) true ∅
               Hlen Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "proc") Hpv
-              with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hprocs Hpanic").
+              with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hprocs").
     iIntros (CIDy Hsy mf rv) "%Hmf Hcg Hcpu Hpc Htfc Htfp".
     destruct Hmf as [Hcs _].
     iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
@@ -1707,7 +1705,7 @@ Section SyscallArms.
   (* THE SIXTH ARM: k = 13, [sys_pause].  kill's trapframe borrow plus the
      tickslock, and -- because it SLEEPS on the tick counter -- the running
      process's own triple ([γs]/[j]/[γl], the process addressed as
-     [proc_addr j]) and [procs_inv]/[panic_wp_any], exactly as sys_wait
+     [proc_addr j]) and [procs_inv], exactly as sys_wait
      needs.  Its [eb = true] parking premise is what [sysc_arm_pre]'s own
      [cpu_own 0 true ...] already says. *)
   Lemma sysc_arm_pause (γf : gname) (pj : mword 64)
@@ -1722,7 +1720,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 13) : mword 64)
                    = mword_of_int KernelSyms.sys_pause) by reflexivity.
@@ -1740,7 +1738,7 @@ Section SyscallArms.
     iApply (SysPause.wp_sys_pause_sconf γs j γl γtk M (av - 4)%nat true 0%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v0 (DfracOwn (1/4)) true ∅
               Hj Hgamma eq_refl Hv0 ltac:(lia) eq_refl (locks_below_empty "time") Hpv
-              with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hticks Hprocs Hpanic").
+              with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hticks Hprocs").
     iIntros (CIDy Hsy mf rv) "%Hmf Hcg Hcpu Hpc Htfc Htfp".
     destruct Hmf as [Hcs _].
     iDestruct ("Hpvback" with "Htfc Htfp") as "Hpriv".
@@ -1800,7 +1798,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 10) : mword 64)
                    = mword_of_int KernelSyms.sys_dup) by reflexivity.
@@ -1860,7 +1858,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 1) : mword 64)
                    = mword_of_int KernelSyms.sys_fork) by reflexivity.
@@ -1874,7 +1872,7 @@ Section SyscallArms.
               M 0%nat (av - 4)%nat true pj true pid V ∅
               ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hkalloc Hpav Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hkalloc Hpav Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
@@ -2004,7 +2002,7 @@ Section SyscallArms.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     subst pj.
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
+    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlks Hcpu]". subst lks.
     iPoseProof "Henv" as "#Henvc".
@@ -2296,7 +2294,7 @@ Section SyscallMain.
     assert (Hav82 : (82 <= av)%nat)
       by (lia).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc Hprocs Hpanic Hbs Hfc Hip Hfd Hir HR Hpriv Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc Hprocs Hbs Hfc Hip Hfd Hir HR Hpriv Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (syci_00 with "Htext") as "Hi00".
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -2745,9 +2743,9 @@ Section SyscallMain.
       iDestruct (cpu_own_transport CID8 CID22 0%nat true pj true Hcr8_22 with "Hcpu") as "Hcpu".
       iApply (sysc_arm_dispatch (CID := CID22) k γf pj γs j γl bn fn dqi ip pid V lks av m D0 us Hk
                 Hj Hgamma eq_refl HD0armsp HD0s2 HD0ra HD0other HD0avb
-                with "[Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
+                with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv". }
+        iFrame "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv". }
     - (* ---------------- OUT OF RANGE: the printk fallback ---------------- *)
       (* [a3num]'s value fits in [mword 32]'s signed range by construction
          (it IS a sign-extended 32-bit value), so [sysc_bltu_taken]'s extra
@@ -2823,9 +2821,9 @@ Section SyscallMain.
       iDestruct (cpu_own_transport CID8 CID15 0%nat true pj true Hcr8_15 with "Hcpu") as "Hcpu".
       iApply (sysc_fallback (CID := CID15) γf pj γs j bn fn dqi ip pid V lks av m B5 us
                 Hj eq_refl HB5armsp HB5s1 HB5other HB5avb
-                with "[Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
+                with "[Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv] Hr24 Hr16 Hr8 Hr0 Hdata Hcont").
       { rewrite /sysc_arm_pre.
-        iFrame "Hpc Hcg Hcpu Htext Hprocs Hpanic HR Hbs Hfc Hip Hfd Hir Hpriv". }
+        iFrame "Hpc Hcg Hcpu Htext Hprocs HR Hbs Hfc Hip Hfd Hir Hpriv". }
   Qed.
 
 End SyscallMain.

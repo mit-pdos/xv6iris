@@ -12,7 +12,7 @@
    resource [intr_inv_alloc] needs to build the interrupt invariant and hence
    to fold the SIE = 1 arm of the capability.
 
-   Straight-line, no callees -> unconditional success, no panic_wp.  Follows
+   Straight-line, no callees -> unconditional success, no panic credential.  Follows
    SpecKvminithart.v's file conventions. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap bitvector.definitions.

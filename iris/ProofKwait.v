@@ -93,7 +93,6 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecCopyout SpecFreeproc.
-Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecKwait.
 From Kernel Require KernelInstrs KernelSyms.
@@ -1981,7 +1980,6 @@ Section ProofKwait.
        below. *)
     locks_below lks "wait_lock" ->
     procs_inv γs -∗
-    panic_wp_any -∗
     kernel_text -∗
     kalloc_env γa None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -2017,7 +2015,7 @@ Section ProofKwait.
       by (vm_compute; lia).
     assert (Hfresh_proc : locks_below ({["wait_lock"]} ∪ lks) "proc").
     { apply locks_below_union_singleton; [exact Hwl_lt_proc | lkbelow]. }
-    iIntros "#Hpinv #Hpanic #Htext #Henv #Hlk".
+    iIntros "#Hpinv #Htext #Henv #Hlk".
     iAssert (∀ (fuel kk : nat) (M : regfile) (hv : mword 64) (ps : list (mword 64)),
                ⌜(NPROC - kk <= fuel)%nat⌝ -∗ ⌜(kk < NPROC)%nat⌝ -∗
                ⌜kw_scan_regs M mm pme addr kk⌝ -∗ ⌜M !!! Regidx Ra4 = hv⌝ -∗
@@ -2507,7 +2505,7 @@ Section ProofKwait.
        [killed]/[sleep_prepare]; the release/re-acquire pair works directly
        off this premise. *)
     locks_below lks "wait_lock" ->
-    kernel_text -∗ procs_inv γs -∗ panic_wp_any -∗
+    kernel_text -∗ procs_inv γs -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     kw_round CID0 γf γw jj mm pme addr K eb pid V lks -∗
     kw_exit_fn CIDt γf mm pme K eb pid V lks -∗
@@ -2527,7 +2525,7 @@ Section ProofKwait.
     { apply locks_below_union_singleton; [exact Hwl_lt_proc | lkbelow]. }
     assert (Hfresh_proc0 : locks_below lks "proc").
     { lkbelow. }
-    iIntros "#Htext #Hpinv #Hpanic #Hlk IH Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe".
+    iIntros "#Htext #Hpinv #Hlk IH Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe".
     pose proof Hregs as Hregs2.
     destruct Hregs2 as (Hsp & Hcs1 & Hcs2 & Hcs3 & Hcs4 & Hcs5 & Hcs6 & Hcs7 & Hcs).
     iPoseProof (kwi_ce with "Htext") as "Hice".
@@ -2892,7 +2890,7 @@ Section ProofKwait.
     (* forwarded to [kw_scan] and [kw_round_tail], the two callees that
        actually touch a lock. *)
     locks_below lks "wait_lock" ->
-    kernel_text -∗ procs_inv γs -∗ panic_wp_any -∗
+    kernel_text -∗ procs_inv γs -∗
     kalloc_env γa None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     ▷ kw_round CID0 γf γw jj mm pme addr K eb pid V lks -∗
@@ -2906,7 +2904,7 @@ Section ProofKwait.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 HK Heb Hjj Hgl Hlen Hpme Hanch Hregs Hbelow.
-    iIntros "#Htext #Hpinv #Hpanic #Henv #Hlk IH Hqfn Hcg Hown Hpay Hpc
+    iIntros "#Htext #Hpinv #Henv #Hlk IH Hqfn Hcg Hown Hpay Hpc
              Htok Hres Hpriv Hframe".
     iDestruct "Hres" as (ps) "Hps".
     iPoseProof (kwi_ee with "Htext") as "Hie0".
@@ -3001,10 +2999,10 @@ Section ProofKwait.
     { iIntros (Mx hx px) "%Hrx %Hax Hcgx Hownx Hpayx Hpcx Htokx Hpsx Hprivx Hframex Hqfnx".
       iApply (kw_round_tail (CIDt := CIDy) CID0 γs γf γw γl jj mm Mx pme addr K eb
                 pid V hx px lks HK Heb Hjj Hgl Hpme Hanch Hrx Hax Hbelow
-                with "Htext Hpinv Hpanic Hlk IH Hqfnx Hcgx Hownx Hpayx Hpcx
+                with "Htext Hpinv Hlk IH Hqfnx Hcgx Hownx Hpayx Hpcx
                       Htokx Hpsx Hprivx Hframex"). }
     iDestruct (kw_scan (CID0 := CIDy)  γs γa γf γw mm pme addr K eb pid V lks
-                 HK Hlen Hbelow with "Hpinv Hpanic Htext Henv Hlk") as "Hscan".
+                 HK Hlen Hbelow with "Hpinv Htext Henv Hlk") as "Hscan".
     iApply ("Hscan" $! 0%nat D2 (mword_of_int 0 : mword 64) ps
               with "[%] [%] [%] Hqfn Hqce Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe").
     { unfold NPROC; lia. }
@@ -3052,7 +3050,7 @@ Section ProofKwaitMain.
        "wait_lock" (10) bound by [locks_below_mono]/
        [locks_below_union_singleton] at each nested call. *)
     intros pcE pj ret_tgt Hj Hgl Hav Heb Hbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hpanic #Hlk #Henv Hpriv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hlk #Henv Hpriv Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX (sys_pause's
        rule): the [b <> eb] instances of this contract are vacuous. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
@@ -3541,7 +3539,7 @@ Section ProofKwaitMain.
       iIntros (CIDz Hsz N) "%Hrz Hcgz Hownz Hpayz Hpcz Htokz Hresz Hprivz Hframez Hqfnz".
       iApply (kw_round_body (CIDy := CIDz) CID γs γa γf γw γl j m N pj adr av eb pid V lks
                 Hav Heb Hj Hgl Hlen Hpjv Hsz Hrz Hbelow
-                with "Htext Hpinv Hpanic Henv Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
+                with "Htext Hpinv Henv Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
                       Htokz Hresz Hprivz Hframez"). }
     rewrite /kw_round.
     (* the loop's own index is the literal [true] (sleep's crossing), while

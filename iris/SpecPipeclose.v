@@ -41,7 +41,6 @@ Require Import SchedCtx.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import PipeInvDefs.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -87,7 +86,6 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   kalloc_avail γk on -∗
   (* wakeup's *)
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
     sie_cap_gpr mr av b pme -∗

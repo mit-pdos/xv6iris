@@ -64,7 +64,7 @@
    THE PANIC ARM IS DEAD.  bmap's [panic("bmap: out of range")] at +0xb2
    is reached only when bn - NDIRECT >= NINDIRECT, which the premise
    (bn < MAXFILE) rules out -- the same way both of log_write's panics are
-   dead.  [panic_wp_any] is still threaded, because the interior
+   dead.  The panic credentials are still threaded, because the interior
    acquire's own holding-check arm wants a panic contract regardless.
 
    THE s4 QUIRK.  gcc saves s4 only on the paths that reach bread
@@ -106,7 +106,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -322,7 +321,6 @@ Definition wp_bmap_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
@@ -508,7 +506,6 @@ Definition wp_bmap_gen_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   panic_env -∗
@@ -725,7 +722,6 @@ Definition wp_bmap_noalloc_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   i_dev ip ↦₄{dqd} dev -∗

@@ -175,7 +175,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
 (* sched() panics ("sched locks") unless [mycpu()->noff == 1], and this file
    used to publish a SECOND contract, [wp_sched_locks], entered at
    noff >= 2: it took the branch, jumped to panic and consumed the caller's
-   [panic_wp_any].  It existed for exactly one client -- the LOCKED branch of
+   a panic credential.  It existed for exactly one client -- the LOCKED branch of
    a NESTED [acquiresleep], through [SpecSleep.wp_sleep_nested] -- and that
    client is gone: iput now takes [SpecAcquiresleep.wp_acquiresleep_nb_sconf],
    which PROVES it does not sleep (claude-notes/projects/iput-acquiresleep.md).
@@ -183,7 +183,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
    to panic.
 
    WHAT IS LEFT IS A REFUTATION.  [wp_sched_sconf] is now sched's ONLY
-   contract.  It demands [cpu_own 1] and takes NO [panic_wp_any], and its
+   contract.  It demands [cpu_own 1] and takes NO panic credential, and its
    proof discharges the [bne] at sched+0x30 from the level alone.  So no
    proof in this tree can hand a WP to sched's entry PC at any level but 1,
    and along the one it can hand, the panic's basic block is not reached --

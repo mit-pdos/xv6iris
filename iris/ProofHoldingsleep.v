@@ -75,7 +75,7 @@ Section ProofHoldingsleep.
     intros pcE slk ret_tgt Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
-    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield #Hpanic Hpidproc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hsleeplock Hsl Hpidfield Hpidproc Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb. cbn in Heb.
     subst eb.
     (* stack-slot address bridges (spr-relative store offset -> pa_stk sp0 k). *)
@@ -721,10 +721,10 @@ Section ProofHoldingsleep.
   Proof.
     cbv beta delta [wp_holdingsleep_sconf_body].
     intros pcE slk ret_tgt Hav Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidfield #Hpanic Hpidproc Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hslk Hsl Hpidfield Hpidproc Hcont".
     iDestruct "Hsl" as (q) "Hsl".
     iApply (wp_holdingsleep_gen_sconf γl γsl s R sl_untracked q m p pidv av eb dq b lks
-              Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidfield Hpanic Hpidproc").
+              Hav Hbelow with "Hcg Hcnt Htext Hpc Hslk Hsl Hpidfield Hpidproc").
     iIntros (CIDf Hsf mf Hcs) "Hcg Hcnt Hpc Hsl Hpidfield Hpidproc".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hcnt Hpc [Hsl] Hpidfield Hpidproc"); [ exact Hcs |].

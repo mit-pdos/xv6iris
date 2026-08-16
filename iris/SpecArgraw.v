@@ -20,7 +20,7 @@
 
    THE CONTRACT.  The index is given as a nat [i < NARG] with the register
    pinned at [mword_of_int i]: that PRECONDITION is what refutes the
-   [bltu a5,s1,panic] arm, so argraw needs no [panic_wp] hypothesis at all.
+   [bltu a5,s1,panic] arm, so argraw needs no panic credential at all.
    The resources are the weakest that suffice, deliberately NOT [proc_priv]:
 
      - [p_trapframe p ↦₈{dqt} page_base tfp] -- a fraction of the pointer

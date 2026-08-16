@@ -87,7 +87,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -219,7 +218,6 @@ Definition wp_sys_write_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filewrite's default arm is [panic("filewrite")], and its callees panic
      too; this is theirs *)
-  panic_wp_any -∗
   (* ...and that arm calls panic as an ORDINARY call: [kernel_data] above
      mints the literal, and this is the console bundle printk needs. *)
   panic_env -∗
