@@ -63,7 +63,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -608,7 +607,6 @@ Definition kxc_bad324_body
   sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
   cpu_own 0 true (proc_addr jp) true lks -∗
   kernel_text -∗
-  panic_wp_any -∗
   pc_is (mword_of_int (KXB + 0x324) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
@@ -730,7 +728,6 @@ Definition kxc_ls_body
   sie_cap_gpr Ml (K - 68)%nat true (proc_addr jp) -∗
   cpu_own 0 true (proc_addr jp) true lks -∗
   kernel_text -∗
-  panic_wp_any -∗
   pc_is (mword_of_int (KXB + 0xf6) : mword 64) -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗

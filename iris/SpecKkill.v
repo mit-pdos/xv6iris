@@ -48,7 +48,7 @@
    caller left in a0), and since both outcomes are live the contract need
    not relate them.
 
-   [panic_wp] is threaded because acquire takes it. *)
+   The panic credentials are threaded because acquire takes them. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -68,7 +68,6 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import SchedCtx.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -93,7 +92,6 @@ Definition wp_kkill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (rv : mword 64),
       ⌜ callee_saved m mf /\

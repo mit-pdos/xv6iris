@@ -692,10 +692,9 @@ Section ProofUvmcopy.
              Hsp Hs1 Hs4 Hs5 Hs6 Hs7 Hthr Hbelow;
       [ exfalso; clear -Hrem; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpo Hpt #Henv Hexit".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iAssert (kalloc_env γa None) as "#Henv2".
-    { iExists γk. iSplitR; [iExact "Hlock" |].
-      iSplitR; [iExact "Havail" | iExact "Hpanic"]. }
+    { iExists γk. iSplitR; [iExact "Hlock" |]. iExact "Havail". }
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".

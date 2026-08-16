@@ -28,8 +28,8 @@
    wants one: the only reader is killed(), which any hart may call on any
    proc.  See claude-notes/design/proc-struct.md, discipline 1.
 
-   [panic_wp] is threaded because acquire takes it (its "acquire" panic on a
-   doubly-held lock). *)
+   The panic credentials are threaded because acquire takes them (its
+   "acquire" panic on a doubly-held lock). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.

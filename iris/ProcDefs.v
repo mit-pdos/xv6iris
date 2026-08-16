@@ -103,7 +103,7 @@ Section ProcDefs.
      (164, the deepest trap round) and the park's own
      [6 + trap_res true + K_prepare_return] (96); the 112 slots below are
      headroom -- the reserve a zombie's parked record will need once
-     [PanicStub]'s [∀ avail] contract is replaced by the real panic's.
+     the placeholder's [∀ avail] contract is replaced by the real panic's.
      Stated here, at the bottom of the tree, so the constant has one home;
      the two bounds are checked where they are used, not here. *)
   Definition KSTACK_AV : nat := 400%nat.

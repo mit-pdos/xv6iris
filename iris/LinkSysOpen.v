@@ -36,8 +36,8 @@
    closes is still FD_NONE ([SpecFileclose.fileclose_env_none]).
 
    panic is NOT a module here.  Every panic sys_open can reach is inside a
-   callee; the [panic_wp_any] resource the contract takes is threaded down
-   and never consumed locally. *)
+   callee; the [kernel_data] / [panic_env] the contract takes are threaded
+   down to the callees' own arms. *)
 Require Import LinkArgint LinkArgstr LinkBeginOp LinkCreate LinkNamei
         LinkIlock LinkIunlock LinkIunlockput LinkEndOp LinkFileclose
         LinkItrunc LinkFilealloc LinkFdalloc

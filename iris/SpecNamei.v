@@ -43,7 +43,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -141,7 +140,6 @@ Definition wp_namei_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
@@ -264,7 +262,6 @@ Definition wp_namei_gen_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
@@ -424,7 +421,6 @@ Definition wp_namei_root_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗

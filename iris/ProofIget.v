@@ -109,7 +109,6 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIget.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import WpUart.
@@ -482,7 +481,7 @@ Section ProofIget.
        RETURNING arms, and simply dropped on the diverging
        panic("iget: no inodes") arm at +0x6a -- which is what a partial
        correctness post owes there and nothing more. *)
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hpanic #Hpenv Hislot Hlic Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hpenv Hislot Hlic Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).

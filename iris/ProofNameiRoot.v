@@ -127,7 +127,7 @@ Section ProofNameiRoot.
     cbv beta delta [wp_namei_root_body].
     intros pcE pv ret_tgt HK Hn Hdev Hnib Hroot Hnib0 Hbelow.
     destruct (nmr_kb K HK) as (Knx & K4 & Kpop).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hitb2 #Hitbl #Hesc Hisl Hp0 Hp1 Hcont".
     iPoseProof (nmi_00 with "Htext") as "Hi00".
     iPoseProof (nmi_02 with "Htext") as "Hi02".
     iPoseProof (nmi_04 with "Htext") as "Hi04".
@@ -289,7 +289,7 @@ Section ProofNameiRoot.
     iApply (NX.wp_namex_root gtl cn gfs gi cov logstart nib dev dqp
               R5 n (K - 4)%nat eb p b lks
               Knx Hn Hdev Hnib Hroot Hnib0 HR5a1 Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hitb2 Hitbl Hesc Hisl Hp0 Hp1").
     iIntros (CID8 Hq8 mf ipv) "%Hcsp Hcg Hcnt Hpc Hp0 Hp1 Hip".
     destruct Hcsp as (Hcs & Hfa0).
     iEval (rewrite HR5a0) in "Hp0".

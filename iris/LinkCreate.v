@@ -25,8 +25,8 @@
    panic is NOT a module here.  create's own panics are all inside callees
    (ialloc's no-inodes arm printks rather than panics, which is why the
    contract carries [printk_gen_contract] rather than a panic obligation);
-   the [panic_wp_any] resource the contract takes is threaded to the callees
-   and never consumed locally.
+   the [kernel_data] / [panic_env] the contract takes are threaded to the
+   callees, whose own panic arms are discharged against [Panic].
 
    So this cone's assumption count is the five platform axioms plus funext,
    plus [create_fresh_ty], plus the TRANSIENT [iput_acquiresleep_order_

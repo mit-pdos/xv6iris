@@ -499,7 +499,7 @@ Section PwPieces.
 
   (* copyin CONSUMES [kalloc_env] and hands nothing back, and the loop calls it
      once per byte -- so the bundle has to be duplicable.  At [on = None] every
-     conjunct is persistent ([is_lock], [kalloc_sealed], [panic_wp_any]), which is
+     conjunct is persistent ([is_lock], [kalloc_sealed]), which is
      exactly why the sealed form is the one the copy chain takes. *)
   (* [kalloc_env _ None _] is persistent: KvmSpec.kalloc_env_None_persistent. *)
 
@@ -1085,7 +1085,7 @@ Section ProofPipewrite.
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
     assert (Hn31 : (n < 2 ^ 31)%Z) by (destruct Hnrange as [_ HB]; exact HB).
     assert (Hn31L : (n < 2147483648)%Z) by (rewrite H31 in Hn31; exact Hn31).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv Hcont".
     (* pipewrite's contract pins depth 0, so the held set is FORCED empty.
        Keep the equation rather than substituting it: the script still names
        [lks] in a dozen argument lists, and the interrupts-on arms hand back
@@ -1368,7 +1368,7 @@ Section ProofPipewrite.
         iApply (Wakeup.wp_wakeup_sconf T2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true false
                   ({["pipe"]} ∪ lks)
                   HwK HwdomW Hlen Hwlvl ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                  with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
         assert (HraT2 : T2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x10c) : mword 64) 4)
@@ -2352,7 +2352,7 @@ Section ProofPipewrite.
               iApply (Wakeup.wp_wakeup_sconf F2 γs (proc_addr j) 1%nat (trap_res true + (av - 14))%nat true false
                         ({["pipe"]} ∪ lks)
                         HwK HwdomF Hlen Hwlvl ltac:(lkbelow)
-                        with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                        with "Hcg Hown Htext Hpc Hpinv").
               all: try lkbelow.
               iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
               assert (HraF2 : F2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x6e) : mword 64) 4)

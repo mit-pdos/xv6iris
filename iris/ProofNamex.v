@@ -1142,7 +1142,7 @@ Section ProofNamexMain.
     (* N3d trap 1's whole-function fix: rename the [let]-bound [pj], fold
        [proc_addr j] into every resource ONCE, and never write [pjv] again. *)
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -2672,7 +2672,7 @@ Section ProofNamexMain.
                          Hlg Hsize Hbmap0 Hbmapcov Hbmaplog Hinos0
                          Hibc Hibl Hpb' Hcovb HbD
                          Hj Hgs HT2a0 Hbelow
-                         with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+                         with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                                Hescp Hireg Hslkp Href Hbmap Hinos Hbits Hppid
                                Hprocs Hdev Hgeom Hdlk Hbslot [] Hlog").
                all: try lkbelow.
@@ -3105,7 +3105,7 @@ Section ProofNamexMain.
                              V2 (K - 12)%nat eb b lks
                              Kil Hik Hlg Hinos0 Hibc Hib' Hj Hgs HV2a0
                              ltac:(lkbelow)
-                             with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitbl Hesck
+                             with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hesck
                                    Hireg Hslkk Hshr Hinos Hppid Hprocs Hdev
                                    Hgeom Hdlk Hbs1").
                    all: try lkbelow.
@@ -3328,7 +3328,7 @@ Section ProofNamexMain.
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
                                HND2a0 Hbelow
-                               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc
+                               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
@@ -3609,7 +3609,7 @@ Section ProofNamexMain.
                                  pidv dq NP3 (K - 12)%nat eb (proc_addr j) b lks
                                  Kiu Hik HP3a0
                                  ltac:(lkbelow)
-                                 with "Hcg Hcnt Htext Hpc Hpanic Hitbl Hesck
+                                 with "Hcg Hcnt Htext Hpc Hitbl Hesck
                                        Hslkk Hslkd Hslpid Hppid Hprocs Hdep
                                        Hidev Hiinum Hivalid Hload Hshot").
                        all: try lkbelow.
@@ -3931,7 +3931,7 @@ Section ProofNamexMain.
                                    HGA4a0
                                    ltac:(rewrite HGA4a2; vm_compute;
                                          reflexivity) Heb
-                                   with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv
+                                   with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv
                                          Hidev Hmeta Hmap Hblocks [Hname] []
                                          Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                                          Hitb2 Hitbl Hesc Hisl Hdlnk Hdiat").
@@ -4114,7 +4114,7 @@ Section ProofNamexMain.
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
                                      Hiu Hj Hgs HGB3a0 Hbelow
-                                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio
+                                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep2 Hbmap
@@ -4332,7 +4332,7 @@ Section ProofNamexMain.
                                      Hlg Hsize Hbmap0 Hbmapcov
                                      Hbmaplog Hinos0 Hibc Hibl Hib' Hcovb
                                      Hiu Hj Hgs HGC3a0 Hbelow
-                                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio
+                                     with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio
                                            Hlogc Hitb2 Hitbl Hesck Hireg
                                            Hslkk Hslkd Hslpid Hdep Hidev
                                            Hiinum Hivalid Hload Hshot Hkeep2 Hbmap
@@ -4621,7 +4621,7 @@ Section ProofNamexMain.
                                Hlg Hsize Hbmap0 Hbmapcov Hbmaplog
                                Hinos0 Hibc Hibl Hib' Hcovb Hiu Hj Hgs
                                HND2a0 Hbelow
-                               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc
+                               with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc
                                      Hitb2 Hitbl Hesck Hireg Hslkk Hslkd
                                      Hslpid Hdep Hidev Hiinum Hivalid Hload
                                      Hshot Hkeep2 Hbmap Hinos Hbits Hppid Hprocs
@@ -5399,7 +5399,7 @@ Section ProofNamexMain.
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
                 Hrino HA3a0 HA3a1 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpanic Hpenv Hisl1
+                with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hisl1
                       Hlicr").
       all: try lkbelow.
       iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
@@ -5872,7 +5872,7 @@ Section ProofNamexMain.
     intros pcE pjv pv nb ret_tgt pl L
            HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
            Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen Hbud Hj Hgs Ha1 Heb Hbelow.
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl
               #Hesc #Hslks #Hireg #Hprocs #Hdev #Hgeom #Hdlk Hbmap Hinos
               Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog Hcont".
     (* THE WITNESS: the set the counted reservation was hiding *)
@@ -5883,7 +5883,7 @@ Section ProofNamexMain.
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsize Hbmap0 Hbmapcov
               Hbmaplog Hinos0 Hcovb Hiregb Hcstr Hplen
               (walk_need_counted L n Hbud) Hj Hgs Ha1 Heb Hbelow
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hireg Hprocs Hdev Hgeom Hdlk Hbmap Hinos
                     Hbits Hppid Hcwdc Hcwdr Hpath Hname Hbslot Hislot Hlog
                     [Hcont]").

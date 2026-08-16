@@ -65,7 +65,7 @@
    system invariant -- dirlink's OWN short-write arm is what breaks it (see
    the APPEND arm below: on [tot < 16] the new size is [16*k0 + tot]) -- so
    the short-readi turn is now a LIVE panic arm, discharged with
-   [SpecPanic.panic_wp_any], and no caller owes granularity.  A dirlink on a
+   [SpecPanic]'s own contract, and no caller owes granularity.  A dirlink on a
    directory a previous short write corrupted therefore PANICS rather than
    returning; that is what the C does, and it is the honest post-state.
 
@@ -174,7 +174,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -564,7 +563,6 @@ Definition wp_dirlink_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -839,7 +837,6 @@ Definition wp_dirlink_gen_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗

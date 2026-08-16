@@ -42,7 +42,7 @@
      user pages at existential bytes (the user-safety altitude, see
      SpecVmfault.v), and kfree's precondition is likewise contents-blind.
 
-   THE PANIC ARM IS DEAD, not discharged by [panic_wp]: [va] page-aligned is
+   THE PANIC ARM IS DEAD, not discharged by a panic credential: [va] page-aligned is
    a precondition (every caller rounds), so the [slli va,52 / bnez] test is
    not taken.  [kalloc_env] is threaded through only for kfree's lock and
    count; at [on := None] it is persistent, so the loop re-supplies it. *)

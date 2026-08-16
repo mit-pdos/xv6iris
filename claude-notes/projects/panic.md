@@ -4,9 +4,13 @@
 `LinkPanic.v`, sealed as `PanicProof Printk : PANIC`, `Print Assumptions` = the
 5 Sail platform externs + funext and nothing else.
 
-**THE SPLICE IS DONE.** Every live panic arm in the tree links against
-`SpecPanic`; `PanicStub.panic_wp_any_at` has no remaining APPLICATION anywhere.
-What is left is a pure deletion — see "What is LEFT" at the foot.
+**THE PROJECT IS DONE.** Every live panic arm links against `SpecPanic`, and
+the placeholder `PanicStub.v` / `LinkPanicStub.v` are deleted — which took
+`LinkPanicStub.PanicAssumed.panic_wp_holds` out of the adequacy print, leaving
+`LinkUserinit` as the only assumed Link in the tree. This file is kept as a
+REFERENCE: the arm recipe and its traps, what threading two ambient
+credentials through a whole cone costs, and how to retire a resource that 200
+files name.
 
 ## The contract
 
@@ -306,32 +310,57 @@ placeholder's file is also a BUILD constraint, not taste: the placeholder is in
 433 files' dependency closure, of which 330 do not otherwise reach `UartTxInv`
 and 354 do not reach `PrintkFmt`.
 
-## What is LEFT: retire `PanicStub.v`
+## `PanicStub.v` IS RETIRED
 
-**A PURE DELETION, and it removes an axiom from adequacy.**  207 files still
-name `panic_wp` / `panic_wp_any`, but nothing APPLIES it any more:
-`panic_wp_any_at`'s only remaining uses are `ProofMain` / `ProofMainSecondary`
-converting the hart-generic form to the ambient one in order to hand it DOWN.
-So every occurrence is a dead premise, and the sweep is:
+The placeholder is deleted, and with it `LinkPanicStub`'s `Axiom`.  The
+adequacy print went from eight entries to **seven** —
+`LinkUserinit.Userinit.wp_userinit_sconf` is now the ONLY assumed Link, beside
+funext and the five Sail platform externs.  The baseline lives in
+[`../durable-notes.md`](../durable-notes.md) §"The adequacy-print baseline".
 
-1. delete `panic_wp_any -∗` from each spec body and module-type parameter;
-2. delete the matching `#Hpanic` from each `iIntros` and each call string;
-3. drop `Require Import PanicStub` where nothing else needs it;
-4. delete `PanicStub.v` and `LinkPanicStub.v` and their `_CoqProject` rows.
+The deletion was 208 files and it was NOT a plain `sed`.  Four shapes had to be
+told apart, and only the first is a one-liner:
 
-When it lands, `Print Assumptions xv6_power_adequacy_xv6Σ` drops
-`LinkPanicStub.PanicAssumed.panic_wp_holds` and goes from eight entries to
-seven — update the baseline in
-[`../durable-notes.md`](../durable-notes.md) §"The adequacy-print baseline" in
-the same commit.  `LinkUserinit.Userinit.wp_userinit_sconf` is then the only
-assumed Link left.
+1. **the standalone premise** — `panic_wp_any -∗` alone on a line (220 of
+   them), plus the same thing mid-line and at end-of-line, which a
+   line-anchored regex silently misses.  Match all three or the second full
+   build finds the leftovers one file at a time.
+2. **the hypothesis name** — `#Hpanic` in an `iIntros` and `Hpanic` in a
+   `with "…"` string (841 occurrences, all inside quoted strings, none
+   outside one).  It is `Hpany` in `ProofMain`/`ProofMainSecondary` and
+   `Hpanicany` in `ProofBwrite`; a sweep that only knows `Hpanic` leaves
+   those three files broken in a way the build reports as an arity error
+   several lemmas away.
+3. **the conjunct of a BUNDLE.** Seven bundles carried it, and dropping a
+   conjunct renumbers every positional projection downstream of it:
+   `KvmSpec.kalloc_env`, `UsertrapRes.ut_caps`, `SpecDevintr.devintr_caps`,
+   `SpecClockintr.tick_keeper`, `ProofSyscall`'s `sysc_arm_pre`,
+   `FsSyscalls.fs_world`, and `BootShared`'s shared persistents.  `ut_caps`
+   is the one that bites: its consumers project by position
+   (`iDestruct "Hcaps" as "(_ & _ & $ & _)"`), and five of those had to lose
+   exactly one `_`.  The tell is `iAndDestruct: cannot destruct`, which names
+   the surviving conjunct rather than the missing one.
+4. **the construction sites** — `iFrame "… Hpanic"` is fine to shorten, but
+   `iSplitR; [iExact "Havail" | iExact "Hpanic"]` must lose the whole
+   `iSplit`, since the bundle is one conjunct shorter, not one name shorter.
 
-**Do it by BUILD-DRIVEN iteration, not by one big regex.**  A deleted
-hypothesis name shifts every later name in the same `iIntros`, so a
-mis-targeted edit reports as `iIntros: not intuitionistic` or
-`iSpecialize: "Hfoo" not found` several lemmas away.  The threading sweep that
-ADDED these premises converged in ~12 full builds using exactly that loop, and
-the errors are the same shape in reverse.
+**DO NOT normalise whitespace while doing this.** The first attempt collapsed
+runs of spaces on every line it touched, which reflowed alignment inside
+`iIntros` patterns across 190 files and made the diff unreadable. Remove the
+token and exactly one adjacent space; leave the rest of the line alone.
+
+Cost: five build rounds, all four failures of the last two mechanical.
+
+## Comment hygiene after a resource dies
+
+`panic_wp_any` survived in ~75 comments after the code was clean, most of them
+file headers saying the resource "is threaded to the callees and never consumed
+locally" — a present-tense claim about something that no longer exists, which is
+exactly what durable-notes' "a fact about something that no longer exists is
+deleted" is about.  They are rewritten to name what actually discharges the arm
+(`SpecPanic`, or `kernel_data` + `panic_env`).  Two `ProofScheduler` /
+`ProofKinit` blocks were pure narrative about a 2023 sweep and are gone.
+Watch the grammar when substituting a plural phrase for a bracketed singular.
 
 ## Build commands
 

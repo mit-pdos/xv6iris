@@ -30,7 +30,6 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SleepLock.
@@ -64,7 +63,6 @@ Definition wp_holdingsleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{
   (* the holder's bundle (returned untouched) *)
   sleeplocked_q γsl q -∗
   sl_pid slk ↦₄ pidv -∗
-  panic_wp_any -∗
   (* the caller's own pid, agreeing with the lock's pid field *)
   p_pid p ↦₄{dq} pidv -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -97,7 +95,6 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
   is_sleeplock γl γsl slk s R -∗
   sleeplocked γsl -∗
   sl_pid slk ↦₄ pidv -∗
-  panic_wp_any -∗
   p_pid p ↦₄{dq} pidv -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,

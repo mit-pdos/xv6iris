@@ -79,7 +79,6 @@ Require Import WpLock.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SpecFiledup.
-Require Import PanicStub.
 Require Import CpuOwn.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -273,7 +272,6 @@ Section KforkB3Proof.
     locks_below lks "ftable" ->
     kernel_text -∗
     is_ftable γl γf -∗
-    panic_wp_any -∗
     (∀ (i : nat) (M : regfile),
       ⌜(i < NOFILE)%nat⌝ -∗
       ⌜M !!! Regidx csp_rs1 = sp0v /\ M !!! Regidx Rs0 = s00v /\
@@ -299,7 +297,7 @@ Section KforkB3Proof.
       WP (Loop : expr riscv_lang)).
   Proof.
     intros HK Hn HV0 Hbelow.
-    iIntros "#Htext #Hft #Hpanic".
+    iIntros "#Htext #Hft".
     assert (HK14 : (14 <= (rsv + (K - 8)))%nat)
       by (pose proof (kfkb3_stack K HK); lia).
     assert (HlenV0 : length (pv_ofile V0) = NOFILE)

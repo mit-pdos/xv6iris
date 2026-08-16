@@ -49,7 +49,7 @@
      truncates;
    - the budget interval [(n - iput_units) <= n' <= n], spend-at-most,
      because iput never holds log.lock;
-   - [panic_wp_any], which BOTH callees carry -- iunlock's three panic tests
+   - the panic credentials, which BOTH callees carry -- iunlock's three panic tests
      are dead but SpecIunlock still takes the resource, and iput's
      "sched locks" arm diverges through it (design §13.12, Route B).
 
@@ -72,7 +72,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -166,7 +165,6 @@ Definition wp_iunlockput_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
@@ -297,7 +295,6 @@ Definition wp_iunlockput_gen_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗

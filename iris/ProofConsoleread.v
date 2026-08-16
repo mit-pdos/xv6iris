@@ -79,7 +79,7 @@ Require Import KallocInv.
 Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots ProcInv FileInvDefs.
 Require Import ConsoleInv.
-Require Import PanicStub SchedCtx.
+Require Import SchedCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecEitherCopyout SpecRelease.
 Require Import CodeConsoleread.
@@ -1761,13 +1761,13 @@ Section ProofConsoleread.
     (consoleread_stack <= av)%nat ->
     locks_below lks "cons" ->
     kernel_text -∗ is_conslock γc -∗ kalloc_env γa None -∗
-    procs_inv γs -∗ panic_wp_any -∗
+    procs_inv γs -∗
     □ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av pid V n fl lks -∗
     cr_wait_prop (CID0 := CID) γc jp sp0 m0 av pid V n fl lks.
   Proof.
     intros Hjp Hjl Hn31 Hav Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
-    iIntros "#Ht #Hlk #Henv #Hpinv #Hpanic #HAVE".
+    iIntros "#Ht #Hlk #Henv #Hpinv #HAVE".
     rewrite /cr_wait_prop.
     iLöb as "IH".
     iIntros (CIDw Hsw M nc cur P') "%Hregs %Hs5 %Hnb %Hext EX Hcg Hpc Hcnt Hpay Hlocked Hres Hpriv Hrest".
@@ -2265,24 +2265,24 @@ Section ProofConsoleread.
     (consoleread_stack <= av)%nat ->
     locks_below lks "cons" ->
     kernel_text -∗ is_conslock γc -∗ kalloc_env γa None -∗
-    procs_inv γs -∗ panic_wp_any -∗
+    procs_inv γs -∗
     cr_head_prop (CID0 := CID) γa γc γf jp sp0 m0 av pid V n fl lks.
   Proof.
     intros Hjp Hjl Hn31 Hav Hbelow.
     induction fl as [| fl IHfl].
-    { iIntros "#Ht #Hlk #Henv #Hpinv #Hpanic". rewrite /cr_head_prop.
+    { iIntros "#Ht #Hlk #Henv #Hpinv". rewrite /cr_head_prop.
       iIntros (CIDh Hsh M nc cur P')
         "%Hregs %Hs5 %Hrng %Hfl %Hext EX Hcg Hpc Hcnt Hpay Hlocked Hres Hpriv Hrest".
       exfalso. lia. }
-    iIntros "#Ht #Hlk #Henv #Hpinv #Hpanic".
+    iIntros "#Ht #Hlk #Henv #Hpinv".
     (* the copy block, then the park, both built from the fuel-[fl] head *)
     iAssert (□ cr_have_prop (CID0 := CID) γa γc γf jp sp0 m0 av pid V n fl lks)%I
       with "[]" as "#HAVE".
     { iModIntro.
       iApply (cr_mk_have γa γc γf jp sp0 m0 av pid V n fl lks Hn31 Hav Hbelow with "Ht Hlk Henv").
-      iApply (IHfl with "Ht Hlk Henv Hpinv Hpanic"). }
+      iApply (IHfl with "Ht Hlk Henv Hpinv"). }
     iPoseProof (cr_mk_wait γa γc γf γs jp γlp sp0 m0 av pid V n fl lks Hjp Hjl Hn31 Hav Hbelow
-                  with "Ht Hlk Henv Hpinv Hpanic HAVE") as "WAIT".
+                  with "Ht Hlk Henv Hpinv HAVE") as "WAIT".
     rewrite /cr_head_prop.
     iIntros (CIDh Hsh M nc cur P')
       "%Hregs %Hs5 %Hrng %Hfl %Hext EX Hcg Hpc Hcnt Hpay Hlocked Hres Hpriv Hrest".
@@ -2458,7 +2458,7 @@ Section ProofConsoleread.
   Proof.
     cbv beta delta [wp_consoleread_sconf_body].
     intros pcE pj ret_tgt Hj Hjl Hlen Ha0v Ha2v Hnrng Hav Heb Hbelow. subst eb.
-    iIntros "Hcg Hcnt #Ht Hpc #Hlk Hpriv #Henv #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hlk Hpriv #Henv #Hpinv Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX, so the whole
        entry stretch speaks one index (piperead's note). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -2853,7 +2853,7 @@ Section ProofConsoleread.
     { rewrite (Hchain Rs5 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)).
       apply HthrP; reg_neq. }
     iPoseProof (cr_mk_head γa γc γf γs j γlp sp0 m av pid V n (S (Z.to_nat n)) lks
-                  Hj Hjl Hn31 Hav Hbelow with "Ht Hlk Henv Hpinv Hpanic") as "HEAD".
+                  Hj Hjl Hn31 Hav Hbelow with "Ht Hlk Henv Hpinv") as "HEAD".
     iSpecialize ("HEAD" $! CIDaq with "[%]"); [wp_next_chain|].
     iApply ("HEAD" $! A4 n (m !!! Regidx Ra1) (pv_upt V)
               with "[%] [%] [%] [%] [%] EX Hcg Hpc Hcnt Hpay Hlocked Hres [Hpriv]

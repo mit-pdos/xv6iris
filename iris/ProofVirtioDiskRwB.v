@@ -44,7 +44,6 @@ Require Import CpuOwn SchedCtx FdSlots.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
 Require Import SpecVirtioDiskRw.
@@ -113,7 +112,7 @@ Section VdrwbFreeAt.
     sie_cap_gpr M av false pme -∗
     cpu_own 1 eb pme false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) -∗
-    panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
     d_desc_ptr ↦₈□ pd -∗
     instr (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) false
           (LOAD (imm, Regidx Rs0, Regidx Ra0, false, 4)) -∗
@@ -131,7 +130,7 @@ Section VdrwbFreeAt.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hi8 Hfri Hlen Haddr Hp4 Hjt Hjal Hret Hlkbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hi0 Hi4 Hidx Hbun Hslot Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hi0 Hi4 Hidx Hbun Hslot Hcont".
     (* ---- lw a0, imm(s0) ---- *)
     iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + off) : mword 64) Ra0 Rs0 imm M av
               (mword_of_int (Z.of_nat i) : mword 32) false (dqm := DfracOwn 1)
@@ -171,7 +170,7 @@ Section VdrwbFreeAt.
     iDestruct "Hde" as (va vl vf vn) "(Hd0 & Hd8 & Hd12 & Hd14)".
     iApply (FreeDesc.wp_free_desc_sconf γs pd i N2 av 1%nat eb pme va vl vf vn false lks
               Hav Hi8 HN2a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
-              with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14". rgall.
     destruct Hf as (Hcs & _).
@@ -304,7 +303,7 @@ Section ProofVirtioDiskRwB.
     trap_csrs -∗
     cpu_claim (proc_addr j) -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
-    panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗
@@ -314,7 +313,7 @@ Section ProofVirtioDiskRwB.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hj Hjl Hlen Hregs Hhi0 Hbelow.
-    iIntros "Hcg Hown Htc Hclm #Htext Hpc #Hpanic #Hpinv
+    iIntros "Hcg Hown Htc Hclm #Htext Hpc #Hpinv
              #Hgeom #Hlk Htok HR Hscr Hexit".
     iPoseProof (rwi_036 with "Htext") as "Hi036".
     iPoseProof (rwi_038 with "Htext") as "Hi038".
@@ -936,7 +935,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi07e Hi082 Hx0 Hbun Hbh").
+                  with "Hcg Hown Htext Hpc Hpinv Hdp Hi07e Hi082 Hx0 Hbun Hbh").
         iIntros (M2) "%Hcs2 Hcg Hown Hpc Hx0 Hbun".
         (* +0x086  c.li a5,1 *)
         iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x086) : mword 64) Ra5
@@ -1013,7 +1012,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi07e Hi082 Hx0 Hbun Hbh").
+                  with "Hcg Hown Htext Hpc Hpinv Hdp Hi07e Hi082 Hx0 Hbun Hbh").
         iIntros (M2) "%Hcs2 Hcg Hown Hpc Hx0 Hbun".
         (* +0x086  c.li a5,1 *)
         iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x086) : mword 64) Ra5
@@ -1067,7 +1066,7 @@ Section ProofVirtioDiskRwB.
                   ltac:(vm_compute; reflexivity)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   ltac:(lkbelow)
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi08c Hi090 Hx1 Hbun Hbm").
+                  with "Hcg Hown Htext Hpc Hpinv Hdp Hi08c Hi090 Hx1 Hbun Hbm").
         iIntros (M3) "%Hcs3 Hcg Hown Hpc Hx1 Hbun".
         iApply ("Hsleep" $! M3 with
                   "[%] Hcg Hown Htc Hclm Hpc Htok [Hbun] [Hx0 Hx1 Hx2 Hxp] Hexit").

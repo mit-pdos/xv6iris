@@ -110,7 +110,7 @@
    (allocatedness is directory-structure knowledge -- namei/ialloc, future
    work), and the pool legitimately holds free inodes ([ipool_shape]'s
    type-0 shape, §13.3).  So on the free-inode arm ilock DIVERGES through
-   [SpecPanic.panic_wp_any] and this postcondition speaks only for
+   [SpecPanic]'s own contract and this postcondition speaks only for
    successful loads.  That is sound in a partial-correctness WP and it is
    the honest statement; every other panic in this tree is refuted, and the
    proof file says at which instruction this one is taken.
@@ -163,7 +163,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -251,7 +250,6 @@ Definition wp_ilock_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,

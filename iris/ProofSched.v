@@ -1524,7 +1524,7 @@ Section ProofSched.
      [SpecSleep]'s nested lemma, which is gone; see SpecSched.v's header for
      why, and note that deleting it is what turns "we permit this panic" into
      "no proof can reach it".  The single walk that remains, above, refutes
-     the branch at noff = 1 and never mentions [panic_wp_any]. *)
+     the branch at noff = 1 and never mentions the panic credentials. *)
 
 End ProofSched.
 

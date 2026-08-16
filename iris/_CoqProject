@@ -224,7 +224,6 @@ WpIntenaBits.v
 SpecPushOff.v
 ProofPushOff.v
 LinkPushOff.v
-PanicStub.v
 SpecHolding.v
 ProofHolding.v
 LinkHolding.v
@@ -872,7 +871,6 @@ CodeUserinit.v
 SpecUserinit.v
 LinkUserinit.v
 StartedInv.v
-LinkPanicStub.v
 CodeMain.v
 SpecMain.v
 ProofMain.v

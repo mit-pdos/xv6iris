@@ -22,8 +22,8 @@
      [IcacheRef.ientry_ne_zero]) and NOT from any premise of this contract.
      That is the one refutation in this cone that a caller cannot see.
 
-   The [panic_wp_any] resource the contract takes is threaded to all eight
-   callees and never consumed locally.
+   The [kernel_data] / [panic_env] the contract takes are threaded to all
+   eight callees, whose own panic arms are discharged against [Panic].
 
    *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  ireclaim's orphan
    arm calls printk on its GENERAL path -- and, unlike balloc's and ialloc's
@@ -35,7 +35,7 @@
    keeps the count at the standing six -- but that is NOT self-containment:
    ireclaim's six are modulo a THREADED printk obligation that its callers
    (fsinit, and the boot client above it) must eventually discharge, exactly
-   the standing that [SpecPanic.panic_wp_any] already has throughout this
+   the standing that [SpecPanic]'s own credentials already have throughout this
    tree.  This is SpecBalloc.v's / LinkIalloc.v's arrangement verbatim; a
    reader who takes the six for "depends on nothing else" is misreading it. *)
 Require Import LinkBread LinkBrelse LinkIget LinkBeginOp

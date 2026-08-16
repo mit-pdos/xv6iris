@@ -39,7 +39,7 @@
    only instance is [LinkPrintk]'s [Axiom], so instantiating the functor
    here would carry that axiom into usertrap's [Print Assumptions] and, through
    the trampoline, into everybody's.  [SpecPrintk.printk_gen_contract] is
-   the [Prop] twin of [SpecPanic.panic_wp_any] for exactly this reason, so
+   the [Prop] twin of [SpecPanic]'s credentials for exactly this reason, so
    [ut_56] takes it as an ordinary [->] premise and pushes the obligation up.
    ProofProcdumpLoop.v and ProofBalloc.v are the two worked call sites.  The
    vararg obligation is free: every conversion in both format strings is
@@ -92,7 +92,7 @@ Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
-Require Import SchedCtx PanicStub.
+Require Import SchedCtx.
 Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecSetkilled SpecKexit SpecYield SpecPrepareReturn.
@@ -261,12 +261,10 @@ Section Ut56.
        eats the name, and the exit hands [ut_env] back). *)
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     iAssert (kernel_data) with "[]" as "#Hkd".
-    { iDestruct "Hcaps" as "(_ & _ & $ & _)". }
+    { iDestruct "Hcaps" as "(_ & $ & _)". }
     iAssert (printk_env (un_pr N) (un_u N) (un_v N)) with "[]" as "#Hpenv".
-    { iDestruct "Hcaps" as "(_ & _ & _ & _ & _ & $ & _)". }
+    { iDestruct "Hcaps" as "(_ & _ & _ & _ & $ & _)". }
     iPoseProof (ut_fmt1_str with "Hkd") as "#Hf1".
     iPoseProof (ut_fmt2_str with "Hkd") as "#Hf2".
     (* the three trap CSR cells, named *)
@@ -1054,8 +1052,6 @@ Section UtE8.
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     iPoseProof (uti_0ea with "Htext") as "Hiea".
     iPoseProof (uti_0ec with "Htext") as "Hiec".
     iPoseProof (uti_0f0 with "Htext") as "Hif0".

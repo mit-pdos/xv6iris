@@ -184,7 +184,7 @@ Section ProofVmfault.
     intros pcE va va0 ret_tgt HK Htp Hroot Hsza1 Hszb Hlvl Hbelow.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     set (spr := add_vec (mm !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
     (* NO struct-proc cell addresses any more.  vmfault used to [ld] p->sz at
@@ -1281,7 +1281,7 @@ Section ProofVmfault.
       { intros i Hi. assert (Hi0 : i = 0%nat) by lia. subst i.
         rewrite vpn_at_0. rewrite HG6a1. exact Hnone. }
       iAssert (kalloc_env γa None) as "#Henv2".
-      { iExists γk. iFrame "Hlock Havail Hpanic". }
+      { iExists γk. iFrame "Hlock Havail". }
       (* ---- mappages(pagetable, va0, PGSIZE, mem, PTE_R|W|U) ----
          at the ambient [lvl]: mappages/walk are level-generic, and [Hlvl] is
          exactly the int-range fact their kalloc needs. *)

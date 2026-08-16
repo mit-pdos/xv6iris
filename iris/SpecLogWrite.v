@@ -18,7 +18,7 @@
    log_write does NOT sleep -- it takes only the "log" SPINLOCK and calls
    bpin (which takes the bcache spinlock) -- so it threads no running-process
    bundle: [cpu_own n eb p C b] at the caller's own nesting level, exactly
-   like SpecBpin.v.  It does need [panic_wp_any]: both of its own panic arms
+   like SpecBpin.v.  Both of its own panic arms
    are DEAD (see below), but acquire's own holding-check arm wants a panic
    contract regardless.
 
@@ -74,7 +74,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto.
@@ -133,7 +132,6 @@ Definition wp_log_write_gen_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -225,7 +223,6 @@ Definition wp_log_write_au_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -387,7 +384,6 @@ Definition wp_log_write_gene_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)
@@ -455,7 +451,6 @@ Definition wp_log_write_sconf_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the slot unit backing the (possible) bpin *)

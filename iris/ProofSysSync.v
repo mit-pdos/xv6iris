@@ -85,7 +85,6 @@ Require Import WpLock.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecSysSync.
 Require Import CodeSysSync.
@@ -656,7 +655,6 @@ Section SsBodies.
     locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     ▷ ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
     ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
@@ -678,7 +676,7 @@ Section SsBodies.
       by lkbelow.
     assert (Hbeloweproc : locks_below ({["log"]} ∪ lks) "proc")
       by (apply locks_below_union_singleton; [vm_compute; lia | exact Hbelowproc]).
-    iIntros "#Htext #Hlog #Hpanic #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HssM : ss_regs m M spd) by exact Hss.
     destruct Hss as (Hs1 & Hsp & Hsv).
@@ -1152,7 +1150,7 @@ Section ProofSysSync.
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hlog #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlog #Hpinv Hcont".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart)".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
@@ -1328,7 +1326,7 @@ Section ProofSysSync.
       iIntros (CIDy Hsy My) "%HssL Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc Hexit".
       iApply (ss_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My K eb lks spd sp0
                 HK Hj Hjl Hsy Hspd HssL Hbelow
-                with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc"). }
+                with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hown Htc Hclm Hcg Hpc"). }
     (* ============ +0x14..+0x26: the two-part guard ============ *)
     iPoseProof (ssi_14 with "Htext") as "Hi14".
     iPoseProof (ssi_18 with "Htext") as "Hi18".

@@ -85,7 +85,6 @@ Require Import WpLock.
 Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep.
 Require Import SpecBeginOp.
 Require Import CodeBeginOp.
@@ -768,7 +767,6 @@ Section BoBodies.
     locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
     bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
@@ -788,7 +786,7 @@ Section BoBodies.
   Proof.
     intros pj HK Hj Hjl Hanch Hbo Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
-    iIntros "#Htext #Hlog #Hpanic #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HboM : bo_regs m M spd) by exact Hbo.
     destruct Hbo as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -1036,7 +1034,6 @@ Section BoBodies.
     locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
     bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
@@ -1056,7 +1053,7 @@ Section BoBodies.
   Proof.
     intros pj HK Hj Hjl Hanch Hbo Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
-    iIntros "#Htext #Hlog #Hpanic #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HboM : bo_regs m M spd) by exact Hbo.
     destruct Hbo as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -1313,7 +1310,6 @@ Section BoBodies.
     locks_below lks "log" ->
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
     bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
@@ -1332,7 +1328,7 @@ Section BoBodies.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj HK Hj Hjl Hanch Hbo Hbelow.
-    iIntros "#Htext #Hlog #Hpanic #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HboM : bo_regs m M spd) by exact Hbo.
@@ -1433,7 +1429,7 @@ Section BoBodies.
       iEval (rewrite Htgt24) in "Hpc".
       iApply (bo_armA_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb spd sp0 lks
                 HK Hj Hjl Hanch HboE1 Hbelow
-                with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
+                with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
       iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & %Hreg & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
@@ -1776,7 +1772,7 @@ Section BoBodies.
         iEval (rewrite Hp46) in "Hpc".
         iApply (bo_armB_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb spd sp0 lks
                   HK Hj Hjl Hanch HboE8 Hbelow
-                  with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
+                  with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc").
   Qed.
 
 End BoBodies.
@@ -1802,7 +1798,7 @@ Section ProofBeginOp.
     intros pcE pj ret_tgt HK Hj Hjl Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hlog Hpid #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hlog Hpid #Hpinv Hcont".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart)".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
@@ -2013,7 +2009,7 @@ Section ProofBeginOp.
       iIntros (CIDy Hsy My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc Hexit".
       iApply (bo_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My pidv dq K eb spd sp0 lks
                 HK Hj Hjl Hsy HboL Hbelow
-                with "Htext Hlog Hpanic Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc"). }
+                with "Htext Hlog Hpinv IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hown Htc Hclm Hcg Hpc"). }
     (* ============ +0x18..+0x22: s1 := &log, s2 := 30, jump to the test ==== *)
     iPoseProof (boi_18 with "Htext") as "Hi18".
     iPoseProof (boi_1c with "Htext") as "Hi1c".

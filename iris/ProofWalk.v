@@ -808,7 +808,7 @@ Section ProofWalk.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
     (* ---- kalloc() through the env bundle ---- *)
-    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
     assert (HspJ : J !!! Regidx csp_rs1 = spr).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Hsp. }
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.walk + 0x76) : mword 64) 4)
@@ -845,7 +845,7 @@ Section ProofWalk.
       (* rebuild kalloc_env from the cpu cell, count unchanged *)
       iAssert (kalloc_env γa (avail_sub on g))
         with "[Havail2]" as "Henv".
-      { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
+      { iExists γk. iFrame "Hlock Havail2". }
       assert (HN1a0 : N1 !!! Regidx (mword_of_int 10 : mword 5) = mr !!! Regidx (mword_of_int 10 : mword 5)).
       { rewrite /N1. rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
       iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.walk + 0x7c)) (mword_of_int 235 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
@@ -884,7 +884,7 @@ Section ProofWalk.
     (* rebuild kalloc_env from the cpu cell, count decremented one step *)
     iAssert (kalloc_env γa (avail_sub on (S g)))
       with "[Havail2]" as "Henv".
-    { rewrite avail_sub_S. iExists γk. iFrame "Hlock Havail2 Hqcpu". }
+    { rewrite avail_sub_S. iExists γk. iFrame "Hlock Havail2". }
     iPoseProof (wi_7e with "Htext") as "Hi7e".
     iPoseProof (wi_80 with "Htext") as "Hi80".
     iPoseProof (wi_82 with "Htext") as "Hi82".

@@ -34,7 +34,7 @@
    and [KptShare.kpt_inv_snapshot] supplies the snapshot ghost.
 
    Boot-free, straight-line, no callees -> unconditional success, no
-   panic_wp.  Follows SpecKvminit.v's file conventions.
+   panic credential.  Follows SpecKvminit.v's file conventions.
 
    INTERRUPTS OFF, AND THAT IS LOAD-BEARING (not a convenience).  Every
    resource this contract carries from entry to exit -- [tlb ↦ᵣ], the

@@ -81,7 +81,6 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import CodeIupdate.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemmove.
@@ -432,7 +431,6 @@ Section IupdateTail.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.iupdate + 0x66) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -470,7 +468,7 @@ Section IupdateTail.
   Proof.
     intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hbelow.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb #Hcrd0 Hop Hau Hheld Hcont".
+    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl #Hvlb #Hcrd0 Hop Hau Hheld Hcont".
     (* THE eb/b BRIDGE, once per top-level lemma (eb-generic-sweep.md). *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iui_66 with "Htext") as "Hi66".
@@ -554,7 +552,7 @@ Section IupdateTail.
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hvlb Hcrd HopS [Hau] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hvlb Hcrd HopS [Hau] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno). iExact "Hau". }
     iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
@@ -633,7 +631,7 @@ Section IupdateTail.
               (* brelse's bound is "bcache"(4); iu_tail's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID6 Hq6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc72 : ret_pc (T3 !!! Regidx Rra : mword 64)
@@ -916,7 +914,6 @@ Section ProofIupdateMain.
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-      panic_wp_any -∗
       panic_env -∗
       bio_ctx bn (fs_view γfs γd dev cov) -∗
       log_ctx γ bn γfs cov logstart dev -∗
@@ -992,7 +989,7 @@ Section ProofIupdateMain.
     { rewrite /dinode_wf Hda /bm_cells length_app Hdirlen. reflexivity. }
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
       by (rewrite /bm_cells length_app Hdirlen; reflexivity).
-    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hstep Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd0 Hop Hcont".
     (* THE eb/b BRIDGE (claude-notes/completed/eb-generic-sweep.md): derived
@@ -1338,7 +1335,7 @@ Section ProofIupdateMain.
               (* bread's bound is "bcache"(4); iupdate's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID15 Hq15 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Htc Hclm Hpc Hppid Hheld".
@@ -1937,7 +1934,7 @@ Section ProofIupdateMain.
               ip inum dn bm ds u Sb cru e0 v kk bno bsd0 d0 Pout
               pidv dq dqd dqn dqs m mM K eb b lks
               HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hbelow
-              with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
+              with "Hcg Hcnt Htc Hclm Htext Hpc Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
                     Hsl Hvlb Hcrd0 Hop Hau Hheld [Hcont]").
     { rewrite /inode_meta.
@@ -1968,7 +1965,7 @@ Qed.
   Proof.
     cbv beta delta [wp_iupdate_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
-    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     (* the trivial anchor: a lower bound of zero is the unit, so the three
@@ -1995,7 +1992,7 @@ Qed.
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
@@ -2033,7 +2030,7 @@ Qed.
   Proof.
     cbv beta delta [wp_iupdate_credgen_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
-    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl #Hvlb #Hcrd Hop Hcont".
     iPoseProof (iu_step_out γ γfs γi inodestart nib inum dn dn0 e0 Hnib
@@ -2044,7 +2041,7 @@ Qed.
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hvlb Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
@@ -2082,7 +2079,7 @@ Qed.
     cbv beta delta [wp_iupdate_cred_body].
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     (* the trivial anchor: a lower bound of zero is the unit, so the three
@@ -2100,7 +2097,7 @@ Qed.
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     { rewrite /trap_csrs_ext. done. }
@@ -2143,7 +2140,7 @@ Qed.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hstab Hnlk Hda Hdirlen Hj Hgl Ha0 Hbelow.
-    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iApply fupd_wp. iMod (log_epoch_lb_0 γ) as "#Hlb0". iModIntro.
@@ -2159,7 +2156,7 @@ Qed.
               (ireg_out γi inum dn)
               pidv dq dqd dqn dqs m K eb b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     iEval (rewrite /wp_next).
@@ -2203,7 +2200,7 @@ Qed.
            Hflp Hbump Hgrd
            Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     (* the trivial anchor and the own-set credit, exactly as the credited
@@ -2222,7 +2219,7 @@ Qed.
               (dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum))%I
               pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     { rewrite /trap_csrs_ext. done. }
@@ -2268,7 +2265,7 @@ Qed.
     intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hnl Hda Hdirlen
            Hj Hgl Ha0 Heb Hbelow.
     subst eb.
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
               Hsb #Hireg Hdn Hlink Hrc Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     (* the trivial DEPOSITOR anchor and the own-set credit, exactly as the
@@ -2288,7 +2285,7 @@ Qed.
               (dinode_at γi inum dn)%I
               pidv dq dqd dqn dqs m K true b lks
               HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlctx Hidev Hinumc Hmeta Hmap
                     Hsb Hireg Hdn Hstep Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hlb0 Hcrd Hop
                     [Hcont]").
     { rewrite /trap_csrs_ext. done. }

@@ -59,7 +59,6 @@ Require Import CpuOwn.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import WpUart.
@@ -81,7 +80,6 @@ Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import IregLinkNz.
@@ -153,7 +151,6 @@ Section ProofSysLinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xbc)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -186,7 +183,7 @@ Section ProofSysLinkTails.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKeo HK38 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs2 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -225,7 +222,7 @@ Section ProofSysLinkTails.
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpcc0 : ret_pc (M1 !!! Regidx Rra : mword 64)
@@ -379,7 +376,6 @@ Section ProofSysLinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xc6)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -438,7 +434,7 @@ Section ProofSysLinkTails.
     intros HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
@@ -505,7 +501,7 @@ Section ProofSysLinkTails.
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitab Hitinv
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
@@ -555,7 +551,7 @@ Section ProofSysLinkTails.
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
@@ -699,7 +695,6 @@ Section ProofSysLinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xd6)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -758,7 +753,7 @@ Section ProofSysLinkTails.
     intros HKup HKeo HK38 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1
            HMs2 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO Hcont".
@@ -825,7 +820,7 @@ Section ProofSysLinkTails.
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitab Hitinv
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
@@ -875,7 +870,7 @@ Section ProofSysLinkTails.
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq M3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc3 : ret_pc (M3 !!! Regidx Rra : mword 64)
@@ -1058,7 +1053,6 @@ Section ProofSysLinkTails.
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xf4)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -1115,7 +1109,7 @@ Section ProofSysLinkTails.
     intros HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
            Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
-    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
+    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hireg #Hslkk Hkeep Hshr #Hshotc Hilink Hsbb Hsbi Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
@@ -1184,7 +1178,7 @@ Section ProofSysLinkTails.
               pidv dq dqs M2 (K - 38)%nat eb b lks
               HKil Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hitinv Hesck Hireg
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck Hireg
                     Hslkk Hshr Hsbi Hpid Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -1364,7 +1358,7 @@ Section ProofSysLinkTails.
               ltac:(exact (sl_setnl_type_stable dn (sl_ndec (di_nlink dn))))
               Htynz Hdec Haddreq Hdirlen Hj Hgl HP4a0 Heb
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hidev Hiinum Hmeta Hmap
+              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hidev Hiinum Hmeta Hmap
                     Hsbi Hireg Hdiat Hilink [] Hpid Hprocs Hdev Hgeo Hdlk Hbs2
                     Hop").
     { iLeft. iSplit; iPureIntro; assumption. }
@@ -1455,7 +1449,7 @@ Section ProofSysLinkTails.
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HQ2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot' Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [Hop]").
@@ -1499,7 +1493,7 @@ Section ProofSysLinkTails.
     iApply (EndOp.wp_end_op_sconf (CID := CID13) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq Q3 (K - 38)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -1684,7 +1678,6 @@ Section ProofSysLinkTails.
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xee)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -1752,7 +1745,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hdblk Hdblog Hdnb Hcovb
            Hcrb Hcru Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
-    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
+    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hshr #Hshotc Hilink Hslkd
               Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hkeepd Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
@@ -1813,7 +1806,7 @@ Section ProofSysLinkTails.
               HKup Hkd Hcrb Hcru Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshotd Hkeepd Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
@@ -1849,7 +1842,7 @@ Section ProofSysLinkTails.
               HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
-              with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
+              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
                     Hesck Hireg Hslkk Hkeep Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
@@ -1953,7 +1946,6 @@ Section ProofSysLinkTails.
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -2021,7 +2013,7 @@ Section ProofSysLinkTails.
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hdblk Hdblog Hdnb Hcovb
            Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
            HMs1 HMs2 Hal Hncd.
-    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
+    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
               #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hshr #Hshotc Hilink Hslkd
               Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hkeepd Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
@@ -2083,7 +2075,7 @@ Section ProofSysLinkTails.
               HKup Hkd ltac:(discriminate) ltac:(discriminate) Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hdblk Hdblog Hdnb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd0 Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshotd Hkeepd Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl [] Hop").
@@ -2138,7 +2130,7 @@ Section ProofSysLinkTails.
               HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
               Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
-              with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
+              with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen Hitab Hitinv
                     Hesck Hireg Hslkk Hkeep Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").

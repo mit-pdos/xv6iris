@@ -134,7 +134,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import ProcInv.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import SpecPanic.
 Require Import SpecBmap SpecWritei.
@@ -2423,7 +2422,6 @@ Section ProofCreateMain.
     sie_cap_gpr m K b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.create) -∗
-    panic_wp_any -∗
     kernel_data -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -2470,7 +2468,7 @@ Section ProofCreateMain.
            Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb.
     destruct (cr_kb K HK)
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlogc #Hkenv
+    iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi
              Hsbn Hsbi Hsbs Hsbb Hbmr Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk
              Hbsl Hislots Hop Halloc Hcont".
@@ -2779,7 +2777,7 @@ Section ProofCreateMain.
               ltac:(exact HKnp) Hdev Hnib Hglog Hist Hroot Hnib0 Hlg Hsize
               Hbms0 Hbmsc Hbmsl Hist0 Hcovb Hiregb Hcstr Hplen31
               ltac:(exact (cr_walk_need _ u Hu)) Hj Hgs Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hkenv Hitb2 Hitbl
                     Hesc Hslks Hiregi Hprocs Hdevi Hgeom Hdlk Hsbb Hsbi Hbmr
                     Hppid Hpcwd Hcref Hpath Hnb14 Hbsl Hisl2 Hop").
     iIntros (CIDnp Hsnp mnp n1 used1 Sb1 okp nfp ipv w)
@@ -2902,7 +2900,7 @@ Section ProofCreateMain.
                 gild gisld cov logstart inodestart nib kd (qd/2)%Qp gd dev dind
                 pidv (DfracOwn (1/4)) dqs Q2 (K - 10)%nat eb b lks
                 ltac:(exact HKil) Hkd Hlg Hist0 Hdblk Hdib' Hj Hgs HQ2a0
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitbl Hescd Hiregi
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescd Hiregi
                       Hslkd Hshr Hsbi Hppid Hprocs Hdevi Hgeom Hdlk Hbs1").
       all: try lkbelow.
       { rewrite Heb /trap_csrs_ext. done. }
@@ -3037,7 +3035,7 @@ Section ProofCreateMain.
                   ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HG2a0
-                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                         Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hkeep2 Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -3321,7 +3319,7 @@ Section ProofCreateMain.
                   ltac:(cbn [negb]; rewrite HD4a2 dlk_zero_moi;
                         exact (eq_vec_refl _))
                   Heb
-                  with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                  with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hnb14 [] Hppid Hprocs Hdevi Hgeom Hdlk Hbs1
                         Hitb2 Hitbl Hesc Hisl1 Hdlnk Hdiat").
         all: try lkbelow.
@@ -3465,7 +3463,7 @@ Section ProofCreateMain.
                     ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                     ltac:(exact Hn1ip) Hj Hgs HF3a0
-                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                           Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                           Hivalid Hload Hshotl Hkeep2 Hsbb Hsbi Hbmr Hppid
                           Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -3544,7 +3542,7 @@ Section ProofCreateMain.
                     gilc gislc cov logstart inodestart nib kslot (qq/2)%Qp gc
                     dev cinum pidv (DfracOwn (1/4)) dqs F5 (K - 10)%nat eb b lks
                     ltac:(exact HKil) Hkslot Hlg Hist0 Hcblk Hcinb Hj Hgs HF5a0
-                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitbl Hescc
+                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hitbl Hescc
                           Hiregi Hslkc Hcshr Hsbi Hppid Hprocs Hdevi Hgeom
                           Hdlk Hbs1").
           all: try lkbelow.
@@ -3684,7 +3682,7 @@ Section ProofCreateMain.
                       ltac:(discriminate)
                       Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
                       ltac:(exact Hn2ip) Hj Hgs HB2a0
-                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2
+                      with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                             Hitbl Hescc Hiregi Hslkc Hcslkd Hcslpid Hcdep
                             Hcidev Hciinum Hcivalid Hcload Hcshotb Hckeep2 Hsbb
                             Hsbi Hbmr Hppid Hprocs Hdevi Hgeom Hdlk Hbsl []
@@ -4206,7 +4204,7 @@ Section ProofCreateMain.
                   ltac:(exact HKiup) Hkd ltac:(discriminate) ltac:(discriminate)
                   Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib' Hcovb
                   ltac:(exact Hn1ip) Hj Hgs HJ2a0
-                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                         Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                         Hivalid Hload Hshotl Hkeep2 Hsbb Hsbi Hbmr Hppid
                         Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -4597,7 +4595,7 @@ Section ProofCreateMain.
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
     eb = true ->
-    kernel_text -∗ panic_wp_any -∗ kernel_data -∗
+    kernel_text -∗ kernel_data -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -4655,7 +4653,7 @@ Section ProofCreateMain.
     assert (Hcsa2 : is_cs_idx Ra2 = false) by (vm_compute; reflexivity).
     assert (Hcsa4 : is_cs_idx Ra4 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iIntros "#Htext #Hpanic #Hkd #Hpk #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl #Hesc
+    iIntros "#Htext #Hkd #Hpk #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl #Hesc
              #Hslks #Hiregi #Hprocs #Hdevi #Hgeom #Hdlk Hmk Hfl".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
@@ -4718,7 +4716,7 @@ Section ProofCreateMain.
               Hni3 Htynz Hpkc Hj Hgs Hroot A20 A9 Hkdlt Heb ltac:(lkbelow)
               (fun CIDx : CpuId => IA.wp_ialloc_gen (CID := CIDx))
               (fun CIDx : CpuId => IL.wp_ilock_sconf (CID := CIDx))
-              with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hitb2 Hitbl
+              with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hitb2 Hitbl
                     Hesc Hslks Hiregi Hprocs Hdevi Hgeom Hdlk Hsbn Hsbi Hppid
                     Hbsl Hisl1 Hidev Hop").
     all: try lkbelow.
@@ -4923,7 +4921,7 @@ Section ProofCreateMain.
                 ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
                 ltac:(exact Hflty) ltac:(exact Hnflty) ltac:(exact Hflpz)
                 Hbump Hgrd Hcadd Hcdirlen Hj Hgs HW3a0 Heb
-                with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcidev Hciinum
+                with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
                       Hcmeta Hcmap Hsbi Hiregi Hcdiat Hppid Hprocs Hdevi
                       Hgeom Hdlk Hbs2 Hop").
       all: try lkbelow.
@@ -5214,7 +5212,7 @@ Section ProofCreateMain.
                   Hcl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
                   ltac:(exact (cr_alloc_dlneed (S q2) _ _ ltac:(lia)))
                   Hj Hgs HX4a0 HX4a2 Heb
-                  with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
+                  with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
                         Hbmr Hiregi Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
@@ -5470,7 +5468,7 @@ Section ProofCreateMain.
                        ltac:(exact HKiup) Hkdlt ltac:(discriminate) Hcruu
                        Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                        ltac:(exact Hipn') Hj Hgs HY2a0
-                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                              Hitbl Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev
                              Hiinum Hivalid Hload Hshotl' Hkeep2 Hsbb Hsbi Hbmr
                              Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -5811,7 +5809,7 @@ Section ProofCreateMain.
                 ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
                 Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                 ltac:(exact Hn1ip) Hj Hgs HZ2a0
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                       Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                       Hivalid Hload Hshotl Hkeep2 Hsbb Hsbi Hbmr Hppid
                       Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -6000,7 +5998,7 @@ Section ProofCreateMain.
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
     eb = true ->
-    kernel_text -∗ kernel_data -∗ panic_wp_any -∗ panic_env -∗
+    kernel_text -∗ kernel_data -∗ panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
@@ -6024,7 +6022,7 @@ Section ProofCreateMain.
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iIntros "#Htext #Hkd #Hpanic #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
+    iIntros "#Htext #Hkd #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
@@ -6160,7 +6158,7 @@ Section ProofCreateMain.
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab
               ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
               Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcidev Hciinum
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
                     Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
@@ -6273,7 +6271,7 @@ Section ProofCreateMain.
                                        (IBLOCK cinum inodestart)))
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescc Hiregi Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hckp Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -6437,7 +6435,7 @@ Section ProofCreateMain.
               ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                     Hivalid Hload Hshotl' Hkeep2 Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -6785,7 +6783,7 @@ Section ProofCreateMain.
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
     eb = true ->
-    kernel_text -∗ kernel_data -∗ panic_wp_any -∗ panic_env -∗
+    kernel_text -∗ kernel_data -∗ panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     is_itable2 gtl cn γfs γi cov logstart nib dev -∗
@@ -6809,7 +6807,7 @@ Section ProofCreateMain.
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iIntros "#Htext #Hkd #Hpanic #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
+    iIntros "#Htext #Hkd #Hpenv #Hbio #Hlogc #Hitb2 #Hitbl #Hesc #Hiregi
              #Hprocs #Hdevi #Hgeom #Hdlk".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
                  with "Htext") as "#Htail".
@@ -6959,7 +6957,7 @@ Section ProofCreateMain.
               ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
               Hlg Hist0 Hcblk Hcblog Hcinb Hstab Htyz0
               Hdec Hcadd0 Hcdirlen Hj Hgs HG2a0 Heb
-              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcidev Hciinum
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hcidev Hciinum
                     Hcmeta Hcmap Hsbi Hiregi Hcdiat Hilink [] Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbs2 Hop").
     all: try lkbelow.
@@ -7076,7 +7074,7 @@ Section ProofCreateMain.
                                        (IBLOCK cinum inodestart)))
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hcblk Hcblog Hcinb Hcovb
               ltac:(exact (proj1 Hn4)) Hj Hgs HG4a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescc Hiregi Hslkc Hcslkd Hcslpid Hcdep Hcidev Hciinum
                     Hcivalid Hcload Hcshot' Hckp Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -7173,7 +7171,7 @@ Section ProofCreateMain.
               ltac:(exact HKiup) Hkdlt ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
               ltac:(exact Hipn5) Hj Hgs HG6a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2 Hitbl
                     Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev Hiinum
                     Hivalid Hload Hshotl Hkeep2 Hsbb Hsbi Hbmr Hppid Hprocs
                     Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -7333,7 +7331,7 @@ Section ProofCreateMain.
     is_aligned_paddr (Physaddr (pa_stk sp0 10)) 8 = true ->
     is_aligned_paddr (Physaddr (pa_stk sp0 9)) 8 = true ->
     eb = true ->
-    kernel_text -∗ panic_wp_any -∗ kernel_data -∗
+    kernel_text -∗ kernel_data -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -7364,7 +7362,7 @@ Section ProofCreateMain.
     assert (Hcsa2 : is_cs_idx Ra2 = false) by (vm_compute; reflexivity).
     assert (Hcsa5 : is_cs_idx Ra5 = false) by (vm_compute; reflexivity).
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
-    iIntros "#Htext #Hpanic #Hkd #Hpk #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl #Hesc
+    iIntros "#Htext #Hkd #Hpk #Hbio #Hlogc #Hkenv #Hitb2 #Hitbl #Hesc
              #Hslks #Hiregi #Hprocs #Hdevi #Hgeom #Hdlk".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     iDestruct (cr_tail_half j m sp0 ret_tgt K b lks HKsum Hal10 Hal9 Hspm Hrt
@@ -7665,7 +7663,7 @@ Section ProofCreateMain.
               ltac:(rewrite Hcnrec0 Hck0; rewrite Hind0;
                     exact (cr_alloc_dlneed n3 _ false Hn3lo))
               Hj Hgs HZ5a0 HZ5a2 Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
+              with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw Hsbi Hsbs Hsbb
                     Hbmr Hiregi Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                     Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk0i Hop").
@@ -8010,7 +8008,7 @@ Section ProofCreateMain.
                 Hdl16b Hbmgeo Hpkc Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb
                 Hdlneed4
                 Hj Hgs HY5a0 HY5a2 Heb
-                with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
+                with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                       Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw Hsbi Hsbs Hsbb
                       Hbmr Hiregi Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                       Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk1 Hop").
@@ -8355,7 +8353,7 @@ Section ProofCreateMain.
                         exact (cr_mkdir_dl3_need n3 n4 n5 _ _ _ _ _ true _
                                  Hn3lo Hcorr' Hspend1 Hspend2 eq_refl eq_refl))
                   Hj Hgs HW4a0 HW4a2 Heb
-                  with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
+                  with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
                         Hbmr Hiregi Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
                         Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
@@ -8731,7 +8729,7 @@ Section ProofCreateMain.
                     Hmtbump Hmtgrd
                     Hmtaddr Hmtdirlen
                     Hj Hgs HV4a0 Heb
-                    with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hidev Hiinum
+                    with "Hcg Hcnt Htext Hkd Hpc Hpenv Hbio Hlogc Hidev Hiinum
                           Hmeta Hmap Hsbi Hiregi Hdiat Hppid Hprocs Hdevi
                           Hgeom Hdlk Hbs2 Hop").
           all: try lkbelow.
@@ -8941,7 +8939,7 @@ Section ProofCreateMain.
                     ltac:(exact HKiup) Hkdlt Hcrbu Hcruu
                     Hlg Hsize Hbms0 Hbmsc Hbmsl Hist0 Hdblk Hdblog Hdib Hcovb
                     ltac:(exact Hipn6) Hj Hgs HT2a0
-                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2
+                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitb2
                           Hitbl Hescd Hiregi Hslkd Hslkdd Hslpid Hdep Hidev
                           Hiinum Hivalid Hload Hshotf Hkeep2 Hsbb Hsbi Hbmr
                           Hppid Hprocs Hdevi Hgeom Hdlk Hbsl [] Hop").
@@ -9123,7 +9121,7 @@ Section ProofCreateMain.
                         kd qd gd γil γisl dind nf nsl
                         HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                         Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
-                        with "Htext Hkd Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                        with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
                               Hprocs Hdevi Hgeom Hdlk") as "Hfl".
           iPoseProof ("Hfl" $! CIDX3) as "Hf".
           iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
@@ -9191,7 +9189,7 @@ Section ProofCreateMain.
                       kd qd gd γil γisl dind nf nsl
                       HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                       Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
-                      with "Htext Hkd Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                      with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
                             Hprocs Hdevi Hgeom Hdlk") as "Hfl".
         iPoseProof ("Hfl" $! CIDX2) as "Hf".
         iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
@@ -9261,7 +9259,7 @@ Section ProofCreateMain.
                     kd qd gd γil γisl dind nf nsl
                     HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                     Hist0 Hcovb Hiregb Hns Hj Hgs Hspm Hrt Hal10 Hal9 Heb
-                    with "Htext Hkd Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                    with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
                           Hprocs Hdevi Hgeom Hdlk") as "Hfl".
       iPoseProof ("Hfl" $! CIDX1) as "Hf".
       iSpecialize ("Hf" with "[%]"); [wp_next_chain |].
@@ -9370,7 +9368,7 @@ Section ProofCreateMain.
            Htynz Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb.
     destruct (cr_kb K HK)
       as (HK10 & HKnp & HKil & HKdlu & HKiup & HKia & HKiu & HKdlk & HKsum).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkd #Hpk #Hbio #Hlogc #Hkenv
+    iIntros "Hcg Hcnt #Htext Hpc #Hkd #Hpk #Hbio #Hlogc #Hkenv
              #Hitb2 #Hitbl #Hesc #Hslks #Hiregi Hsbn Hsbi Hsbs Hsbb Hbmr
              Hpriv Hpath #Hprocs #Hdevi #Hgeom #Hdlk Hbsl Hisl Hop Hcont".
     iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
@@ -9383,7 +9381,7 @@ Section ProofCreateMain.
               HK Hdev Hnib Hglog Hist Hroot Hnib0 Hlg Hsize Hbms0 Hbmsc
               Hbmsl Hist0 Hcovb Hbmgeo Hiregb Hcstr Hplen31 Hni1 Hni2 Hni3
               Htynz Hpkc Hu Hns Hj Hgs Ha1 Ha2 Ha3 Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
+              with "Hcg Hcnt Htext Hpc Hkd Hpk Hbio Hlogc Hkenv
                     Hitb2 Hitbl Hesc Hslks Hiregi Hsbn Hsbi Hsbs Hsbb Hbmr
                     Hpriv Hpath Hprocs Hdevi Hgeom Hdlk Hbsl Hisl Hop
                     [] Hcont").
@@ -9396,7 +9394,7 @@ Section ProofCreateMain.
               HK Hdev Hnib Hglog Hist Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
               Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Htynz Hpkc
               Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
-              with "Htext Hpanic Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl Hesc
+              with "Htext Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl Hesc
                     Hslks Hiregi Hprocs Hdevi Hgeom Hdlk [] []").
     - iIntros (kd qd gd γil γisl dind dn bm data nf nsl).
       iApply (cr_mkdir_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
@@ -9409,7 +9407,7 @@ Section ProofCreateMain.
                 HK Hdev Hnib Hglog Hist Hroot Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hbmgeo Hiregb Hni1 Hni2 Hni3 Hnib16 Hpkc
                 Hu Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
-                with "Htext Hpanic Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl
+                with "Htext Hkd Hpk Hbio Hlogc Hkenv Hitb2 Hitbl
                       Hesc Hslks Hiregi Hprocs Hdevi Hgeom Hdlk").
     - iIntros (kd qd gd γil γisl dind dn bm data nf nsl).
       iApply (cr_fail_half γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
@@ -9421,7 +9419,7 @@ Section ProofCreateMain.
                 kd qd gd γil γisl dind dn bm data nf nsl
                 HK Hglog Hist Hnib Hnib16 Hlg Hsize Hbms0 Hbmsc Hbmsl
                 Hist0 Hcovb Hiregb Hns Hj Hgs eq_refl eq_refl Hal10 Hal9 Heb
-                with "Htext Hkd Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
+                with "Htext Hkd Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hiregi
                       Hprocs Hdevi Hgeom Hdlk").
   Qed.
 

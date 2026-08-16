@@ -35,8 +35,8 @@
    ([BitmapInv.free_pool_own_used]).  The bit is therefore set,
    [bp->data[bi/8] & m] is nonzero ([BitmapEnc.bm_bit_test]), and the
    branch at +0x3a is not taken.  Refuting this panic is the main thing the
-   invariant has to buy; the contract still takes [panic_wp_any] because
-   bread's own interior panic arm wants one.
+   invariant has to buy; the contract still takes the panic credentials
+   because bread's own interior panic arm wants them.
 
    ONE BITMAP BLOCK.  [FSSIZE = 2000 < BPB = 8192], so [size <= BPB] is a
    premise and [BBLOCK b sb = sb.bmapstart] outright
@@ -74,7 +74,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -160,7 +159,6 @@ Definition wp_bfree_gen_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
@@ -293,7 +291,6 @@ Definition wp_bfree_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗

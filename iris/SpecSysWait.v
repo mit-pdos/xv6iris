@@ -74,7 +74,6 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WaitInv.
-Require Import PanicStub.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKwait.      (* [K_kwait] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
@@ -104,7 +103,6 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   kalloc_env γa None -∗
   proc_priv γf pj pid V -∗

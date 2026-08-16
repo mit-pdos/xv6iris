@@ -20,7 +20,7 @@
      QUEUE_READY <- 1; disk.free[0..7] <- 1; STATUS <- | DRIVER_OK
 
    EVERY panic path is refuted rather than assumed, so this spec needs no
-   [panic_wp]:
+   panic credential at all (all six are refuted):
      - the four identification reads are constants of the model
        ([virtio_ident_reads], [virtio_queue_num_max_read]);
      - FEATURES_OK sticks because the write took ([virtio_status_readback]);

@@ -96,7 +96,6 @@ Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
@@ -114,7 +113,6 @@ Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import SpecMyproc.
@@ -721,7 +719,6 @@ Section ProofSysChdirM1Tail.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SC + 0x68)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -752,7 +749,7 @@ Section ProofSysChdirM1Tail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKeo HK20 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (schdi_68 with "Htext") as "Hi68".
@@ -789,7 +786,7 @@ Section ProofSysChdirM1Tail.
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 20)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(lkbelow)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc6c : ret_pc (M1 !!! Regidx Rra : mword 64)
@@ -939,7 +936,7 @@ Section ProofSysChdirBody.
     destruct (sc_kb K HK) as (Kna & Kar & Kbo & Keo & Kil & Kiu & Kip & Kiup
                               & K10 & K20 & Kpop).
     set (sp0 := m !!! Regidx csp_rs1).
-    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpanic #Hpe #Hbio #Hlog Hseam
+    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpe #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg Hsbb Hsbi Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -1173,7 +1170,7 @@ Section ProofSysChdirBody.
     iApply (BeginOp.wp_begin_op_sconf (CID := CID9) gs j gl bn g gfs cov logstart
               dev pid (DfracOwn (1/4)) M5 (K - 20)%nat eb b lks
               ltac:(lia) Hj Hgl (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hlog Hpidq Hprocs").
+              with "Hcg Hown [] [] Htext Hpc Hlog Hpidq Hprocs").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
     iIntros (CID10 Hq10 mbo) "%Hcsbo Hcg Hown _ _ Hpc Hpidq Hop".
@@ -1444,7 +1441,7 @@ Section ProofSysChdirBody.
                 ltac:(lia) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize
                 Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr
                 (sc_plen_lt pk Hpk) (sc_bud_walk _) Hj Hgl Heb
-                with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hkenv Hitab Hitinv
+                with "Hcg Hown Htext Hdata Hpc Hpe Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir HopS").
       { iEval (rewrite HN1a0). iExact "Hbufk". }
@@ -1562,7 +1559,7 @@ Section ProofSysChdirBody.
                   P0 (K - 20)%nat eb b lks
                   ltac:(lia) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HP0a0
                   (Hlb "bcache"%string)
-                  with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hitinv Hesck
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hitinv Hesck
                         Hireg Hslkk Hshr Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
@@ -1732,7 +1729,7 @@ Section ProofSysChdirBody.
                     cov logstart kk (qq/2)%Qp gsh dev inum dn bm
                     pid (DfracOwn (1/4)) P4 (K - 20)%nat eb pj b lks
                     ltac:(lia) Hkk HP4a0 (Hlb "sleep lock"%string)
-                    with "Hcg Hown Htext Hpc Hpanic Hitinv Hesck Hslkk Hslkd
+                    with "Hcg Hown Htext Hpc Hitinv Hesck Hslkk Hslkd
                           Hslpid Hpidq Hprocs Hdep Hidev Hiinum Hivalid Hload
                           Hshot").
           iIntros (CID30 Hq30 miu) "%Hcsiu Hcg Hown Hpc Hpidq Hshr".
@@ -1829,7 +1826,7 @@ Section ProofSysChdirBody.
                     ltac:(lia) Hkc Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblkc Hiblogc Hinbc Hcovb Hiu Hj Hgl
                     ltac:(rewrite HP6a0; exact Hcwde) (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hitab Hitinv
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hescc Hireg Hslkc Hrefc Hsbb Hsbi Hbmres Hpidq Hprocs
                           Hdev Hgeo Hdlk Hbsl [HopS]").
           { rewrite Heb /trap_csrs_ext. done. }
@@ -1888,7 +1885,7 @@ Section ProofSysChdirBody.
                     bn g gfs cov logstart dev n2 pid (DfracOwn (1/4))
                     P7 (K - 20)%nat eb b lks
                     ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk Hop").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -2082,7 +2079,7 @@ Section ProofSysChdirBody.
                     Q1 (K - 20)%nat eb b lks
                     ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
                     Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl HQ1a0 (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hitab Hitinv
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hitab Hitinv
                           Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
                           Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpidq
                           Hprocs Hdev Hgeo Hdlk Hbsl [HopS]").
@@ -2127,7 +2124,7 @@ Section ProofSysChdirBody.
                     bn g gfs cov logstart dev n2 pid (DfracOwn (1/4))
                     Q2 (K - 20)%nat eb b lks
                     ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk Hop").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -2278,7 +2275,7 @@ Section ProofSysChdirBody.
                   m N3 sp0 K eb b lks (m !!! Regidx Rs1 : mword 64) bf1
                   ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN3sp HN3thr HN3s1 Hal
-                  with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4 Hbuf
                         [Hpback Hcwd Hcwdref Hbsl Hsbb Hsbi Hbmres Hir Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
@@ -2325,7 +2322,7 @@ Section ProofSysChdirBody.
                 m mas sp0 K eb b lks u3 bf
                 ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hass1 Hal
-                with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
+                with "Hcg Hown [] [] Htext Hdata Hpc Hpe Hbio Hlog Hseam Hgen
                       Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hbuf
                       [Hpback Hbsl Hsbb Hsbi Hbmres Hir Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }

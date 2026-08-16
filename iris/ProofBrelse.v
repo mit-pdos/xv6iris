@@ -546,7 +546,7 @@ Section ProofBrelse.
     pose proof (locks_below_not_elem _ _ Hbelow_sl) as Hfresh_sl.
     assert (HK26 : (26 <= K)%nat) by (exact HK).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid Hprocs Hlocked Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hbio Hppid Hprocs Hlocked Hcont".
     (* brelse enters at level 0, so the saved base enable IS the live SIE
        state: [eb = b].  Substituting makes release's exit index (which is
        [eb]) literally [b], so one [wp_next_chain] composes across the whole
@@ -790,7 +790,7 @@ Section ProofBrelse.
     iApply (Hsl.wp_holdingsleep_sconf (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) mA p pidv (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hppid").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hslk". }
     { iEval (rewrite HmAa0). iExact "Hpid". }
@@ -872,7 +872,7 @@ Section ProofBrelse.
     iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b b lks
               ltac:(lia) Hbelow_sl
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hpanic Hprocs").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hprocs").
     all: try lkbelow.
     { iEval (rewrite HH2a0). iExact "Hslk". }
     { iEval (rewrite HH2a0). iExact "Hpid". }

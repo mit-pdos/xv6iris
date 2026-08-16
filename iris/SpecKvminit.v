@@ -28,7 +28,7 @@ From Kernel Require KernelSyms.
    KernelSyms.kernel_pagetable = 0x8000a238; pre = arbitrary [kpt0], post = the
    root page's byte address).  COUNTED-ONLY like kvmmake (boot-only, STRICT
    budget premise ⌜166 < nb⌝ -- see SpecKvmmake's spare-page note), so
-   unconditional success, NO panic_wp.  This is THE deliverable: the verified
+   unconditional success, NO panic credential.  This is THE deliverable: the verified
    construction whose post feeds the boot switch [wp_kvminithart] through
    [kvm_bridge].
    stack_own bound 50 = own 2-slot frame + kvmmake's 48 (PROVISIONAL). *)

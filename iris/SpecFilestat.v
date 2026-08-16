@@ -124,7 +124,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -481,7 +480,6 @@ Definition wp_filestat_sconf_body
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
-  panic_wp_any -∗
   panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q Cf -∗

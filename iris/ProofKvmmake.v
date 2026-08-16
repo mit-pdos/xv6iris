@@ -1071,7 +1071,7 @@ Section KvmmakeBody.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.kvmmake + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.kvmmake + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095636 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J /W2. repeat (rewrite upd_ne; [| reg_neq]). exact HspW1. }
     iDestruct (cpu_own_transport CID0 CID6 0%nat eb p b ltac:(wp_next_chain)
@@ -1097,7 +1097,7 @@ Section KvmmakeBody.
     iEval (rewrite Hav1) in "Havail2".
     iAssert (kalloc_env γa (avail_sub (Some nb) 1))
       with "[Havail2]" as "Henv".
-    { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
+    { iExists γk. iFrame "Hlock Havail2". }
     set (root0 := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     (* recover callee-saved through kalloc *)
     assert (Hmr0sp : mr0 !!! Regidx csp_rs1 = spr).

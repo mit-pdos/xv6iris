@@ -91,7 +91,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -163,7 +162,6 @@ Definition wp_initlog_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* THE CRASH SEAM (phase C2b/D1 stage 3): the persistent identification of

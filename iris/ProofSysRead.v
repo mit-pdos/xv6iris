@@ -342,7 +342,7 @@ Section ProofSysRead.
     (* [KvmSpec.kalloc_env γa None] IS PERSISTENT (durable-notes.md): fileread
        consumes it and does not give it back, and this contract's post owes it
        -- so it must be introduced with [#], not threaded. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpanic #Hpenv Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv #Hkenv #Hprocs Henv Hdev Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -925,7 +925,7 @@ Section ProofSysRead.
                 S4 (av - 6)%nat eb (sys_rw_count v2) b
                 _ ltac:(lia) Hkk Hj Hgs Hlens
                 HS4a0' HS4a2 Hn0 Hnmax Heb
-                with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpenv Href Hcore Hkenv Hprocs Hfenv").
+                with "Hcg Hcpu Htext Hdata Hpc Hpenv Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID25 Hs25 mf rv P')
         "%Hcsf %Hupt %Hrvok %Hrva Hcg Hcpu Hpc Href Hcore Hfout".

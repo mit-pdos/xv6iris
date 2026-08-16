@@ -49,7 +49,7 @@ Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
 Require Import PermInv.
-Require Import PanicStub SpecWakeup SpecAcquire SpecRelease.
+Require Import SpecWakeup SpecAcquire SpecRelease.
 Require Import CodeVirtioDiskIntr.
 Require Import SpecVirtioDiskIntr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -378,7 +378,6 @@ Section VtPrologue.
     sie_cap_gpr m av b pme -∗
     cpu_own n eb pme b lks -∗
     kernel_text -∗ pc_is (mword_of_int KernelSyms.virtio_disk_intr : mword 64) -∗
-    panic_wp_any -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ (MA : regfile) (sp0 : mword 64),
@@ -403,7 +402,7 @@ Section VtPrologue.
   Proof.
     intros Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hlk Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hlk Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     iPoseProof (vti_00 with "Htext") as "Hi00".
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -2730,12 +2729,12 @@ Section VtLoopProof.
        acquire); wakeup's own order premise ("proc") is derived from this at
        the +0x6e call site via [locks_below_union_singleton]/[locks_below_mono] *)
     locks_below lks "virtio_disk" ->
-    kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
+    kernel_text -∗ procs_inv γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     vt_loop γd pd pav pu m av lvl eb pme sp0 lks.
   Proof.
     intros Hav Hlen Hlvl Hfresh.
-    iIntros "#Htext #Hpanic #Hpi #Hdinv #Hgeom".
+    iIntros "#Htext #Hpi #Hdinv #Hgeom".
     iLöb as "IH". rewrite {2}/vt_loop.
     iIntros (MB) "%Hregs Hcg Hpc Hown Hst Hexit".
     pose proof Hregs as Hregs'.
@@ -2811,7 +2810,7 @@ Section VtLoopProof.
     iApply (Wakeup.wp_wakeup_sconf W γs pme (S lvl)
               (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb false _ HwK HWdom Hlen Hwlvl
               Hwproc
-              with "Hcg Hown Htext Hpc Hpanic Hpi").
+              with "Hcg Hown Htext Hpc Hpi").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (MW) "[%HcsW %HdomW] Hcg Hown #Htext2 Hpc".
@@ -3020,12 +3019,12 @@ Section ProofVirtioDiskIntr.
     intros pcE ret_tgt HK Hdom Hlen Hlvl Hfresh.
     assert (HKav : (22 <= K)%nat) by (exact HK).
     pose proof (vt_lvl_weaken lvl Hlvl) as Hlvl1.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpi #Hdinv #Hgeom #Hlk Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpi #Hdinv #Hgeom #Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq.
     (* ===================== PROLOGUE + acquire ===================== *)
     iApply (Pro.wp_vt_prologue γk γd pd pav pu m K lvl eb pme b lks
               Hlvl1 HKav Hfresh
-              with "Hcg Hown Htext Hpc Hpanic Hlk").
+              with "Hcg Hown Htext Hpc Hlk").
     iIntros (CIDa Hsa MA sp0) "%Hpro Hcg Hpc Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap".
     destruct Hpro as (Hsp0 & HMAcsp & HMAs1 & HMAthr).
     (* ===================== the ISR read/ack ===================== *)
@@ -3082,7 +3081,7 @@ Section ProofVirtioDiskIntr.
       iEval (rewrite -Hbeq) in "Hcg".
       iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme sp0 lks
                     HKav Hlen Hlvl Hfresh
-                    with "Htext Hpanic Hpi Hdinv Hgeom") as "Hloop".
+                    with "Htext Hpi Hdinv Hgeom") as "Hloop".
       iApply ("Hloop" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring] Hexit").
       { split_and!.
         - rewrite (HMEthr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)).

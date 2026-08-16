@@ -135,7 +135,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -556,7 +555,7 @@ Section SpecFilewrite.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      writer nothing -- the arm is [panic] at +0x11e (decode note 3), and
-     [panic_wp_any] closes it. *)
+     [SpecPanic] discharges it. *)
   Lemma filewrite_env_none γf fn Cf :
     fc_type Cf = FD_NONE -> ⊢ filewrite_env γf fn Cf.
   Proof.
@@ -613,7 +612,6 @@ Definition wp_filewrite_sconf_body
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* WHAT THE ELSE ARM COSTS.  [f->type] outside {FD_PIPE, FD_DEVICE,
      FD_INODE} reaches [panic("filewrite")], and panic is an ordinary call:
      the literal comes out of [kernel_data] and the console credentials

@@ -59,7 +59,6 @@ Require Import WpLock.
 Require Import TicksInv.
 Require Import TimerCap.
 Require Import SchedCtx.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -76,14 +75,12 @@ Section SpecClockintr.
   (* the tick machinery, owned by the tick keeper (see the header).
      HART-INDEXED, through [tick_hart]'s [cid_word] -- which is why this
      contract is stated at [b = false] and not generically; see the note on
-     [wp_clockintr_sconf_body]. [panic_wp_any] rather than [panic_wp] because
-     the acquire/wakeup arms it discharges are stated hart-generically. *)
+     [wp_clockintr_sconf_body]. *)
   Definition tick_keeper 
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
     ∨ ( is_tickslock γl ∗
-        procs_inv γs ∗
-        panic_wp_any ) )%I.
+        procs_inv γs ) )%I.
 
 End SpecClockintr.
 

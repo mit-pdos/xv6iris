@@ -170,7 +170,7 @@
    All inherited, none new: ilock's "ilock: no type", iget's "iget: no
    inodes", dirlookup's "dirlookup not DIR" (refuted by the [lh a5,68(s4)]
    test namex performs at +0xbc) and its now-live "dirlookup read"
-   granularity arm.  [panic_wp_any] is threaded and nothing else is owed.
+   granularity arm.  The panic credentials are threaded and nothing else is owed.
 
    namex enters and returns at noff 0. *)
 From Stdlib Require Import ZArith Lia List.
@@ -190,7 +190,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -498,7 +497,6 @@ Definition wp_namex_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
@@ -651,7 +649,6 @@ Definition wp_namex_gen_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
@@ -830,7 +827,6 @@ Definition wp_namex_root_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   panic_env -∗
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗

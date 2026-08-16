@@ -283,7 +283,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -633,7 +632,6 @@ Definition wp_writei_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
@@ -910,7 +908,6 @@ Definition wp_writei_gen_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗

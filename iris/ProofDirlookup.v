@@ -46,7 +46,7 @@
    found arm; [dir_first_None] closes the exhausted arm at [nrec].
 
    The nine AMBIENT resources dirlookup threads are all PERSISTENT and are
-   introduced with [#] -- [kernel_text], [panic_wp_any], [bio_ctx],
+   introduced with [#] -- [kernel_text], [kernel_data], [bio_ctx],
    [kalloc_env], [procs_inv], [dev_inv], [disk_geom], the disk [is_lock],
    [is_itable2], [itable_inv], [ic_escrows].  That is forced by readi's own
    contract (which hands none of them back) and it is what keeps the loop's
@@ -92,14 +92,12 @@ Require Import IcacheRef.
 Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import SpecPanic.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import DirView.
-Require Import PanicStub.
 Require Import SpecReadi SpecNamecmp SpecIget.
 Require Import CodeDirlookup.
 Require Import DirLinks.
@@ -469,7 +467,7 @@ Section ProofDirlookupMain.
        [let]-bound [pj].  The two are convertible but [iSpecialize] matches
        syntactically, so fold them back at the seam. *)
     assert (Hpjd : proc_addr j = pj) by reflexivity.
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
               Hnm Hpoff Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbslot #Hitb2 #Hitbl
               #Hesc Hislot Hlinks Hdi Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -1604,7 +1602,7 @@ Section ProofDirlookupMain.
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
                   ltac:(lkbelow)
-                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
+                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
@@ -2094,7 +2092,7 @@ Section ProofDirlookupMain.
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
-                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpanic Hpenv Hislot
+                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpenv Hislot
                             Hlic").
             all: try lkbelow.
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href Hlic".

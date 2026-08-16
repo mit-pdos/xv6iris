@@ -68,7 +68,6 @@ Require Import VirtioModel DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
 Require Import SpecVirtioDiskRw.
@@ -383,7 +382,6 @@ Section ProofVirtioDiskRwE.
        "proc" (11) follow from this by [locks_below_mono]. *)
     locks_below lks "virtio_disk" ->
     kernel_text -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -393,7 +391,7 @@ Section ProofVirtioDiskRwE.
                     bs_disk m0 kq ({["virtio_disk"]} ∪ lks).
   Proof.
     intros HK Hj Hjl Hbnz Hbelow.
-    iIntros "#Htext #Hpanic #Hpinv #Hdinv #Hlk Hexit".
+    iIntros "#Htext #Hpinv #Hdinv #Hlk Hexit".
     rewrite /P4.vdrw_p4_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
             "%Hrh %Ha1 %Hok %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok Hbody Hclaim Hrm Hrt Hidx".

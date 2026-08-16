@@ -158,7 +158,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -495,7 +494,6 @@ Definition wp_kexec_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
             cov logstart inodestart nib dev -∗
   kalloc_env ga None -∗

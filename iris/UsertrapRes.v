@@ -69,7 +69,6 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import UserPtTree.
-Require Import PanicStub.
 Require Import SpecProcinit.
 Require Import SpecFileclose.
 Require Import SpecDevintr.
@@ -504,7 +503,7 @@ Section UsertrapRes.
      because their propositions are [emp] at [true], which this one is not.
 
      So the bundle carries the [∀ h] form, exactly as [SpecPanic.
-     panic_wp_any] carries panic's contract for the same reason (a function
+     panic_env] carries panic's credentials for the same reason (a function
      that PARKS does not return on the hart it entered on).  It is
      persistent, hence free to hand to devintr at whatever hart the call
      happens on ([devintr_caps_any_at]), and it is satisfiable: of
@@ -549,7 +548,6 @@ Section UsertrapRes.
      twenty-five-way destructure and rebuild. *)
   Definition ut_caps (N : ut_names) : iProp Σ :=
     (procs_inv (un_s N) ∗
-     panic_wp_any ∗
      kernel_data ∗
      is_kstack (un_pj N) (un_ks N) ∗
      devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
@@ -578,8 +576,8 @@ Section UsertrapRes.
   Lemma ut_caps_kalloc (N : ut_names) :
     ut_caps N -∗ kalloc_env (un_kl N) None.
   Proof.
-    iIntros "(_ & #Hp & _ & _ & _ & _ & _ & _ & #Hkm & _ & _ & _ & _ & _ & _ & _ & #Hav & _)".
-    iExists (un_ka N). iFrame "Hkm Hav Hp".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & #Hkm & _ & _ & _ & _ & _ & _ & _ & #Hav & _)".
+    iExists (un_ka N). iFrame "Hkm Hav".
   Qed.
 
   (* the EXCLUSIVE remainder: what a callee can consume and must give back --

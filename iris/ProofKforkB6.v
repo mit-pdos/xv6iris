@@ -72,7 +72,6 @@ Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import PanicStub.
 Require Import SpecMyproc.
 Require Import SpecAllocproc.
 Require Import SpecUvmcopy.
@@ -251,7 +250,6 @@ Section KforkPrologue.
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
     pc_is (mword_of_int KF : mword 64) -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -436,7 +434,7 @@ Section KforkPrologue.
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hbelow.
     
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
              #Hitinv Henv #Hpav Hpv HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     iPoseProof (kfk_000 with "Htext") as "Hi000".
@@ -656,7 +654,7 @@ Section KforkPrologue.
     iDestruct (cpu_own_transport CID8 CID10 lvl eb pme b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Allocproc.wp_allocproc_core γa γp γf γs M5 lvl K1 eb pme on None b lks
               ltac:(lia) ltac:(lia) Hbelow
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Henv Hpav").
+              with "Hcg Hcpu Htext Hpc Hprocs Hplock Henv Hpav").
     all: try lkbelow.
     iIntros (CID11 Hs11 mf6) "%HcsB Hpc Hpost".
     assert (Hpc16 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0x16))

@@ -17,8 +17,8 @@
    in the cone belongs to a callee (ilock's "ilock: no type", iget's
    "iget: no inodes", dirlookup's "dirlookup not DIR" -- which namex's own
    [lh a5,68(s4)] / [bne a5,s7] test refutes for it -- and dirlookup's
-   granularity arm), so the [panic_wp_any] resource the contract takes is
-   threaded to the callees and never consumed locally.
+   granularity arm), so the [kernel_data] / [panic_env] the contract takes
+   are threaded to the callees, whose own panic arms are theirs.
 
    So this cone's assumption count stays at the five platform axioms plus
    funext. *)

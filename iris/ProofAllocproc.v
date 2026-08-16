@@ -445,7 +445,7 @@ Section ProofAllocproc.
     intros pcE ret_tgt HK Hlvl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hpidlk Henv Hpav Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
     iAssert (procs_inv γs) as "#Hpinv". { iExact "Hprocs". }
     (* ================= PROLOGUE (32-byte frame, 4 slots) ================= *)
@@ -1057,7 +1057,7 @@ Section ProofAllocproc.
           rewrite /F3 upd_ne; [| congruence].
           rewrite /F2 upd_ne; [| congruence].
           exact (Hfa_rest r Hr Ncsp N8 N9 N18). }
-        iDestruct "Henv" as (γk) "(#Hkmem & Havail & _)".
+        iDestruct "Henv" as (γk) "(#Hkmem & Havail)".
         (* p->lock is still held: kalloc's own held set is
            [{["proc"]} ∪ lks], and its "kmem" freshness premise
            needs [ap_below_kmem]. *)
@@ -1198,7 +1198,7 @@ Section ProofAllocproc.
              third arm of [allocproc_post] records.  The sealed bundle is
              persistent, so the post still gets one. *)
           iAssert (kalloc_env γa on) with "[Havail]" as "Henv".
-          { iExists γk. iFrame "Hkmem Havail Hpanic". }
+          { iExists γk. iFrame "Hkmem Havail". }
           iMod (kalloc_env_seal γa on with "Henv") as "#Henv".
           iDestruct (p_pid_split (proc_addr k) pidn with "Hpidfull") as "[Hpidinv Hpidown]".
           iDestruct (proc_ofiles_null_split γf (proc_addr k) (pv_ofile V) Hof with "Hofiles")
@@ -1414,7 +1414,7 @@ Section ProofAllocproc.
           rewrite /F4 upd_ne; [| congruence].
           exact (Hka_rest r Hr Ncsp N8 N9 N18). }
         iAssert (kalloc_env γa (avail_dec on)) with "[Havail]" as "Henv".
-        { iExists γk. iFrame "Hkmem Havail Hpanic". }
+        { iExists γk. iFrame "Hkmem Havail". }
         (* the GENERAL contract: at an arbitrary budget proc_pagetable can
            fail, and its failure is allocproc's second tail.  p->lock is
            still held here, so the actual held set is
@@ -2306,9 +2306,9 @@ Section SealAllocproc.
     cbv beta delta [wp_allocproc_sconf_body].
     intros pcE ret_tgt HK Hlvl Hex Hbelow.
     destruct Hex as (nb & Hon & Hnb). subst on.
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hpidlk Henv Hpav Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpidlk Henv Hpav Hcont".
     iApply (Core.wp_allocproc_core γa γp γf γs m lvl K eb pme (Some nb) op b lks HK Hlvl Hbelow
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hpidlk Henv Hpav").
+              with "Hcg Hcpu Htext Hpc Hprocs Hpidlk Henv Hpav").
     all: try lkbelow.
     iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
     iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx|].

@@ -104,7 +104,7 @@ Section ProofSysWait.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs
              #Hlk #Henv Hpriv Hcont".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
@@ -297,7 +297,7 @@ Section ProofSysWait.
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb b pid V lks
               Hj Hgl (sw_Kkw av Hav) Heb
-              with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk Henv Hpriv").
+              with "Hcg Hcpu Htext Hpc Hprocs Hlk Henv Hpriv").
     all: try lkbelow.
     iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpriv".
     destruct Hkw as (HcsKw & HKwa0).

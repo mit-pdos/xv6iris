@@ -72,7 +72,6 @@ Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import DiskPtsto WpUart DiskInv.
 Require Import TimerCap.
 Require Import SpecClockintr.
@@ -140,7 +139,6 @@ Section DevintrCaps.
                       free);
        [procs_inv]    the proc array's locks -- wakeup, reached from three of
                       the handlers;
-       [panic_wp_any] the panic arms inside acquire/release/wakeup.
 
      ALL PERSISTENT, so the bundle is threaded and never consumed, and the
      postcondition does not mention it. *)
@@ -153,8 +151,7 @@ Section DevintrCaps.
       is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
       timer_cap ∗
       tick_keeper γtl γs ∗
-      procs_inv γs ∗
-      panic_wp_any )%I.
+      procs_inv γs )%I.
 
   Global Instance devintr_caps_persistent γu γv γdk γtl γs pd pav pu :
     Persistent (devintr_caps γu γv γdk γtl γs pd pav pu).

@@ -526,7 +526,7 @@ Section KexecMain.
            Hcovb Hiregb Hcstr Hplen Havf_nz Havf_na Hnamax
            Halen_b Halen_c Halen_4 Hjp Hgs Hb Heb.
     subst b eb.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hfab #Hka Hbm Hins Hbits Hpriv
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hbm Hins Hbits Hpriv
              Hpath Hargv Hargs Hbs Hirs Hcont".
     (* depth 0 pins the held-lock set empty, which is what every seam past
        phase A spells as the literal [∅] (SpecKexec.v's note on the
@@ -543,7 +543,7 @@ Section KexecMain.
               HK Hdev Hnib Htlog Htist Hroot Hnib0 Hlg Hsz Hbm0 Hbmc Hbml
               Hins0 Hcovb Hiregb Hcstr Hplen Hjp Hgs eq_refl
               eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hfab Hka Hbm Hins Hbits Hpriv
+              with "Hcg Hcnt Htext Hpc Hfab Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hcont []").
     iIntros (CIDa) "%Hsa".
     iIntros (M90 kf qf sf inumf dnf bmf gilf gislf gyf n2 used2)
@@ -580,7 +580,7 @@ Section KexecMain.
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs eq_refl
               Hu2 Hkf Hinumf Hn2 eq_refl eq_refl eq_refl eq_refl eq_refl
               HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr
-              with "Htext Hpanic Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins
+              with "Htext Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins
                     Hbits Hbs Hka2 Hpriv Hpath Hargv Hargs Hframe Hcont [] []").
     - (* ---- OUTPUT 1: elf.phnum = 0, the phdr loop is skipped ---- *)
       iIntros (CIDz) "%Hsz1". iIntros (Mz efz Pz w67z) "Hst1a2 Hcont".
@@ -592,7 +592,7 @@ Section KexecMain.
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs2)
                 (m !!! Regidx Ra0) (m !!! Regidx Ra1) w67z efz Pz
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
-                with "Htext Hpanic Hfab Hst1a2 [Hcont]").
+                with "Htext Hfab Hst1a2 [Hcont]").
       iIntros (CIDy) "%Hsy". iIntros (My used3) "Hst1ae".
       iDestruct (wp_next_retarget CIDz CIDy true (proc_addr jp) _
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
@@ -623,7 +623,7 @@ Section KexecMain.
                 (mword_of_int 0 : mword 64)
                 HK Hkf Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdev
                 eq_refl eq_refl eq_refl eq_refl eq_refl
-                with "Htext Hpanic Hfab Hst12c Hcont []").
+                with "Htext Hfab Hst12c Hcont []").
       iIntros (CIDy) "%Hsy". iIntros (My used3 Py szvy) "Hst1ae Hcont".
       iApply (kxc_cd (CID0 := CIDy) jp bn gfs ga gf cov logstart bmapstart
                 inodestart size used used3 plen pfun na avf alen aslen afun

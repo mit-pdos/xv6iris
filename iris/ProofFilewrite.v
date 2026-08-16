@@ -807,7 +807,6 @@ Require Import UserPtTree.
 Require Import KallocInv.
 Require Import SchedCtx.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPanic.
 Require Import FileOff.
 Require Import FileInvDefs.
@@ -1502,7 +1501,6 @@ Section ProofFilewrite.
     cpu_own 0%nat eb pj b lks -∗
     kernel_text -∗
     InstrBytes.pc_is (mword_of_int (FW + 0xcc) : mword 64) -∗
-    panic_wp_any -∗
     procs_inv gs -∗
     (* the twelve frame slots, none of which the body touches *)
     word_pointsto (pa_stk sp0 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
@@ -1574,7 +1572,7 @@ Section ProofFilewrite.
     { (* NO FUEL.  The loop is entered only at [i < n], so [n - i] is at
          least one and the zero case is vacuous. *)
       exfalso. lia. }
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hprocs
+    iIntros "Hcg Hcnt #Htext Hpc #Hprocs
              Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
@@ -1786,7 +1784,7 @@ Section ProofFilewrite.
               pidv (DfracOwn (1/4)) D1 (K - 12)%nat eb b
               _ (fw_av_begin_op K HK) Hjp Hgsj
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hlog Hppid Hprocs").
+              with "Hcg Hcnt [] [] Htext Hpc Hlog Hppid Hprocs").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -1866,7 +1864,7 @@ Section ProofFilewrite.
               (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hit Hesc Hireg
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hit Hesc Hireg
                     Hslk2 Hshrl Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1").
     all: try lkbelow.
@@ -2091,7 +2089,7 @@ Section ProofFilewrite.
               ltac:(rewrite HQ6a0; exact P8)
               ltac:(rewrite HQ6a1; vm_compute; reflexivity)
               HQ6a3 HQ6a4
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hkd Hpk Hbio Hlog Hkenv
+              with "Hcg Hcnt [] [] Htext Hpc Hkd Hpk Hbio Hlog Hkenv
                     Hidev Hinum Hmeta Hmap Hblocks Hsbi Hsbsz Hsbb Hbmres
                     Hireg Hdnat [Hpriv] Hprocs Hdev Hgeo Hdlk Hbsl Hlogop").
     all: try lkbelow.
@@ -2300,7 +2298,7 @@ Section ProofFilewrite.
               (* iunlock's bound is "sleep lock"(6); fw_loop's own is
                  "log"(3), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hit Hesc Hslk2
+              with "Hcg Hcnt Htext Hpc Hit Hesc Hslk2
                     Hheld Hslpid Hppid Hprocs
                     Hdep Hidev Hinum Hvalid Hlk [Hshot]").
     all: try lkbelow.
@@ -2359,7 +2357,7 @@ Section ProofFilewrite.
               pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks
               (fw_av_end_op K HK) P1 Hjp Hgsj
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hcrash Hgc
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlog Hcrash Hgc
                     Hppid Hprocs Hdev Hgeo Hdlk Hlogop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -2606,7 +2604,7 @@ Section ProofFilewrite.
                         rewrite (HY1cs r Hr N1 N4);
                         exact (HB0thr2 r Hr Nsp N0 N1 N2 N3 N4 N5 N6 N7 N8 N9))
                   Hbelow
-                  with "Hcg Hcnt Htext Hpc Hpanic Hprocs
+                  with "Hcg Hcnt Htext Hpc Hprocs
                         Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                         Href Hpriv Hkenv
                         Hbio Hlog Hcrash Hgc Hkd Hpk Hit Hescs Hireg
@@ -2697,7 +2695,7 @@ Section ProofFilewrite.
     cbv beta delta [wp_filewrite_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -3066,7 +3064,7 @@ Section ProofFilewrite.
         iApply (Pipewrite.wp_pipewrite_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q P2 (K - 12)%nat eb pidv V n b lks
                   Hj Hgs Hlens HP2a2 (fw_n_range n Hn) (fw_av_pipe K HK) Heb
-                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic").
+                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs").
         all: try lkbelow.
         { iEval (rewrite HP2a0). iExact "Hpipe". }
         iIntros (CIDpw Hspw mf P') "%Hcspw %Hupt %Hretpw Hcg Hcnt Hpc Hpref Hpriv".
@@ -3493,7 +3491,7 @@ Section ProofFilewrite.
                           Hj Hgs Hlens HE2a0 HE2a2 (fw_n_range n Hn)
                           (fw_av_cons K HK) Heb
                           with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hdevinv Htxlk
-                                Hprocs Hpanic").
+                                Hprocs").
                 all: try lkbelow.
                 iIntros (CIDcw Hscw mf r P') "%Hcscw %Hupt %Hrr %Hra0 Hcg Hcnt Hpc Hpriv".
                 assert (Hpc80 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FW + 0x80)).
@@ -4177,7 +4175,7 @@ Section ProofFilewrite.
                            ltac:(intros r Hr A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11;
                                  exact (HL7thr r Hr A1 A2 A4 A6 A7 A8 A9 A10 A11))
                            Hbelow
-                           with "Hcg Hcnt Htext Hpc Hpanic Hprocs
+                           with "Hcg Hcnt Htext Hpc Hprocs
                                  Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hb9 Hb10 Hb11 Hb12
                                  [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
                                  [Hpriv] Hkenv

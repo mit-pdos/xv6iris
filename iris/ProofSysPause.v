@@ -104,7 +104,8 @@
      * the parked-scheduler record is NOT threaded here.  It lives in the
        running proc's own [p->lock] ([SchedCtx.run_slot]), which sleep
        reaches by holding that lock, so sys_pause never names it.
-     * [panic_wp_any] is what acquire, killed, sleep_prepare and sleep take.
+     * The panic credentials are what acquire, killed, sleep_prepare and
+       sleep take.
 
    A functor over ARGINT / ACQUIRE / RELEASE / MYPROC / KILLED /
    SLEEP_PREPARE / SLEEP. *)
@@ -133,7 +134,6 @@ Require Import FileInvDefs.
 Require Import SchedCtx.
 Require Import TicksInv.
 Require Import CodeSysPause.
-Require Import PanicStub.
 Require Import SpecArgint SpecAcquire SpecRelease SpecMyproc SpecKilled SpecSleepPrepare SpecSleep.
 Require Import SpecSysPause.
 From Kernel Require KernelSyms.
@@ -1137,7 +1137,6 @@ Section SpBodies.
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
-    panic_wp_any -∗
     ▷ sp_loop CID0 γt j m av eb sp0 pj tk nv lks -∗
     sp_exit0 CID0 γt j m av eb sp0 pj lks -∗
     sp_exitk CID0 γt j m av eb sp0 pj tk lks -∗
@@ -1158,7 +1157,7 @@ Section SpBodies.
     (* [sleep]'s contract names the parking proc as [proc_addr j] literally, so
        the caller's [pj] has to be spelled that way before the crossing. *)
     intros Hav Heb Hj Hjl Hpjv Hanch Hbn Hln Hfresh. subst pj.
-    iIntros "#Htext #Hlkt #Hpinv #Hpanic IH Hex0 Hexk Htl
+    iIntros "#Htext #Hlkt #Hpinv IH Hex0 Hexk Htl
               Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     assert (Hn1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z) by (vm_compute; reflexivity).
@@ -1509,7 +1508,6 @@ Section SpBodies.
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
-    panic_wp_any -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     sp_free sp0 -∗
@@ -1521,7 +1519,7 @@ Section SpBodies.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hj Hjl Hpjv Hanch Hb Hsv Hfresh.
-    iIntros "#Htext #Hlkt #Hpinv #Hpanic Hs1 Hs2 Hfree Hnc Hjoin7
+    iIntros "#Htext #Hlkt #Hpinv Hs1 Hs2 Hfree Hnc Hjoin7
               Hcg Hown Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     assert (Hn0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z) by (vm_compute; reflexivity).
@@ -1818,7 +1816,7 @@ Section SpBodies.
         iApply (sp_loop_body (CID := CIDy) CID0 γs γt γl j m N av eb sp0 pj
                   (sign_extend' 64 (t0 : mword 32)) nv lks
                   Hav Heb Hj Hjl Hpjv Hsy Hbn Hln Hfresh
-                  with "Htext Hlkt Hpinv Hpanic IH Hex0 Hexk Htl
+                  with "Htext Hlkt Hpinv IH Hex0 Hexk Htl
                         Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpc"). }
 
       (* ============ the normal (return 0) exit at +0x70, anchored ============ *)
@@ -1855,7 +1853,7 @@ Section ProofSysPause.
     intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb Hfresh Hpv.
     subst i.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hown #Htext #Hdata Hpc Htf Hpage #Hlkt #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hown #Htext #Hdata Hpc Htf Hpage #Hlkt #Hpinv Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX: the [b = false]
        instance of this contract is vacuous, and pinning [b] here is what makes
        every crossing in the function speak the same index. *)
@@ -2077,7 +2075,7 @@ Section ProofSysPause.
       destruct Hf as (Hbb & Hss).
       iApply (sp_acq_body (CID := CIDq) CID γs γt γl j m M nv av eb sp0 pj lks
                 Hav Heb Hj Hjl Hpjv Hsq Hbb Hss Hfresh
-                with "Htext Hlkt Hpinv Hpanic Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpc Htl"). }
+                with "Htext Hlkt Hpinv Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpc Htl"). }
 
     (* ====================== the [n < 0] dispatch ====================== *)
     iPoseProof (spi_16 with "Htext") as "Hi16".

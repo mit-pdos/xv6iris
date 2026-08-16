@@ -960,7 +960,7 @@ Section ProofCopyinstr.
         Hlkbelow;
       [ exfalso; lia |].
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hdst Hcont".
-    iDestruct "Henv" as (γk) "(#Hlock & #Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & #Havail)".
     iDestruct (sie_cap_gpr_dup_hw_config with "Hcg") as "[Hhwc Hcg]".
     iDestruct "Hhwc" as (hwmisa0 hwmseccfg0 hwpmar0 hwelp0)
       "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & #Hkmapb)".
@@ -1540,7 +1540,7 @@ Section ProofCopyinstr.
             iDestruct (cpu_own_transport CIDc CIDd6 lvl eb pcur b ltac:(wp_next_chain)
                          with "Hcnt") as "Hcnt".
             iAssert (kalloc_env γa None) as "Henv".
-            { iExists γk. iFrame "Hlock Havail Hpanic". }
+            { iExists γk. iFrame "Hlock Havail". }
             iApply (IH (done + n)%nat (rem - n)%nat CIDd6 Pd D5 g
                       Hf1 Hf2 Hf3 Hnulg (uptd_ext_sz_trans szv P Pc Pd Hext Hextd)
                       HD5sp HD5s1 HD5s3 HD5s4 HD5s5 HD5s6
@@ -1708,7 +1708,7 @@ Section ProofCopyinstr.
                       = add_vec_int (mword_of_int (KernelSyms.copyinstr + 0x36) : mword 64) 4)
         by (rewrite /F5 upd_eq; reflexivity).
       iAssert (kalloc_env γa None) as "Henv".
-      { iExists γk. iFrame "Hlock Havail Hpanic". }
+      { iExists γk. iFrame "Hlock Havail". }
       iDestruct (cpu_own_transport CID0 CIDu6 lvl eb pcur b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iDestruct (sie_cap_gpr_tp_pin (CIDx := CIDu6) F5 (K - 12)%nat b pcur with "Hcg") as "Hcg".

@@ -51,7 +51,7 @@ Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
   (* COUNTED-ONLY (mirrors SpecProcMapstacks/SpecKvmmake): every caller in the
      tree already supplies [Some nb] here (kvmmake's six per-region calls,
      proc_mapstacks' boot-only call), and [nb] always dominates the missing
-     nodes, so the kalloc-null / mappages-fail branch is DEAD -- NO panic_wp.
+     nodes, so the kalloc-null / mappages-fail branch is DEAD -- NO panic.
      [on] stays [option nat] in the signature only so it keeps matching the
      dual-mode calling convention shared by [kalloc_env] and the sibling
      specs in this cone. *)

@@ -523,7 +523,7 @@ Section ProofPMS.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) 4)]> Mk).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) (sign_extend' 64 (mword_of_int 2093890 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hqcpu)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. exact Hsp. }
     assert (HJ1 : J !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.proc_mapstacks + 0x52) : mword 64) 4)
@@ -558,7 +558,7 @@ Section ProofPMS.
     (* rebuild kalloc_env at avail_sub (i+gk+1) *)
     iAssert (kalloc_env γa (avail_sub (Some nb) (i + gk + 1)))
       with "[Havail2]" as "Henv".
-    { iExists γk. iFrame "Hlock Havail2 Hqcpu". }
+    { iExists γk. iFrame "Hlock Havail2". }
     (* a0 = page, page_valid, nonzero *)
     set (page := mr0 !!! Regidx (mword_of_int 10 : mword 5)).
     assert (Hpanz : page <> mword_of_int 0).

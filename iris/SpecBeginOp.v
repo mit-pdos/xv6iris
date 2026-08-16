@@ -62,7 +62,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -115,7 +114,6 @@ Definition wp_begin_op_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* threaded, never read: see the header note *)
   p_pid pj ↦₄{dq} pidv -∗

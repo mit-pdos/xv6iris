@@ -426,7 +426,7 @@ Section ProofClockintr.
     (* ===================== the cpuid() == 0 case split ===================== *)
     destruct (tick_hart) as [|] eqn:Hth.
     - (* ---------------- THIS HART KEEPS TIME: the tick block ------------- *)
-      iDestruct "Htk" as "[%Hno | (#Hlk & #Hpi & #Hpanic)]".
+      iDestruct "Htk" as "[%Hno | (#Hlk & #Hpi)]".
       { rewrite Hth in Hno. discriminate. }
       iPoseProof "Hpi" as "Hpi2".
       iDestruct "Hpi2" as "[%Hlen _]".
@@ -646,7 +646,7 @@ Section ProofClockintr.
                 (locks_below_union_singleton lks "time" "proc"
                    ltac:(vm_compute; lia)
                    ltac:(lkbelow))
-                with "Hcg Hcnt Htext Hpc Hpanic Hpi").
+                with "Hcg Hcnt Htext Hpc Hpi").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (MW) "%HcsW Hcg Hcnt #Htext2 Hpc".
@@ -801,7 +801,7 @@ Section ProofClockintr.
         split; [apply Hthr; vm_compute; first [reflexivity | discriminate]|].
         apply Hthr; vm_compute; first [reflexivity | discriminate]. }
       { iExact "Hpc". }
-      iRight. iFrame "Hlk Hpi Hpanic".
+      iRight. iFrame "Hlk Hpi".
     - (* ---------------- ANOTHER HART: straight to the timer tail -------- *)
       assert (Hnzero : eq_vec (rget mo a0_idx) (zero_reg : mword 64) = false)
         by (rgne; rewrite Hmoa0; exact Hth).

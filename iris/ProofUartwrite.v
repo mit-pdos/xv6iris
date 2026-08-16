@@ -93,7 +93,6 @@ Require Import WpLock ProcGeom CpuOwn.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecAcquire SpecRelease SpecSleep SpecSleepPrepare.
@@ -767,7 +766,7 @@ Section UwBodies.
        call (at "uart", 15) widens this with [locks_below_mono]. *)
     locks_below lks "proc" ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
-    procs_inv γs -∗ panic_wp_any -∗
+    procs_inv γs -∗
     sie_cap_gpr M (av - 10)%nat true pj -∗
     cpu_own 0%nat eb pj true lks -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
@@ -782,7 +781,7 @@ Section UwBodies.
     assert (H231 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
     assert (H263 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
     rewrite H231 in Hn31.
-    iIntros "#Ht #Hdinv #Htxl #Hpinv #Hpanic".
+    iIntros "#Ht #Hdinv #Htxl #Hpinv".
     iIntros "Hcg Hcnt Hpc Hpid #Hsub Hfull Hbuf Hcont".
     iDestruct (is_txlock_lock with "Htxl") as "#Hlk".
     iDestruct (is_txlock_dlab with "Htxl") as "#Hdlab".
@@ -1285,31 +1284,31 @@ Section UwBodies.
     locks_below lks "proc" ->
     forall i : nat, (i + S k)%nat = n ->
     ⊢ kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
-      procs_inv γs -∗ panic_wp_any -∗
+      procs_inv γs -∗
       uw_head (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks.
   Proof.
     intros Hn31 Hj Hjlp Hav Heb Hfresh.
     induction k as [|k IH].
-    - intros i Hik. iIntros "#Ht #Hdinv #Htxl #Hpinv #Hpanic".
+    - intros i Hik. iIntros "#Ht #Hdinv #Htxl #Hpinv".
       rewrite /uw_head.
       iIntros (CIDh Hsh M) "%Hregs Hcg Hcnt Hpc Hpid #Hsub Hfull Hbuf Hexit".
       iApply (uw_one (CID := CIDh) CID0 γl γu γv γs j γlp m0 M av eb sp0 buf n f dq
                 pidv dqp i lks ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs Hfresh
-                with "Ht Hdinv Htxl Hpinv Hpanic Hcg Hcnt Hpc Hpid Hsub Hfull Hbuf [Hexit]").
+                with "Ht Hdinv Htxl Hpinv Hcg Hcnt Hpc Hpid Hsub Hfull Hbuf [Hexit]").
       iSplit.
       + (* the back edge is dead: this was the last byte *)
         rewrite /uw_next_cont. iIntros (CIDx Hsx M') "%Hlt". exfalso. lia.
       + iExact "Hexit".
-    - intros i Hik. iIntros "#Ht #Hdinv #Htxl #Hpinv #Hpanic".
+    - intros i Hik. iIntros "#Ht #Hdinv #Htxl #Hpinv".
       rewrite /uw_head.
       iIntros (CIDh Hsh M) "%Hregs Hcg Hcnt Hpc Hpid #Hsub Hfull Hbuf Hexit".
       iApply (uw_one (CID := CIDh) CID0 γl γu γv γs j γlp m0 M av eb sp0 buf n f dq
                 pidv dqp i lks ltac:(lia) Hn31 Hj Hjlp Hav Heb Hsh Hregs Hfresh
-                with "Ht Hdinv Htxl Hpinv Hpanic Hcg Hcnt Hpc Hpid Hsub Hfull Hbuf [Hexit]").
+                with "Ht Hdinv Htxl Hpinv Hcg Hcnt Hpc Hpid Hsub Hfull Hbuf [Hexit]").
       iSplit.
       + rewrite /uw_next_cont.
         iIntros (CIDx Hsx M') "%Hlt %Hregs' Hcg Hcnt Hpc Hpid #Hsub' Hfull Hbuf".
-        iPoseProof (IH (S i) ltac:(lia) with "Ht Hdinv Htxl Hpinv Hpanic") as "Next".
+        iPoseProof (IH (S i) ltac:(lia) with "Ht Hdinv Htxl Hpinv") as "Next".
         rewrite /uw_head.
         iSpecialize ("Next" $! CIDx with "[%]"); [wp_next_chain|].
         iApply ("Next" $! M' with "[%] Hcg Hcnt Hpc Hpid Hsub' Hfull Hbuf Hexit").
@@ -1340,7 +1339,7 @@ Section ProofUartwrite.
   Proof.
     cbv beta delta [wp_uartwrite_sconf_body].
     intros pcE pj buf ret_tgt Hj Hjlp Ha1 Hn31 Hav Heb Hfresh.
-    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Htxl Hpid Hbuf #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Htxl Hpid Hbuf #Hpinv Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hbt : b = true) by (rewrite -Hbm; exact Heb).
     clear Hbm. subst b.
@@ -1713,7 +1712,7 @@ Section ProofUartwrite.
                    with "Hcnt") as "Hcnt".
       iPoseProof (uw_iter CID γl γu γv γs j γlp m av eb sp0 buf n f dq
                     pidv dqp (n - 1)%nat lks ltac:(lia) Hj Hjlp Hav Heb Hfresh 0%nat ltac:(lia)
-                    with "Ht Hdinv Htxl Hpinv Hpanic") as "Iter".
+                    with "Ht Hdinv Htxl Hpinv") as "Iter".
       rewrite /uw_head.
       iSpecialize ("Iter" $! CID23 with "[%]"); [wp_next_chain|].
       iApply ("Iter" $! A11 with "[%] Hcg Hcnt Hpc Hpid Hsub0 Hfull Hbuf [Hcont]").

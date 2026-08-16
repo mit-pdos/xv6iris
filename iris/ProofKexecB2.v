@@ -102,7 +102,6 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -122,7 +121,6 @@ Require Import InodeInv.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
 Require Import ProcInv.
@@ -322,7 +320,7 @@ Section KexecB2Body.
        hand it back, while [kxc_bad64] needs it at the exit.  Introduced
        exclusively, the second use fails with [iSpecialize: "Hka" not found]
        -- which names the hypothesis and not the reason. *)
-    iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab Hopen Hbm Hins Hbits #Hka Hpt
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab Hopen Hbm Hins Hbits #Hka Hpt
              Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe Hcont".
     (* depth 0 forces the held set empty, so proc_freepagetable's order
        premise needs no hypothesis of this lemma's own. *)
@@ -653,7 +651,7 @@ Section KexecB2Body.
               m U8 K lks sp0 ra0 s00 s10 s20 pv av
               HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
               Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HU8sp HU8s4 HU8thr
-              with "Hcg Hcnt Htext Hpanic Hpc Hfab Hslkk Hslkd Hslpid Hdep
+              with "Hcg Hcnt Htext Hpc Hfab Hslkk Hslkd Hslpid Hdep
                     Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits
                     Hka Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont]
                     Hcont").
@@ -743,8 +741,8 @@ Section KexecB2Loops.
   (*  WHAT THE INVARIANT IS, AND WHAT IT IS NOT.                          *)
   (*                                                                      *)
   (*  It carries NOTHING about the page table.  walkaddr's failure arm     *)
-  (*  reaches [panic("loadseg: address should exist")], which the          *)
-  (*  contract's [panic_wp_any] absorbs outright, so the loop never has to *)
+  (*  reaches [panic("loadseg: address should exist")], which is           *)
+  (*  discharged against [SpecPanic], so the loop never has to             *)
   (*  show its destination is mapped -- and it does not have to show the   *)
   (*  destination is page-ALIGNED either, because readi is handed the      *)
   (*  whole 4096-byte page walkaddr returned and [n <= PGSIZE].  That is   *)
@@ -807,7 +805,7 @@ Section KexecB2Loops.
       assert (Hlt : ((po + ii) `mod` 2 ^ 32 < 2 ^ 32)%Z)
         by (apply Z.mod_pos_bound; lia).
       cbn in Hfuel. lia. }
-    iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hka Hres Hcont Hc116".
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hka Hres Hcont Hc116".
     (* depth 0 forces the held set empty, so readi's order premise needs no
        hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
@@ -980,7 +978,7 @@ Section KexecB2Loops.
     (* ---- +0x106: c.beqz a0,+0x0ce -- the panic arm ---- *)
     destruct Hwapay as [(Ha0z & _) | (wpte & Hsome & Hvu & _ & Ha0v)].
     { (* walkaddr missed: panic("loadseg: address should exist"), which the
-         contract's [panic_wp_any] absorbs -- so this arm needs nothing back. *)
+         arm is discharged against [SpecPanic] -- so it needs nothing back. *)
       assert (Htgt0ce : add_vec (mword_of_int (KXB + 0x106) : mword 64)
                 (sign_extend' 64
                    (sign_extend' 13 (concat_vec (mword_of_int 228 : mword 8)
@@ -1354,7 +1352,7 @@ Section KexecB2Loops.
                       pose proof Hszb as Hs; rewrite Hmb in Hs; lia)
                 Hjp Hgs HD6a0
                 ltac:(rewrite HD6a1; vm_compute; reflexivity) HD6a3 HD6a4
-                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hka Hidev Hmeta Hmap
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hka Hidev Hmeta Hmap
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -1578,7 +1576,7 @@ Section KexecB2Loops.
                                     ltac:(lnz) ltac:(lnz)); exact HMs10)
                     ltac:(rewrite (HE1get Rs11 ltac:(vm_compute; reflexivity)
                                     ltac:(lnz) ltac:(lnz)); exact HMs11)
-                    with "Hcg Hcnt Htext Hpanic Hpc [] Hka
+                    with "Hcg Hcnt Htext Hpc [] Hka
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
           { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
@@ -1628,7 +1626,7 @@ Section KexecB2Loops.
                   ltac:(rewrite (HM2get Rs6 ltac:(vm_compute; reflexivity)
                                   ltac:(lnz)); exact HMs6)
                   Hal Hbelow Hcovp
-                  with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                  with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
         { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv

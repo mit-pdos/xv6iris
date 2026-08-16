@@ -847,7 +847,7 @@ Section ProofFreeproc.
       (* kfree is stated over the RAW kmem lock and count, not the bundle:
          open [kalloc_env] once here.  It is at [None], hence persistent, so
          nothing is lost by opening it. *)
-      iDestruct "Henv" as (γk) "(#Hkmem & #Havail & #Hpanic)".
+      iDestruct "Henv" as (γk) "(#Hkmem & #Havail)".
       iDestruct (cpu_own_transport CID CID9 ilvl eb pme false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iApply (KF.wp_kfree_sconf γa γk (mword_of_int KernelSyms.kmem)

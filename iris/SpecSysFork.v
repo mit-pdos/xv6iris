@@ -63,7 +63,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import CpuOwn.
-Require Import PanicStub.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -105,7 +104,6 @@ Definition wp_sys_fork_sconf_body
   sie_cap_gpr m av b p -∗
   cpu_own lvl eb p b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

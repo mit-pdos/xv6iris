@@ -86,7 +86,6 @@ Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeWriteHead.
-Require Import PanicStub.
 Require Import SpecBread SpecBwrite SpecBrelse.
 Require Import FsCrash.
 Require Import SpecWriteHead.
@@ -558,7 +557,6 @@ Section WriteHeadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x46) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv γs -∗
@@ -582,7 +580,7 @@ Section WriteHeadBlocks.
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1 Hbelow.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: write_head never push_off's, so its
@@ -675,7 +673,7 @@ Section WriteHeadBlocks.
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat eb
               (f <$> seq 0 1024) bsd0 b Q
               _ HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm]").
     all: try lkbelow.
     (* THE CALLER'S OWN PERMIT, at the header image this function assembled
@@ -784,7 +782,7 @@ Section WriteHeadBlocks.
               T4 (K - 4)%nat eb (proc_addr j)
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
               _ HKbl Hk HT4a0 Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID6 Hs6 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hslot".
     assert (Hpc52 : ret_pc (T4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x52)).
@@ -1070,7 +1068,6 @@ Section WriteHeadBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.write_head + 0x3a) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv γs -∗
@@ -1099,7 +1096,7 @@ Section WriteHeadBlocks.
       iIntros (i M f Hi Hfuel Hf4 Henc Hregs HMs1 HMa4 HMa5 HMa2);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
@@ -1282,7 +1279,7 @@ Section WriteHeadBlocks.
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
                 HS3regs HS3s1 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* more entries: branch back to +0x3a *)
@@ -1315,7 +1312,7 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
-      iApply ("IH" with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
+      iApply ("IH" with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
                          Hextra HLauth Hfsb Hncell HW Hperm Hcont").
   Qed.
 
@@ -1347,7 +1344,7 @@ Section ProofWriteHead.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct Hbatch as [HnW HnB].
     
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hfroz Hppid #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hfroz Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -1614,7 +1611,7 @@ Section ProofWriteHead.
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat eb b lks
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot").
     all: try lkbelow.
     iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1778,7 +1775,7 @@ Section ProofWriteHead.
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB2regs HB2s1 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* ---- n > 0: set the cursors up and enter the loop ---- *)
@@ -1944,7 +1941,7 @@ Section ProofWriteHead.
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
   Qed.

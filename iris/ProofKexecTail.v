@@ -76,7 +76,6 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SleepLock.   (* [is_sleeplock]: the nightly dead-import sweep re-pointed the chain that used to carry it *)
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -1293,7 +1292,6 @@ Section KexecABad.
     sie_cap_gpr Mt (K - 68)%nat true (proc_addr jp) -∗
     cpu_own 0 true (proc_addr jp) true lks -∗
     kernel_text -∗
-    panic_wp_any -∗
     pc_is (mword_of_int (KXA + 0x64) : mword 64) -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
@@ -1350,7 +1348,7 @@ Section KexecABad.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
            Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
     
-    iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
+    iIntros "Hcg Hcnt #Htext Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
              Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
@@ -1410,7 +1408,7 @@ Section KexecABad.
               B2 (K - 68)%nat true true lks
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitab Hitinv Hesck
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
@@ -1449,7 +1447,7 @@ Section KexecABad.
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
               true true lks ltac:(lia) Hlg Hjp Hgs
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcrash Hcert Hppid
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

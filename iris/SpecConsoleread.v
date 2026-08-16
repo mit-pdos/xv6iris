@@ -89,7 +89,6 @@ Require Import ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import ConsoleInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Export SwtchCtx.
 From Kernel Require KernelSyms.
@@ -147,7 +146,6 @@ Definition wp_consoleread_sconf_body
   proc_priv_core pj pid V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  panic_wp_any -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗

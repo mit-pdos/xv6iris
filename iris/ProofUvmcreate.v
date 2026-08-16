@@ -390,7 +390,7 @@ Section ProofUvmcreate.
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) 4)]> W2).
     assert (Htgtk : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095434 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
-    iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hlock & Havail)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
     { rewrite /J /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
     assert (HJsp : J !!! Regidx csp_rs1 = spr).
@@ -485,7 +485,7 @@ Section ProofUvmcreate.
       { rewrite /uvmcreate_post. iLeft.
         iSplit; [iPureIntro; rewrite Hnull; symmetry; exact Hnz|].
         iSplit; [iPureIntro; exact Hz|].
-        iExists γk. iFrame "Hlock Havail2 Hpanic". }
+        iExists γk. iFrame "Hlock Havail2". }
       (* [uvc_htail]'s OWN [wp_next b K] obligation (the [-]-framed slot
          above) is at ITS ambient hart (CID9 here), which is NOT [Hcont]'s
          hart -- [Hcont]'s [wp_next] is fixed at the OUTER entry hart
@@ -498,7 +498,7 @@ Section ProofUvmcreate.
     }
     iAssert (kalloc_env γa (avail_sub on 1))
       with "[Havail2]" as "Henv".
-    { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2 Hpanic". }
+    { iExists γk. rewrite avail_sub_S avail_sub_0. iFrame "Hlock Havail2". }
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.uvmcreate + 0x10)) (mword_of_int 5 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               M1 (K - 4)%nat b
               ltac:(vm_compute; reflexivity)

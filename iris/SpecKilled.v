@@ -27,7 +27,7 @@
    [sign_extend' 64 kl] because [c.lw] is a signed 32-bit load widening to
    the [int] return type.
 
-   [panic_wp] is threaded because acquire takes it (its "acquire" panic on a
+   The panic credentials are threaded because acquire takes them (its "acquire" panic on a
    doubly-held lock). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.

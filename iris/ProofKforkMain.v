@@ -133,7 +133,6 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import PanicStub.
 Require Import SpecFreeproc.
 Require Import SpecMyproc.
 Require Import SpecAllocproc.
@@ -452,7 +451,6 @@ Section KforkArms.
        four follow from this one by [locks_below_mono]. *)
     locks_below lks "wait_lock" ->
     kernel_text -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     (* ENTRY is in-lock (allocproc returned holding np->lock: level
        [S lvl], arm [false]), so the index carries the reserve of the arm
@@ -497,7 +495,7 @@ Section KforkArms.
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull Hbelow.
     subst tfsrc tfdst.
-    iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
+    iIntros "#Htext #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv #Hmk
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
              Hitb Hitinv Hirs Hcont".
     iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
@@ -571,7 +569,7 @@ Section KforkArms.
     iPoseProof (B3.kfkb3_fd_loop γl γf pme npa pid_p pid_c Vp V2 m (trap_res b) K (S lvl) eb false
                   (pa_stk sp0 8) (Mt !!! Regidx Rs0) ({["proc"]} ∪ lks)
                   ltac:(lia) ltac:(lia) HofnullV2 ltac:(lkbelow)) as "Hb3app".
-    iSpecialize ("Hb3app" with "Htext Hft Hpanic").
+    iSpecialize ("Hb3app" with "Htext Hft").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
                      Hheld Hhart Hfd Hpay Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
@@ -593,7 +591,7 @@ Section KforkArms.
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 (trap_res b) K (S lvl) eb ({["proc"]} ∪ lks)
                 ltac:(lia) ltac:(lia) Hd4 Hd3
-                with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx").
+                with "Hsc Hown Htext Hpcx Hitb Hitinv Hirs Hpvx Hpvcx").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
@@ -620,7 +618,7 @@ Section KforkArms.
       iApply (B5.kfk_b5 γs γf γw γl2 j mf4 K lvl eb b
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) lks
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen (eq_sym Hbeq) Hmf4s4 Hmf4s5 Hpid4
-                with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
+                with "Hsc4 Hown4 Hpay Htext Hpc4 Hprocs Hwlock
                       Hheld Hhart Hpvcx4 Hmk Hfd Hirsp Hks Hkctx").
       all: try lkbelow.
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
@@ -702,7 +700,7 @@ Section KforkMain.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl Hbelow.
-    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv Henv #Hpav Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
@@ -720,7 +718,7 @@ Section KforkMain.
                       K mr (mr !!! Regidx Ra0) lks -∗
                     WP (Loop : expr riscv_lang))%I)) lks
               HK Hlvl
-              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
+              with "Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpav Hpv Hcont [] [] []").
     all: try lkbelow.
     - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
@@ -776,7 +774,7 @@ Section KforkMain.
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn ltac:(lkbelow)
-                with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
+                with "Ht Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hmk Hheld Hhart
                       Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hirs [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is

@@ -64,7 +64,7 @@ Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots ProcInv.
 Require Import FileInvDefs.
 Require Import DiskPtsto WpUart UartTxInv.
-Require Import PanicStub SchedCtx.
+Require Import SchedCtx.
 Require Import SpecEitherCopyin SpecUartwrite.
 Require Import CodeConsolewrite.
 Require Import SpecConsolewrite.
@@ -976,7 +976,6 @@ Section CwBodies.
       dev_inv γu γv -∗
       is_txlock γl γu -∗
       procs_inv γs -∗
-      panic_wp_any -∗
       cw_saved sp0 m0 -∗ cw_spill sp0 m0 -∗ cw_buf sp0 -∗
       cw_ret (CID0 := CID0) jp m0 av eb pid V n lks -∗
       WP (Loop : expr riscv_lang).
@@ -985,7 +984,7 @@ Section CwBodies.
     induction mrem as [| mrem IH]; intros CID M V i Hi Hrem Hregs Hs11 Hcr Hbelow.
     { (* fuel 0 is unreachable: the head is entered only with [i < n] *)
       exfalso. lia. }
-    iIntros "#Ht Hcg Hcnt Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv #Hpanic
+    iIntros "#Ht Hcg Hcnt Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv
              Hsaved Hspill Hbuf Hcont".
     set (pj := proc_addr jp).
     set (buf := pa_stk sp0 16%nat).
@@ -1263,7 +1262,7 @@ Section CwBodies.
                   (* Uartwrite's premise is at "proc" too -- same rank,
                      [Hbelow] passed directly. *)
                   Hbelow
-                  with "Hcg Hcnt Ht Hpc Hdinv Htxl Hpid [Hb1] Hpinv Hpanic").
+                  with "Hcg Hcnt Ht Hpc Hdinv Htxl Hpid [Hb1] Hpinv").
         all: try lkbelow.
         { iEval (rewrite HD3a0). iExact "Hb1". }
         iIntros (CIDcc Hscc mf2) "%Hcs2 Hcg Hcnt Hpc Hb1 Hpid #Hsent".
@@ -1366,7 +1365,7 @@ Section CwBodies.
                        with "Hcont") as "Hcont".
           iApply (IH CIDce F1 (upd_upt V P1) (nn + i)%Z
                     ltac:(lia) ltac:(lia) HF1regs HF1s11 ltac:(wp_next_chain) Hbelow
-                    with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv Hpanic
+                    with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv
                           Hsaved Hspill Hbuf Hcont").
       - (* the copy failed: the branch IS taken, and [i] is the answer *)
         assert (Heqt : eq_vec (rget mf1 Ra0) (rget mf1 Rs8) = true).
@@ -1528,7 +1527,7 @@ Section CwBodies.
        "proc")] premise -- see the companion note at [cw_loop] above for why
        "proc" (11), not "kmem" (13), is the cone's true floor. *)
     intros pcE pj ret_tgt Hj Hjlp Hlens Ha0 Ha2 Hnr Hav Heb Hbelow.
-    iIntros "Hcg Hcnt #Ht Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc Hpriv #Hkenv #Hdinv #Htxl #Hpinv Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     assert (Hbt : b = true) by (rewrite -Hbm; exact Heb).
     clear Hbm. subst b.
@@ -1985,7 +1984,7 @@ Section CwBodies.
                 CIDg9 G8 V 0 ltac:(split; [apply Z.le_refl | exact Hnpos])
                 ltac:(rewrite Z.sub_0_r; reflexivity)
                 HA9regs HA9s11 ltac:(wp_next_chain) Hbelow
-                with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv Hpanic
+                with "Ht Hcg Hcnt Hpc Hpriv Hkenv Hdinv Htxl Hpinv
                       Hsaved Hspill [Hbuf] [Hcont]").
       { rewrite /cw_buf. change (8 * 4)%nat with 32%nat. iExact "Hbuf". }
       { rewrite /cw_ret. iExact "Hcont". }

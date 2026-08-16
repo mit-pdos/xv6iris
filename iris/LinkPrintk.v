@@ -15,7 +15,7 @@
      - there is NO panic credential to supply any more: acquire's
        [if(holding(lk)) panic] arm is refuted (SpecAcquire.v), so nothing in
        the printk cone asks for one and this file no longer reaches
-       [LinkPanicStub] at all.
+       a panic credential at all.
      - the postcondition WEAKENS (drops the trace claim and the return-value
        fact), which is a plain [wp_next] reindex -- no new hart-transport
        needed since both sides share the caller's ambient [CID]. *)

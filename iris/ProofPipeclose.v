@@ -121,7 +121,7 @@ Section ProofPipeclose.
        every hart rather than pinned at the ambient one. *)
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero, tp_ok_cid_of).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href #Hkmem Havail #Hpinv #Hpanic Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href #Hkmem Havail #Hpinv Hcont".
     iDestruct (sie_b_agree m n av eb b pme lks with "Hcg Hown") as %Houtb.
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hpinv" as "[%Hl _]". iPureIntro. exact Hl. }
@@ -845,7 +845,7 @@ Section ProofPipeclose.
       iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb false
                 ({["pipe"%string]} ∪ lks)
                 HwK HwdomW Hlen Hwlvl Hfresh_proc
-                with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                with "Hcg Hown Htext Hpc Hpinv").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
@@ -913,7 +913,7 @@ Section ProofPipeclose.
       iApply (Wakeup.wp_wakeup_sconf W2 γs pme (S n) (trap_res b + (av - 4))%nat eb false
                 ({["pipe"%string]} ∪ lks)
                 HwK HwdomW Hlen Hwlvl Hfresh_proc
-                with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                with "Hcg Hown Htext Hpc Hpinv").
       all: try lkbelow.
       iApply wp_next_off_intro.
       iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".

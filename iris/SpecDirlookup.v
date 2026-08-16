@@ -77,7 +77,7 @@
    scan of such a directory takes ONE extra turn of the loop, at
    [i = nrec] with [16*nrec < size], whose readi returns [tot < 16] and
    whose [bne a0,s3] at +0x6a is TAKEN -- into panic("dirlookup read").
-   That arm is now LIVE and discharged by [SpecPanic.panic_wp_any].  No
+   That arm is now LIVE and discharged against [SpecPanic].  No
    postcondition arm is added: panic never returns, so the found/notfound
    arms carry an implicit "...and every readi in the scan returned 16",
    which is what the old premise gave and what the panic arm gives without
@@ -164,7 +164,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import FdSlots.
@@ -311,7 +310,6 @@ Definition wp_dirlookup_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   (* THE SHORT READ arm calls [panic("dirlookup read")], and panic is an
      ordinary call: the literal comes out of [kernel_data] above and the
      console credentials printk needs out of [panic_env].  Both persistent,

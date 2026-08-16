@@ -24,7 +24,7 @@
 
    The scheduler is the supplier of the chain's dispatch payload and the
    consumer of its parking payload (SchedCtx.p_sched); [procs_inv] provides
-   the 64 proc locks, and [panic_wp] discharges acquire's holding-panic arm. *)
+   the 64 proc locks. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -80,7 +80,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
      and its [p = zero_reg] hatch express -- but that is not the point: the
-     [acquire] it calls in the scan asks for [panic_wp_any], a resource
+     [acquire] it calls in the scan asked for a hart-generic credential, a resource
      quantified over EVERY hart, and one hart's copy does not yield it.  Same
      propagation as SpecMain / SpecKinit / SpecUserinit / kalloc_env. *)
   (* ONE premise where there were two: [trap_csrs] now carries [intr_res] --

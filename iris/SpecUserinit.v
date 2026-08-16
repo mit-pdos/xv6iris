@@ -57,7 +57,6 @@ Require Import CpuOwn.
 Require Import FdSlots.
 Require Import SchedCtx.
 Require Import KallocInv KvmSpec.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -90,7 +89,6 @@ Definition wp_userinit_sconf_body
   sie_cap_gpr m0 K b pj -∗
   (* [kernel_data] supplies the "initcode" / "/" string literals *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   cpu_own 0%nat eb pj b lks -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)

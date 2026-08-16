@@ -112,7 +112,6 @@ Require Import CalleeSaved.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import IntrDefs.
@@ -644,7 +643,6 @@ Definition wp_fileclose_sconf_body
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
-  panic_wp_any -∗
   panic_env -∗
   file_ref γf k q Cf -∗
   fileclose_env fn on us n eb p Cf -∗

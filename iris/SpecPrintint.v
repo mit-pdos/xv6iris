@@ -40,8 +40,8 @@
    there are no flag cells and no [eq_vec]/[neq_vec] refutation premises.  What
    arrives in their place is what every consputc byte now costs -- a [tx_lock]
    acquire/release round trip per byte -- so printint threads the ordinary
-   spinlock-caller accounting ([cpu_own] net-zero, the [noff] transient bound,
-   [panic_wp_any]) and brings the persistent [UartTxInv.is_txlock] rather than
+   spinlock-caller accounting ([cpu_own] net-zero, the [noff] transient
+   bound) and brings the persistent [UartTxInv.is_txlock] rather than
    the transmitter token, which lives under that lock.  The digit loop takes the
    lock once per digit, so the trace claim is the sublist form
    [UartTxInv.uart_sent_sub] -- see SpecConsputc.v. *)

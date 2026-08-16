@@ -52,7 +52,6 @@ Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
-Require Import PanicStub.
 Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecWakeup SpecConsoleintr.
@@ -360,7 +359,7 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M (pa_stk sp0 4) ⌝ -∗
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗ panic_wp_any -∗
+      kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗
       console_caps γu -∗
       sie_cap_gpr (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
@@ -370,7 +369,7 @@ Section ProofUartintr.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav Hbelow.
-    iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hpanic #Hccaps".
+    iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hccaps".
     iIntros "Hcg Hcnt Hpc Hfr Hcont".
     iPoseProof (uii2_2c with "Ht") as "#Hi2c".
     iPoseProof (uii2_30 with "Ht") as "#Hi30".
@@ -452,7 +451,7 @@ Section ProofUartintr.
         iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
                   ltac:(lia)
                   Hlen ltac:(lia) Hbelow
-                  with "Hcg Hcnt Ht Hpc Hpanic Hpinv Hdinv Hccaps").
+                  with "Hcg Hcnt Ht Hpc Hpinv Hdinv Hccaps").
         all: try lkbelow.
         iIntros (CIDc Hsc Mf) "[%Hcsf %Hdomf] Hcg Hcnt Ht2 Hpc".
         iEval (rewrite HG1ra) in "Hpc".
@@ -493,7 +492,7 @@ Section ProofUartintr.
     (uartintr_stack <= av)%nat ->
     locks_below lks "cons" ->
     kernel_text -∗ dev_inv γu γv -∗
-    procs_inv γs -∗ panic_wp_any -∗ console_caps γu -∗
+    procs_inv γs -∗ console_caps γu -∗
     sie_cap_gpr M (av - 4)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
@@ -502,7 +501,7 @@ Section ProofUartintr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav Hbelow.
-    iIntros "#Ht #Hdinv #Hpinv #Hpanic #Hccaps Hcg Hcnt Hpc Hfr Hcont".
+    iIntros "#Ht #Hdinv #Hpinv #Hccaps Hcg Hcnt Hpc Hfr Hcont".
     iPoseProof (uii2_22 with "Ht") as "Hi22".
     iPoseProof (uii2_26 with "Ht") as "Hi26".
     iPoseProof (uii2_28 with "Ht") as "Hi28".
@@ -550,7 +549,7 @@ Section ProofUartintr.
     iDestruct (ui_ret_cont_shift CID0 CIDT3 m0 av lvl eb pme b lks
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iPoseProof (ui_rx γu γv γs m0 av lvl eb pme sp0 b lks Hsp0 Hlen Hlvl Hav Hbelow) as "Rx".
-    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont");
+    iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont");
       [exact HS2regs | exact HS2s1 | exact HS2s2].
   Qed.
 
@@ -564,7 +563,7 @@ Section ProofUartintr.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav Hbelow.
-    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hpanic #Hccaps Hcont".
+    iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Hpinv #Hccaps Hcont".
     iAssert (ui_ret_cont m av lvl eb pme b lks) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -742,7 +741,7 @@ Section ProofUartintr.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m B2 av lvl eb pme sp0 b lks
                 HB2regs Hspm Hlen Hlvl Hav Hbelow
-                with "Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont").
     - (* THRE: wake the writers, then join the rx setup *)
       assert (Jtx : add_vec (mword_of_int (KernelSyms.uartintr + 0x20) : mword 64)
                       (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
@@ -807,7 +806,7 @@ Section ProofUartintr.
                 Hlen
                 ltac:(lia)
                 ltac:(lkbelow)
-                with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
+                with "Hcg Hcnt Ht Hpc Hpinv").
       all: try lkbelow.
       iIntros (CIDW4 HsW4 Mw) "[%Hcsw %Hdomw] Hcg Hcnt Ht2 Hpc".
       iEval (rewrite HT3ra P4a) in "Hpc".
@@ -827,7 +826,7 @@ Section ProofUartintr.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (ui_rx_setup γu γv γs m Mw av lvl eb pme sp0 b lks
                 HregsW Hspm Hlen Hlvl Hav Hbelow
-                with "Ht Hdinv Hpinv Hpanic Hccaps Hcg Hcnt Hpc Hfr Hcont").
+                with "Ht Hdinv Hpinv Hccaps Hcg Hcnt Hpc Hfr Hcont").
   Qed.
 
 End ProofUartintr.

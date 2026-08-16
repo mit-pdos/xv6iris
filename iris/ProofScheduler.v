@@ -1140,20 +1140,6 @@ Section ProofScheduler.
       assert (HM1a0 : M1 !!! Regidx Ra0 = proc_addr jj).
       { rewrite /M1 upd_ne; [| vm_compute; discriminate].
         rewrite /M0 upd_eq Hp1. apply add_vec_zero_l. }
-      (* ================================================================ *)
-      (* THE ONE OPEN SEAM (report, not a proof gap): [SpecAcquire] now    *)
-      (* demands [panic_wp_any] (the hart-GENERIC form, propagated to 23   *)
-      (* contracts in 7865e4e), while [SpecScheduler]'s premise is still   *)
-      (* the AMBIENT [panic_wp] -- 990544b explicitly kept it ambient      *)
-      (* ("scheduler never migrates"), which is true but irrelevant: the   *)
-      (* resource acquire asks for is [□ ∀ h, panic_wp (CID := h)] and     *)
-      (* nothing derives that from one hart's copy.  Fix (one line each,   *)
-      (* both outside this file's scope): [SpecScheduler]'s [panic_wp] ->  *)
-      (* [panic_wp_any], and [ProofMain]/[ProofMainSecondary] pass their   *)
-      (* existing [Hpany] instead of the [panic_wp_any_at cpu_id]          *)
-      (* downgrade.  Verified: with that single substitution this file     *)
-      (* compiles clean end to end.                                        *)
-      (* ================================================================ *)
       (* the loop-head set is EMPTY (the previous iteration's release emptied
          it, and [intr_on] at +0x86 could not have run otherwise), so acquire's
          order premise is [locks_below ∅ "proc"] -- the degenerate

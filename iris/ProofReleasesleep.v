@@ -83,7 +83,7 @@ Section ProofReleasesleep.
     set (spr := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     assert (Hcpune : forall i : CPU, eq_vec (zero_reg : mword 64) (mycpu_ret (cid_word_of i)) = false)
       by (intro i; apply mycpu_ret_nonzero; apply tp_ok_cid_of).
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HRcaller #Hpanic #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HRcaller #Hpinv Hcont".
     (* [b] and [eb] coincide here: the entry level is 0, so the ghost
        agreement pins the ambient SIE index to the saved base enable -- which
        is also release's own exit index.  Collapsing the two names is what
@@ -320,7 +320,7 @@ Section ProofReleasesleep.
               (locks_below_union_singleton lks "sleep lock"%string "proc"%string
                  ltac:(vm_compute; lia)
                  ltac:(lkbelow))
-              with "Hcg Hown Htext Hpc Hpanic Hpinv").
+              with "Hcg Hown Htext Hpc Hpinv").
     all: try lkbelow.
     iApply wp_next_off_intro.
     iIntros (Mwk) "[%Hwkcs %Hwkdom] Hcg Hown Htext2 Hpc".
@@ -556,10 +556,10 @@ Section ProofReleasesleep.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Hav Hno.
-    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HR #Hpanic #Hpinv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslp Hslk Hpid HR #Hpinv Hcont".
     iDestruct "Hslk" as (q) "Hslk".
     iApply (wp_releasesleep_gen_sconf γs γl γsl s R sl_untracked q m pd pme av eb b lks
-              Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk Hpid HR Hpanic Hpinv").
+              Hav Hno with "Hcg Hown Htext Hpc Hslp Hslk Hpid HR Hpinv").
     iIntros (CIDf Hsf mf Hcs) "Hcg Hown Hpc _".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
     iApply ("Hcont" $! mf with "[%] Hcg Hown Hpc"). exact Hcs.

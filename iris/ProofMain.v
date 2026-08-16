@@ -77,7 +77,7 @@ Require Import BcacheInv SleepLock.
 Require Import DevModel VirtioModel DiskPtsto WpUart.
 Require Import VirtioQueue VirtioProto DiskInv DiskBoot.
 Require Import PrintkFmt.
-Require Import PanicStub StartedInv.
+Require Import StartedInv.
 Require Import SpecCpuid SpecConsoleinit SpecPrintkinit SpecPrintk.
 Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
@@ -380,7 +380,7 @@ Section ProofMain.
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool) :
     (K_userinit <= n)%nat ->
     sie_cap_gpr m n false p0 -∗
-    kernel_text -∗ kernel_data -∗ panic_wp -∗ dev_inv γd γv -∗
+    kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
@@ -404,7 +404,7 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn.
-    iIntros "Hcg #Htext #Hkdata #Hpanic #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
+    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr".
     iIntros "Hdevsw Hring Htx Hsent Hlb Hdlab Hcont".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     iPoseProof (mni_42 with "Htext") as "Hi42".
@@ -733,7 +733,7 @@ Section ProofMain.
     prun phystop s1entry ps ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     sie_cap_gpr m n false p0 -∗
-    kernel_text -∗ kernel_data -∗ panic_wp_any -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
@@ -775,7 +775,7 @@ Section ProofMain.
   Proof.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
-    iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt".
+    iIntros "Hcg #Htext #Hkdata Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt".
     iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
@@ -810,7 +810,7 @@ Section ProofMain.
     (* ---- ASSEMBLY 1: kalloc_env out of + kalloc_avail ---- *)
     iAssert (kalloc_env γl (Some (length ps))) with "[Havail]" as "Hkenv".
     { rewrite /kalloc_env. iExists γk. iSplitR; [iExact "Hkmem"|].
-      iSplitL "Havail"; [iExact "Havail" | iExact "Hpanic"]. }
+      iExact "Havail". }
     (* ---- +0x72 jal kvminit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x72)) (mword_of_int 1 : mword 5)
               (mword_of_int 718 : mword 21) mki n false
@@ -1091,7 +1091,7 @@ Section ProofMain.
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
     sie_cap_gpr m n false p0 -∗
-    kernel_text -∗ kernel_data -∗ panic_wp_any -∗ dev_inv γd γv -∗
+    kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
@@ -1125,7 +1125,7 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hlen Hlive.
-    iIntros "Hcg #Htext #Hkdata #Hpanic #Hdev Hpc Hfree Hcpu #Hpinv Hkenv".
+    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu #Hpinv Hkenv".
     iIntros "Hlbc Hbufl Hbufn Hbhead Hlit Hinl Hlft Hldisk".
     iIntros "Hdiskptr Hdiskfree Hdusedidx Hdslots Hclaim #Hdone Hcfg Hinitproc Hcont".
     iPoseProof (dev_inv_disk with "Hdev") as "#Hdinv".
@@ -1302,7 +1302,7 @@ Section ProofMain.
     iApply (Userinit.wp_userinit_sconf γa γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3) iv0 false ∅
               ltac:(lia) Hnb8
-              with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpinv Hkenv Hinitproc").
+              with "Hcg Htext Hkdata Hpc Hcpu Hpinv Hkenv Hinitproc").
     iApply wp_next_off_intro.
     iIntros (mui) "Hcg Hpc %Hcsui Hcpu _ _".
     destruct Hcsui as (Hcsui & _).
@@ -1328,7 +1328,7 @@ Section ProofMain.
     (kv_frame_slots + 20 <= n)%nat ->
     p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗
-    kernel_text -∗ panic_wp_any -∗
+    kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
@@ -1360,7 +1360,7 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hfree Hcpu Htcsr #Hsinv #Hwand".
+    iIntros "Hcg #Htext Hpc Hfree Hcpu Htcsr #Hsinv #Hwand".
     iIntros "#Hpenv #Hpinv #Hccaps #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
@@ -1499,7 +1499,7 @@ Section ProofMain.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
-    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
+    iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hparks Hpst".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
@@ -1523,25 +1523,18 @@ Section ProofMain.
                              Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots & Hring)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
-    (* main's boot arm reaches kinit -> freerange -> kfree -> acquire and
-       userinit -> allocproc, whose contracts (and [KvmSpec.kalloc_env]) take
-       the HART-GENERIC [panic_wp_any]; the printk / scheduler calls want the
-       ambient [panic_wp], which is one projection away.  scheduler() itself
-       needs the GENERIC form -- its acquire does -- so [mn_grp_started] takes
-       [Hpany] directly. *)
-    iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
     (* --- 0x00 .. 0x14 : prologue, cpuid, the taken branch --- *)
     iApply (mn_boot_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc".
     (* --- 0x42 .. 0x6a : console / printk --- *)
     iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
-              with "Hcg Htext Hkdata Hpanic Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
+              with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx Hlpr
                     Hdevsw Hring Htx Hsent Hlb Hdlab").
     iIntros (γpr m2) "Hcg Hpc Hfree Hcpu #Hpenv #Hccaps".
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
-              with "Hcg Htext Hkdata Hpany Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt
+              with "Hcg Htext Hkdata Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
     iIntros (γa γs m3 root pas)
@@ -1554,7 +1547,7 @@ Section ProofMain.
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
               Hn50 Hlen Hlive
-              with "Hcg Htext Hkdata Hpany Hdev Hpc Hfree Hcpu Hpinv Hkenv Hlbc Hbufl
+              with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hpinv Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hlit Hinl Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     iIntros (γk pd pav pu m5) "Hcg Hpc Hfree Hcpu #Hdlock #Hgeom".
@@ -1562,18 +1555,18 @@ Section ProofMain.
            handler contract closes over [devintr_caps], and its disk lock and
            geometry are exactly what the group above just produced.  ALL SEVEN
            members are now in hand and NONE is assumed: [dev_inv], [procs_inv],
-           [panic_wp_any], the disk lock and geometry from the group above,
+           the disk lock and geometry from the group above,
            [timer_cap] handed in by the boot chain (which mints it out of the
            two cells timerinit wrote), and the tick keeper below. ---- *)
     iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
     (* THE TICK KEEPER IS NOT ASSUMED: hart 0 IS the tick hart
        ([tick_hart] is [cpuid() == 0]), so it owes the real arm -- the lock
-       trapinit's group brought up, plus [procs_inv] and [panic_wp_any]. *)
+       trapinit's group brought up, plus [procs_inv]. *)
     iAssert (tick_keeper γtl γs) as "#Htick".
-    { iRight. iFrame "Htl Hpinv Hpany". }
+    { iRight. iFrame "Htl Hpinv". }
     iAssert (devintr_caps γd γv γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
-      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv Hpany". }
+      iFrame "Hdev Hccaps Hgeom Hdlock Htimc Htick Hpinv". }
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γk γtl γs pd pav pu
                   Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
@@ -1584,7 +1577,7 @@ Section ProofMain.
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
-              with "Hcg Htext Hpany Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
+              with "Hcg Htext Hpc Hfree Hcpu [Htcsr Hintr Hkpt] Hsinv Hwand Hpenv
                     Hpinv Hccaps Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
     (* fold the boot cells and the freshly built handler resource into the
        [trap_csrs] the scheduler consumes. *)

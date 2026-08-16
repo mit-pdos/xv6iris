@@ -1207,7 +1207,7 @@ Section ProofIput.
     pose proof HK as HK'. 
     unfold iput_units in Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
              Href Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hnlz Hop Hcont".
     (* iput enters at level 0, so the live index and the saved base agree;
        keep BOTH names alive as [Hbm], then [subst b] -- unlike the
@@ -1903,7 +1903,7 @@ Section ProofIput.
               (ic_tok cn k) (icfg_isl k) q G4 pidv (trap_res eb + (K - 4))%nat eb 0%nat
               ({["itable"]} ∪ lks)
               ltac:(lia) ltac:(cbn; lia) Hslfresh
-              with "Hcg Hcnt Htext Hpc [] Hisl Hpanic Hppid").
+              with "Hcg Hcnt Htext Hpc [] Hisl Hppid").
     { iEval (rewrite HG4a0). iExact "Hslk". }
     iApply wp_next_off_intro.
     iIntros (mfa) "%Hcsa Hcg Hcnt Hpc Hstok Hisl Hspid Hictok Hppid".
@@ -2231,7 +2231,7 @@ Section ProofIput.
               (* itrunc's bound is "log"(3); iput's own is "itable"(2), and
                  [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hidv Hinh Hmeta
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
                     Hdevi Hdgeom Hdlock [Hbs2 Hbs1] Hcrui [Hop]").
     all: try lkbelow.
@@ -2372,7 +2372,7 @@ Section ProofIput.
               (* iupdate's bound is "log"(3); iput's own is "itable"(2), and
                  [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hidv Hinh Hmeta Hmap
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc Hidv Hinh Hmeta Hmap
                     Hins Hireg Hdat Hppid Hprocs Hdevi Hdgeom Hdlock Hbs2 Hlb0
                     Hcrdu [Hop]").
     all: try lkbelow.
@@ -2490,7 +2490,7 @@ Section ProofIput.
               (* releasesleep's bound is "sleep lock"(6); iput's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hspid] Hictok Hpanic Hprocs").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hspid] Hictok Hprocs").
     all: try lkbelow.
     { iEval (rewrite HJ6a0). iExact "Hslk". }
     { iEval (rewrite HJ6a0). iExact "Hspid". }
@@ -2690,7 +2690,7 @@ Section ProofIput.
     cbv beta delta [wp_iput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
              Href Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hop Hcont".
     (* THE WITNESS: the set the counted reservation was hiding, and the birth
        epoch it was hiding under it ([log_opS_named]).  Both are the gen
@@ -2703,7 +2703,7 @@ Section ProofIput.
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Hcovb Hn Hj Hgsj Ha0 Hfresh
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitab Hinv Hesc Hireg Hslk
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hinv Hesc Hireg Hslk
                     Href Hbms Hins Hbm Hppid Hprocs Hdevi Hdgeom Hdlock Hbslots [] Hop
                     [Hcont]").
     all: try lkbelow.

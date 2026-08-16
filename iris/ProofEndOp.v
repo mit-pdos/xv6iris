@@ -109,7 +109,6 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeEndOp.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecWakeup.
@@ -1163,7 +1162,6 @@ Section EndOpBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x42) : mword 64) -∗
-    panic_wp_any -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1176,7 +1174,7 @@ Section EndOpBlocks.
     intros HK Hregs Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hlctx #Hprocs Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hlctx #Hprocs Hppid
               Hframe Hjunk Hbatch Hcont".
     iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc)".
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
@@ -1447,7 +1445,7 @@ Section EndOpBlocks.
               (trap_res eb + (K - 8))%nat eb false ({["log"]} ∪ lks)
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomF Hlen eo_noff1
               Hbelow_wk1
-              with "Hcg Hcnt Htext Hpc Hpanic Hprocs").
+              with "Hcg Hcnt Htext Hpc Hprocs").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hcnt Htext2 Hpc".
     iEval (rewrite HF4ra) in "Hpc".
@@ -1714,7 +1712,6 @@ Section EndOpBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x104) : mword 64) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1737,7 +1734,7 @@ Section EndOpBlocks.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw Hregs Hbelow.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
               Hopen Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
@@ -1785,7 +1782,7 @@ Section EndOpBlocks.
               (log_mirror_at (n, map uint W)
                ∗ ∃ Dc : gmap Z (list (bv 8)), fs_receipt_any Dc)%I lks
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
                     [Hmirc]").
     all: try lkbelow.
     (* THE COMMIT POINT's fupd (phase C2b/D1 stage 4).  The durable state
@@ -1898,7 +1895,7 @@ Section EndOpBlocks.
               pidv dq A3 (K - 8)%nat eb eb (log_mirror_at (n, map uint W)) lks
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl (or_introl eq_refl) HA3a0
               (conj HnW Hn30) Hnd Hwok HLw'
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
                     [] [Hmirc]").
     all: try lkbelow.
     (* THE INSTALL fupds, one per entry, out of one generator: each reads the
@@ -2012,7 +2009,7 @@ Section EndOpBlocks.
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
               A5 (K - 8)%nat eb eb log_mirror_clean lks
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
                     [Hmirc]").
     all: try lkbelow.
     { by iApply big_sepL_nil. }
@@ -2194,7 +2191,7 @@ Section EndOpBlocks.
       iSplitL "Hg8"; [iExact "Hg8"|]. iExact "Hg0". }
     iApply (eo_tail (CID0 := CIDa10)  γs j γl bn γ γfs cov logstart dev pidv dq
               m B3 K eb lks HK HB3regsE Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hlctx Hprocs Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
                     Hframe Hjunk2 Hbatch Hcont").
   Qed.
 
@@ -2246,7 +2243,6 @@ Section EndOpBlocks.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0xb4) : mword 64) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -2273,7 +2269,7 @@ Section EndOpBlocks.
       intros CID0 t M L Lw Ht Hfuel HLw Hregs HMs2 HMs4 HMs5;
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
               Hopen Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
@@ -2485,7 +2481,7 @@ Section EndOpBlocks.
               ltac:(reflexivity) ltac:(rewrite Hubnol; exact Hslotcov) ltac:(reflexivity)
               Hj Hgl HA5a0 HA5a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu1").
     all: try lkbelow.
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
@@ -2659,7 +2655,7 @@ Section EndOpBlocks.
               ltac:(reflexivity) ltac:(exact Hwcov) ltac:(reflexivity)
               Hj Hgl HB4a0 HB4a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu2").
     all: try lkbelow.
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
@@ -3008,7 +3004,7 @@ Section EndOpBlocks.
               ltac:(pose proof (eo_Kbwrite K HK); lia)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hmirc]").
     all: try lkbelow.
     (* THE LOG-FILL fupd (phase C2b/D1 stage 4): with the ON-DISK header
@@ -3127,7 +3123,7 @@ Section EndOpBlocks.
               H4 (K - 8)%nat eb (proc_addr j) bs2 bsd2 d2 eb lks
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk2 HH4a0
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk2").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk2").
     all: try lkbelow.
     iIntros (CIDb4 Hsb4 mf5) "%Hcs5 Hcg Hcnt Hpc Hppid Hu2".
     assert (Hpcf2 : ret_pc (H4 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xf2)).
@@ -3224,7 +3220,7 @@ Section EndOpBlocks.
               H6 (K - 8)%nat eb (proc_addr j) bs2 bs2 d1 eb lks
               ltac:(pose proof (eo_Kbrelse K HK); lia) Hk1 HH6a0
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk1").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk1").
     all: try lkbelow.
     iIntros (CIDb5 Hsb5 mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu1".
     assert (Hpcf8 : ret_pc (H6 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.end_op + 0xf8)).
@@ -3412,7 +3408,7 @@ Section EndOpBlocks.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Hlt
                 (eo_fuel_step t n fuel Hfuel) HLw' HJ3regs HJ3s2 HJ3s4 HJ3s5
-                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                       Hopen Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
       assert (Htn : S t = n) by lia.
@@ -3449,7 +3445,7 @@ Section EndOpBlocks.
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
                 HJ3regs Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                       Hopen Hcont").
   Qed.
 
@@ -3484,7 +3480,6 @@ Section EndOpBlocks.
     log_res γ bn γfs cov logstart -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x7a) : mword 64) -∗
-    panic_wp_any -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -3496,7 +3491,7 @@ Section EndOpBlocks.
     intros HK Hregs Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hpay Hextc Hextm Htok HRres #Htext Hpc #Hpanic #Hlctx #Hprocs Hppid Hframe Hjunk Hcont".
+    iIntros "Hcg Hcnt Hpay Hextc Hextm Htok HRres #Htext Hpc #Hlctx #Hprocs Hppid Hframe Hjunk Hcont".
     iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc)".
     iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
     (* ===== +0x7a / +0x7e : a0 := &log ===== *)
@@ -3575,7 +3570,7 @@ Section EndOpBlocks.
               (trap_res eb + (K - 8))%nat eb false ({["log"]} ∪ lks)
               ltac:(pose proof (eo_Kwk K HK); lia) HwdomE Hlen eo_noff1
               Hbelow_wk2
-              with "Hcg Hcnt Htext Hpc Hpanic Hprocs").
+              with "Hcg Hcnt Htext Hpc Hprocs").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hcnt Htext2 Hpc".
     iEval (rewrite HE3ra) in "Hpc".
@@ -3717,7 +3712,7 @@ Section ProofEndOp.
     intros HK Hgeom Hj Hgl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hgeom as [Hcovok Hlogsub].
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
     iDestruct "Hcert" as "(_ & _ & #Hregc)".
     (* [b] and [eb] AGREE at depth 0 -- [CpuOwn.cpu_own_eb_agree], the general
        (index-free) fact, not [cpu_own_forces_on] which needed [eb = true].
@@ -4475,7 +4470,7 @@ Section ProofEndOp.
         iDestruct (eo_open_to_batch with "Hmirc Hopen") as "Hbatch".
         iApply (eo_tail (CID0 := CIDs2)  γs j γl bn γ γfs cov logstart dev pidv dq
                   m V1 K eb lks HK HV1regsE Hbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hlctx Hprocs Hppid
+                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hlctx Hprocs Hppid
                         Hframe Hjunk Hbatch Hcont").
       + (* n > 0: save s3/s4/s5, set up the cursors, and run the copy loop *)
         assert (Hcmp : zopz0zI_s (zero_reg : mword 64) (rget V1 Ra5) = true).
@@ -4656,7 +4651,7 @@ Section ProofEndOp.
                   HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HY4regs HY4s2 HY4s4 HY4s5
-                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                         Hopen Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = true).
@@ -4701,7 +4696,7 @@ Section ProofEndOp.
       clear Htgt26.
       iApply (eo_fast (CID0 := CIDq)  γs j γl bn γ γfs cov logstart dev pidv dq
                 m T4 K eb lks HK HT4regsE Hbelow
-                with "Hcg Hcnt Hpay Hextc Hextm Htok HRres Htext Hpc Hpanic Hlctx Hprocs Hppid Hframe Hjunk Hcont").
+                with "Hcg Hcnt Hpay Hextc Hextm Htok HRres Htext Hpc Hlctx Hprocs Hppid Hframe Hjunk Hcont").
   Qed.
 
 End ProofEndOp.

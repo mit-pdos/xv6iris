@@ -14,7 +14,7 @@
      ARM E   (+0x174 .. +0x17e)  iunlockput(ip) ; restore s2 and s3 ;
                                  j [bad:]
      the three PANICs (+0x0ec, +0x12e, +0x13a) -- auipc / addi / jal, all
-     closed by [panic_wp_any], none of which returns.
+     discharged against [SpecPanic], none of which returns.
 
    THE FRAME CARVE IS ARM-DEPENDENT (sys_open's shape, not sys_link's).
    The prologue pushes only ra and s0; [c.sdsp s1] is at +0x1a, [c.sdsp s2]
@@ -63,7 +63,6 @@ Require Import CpuOwn.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import PrintkArgs.
 Require Import SpecPanic.
@@ -553,7 +552,6 @@ Section ProofSysUnlinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0xe2)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -591,7 +589,7 @@ Section ProofSysUnlinkTails.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKeo HK30 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs2 HMs3 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
               HbD HbN HbP H27 HbE H30 Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -632,7 +630,7 @@ Section ProofSysUnlinkTails.
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 30)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpce6 : ret_pc (M1 !!! Regidx Rra : mword 64)
@@ -800,7 +798,6 @@ Section ProofSysUnlinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0x15a)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -863,7 +860,7 @@ Section ProofSysUnlinkTails.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
            HMs3 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
@@ -934,7 +931,7 @@ Section ProofSysUnlinkTails.
               HKup Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk Hiblog
               Hinb Hcovb Hiu Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitab Hitinv
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                     Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid Hprocs Hdev Hgeo
                     Hdlk Hbsl Hop").
@@ -989,7 +986,7 @@ Section ProofSysUnlinkTails.
     iApply (EndOp.wp_end_op_sconf (CID := CID4) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev n2 pidv dq Q1 (K - 30)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID5 Hq5 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc164 : ret_pc (Q1 !!! Regidx Rra : mword 64)
@@ -1129,7 +1126,6 @@ Section ProofSysUnlinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0x158)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -1191,7 +1187,7 @@ Section ProofSysUnlinkTails.
   Proof.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs3 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev
               Hiinum Hivalid Hload #Hshot Hkeep Hsbb Hsbi Hbmres Hpid #Hprocs
               #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbN HbP
@@ -1240,7 +1236,7 @@ Section ProofSysUnlinkTails.
               HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HM1sp HM1thr
               HM1s1 HM1s2 HM1s3 Hal
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6
@@ -1314,7 +1310,6 @@ Section ProofSysUnlinkTails.
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
     kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0x174)) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
@@ -1390,7 +1385,7 @@ Section ProofSysUnlinkTails.
     intros HKup HKeo HK30 Kpop Hkk Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
            Hiblk Hiblog Hinb Hiblki Hiblogi Hinbi Hcovb Hiu Hj Hgl Hlkempty
            Hsp0 HMsp HMthr HMs1 HMs2 Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpenv #Hbio #Hlog Hseam Hgen
               #Hitab #Hitinv #Hesck #Hescki #Hireg
               #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshot Hkeep
               #Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hloadi
@@ -1459,7 +1454,7 @@ Section ProofSysUnlinkTails.
               HKup Hki Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi
               Hinbi Hcovb ltac:(unfold iput_units in *; lia) Hj Hgl HM2a0
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitab Hitinv
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hitab Hitinv
                     Hescki Hireg Hslkki Hslkdi Hslpidi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti Hkeepi Hsbb Hsbi Hbmres Hpid Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
@@ -1557,7 +1552,7 @@ Section ProofSysUnlinkTails.
               HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb ltac:(unfold iput_units in *; lia)
               Hj Hgl Hlkempty Hsp0 HP2sp HP2thr HP2s1 HP2s2 HP2s3 Hal
-              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpenv Hbio Hlog Hseam Hgen
                     Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev
                     Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6

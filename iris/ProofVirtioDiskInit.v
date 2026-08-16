@@ -1561,7 +1561,7 @@ Section ProofVirtioDiskInit.
     assert (Hp0be : add_vec_int (mword_of_int (KernelSyms.virtio_disk_init + 0x0ba) : mword 64) 4 = mword_of_int (KernelSyms.virtio_disk_init + 0x0be)) by pcs.
     iEval (rewrite Hp0be) in "Hpc".
     (* ===== disk.desc/avail/used = kalloc() x3 (0x0be..0x0d8) ===== *)
-    iDestruct "Henv" as (γk) "(#Hklock & Havl & #Hpanic)".
+    iDestruct "Henv" as (γk) "(#Hklock & Havl)".
     (* +0x0be jal kalloc *)
     iPoseProof (vdi_0be with "Htext") as "Hi".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_init + 0x0be)) (mword_of_int 1 : mword 5)
@@ -2522,7 +2522,7 @@ Section ProofVirtioDiskInit.
     assert (Havs : avail_sub (Some nb) 3 = Some (nb - 3)%nat)
       by (rewrite avail_sub_Some; reflexivity).
     iAssert (kalloc_env γa (avail_sub (Some nb) 3)) with "[Havl]" as "Henv".
-    { rewrite Havs. iExists γk. iFrame "Hklock Havl Hpanic". }
+    { rewrite Havs. iExists γk. iFrame "Hklock Havl". }
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->
               c <> (mword_of_int 1 : mword 5) -> c <> csp_rs1 ->
               c <> (mword_of_int 8 : mword 5) -> c <> (mword_of_int 9 : mword 5) ->

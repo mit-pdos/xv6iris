@@ -410,7 +410,7 @@ Section ProofDevintr.
     set (s00 := (m !!! Regidx s0_idx : mword 64)).
     set (s10 := (m !!! Regidx s1_idx : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc Hsc #Hcaps".
-    iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv & #Hpanic)".
+    iDestruct "Hcaps" as "(#Hdev & #Hccaps & #Hgeom & #Hdlk & #Htcap & #Htk & #Hpinv)".
     iIntros "Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
     assert (Hpush : add_vec (m !!! Regidx csp_rs1)
@@ -873,7 +873,7 @@ Section ProofDevintr.
           by (rewrite /U0 upd_eq; reflexivity).
         iApply (Uartintr.wp_uartintr_sconf γu γv γs U0 (av - 4)%nat lvl eb p false
                   _ Hlen ltac:(lia) ltac:(lia)
-                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hpanic Hccaps").
+                  with "Hcg Hcnt Htext Hpc Hdev Hpinv Hccaps").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
         destruct HcsU as [HcsU HdomU].
@@ -984,7 +984,7 @@ Section ProofDevintr.
                   ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hpanic Hpinv Hdev Hgeom Hdlk").
+                  with "Hcg Hcnt Htext Hpc Hpinv Hdev Hgeom Hdlk").
         all: try lkbelow.
         iApply wp_next_off_intro. iIntros (MV) "%HcsV Hcg Hcnt Htext2 Hpc".
         destruct HcsV as [HcsV HdomV].

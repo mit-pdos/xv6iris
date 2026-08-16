@@ -30,7 +30,7 @@ From Kernel Require KernelSyms.
    ⌜on = Some nb ∧ 166 < nb⌝): kvmmake is boot-only (kvminit its sole caller),
    so it needs no None mode -- a deviation from the chain's dual-mode specs,
    justified by the absence of any non-boot caller.  With the budget premise no
-   kalloc can fail, so NO panic_wp anywhere.  The premise is STRICT while the
+   kalloc can fail, so NO panic credential anywhere.  The premise is STRICT while the
    post's [avail_sub on K_kvmmake] is the true consumption: the chain's
    counted-arm convention (kvmmap's [missing < nb], proc_mapstacks'
    [64 + kstacks_missing < nb]) demands one spare page beyond consumption --

@@ -83,7 +83,7 @@
        the running proc's own [p->lock] ([SchedCtx.run_slot]), which sleep
        reaches by holding that lock; acquiresleep never parks itself and so
        never names it.
-     * [panic_wp_any] is what acquire and sleep take; acquiresleep has no
+     * The panic credentials are what acquire and sleep take; acquiresleep has no
        panic arm of its own after the park.
 
    THE HOLDER DEPOSIT, AND THE THREE PIECES THE FILE IS NOW IN.
@@ -142,7 +142,6 @@ Require Import SchedCtx.
 Require Import WpLock.
 Require Import SleepLock.
 Require Import CodeSleeplock.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecMyproc SpecSleep SpecSleepPrepare.
 Require Import SpecAcquiresleep.
 From Kernel Require KernelSyms.
@@ -860,7 +859,6 @@ Section AslBodies.
     locks_below lks "sleep lock" ->
     kernel_text -∗
     is_sleeplock_gen γl γsl slk s R H -∗
-    panic_wp_any -∗
     procs_inv γs -∗
     ▷ asl_loop CID0 γs j γl γsl R H q m pidv av dq slk spd sp0 eb lks -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -881,7 +879,7 @@ Section AslBodies.
   Proof.
     intros pj Hav Hj Hjpl Hanch Hasl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
-    iIntros "#Htext #Hslk #Hpanic #Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit".
+    iIntros "#Htext #Hslk #Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit".
     assert (HaslM : asl_regs m M slk spd) by exact Hasl.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iDestruct "Hheld" as (vh) "[Hw %Hvh]".
@@ -1122,7 +1120,7 @@ Section ProofAcquiresleep.
     intros pcE slk pj ret_tgt Hj Hav Hbelow.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk HHq #Hpanic Hpid #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk HHq Hpid #Hpinv Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
        outright, so the function runs at ONE index throughout and there is
        nothing left to pin.  This used to derive [b = true] from the
@@ -1346,7 +1344,7 @@ Section ProofAcquiresleep.
       iIntros (CIDy Hsy M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit".
       iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R H q m M pidv av dq slk spd sp0 eb lks
                 Hav Hj Hjpl Hsy HaslL Hbelow
-                with "Htext Hslk Hpanic Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit"). }
+                with "Htext Hslk Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hdep HHq Hpid Hown Htc Hclm Hcg Hpc Hexit"). }
 
     (* ============ entry dispatch at +0x18 (lw then c.beqz) ============ *)
     pose proof Hasl_acq as HaslAcqW.
@@ -1463,7 +1461,6 @@ Section ProofAcquiresleep.
     cpu_own (S n) eb pj false lks -∗
     kernel_text -∗ pc_is pcE -∗
     is_sleeplock_gen γl γsl slk s R H -∗
-    panic_wp_any -∗
     H q -∗
     X -∗
     p_pid pj ↦₄{dq} pidv -∗
@@ -1488,7 +1485,7 @@ Section ProofAcquiresleep.
     intros pcE slk pj ret_tgt Hav Hb31 Hfresh.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown #Htext Hpc #Hslk #Hpanic HHq HX Hpid Hnloop Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslk HHq HX Hpid Hnloop Hcont".
     (* the crossing is at index [false], so the continuation is usable at
        THIS hart with no anchoring at all. *)
     iEval (rewrite wp_next_off) in "Hcont".
@@ -2064,11 +2061,11 @@ Section ProofAcquiresleep.
   Proof.
     cbv beta delta [wp_acquiresleep_sconf_body].
     intros pcE slk pj ret_tgt Hj Hav Hbelow.
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk #Hpanic Hpid #Hpinv Hcont".
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hslk Hpid #Hpinv Hcont".
     iAssert (emp)%I with "[]" as "Hemp"; [ first [ done | iEmpIntro ] |].
     iApply (wp_acquiresleep_gen_sconf γs j γl γsl s R sl_untracked 1%Qp m pidv av eb b lks
               Hj Hav Hbelow
-              with "Hcg Hown Hextc Hextm Htext Hpc Hslk Hemp Hpanic Hpid Hpinv [Hcont]").
+              with "Hcg Hown Hextc Hextm Htext Hpc Hslk Hemp Hpid Hpinv [Hcont]").
     iIntros (CIDf Hsf mf) "%Hcs Hcg Hown Hextc Hextm Hpc Hstok Hspid HR Hpid".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [ exact Hsf |].
     iAssert (sleeplocked γsl) with "[Hstok]" as "Hstok"; [ iExists 1%Qp; iFrame |].
@@ -2088,14 +2085,14 @@ Section ProofAcquiresleep.
   Proof.
     cbv beta delta [wp_acquiresleep_nb_body].
     intros pcE slk pj ret_tgt Hav Hb31 Hfresh.
-    iIntros "Hcg Hown #Htext Hpc #Hslk Hauth #Hpanic Hpid Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslk Hauth Hpid Hcont".
     (* the share this call will deposit, minted out of the authoritative
        zero.  It is spent only on the FREE arm; on the other arm it is still
        in hand, which is what makes the refutation below go through. *)
     iMod (slh_mint_none γt q with "Hauth") as "[Hauth Htokq]".
     iApply (asl_nested_core γl γsl s R (slh_tok γt) q (slh_auth γt (Some q))
               m j pidv av eb n lks Hav Hb31 Hfresh
-              with "Hcg Hown Htext Hpc Hslk Hpanic Htokq Hauth Hpid [] Hcont").
+              with "Hcg Hown Htext Hpc Hslk Htokq Hauth Hpid [] Hcont").
     (* THE REFUTATION.  Reaching the wait loop means the lock was HELD, i.e.
        its held arm holds somebody's share [q']; this call still holds its own
        [q]; and the authority says the total outstanding is exactly [q].

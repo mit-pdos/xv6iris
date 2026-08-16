@@ -73,7 +73,6 @@ Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -781,7 +780,6 @@ Section KexecB3Body.
     m !!! Regidx Rs1 = s10 ->
     m !!! Regidx Rs2 = s20 ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -862,7 +860,7 @@ Section KexecB3Body.
     pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
-    iIntros "#Htext #Hpanic #Hfab Hst Hcont Hout".
+    iIntros "#Htext #Hfab Hst Hcont Hout".
     rewrite /kxc_at_12c.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
                           %HMs9 & %HMs10 & %HMs11 & %HMa3) &
@@ -1110,7 +1108,7 @@ Section KexecB3Body.
                     change (2 ^ 32)%Z with 4294967296%Z; lia)
               Hjp Hgs HU5a0
               ltac:(rewrite HU5a1; vm_compute; reflexivity) HU5a3 HU5a4'
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hka Hidev Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hka Hidev Hmeta Hmap
                     Hblocks [Hphb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1441,7 +1439,7 @@ Section KexecB3Body.
                     HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                     Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                     Hal Hbelow Hcov
-                    with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                    with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                           Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                           Hcont").
           { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
@@ -1574,7 +1572,7 @@ Section KexecB3Body.
                        HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                        Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                        Hal Hbelow Hcov
-                       with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                       with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                              Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                              Hcont").
              { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
@@ -1707,7 +1705,7 @@ Section KexecB3Body.
                           HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                           Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hbsp Hbs0 Hbs4 Hbs6
                           Hal Hbelow Hcov
-                          with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                          with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                                 Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                                 Hcont").
                 { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
@@ -2183,7 +2181,7 @@ Section KexecB3Body.
                              HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb
                              Hib Hn2 Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2
                              HM4sp HM4s0 HM4s4 HM4s6' Hal Hbel4z Hcov4z
-                             with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins
+                             with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins
                                    Hbits Hka Hpt Hpriv Hpath Hargv Hargs Helf
                                    Hbs Hirs Hlog Hframe Hcont").
                    { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab
@@ -2632,7 +2630,7 @@ Section KexecB3Body.
                                  Hguard HU24sp HU24s0 HU24s1 HU24s3 HU24s4
                                  HU24s5 HU24s6 HU24s7 HU24s8 HU24s9 HU24s10
                                  HU24s11
-                                 with "Hcg Hcnt Htext Hpanic Hpc [] Hka
+                                 with "Hcg Hcnt Htext Hpc [] Hka
                                        [-Hcont Hout] Hcont [Hout]").
                        { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert
                                                       Hitab Hitinv Hesc Hslks
@@ -2827,7 +2825,7 @@ Section KexecB3Body.
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp
                 Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 HM2sp HM2s0 HM2s4 HM2s6
                 Hal Hbelow Hcov
-                with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
+                with "Hcg Hcnt Htext Hpc [] Hopen Hbm Hins Hbits Hka
                       Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                       Hcont").
       { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
@@ -2901,7 +2899,6 @@ Section KexecB3Loop.
     forall (W : nat) (M : regfile) (P : uptd) (i : nat) (szv : mword 64),
     (eh_phnum ef - Z.of_nat i <= Z.of_nat W)%Z ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_12c jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -2971,7 +2968,7 @@ Section KexecB3Loop.
            Hsp Hra Hs0 Hs1 Hs2.
     intro W. revert CID0.
     induction W as [| W IH]; intros CID0 M P i szv Hfuel;
-      iIntros "#Htext #Hpanic #Hfab Hst Hcont Hc1a4";
+      iIntros "#Htext #Hfab Hst Hcont Hc1a4";
       iApply (kxc_ph_step (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs
                 gi cn gtl gilf gislf ga gf cov logstart bmapstart inodestart
                 nib size dev used used2 kf qf sf gyf inumf dnf bmf n2 plen
@@ -2979,7 +2976,7 @@ Section KexecB3Loop.
                 sp0 ra0 s00 s10 s20 pv av w67 ef P i szv
                 HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
                 Hsp Hra Hs0 Hs1 Hs2
-                with "Htext Hpanic Hfab Hst Hcont [Hc1a4]");
+                with "Htext Hfab Hst Hcont [Hc1a4]");
       iIntros (CIDn Hsn M' P' szv') "[Hnext | Hexit] Hcont".
     - (* NO FUEL, and the back edge is what refutes it. *)
       iDestruct "Hnext" as "(_ & _ & %Hp3 & _)".
@@ -2999,7 +2996,7 @@ Section KexecB3Loop.
       iApply (IH CIDn M' P' (S i) szv'
                 ltac:(rewrite Nat2Z.inj_succ; rewrite Nat2Z.inj_succ in Hfuel;
                       lia)
-                with "Htext Hpanic Hfab [Hrest] Hcont Hc1a4").
+                with "Htext Hfab [Hrest] Hcont Hc1a4").
       rewrite /kxc_at_12c.
       iSplitR; [iPureIntro; exact Hp1 |].
       iSplitR; [iPureIntro; exact Hp2 |].
@@ -3159,7 +3156,6 @@ Section KexecB3Close.
     (jp < NPROC)%nat ->
     gs !! jp = Some gl ->
     kernel_text -∗
-    panic_wp_any -∗
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev -∗
     kxc_at_1a4 jp bn g gfs gi cn ga gf cov logstart bmapstart inodestart nib
@@ -3178,7 +3174,7 @@ Section KexecB3Close.
   Proof.
     intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
     pose proof HK as HK'. 
-    iIntros "#Htext #Hpanic #Hfab Hst Hout".
+    iIntros "#Htext #Hfab Hst Hout".
     rewrite /kxc_at_1a4.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs6) &
                          (%Hk & %Hib & %Hn2 & %Hu2 & %Hal) &
@@ -3254,7 +3250,7 @@ Section KexecB3Close.
               dqb dqs B2 (K - 68)%nat true true ∅
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitab Hitinv Hesck
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
@@ -3309,7 +3305,7 @@ Section KexecB3Close.
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
               true true ∅ ltac:(lia) Hlg Hjp Hgs
-              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcrash Hcert
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpenv Hbio Hlogc Hcrash Hcert
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -3411,7 +3407,7 @@ Section KexecB3Main.
     cbv beta delta [kxc_b2_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
            Hsp Hra Hs0 Hs1 Hs2.
-    iIntros "#Htext #Hpanic #Hfab Hst Hcont Hc1ae".
+    iIntros "#Htext #Hfab Hst Hcont Hc1ae".
     iApply (kxc_phdr (CID0 := CID0) gs jp gl gu gd gk pd pav pu bn g gfs gi cn
               gtl gilf gislf ga gf cov logstart bmapstart inodestart nib size
               dev used used2 kf qf sf gyf inumf dnf bmf n2 plen pfun na avf
@@ -3423,7 +3419,7 @@ Section KexecB3Main.
               ltac:(rewrite Z2Nat.id;
                     [ pose proof (Nat2Z.is_nonneg i); lia
                     | pose proof (eh_phnum_bound ef); lia ])
-              with "Htext Hpanic Hfab Hst Hcont [Hc1ae]").
+              with "Htext Hfab Hst Hcont [Hc1ae]").
     iIntros (CIDn Hsn M' P' szv') "Hst4 Hcont".
     assert (Hcr : true = false \/ proc_addr jp = zero_reg ->
               (CIDn : CPU) = (CID0 : CPU)) by wp_next_chain.
@@ -3438,7 +3434,7 @@ Section KexecB3Main.
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w67 ef P' szv'
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
-              with "Htext Hpanic Hfab Hst4 [Hc1ae Hcont]").
+              with "Htext Hfab Hst4 [Hc1ae Hcont]").
     iIntros (CIDm Hsm M'' used3) "Hst1ae".
     assert (Hcr2 : true = false \/ proc_addr jp = zero_reg ->
               (CIDm : CPU) = (CIDn : CPU)) by wp_next_chain.
@@ -3471,7 +3467,7 @@ Section KexecB3Main.
   Proof.
     cbv beta delta [kxc_b2z_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
-    iIntros "#Htext #Hpanic #Hfab Hst Hc1ae".
+    iIntros "#Htext #Hfab Hst Hc1ae".
     iApply (kxc_seam1a2 (CID0 := CID0) jp bn g gfs gi cn ga gf cov logstart
               bmapstart inodestart nib size dev used used2 kf qf sf gyf inumf
               dnf bmf gilf gislf n2 plen pfun na avf aslen afun pidv V
@@ -3494,7 +3490,7 @@ Section KexecB3Main.
               (m !!! Regidx Rs9) (m !!! Regidx Rs10) (m !!! Regidx Rs11)
               w67 ef P (mword_of_int 0 : mword 64)
               HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs
-              with "Htext Hpanic Hfab Hst4 [Hc1ae]").
+              with "Htext Hfab Hst4 [Hc1ae]").
     iIntros (CIDm Hsm M'' used3) "Hst1ae".
     iSpecialize ("Hc1ae" $! CIDm with "[%]"); [wp_next_chain |].
     iApply ("Hc1ae" $! M'' used3 with "Hst1ae").

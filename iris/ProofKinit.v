@@ -315,13 +315,8 @@ Section ProofKinit.
        not mention [cpu_own] at all. ---- *)
     iDestruct (cpu_own_transport CID CID14 ncnt eb pcur b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads the count.
-
-       [SpecFreerange.wp_freerange_sconf_body] wants [panic_wp_any] (added by
-       commit 7865e4e, "explicit cpuid: propagate p into 23 contracts, and
-       panic_wp_any with it"); [SpecKinit.wp_kinit_sconf_body] now threads the
-       same [panic_wp_any] (that sweep missed this one contract -- fixed
-       above), so "Hpanic" hands it straight through with no conversion. *)
+    (* freerange(end, PHYSTOP) : consumes the pages into the lock, threads
+       the count. *)
     iApply (Freerange.wp_freerange_sconf γl γk lk fl R12 ps (K - 2) ncnt eb pcur b lks
               ltac:(lia) Hncnt
               ltac:(reflexivity) ltac:(reflexivity)

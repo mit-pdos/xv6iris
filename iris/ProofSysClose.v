@@ -342,7 +342,7 @@ Section ProofSysClose.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpanic #Hpe Hpriv Hpenv
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Hpe Hpriv Hpenv
               Hfenv Hcont".
     (* [b] AND [eb] ARE DERIVABLY EQUAL HERE, and the derivation is available
        because fileclose's FS bundle carries [⌜n = 0⌝]: sys_close has no
@@ -855,7 +855,7 @@ Section ProofSysClose.
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
                 ltac:(lia) Hn HDa0
                 Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpanic Hpe Href Hfcenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpe Href Hfcenv").
       all: try lkbelow.
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hextc Hextm Hpc %HcsR Hfdslot Hout".
       iDestruct ("Hfcback" with "Hout") as "[Hpenv Hfenv]".

@@ -57,13 +57,12 @@ Require Import ProcGeom.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import KallocInv.
-Require Import PanicStub.
 Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash.
 Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.
-Require Import SchedCtx PanicStub.
+Require Import SchedCtx.
 Require Import FileInvDefs.
 Require Import CodeUsertrap.
 Require Import SpecKilled SpecKexit SpecYield SpecPrepareReturn.
@@ -135,7 +134,7 @@ Section ProofUsertrapTail.
   Proof.
     intros Hwf Hnx Hbelow. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg (Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
-    iDestruct "Hcaps" as "(#Hpi & #Hpa & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
+    iDestruct "Hcaps" as "(#Hpi & #Hkd & #Hks & #Hdi & #Hpk & #Hw & #Hft
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
                            & #Hgeom & #Hav & #Hic)".
     iDestruct "Hown" as "(Hbs & Hbm & Hip & Hfd & Hir & Hpv & _)".
@@ -148,7 +147,7 @@ Section ProofUsertrapTail.
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
               None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
-              with "Hcg Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpa Hpe Hw Hft Hkm Hav
+              with "Hcg Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpe Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
     all: try lkbelow.
   Qed.
@@ -674,7 +673,7 @@ Section UtRet.
     iDestruct (ut_epc_exists with "Hpv") as %Hepcx.
     destruct Hepcx as [uepc Hepc].
     iAssert (is_kstack (un_pj N) (un_ks N)) with "[]" as "#Hkst".
-    { iDestruct "Hcaps" as "(_ & _ & _ & #H & _)". iExact "H". }
+    { iDestruct "Hcaps" as "(_ & _ & #H & _)". iExact "H". }
     (* ---- +0xae: jal prepare_return ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (UT + 0xae)) Rra
               (mword_of_int 2096658 : mword 21) m nx b
@@ -797,8 +796,6 @@ Section UtA6.
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     (* ---- +0xa6: c.mv a0,s1 ---- *)
     iApply (wp_cmv_s_sconf (mword_of_int (UT + 0xa6)) Ra0 Rs1 m nx b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1038,8 +1035,6 @@ Section UtFa.
     iDestruct (cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     iAssert (procs_inv (un_s N)) with "[]" as "#Hpi".
     { iDestruct "Hcaps" as "($ & _)". }
-    iAssert (panic_wp_any) with "[]" as "#Hpa".
-    { iDestruct "Hcaps" as "(_ & $ & _)". }
     (* ---- +0xfc: c.li a5,2 ---- *)
     iApply (wp_cli_s_sconf (mword_of_int (UT + 0xfc)) Ra5 (mword_of_int 2 : mword 6)
               (add_vec zero_reg (sign_extend' 64

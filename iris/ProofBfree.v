@@ -25,7 +25,7 @@
    [b ∈ used] outright, and [BitmapEnc.bm_bit_test] turns that into
    [bp->data[bi/8] & m = 2^(b mod 8) <> 0]: the [c.beqz] at +0x3a falls
    THROUGH, and the arm at +0x60 is never entered.  Nothing about the panic
-   is proved -- it is refuted.  [panic_wp_any] is still threaded because
+   is proved -- it is refuted.  The panic credentials are still threaded because
    bread's own interior panic arm wants one.
 
    ONE BITMAP BLOCK.  [size <= BPB] is a premise, so [BBLOCK b sb] collapses
@@ -78,7 +78,6 @@ Require Import FsBlocks LogInv.
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBfree.
-Require Import PanicStub.
 Require Import SpecBread SpecBrelse SpecLogWrite.
 Require Import SpecBfree.
 From Kernel Require KernelSyms.
@@ -626,7 +625,6 @@ Section BfreeTail.
     cpu_claim_ext b (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bfree + 0x4a) : mword 64) -∗
-    panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -647,7 +645,7 @@ Section BfreeTail.
   Proof.
     intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop Hfsb Hpool Hheld Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop Hfsb Hpool Hheld Hcont".
     iPoseProof (bfi_4a with "Htext") as "Hi4a".
     iPoseProof (bfi_4e with "Htext") as "Hi4e".
     iPoseProof (bfi_50 with "Htext") as "Hi50".
@@ -700,7 +698,7 @@ Section BfreeTail.
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hcredit Hop Hfsb Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hcredit Hop Hfsb Hheld").
     all: try lkbelow.
     (* the registry row log_write hands back is dropped here: bfree's caller
        threads the ENTRY, at its own epoch, and nothing below the bitmap
@@ -779,7 +777,7 @@ Section BfreeTail.
                  [locks_below_mono] weakens it.  This is the composition the
                  bound exists for -- one premise covers the whole cone. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID5 Hq5 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc54 : ret_pc (T2 !!! Regidx Rra : mword 64)
@@ -1069,7 +1067,7 @@ Section ProofBfreeMain.
     { rewrite HbnoB. exact (proj2 Hbm31). }
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl #Hcredit Hop Hcont".
     (* bfree enters at level 0, so the live index IS the saved base -- one
        variable [b] carries both from here on (the porting guide's "derive
@@ -1385,7 +1383,7 @@ Section ProofBfreeMain.
               RA (K - 4)%nat b b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1833,7 +1831,7 @@ Section ProofBfreeMain.
     iApply (bf_tail (CID0 := CID27)  γs j γfs γd bn γ cov logstart bmapstart size
               dev used bi u cr Sb e0 kk bnoB bsd0 d0 pidv dq dqb m B11 K b lks
               Hbelow HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hbio Hlctx Hprocs Hframe
                     Hppid Hsb Hsl Hcredit Hop Hfsbm Hpool Hheld [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
                 with "Hcont"). }
@@ -1861,7 +1859,7 @@ Section ProofBfreeMain.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     (* the counted form opens its own birth epoch and presents the EMPTY
@@ -1875,7 +1873,7 @@ Section ProofBfreeMain.
               pidv dq dqb m K eb b lks
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].

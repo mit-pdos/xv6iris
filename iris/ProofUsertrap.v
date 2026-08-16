@@ -749,7 +749,7 @@ Section UtDispatch.
     (* the device complement, at THIS hart, out of the bundle's [∀ h] form *)
     iAssert (devintr_caps_any (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdca".
-    { iDestruct "Hcaps" as "(_ & _ & _ & _ & $ & _)". }
+    { iDestruct "Hcaps" as "(_ & _ & _ & $ & _)". }
     iAssert (devintr_caps (un_u N) (un_v N) (un_k N) (un_tk N) (un_s N)
                (un_pd N) (un_pav N) (un_pu N)) with "[]" as "#Hdc".
     { iApply (devintr_caps_any_at CID with "Hdca"). }

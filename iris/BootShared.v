@@ -32,7 +32,7 @@ Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
 Require Import SpecConsoleinit SpecIinit.
 Require Import SpecFreerange KvmSpec BcacheInv.
-Require Import StartedInv PanicStub LinkPanicStub.
+Require Import StartedInv.
 Require Import SpecMain SpecMainSecondary.
 Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.
@@ -705,7 +705,7 @@ End BootBssChain.
 (* that turns [RiscvAdequacy.power_boot_res] into                          *)
 (*                                                                        *)
 (*   - the SHARED PERSISTENTS both chain arms take: the image              *)
-(*     ([kernel_text]/[kernel_data]), [panic_wp_any], the handover channel  *)
+(*     ([kernel_text]/[kernel_data]), the handover channel               *)
 (*     [started_inv (main_deposit γd γv Φ)], the device fabric [dev_inv],   *)
 (*     the wire invariant, [crash_inv] and [gen_cert];                     *)
 (*   - EIGHT per-hart [boot_hart_res] bundles;                             *)
@@ -907,7 +907,7 @@ Section BootAlloc.
              (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
-      kernel_text ∗ kernel_data ∗ panic_wp_any ∗
+      kernel_text ∗ kernel_data ∗
       started_inv (main_deposit γd γv) ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
@@ -1060,7 +1060,6 @@ Section BootAlloc.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
-    iSplitR; [iApply panic_wp_any_holds |].
     iSplitR; [iExact "Hstarted" |].
     iSplitR; [iExact "Hdev" |].
     iSplitR; [iExact "Hwinv" |].

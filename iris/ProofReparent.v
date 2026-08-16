@@ -48,7 +48,6 @@ Require Import WaitInv.
 Require Import CodeReparent.
 Require Import SpecWakeup.
 Require Import SpecReparent.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Require Import ProcAvail.
@@ -614,7 +613,6 @@ Section ProofReparentLoop.
        this bound -- is a loop INVARIANT, unchanged across every iteration. *)
     locks_below lks "proc" ->
     procs_inv γs -∗
-    panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [reparent+0x46]. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
       ∀ Mexit : regfile,
@@ -637,7 +635,7 @@ Section ProofReparentLoop.
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hpslen Hlvl Hav Hno.
-    iIntros "#Hpinv #Hpanic Hqexit".
+    iIntros "#Hpinv Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                  ∀ (k : nat) (M : regfile),
@@ -922,7 +920,7 @@ Section ProofReparentLoop.
                   Hlen
                   ltac:(lia)
                   Hno
-                  with "Hcg Hown Htext Hpc Hpanic Hpinv").
+                  with "Hcg Hown Htext Hpc Hpinv").
         all: try lkbelow.
         iIntros (CIDq Hsq Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc".
         assert (Hpc44 : ret_pc (M40 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1052,7 +1050,7 @@ Section ProofReparent.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
     intros pcE pv rettgt HK Hdom Hlen Hlvl Hno.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv Hinit Hpar".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv Hinit Hpar".
     iDestruct (parents_own_length with "Hpar") as %Hpslen.
     iIntros "Hcont".
     (* ---- prologue ---- *)
@@ -1074,7 +1072,7 @@ Section ProofReparent.
                   (m !!! Regidx (mword_of_int 27 : mword 5))
                   lvl (K - 6)%nat eb b lks
                   Hlen Hpslen Hlvl ltac:(lia) Hno
-                  with "Hpinv Hpanic") as "Hloop".
+                  with "Hpinv") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* exit continuation = the epilogue at +0x46 *)
       iIntros (CIDex Hsex Mexit) "%Hex Hcg Hown Htextx Hpc Hframe Hinit Hpar".

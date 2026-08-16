@@ -111,7 +111,6 @@ Require Import IcacheRef.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIalloc.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
@@ -767,7 +766,6 @@ Section IallocOut.
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x66) : mword 64) -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     ia_frame m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -783,7 +781,7 @@ Section IallocOut.
     intros HK Hty Hpk Hsp Hthr.
     pose proof HK as HK'. 
     pose proof ia_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv Hframe Hppid
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpenv Hframe Hppid
               Hsbn Hsbi Hsl Hiref Hop Hcont".
     iPoseProof (kernel_data_string ia_msg_addr ia_msg
                   (mword_of_int ia_msg_addr) eq_refl
@@ -1128,7 +1126,6 @@ Section IallocClaim.
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x88) : mword 64) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1157,7 +1154,7 @@ Section IallocClaim.
            Hnib Hdswf Ht0 Hty Hinum Halign Hbelow.
     pose proof HK as HK'. 
     pose proof (DinodeEnc.islot_lt inum) as Hsl16.
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpanenv #Hbio #Hlctx #Hireg #Hprocs
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanenv #Hbio #Hlctx #Hireg #Hprocs
               #Hdevi #Hdgeom #Hdlock Hitb2 Hitbl Hesc Hiref
               Hframe Hppid Hsbn Hsbi Hsl Hop Hheld Hcont".
     iPoseProof (iali_88 with "Htext") as "Hi88".
@@ -1469,7 +1466,7 @@ Section IallocClaim.
               (* log_write's bound is "log"(3); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hlb0 Hcrd HopS [] Hheld").
     all: try lkbelow.
     { iEval (rewrite Hbno).
       (* ialloc owes no receipt, so the atomic update's own anchor is the
@@ -1568,7 +1565,7 @@ Section IallocClaim.
               (* brelse's bound is "bcache"(4); ia_claim's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID12 Hq12 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpca4 : ret_pc (W7 !!! Regidx Rra : mword 64)
@@ -1684,7 +1681,7 @@ Section IallocClaim.
               ltac:(lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanic Hpanenv Hiref Hlic").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanenv Hiref Hlic").
     all: try lkbelow.
     iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href _".
     destruct Higp as (Hcsi & Hkslot & Higa0).
@@ -1929,7 +1926,6 @@ Section IallocScan.
        at its rank covers the whole cone via [locks_below_mono]. *)
     locks_below lks "log" ->
     kernel_text -∗ kernel_data -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1971,7 +1967,7 @@ Section IallocScan.
     intros HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Hbelow.
     pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
-    iIntros "#Htext #Hkdata #Hpanic #Hpenv #Hbio #Hlctx #Hireg #Hprocs
+    iIntros "#Htext #Hkdata #Hpenv #Hbio #Hlctx #Hireg #Hprocs
               #Hdevi #Hdgeom #Hdlock #Hitb2 #Hitbl #Hesc".
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iIntros (fuel).
@@ -2191,7 +2187,7 @@ Section IallocScan.
                 (* bread's bound is "bcache"(4); ia_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
-                with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs
+                with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -2495,7 +2491,7 @@ Section IallocScan.
                   HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Hinum Hslotal
                   Hbelow
-                  with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hireg Hprocs
+                  with "Hcg Hcnt Htext Hkdata Hpc Hpanenv Hbio Hlctx Hireg Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc Hiref Hframe
                         Hppid Hsbn Hsbi Hsl Hop Hheld [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID13)
@@ -2555,7 +2551,7 @@ Section IallocScan.
                   (* brelse's bound is "bcache"(4); ia_scan's own is
                      "itable"(2), and [locks_below_mono] weakens it. *)
                   ltac:(lkbelow)
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+                  with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
         all: try lkbelow.
         iIntros (CID15 Hq15 mR) "%Hcsr Hcg Hcnt Hpc Hppid Hsl1".
         assert (Hpc58 : ret_pc (GB !!! Regidx Rra : mword 64)
@@ -2746,7 +2742,7 @@ Section IallocScan.
           iApply (ia_out (CID0 := CID19) j bn γ γpr γu γd inodestart ninodes nib
                     dev ty u Sb pidv dq dqs dqn m GE K b lks
                     HK Hty Hpk HGEsp HGEthr
-                    with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hframe Hppid
+                    with "Hcg Hcnt Htext Hkdata Hpc Hpenv Hframe Hppid
                           Hsbn Hsbi Hsl Hiref Hop [Hcont]").
           { iApply (wp_next_shift (b := true) (CIDa := CID14) (CIDb := CID19)
                       ltac:(wp_next_chain) with "Hcont"). }
@@ -2797,7 +2793,7 @@ Section IallocMain.
                  ltac:(lia)
                  ltac:(change (2^31)%Z with 2147483648%Z in Hn31; lia)).
       apply not_true_is_false. intro Hc. apply Z.geb_le in Hc. lia. }
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hpenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
     iAssert (ia_cont (CID0 := CID) γ bn inodestart ninodes nib dev ty u Sb
@@ -3223,7 +3219,7 @@ Section IallocMain.
                   cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
                   pidv dq dqs dqn m K b lks
                   HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Hbelow
-                  with "Htext Hkdata Hpanic Hpenv Hbio Hlctx Hireg Hprocs
+                  with "Htext Hkdata Hpenv Hbio Hlctx Hireg Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc") as "Hscan".
     iSpecialize ("Hscan" $! (Z.to_nat (ninodes - 1))).
     iPoseProof ("Hscan" $! CID19 with "[%]") as "Hscan1";
@@ -3268,7 +3264,7 @@ Section IallocMain.
     cbv beta delta [wp_ialloc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl
            Ha0 Ha1 Heb Hbelow.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hpenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx
               Hsbn Hsbi #Hireg Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl
               #Hitb2 #Hitbl #Hesc Hiref Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
@@ -3276,7 +3272,7 @@ Section IallocMain.
               cn gtl γpr cov logstart inodestart ninodes nib dev ty u Sb
               pidv dq dqs dqn m K eb b lks
               HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Ha0 Ha1 Heb Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hpenv Hbio Hlctx
+              with "Hcg Hcnt Htext Hpc Hkdata Hpenv Hbio Hlctx
                     Hsbn Hsbi Hireg Hppid Hprocs Hdevi Hdgeom Hdlock Hsl
                     Hitb2 Hitbl Hesc Hiref HopS [Hcont]").
     all: try lkbelow.

@@ -56,7 +56,6 @@ Require Import VirtioModel VirtioQueue DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpUart.
 Require Import PermInv.
-Require Import PanicStub.
 Require Import SpecAcquire SpecRelease SpecSleepPrepare SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.
 Require Import SpecVirtioDiskRw.
@@ -540,7 +539,7 @@ Section VdrwfP6.
     sie_cap_gpr M av false pme -∗
     cpu_own 1 eb pme false lks -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f4) : mword 64) -∗
-    panic_wp_any -∗ procs_inv γs -∗
+ procs_inv γs -∗
     d_desc_ptr ↦₈□ pd -∗
     d_desc pd i ↦₈ va -∗ pa_add pd (16 * i + 8) ↦₄ vl -∗
     pa_add pd (16 * i + 12) ↦₂ vf -∗ pa_add pd (16 * i + 14) ↦₂ vn -∗
@@ -558,7 +557,7 @@ Section VdrwfP6.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hi8 Hfri Hlen Hs2 Hs3 Hbelow.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
     iPoseProof (rwi_1f4 with "Htext") as "Hi1d2".
     iPoseProof (rwi_1f8 with "Htext") as "Hi1d6".
     iPoseProof (rwi_1fc with "Htext") as "Hi1da".
@@ -702,7 +701,7 @@ Section VdrwfP6.
     iEval (rewrite Hfri) in "Hcell".
     iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme va vl vf vn false lks
               Hav Hi8 HN7a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
-              with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14".
     destruct Hf as (Hcs & _).
@@ -763,7 +762,7 @@ Section VdrwfP6.
        "proc" its free_desc/wakeup cone needs, and delivers it by
        [locks_below_mono]. *)
     locks_below lks "virtio_disk" ->
-    kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
+    kernel_text -∗ procs_inv γs -∗
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
        ours -- the claim pins [vs_perm] of our own slot, so the token the
@@ -798,7 +797,7 @@ Section VdrwfP6.
                     bs_disk m kq lks.
   Proof.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Hbelow.
-    iIntros "#Htext #Hpanic #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
+    iIntros "#Htext #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
             "%Hrh %Hok %Hpq %Hpinr %Hal Hcg Hown Htc Hclm Hpc Htok
@@ -1198,7 +1197,7 @@ Section VdrwfP6.
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
               E8 (trap_res eb + (K - 12))%nat eb (proc_addr j) ({["virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hh8 Hfrh Hglen HE8s2 HE8s3 ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Wd0 Wl0 Wf0 Wn0 Hfb Hrh").
     iIntros (F1) "%HF1 Hcg Hown Hpc Hfb".
     destruct HF1 as (HF1thr & HF1s1 & HF1s2).
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
@@ -1243,7 +1242,7 @@ Section VdrwfP6.
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
               G1 (trap_res eb + (K - 12))%nat eb (proc_addr j) ({["virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Hm8 Hfr1m Hglen HG1s2 HG1s3 ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Wd1 Wl1 Wf1 Wn1 Hfb Hrm").
     iIntros (F2) "%HF2 Hcg Hown Hpc Hfb".
     destruct HF2 as (HF2thr & HF2s1 & HF2s2).
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
@@ -1289,7 +1288,7 @@ Section VdrwfP6.
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
               G2 (trap_res eb + (K - 12))%nat eb (proc_addr j) ({["virtio_disk"]} ∪ lks)
               ltac:(pose proof (vdrwb_K20 K HK); lia) Ht8 Hfr2t Hglen HG2s2 HG2s3 ltac:(lkbelow)
-              with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
+              with "Hcg Hown Htext Hpc Hpinv Hdp Wd2 Wl2 Wf2 Wn2 Hfb Hrt").
     iIntros (F3) "%HF3 Hcg Hown Hpc Hfb".
     destruct HF3 as (HF3thr & HF3s1 & HF3s2).
     iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x20c) : mword 64) Rs1
@@ -1848,7 +1847,7 @@ Section ProofVirtioDiskRwF.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
     intros HK Hbnolt Hbufkd Hj Hjl Hbelow.
-    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpanic #Hpinv
+    iIntros "Hcg Hown Hextc Hextm #Htext Hpc #Hpinv
              #Hdinv #Hgeom #Hlk Hbuf Hdisk Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: [cpu_own_eb_agree] gives [eb = b]
        outright, so the function runs at ONE index throughout and there is
@@ -1911,7 +1910,7 @@ Section ProofVirtioDiskRwF.
     iApply (P2.wp_vdrw_p2 (CID := CIDa) γk γs j γl γd pd pav pu M K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) m lks HK Hj Hjl Hglen Hregs Hhi
-              with "Hcg Hown Htc Hclm Htext Hpc Hpanic Hpinv Hgeom Hlk
+              with "Hcg Hown Htc Hclm Htext Hpc Hpinv Hgeom Hlk
                     Htok HR Hscr").
     all: try lkbelow.
     (* ---- P3: the chain formatting ---- *)
@@ -1949,13 +1948,13 @@ Section ProofVirtioDiskRwF.
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bs_buf bs_disk m kq lks HK Hj Hjl
               (vdrwf_bnz _ (Hbufkd 0%nat ltac:(lia))) ltac:(lkbelow)
-              with "Htext Hpanic Hpinv Hdinv Hlk").
+              with "Htext Hpinv Hdinv Hlk").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
     iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq lks
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl ltac:(lkbelow)
-              with "Htext Hpanic Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
+              with "Htext Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno").
     iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hextc Hextm Hpc Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".

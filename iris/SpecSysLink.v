@@ -158,7 +158,6 @@ Require Import CalleeSaved KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import SpecPrintk.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -280,7 +279,6 @@ Definition wp_sys_link_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr gu gd -∗
   (* ---- the block layer ---- *)
   bio_ctx bn (fs_view gfs gd dev cov) -∗

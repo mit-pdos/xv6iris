@@ -171,7 +171,6 @@ Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
-Require Import PanicStub.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -238,7 +237,6 @@ Definition wp_kfork_sconf_body
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme b lks -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
   procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

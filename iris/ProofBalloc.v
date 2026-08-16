@@ -94,7 +94,6 @@ Require Import FsBlocks LogInv.
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBalloc.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPanic.
 Require Import SpecPrintk.
@@ -618,7 +617,6 @@ Section BallocOut.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0xe8) : mword 64) -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     ba_frame m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -634,7 +632,7 @@ Section BallocOut.
     intros HK Hpk Hsp Hthr.
     pose proof HK as HK'. 
     pose proof ba_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpanic #Hpenv Hframe Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv Hframe Hppid
               Hsbsz Hsbbm Hsl Hbmr Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (kernel_data_string ba_msg_addr ba_msg
@@ -1008,7 +1006,6 @@ Section BallocExhaust.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x8a) : mword 64) -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv γs -∗
@@ -1027,7 +1024,7 @@ Section BallocExhaust.
     intros HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow.
     pose proof HK as HK'. 
     pose proof Hsize as Hsize'. rewrite BPB_value in Hsize'.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv #Hbio #Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (bai_08a with "Htext") as "Hi8a".
     iPoseProof (bai_08c with "Htext") as "Hi8c".
@@ -1095,7 +1092,7 @@ Section BallocExhaust.
               pidv dev bnoB dq E1 (K - 10)%nat eb (proc_addr j) bsX bsdX dX b lks
               HKbl Hkk HE1a0
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID3 Hq3 mR) "%Hcs1 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc90 : ret_pc (E1 !!! Regidx Rra : mword 64)
@@ -1196,7 +1193,7 @@ Section BallocExhaust.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iApply (ba_out (CID0 := CID6)  j γfs bn γ γpr γu γd cov logstart bmapstart
               size used u cr Sb pidv dq dqb dqs m E3 K eb b lks HK Hpk HE3sp HE3thr
-              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hframe
+              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hframe
                     Hppid Hsbsz Hsbbm Hsl Hbmr Hop [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID6) ltac:(wp_next_chain)
                 with "Hcont"). }
@@ -1509,7 +1506,6 @@ Section BallocBzero.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x4c) : mword 64) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1551,7 +1547,7 @@ Section BallocBzero.
       by (rewrite HbsDlen; unfold BSIZE; reflexivity).
     assert (Hlvl : (Z.of_nat 0 + 2 < 2 ^ 31)%Z)
       by (change (2^31)%Z with 2147483648%Z; lia).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
               Hbmr HfsbD Hown Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     iPoseProof (bai_04c with "Htext") as "Hi4c".
@@ -1657,7 +1653,7 @@ Section BallocBzero.
               Z2 (K - 10)%nat eb b lks
               HKbr HbnoDlt eq_refl HbnoDcov eq_refl Hj Hgl HZ2a0 HZ2a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID4 Hq4 mB kk2 bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1916,7 +1912,7 @@ Section BallocBzero.
               ltac:(rewrite HbnoD; exact Hbilog)
               ltac:(discriminate)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hop HfsbD Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hop HfsbD Hheld").
     all: try lkbelow.
     iIntros (CID13 Hq13 mL2) "Hcg Hcnt Hpc %Hcs3 Hop HfsbD Hlk Hsl".
     assert (HsetD : (Sb ∪ {[bmapstart]} ∪ {[uint bnoD]} : gset Z)
@@ -1996,7 +1992,7 @@ Section BallocBzero.
               (replicate BSIZE (bv_0 8)) bsd0 true b lks
               HKbl2 Hkk2 HZBa0
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID16 Hq16 mR2) "%Hcs4 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc70 : ret_pc (ZB !!! Regidx Rra : mword 64)
@@ -2092,7 +2088,6 @@ Section BallocAlloc.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x38) : mword 64) -∗
-    panic_wp_any -∗
     panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -2144,7 +2139,7 @@ Section BallocAlloc.
       change (2^31)%Z with 2147483648%Z. lia. }
     assert (HbnoBlt : (Z.of_nat 0 + 2 < 2 ^ 31)%Z)
       by (change (2^31)%Z with 2147483648%Z; lia).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom #Hdlock Hsl Hop
               Hfsbm Hpool Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
     (* ---- the block leaves the pool, with its content half and token ---- *)
@@ -2349,7 +2344,7 @@ Section BallocAlloc.
               ltac:(rewrite HbnoB; exact Hbmlog)
               ltac:(rewrite HbnoB; exact Hcred)
               Hbelow
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hop Hfsbm Hheld").
+              with "Hcg Hcnt Htext Hpc Hbio Hlctx Hsl Hop Hfsbm Hheld").
     all: try lkbelow.
     iIntros (CID6 Hq6 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hfsbm Hlk Hsl".
     assert (HbudgeB : (if cr then S (1 + u) else (1 + u))%nat
@@ -2438,7 +2433,7 @@ Section BallocAlloc.
               (bitmap_bytes (used ∪ {[ bi ]})) bsdX true b lks
               HKbl Hkk HA5a0
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
+              with "Hcg Hcnt Htext Hpc Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
     iIntros (CID9 Hq9 mR) "%Hcs2 Hcg Hcnt Hpc Hppid Hsl1".
     assert (Hpc4c : ret_pc (A5 !!! Regidx Rra : mword 64)
@@ -2477,7 +2472,7 @@ Section BallocAlloc.
               pidv dq dqb dqs m mR K eb b lks
               HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl
               HmRsp HmRthr HmRs1 HmRs7 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
                     Hbmr HfsbD Hown [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID9) ltac:(wp_next_chain)
                 with "Hcont"). }
@@ -2550,7 +2545,6 @@ Section BallocScan.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0xb6) : mword 64) -∗
-    panic_wp_any -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -2578,7 +2572,7 @@ Section BallocScan.
     pose proof Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
       intros CIDx bi M Hfuel Hbi Hsp Hthr Ha0 Ha4 Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hs7 Hs8 Hbelow;
-      iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom
+      iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hsbsz Hsbbm #Hdevi #Hdgeom
                 #Hdlock Hsl Hop Hfsbm Hpool Hlk Hcont";
       iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm; cbn in Hbm;
       pose proof Hbi as Hbi'; rewrite BPB_value in Hbi';
@@ -2613,7 +2607,7 @@ Section BallocScan.
       iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
                 bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                 pidv dq dqb dqs m M K eb b lks HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
+                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
       { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                   with "Hcont"). }
     - (* ---- FUEL S: the full loop body ---- *)
@@ -2642,7 +2636,7 @@ Section BallocScan.
         iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
                   bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                   pidv dq dqb dqs m M K eb b lks HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
+                  with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID1) ltac:(wp_next_chain)
                     with "Hcont"). }
       + (* +0xb6 FALL-THROUGH: bi < sb.size, so this bit is in range *)
@@ -3269,7 +3263,7 @@ Section BallocScan.
                        bmapstart size dev used u cr Sb kk bnoB (bitmap_bytes used) bsdX dX
                        pidv dq dqb dqs m SA K eb b lks HK Hpk Hsize HSAsp HSAthr HSAs2
                        HSAs5 HSAs6 HSAs8 Hkk Hbelow
-                       with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
+                       with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk [Hcont]").
              { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID15)
                          ltac:(wp_next_chain) with "Hcont"). }
           -- (* bi + 1 < BPB: branch back to +0xb6, one fuel unit down *)
@@ -3301,7 +3295,7 @@ Section BallocScan.
                                              Hfuel Hbi Hbilt Hsize)))
                        HSAsp HSAthr HSAa0 HSAa4 HSAs1
                        HSAs2 HSAs3 HSAs4 HSAs5 HSAs6 HSAs7 HSAs8 Hbelow
-                       with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
+                       with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
                              Hdlock Hsl Hop Hfsbm Hpool Hlk [Hcont]").
              { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID14)
                          ltac:(wp_next_chain) with "Hcont"). }
@@ -3335,7 +3329,7 @@ Section BallocScan.
                     ltac:(rewrite HS8a2 Hqeq; reflexivity)
                     ltac:(rewrite HS8a3 Hreq; reflexivity)
                     HS8s1 HS8s2 HS8s7 Hcred Hbelow
-                    with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
+                    with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom Hdlock Hsl Hop
                           Hfsbm Hpool Hlk [Hcont]").
           { iApply (wp_next_shift (b := true) (CIDa := CIDx) (CIDb := CID11)
                       ltac:(wp_next_chain) with "Hcont"). }
@@ -3408,7 +3402,6 @@ Section BallocMain.
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
       kernel_text -∗ pc_is pcE -∗
-      panic_wp_any -∗
       kernel_data -∗
       printk_env γpr γu γd -∗
       bio_ctx bn (fs_view γfs γd dev cov) -∗
@@ -3473,7 +3466,7 @@ Section BallocMain.
     assert (Hszne0 : eq_vec (mword_of_int size : mword 64) (zero_reg : mword 64)
                      = false)
       by (apply ba_moi64_nonzero; lia).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hpenv #Hbio #Hlctx Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx Hppid
               Hsbsz Hsbbm Hbmr #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
@@ -4155,7 +4148,7 @@ Section BallocMain.
               RA (K - 10)%nat eb b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CIDb29 Hq29 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -4359,7 +4352,7 @@ Section BallocMain.
               HK Hpk Hgeom Hsize HbnoB Hbmcov Hbmlog Hok Hkk Hj Hgl Hcred
               CIDb33 0 W4 ba_fuel_full ba_bi_zero HW4sp HW4thr
               HW4a0 HW4a4 HW4s1 HW4s2 HW4s3 HW4s4 HW4s5 HW4s6 HW4s7 HW4s8 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
+              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpenv Hbio Hlctx Hprocs Hframe Hppid Hsbsz Hsbbm Hdevi Hdgeom
                     Hdlock Hsl Hop Hfsbm Hpool Hlk [Hcont]").
     { iApply (wp_next_shift (b := true) (CIDa := CIDb28) (CIDb := CIDb33)
                 ltac:(wp_next_chain) with "Hcont"). }
@@ -4415,7 +4408,7 @@ Section BallocMain.
   Proof.
     cbv beta delta [wp_balloc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog Hj Hgl Ha0 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hpenv #Hbio #Hlctx Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hkdata #Hpenv #Hbio #Hlctx Hppid
               Hsbsz Hsbbm Hbmr #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     (* [ba_main] is the eb-generic core both top-level lemmas share -- see
@@ -4427,7 +4420,7 @@ Section BallocMain.
               pidv dq dqb dqs m K eb b lks
               HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog ltac:(discriminate)
               Hj Hgl Ha0 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hpenv Hbio Hlctx Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hkdata Hpenv Hbio Hlctx Hppid
                     Hsbsz Hsbbm Hbmr Hprocs Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
     iIntros (mf) "%Hcs Hsie Hcnt Htc Hclm Hpc Hppid Hsbsz Hsbbm Hsl Harms".

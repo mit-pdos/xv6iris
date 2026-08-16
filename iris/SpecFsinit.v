@@ -87,8 +87,8 @@
    BEHAVIOUR -- this one really is a panic, so a contract that promises to
    RETURN has to refute it.  [sb_magic (sb_image ...) = FSMAGIC] is what
    does, and it is an image premise of exactly the same kind as the rest:
-   mkfs writes the magic.  [panic_wp_any] still rides, because the callees
-   have their own panic arms.
+   mkfs writes the magic.  The panic credentials still ride, because the
+   callees have their own panic arms.
 
    ---- ONE SLOT MORE THAN initlog GIVES BACK (a real composition fact) --
 
@@ -133,7 +133,6 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import PanicStub.
 Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import FdSlots.
@@ -317,7 +316,6 @@ Definition wp_fsinit_sconf_body
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  panic_wp_any -∗
   printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   (* initlog's crash seam, era certificate and era mirror variable *)
