@@ -849,23 +849,32 @@ Qed.
    record's TYPE, and create has it from the fresh-type fact it already
    carries ([di_type dnc = ty], SpecCreateFreshTy's licence) -- the same
    fact ARM C-OK-DIR's existing [Htyc] is. *)
-(* WIDENED WITH THE INDEX (V5'): the UNTAGGED d flavour is [Some None].
-   The TAGGED form ([Some (Some dp_inum)]) is the V5' successor's -- the
-   +0xc4 mint then carries the parent's inum -- and [cr_flav_ntag] below
-   is what discharges the tagged premises vacuously until then. *)
-Definition cr_flav (ty : mword 16) : option (option Z) :=
-  if decide (ty = SpecDirlookup.T_DIR) then Some None else None.
+(* TAGGED SINCE V5' INCREMENT P.  The child's mint at +0xc4 now carries the
+   PARENT's inum: [Some (Some dpv)] pays out [IcacheRef.ilinkdp ip dpv] --
+   the unit the parent's name record will hold, whose tag says whose child
+   this is -- TOGETHER WITH [IcacheRef.iparent ip dpv], the half that goes
+   into the CHILD's own [DirLinks.dir_par_tie] beside the [".."] bytes.
+   Both inums are in create's hand at +0xc4 ([dind] is the arm's parameter),
+   which is why this is the site: it is the last instant at which the two
+   are related by anything the walk knows.
 
-Lemma cr_flav_dir (ty : mword 16) :
-  ty = SpecDirlookup.T_DIR -> cr_flav ty = Some None.
+   IT IS STILL A FUNCTION OF [ty] ALONE at the flavour's decision -- the
+   [beq] at +0xca is four instructions below and the mint must pass a term
+   both arms reduce -- and the FILE arm's [None] is byte-identical to what
+   it was, so every landed non-directory discharge is unchanged (R6). *)
+Definition cr_flav (ty : mword 16) (dpv : Z) : option (option Z) :=
+  if decide (ty = SpecDirlookup.T_DIR) then Some (Some dpv) else None.
+
+Lemma cr_flav_dir (ty : mword 16) (dpv : Z) :
+  ty = SpecDirlookup.T_DIR -> cr_flav ty dpv = Some (Some dpv).
 Proof. intro H. rewrite /cr_flav decide_True; [reflexivity | exact H]. Qed.
 
-Lemma cr_flav_file (ty : mword 16) :
-  ty <> SpecDirlookup.T_DIR -> cr_flav ty = None.
+Lemma cr_flav_file (ty : mword 16) (dpv : Z) :
+  ty <> SpecDirlookup.T_DIR -> cr_flav ty dpv = None.
 Proof. intro H. rewrite /cr_flav decide_False; [reflexivity | exact H]. Qed.
 
-Lemma cr_flav_ty (ty : mword 16) (od : option Z) :
-  cr_flav ty = Some od -> ty = SpecDirlookup.T_DIR.
+Lemma cr_flav_ty (ty : mword 16) (dpv : Z) (od : option Z) :
+  cr_flav ty dpv = Some od -> ty = SpecDirlookup.T_DIR.
 Proof.
   rewrite /cr_flav.
   destruct (decide (ty = SpecDirlookup.T_DIR)) as [H | H];
@@ -873,21 +882,24 @@ Proof.
 Qed.
 
 (* the mirror reading, for (T1')'s premise at the plain mint *)
-Lemma cr_flav_nty (ty : mword 16) :
-  cr_flav ty = None -> ty <> SpecDirlookup.T_DIR.
+Lemma cr_flav_nty (ty : mword 16) (dpv : Z) :
+  cr_flav ty dpv = None -> ty <> SpecDirlookup.T_DIR.
 Proof.
   rewrite /cr_flav.
   destruct (decide (ty = SpecDirlookup.T_DIR)) as [H | H];
     [discriminate | intros _; exact H].
 Qed.
 
-(* no create mint is TAGGED until the V5' successor lands *)
-Lemma cr_flav_ntag (ty : mword 16) (pv : Z) :
-  cr_flav ty = Some (Some pv) -> False.
+(* ...and the TAG a tagged mint carries is the parameter, which is what
+   [DirLinks.dir_links_dirlink_d]'s [self]-shaped premise needs.
+   ([cr_flav_ntag], which refuted the tagged arm outright while create had
+   no tagged mint, is RETIRED by this increment.) *)
+Lemma cr_flav_tag (ty : mword 16) (dpv pv : Z) :
+  cr_flav ty dpv = Some (Some pv) -> pv = dpv.
 Proof.
   rewrite /cr_flav.
   destruct (decide (ty = SpecDirlookup.T_DIR)) as [H | H]; intro Hc;
-    [injection Hc as Hc; discriminate Hc | discriminate Hc].
+    [congruence | discriminate Hc].
 Qed.
 
 (* ---- (iv-bis) THE NLINK_MAX GATE AT +0x30..+0x3c (xv6 117c0e7).
@@ -2153,7 +2165,7 @@ Section ProofCreateMain.
        ity_shot g (di_type dnc) -∗
        inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g -∗
        (* THE MINT, UNDEPOSITED *)
-       ilink_fl (cr_flav ty) (bv_unsigned cinum) -∗
+       ilink_fl (cr_flav ty (bv_unsigned dind)) (bv_unsigned cinum) -∗
        (* everything the contract still owes back *)
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2331,7 +2343,7 @@ Section ProofCreateMain.
        (* THE MINT.  UNDEPOSITED: at [tot = 1] the written record is live at
           [cinum mod 256] and no ticket for that key exists anywhere, so the
           re-park is not available at this seam. *)
-       ilink_fl (cr_flav ty) (bv_unsigned cinum) -∗
+       ilink_fl (cr_flav ty (bv_unsigned dind)) (bv_unsigned cinum) -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -4842,26 +4854,34 @@ Section ProofCreateMain.
       (* THE FLAVOUR'S OWN PREMISE (V2), and it is the fresh-type fact this
          walk already carries: the mint is d-flavoured exactly when [ty] is
          [T_DIR], and the record being flushed has [di_type = ty]. *)
-      assert (Hflty : forall od : option Z, cr_flav ty = Some od ->
+      assert (Hflty : forall od : option Z,
+                cr_flav ty (bv_unsigned dind) = Some od ->
                 bv_unsigned (di_type (cr_setf dnc major minor
                                (mword_of_int 1 : mword 16)))
                 = InodeRegion.ireg_dir_ty).
-      { intros od Hfl. rewrite cr_setf_type Htyc (cr_flav_ty ty od Hfl).
+      { intros od Hfl. rewrite cr_setf_type Htyc
+          (cr_flav_ty ty (bv_unsigned dind) od Hfl).
         vm_compute. reflexivity. }
       (* (T1')'s mirror at the plain flavour (V4): the child is then NOT a
          directory, off [cr_flav]'s own decision *)
-      assert (Hnflty : cr_flav ty = None ->
+      assert (Hnflty : cr_flav ty (bv_unsigned dind) = None ->
                 bv_unsigned (di_type (cr_setf dnc major minor
                                (mword_of_int 1 : mword 16)))
                 <> InodeRegion.ireg_dir_ty).
-      { intros Hfl Hc. apply (cr_flav_nty ty Hfl).
+      { intros Hfl Hc. apply (cr_flav_nty ty (bv_unsigned dind) Hfl).
         apply bv_eq. rewrite -Htyc.
         rewrite <- (cr_setf_type dnc major minor (mword_of_int 1 : mword 16)).
         rewrite Hc. vm_compute. reflexivity. }
-      (* the tagged premise is vacuous until the V5' successor *)
-      assert (Hflpz : forall pvv : Z, cr_flav ty = Some (Some pvv) ->
-                bv_unsigned (di_nlink dnc) = 0)
-        by (intros pvv Hc; exfalso; exact (cr_flav_ntag ty pvv Hc)).
+      (* V5': THE TAGGED MINT'S OWN PRECONDITION, and it is the fresh
+         child's zero.  [InodeRegion.ireg_write_link_p] derives [p = None]
+         INSIDE the mover from this one fact -- (L1) collapses the counts at
+         [nlink = 0], and [ireg_par_ok]'s iff then frees the register --
+         which is §20.9(b)'s escape clause made mechanical: nothing is
+         remembered across a free, the check is at the instant of minting. *)
+      assert (Hflpz : forall pvv : Z,
+                cr_flav ty (bv_unsigned dind) = Some (Some pvv) ->
+                bv_unsigned (di_nlink dnc) = 0).
+      { intros pvv _. rewrite Hcnl0. vm_compute. reflexivity. }
       assert (Hcadd : di_addrs (cr_setf dnc major minor
                                  (mword_of_int 1 : mword 16)) = bm_cells bmc)
         by (rewrite cr_setf_addrs; exact (proj1 (proj2 (proj2 Hciok)))).
@@ -4874,7 +4894,7 @@ Section ProofCreateMain.
       iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart inodestart nib dev (ientry kslot) cinum
                 (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dnc bmc
-                q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true (cr_flav ty) pidv
+                q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true (cr_flav ty (bv_unsigned dind)) pidv
                 (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                 W3 (K - 10)%nat eb b lks
                 ltac:(exact HKiu)
@@ -5284,13 +5304,24 @@ Section ProofCreateMain.
                 THIS ARM (V2): the child is not a directory, so the record
                 is not counted by the parent's [DirView.dlc_bound] and the
                 parent's own count does not move. *)
-             iEval (rewrite (cr_flav_file ty Htdir)) in "Hilink".
+             iEval (rewrite (cr_flav_file ty (bv_unsigned dind) Htdir)) in "Hilink".
              iEval (rewrite -Hcl16) in "Hilink".
              (* optimization.md: an inline [ltac:] in ARGUMENT POSITION is
                 re-elaborated against the call's still-open evars, priced by
                 the call site's depth -- hoist to a named fact, closed with
                 the one hypothesis ([Ht16], this arm's [tot = 16]) it needs. *)
              assert (Htotge2 : (2 <= tot)%nat) by (clear -Ht16; lia).
+             (* V5': the appended slot is not the [".."] the parent tie
+                names -- [DirLinks.dir_slot_dots_ge2] off the dots clause
+                this arm already carries *)
+             assert (Hslot1 : dir_slot data
+                                (dir_nrec (bv_unsigned (di_size dn))) <> 1%nat).
+             { pose proof (dir_slot_dots_ge2 (bv_unsigned dind) dn data
+                             (dir_nrec (bv_unsigned (di_size dn)))
+                             ltac:(clear -Htydir; rewrite Htydir;
+                                   vm_compute; reflexivity)
+                             (cr_nl0z dn Hnl0) Hddix eq_refl) as Hge2.
+               clear -Hge2. lia. }
              iDestruct (dir_link_at_dirlink (bv_unsigned dind) dn' data data'
                           (cr_low16 cinum) (bname 14 nf)
                           (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
@@ -5299,8 +5330,8 @@ Section ProofCreateMain.
                           (cr_low16 cinum) (bname 14 nf)
                           (dir_nrec (bv_unsigned (di_size dn)))
                           (dir_slot data (dir_nrec (bv_unsigned (di_size dn))))
-                          tot eq_refl eq_refl Htot16 Hty' Hnl' Hszmax Hrng
-                          with "Hk0 Hdlnk") as "Hdlnk".
+                          tot eq_refl eq_refl Htot16 Hslot1 Hty' Hnl' Hszmax
+                          Hrng with "Hk0 Hdlnk") as "Hdlnk".
              assert (Hiok' : inode_ok cov logstart dn' bm' data').
              { rewrite /inode_ok. split_and!.
                - exact Hwf'.
@@ -6099,7 +6130,7 @@ Section ProofCreateMain.
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
-              u0 Sb4 true (cr_flav ty) pidv
+              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
@@ -6547,8 +6578,11 @@ Section ProofCreateMain.
          which is also honest, since a grey record's target is not being
          claimed to be anything. *)
       iModIntro.
+      (* V5': the parent tie is not owed at a DEAD home, so the all-plain
+         stock's root obligation is vacuous here *)
       iApply (dir_links_of_plain self dz data Hd
-                ltac:(apply dlc_bound_le1; lia) with "Hlinks").
+                ltac:(apply dlc_bound_le1; lia)
+                ltac:(intro Hc; exfalso; exact (Hc Hz)) with "Hlinks").
     - iModIntro. iApply dir_links_not_dir. exact Hd.
   Qed.
 
@@ -6668,7 +6702,7 @@ Section ProofCreateMain.
        ity_shot g (di_type dc) -∗
        inode_ref_short_gen kslot (q/2 + q/2)%Qp (q/2)%Qp dev cinum g -∗
        (* THE MINT, still undeposited: the +0x14c flush spends it *)
-       ilink_fl (cr_flav ty) (bv_unsigned cinum) -∗
+       ilink_fl (cr_flav ty (bv_unsigned dind)) (bv_unsigned cinum) -∗
        sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
        sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
        sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
@@ -6896,7 +6930,7 @@ Section ProofCreateMain.
     iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) dc bmc
-              u0 Sb4 true (cr_flav ty) pidv
+              u0 Sb4 true (cr_flav ty (bv_unsigned dind)) pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
@@ -7733,12 +7767,15 @@ Section ProofCreateMain.
         iSplitR; [iPureIntro; apply dlc_bound_le1;
                   rewrite cr_setf_nlink; vm_compute; discriminate |].
         iSplitR; [iPureIntro; exact (dlc_lower_false _ _) |].
+        (* V5': a fresh child has no records at all, so it has no [".."]
+           and the tie's guard is false *)
+        iSplitR; [iApply dir_par_tie_small; rewrite Hcnrec0; lia |].
         rewrite Hcnrec0. done. }
       iDestruct (dir_links_dirlink (bv_unsigned cinum)
                    (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dc1
                    datc dat1 (cr_low16 cinum) (bname 14 cr_dot_f)
                    0%nat 0%nat tot1 (eq_sym Hcnrec0) (eq_sym Hck0) Htot161
-                   Hc1ty0 Hc1nl0 Hc1szmax Hrng1
+                   ltac:(lia) Hc1ty0 Hc1nl0 Hc1szmax Hrng1
                    with "Hk0c Hcdlnk0") as "Hcdlnk1".
       (* THE FIRST LINK ALLOCATED, and the whole arm's ledger rests on it *)
       assert (Hc1sz : bv_unsigned (di_size dc1) = 16).
@@ -8418,8 +8455,21 @@ Section ProofCreateMain.
              cross the clause TOGETHER ([DirLinks.dir_links_dirlink_d]'s
              banner).  Sealing the payload here instead would existentially
              quantify the flavour map away and lose the one unit of slack. *)
-          iEval (rewrite (cr_flav_dir ty Htdir); cbn [ilink_fl]) in "Hilink".
+          (* V5': THE MINT PAYS OUT TWO HALVES AND THEY GO TO TWO PAYLOADS.
+             [ilink_fl (Some (Some dpv))] is [ilinkdp ip dpv ∗ iparent ip dpv]
+             -- one payout slot, so the contract keeps one shape -- and this
+             is where they part company: the [ilinkdp] into the PARENT's new
+             name record (below, [dir_links_dirlink_d]), the [iparent] into
+             the CHILD's own tie beside its [".."] bytes
+             ([dir_links_dirlink_dot]).  Half plus half is the whole
+             register, which is exactly why no third copy can exist and why
+             [IcacheRef.iparent_agree] is an agreement rather than a
+             convention. *)
+          iEval (rewrite (cr_flav_dir ty (bv_unsigned dind) Htdir);
+                 cbn [ilink_fl]) in "Hilink".
+          iDestruct "Hilink" as "[Hilink Hipar]".
           iEval (rewrite -Hcl16) in "Hilink".
+          iEval (rewrite -Hdl16) in "Hipar".
           (* the child is not the parent: two records held at once are two
              records ([InodeRegion.dinode_at_ne], pure, consumes neither) *)
           iDestruct (InodeRegion.dinode_at_ne γi cinum dind _ _
@@ -8696,12 +8746,18 @@ Section ProofCreateMain.
              DOT deposit is count-neutral by index
              ([DirLinks.dir_links_dirlink_dot]). *)
           iEval (rewrite -Hdl16) in "Hilinkd".
+          (* V5': **THE TIE IS ESTABLISHED HERE.**  The [iparent] half is the
+             one the +0xc4 mint paid out beside the [ilinkdp] the parent's
+             record took, and the bytes this write installs at record 1 are
+             what pin it: [dir_inum dat2 1 = dind].  The guard turns true at
+             exactly this instruction, because it is this write that pushes
+             the child's record count to two. *)
           iDestruct (dir_links_dirlink_dot (bv_unsigned cinum) dc1 dc2
                        dat1 dat2 (cr_low16 dind) (bname 14 cr_dotdot_f)
                        1%nat 1%nat tot2 (eq_sym Hc1nrec) (eq_sym Hc1k0)
-                       ltac:(lia) Ht2le2 Htot162 Hc2ty0 Hc2nl0 Hc2szmax
+                       eq_refl Ht2le2 Htot162 Hc2ty0 Hc2nl0 Hc2szmax
                        Hrng2
-                       with "Hilinkd Hcdlnk1") as "Hcdlnk2".
+                       with "Hilinkd Hipar Hcdlnk1") as "Hcdlnk2".
           (* ===== +0x144 c.j +0xe0 : into ARM C-OK's own block ======= *)
           assert (Htg0e0 : add_vec (mword_of_int (CK + 0x144) : mword 64)
                     (sign_extend' 64 (sign_extend' 21

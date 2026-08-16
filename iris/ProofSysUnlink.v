@@ -14,11 +14,15 @@
      W4  +0xf8 .. +0x12c  the inlined isdirempty loop
      W5  +0x8a .. +0xd8   the zeroing writei and the two tails
 
-   NO SEAL YET.  [LinkSysUnlink.v] still supplies [SYSUNLINK] with an
-   [Axiom]: the T_DIR half of W5 cannot be closed until the design ruling
-   FINDING 3 asks for lands (an empty directory's link count is 1, which
-   the model states nowhere), so the walk is built to STOP one pure premise
-   short of the seal.  See projects/fs-sysfile.md, S7-unlink, FINDING 3.
+   SEALED.  The functor is ascribed [: SYSUNLINK] and
+   [wp_sys_unlink_sconf] at the bottom of this file composes
+   W1 ∘ W2 ∘ W3 ∘ {W5-FILE, W5-DIR}; [LinkSysUnlink.v] instantiates it
+   against the twelve callees' proofs and its [Axiom] is gone.  The two
+   pure facts the T_DIR half used to stop on -- the child's [".."] naming
+   the parent, and a directory with a live subdirectory entry having two
+   links -- are DERIVED inside [su_w5_dir] from the ledger's parent
+   register and its count clauses (projects/fs-fragments-campaign.md, V4
+   and V5'; projects/fs-sysfile.md, S7-unlink).
 
    ==== HOW THE BLOCKS CHAIN ============================================
 
@@ -84,6 +88,10 @@ Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IregDirBit.
+Require Import IregLinkNz.   (* V5' increment W: the root refutation at a
+                                TAGGED unit ([ireg_link_root_min2_dp]) and the
+                                [dl_root]/[ireg_root] bridge, which is what
+                                opens [dir_links_dotdot_out]'s tie leg *)
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
@@ -429,7 +437,7 @@ Module SysUnlinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
                       (Namecmp : NAMECMP) (Dirlookup : DIRLOOKUP)
                       (Memset : MEMSET) (Readi : READI) (Writei : WRITEI)
                       (Iupdate : IUPDATE) (Iunlockput : IUNLOCKPUT)
-                      (EndOp : END_OP).
+                      (EndOp : END_OP) : SYSUNLINK.
 
 Module Tails := SysUnlinkTails Iunlockput EndOp.
 
@@ -705,6 +713,12 @@ Section ProofSysUnlinkBody.
        ⌜su_al (m !!! Regidx csp_rs1 : mword 64)⌝ -∗
        ⌜su_regs m (m !!! Regidx csp_rs1 : mword 64) dpv
                 (m !!! Regidx Rs2 : mword 64) (m !!! Regidx Rs3 : mword 64) Ms⌝ -∗
+       (* [a0] STILL HOLDS [dp] AT THE SEAM, and it has to be said: [su_regs]
+          pins the five CALLEE-SAVED registers and [a0] is not one of them,
+          so the [c.mv s1,a0] at +0x2c leaves the fact true and unexported.
+          W2's [ilock(dp)] reads [a0], so this is its first premise.  (Found
+          by the seal, which is the first consumer to compose W1 with W2.) *)
+       ⌜(Ms !!! Regidx Ra0 : mword 64) = dpv⌝ -∗
        ⌜uptd_ext (pv_upt V) P1⌝ -∗
        ⌜used1 ⊆ used⌝ -∗
        ⌜(su_u1 w1 <= n1)%nat⌝ -∗
@@ -1237,12 +1251,13 @@ Section ProofSysUnlinkBody.
                      ltac:(wp_next_chain) with "Hown") as "Hown".
         rewrite (proj1 Hnp) in HN4regs.
         iApply ("Hseamk" $! CID19 N4 P1 n1 Sb1 used1 w1 dpv nf bpf bnm0 bd0 be0
-                  u4 u5 u6 u27 u30 with "[%] [%] [%] [%] [%] [%] [%]
+                  u4 u5 u6 u27 u30 with "[%] [%] [%] [%] [%] [%] [%] [%]
                   Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hbmres Hpriv
                   Hir1 Hhelddp HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
                   HbPj H27 HbE H30 [Hcont]").
         { exact Hal. }
         { exact HN4regs. }
+        { exact (eq_trans HN4a0 (proj1 Hnp)). }
         { exact Hupt1. }
         { exact Hused1. }
         { exact (su_cnt_ok w1 n1 (proj1 Hn1)). }
@@ -4792,17 +4807,21 @@ Section ProofSysUnlinkBody.
     destruct bfl.
     { (* [b = true]: the ticket is d-flavoured, so the REGION says the
          removed record names a DIRECTORY -- refuted by this arm's payload.
-         V2's file-arm adaptation, through [IregDirBit.ireg_dirbit_ty]. *)
-      iEval (cbn [dlc_fl ilink_fl]) in "Hticket".
+         V2's file-arm adaptation; since V5' the record is at index >= 2 and
+         its unit is the TAGGED one, so the reader is
+         [IregDirBit.ireg_dirbit_ty_dp] -- (T1) is stated at [wdu + wdt] and
+         does not care which of the two the caller holds. *)
       iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
       iApply fupd_wp.
-      iMod (ireg_dirbit_ty ⊤ gi gfs inodestart nib
+      iMod (ireg_dirbit_ty_dp ⊤ gi gfs inodestart nib
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
+              (bv_unsigned dinum)
               ltac:(solve_ndisj) Hinb with "Hireg Hdiati Hticket")
         as "(%Htydi & _ & _)".
       destruct (Htynzi Htydi). }
     (* [b = false]: a plain [ilink], and the re-park owes nothing *)
-    iEval (cbn [dlc_fl ilink_fl]) in "Hticket".
+    iAssert (ilink (bv_unsigned (dir_inum datd kk))) with "[Hticket]"
+      as "Hticket"; [iExact "Hticket" |].
     iDestruct ("Hrepark" with "[%]") as "Hdlnkd".
     { cbn. rewrite Hnl'v. lia. }
     (* [dp]'s bundle, repacked at the flushed record *)
@@ -5498,24 +5517,26 @@ Section ProofSysUnlinkBody.
     (forall k : nat, (2 <= k)%nat ->
        (k < dir_nrec (bv_unsigned (di_size dni)))%nat ->
        dir_inum dati k = bv_0 16) ->
-    (* ==== THE TWO DESIGN-FACT PREMISES (FINDING 3's precedent: name the
-       wall in ONE place):
-         (D1) the child's [".."] names the parent -- STILL UNSUPPLIED;
-              its carrier is the campaign's V5' (the fractional parent
-              register; increment R is landed, the payload half and the
-              extraction are the successor's).  The seal stays stopped
-              on this one alone.
-         (D2) a directory with a live subdirectory entry has [2 <= nlink]
-              -- SUPPLIED since the fused V4+V5' region increment:
-              [IregDirBit.dir_links_subdir_nlink2] derives exactly this
-              conclusion from holdings the +0x8a seam has (dp's payload,
-              the found record's facts, ip's [dinode_at] and its T_DIR
-              test), through (T1')'s plain-flavour refutation and
-              [DirView.dlc_lower].  The seal discharges this premise by
-              ONE application of that lemma before applying this one.
+    (* ==== THE TWO DESIGN FACTS ARE NOW DERIVED INSIDE, AND THE PREMISES
+       ARE GONE (V5' increment W).  For the record, since this lemma's
+       statement is where they stood for three increments:
+         (D1) [bv_unsigned (dir_inum dati 1) = bv_unsigned dinum] -- the
+              child's [".."] names the parent.  Derived at the zeroing:
+              the released ticket is the TAGGED parent-record unit
+              [ilinkdp ip dp] (the tag is dp's own inum, off the payload's
+              [self] parameter), the child's payload hands out the other
+              half of the same register through
+              [DirLinks.dir_links_dotdot_out]'s tie, and
+              [IcacheRef.iparent_agree] collapses the two values -- no
+              region open, no tree fragment.  The root exclusion the tie's
+              guard wants comes from [IregLinkNz.ireg_link_root_min2_dp]
+              against FINDING 3's [nlink ip = 1].
+         (D2) [2 <= bv_unsigned (di_nlink dnd)] -- a directory holding a
+              live subdirectory entry has at least two links.  Derived
+              before the zeroing by [IregDirBit.dir_links_subdir_nlink2],
+              which is (T1')'s plain-flavour refutation plus
+              [DirView.dlc_lower] at the counted record.
        ==== *)
-    bv_unsigned (dir_inum dati 1) = bv_unsigned dinum ->
-    2 <= bv_unsigned (di_nlink dnd) ->
     sie_cap_gpr M3 (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗
@@ -5622,7 +5643,7 @@ Section ProofSysUnlinkBody.
     intros HK Hglog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov
            Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb Hsp0 Hal Hn1 Hupt1 Hkd Hks
            Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd Hfst Hal27
-           Hregs Hnlzi Hioki Hdoki Hddixi Hdoci Hduqi Htyzi Hdots Hdead Hpar Hdp2.
+           Hregs Hnlzi Hioki Hdoki Hddixi Hdoci Hduqi Htyzi Hdots Hdead.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
     iIntros "Hcg Hown #Htext #Hdata #Hprenv Hpc #Hpanic #Hbio #Hlog Hseam Hgen
@@ -6237,6 +6258,25 @@ Section ProofSysUnlinkBody.
                         (sign_extend' 12 (mword_of_int 63 : mword 6))
                       : mword 64)) 31 0)))) = di_size dnd)
       by (rewrite su_setnl_size; exact Hsz'v).
+    (* ===================================================================
+       (D2) FALLS HERE, and the premise is gone (V5' increment W).  A
+       directory holding a LIVE record for a directory has at least two
+       links: the record's ticket is d-flavoured (a PLAIN one dies against
+       (T1') at the child the walk names), so [DirView.dlc_lower] counts it
+       and reads [1 + 1 <= nlink] off [dp]'s own payload.  All of that is
+       [IregDirBit.dir_links_subdir_nlink2], one mask-preserving step, and
+       every one of its premises is a holding of the +0x8a seam.  It runs
+       BEFORE the zeroing because it reads [dp]'s payload at the record the
+       zeroing is about to kill.
+       =================================================================== *)
+    iApply fupd_wp.
+    iMod (dir_links_subdir_nlink2 ⊤ gi gfs inodestart nib
+            (bv_unsigned dinum) dnd datd kk
+            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
+            ltac:(solve_ndisj) Hinb Htydz Hdplive ltac:(lia) Hkklt Hkklive
+            Hnotself (su_zext32_unsigned (dir_inum datd kk)) Htyzi
+            with "Hireg Hdiati Hdlnkd") as "(%Hdp2 & Hdiati & Hdlnkd)".
+    iModIntro.
     (* ===== VERDICT #1 (dir arm): [dir_links_unlink] at the record the
        [+0x146] tail is ABOUT to flush -- the [b = true] flavour needs no
        refutation, because the [dp->nlink--] pays the unit ===== *)
@@ -6258,7 +6298,8 @@ Section ProofSysUnlinkBody.
        ([IregDirBit.ireg_link_not_dir]).  The wand's equality then prices
        the [b = true] arm alone -- the decrement pays exactly one. ===== *)
     destruct bfl; last first.
-    { iEval (cbn [dlc_fl ilink_fl]) in "Hticket".
+    { iAssert (ilink (bv_unsigned (dir_inum datd kk))) with "[Hticket]"
+        as "Hticket"; [iExact "Hticket" |].
       iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
       iApply fupd_wp.
       iMod (ireg_link_not_dir ⊤ gi gfs inodestart nib
@@ -6268,6 +6309,61 @@ Section ProofSysUnlinkBody.
       destruct (Hndi Htyzi). }
     iDestruct ("Hrepark" with "[%]") as "Hdlnkd2".
     { cbn. rewrite <- HdWnd. exact (eq_sym HdecrW). }
+    (* ===================================================================
+       (D1) FALLS HERE, IN THREE STEPS, and the premise is gone (V5'
+       increment W).  This is the fact the whole parent-register carrier
+       exists for, and none of the three steps opens the region twice or
+       reads a tree fragment:
+
+         1. THE RELEASED TICKET IS TAGGED.  The record just zeroed is at
+            index >= 2 -- a NAME record -- and since V5' a name record
+            naming a directory carries [IcacheRef.ilinkdp ip self], whose
+            tag is the payload's OWN [self] parameter, i.e. [dp]'s inum
+            verbatim.  The [b = false] arm was refuted one step above by
+            (T1'), so what the walk holds is [ilinkdp ip dp].
+         2. THE CHILD HANDS OUT THE OTHER HALF.  [ip]'s payload carries
+            [DirLinks.dir_par_tie] -- [∃ pv, iparent ip pv ∗
+            ⌜dir_inum dati 1 = pv⌝] -- under a guard whose two live
+            conjuncts the seam already supplies and whose third is the root
+            exclusion, and THAT is [IregLinkNz.ireg_link_root_min2_dp]
+            against FINDING 3's [nlink ip = 1]: the strict root clause plus
+            any outstanding unit put root's count at two.
+         3. THE AGREEMENT.  Half plus half is at most the whole register,
+            so [IcacheRef.iparent_agree] collapses [dp] and [pv] --
+            fragment against fragment, no region open at all.  With
+            [⌜dir_inum dati 1 = pv⌝] that IS (D1).
+
+       The lock is what makes it an episode rather than a coincidence: the
+       walk has held [ip]'s reference and sleeplock continuously since
+       [ilock], both fragments are HELD resources, and the only authority
+       reads are at create's mint and at the spend below.
+       =================================================================== *)
+    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
+    iApply fupd_wp.
+    iMod (ireg_link_root_min2_dp ⊤ gi gfs inodestart nib
+            (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
+            (bv_unsigned dinum) ltac:(solve_ndisj) Hinb
+            with "Hireg Hdiati Hticket") as "(%Hrmin & Hdiati & Hticket)".
+    iModIntro.
+    assert (Hipnroot : bv_unsigned (zero_extend' 32
+                         (dir_inum datd kk : mword 16) : mword 32)
+                       <> dl_root).
+    { rewrite dl_root_ireg_root. intro Hc.
+      pose proof (Hrmin Hc) as Hge2. rewrite Hnl1 in Hge2. lia. }
+    iDestruct (dir_links_dotdot_out
+                 (bv_unsigned (zero_extend' 32
+                    (dir_inum datd kk : mword 16) : mword 32)) dni dati
+                 Htyzi Hnlzi Hddixi Hipnroot with "Hdlnki")
+      as (pvv) "(Hipar & %Hpv & Hdotacc)".
+    iDestruct (iparent_agree
+                 (bv_unsigned (zero_extend' 32
+                    (dir_inum datd kk : mword 16) : mword 32))
+                 (bv_unsigned dinum) pvv with "Hticket Hipar") as %Hagr.
+    assert (Hpar : bv_unsigned (dir_inum dati 1) = bv_unsigned dinum)
+      by (rewrite Hpv; exact (eq_sym Hagr)).
+    (* the half comes out at the payload's own reading of the register;
+       the agreement is what lets the SPEND below name it [dp]'s *)
+    iEval (rewrite -Hagr) in "Hipar".
     (* [dp]'s pure re-park facts, moved DOWN to the decremented record *)
     assert (HiokF2 : inode_ok cov logstart (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -6490,18 +6586,20 @@ Section ProofSysUnlinkBody.
       by (rewrite /G4 upd_ne; [exact HG3a0 | nz]).
     assert (HG4regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) G4)
       by (rewrite /G4; apply su_regs_caller; [exact Hcsra | exact HG3regs]).
-    (* the [".."]-extraction: [dir_links_dotdot_out] hands the ticket at
-       INDEX 1's inum, and [Hpar] -- THE UNSUPPLIED FACT -- is what names
-       it [dp]'s *)
+    (* the [".."]-extraction: the accessor's second leg, opened with the
+       disequality (D1) has just made available -- record 1 names [dp], and
+       [dp] is not [ip] ([InodeRegion.dinode_at_excl], two records held at
+       once).  The ticket comes out at index 1's inum, which [Hpar] then
+       rewrites to [dp]'s: that index identity is exactly what
+       [wp_iupdate_unlink]'s fragment premise is fixed at, and it is
+       irreducibly (D1). *)
     assert (Hz1ne : bv_unsigned (dir_inum dati 1)
                     <> bv_unsigned (zero_extend' 32
                          (dir_inum datd kk : mword 16) : mword 32)).
     { rewrite su_zext32_unsigned Hpar. intro Hc. apply Hnotself.
       symmetry. exact Hc. }
-    iDestruct (dir_links_dotdot_out
-                 (bv_unsigned (zero_extend' 32
-                    (dir_inum datd kk : mword 16) : mword 32)) dni dati
-                 Htyzi Hnlzi Hddixi Hz1ne with "Hdlnki") as (b2) "[Hticket2 _]".
+    iDestruct ("Hdotacc" with "[%]") as (b2) "[Hticket2 _]";
+      [exact Hz1ne |].
     iEval (rewrite Hpar) in "Hticket2".
     assert (Hmoidin : (mword_of_int (bv_unsigned dinum) : mword 32) = dinum)
       by (exact (su_moi32_id dinum)).
@@ -6774,8 +6872,15 @@ Section ProofSysUnlinkBody.
     iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
     iDestruct (cpu_own_transport D21 D26 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
-    (* the spent ticket, at the region's own index spelling *)
-    iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
+    (* THE TAGGED SPEND (V5' increment W).  Both halves of [ip]'s parent
+       register come in here -- the [ilinkdp] the parent's name record
+       released at the zeroing and the [iparent] the child's own tie handed
+       out -- so the flush's local update is [Some (1, ag dp) -> None]:
+       [wdt] falls 1 -> 0 and **the register is RESET**.  That is
+       §20.9(b)'s escape clause paying off: nothing survives into the free,
+       so the next mkdir that reuses this inum under a different parent
+       mints against a clean [p = None].  The ticket is already at the
+       region's own index spelling (rewritten at (D1) above). *)
     iApply (Iupdate.wp_iupdate_unlink (CID := D26) gs jx gl gu gd gk pd pav pu
               bn g gfs gi cov logstart inodestart nib dev (ientry ks)
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
@@ -6785,7 +6890,8 @@ Section ProofSysUnlinkBody.
                     (sign_extend' 64
                        (sign_extend' 12 (mword_of_int 63 : mword 6))
                      : mword 64)) 31 0))))
-              dni bmi c2 (Sb2 : gset Z) false (dlc_fl true) pid
+              dni bmi c2 (Sb2 : gset Z) false
+              (Some (Some (bv_unsigned dinum))) pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               C9 (K - 30)%nat eb b lks
               ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0 Hiblki
@@ -6795,10 +6901,10 @@ Section ProofSysUnlinkBody.
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hidevi Hiinumi Hmetai
-                    [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket] [] Hpidq
-                    Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
+                    [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket Hipar] []
+                    Hpidq Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsi Hindi". }
-    { iExact "Hticket". }
+    { cbn [ilink_fl]. iSplitL "Hticket"; [iExact "Hticket" | iExact "Hipar"]. }
     { iLeft. iSplit; iPureIntro; [exact Hglog | exact Hcist]. }
     iIntros (D27 Hd27 miu)
       "%Hcsiu Hcg Hown Hpc Hpidq Hidevi Hiinumi Hmetai Hmapi Hsbi Hdiati
@@ -7184,6 +7290,159 @@ Section ProofSysUnlinkBody.
     { rewrite su_slots2. change 2%nat with (1 + 1)%nat.
       rewrite iref_slots_op. rewrite /iref_slot. iFrame. }
     { right. rewrite Ha0f HF4a0. pcw. }
+  Qed.
+
+
+  (* ==================================================================== *)
+  (*  **THE SEAL.**  W1 ∘ W2 ∘ W3 ∘ {W5-FILE, W5-DIR}, and nothing else.  *)
+  (*                                                                      *)
+  (*  Every block is a landed lemma and every seam is the next block's     *)
+  (*  premise list verbatim, so this composes rather than proves: the only *)
+  (*  work is naming the seam's ∀-bound bundle and handing the caller's    *)
+  (*  exit BACK at each stage (durable-notes, "chaining two halves").      *)
+  (*  [trap_csrs_ext eb] and [cpu_claim_ext eb] are DROPPED at entry --    *)
+  (*  both are [emp] at [eb = true], which this contract's own premise     *)
+  (*  forces -- and the exit continuation the walk hands on is the         *)
+  (*  caller's own, which still demands them, so nothing is lost.          *)
+  (*                                                                      *)
+  (*  The T_DIR arm takes NO design-fact premise any more: (D1) and (D2)   *)
+  (*  are derived inside [su_w5_dir] (V5' increment W).                    *)
+  (* ==================================================================== *)
+  Lemma wp_sys_unlink_sconf `{GEN : GenId} `{CID0 : CpuId}
+      (gf ga gpr : gname)
+      (gs : list gname) (jx : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32) (used : gset Z)
+      (dqb dqs dqbs : dfrac) (v0 : mword 64)
+      (pid : mword 32) (V : pprivate)
+      (m : regfile) (K : nat) (eb : bool) (b : bool) (lks : gset string) :
+    SpecSysUnlink.wp_sys_unlink_sconf_body gf ga gpr gs jx gl gu gd gk pd pav
+      pu bn g gfs gi cn gtl cov logstart bmapstart inodestart nib size dev
+      used dqb dqs dqbs v0 pid V m K eb b lks.
+  Proof.
+    cbv beta zeta delta [SpecSysUnlink.wp_sys_unlink_sconf_body].
+    intros HK Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom Hsize Hbm0 Hbmcov
+           Hbmlog Hist0 Hcovb Hbmgeo Hiregb Hnib16 Hprk Hj Hgl Heb Harg0.
+    iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpanic #Hprenv #Hbio #Hlog
+             Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows
+             #Hslks #Hireg Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hir Hpriv
+             Hcont".
+    (* ---- W1, +0x00..+0x2e: the prologue, argstr, begin_op, nameiparent ---- *)
+    iApply (su_w1 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
+              logstart bmapstart inodestart nib size dev used dqb dqs dqbs
+              v0 pid V m K eb b lks HK Hcdev Hcnib Hclog Hcist HdevR Hnib0
+              Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb
+              Harg0
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hbio Hlog Hseam Hgen
+                    Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg
+                    Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv [] Hcont").
+    iIntros (CIDa Ms P1 n1 Sb1 used1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30).
+    iIntros "%Hal %Hregs1 %Hma01 %Hupt1 %Hused1 %Hn1 %Hw1 %Hdpvnz
+             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hbmres Hpriv Hir
+             Hheld HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE
+             H30 Hcont".
+    (* ---- W2, +0x30..+0x6e: ilock(dp), the two namecmp refusals,
+       dirlookup ---- *)
+    iApply (su_w2 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
+              logstart bmapstart inodestart nib size dev used1 dqb dqs dqbs
+              pid V P1 n1 Sb1 w1 dpv nf bnm0 bp bd be w4 w5 w6 w27 w30
+              m Ms (m !!! Regidx csp_rs1 : mword 64) K eb b lks
+              HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hregs1 Hma01 Hn1
+              Hupt1
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hbio Hlog Hseam Hgen
+                    Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg
+                    Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv Hheld HopS
+                    Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30
+                    [] Hcont").
+    iIntros (CIDb M2 kd ks kk gild gisld gyd qdi sd qs dinum dnd bmd datd lo).
+    iIntros "%Hregs2 %Hkd %Hks %Hdinb %Htydir %Hiok %Hdok %Hddix %Hdoc %Hduq
+             %Hnotdot %Hnotdd %Hfst %Hma02 %Hal27
+             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hbmres Hpriv
+             Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hkeepd Hchild HopS
+             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
+             Hcont".
+    (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
+       (and, on the taken arm, the whole isdirempty loop through W4) ---- *)
+    iApply (su_w3 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
+              logstart bmapstart inodestart nib size dev used1 dqb dqs dqbs
+              pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs
+              dinum dnd bmd datd lo nf bnm0 bp bd be w5 w6 w30
+              m M2 (m !!! Regidx csp_rs1 : mword 64) K eb b lks
+              HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1 Hupt1 Hregs2
+              Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd
+              Hfst Hma02 Hal27
+              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hdev Hgeo
+                    Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hsbb Hsbi
+                    Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq Hslpidd
+                    Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
+                    Haddrsd Hindd Hblocksd Hshotd Hkeepd Hchild HopS
+                    Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
+                    HbE H30 [] Hcont").
+    iIntros (CIDc M3 s3x bex isdir gili gisli gyi si qsi dni bmi dati).
+    iIntros "%Hregs3 %Hnlzi %Hioki %Hdoki %Hddixi %Hdoci %Hduqi %Hisd
+             Hcg Hown Hpc Hseam Hgen Hbsl Hsbb Hsbi Hsbs Hbmres Hpriv
+             Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+             Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hkeepd
+             Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+             Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hkeepi HopS
+             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
+             Hcont".
+    (* ---- W5, +0x8a..: the zeroing and the two tails, split on the seam's
+       own index.  The FILE arm is [su_w5_file]; the T_DIR arm is
+       [su_w5_dir], which since V5' increment W derives (D1) and (D2)
+       internally and takes neither as a premise. ---- *)
+    destruct isdir.
+    - destruct Hisd as (Htyzi & Hdots & Hdead).
+      iApply (su_w5_dir gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                gpr cov logstart bmapstart inodestart nib size dev used1
+                dqb dqs dqbs pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd
+                qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
+                gili gisli gyi si qsi dni bmi dati
+                m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks
+                HK Hclog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0
+                Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
+                Hupt1 Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq
+                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hdoki Hddixi
+                Hdoci Hduqi Htyzi Hdots Hdead
+                with "Hcg Hown Htext Hdata Hprenv Hpc Hpanic Hbio Hlog Hseam
+                      Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg
+                      Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
+                      Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd
+                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd
+                      Hkeepd Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
+                      Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
+                      Hshoti Hkeepi HopS
+                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
+                      HbE H30 Hcont").
+    - iApply (su_w5_file gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl
+                gpr cov logstart bmapstart inodestart nib size dev used1
+                dqb dqs dqbs pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd
+                qdi sd qs dinum dnd bmd datd lo nf bnm0 bp bd bex w6 w30
+                gili gisli gyi si qsi dni bmi dati
+                m M3 (m !!! Regidx csp_rs1 : mword 64) s3x K eb b lks
+                HK Hclog Hprk Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0
+                Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1
+                Hupt1 Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq
+                Hnotdot Hnotdd Hfst Hal27 Hregs3 Hnlzi Hioki Hdoki Hddixi
+                Hdoci Hduqi Hisd
+                with "Hcg Hown Htext Hdata Hprenv Hpc Hpanic Hbio Hlog Hseam
+                      Hgen Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hireg
+                      Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hpriv
+                      Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd
+                      Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd
+                      Hkeepd Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
+                      Hivalidi Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi
+                      Hshoti Hkeepi HopS
+                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
+                      HbE H30 Hcont").
   Qed.
 
 End ProofSysUnlinkBody.

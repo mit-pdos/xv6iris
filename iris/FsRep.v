@@ -198,7 +198,7 @@ Section FsRep.
         (dir_link_at_f F self dn data k -∗ fedges self dn data).
   Proof.
     intros Hty Hk. rewrite /fedges /dir_links decide_True; [| exact Hty].
-    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
+    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & Htie & H)".
     iDestruct (big_sepL_lookup_acc _ (seq 0 (dir_nrec (bv_unsigned (di_size dn))))
                  k k with "H") as "[Hk Hback]".
     { apply lookup_seq. lia. }
@@ -208,6 +208,8 @@ Section FsRep.
     iExists F. iSplitL "Hk"; [iExact "Hk" |].
     iIntros "Hk". iExists F. iSplitR; [iPureIntro; exact Hbnd |].
     iSplitR; [iPureIntro; exact Hlow |].
+    (* V5': the parent tie rides the borrow untouched *)
+    iSplitL "Htie"; [iExact "Htie" |].
     iApply ("Hback" with "Hk").
   Qed.
 

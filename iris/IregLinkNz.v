@@ -236,6 +236,67 @@ Section IregLinkNz.
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin2.
   Qed.
 
+  (* ...AND THE SAME READING OFF THE **TAGGED** UNIT (V5' increment W).
+     The walk that needs the root refutation for [ip] holds exactly one
+     fragment for it -- the [ilinkdp ip dp] the zeroing released -- and
+     that is not an [ilink_fl]: the payload keeps only the payment half,
+     the [iparent] half being the child's own and still locked inside the
+     payload this refutation is about to open.  So the [wdt] bound is read
+     directly ([IcacheRef.link_wdt_ge]) and the proof is otherwise
+     [ireg_link_root_min2]'s, line for line. *)
+  Lemma ireg_link_root_min2_dp (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (pv : Z) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn -∗
+    ilinkdp (bv_unsigned inum) pv ={E}=∗
+    ⌜bv_unsigned inum = ireg_root -> 2 <= bv_unsigned (di_nlink dn)⌝ ∗
+    dinode_at γi inum dn ∗ ilinkdp (bv_unsigned inum) pv.
+  Proof.
+    iIntros (HE Hin) "#Hinv Hdn Hfrag".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct (link_wdt_ge with "Hla Hfrag") as %[Hw1 _].
+    rewrite /dinode_at.
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
+    assert (Hdeq : ds !!! islot inum = dn).
+    { specialize (Hcp (islot inum) Hsl).
+      rewrite -ireg_key_split in Hcp. congruence. }
+    rewrite Hdeq in Hrt.
+    assert (Hmin2 : bv_unsigned inum = ireg_root ->
+                    2 <= bv_unsigned (di_nlink dn)).
+    { intro Hz. pose proof (Hrt Hz) as Hlt.
+      pose proof (di_nlink_nonneg dn). lia. }
+    rewrite -Hdeq in Hrt.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    { iNext. iExists m. iFrame "Ha".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
+                with "Hla Hep"). iExact "Harm". }
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin2.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  THE ROOT INUM, ACROSS THE TWO SPELLINGS                             *)
   (* ------------------------------------------------------------------ *)
@@ -250,6 +311,18 @@ Section IregLinkNz.
      A consumer of [InodeRegion.ireg_root_ne] -- §20.4's licence (f), whose
      arm is [⌜bv_unsigned z = ROOTINO⌝] -- rewrites with this and is done. *)
   Lemma ireg_root_ROOTINO : bv_unsigned ROOTINO = ireg_root.
+  Proof. vm_compute. reflexivity. Qed.
+
+  (* ...AND THE THIRD SPELLING (V5' increment P).  [DirLinks.dl_root] is
+     the root inum at the PAYLOAD's key type, restated there for the same
+     layering reason [ireg_root] is restated in [InodeRegion] -- DirLinks
+     sits below both files and can import neither.  This is the bridge, and
+     it is what S7-unlink's T_DIR arm rewrites with after
+     [ireg_link_root_min2] has refuted [ip = ireg_root]. *)
+  Lemma dl_root_ireg_root : dl_root = ireg_root.
+  Proof. reflexivity. Qed.
+
+  Lemma dl_root_ROOTINO : bv_unsigned ROOTINO = dl_root.
   Proof. vm_compute. reflexivity. Qed.
 
   (* ------------------------------------------------------------------ *)

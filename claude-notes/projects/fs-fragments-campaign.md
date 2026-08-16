@@ -22,7 +22,7 @@ diverged from the design's sketches, and what is left.
 | **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | **LANDED, fused with V5′'s increment R** — see the fused-increment entry below |
 | **F3** | the SYSCALL BOUNDARY: `fs_geom`/`fs_world`/`fs_res` + the mkdir and chdir wrappers | `FsSyscalls.v`, `LinkFsSyscalls.v` (new leaves) | F2 | **LANDED — the CALLING-CONVENTION half only; THE TREE-DELTA HALF IS STOPPED (S1–S3), and lifting the stop needs an R3 ruling** |
 | **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | SUPERSEDED by **V5′** — the sketch is unsound (Correction 1) and unprovable (Correction 2) as written; see the V5′ entry |
-| **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | DESIGNED (probe report transcribed below); increment R IN FLIGHT fused with V4 |
+| **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | **ALL THREE INCREMENTS LANDED** (R fused with V4; P and W below) -- (D1) falls, `su_w5_dir` takes no design-fact premise, and the seal flips sysfile.c to 16/16 |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
 landed contract and no landed proof moved.
@@ -1982,6 +1982,112 @@ local-update helper is OWED as an optimization).  A third, smaller one:
 `destruct (F kk) eqn:` substitutes into HYPOTHESES but not into a
 wand's not-yet-unfolded premise, so a re-park after a flavour destruct
 needs `rewrite EFkk` on the goal side only.
+
+## V5′ INCREMENT P — **EXECUTED.  The ticket index-split, the tie, the
+## tagged mint and its two halves, and the dot deposit that ESTABLISHES
+## the tie.  (D1)'s payload half is landed**
+
+What the payload layer now says, layer by layer:
+
+* **`DirLinks.v`** — the per-record ticket is `dlc_tick self k b z`:
+  plain at `b = false`, the UNTAGGED `ilinkd` at the two dot slots
+  (`k < 2`), and the TAGGED `ilinkdp z self` at a NAME record
+  (`2 <= k`) — **the tag is literally the payload's own `self`
+  parameter**, which is the whole trick: one payload states a two-inode
+  relation without ever naming the second inode.  Four movers
+  (`dlc_tick_dot_out`/`_in`, `dlc_tick_name_out`/`_in`) are stated as
+  WANDS rather than equations, because a `rewrite` of the equation
+  inside the proofmode does not always match the `∃`/`∗`-elaborated
+  term (the trap below).  The tie is `dir_par_tie self dn data` — a
+  separate conjunct of `dir_links`' T_DIR branch, guarded on
+  `nlink ≠ 0 ∧ 2 ≤ nrec ∧ self ≠ dl_root`, with
+  `_nl0`/`_small`/`_root`/`_cong`/`_open`/`_close` as its six movers.
+  `dl_root` is restated locally at `1` for `InodeRegion.ireg_root`'s own
+  layering reason; the bridges are `IregLinkNz.dl_root_ireg_root` and
+  `dl_root_ROOTINO`.
+* **The park table, as executed.**  `dir_links_dirlink` gained
+  **`k0 <> 1`** (a plain deposit into record 1 would have to
+  re-establish a tie it has no register half for) and
+  `dir_slot_dots_ge2` is the packaged discharge every caller uses;
+  `_nop` needed nothing; `dir_links_dirlink_d` takes the TAGGED unit and
+  rides the tie; `dir_links_dirlink_dot` is pinned to `k0 = 1`, takes
+  BOTH halves of the mint, and is the ONE site in the tree that
+  ESTABLISHES the tie; `dir_links_unlink` releases
+  `if b then ilinkdp _ self else ilink _` and rides the tie through a
+  count case-split; `dir_links_orphan` / `_size_zero` are guard-false;
+  `dir_links_of_plain` carries boot's one image fact
+  (`nlink ≠ 0 -> 2 ≤ nrec -> self = dl_root`), vacuous at its one caller.
+* **`dir_links_dotdot_out` IS AN ACCESSOR IN TWO LEGS, and the ORDER IS
+  FORCED.**  Stating the tie and the ticket under one premise list is
+  CIRCULAR: the ticket needs `dir_inum data 1 ≠ self`, which a caller
+  cannot know until it knows WHO record 1 names — which is (D1), which
+  is what the tie supplies.  So the tie comes out unconditionally and the
+  ticket sits behind `⌜dir_inum data 1 <> self⌝ -∗ …`.
+* **`ProofCreate.v`** — `cr_flav ty dpv` is the TAGGED index
+  (`Some (Some dpv)` at `T_DIR`), `cr_flav_ntag` is RETIRED and
+  `cr_flav_tag` replaces it; the +0xc4 mint's third premise
+  (`p = None`'s source) is now the fresh child's own `nlink = 0` rather
+  than a vacuity; the payout is SPLIT at ARM C-OK-DIR — `ilinkdp` into
+  dp's name record, `iparent` into the child's tie — and the fail arms'
+  `wp_iupdate_unlink` spends the pair back, resetting the register.
+* **`IregDirBit.v` / `IregLinkNz.v`** — `ireg_dirbit_ty_dp` and
+  `ireg_link_root_min2_dp`, structural copies of their `ilink_fl`
+  twins with `link_wdt_ge` in place of `link_wd_ge`/`link_wsum_ge`.
+  They are needed because a payload's NAME record now hands the walk an
+  `ilinkdp`, which is not an `ilink_fl` — the other half is the child's.
+
+## V5′ INCREMENT W — **(D1) AND (D2) ARE DERIVED INSIDE `su_w5_dir`, AND
+## BOTH PREMISES ARE GONE**
+
+* **(D2)** — one `IregDirBit.dir_links_subdir_nlink2` before the
+  zeroing, off holdings the +0x8a seam already has.
+* **(D1) — three steps, no region open twice and no tree fragment.**
+  (1) the zeroing releases `ilinkdp ip dp`, the tag read off dp's own
+  `self`; (2) `ireg_link_root_min2_dp` against FINDING 3's
+  `nlink ip = 1` refutes `ip = root`, which opens
+  `dir_links_dotdot_out`'s tie leg and yields
+  `iparent ip pv ∗ ⌜dir_inum dati 1 = pv⌝`; (3) `iparent_agree`
+  collapses `pv` and `dp`.  The `".."`-ticket's index then rewrites to
+  dp and feeds `wp_iupdate_unlink(dp)`, and the TAGGED spend at
+  `ip->nlink--` takes both halves and RESETS the register before the
+  inum can be reclaimed.
+* **A GAP THE SEAL FOUND, and it is real**: `su_w1`'s seam did not
+  export `⌜Ms !!! Ra0 = dpv⌝`.  `su_regs` pins the five CALLEE-SAVED
+  registers and `a0` is not one of them, so the `c.mv s1,a0` at +0x2c
+  leaves the fact true and unexported — and W2's `ilock(dp)` reads `a0`.
+  One conjunct added to the seam, one `eq_trans` at the site.
+
+**THE TRAP THIS INCREMENT PAID FOR**: **an equation between `iProp`s
+does not always `rewrite` inside the proofmode.**
+`dlc_tick self k b z = (if b then ilinkdp z self else ilink z)` failed
+with *"Found no subterm matching"* against a goal that PRINTS as exactly
+that RHS — it was under an `iExists`-instantiated `∃`/`∗` skeleton.  The
+fix is not a stronger rewrite: state the mover as a WAND and `iApply`
+it.  Every `dlc_tick` mover in `DirLinks.v` is written that way, and the
+equations are kept only as the reading.
+
+### The P + W increment's gate
+
+Lane `/home/ubuntu/v4lane` ON THE EC2 MIRROR, re-synced around the three
+upstream commits that landed mid-increment (F3's `FsSyscalls.v` /
+`LinkFsSyscalls.v` / `_CoqProject` rows, and the equivalence package's
+`IregBox.v` / `SpecCreateFreshTy.v` / `SystemAdequacy.v`), block-md5
+verified before the build.  `make -f CoqMakefile -j24 -k` **EXIT=0**;
+`make -n` emits **0** compile lines; the `.v`-vs-`.vo` staleness sweep
+over every `_CoqProject` row reports **0**.
+`tools/lemma_diff.py --ref HEAD` over the ten files: exactly **three**
+retirements, all intended -- `Module SysUnlinkAx` and
+`Axiom wp_sys_unlink_sconf` (the tree's LAST stub axiom, retired by the
+seal) and `Lemma cr_flav_ntag` (create's mint is tagged now).
+`proof_coverage.py --check` exits 0; coverage **187/190 (98 %),
+sysfile.c 16/16 -- COMPLETE**.
+
+`Print Assumptions SysUnlink.wp_sys_unlink_sconf` is **THE STANDING SIX
+AND NOTHING ELSE** -- `valid_reservation`, `plat_term_write`,
+`match_reservation`, `load_reservation`,
+`functional_extensionality_dep`, `cancel_reservation`.  No
+`create_fresh_ty` (sys_unlink allocates no inode), no module parameter,
+no admit.
 
 ## F3 — **THE SYSCALL BOUNDARY.  The packaging half LANDS; the TREE-DELTA
 ## half is STOPPED on three obstructions, and the third one is R3 itself**

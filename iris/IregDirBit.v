@@ -133,6 +133,68 @@ Section IregDirBit.
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 
+  (* ...AND THE SAME READING OFF THE **TAGGED** UNIT (V5' increment P).
+     (T1) is stated at [wdu + wdt], so the parent-record unit forces it just
+     as the [".."]-unit does; what changes is only which component the bound
+     comes off ([IcacheRef.link_wdt_ge] rather than [link_wd_ge]).  It is
+     needed because since V5' a payload's NAME records (index >= 2) carry
+     the tagged unit, so sys_unlink's FILE arm -- which refutes [b = true]
+     against the non-directory it is deleting -- meets an [ilinkdp] where it
+     used to meet an [ilinkd].  Structural copy, one line different. *)
+  Lemma ireg_dirbit_ty_dp (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode) (pv : Z) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn -∗
+    ilinkdp (bv_unsigned inum) pv ={E}=∗
+    ⌜bv_unsigned (di_type dn) = T_DIR_z⌝ ∗
+    dinode_at γi inum dn ∗ ilinkdp (bv_unsigned inum) pv.
+  Proof.
+    iIntros (HE Hin) "#Hinv Hdn Hfrag".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct (link_wdt_ge with "Hla Hfrag") as %[Hw1 _].
+    rewrite /dinode_at.
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
+    assert (Hdeq : ds !!! islot inum = dn).
+    { specialize (Hcp (islot inum) Hsl).
+      rewrite -ireg_key_split in Hcp. congruence. }
+    (* (T1), read at the caller's own record, and translated into
+       [DirView]'s spelling in the same step *)
+    assert (Hty : bv_unsigned (di_type dn) = T_DIR_z).
+    { rewrite -ireg_dir_ty_T_DIR_z -Hdeq.
+      exact (ireg_dir_ok_ty (ds !!! islot inum) (wdu + wdt) Hdir
+               ltac:(lia)). }
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    { iNext. iExists m. iFrame "Ha".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
+                with "Hla Hep"). iExact "Harm". }
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
+  Qed.
+
+
   (* ------------------------------------------------------------------ *)
   (*  (T1') AT A RECORD THE CALLER NAMES -- THE MIRROR (V4)               *)
   (* ------------------------------------------------------------------ *)
@@ -241,7 +303,7 @@ Section IregDirBit.
     iIntros (HE Hin Htyd Hnzd Hk2 Hklt Hlv Hnself Hieq Htyi)
       "#Hinv Hdni Hdlnk".
     rewrite /dir_links decide_True; [| exact Htyd].
-    iDestruct "Hdlnk" as (F) "(%Hbnd & %Hlow & H)".
+    iDestruct "Hdlnk" as (F) "(%Hbnd & %Hlow & Htie & H)".
     iDestruct (big_sepL_lookup_acc _
                  (seq 0 (dir_nrec (bv_unsigned (di_size dnd)))) kk kk
                  with "H") as "[Hk Hback]".
@@ -270,9 +332,12 @@ Section IregDirBit.
       iSplitR; [iPureIntro; lia |].
       iFrame "Hdni".
       iExists F. iSplitR; [iPureIntro; exact Hbnd |].
-      iSplitR; [iPureIntro; exact Hlow |]. iExact "H".
+      iSplitR; [iPureIntro; exact Hlow |].
+      (* V5': the parent tie is untouched -- this lemma BORROWS one record
+         and hands it straight back *)
+      iSplitL "Htie"; [iExact "Htie" |]. iExact "H".
     - (* plain: dies against (T1') at the child the walk NAMES *)
-      iEval (cbn [dlc_fl ilink_fl]) in "Hticket".
+      iEval (cbn [dlc_tick]) in "Hticket".
       iEval (rewrite -Hieq) in "Hticket".
       iMod (ireg_link_not_dir E γi γfs inodestart nib inum dni HE Hin
               with "Hinv Hdni Hticket") as "(%Hnd & _ & _)".

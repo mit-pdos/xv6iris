@@ -2780,13 +2780,32 @@ Section ProofSysLinkBody.
                                          tot ltac:(lia) Hrng with "[Hilink]")
                               as "Hk0".
                             { rewrite Hli. iExact "Hilink". }
+                            (* V5': the appended slot is not the [".."] the
+                               parent tie names.  [DirLinks.dir_slot_dots_ge2]
+                               reads it off the dots clause under ARM E2's
+                               own live-parent fall-through. *)
+                            assert (Hslot1 : dir_slot datd
+                                     (dir_nrec (bv_unsigned (di_size dnd)))
+                                     <> 1%nat).
+                            { pose proof (dir_slot_dots_ge2 (bv_unsigned dinum)
+                                            dnd datd
+                                            (dir_nrec (bv_unsigned (di_size dnd)))
+                                            ltac:(clear -Htyd; rewrite Htyd;
+                                                  vm_compute; reflexivity)
+                                            ltac:(clear -Hdnl0; intro Hc;
+                                                  apply Hdnl0; apply bv_eq;
+                                                  rewrite Hc; vm_compute;
+                                                  reflexivity)
+                                            Hddixd eq_refl) as Hge2.
+                              clear -Hge2. lia. }
                             iDestruct (dir_links_dirlink (bv_unsigned dinum)
                                          dnd dnd' datd datd' (sl_low16 inum)
                                          (bname 14 nf)
                                          (dir_nrec (bv_unsigned (di_size dnd)))
                                          (dir_slot datd
                                             (dir_nrec (bv_unsigned (di_size dnd))))
-                                         tot eq_refl eq_refl Htotle Htyeq Hnleq
+                                         tot eq_refl eq_refl Htotle Hslot1
+                                         Htyeq Hnleq
                                          Hszmax Hrng with "Hk0 Hdlnkd") as "Hdlnkd'".
                             iAssert (ic_loaded gfs gi cov logstart kd dinum dnd' bmd')
                               with "[Hdlnkd' Hdiatd Hmetad Hmapd Hblocksd]"
