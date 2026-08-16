@@ -274,7 +274,53 @@ Section SRegimeDef.
     sr_tmode : forall (σ : mstate),
       _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
       ⊢ reg_interp σ.(sregs) -∗ sr_inv -∗
-        ⌜ exists md, exec (translationMode Supervisor) σ = Some (md, σ) ⌝
+        ⌜ exists md, exec (translationMode Supervisor) σ = Some (md, σ) ⌝;
+    (* THE WITNESSED absorption (claude-notes/projects/sp-migration.md
+       design §3): a SECOND way to discharge admissibility, gated on a
+       PERSISTENT WITNESS instead of the [sr_adm] premise above.  Where
+       [sr_adm_id] says "this regime honors an IDENTITY claim", [sr_kwit]
+       says "this regime honors EVERY claim" -- and unlike [sr_adm], that
+       is not uniformly true, so it cannot be a bare field: a regime that
+       does NOT honor every claim (Bare) must make [sr_kwit] itself
+       unsatisfiable, so unsoundness surfaces as an unpayable WITNESS
+       rather than an unpayable premise.  [kpt_share_regime]'s Sv39 walk
+       honors every claim for free, so its witness is [emp].
+       [strans_regime]'s witness pins its folded slot's arm at KPT
+       ([kpt_on cpu_id]): a Bare arm holder cannot produce it, so the
+       Bare arm never has to reconcile a non-identity claim.  This is the
+       route a NON-identity claim (a KSTACK/trampoline va) uses once its
+       holder knows its hart is at KPT, with no per-address premise
+       anywhere in the leaf/engine layer. *)
+    sr_kwit : iProp Σ;
+    sr_kwit_pers : Persistent sr_kwit;
+    sr_absorb_wit : forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
+        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
+      s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      ⊢ sr_kwit -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv;
   }.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
@@ -392,9 +438,45 @@ Section SRegimeDef.
     exact (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode).
   Qed.
 
+  (* Bare + a non-identity claim is UNSOUND (SRegime.v's header comment,
+     [kadm_ident]'s), so the witness that would let [sr_absorb_wit] skip
+     the identity premise must be UNSATISFIABLE here -- unsoundness shows
+     up as an unpayable WITNESS, never an unpayable premise. *)
+  Lemma bare_absorb_wit :
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      ⊢ (False : iProp Σ) -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ bare_inv ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ bare_inv.
+  Proof.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "H". iDestruct "H" as %[].
+  Qed.
+
   Definition bare_regime : s_regime :=
     SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
-            bare_tmode.
+            bare_tmode (False%I) _ bare_absorb_wit.
 
 End SRegimeDef.
 
@@ -488,9 +570,48 @@ Section SRegimeShared.
     exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode).
   Qed.
 
+  (* The Sv39 walk honors every claim ([sr_adm := fun _ _ => True]), so its
+     witness costs nothing: [emp], and the proof is [res_absorb] with the
+     dropped premise's argument supplied as [I] exactly as [res_absorb]
+     already takes it. *)
+  Lemma res_absorb_wit (root_ppn : mword 44) :
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      ⊢ emp -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ tlb_res_pt root_ppn ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ tlb_res_pt root_ppn.
+  Proof.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "_ Hat Hri Hgh Hres".
+    iApply (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
+              with "Hat Hri Hgh Hres").
+  Qed.
+
   Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
     SRegime (tlb_res_pt root_ppn) (fun _ _ => True) (fun _ _ _ => I)
-            (res_absorb root_ppn) (res_transform root_ppn) (res_tmode root_ppn).
+            (res_absorb root_ppn) (res_transform root_ppn) (res_tmode root_ppn)
+            (emp%I) _ (res_absorb_wit root_ppn).
 
   Lemma kpt_share_regime_inv (root_ppn : mword 44) :
     sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.
