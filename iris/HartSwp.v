@@ -389,6 +389,32 @@ Section swp.
     iApply (swp_mono with "[H2] H1"). iIntros (v) "HΦ". by iApply "H2".
   Qed.
 
+  Lemma swp_use_cer4 {X A B E1 R : Type} (m : M X) (Φ : X -> iProp Σ)
+      (K0 : X -> MR R A) (K1 : A -> MR R B) (K2 : B -> MR R E1)
+      (K3 : E1 -> MR R R) (C : M R -> M unit) :
+    mctx C ->
+    swp m Φ -∗
+    (∀ v : X, Φ v -∗
+       WP (HartE gen_id cpu_id
+             (C (Defs.catch_early_return
+                   (Defs.bind (Defs.bind (Defs.bind (K0 v) K1) K2) K3)))
+           : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id
+          (C (Defs.catch_early_return
+                (Defs.bind (Defs.bind (Defs.bind
+                   (Defs.bind (Defs.liftR (R := R) m) K0) K1) K2) K3)))
+        : expr riscv_lang).
+  Proof.
+    iIntros (HC) "Hswp H".
+    iApply (swp_use m Φ _
+              (mctx_cer_F
+                 (fun h => Defs.bind (Defs.bind (Defs.bind
+                              (Defs.bind h K0) K1) K2) K3) C HC
+                 (mctxE_bind K0 _ (mctxE_bind K1 _
+                    (mctxE_bind K2 _ (mctxE_bind K3 _ mctxE_id)))))
+              with "Hswp H").
+  Qed.
+
 End swp.
 
 Global Arguments swp {Σ _ _ _ X} m Φ.
