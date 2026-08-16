@@ -1434,3 +1434,13 @@ A MISSING assumed-Link = someone proved it: celebrate, then update this
 list in the same commit.  Remember the print's honest scope: cones not
 wired into boot (create's, syscall dispatch) do not appear here, so
 absence from this list is not absence from the tree.
+
+## Gate grep: match "ROCQ compile", NOT "COQC" (false-green trap)
+
+This tree builds with Rocq 9.0.1, whose build recipe prints `ROCQ compile
+<f>.v`, not `COQC <f>.v`.  A gate check like `make -n | grep -c COQC` reads
+**0** on a tree that still has hundreds of files to compile — it looks
+green when it is not.  Grep case-insensitive `compile` (or `ROCQ compile`)
+for the pending-compile check, never `COQC`.  (Caught mid-GR-38, 2026-08-16;
+the older durable-notes guidance that said to look for COQC lines is wrong
+for this switch.)
