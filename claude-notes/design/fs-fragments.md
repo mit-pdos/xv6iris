@@ -176,6 +176,39 @@ R12. **Do not build on the current grey provenance** — today the only
      dimension (dl/crz credit) stays outside the algebra; only F3's
      syscall boundary can hide it.
 
+R14 (2026-08-16, C′ UN-PARKED — the licence increment executes).  The
+     user directed the delivery half built now ("Follow your
+     recommendation.  I am hoping that by keeping improving we will
+     get rid of the axiom"), prompted by their own formulation of the
+     invariant — "the kernel will never invoke iget on inode numbers
+     in directories in a disconnected subtree" — whose statable form
+     IS the SpecIget licence (§7.5.6 point 2 of TRACE G: the
+     enumeration lives at delivery).  Three amendments to R13:
+     (i) R13(iii)'s parking clause ("C′ EXECUTES ONLY AFTER K-F2
+     lands") is VOID: K-F2 is rejected, so the clause as written parks
+     C′ forever, which was not its intent.  C′-lite — the delivery
+     half, licence (d) FORECLOSED per §7.9 step 3 — executes now.
+     The worklist is `claude-notes/projects/iget-licence.md`.
+     (ii) The one design delta the foreclosure forces: `ProofIalloc`'s
+     own `iget` presents a new TRANSITIONAL constructor `SpanL`, with
+     `iname … SpanL := ⌜True⌝`, documented in `IgetLic.v` as the
+     create_fresh_ty span licence — permitted at EXACTLY ONE site
+     (`ProofIalloc`'s iget), so the axiom's delivery-side perimeter
+     becomes a grep line.  `SpanL` deletes when F1.5c mints `iclaim`
+     or the axiom retires.  `ClaimL := iclaim` stays per R11 (honesty
+     marker, unminted); `GreyL := igrey` stays with the audit
+     obligation *zero sites instantiate it* (G1's token deletion
+     remains available and is deferred to a milestone fold-back — it
+     touches `IcacheRef`/`InodeRegion`, which this increment must not).
+     (iii) Honesty, restated so the increment is not oversold: this
+     retires §20.17.5's PARAGRAPH (the enumeration becomes contract),
+     not §20.7's WALL (the free-side residue, §7.1.6's death
+     certificate, stands; the axiom stands).  The gate does not open
+     when this lands — what changes is that the invariant the user
+     stated becomes a theorem of every licensed iget, and the axiom's
+     remaining justification shrinks to the three §7.9 pieces plus one
+     greppable SpanL site.
+
 ---
 
 What follows is the verification report, preserved verbatim (2026-08-14,
