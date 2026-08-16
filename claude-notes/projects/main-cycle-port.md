@@ -335,6 +335,17 @@ it here.  What is left is the rest:
 - `set_solver` in a clean top-level goal is 7 ms; the SAME goal inside a
   leaf proof, with the towers in scope, is unbounded.  Precompute
   memberships as standalone lemmas (`ml_in_*`, `ml_ind_*`) and pass them.
+- **A footprint (`hfrun`/`swp_hfrun`) CANNOT run an instruction with
+  SYMBOLIC operands**, and every leaf in the tree has symbolic operands
+  (`wp_or_gpr` quantifies `rs2 rs1 rd : mword 5`).  `hfrun` answers a
+  register read by `bool_decide (r ∈ D)`, which does not compute at a
+  symbolic index.  This kills the whole "convert `gpr_file` into
+  `hreg_frame` so the leaf can use `swp_hfrun`" plan -- the GPRs do not
+  belong in the wrapper's footprint at all.  What a leaf needs is per-NODE
+  access at a symbolic index, which is `HartRegNode`'s σ-shaped
+  `swp_hart_regread`/`swp_hart_regwrite`, needing no frame; see
+  `HartMFrame.swp_rX_bits`/`swp_wX_bits`, proved once by the same 32-way
+  `lia` case split `WpGpr.exec_rX_bits_gpr` already uses.
 - **`vm_compute` does NOT normalise a `regidx`'s WIDTH INDEX, so computed
   register keys never syntactically match hand-written `k%bv` literals.**
   Measured with `Set Printing All`: the literal is

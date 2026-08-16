@@ -1,106 +1,150 @@
-(* HartMFrame.v -- the FRAME BRIDGE for the M-mode instruction wrapper.
+(* HartMFrame.v -- GPR ACCESS FOR THE [swp] LAYER, at [gpr_pt] / [gpr_file],
+   with NO frame and NO footprint.
 
-   The leaves hold their register state as [gpr_file m] / [pc_is pc] /
-   [mmode_config dq]; the [swp] layer wants [hreg_frame rs Drw] and
-   [hreg_frame_ro Df rs Dro].  Doing that conversion ONCE, here, is what
-   keeps the 135 leaf statements unchanged: a leaf never sees a footprint,
-   a register-file tower, or [hreg_frame].
-   
-   THE FOOTPRINT SPLIT, and why the GPRs have to be in it.  The wrapper
-   itself ([try_step]'s prelude and tail, the fetch, the decode, the tick)
-   touches NO general-purpose register -- so it is tempting to leave the
-   GPRs outside [Drw] and let them ride in the caller's [R].  That fails at
-   the next step down: a leaf discharges its [swp (execute i)] by
-   [swp_hfrun], which needs ONE frame covering everything [execute i]
-   touches -- the GPRs it reads and writes AND [nextPC] for the jumps.
-   Splitting [hreg_frame _ Drw] apart and recombining it with [gpr_file] at
-   each of the 135 leaves is the same conversion done 135 times.  So the
-   GPRs go in [Drw] and the conversion happens here.
-   
-   MEASURED: the 31-way [big_sepS] split costs ~17 s (30 [big_sepS_union]
-   rewrites, each with a [set_solver] disjointness side condition).  That
-   is a one-time cost in this file, not a per-leaf one. *)
-From Stdlib Require Import ZArith.
+   THIS FILE USED TO HOLD A FRAME BRIDGE ([mm_gpr_D] + a 31-way
+   [big_sepS] split converting [gpr_file] to [hreg_frame]).  It is gone,
+   and the reason is worth keeping:
+
+   THE BRIDGE EXISTED ONLY TO PUT THE GPRs IN THE WRAPPER'S FOOTPRINT, and
+   the only argument for doing that was "a leaf discharges its
+   [swp (execute i)] by [swp_hfrun], which needs ONE frame".  That argument
+   is FALSE for the leaves that matter.  [hfrun] answers a register read by
+   [bool_decide (r ∈ D)], which does not compute at a SYMBOLIC register
+   index -- and every instruction leaf in the tree is generic in its
+   operands ([wp_or_gpr] quantifies [rs2 rs1 rd : mword 5]).  So [hfrun]
+   was never going to run [execute (RTYPE (rs2, rs1, rd, OR))] anyway.
+   What a leaf actually needs is per-NODE access at a symbolic index, which
+   is [HartRegNode]'s σ-shaped [swp_hart_regread] / [swp_hart_regwrite] --
+   and those need no frame at all.
+
+   SO: the GPRs stay OUT of [Drw] and ride in the caller's [R]; [gpr_file]
+   and [gpr_pt] keep their definitions (no change to [WpGpr], none to the
+   32 sites that destructure them); and the two lemmas below are the whole
+   interface, proved ONCE by the same 32-way [lia] case split that
+   [WpGpr.exec_rX_bits_gpr] already uses.
+
+   The shape is deliberately the [swp] twin of [exec_rX_bits_gpr] /
+   [exec_wX_bits_gpr], so a leaf's proof reads as it does today. *)
+From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
-        RegFile WpGpr.
+        HartRegNode RegFile WpGpr.
 Local Open Scope Z_scope.
 
-(* the 31 writable GPRs.  x0 is NOT here: [gpr_pt] at index 0 is the PURE
-   fact [v = zero_reg], not a cell, because x0 is hardwired. *)
-Definition mm_gpr_D : gset register :=
-  {[ (R_bitvector_64 x1 : register); R_bitvector_64 x2; R_bitvector_64 x3;
-     R_bitvector_64 x4; R_bitvector_64 x5; R_bitvector_64 x6;
-     R_bitvector_64 x7; R_bitvector_64 x8; R_bitvector_64 x9;
-     R_bitvector_64 x10; R_bitvector_64 x11; R_bitvector_64 x12;
-     R_bitvector_64 x13; R_bitvector_64 x14; R_bitvector_64 x15;
-     R_bitvector_64 x16; R_bitvector_64 x17; R_bitvector_64 x18;
-     R_bitvector_64 x19; R_bitvector_64 x20; R_bitvector_64 x21;
-     R_bitvector_64 x22; R_bitvector_64 x23; R_bitvector_64 x24;
-     R_bitvector_64 x25; R_bitvector_64 x26; R_bitvector_64 x27;
-     R_bitvector_64 x28; R_bitvector_64 x29; R_bitvector_64 x30;
-     R_bitvector_64 x31 ]}.
+(* collapse the closed [Z.eqb] tests of the model's rX/wX cascades *)
+Local Ltac zt :=
+  repeat match goal with
+  | |- context [ if ?b then _ else _ ] =>
+      assert_fails (is_var b);
+      let x := eval vm_compute in b in
+      lazymatch x with true => change b with true
+                     | false => change b with false end
+  end.
 
-Section frame.
+Section gpr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* THE SPLIT.  [hreg_frame] over the 31 GPRs, as the 31 cells a leaf
-     actually holds.  Stated (and proved) once; every use downstream is an
-     [iApply], not a re-derivation. *)
-  Lemma mm_gpr_split (rs : regstate) :
-    (hreg_frame rs mm_gpr_D : iProp Σ) ⊣⊢
-    ((R_bitvector_64 x1) ↦ᵣ register_lookup (R_bitvector_64 x1) rs ∗
-     (R_bitvector_64 x2) ↦ᵣ register_lookup (R_bitvector_64 x2) rs ∗
-     (R_bitvector_64 x3) ↦ᵣ register_lookup (R_bitvector_64 x3) rs ∗
-     (R_bitvector_64 x4) ↦ᵣ register_lookup (R_bitvector_64 x4) rs ∗
-     (R_bitvector_64 x5) ↦ᵣ register_lookup (R_bitvector_64 x5) rs ∗
-     (R_bitvector_64 x6) ↦ᵣ register_lookup (R_bitvector_64 x6) rs ∗
-     (R_bitvector_64 x7) ↦ᵣ register_lookup (R_bitvector_64 x7) rs ∗
-     (R_bitvector_64 x8) ↦ᵣ register_lookup (R_bitvector_64 x8) rs ∗
-     (R_bitvector_64 x9) ↦ᵣ register_lookup (R_bitvector_64 x9) rs ∗
-     (R_bitvector_64 x10) ↦ᵣ register_lookup (R_bitvector_64 x10) rs ∗
-     (R_bitvector_64 x11) ↦ᵣ register_lookup (R_bitvector_64 x11) rs ∗
-     (R_bitvector_64 x12) ↦ᵣ register_lookup (R_bitvector_64 x12) rs ∗
-     (R_bitvector_64 x13) ↦ᵣ register_lookup (R_bitvector_64 x13) rs ∗
-     (R_bitvector_64 x14) ↦ᵣ register_lookup (R_bitvector_64 x14) rs ∗
-     (R_bitvector_64 x15) ↦ᵣ register_lookup (R_bitvector_64 x15) rs ∗
-     (R_bitvector_64 x16) ↦ᵣ register_lookup (R_bitvector_64 x16) rs ∗
-     (R_bitvector_64 x17) ↦ᵣ register_lookup (R_bitvector_64 x17) rs ∗
-     (R_bitvector_64 x18) ↦ᵣ register_lookup (R_bitvector_64 x18) rs ∗
-     (R_bitvector_64 x19) ↦ᵣ register_lookup (R_bitvector_64 x19) rs ∗
-     (R_bitvector_64 x20) ↦ᵣ register_lookup (R_bitvector_64 x20) rs ∗
-     (R_bitvector_64 x21) ↦ᵣ register_lookup (R_bitvector_64 x21) rs ∗
-     (R_bitvector_64 x22) ↦ᵣ register_lookup (R_bitvector_64 x22) rs ∗
-     (R_bitvector_64 x23) ↦ᵣ register_lookup (R_bitvector_64 x23) rs ∗
-     (R_bitvector_64 x24) ↦ᵣ register_lookup (R_bitvector_64 x24) rs ∗
-     (R_bitvector_64 x25) ↦ᵣ register_lookup (R_bitvector_64 x25) rs ∗
-     (R_bitvector_64 x26) ↦ᵣ register_lookup (R_bitvector_64 x26) rs ∗
-     (R_bitvector_64 x27) ↦ᵣ register_lookup (R_bitvector_64 x27) rs ∗
-     (R_bitvector_64 x28) ↦ᵣ register_lookup (R_bitvector_64 x28) rs ∗
-     (R_bitvector_64 x29) ↦ᵣ register_lookup (R_bitvector_64 x29) rs ∗
-     (R_bitvector_64 x30) ↦ᵣ register_lookup (R_bitvector_64 x30) rs ∗
-     (R_bitvector_64 x31) ↦ᵣ register_lookup (R_bitvector_64 x31) rs)%I.
+  (* the model's GPR read, at a SYMBOLIC index, against the caller's own
+     [gpr_pt] entry.  x0 is the [Ret] case (hardwired zero, nothing owned);
+     x1..x31 are one [RegRead] node each. *)
+  Lemma swp_rX_bits (i : SailStdpp.Values.mword 5)
+      (v : SailStdpp.Values.mword 64) :
+    gen_cert -∗
+    gpr_pt (Regidx i) v -∗
+    swp (rX_bits (Regidx i)) (fun w => ⌜w = v⌝ ∗ gpr_pt (Regidx i) v).
   Proof.
-    rewrite /hreg_frame /mm_gpr_D.
-    repeat (rewrite big_sepS_union; last set_solver).
-    rewrite !big_sepS_singleton.
-    by rewrite !bi.sep_assoc.
+    iIntros "#Hcert Hpt".
+    pose proof (uint5_lt i) as Hb.
+    assert (Hc : uint i = 0 \/ uint i = 1 \/ uint i = 2 \/ uint i = 3 \/
+      uint i = 4 \/ uint i = 5 \/ uint i = 6 \/ uint i = 7 \/ uint i = 8 \/
+      uint i = 9 \/ uint i = 10 \/ uint i = 11 \/ uint i = 12 \/
+      uint i = 13 \/ uint i = 14 \/ uint i = 15 \/ uint i = 16 \/
+      uint i = 17 \/ uint i = 18 \/ uint i = 19 \/ uint i = 20 \/
+      uint i = 21 \/ uint i = 22 \/ uint i = 23 \/ uint i = 24 \/
+      uint i = 25 \/ uint i = 26 \/ uint i = 27 \/ uint i = 28 \/
+      uint i = 29 \/ uint i = 30 \/ uint i = 31) by lia.
+    unfold gpr_pt; cbn match.
+    destruct Hc as [H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|
+      [H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|H]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
+    1:{ (* x0: nothing owned, the model returns zero_reg *)
+        rewrite H. cbn match. iDestruct "Hpt" as %->.
+        unfold rX_bits, rX. rewrite H. cbn match.
+        iApply swp_ret. by iSplit. }
+    all: rewrite H; cbn match;
+         unfold rX_bits, rX; rewrite H; cbn match;
+         iApply (swp_hart_regread with "Hcert");
+         [cbn [hregread_at]; apply bool_decide_eq_true_2; reflexivity|];
+         iIntros (σ) "Hsi"; rewrite /mstate_interp;
+         iDestruct "Hsi" as "(Hreg & Hmem & Hdev)";
+         iDestruct (reg_valid with "Hreg Hpt") as %Lv;
+         iApply fupd_mask_intro; [apply empty_subseteq|];
+         iIntros "Hcl"; iNext; iMod "Hcl" as "_"; iModIntro;
+         iSplitL "Hreg Hmem Hdev"; [by iFrame|];
+         rewrite hregread_resume_red Lv;
+         iApply swp_ret; by iFrame.
   Qed.
 
-  (* the per-index reduction the [gpr_file] side needs: at a CONCRETE
-     nonzero index [gpr_pt] is just the cell, and [gpr_of_Z (uint i)]
-     computes.  Instant. *)
-  Lemma gpr_pt_cell (i : SailStdpp.Values.mword 5) (v : SailStdpp.Values.mword 64) :
+  Local Lemma hregwrite_val_at_red (r : register) (ak : option unit)
+      (v : type_of_register r) (K : unit -> M unit) :
+    hregwrite_val_at r (Interface.Next (Interface.RegWrite r ak v) K) = Some v.
+  Proof.
+    simpl. destruct (decide _) as [Heq|Hne]; [|congruence].
+    assert (Heq = eq_refl) as -> by apply proof_irrel.
+    reflexivity.
+  Qed.
+
+  (* the model's GPR write, likewise.  [uint i <> 0] is a premise rather
+     than a case, because a write to x0 is discarded and the leaves that
+     use this already carry the guard ([wp_or_gpr] and friends all require
+     [uint rd <> 0]). *)
+  Lemma swp_wX_bits (i : SailStdpp.Values.mword 5)
+      (v w : SailStdpp.Values.mword 64) :
     uint i <> 0 ->
-    gpr_pt (Regidx i) v ⊣⊢ ((R_bitvector_64 (gpr_of_Z (uint i))) ↦ᵣ v : iProp Σ).
+    gen_cert -∗
+    gpr_pt (Regidx i) v -∗
+    swp (wX_bits (Regidx i) w)
+      (fun _ => gpr_pt (Regidx i) (regval_into_reg w)).
   Proof.
-    intros Hnz. cbv [gpr_pt].
-    rewrite (proj2 (Z.eqb_neq (uint i) 0) Hnz). reflexivity.
+    intros Hnz. iIntros "#Hcert Hpt".
+    pose proof (uint5_lt i) as Hb.
+    assert (Hc : uint i = 1 \/ uint i = 2 \/ uint i = 3 \/
+      uint i = 4 \/ uint i = 5 \/ uint i = 6 \/ uint i = 7 \/ uint i = 8 \/
+      uint i = 9 \/ uint i = 10 \/ uint i = 11 \/ uint i = 12 \/
+      uint i = 13 \/ uint i = 14 \/ uint i = 15 \/ uint i = 16 \/
+      uint i = 17 \/ uint i = 18 \/ uint i = 19 \/ uint i = 20 \/
+      uint i = 21 \/ uint i = 22 \/ uint i = 23 \/ uint i = 24 \/
+      uint i = 25 \/ uint i = 26 \/ uint i = 27 \/ uint i = 28 \/
+      uint i = 29 \/ uint i = 30 \/ uint i = 31) by lia.
+    unfold gpr_pt; cbn match.
+    destruct Hc as [H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|
+      [H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|H]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
+    all: rewrite H; cbn match;
+         unfold wX_bits, wX; rewrite H;
+         cbn beta iota zeta delta [Defs.bind0 Defs.bind Interface.iMon_bind
+           Defs.write_reg Defs.returnm returnM Z.eqb Pos.eqb];
+         lazymatch goal with
+         | |- context [Interface.RegWrite ?rg] =>
+             iApply (swp_hart_regwrite rg (regval_into_reg w) with "Hcert");
+             [cbn [hregwrite_val_at Defs.write_reg];
+              destruct (decide _) as [Heq|Hne]; [|congruence];
+              assert (Heq = eq_refl) as -> by apply proof_irrel;
+              reflexivity|];
+             iIntros (σ) "Hsi"; rewrite /mstate_interp;
+             iDestruct "Hsi" as "(Hreg & Hmem & Hdev)";
+             iMod (reg_update _ rg _ (regval_into_reg w) with "Hreg Hpt")
+               as "[Hreg Hpt]";
+             iApply fupd_mask_intro; [apply empty_subseteq|];
+             iIntros "Hcl"; iNext; iMod "Hcl" as "_"; iModIntro;
+             iSplitL "Hreg Hmem Hdev";
+             [rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg; by iFrame|];
+             rewrite hregwrite_resume_red;
+             iApply swp_ret; iExact "Hpt"
+         end.
   Qed.
 
-End frame.
+End gpr.
