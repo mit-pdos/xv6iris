@@ -1424,6 +1424,9 @@ Section ProofScheduler.
         iApply (Swtch.wp_swtch_sconf (p_sched γs) None (Some cpu_id)
                   (a_cpu_ctx cid_word) (p_context (proc_addr jj))
                   Mc ctxvs (av - 10)%nat ebc (proc_addr jj)
+                  (* the scheduler ALWAYS comes back: its record is what the
+                     dispatched thread's own park will resume. *)
+                  true
                   Hctxlen Holdc Hnewc (adm_none cpu_id)
                   with "Htext Hcg Hcpu Hpc Hctxcells [Hvc] [HP]").
         { iExact "Hvc". }
@@ -1463,12 +1466,16 @@ Section ProofScheduler.
            which is exactly what its pinned index says. *)
         pose proof (adm_pin_inv _ _ Hadm') as Hh. subst h.
         (* the resume side: the payload identifies the parking proc with jj *)
-        iDestruct "Hresume" as (A' cret) "[Hvc' Hpay2]".
-        iDestruct (p_sched_at_cpu γs cpu_id A' jj cret (rget m' Rtp) Hjj with "Hpay2")
+        iDestruct "Hresume" as (A' cret backp) "[Hvc' Hpay2]".
+        iDestruct (p_sched_at_cpu γs cpu_id A' jj cret (rget m' Rtp) backp Hjj with "Hpay2")
           as "(%Htpv & %Hcret & %HA' & Hcsrs & Hpay3)".
         subst A'.
         iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts (Hheld' & Htag' & Hppay)]".
-        destruct Hfacts as [Hgl' Hneeds'].
+        destruct Hfacts as (Hgl' & Hneeds' & Hbackp).
+        (* the crossing's shape IS the slot's guard: [back = needs_ctx st'],
+           so what came back -- a record or the bare cells -- is already in
+           the form [proc_slots_park_gen] wants, with no case analysis here. *)
+        subst backp.
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
         iEval (rewrite /proc_held) in "Hheld'".
         iDestruct "Hheld'" as "(Hlocked & Hstate & Hpg & Hchan & Hpub)".
@@ -1558,11 +1565,12 @@ Section ProofScheduler.
           rewrite (HMcthr Rs7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
           rewrite HM2s7. intro Hbad. discriminate. }
         (* rebuild the lock resource at the parked state.  ONE lemma for both
-           kinds of park (SchedCtx.proc_slots_park_gen): the record the swtch
-           handed back, the rejoined receipt, and whatever the crossing's
-           [park_pay] carried -- the dormant block at a ZOMBIE park, nothing
-           at a resumable one.  The update is that lemma's ZOMBIE arm
-           forgetting the record down to its cells. *)
+           kinds of park (SchedCtx.proc_slots_park_gen): the context slot the
+           swtch handed back -- a RECORD at a resumable park, the bare CELLS
+           at a ZOMBIE one, in exactly the shape the slot's own [needs_ctx]
+           guard asks for -- the rejoined receipt, and whatever the
+           crossing's [park_pay] carried (the dormant block at a ZOMBIE park,
+           nothing at a resumable one). *)
         (* the update is eliminated against the WP through [fupd_wp], the way
            every other fancy-update step in this tree is -- there is no
            [ElimModal] instance for a bare [WP] goal here. *)

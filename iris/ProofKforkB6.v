@@ -715,7 +715,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
+        "(%Hpures & Hheld & Hhart & Hcpriv & #Hmk & Hfdsp & Hirsp & Hks & Hkstk & Hctx & Hcg & Hcpu & Harmpay & Henv' & _)".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).

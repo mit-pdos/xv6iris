@@ -36,8 +36,10 @@
    context (durable-notes.md).
 
    The fd-slot supply is routed ONCE, before the loop: [proc_seal_list] turns
-   the [proc_dormant_nofd] blocks the caller handed over into real
-   [proc_dormant]s ([ProcInv.proc_dormant_seal]).  Nothing about the
+   the [proc_dormant_nofd] blocks the caller handed over into
+   [ProcInv.proc_dormant_prestk]s -- the block with its units routed but its
+   KERNEL STACK not yet deposited, because the deposit needs the persisted
+   [p->kstack] this loop is about to write.  Nothing about the
    distribution is per-iteration -- procinit's code never touches an fd -- so
    keeping it out of the loop invariant costs nothing and says the true
    thing. *)
@@ -214,12 +216,15 @@ Section ProofProcinit.
   (* ================================================================= *)
   (* A process whose block has already been given its NOFILE units: what
      the loop actually consumes.  Everything else is exactly [proc_raw]. *)
+  (* [proc_dormant_prestk], not [proc_dormant]: the slot's stack cannot be
+     deposited until [p->kstack] is written AND persisted, and this loop is
+     what writes it -- see [ProcInv.proc_dormant_prestk]. *)
   Definition proc_seal (pa : mword 64) : iProp Σ :=
     (∃ (vst : mword 32) (vks : mword 64),
        lk_raw pa ∗
        p_state pa ↦₄ vst ∗
        p_kstack pa ↦₈ vks ∗
-       proc_dormant pa UNUSED)%I.
+       proc_dormant_prestk pa)%I.
 
   (* Stated over an arbitrary LIST so the induction is a plain cons peel --
      the list's elements never matter, only how many there are. *)
@@ -241,7 +246,7 @@ Section ProofProcinit.
     iSplitL "Hx Hs1 Hi1".
     - iDestruct "Hx" as (vst vks) "(Hlk & Hst & Hks & Hdorm)".
       iExists vst, vks. iFrame "Hlk Hst Hks".
-      iApply (proc_dormant_seal with "Hdorm Hs1 Hi1").
+      iApply (proc_dormant_prestk_intro with "Hdorm Hs1 Hi1").
     - iApply (IH with "Hraw Hsl Hir").
   Qed.
 

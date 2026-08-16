@@ -163,6 +163,9 @@ Require Import WpLock TicksInv.
 Require Import FileInvDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
+Require Import StackOwn.
+Require Import KvmMap.
+Require Import ProcDefs.
 Require Import ProcAvail.
 
 
@@ -401,6 +404,20 @@ Section SpecMain.
        boot can mint them all at the same arbitrary hart. *)
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
+    (* THE 64 KERNEL STACKS.  Each slot's page, free, anchored at the top --
+       which is where [p->context.sp] points for a process that has never
+       run.  main routes them into the slots' dormant blocks at the
+       [procs_inv] assembly, and from there they are what allocproc hands a
+       new process and what the exit path must give back.
+       WHY THIS IS A PREMISE AND NOT A CONSEQUENCE: the words are
+       [SpecProcMapstacks]'s 64 pages, which arrive as [page_own] AT THE
+       IDENTITY ADDRESS, and a KSTACK va is not identity-mapped -- a byte
+       there is not expressible as [↦ₘ] at all (design/tlb-translation.md,
+       "Non-identity kernel memory is NOT a ↦ₘ").  Bridging the two is the
+       sp-migration project; until it lands this premise is where that debt
+       is parked, in the open, at the boot interface. *)
+    ([∗ list] i ∈ seq 0 NPROC,
+       stack_own (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗

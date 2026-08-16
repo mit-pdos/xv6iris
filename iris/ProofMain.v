@@ -91,6 +91,8 @@ Require Import SpecMain.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
+Require Import ProcDefs.
+Require Import StackOwn.
 Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.
@@ -752,6 +754,12 @@ Section ProofMain.
     iref_slots (NPROC * (1 + IREFSPARE)) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
+    (* THE 64 KERNEL STACKS, one per slot, anchored at the top of the page
+       procinit is about to name in [p->kstack].  They go into the slots'
+       dormant blocks at the [procs_inv] assembly below, which is where a
+       process's stack comes from for the rest of the system's life. *)
+    ([∗ list] i ∈ seq 0 NPROC,
+       stack_own (add_vec (kstack_va i) (mword_of_int 4096)) KSTACK_AV) -∗
     ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
         (root : mword 44) (pas : nat -> mword 44),
         sie_cap_gpr m' n false p0 -∗
@@ -776,7 +784,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs Hparks Hpst Hkstks Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -916,7 +924,7 @@ Section ProofMain.
                                 proc_pub (proc_addr i))) ∗ hart_full i (0%fin : CPU))%I)
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
-    iMod (procs_inv_alloc ⊤ with "Hin") as (γs) "#Hpinv".
+    iMod (procs_inv_alloc ⊤ with "Hin Hkstks") as (γs) "#Hpinv".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
               with "Hcg Hpc Hfree Hcpu Hkenv Hpinv Hkptr Hstvec Hkinv Hkptp Htramp Hkstx").
@@ -1500,7 +1508,7 @@ Section ProofMain.
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hfree Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
-    iIntros "Hparks Hpst".
+    iIntros "Hparks Hpst Hkstks".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone #Htimc Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
@@ -1543,7 +1551,7 @@ Section ProofMain.
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpany Hpc Hfree Hcpu Hlkmem Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs
-                    Hparks Hpst").
+                    Hparks Hpst Hkstks").
     iIntros (γa γs m3 root pas)
       "Hcg Hpc Hfree Hcpu Hkenv #Hpinv Hkpt Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)

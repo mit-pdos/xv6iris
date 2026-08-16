@@ -1147,10 +1147,21 @@ the evidence for every offset. This file is only the worklist.
 
       **THE ONE ASSUMPTION** is `SpecForkretPark.FORKRET_PARK`, argued at
       length in that file's header: parking a fresh process at RUNNABLE
-      needs a `▷ proc_ctx`, which is a Löb argument about `forkret`, and
-      nothing in the tree produces a fresh one.  Proving
-      `forkret`/`usertrapret`/`userret` (projects/uservec.md) retires it and
-      changes nothing else.
+      needs a `▷ proc_ctx`.
+
+      **THE SAME PARK IS NOW A THEOREM in its PAID form** --
+      `SpecForkretParkPaid.v` / `ProofForkretPark.v` over forkret's own
+      contract (projects/uservec.md has the correspondence table and the
+      inventory).  What kfork still cannot supply is that form's extra
+      precondition `forkret_park_pkg`: the child's FREE KERNEL STACK
+      (`stack_own ksp av` -- nothing in the chain hands out the KSTACK words,
+      allocproc gives only the persistent `is_kstack`) and the closer that
+      builds the trap loop's kernel-side bundle for the child, which needs a
+      NEW process's `bslots` / `fileclose_bm` / `initproc` share /
+      `syscall_env`.  So retiring the Axiom is a change to kfork's contract
+      (and behind it sys_fork's and the syscall environment's), NOT a functor
+      application -- and it is a question about where a fresh process's half
+      of the kernel environment comes from, no longer one about `forkret`.
 
       Proven and reusable:
       * `ProofKforkParts.kfk_epi` -- the epilogue at +0xfc
@@ -1464,6 +1475,223 @@ the evidence for every offset. This file is only the worklist.
       observable from inside its diverging body), so the only thing sys_exit
       needs from argint is that argument 0 EXISTS in the trapframe — the
       loaded value itself is never named in the postcondition.
+
+## Retiring the `ForkretPark` axiom: the four obstacles, measured
+
+The park itself is no longer one of them — `SpecForkretParkPaid.v` /
+`ProofForkretPark.v` prove it over forkret's own contract
+([`uservec.md`](uservec.md) has the correspondence table). What is left is
+kfork's side, and it is these four, checked against the tree rather than
+guessed:
+
+**1. Most of `forkret_park_pkg` kfork already holds.** At the
+`FP.forkret_park` call site in `ProofKforkB5.v`: `kernel_text`,
+`procs_inv γs`, `pslot_used_at` (allocproc mints it) and
+`pa = proc_addr j ∧ j < NPROC`. `wire_inv` and the trampoline `kmap_at`
+appear nowhere in the syscall cone but are persistent and do exist
+(`BootChain.v` allocates `wire_inv`) — one more persistent premise threaded
+from boot. The two page-table facts (`ud_data pt = ud_pas pt`,
+`proc_pt_wf pt`) should fall out of uvmcopy's post via `ud_norm_id` /
+`ud_norm_pas`.
+
+**2. The child's KERNEL STACK is the one missing resource of substance.**
+See the next section.
+
+**3. The closer's environment is mostly FREE, which is not what it looks
+like.** `ProofSyscall.syscall_env` is **entirely persistent** — its own
+header says so ("Every conjunct is Persistent … so the whole bundle is held
+with `#`"), and so is all of `UsertrapRes.ut_caps`. So a second process's
+copy of both costs nothing. Of `ut_env_nopt` only three pieces are real:
+`bslots bn 3` (a draw from the finite `BSLOTS` pool — the same accounting
+`FDSLOTS = NPROC * (NOFILE + FDSPARE)` already does for fds, so the fix is to
+size the bio pool per process and split at fork), `fileclose_bm` (two
+superblock cells at *parametric* dfracs plus `bitmap_res … us`; `us = ∅` may
+be free), and `initproc ↦₈{dqi}` (free if the parent's dfrac is discarded —
+`un_dqi` is a field, so it can be).
+
+**4. THE LAYERING WALL, and it decides the shape of everything else.**
+`usertrap_res_bare` is `ut_res_bare SY.syscall_env`, defined ABOVE the
+syscall table: `UsertrapRes.v` requires `SpecSyscall.v` (the module TYPE),
+`ProofSyscall.v` requires `SpecSysFork` → `SpecKfork`, and `SpecKfork.v`
+mentions neither. So the concrete residue exists only once `SY` is
+instantiated at `ProofSyscall`'s module — which is built over `Kfork`. A
+kfork contract naming `usertrap_res_bare` is therefore a MODULE-LEVEL CYCLE,
+and no file-level reshuffle fixes it. The escape is the one
+`wp_forkret_body` already uses: keep `URes` an ABSTRACT PARAMETER of the
+statement, threaded `SpecKfork` → `SpecSysFork` → `SpecSyscall`'s table
+entry, and instantiated only at `LinkUsertrap`. Note the same wall blocks
+the tempting shortcut of parking the whole package in the proc slot:
+`SchedCtx` / `ProcInv` sit below `UsertrapRes` too, so a slot could only
+store it at a parameterized residue.
+
+## The kernel stack is OWNED AT BOOT AND LEAKED AT EXIT
+
+`SpecProcMapstacks`'s postcondition hands back
+`[∗ list] i ∈ seq 0 64, page_own (kstack page i)`, and `SpecKvmmake` /
+`SpecKvminit` carry it up into `main`. So the words exist. Nothing then
+parks them per slot: `SpecAllocproc`'s post gives only the persistent
+`is_kstack` (the `p->kstack` agreement), which is why a fresh process's
+`stack_own` has no source and `SpecUserinit`'s Axiom conjures the first
+one.
+
+**AND THE DEPOSIT AT THE REAL ADDRESS IS GATED ON sp-migration.**
+`stack_own` is built on `word_pointsto` → `mem_pointsto`, which carries the
+IDENTITY conjunct `pa_of ppn va = va`; a KSTACK va is not identity-mapped, so
+a kernel-stack byte at `KSTACK(i)` is **not expressible as `↦ₘ` at all**
+(`RiscvPtsto.v`'s own header says so; the ruling is
+[`../design/tlb-translation.md`](../design/tlb-translation.md),
+"Non-identity kernel memory is NOT a `↦ₘ`", and
+[`../completed/bare-inv-generic.md`](../completed/bare-inv-generic.md) is
+why — the identity is what discharges the Bare regime's `sr_adm`). Boot's 64
+pages are `page_own` **at the identity address**; the way to a stack at a
+KSTACK va is the named-but-unstarted **sp-migration** project: a KPT-REGIME
+leaf family (`sr_adm = True` there) over a kstack-flavoured points-to built
+from the mapping claim plus the identity page's `↦ₚ`.
+
+THE WHOLE PROCESS-THREAD CONE IS PARAMETRIC IN `ks` AND THEREFORE FINE
+TODAY: `procs_inv` says only `∃ ks, is_kstack (proc_addr i) ks`, `ut_caps`
+carries `is_kstack (un_pj N) (un_ks N)` at a free field, and nothing above
+pins it. The ONE place `ks` becomes a KSTACK va is procinit's own
+postcondition — and no proven code path runs a process thread out of it,
+because `SpecUserinit` is an Axiom. **That Axiom is what currently hides the
+sp-migration gap**, and any real deposit of a process stack meets it.
+
+**AND THE EXIT PATH GIVES NOTHING BACK, which is what makes the recycle
+direction the hard half.** Whoever makes a slot UNUSED must produce a free
+stack anchored at `ksp`, and that is `freeproc` — from the zombie, hence
+from `kexit`. But at the final swtch the dying thread's page is in three
+places: kexit's own frame (it never returns, so it *could* deposit it),
+sched's frame (sched is shared with yield/sleep, so it can only deposit
+through a closer in the payload), and everything below the parked sp, which
+lives in the record `SchedCtx.proc_ctx_cells` FORGETS — that lemma drops
+`stack_own (nth 1 vs) av` on the floor. A hole anywhere in the page is
+fatal: `stack_own ksp N` needs the whole run from `ksp` down, so recovering
+"most of it" is worth nothing to the next thread, whose `context.sp` is
+`ksp` by construction.
+
+So the honest invariant is that a DORMANT slot owns its stack (both arms —
+`freeproc` then passes it ZOMBIE → UNUSED for free), and the bill lands on
+`kexit` + `sched`. Anything cheaper either breaks `freeproc` (stack on the
+UNUSED arm only) or hands kfork a stack with no usable depth bound.
+
+### The exit path, designed: THE PAGE IS CONSERVED, and here is how
+
+The bill looked unpayable — a thread must deposit as much as it received,
+yet it also parks a record, and a record's stack is FORGOTTEN
+(`proc_ctx_own_ctx` drops `stack_own (nth 1 vs) av` on the floor). Recovering
+it is not possible: the record's anchor and depth are existentials of
+`SwtchCtx.valid_context`, so nothing downstream can prove the recovered
+region abuts the deposited one.
+
+**`PanicStub.panic_wp` is what makes it close.** It is
+`□ ∀ m avail b p, … sie_cap_gpr m avail b p -∗ WP Loop` — quantified over
+`avail`, INCLUDING 0. The zombie's record is resumable only into the panic
+arm (`ProofKexit`'s post-resume arm: "a dispatched zombie returns here and
+panics"), so **that record can park a ZERO-DEPTH stack** and still discharge
+its resume obligation. Nothing has to be recovered from a forgotten record,
+and the dying thread can give the whole page away.
+
+The page then leaves in three pieces, all merged by `stack_own_app` at
+statically known depths:
+
+1. **the frames above kexit's sp** — usertrap's, syscall's, sys_exit's.
+   Threaded down the diverging path as a CLOSER, not as a borrow: each layer
+   passes the callee a wand that has captured its own frame, and the callee
+   wraps it with its own. Return arms are unaffected — the closer is affine
+   and simply dropped on every arm that returns.
+2. **kexit's own frame and the deep end of its free tail** — kexit splits its
+   tail with `stack_own_app`, keeping exactly `f_sched` slots adjacent to its
+   sp and depositing the rest.
+3. **sched's frame** — `SpecSched`'s `park_pay` premise becomes a CLOSER
+   (`stack_own (m !!! sp) f_sched -∗ park_pay pj st`). yield and sleep pass a
+   trivial wrapper: at RUNNABLE/SLEEPING `park_pay` is `emp`, so their closer
+   ignores its argument.
+
+Then `av` at the swtch is 0, the record parks nothing, and deposit = the
+whole page. The one number to fix is the slot's depth `KSTACK_AV`, which must
+be ≥ `K_usertrap` = 164 (`6 + trap_res true + K_prepare_return` = 96 is the
+weaker of the park's two bounds) and ≤ 512, the page.
+
+### THE RIGHT FIX: a ZOMBIE swtch LEAVES NO RECORD
+
+The loss above (sched's frame) has a cause, not just a symptom: we were
+parking a resumable `valid_context` for a thread that is never coming back.
+**When kexit calls sched and sched calls swtch, that swtch does not return**
+— and proving exactly that is what is needed anyway to show kexit's
+`panic("zombie exit")` tail is dead code.
+
+So the swtch protocol gets one generalization, carrying NO knowledge of
+process states:
+
+```coq
+(* SwtchCtx.valid_context_pre's resume slot *)
+(∃ (A' : ctx_adm) (cret : mword 64) (back : bool),
+   (if back then ▷ rec A' cret p else own_ctx cret) ∗
+   P h A' c cret tpv p back)
+```
+
+Either the resumer left a resumable record, or it left only its raw context
+cells. `back` is existential and PINNED BY THE PAYLOAD, so `SwtchCtx` never
+learns why. `SchedCtx.p_sched` is where the process knowledge goes, and it is
+one conjunct.
+
+**THE CONDITION IS `ProcGeom.needs_ctx st` — THE PROC LOCK'S OWN PREDICATE —
+not a not-ZOMBIE test.** `proc_slots` already says a slot owns a
+`▷ proc_ctx` exactly when `needs_ctx st`, so pinning `back = needs_ctx st` on
+the park arm (and `back = true` on the dispatch arm) makes the crossing
+deliver precisely what the invariant it feeds asks for, with no second,
+weaker spelling of the same fact to keep in step. The two happen to coincide
+on the three parkable states, and that is the point: one predicate, stated
+once, in the file that owns it.
+
+Everything else follows:
+
+- **`SpecSwtch`** gains `back`. At `true` it is today's spec. At `false` it
+  takes NO caller resume-wand and parks NO stack (swtch touches no stack, so
+  it can run at `av = 0`), and hands the resumed party `own_ctx oldc` — the
+  cells it just wrote — instead of a record.
+- **`SpecSched`** at a ZOMBIE park therefore has no post-resume continuation
+  to prove, which is what lets it deposit its own frame into `park_pay`. The
+  ~16-slot hole closes and the page is conserved exactly.
+- **`SpecKexit`** loses its post-resume arm entirely: the `panic("zombie
+  exit")` after `jal sched` becomes unreachable rather than discharged.
+- **`ProofScheduler`**: its own swtch's postcondition — the record for the
+  proc that just switched in — becomes guarded by `needs_ctx st`, the same
+  guard `proc_slots` uses, so the release is a direct fit with nothing to
+  reconcile.
+- **`SchedCtx.proc_slots_park_gen`** at ZOMBIE stops forgetting a record
+  (`proc_ctx_own_ctx`) and takes the cells straight off the crossing.
+
+### What is landed, and what is left
+
+Landed and compiling: the protocol change itself (`SwtchCtx` + `SpecSwtch` +
+`ProofSwtch` + `SchedCtx` + `SpecSched` + `ProofSched`), and the forward half
+of the stack (`ProcDefs.kstack_free` / `KSTACK_AV` / `kstack_closer`,
+`proc_dormant` on both arms, `ProcInv.proc_dormant_prestk` and the moved
+seal, `SpecProcinit`/`ProofProcinit`, `SpecMain`'s boot premise,
+`SpecAllocproc`'s hand-out).
+
+Left, in order:
+
+1. **kexit's park.** `SpecKexit` takes the closer and `kexit_park_pay` takes
+   `kstack_free`; `ProofKexit` must assemble — its own frame plus what
+   sched's closer returns — and its post-resume arm (+0x9a..+0xa2, the
+   `panic("zombie exit")`) DELETES: the contract's `else emp` leaves nothing
+   to prove there.
+2. **The closer up the diverging chain**: `SpecSysExit`, `SpecSyscall`,
+   `SpecUsertrap` each take a `kstack_closer` and pass a wrapped one at their
+   single diverging call site (`kstack_closer_frame`). usertrap BUILDS the
+   top one out of `is_kstack` + its own `ut_stack ksp av`, so the chain
+   terminates there and nothing new is assumed — but `ut_res_bare`'s bound
+   must strengthen from `K_usertrap ≤ av` to `KSTACK_AV ≤ av`.
+3. **The forward leftovers**: `ProofAllocproc`'s second failure tail,
+   `ProofKforkMain`, `ProofMain`'s call site.
+4. Then the park package (`SpecForkretParkPaid.forkret_park_pkg`) can take
+   the stack from allocproc, and `LinkForkretPark`'s Axiom is reachable.
+
+**And it retires the `panic_wp`-at-`avail = 0` dependency** that the
+zero-depth-record trick needed: with no record there is no resume arm and no
+panic to discharge, so nothing here rests on `PanicStub`'s `∀ avail` form.
 
 ## The unlinked chain: `fileclose` is the only blocker
 

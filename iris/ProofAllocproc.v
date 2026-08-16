@@ -935,7 +935,7 @@ Section ProofAllocproc.
         iMod (pstate_whole_update (proc_addr k) UNUSED USED with "Hpg") as "Hpg".
         iModIntro.
         iDestruct (proc_dormant_unused γf (proc_addr k) with "Hdorm")
-          as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hrest)".
+          as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hkst & Hrest)".
         iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv)".
         iDestruct (p_pid_join (proc_addr k) pid1 pid0 with "Hpidinv Hpidhalf") as "[%Hpideq Hpidfull]".
@@ -1209,13 +1209,13 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa T2 k γl V pidn USED ch None None
                     (trap_res b + (K - 4))%nat eb pme (S lvl) ({["proc"]} ∪ lks)
                     ltac:(pose proof (ap_K44 K HK); lia) (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell] Henv").
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx] [Hpgcell] [Htfcell] Henv").
           all: try lkbelow.
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. iEval (rewrite -Htfz). iExact "Htfcell". }
           iApply wp_next_off_intro.
@@ -1585,7 +1585,7 @@ Section ProofAllocproc.
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hkst Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. cbn [fst snd].
             iEval (rewrite -Hbasetf) in "Htfcell". iFrame "Htfcell Htfpage".
@@ -2042,7 +2042,11 @@ Section ProofAllocproc.
         iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
-        iFrame "Hpark Hpriv Hmk Hspare Hirsp Hks".
+        (* the slot's stack, spelled at the [ks] the code just loaded: the
+           block carries it under an existential pinned by [is_kstack], and
+           this is where the two meet. *)
+        iDestruct (kstack_free_at (proc_addr k) ks with "Hks Hkst") as "Hstk".
+        iFrame "Hpark Hpriv Hmk Hspare Hirsp Hks Hstk".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

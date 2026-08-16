@@ -746,6 +746,20 @@ permanent form is the only one a caller can keep across the trap loop.
 Closing the arm for real needs a one-shot ghost nothing carries yet, and it is
 the BOOT client's obligation, not forkret's.
 
+**THAT PREMISE IS A PARAMETER OF THE STATEMENT, NOT PART OF IT.**
+`wp_forkret_gen_body` takes it as `Pfirst`, and the file exports two readings:
+`wp_forkret_body` (`Pfirst :=` the discarded points-to, what `ProofForkret.v`
+proves) and `wp_forkret_nf_body` (`Pfirst := emp`).  The second exists because
+a caller that PARKS a fresh process cannot pay the first: the record is
+resumed by whichever hart's scheduler picks the process up, and neither that
+scheduler nor the kfork that created it holds any claim on the boot client's
+one-shot -- threading a discarded points-to into every `proc_ctx` would put a
+boot fact inside the scheduler protocol.  `LinkForkretNF.v` assumes the `nf`
+reading (the only assumption under the park proof below), and
+`SpecForkret.wp_forkret_body_of_nf` is the mechanical check that assuming it
+is a STRENGTHENING of the proven contract rather than a different statement.
+Closing the `if (first)` arm discharges it and deletes that file.
+
 **THE ENTRY IS `SwtchCtx.valid_context`'s RESUME PAYLOAD, spelled out.**
 p->lock is still held from scheduler(), so the contract starts at
 `cpu_own 1 eb p false {["proc"]}` with `sie_cap_gpr m av false p`, plus
@@ -769,9 +783,9 @@ block) is the bundle's other half.  So `wp_forkret_body`'s last premise is
 
 with `forkret_yield = ut_trap_parked p ksp av ∅ ∗ proc_priv_nopt γf p pid V'`
 -- quantified over the hart because prepare_return parks, and over the record
-because prepare_return moves the trapframe.  When `SpecForkretPark`'s Axiom is
-finally discharged, the caller that PARKS the process is the one that proves
-this wand; nothing else about `ProofForkret.v` changes.
+because prepare_return moves the trapframe.  The caller that PARKS the process
+is the one that proves this wand, and that is exactly where it now sits: it is
+the load-bearing half of `SpecForkretParkPaid.forkret_park_pkg` below.
 
 **Three things in the walk worth keeping.**
 
@@ -798,9 +812,67 @@ this wand; nothing else about `ProofForkret.v` changes.
   five instructions over a different register pair), `udata_cov` from
   `ProcPtOwn.ud_pas_cov` and the `ud_data pt = ud_pas pt` premise.
 
-**What is left**: the `if (first)` arm (fsinit + kexec + the panic tail), and
-the `SpecForkretPark` Axiom -- for which forkret's wand premise is now the
-exact obligation.
+**What is left**: the `if (first)` arm (fsinit + kexec + the panic tail).
+
+## Parking a fresh process: A THEOREM over forkret, and what it costs
+
+`SpecForkretParkPaid.v` (statement) / `ProofForkretPark.v` (proof, a functor
+over `FORKRET_NF`) / `LinkForkretParkPaid.v` (instantiation).  `Print
+Assumptions ForkretParkPaid.forkret_park_paid` is the five `rv64d.*` platform
+axioms plus `LinkForkretNF.wp_forkret_nf_ax`, and nothing else.
+
+**The record IS forkret's contract turned inside out.**  Unfold
+`SwtchCtx.valid_context` once and read the dispatch payload
+(`SchedCtx.p_sched_at_proc`, which also refutes the parking disjunct):
+
+| the record's resume wand gives | forkret's precondition wants |
+|---|---|
+| `pc_is (ret_pc (m !!! ra))`, `callee_img m = vs` | `pc_is forkret` (ra = `forkret_pc`), sp = kstack top |
+| `sie_cap_gpr m av false p`, `cpu_own 1 eb' p false {["proc"]}` | the same, at the resuming hart |
+| payload's `trap_csrs` + `proc_held h j γl RUNNING` | `trap_csrs`, `locked`, `cpu_claim` (state half #2 + tag half) |
+| payload's ▷ resumer record | `run_slot`'s parked scheduler, i.e. half of `Rlk` |
+| the cells handed BACK by the wand | `run_slot`'s `own_ctx`, the other half of `Rlk` |
+| `procs_inv γs` (persistent, from the caller) | the `is_lock` that `Rlk` is the resource of |
+
+so `Rlk := proc_lock_res γs γl (proc_addr j)` is assembled, not assumed, and
+forkret's `WP Loop` at the resuming hart IS the fixpoint's obligation.  No Löb
+anywhere: the NEXT park is inside `SpecUserretClosed`'s own theorem.
+
+**One parked depth, both arms.**  The wand is `∀ eb'` (the RESUMER's base
+enable) and forkret's budget is stated over that `eb'`, so the record's `av`
+has to cover the ENABLED reserve: `6 + trap_res true + K_prepare_return <= av`
+(plus `K_usertrap <= av` for the loop).  `trap_res b <= trap_res true` is the
+one lemma that makes a single depth serve both.
+
+**WHAT A CREATOR OWES, and why kfork cannot pay it yet** --
+`forkret_park_pkg`, and this list is the remaining work, all of it on the
+kfork/sys_fork side:
+
+- `stack_own ksp av` -- the child's KERNEL STACK, free.  A running thread
+  carries its stack in `sie_cap_gpr` and a parked one in its record; a
+  never-run one has it nowhere.  procinit maps the NPROC KSTACK pages and
+  allocproc's post hands out `is_kstack` (the persistent `p->kstack`
+  agreement) but never the words.  A real hole in the chain.
+- the residue closer, `∀ h V', ⌜pv_upt V' = pt⌝ -∗ forkret_yield … -∗
+  fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗ URes h pt ksp`.  It takes the
+  park's own two allowances because they live INSIDE the loop's bundle
+  (`UsertrapRes.ut_own_nopt`), and the record is where they are captured.
+  Producing `URes` for the child needs only `bslots bn 3`, `fileclose_bm` and
+  the `initproc` share: `ut_caps` AND `ProofSyscall.syscall_env` are both
+  entirely persistent, so a second process's copy of either is free.  See
+  [`proc-struct-resources.md`](proc-struct-resources.md) for the full
+  four-obstacle measurement, including the layering wall that decides how the
+  package reaches kfork at all.
+- the persistent world (`kernel_text`, `wire_inv`, the trampoline `kmap_at`,
+  `procs_inv`, `pslot_used_at`) -- free for any caller, but NAMED, because a
+  closure captures what it uses.
+- `ud_data pt = ud_pas pt` / `proc_pt_wf pt`, and the two pure `SpecUservec`
+  gaps, passed through one more tier.
+
+Joining this to `ProofKfork.v` is therefore not a functor application: it is a
+new premise on kfork's contract, and behind it on sys_fork's and on the
+syscall environment's.  Until then the tree carries both forms --
+`SpecForkretPark.FORKRET_PARK` (assumed, what kfork uses) and this theorem.
 
 ## THE CLOSED LOOP'S ENTRY WAS VACUOUS, AND IS FIXED
 
