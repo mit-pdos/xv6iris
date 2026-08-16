@@ -8666,10 +8666,10 @@ budgeting a repair.
 
 ## S7-unlink — **IN FLIGHT, AND STOPPED ON THE T_DIR ARM.**  The budget
 ## audit, the REAL contract, the pure+frame+register layer, EVERY EXIT
-## BLOCK and the WALK's first block `su_w1` are landed and gated.  W2–W5
-## are unwritten and the walk cannot be finished as designed: **FINDING 3
-## below is a missing MODEL fact, not a proof obligation.**  sysfile.c
-## stays 15/16 until `LinkSysUnlink.v` flips
+## BLOCK and the WALK's first two blocks `su_w1` and `su_w2` are landed
+## and gated.  W3–W5 are unwritten and the walk cannot be finished as
+## designed: **FINDING 3 below is a missing MODEL fact, not a proof
+## obligation.**  sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
 
 Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
 every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
@@ -8860,10 +8860,88 @@ Three shape decisions inside `su_w1` a later block should copy:
   Nothing else; no `Ilock`, no `Iunlockput`, which is the arm graph's word
   that W1 really is the first block.
 
+### W2 IS LANDED — `su_w2`, AND ITS SEAM AT +0x72
+
+`ProofSysUnlink.su_w2` covers +0x30..+0x6e: `ilock(dp)`, both `namecmp`
+refusals, the `c.sdsp s2`, `dirlookup(dp,name,&off)` and the `beqz` at
++0x6e.  It takes W1's seam apart and hands on a seam at +0x72.  Five
+helper lemmas landed with it, all inside the walk file because that is
+where sys_link and create keep theirs:
+
+* `su_shed_gen` / `su_carve_gen` — `ProofSysLink.sl_shed_gen` verbatim.
+  The share handed to `ilock` names the SAME generation as
+  `inode_held_ty`'s type one-shot, which is what makes `ity_shot_agree`
+  turn nameiparent's promise into `di_type dnd = T_DIR` — dirlookup's
+  first premise, and one this walk has no test of its own for.
+* `su_dot_window` / `su_dotdot_window` (+ `su_kd_bytes`, `su_dot_f`,
+  `su_dotdot_f`, `su_dot_name`, `su_dotdot_name`) — the two fourteen-byte
+  `.rodata` windows at **0x800075e0 and 0x800075e8**, the SAME two
+  addresses create's `dirlink(ip,".")` / `(ip,"..")` use, restated rather
+  than imported from `ProofCreateParts`.  `namecmp` wants a byte WINDOW,
+  so neither `kernel_data_window` (a machine word) nor
+  `kernel_data_string` (NUL-terminated) applies; ownership is of all
+  fourteen bytes, so the two functions have to be honest about the
+  neighbouring literals that follow the NUL.
+* `su_offcell_sp` + `su_sp_bounds` — `&off` is not null, and that is
+  dirlookup's `hasp = true` premise.  Slot 27's upper word is `sp + 28`
+  off the PUSHED sp, so `StackOwn.stack_off_nonzero` applies once the
+  address is re-based; `su_sp_bounds` is `ProofSysClose.sc_sp_bounds`'
+  shape and its `0 < k` premise is mandatory (`trap_res false` is
+  nothing, so at the interrupts-off arm the caller's own slots are all
+  that bound sp).
+* `su_esc_acc` / `su_slk_acc` / `su_bs3` — `ProofSysLink`'s three
+  projections verbatim.
+
+**THE TWO namecmp REFUSALS ARE ONE LEMMA, NOT TWO, AND THAT IS THE
+OPPOSITE OF ARMS D AND E.**  `su_w2_bad` is applied at +0x44 and at
++0x58 with nothing but the register map differing: neither arm has saved
+s2 or s3, neither has run `dirlookup`, so `ic_loaded` is still PACKED and
+`iref_slots 1` is still whole.  The tails file's rule ("two entries into
+one tail are two lemmas") is about arms that arrive holding DIFFERENT
+things; these two do not.  What keeps the interface small is that the
+process block travels as **the pid quarter plus its CLOSER**
+(`p_pid … -∗ proc_priv …`), built once right after `proc_priv_split_cwd`
+and reused at every arm and at the seam — the cwd half never appears in
+a block interface at all.
+
+**WHAT CROSSES AT +0x72**, in order: `su_regs m sp0 (ientry kd)
+(ientry ks) (m!!!s3) M2`, the two slot bounds, `dinum`'s region bound,
+`di_type dnd = T_DIR`, `inode_ok` / `dir_ok` / `dir_dots_ix` /
+`dir_orphan_clean` at `datd`, **`bname 14 nf <> dot_name` and
+`<> dotdot_name`** — the two refusals' fall-through, which nothing in W2
+spends and which FINDING 1's home-live derivation needs at the zeroing —
+and `dir_first datd nrec (bname 14 nf) = Some kk`; then `sie_cap_gpr` at
+`K-30`, `cpu_own`, `pc_is`, `fs_crash_seam`, `gen_cert`, `bslots 3`, the
+three superblock cells, `bitmap_res used1`, **`proc_priv` REBUILT WHOLE**
+(W1's decision, repeated for W3's benefit), `dp`'s locked bundle at its
+TWELVE components — the sleeplock, `sleeplocked_q`, `sl_pid`,
+`ic_deposit`, the two identity halves, `i_valid`, and `ic_loaded`
+**UNPACKED** into `dir_links` / `dinode_at` / `inode_meta` /
+`inode_addrs` / `ind_res` / `inode_blocks`, plus `ity_shot` and
+`inode_ref_short` — `ip`'s `inode_ref ks qs dev (zext (dir_inum datd kk))`,
+`log_opS g n1 Sb1`, and the frame with **slot 4 filled and slot 27
+SPLIT** into its two words, the upper one at `16 * kk`.
+
+`ic_loaded` crosses UNPACKED and that is forced, not a preference: it
+existentially binds `data`, so a seam that handed it back packed would
+give W3 a `data'` with no relation to the `datd` the seam's own pure
+clauses are stated at.  Six items instead of one; `su_w2` repacks it by
+hand at ARM D, which is the only place inside W2 that wants the packed
+form.
+
+**THE THREE FIRST-CONSUMER VERDICTS ARE STILL OPEN AFTER W2, and its
+`Print Assumptions` is the mechanical proof of that**: five module
+parameters (`Ilock`, `Namecmp`, `Dirlookup`, and `Iunlockput` / `EndOp`
+through the two tails) and no `dir_*` fragment lemma at all.  W2 CARRIES
+`dir_orphan_clean` and the two `bname` disequalities across its seam —
+the ingredients of verdict #1 — but spends neither, because the zeroing
+is in W5.  Verdicts #1 and #3 remain W4/W5's to record; #2 is W5-DIR's
+and stays parked.
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
-`ProofSysUnlink.v` — **W2, W3, W4, the FILE half of W5, and the seal.**
-W2–W4 and the FILE half of W5 are unobstructed; **the T_DIR half of W5 is
+`ProofSysUnlink.v` — **W3, W4, the FILE half of W5, and the seal.**
+W3–W4 and the FILE half of W5 are unobstructed; **the T_DIR half of W5 is
 not** (FINDING 3), so the walk cannot reach the seal until that ruling
 lands.  The decomposition, with every exit already in hand:
 
@@ -8880,10 +8958,12 @@ lands.  The decomposition, with every exit already in hand:
   is worse.  `proc_priv_split_cwd` + `proc_priv_nocwd_cwd_pid` +
   `cwd_ref_held` is how the process block is opened for the walker, and it
   stays open until the arm that rebuilds it.
-* **W2, +0x30..+0x6e** — `ilock(dp)`, the two `namecmp` refusals (both
-  branch to `bad:`, i.e. **`su_tail_bad`** with nothing reloaded),
-  `c.sdsp s2` at +0x5c, `dirlookup(dp,name,&off)` (the `off` cell is
+* **W2, +0x30..+0x6e — DONE.**  `ilock(dp)` at the shed generation, the
+  two `namecmp` refusals (both **`su_w2_bad`**, which is the ONE lemma
+  both entries into `su_tail_bad` share — see below), `c.sdsp s2` at
+  +0x5c, `dirlookup(dp,name,&off)` at `hasp = true` (the `off` cell is
   `su_off_split`'s UPPER word), the `beqz` at +0x6e (**`su_tail_d`**).
+  Its seam is at +0x72 and is described below.
 * **W3, +0x72..+0x88** — `c.sdsp s3`, `ilock(ip)`, the `blez` at +0x7c
   (**`su_panic_nlink`**; its FALL-THROUGH is the only source of
   `di_nlink ip <> 0`), the T_DIR test at +0x86.
@@ -8954,6 +9034,45 @@ this walk's, and it should be made BEFORE the first deep arm is written
 rather than discovered inside one.
 
 ### Gate
+
+**The `su_w2` increment's gate.**  Lane `/shared/xv6iris-u7`.  V1 (the
+count-fact carrier) COMMITTED mid-increment, so the lane was re-synced
+from the working tree — `IcacheRef.v`, `InodeRegion.v` and
+`SpecIupdate.v` copied over the pre-V1 copies and the chain re-made —
+and `su_w2` needed **no adaptation whatever**: it names
+`inode_ref_gen` / `inode_ref_short_gen` / `inode_shr_gen`,
+`live_gen_split`, `inode_ident_split` and `slh_tok_split`, none of which
+the `w = (wl, wd)` widening moved.  Afterwards `make -f CoqMakefile -j3
+ProofSysUnlink.vo` ends `MAKEEXIT=0` with zero `Error` lines, `make -n`
+emits 0 compile lines on that target AND on `ProofSysUnlinkTails.vo`, and
+all 208 chain files are byte-identical to the working tree's except
+`ProofSysUnlink.v` itself.  `tools/proof_coverage.py --check` exits 0:
+**186/190, sysfile.c 15/16 — unmoved**, which is what it must be until
+the `Link` flips.  `Print Assumptions su_w2` = the standing six
+(`valid_reservation`, `load_reservation`, `match_reservation`,
+`cancel_reservation`, `plat_term_write`,
+`functional_extensionality_dep`) + `Ilock.wp_ilock_sconf`,
+`Namecmp.wp_namecmp_sconf`, `Dirlookup.wp_dirlookup_sconf`,
+`Iunlockput.wp_iunlockput_sconf`, `EndOp.wp_end_op_sconf`;
+`su_w2_bad` = the standing six + `Iunlockput` + `EndOp`.
+
+**TWO TRAPS THIS INCREMENT FOUND.**
+
+* **A LEMMA STATED OVER A `su_regs`-STYLE BUNDLE CANNOT INFER THE
+  ARGUMENT ITS CONCLUSION DROPS.**  `su_regs_wr_s2 m sp0 dpv _ ipv' _ Mx _`
+  fails with *"Cannot infer this placeholder of type mword 64"* and the
+  error prints an UNRELATED goal from later in the proof — the OLD value
+  of the register being overwritten appears only in the hypothesis, so
+  unification has nothing to pin it with.  Spell `ipv` and `s3v` out.
+  Same family as the `co_license`-index trap in durable-notes, one tier
+  up.
+* **`inode_ok` HAS SEVEN CONJUNCTS AND A PARTIAL `destruct` LEAVES THE
+  TAIL GLUED.**  Destructuring it to feed `dirlookup`'s three numeric
+  premises and then rebuilding it by `split_and!` fails with *"The term
+  Hiokrest has type A ∧ B while it is expected to have type A"* — which
+  reads like a wrong conjunct order and is not.  Keep the whole fact
+  (`pose proof Hiok as Hiok0`) and rebuild with `exact Hiok0`; never
+  re-assemble a record-shaped `Prop` conjunct by conjunct.
 
 **The `su_w1` increment's gate.**  Lane `/shared/xv6iris-u7`, whose seven
 sys_unlink `.v` were md5-identical to the working tree's at `e50a6508`
