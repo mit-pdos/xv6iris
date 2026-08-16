@@ -1128,6 +1128,8 @@ ProofSysChdir.v
 SpecSysMkdir.v
 ProofSysMkdir.v
 LinkSysMkdir.v
+FsSyscalls.v
+LinkFsSyscalls.v
 SpecSysMknod.v
 ProofSysMknod.v
 LinkSysMknod.v

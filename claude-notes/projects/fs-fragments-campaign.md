@@ -20,6 +20,7 @@ diverged from the design's sketches, and what is left.
 | **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | **LANDED with W5-DIR (increment 9), at two premises D1/D2** |
 | **S2-0** | the NAME-UNIQUENESS payload clause `dir_uniq`, and the payload → tree constructor it unlocks | FsTree, FsLookup, IcacheEscrow, IcacheBoot + 18 walk/spec files | full cone | **LANDED** |
 | **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | **LANDED, fused with V5′'s increment R** — see the fused-increment entry below |
+| **F3** | the SYSCALL BOUNDARY: `fs_geom`/`fs_world`/`fs_res` + the mkdir and chdir wrappers | `FsSyscalls.v`, `LinkFsSyscalls.v` (new leaves) | F2 | **LANDED — the CALLING-CONVENTION half only; THE TREE-DELTA HALF IS STOPPED (S1–S3), and lifting the stop needs an R3 ruling** |
 | **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | SUPERSEDED by **V5′** — the sketch is unsound (Correction 1) and unprovable (Correction 2) as written; see the V5′ entry |
 | **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | DESIGNED (probe report transcribed below); increment R IN FLIGHT fused with V4 |
 
@@ -1981,3 +1982,178 @@ local-update helper is OWED as an optimization).  A third, smaller one:
 `destruct (F kk) eqn:` substitutes into HYPOTHESES but not into a
 wand's not-yet-unfolded premise, so a re-park after a flavour destruct
 needs `rewrite EFkk` on the goal side only.
+
+## F3 — **THE SYSCALL BOUNDARY.  The packaging half LANDS; the TREE-DELTA
+## half is STOPPED on three obstructions, and the third one is R3 itself**
+
+F3's charter (fs-friendly.md §4) is the friendly triple
+`⟨t. fs_rep-fragment⟩ sys_mkdir(path) ⟨t'. post ∗ ⌜t' = tree_insert t p …⌝⟩`,
+lifted caller-side out of the landed seals the way F2 was lifted out of
+`SpecDirlookup`. **The lift does not exist, and the reason is structural.**
+What landed instead is the boundary's CALLING CONVENTION — item (c) of the
+same charter, and the half that is derivable.
+
+### The three stops, each verified against the landed text
+
+**(S1) NO SYSCALL SEAL CARRIES A TREE DELTA, AND NONE CAN BE GIVEN ONE
+CALLER-SIDE.** `SpecSysMkdir.v:280-304` is the entire postcondition: a
+register file, `proc_priv`, the four superblock cells, `bslots`,
+`bitmap_res` at an unordered `used'`, the iref interval, and
+`sys_mkdir_ret` (0 or −1). Nothing inode-shaped, byte-shaped or
+tree-shaped. `ProofSysMkdir.v:60` says it in the seal's own words: *"Nothing
+inode-shaped survives the call, which is why this function's own post
+mentions none of it."* And the delta cannot be recovered one contract down
+either: **create's post names only the CHILD** (`create_locked` at
+`k`/`inum`/`dn`/`bm`, `SpecCreate.v:668-692`) and says nothing whatever
+about the PARENT, which it has already `iunlockput`'d — while the tree
+delta of a mkdir IS an edge at the parent. F2's lift worked because
+`SpecDirlookup`'s post spoke about the SAME `data` the caller's fragment
+named; at the syscall boundary there is no shared name to speak through.
+Checked across the family: every `SpecSys*.v` post in sysfile.c is
+register/process/ledger-shaped. `sys_open` is the one with a structural
+payout, and it is at the FD layer (`SpecSysOpen.v:240-256`: the returned fd
+is the least free descriptor and `pv_ofile` gains a slot), not the tree.
+
+**(S2) THERE IS NO AMBIENT TREE RESOURCE AT THE SYSCALL BOUNDARY.**
+`FsRep.fnode` needs `InodeRegion.dinode_at`, which is exclusive and lives
+inside `IcacheEscrow.ic_loaded` / `ipool_alloc` — **the escrow owns every
+node fragment in the system**, and a thread can hold one only while it holds
+that inode's sleeplock (§1.4). A syscall-level client holds no lock, so the
+only `fs_rep t` it can supply is at the EMPTY tree. This is §1.4 restated
+one altitude up, and it has a sharp consequence for F2's own `dl_au`: that
+device is satisfiable today only by a client that is itself inside a walk.
+**The HOCAP thread does not rescue it.** Threading an atomic update from
+the syscall down to the record write (the `wp_log_write_au` shape, which is
+where the linearization point genuinely is — the parent's record write
+inside the `begin_op..end_op` window) still requires the client to own the
+ambient tree it surrenders at the firing instant, and it does not.
+
+**(S3) EVEN THE PURE-RESOURCE TRIPLE IS NOT COMPOSABLE FOR mkdir.** The
+iref ledger returns as an INTERVAL (`SpecSysMkdir.v:300`,
+`ns - create_slots ≤ ns' ≤ ns`), inherited from create's own interval
+(`SpecCreate.v:659-661`). A client cannot re-establish its precondition
+`create_slots ≤ ns` from that, so **the friendly mkdir triple cannot be
+called twice.** Physically the figure is exact (create's failure arms
+return every slot; the success arm's one is returned by the caller's
+`iunlockput`), so this is contract imprecision, not a leak. `sys_chdir` has
+no such problem — `iref_slots 2` in and out on all four arms
+(`SpecSysChdir.v:259, :283`), `used' ⊆ used` (:280) — which is why the chdir
+wrapper is composable and the mkdir one is not. **The first real
+distinction the friendly layer draws between two syscalls is a LEDGER fact,
+not a tree fact.** NOTHING WAS AMENDED: the tightening, if ever wanted, is
+create's post, not sys_mkdir's.
+
+### WHAT IT WOULD TAKE — the price of the tree half, named exactly
+
+The only carrier that survives S2 is a **per-node LOCKSTEP GHOST**: a
+`ghost_map Z fsnode` whose AUTHORITY half rides in the same payload as
+`dinode_at` — so every mover that changes the bytes changes it under the
+same lock — and whose FRAGMENT half is CLIENT-HELD. That fragment is F4's
+path-points-to; with it, `fs_rep` becomes holdable by a thread that holds no
+lock, the syscall AU has something to surrender, and S1 becomes a matter of
+threading one AU parameter down the write path.
+
+**This is a whole-tree authority in the sense R3 forbids**, and the
+coordinator, not this increment, rules on it. Two observations for that
+ruling, both in the proposal's favour and neither decisive:
+
+* §20.9(c)'s death certificate is against an authority *a mover can read
+  only by opening, with nothing letting the caller supply a fact about it*.
+  A lockstep ghost parked in the payload is read by the mover **that already
+  holds the payload** — the writer holds the parent's `ic_loaded` — so that
+  certificate does not obviously transfer.
+* §20.9(e)'s certificate is a PRICE, not an impossibility: a new gname enters
+  `ireg_inv` and `ipool_shape`, i.e. `ic_escrow`'s arity, i.e. every fs
+  contract. That is the V1/V2/V5′ sweep shape, at the payload level, one more
+  time.
+
+Against it: the AU parameter has to be threaded through **every intermediate
+contract on the write path** (sys_mkdir → create → dirlink → writei →
+log_write), and the hardness data's expensive mistake is exactly a contract
+renegotiated after its consumers exist. **If the tree half is ever wanted,
+`sys_unlink`'s IN-FLIGHT seal is the cheapest place in the tree to design it
+in** — it is the one syscall contract that does not yet have consumers.
+
+### What landed — `iris/FsSyscalls.v` + `iris/LinkFsSyscalls.v` (new leaves)
+
+Two files, no landed file touched (the two `_CoqProject` rows are the only
+edit outside them). ONE file for both syscalls because the three bundles are
+shared; the Link file is separate because that is the house discipline — the
+tree layer never enters a Link cone, so `FsSyscalls.v` compiles against the
+definitional layer alone and `LinkFsSyscalls.v` is the one place the
+packaging meets the proofs (and the only place `Print Assumptions` has a
+closed term).
+
+* **`fs_geom`** — the 19 pure geometry/ties premises as ONE record. The
+  UNION of the two seals', deliberately: geometry is a fact about mkfs's
+  image and boot, established once and handed to every syscall; chdir
+  ignores five fields. The `icfg` instance is left implicit so it resolves
+  from the ambient `fileG`, which is `SpecCreate.v:433-444`'s two-instance
+  trap avoided.
+* **`fs_world`** — the 19 ambient resources as ONE assertion, **and
+  `fs_world_persistent` is the increment's real theorem about hiding**: the
+  seals consume all nineteen and return none, and that is sound precisely
+  because not one is spent. A client pays for the file system's world once,
+  at boot, and every syscall is free of it forever after.
+* **`fs_res`** — the 7 consumables that actually cross: `bslots`, the four
+  superblock cells, `bitmap_res`, the iref ledger. Everything F3 must
+  ACCOUNT for is here, and S3 is a statement about this bundle's `ns`.
+* **`wp_sys_mkdir_friendly` / `wp_sys_chdir_friendly`** — functors over
+  `SYSMKDIR` / `SYSCHDIR`, F2's `FsLookupTree` pattern. 26 pure premises
+  become 6 (mkdir) and 5 (chdir); 31 resources become 6 — the two bundles,
+  the process block, and the three machine ones (`sie_cap_gpr`, `cpu_own`,
+  `pc_is`) that cannot be bundled away. `eb` disappears as a parameter,
+  fixed at the `true` both seals force, and with it `trap_csrs_ext` /
+  `cpu_claim_ext` vanish from the pre AND the post (`emp` at `true`,
+  `IntrDefs.v:1068, :1737`). **That is F2's bar — fewer premises than the
+  seal, zero axioms added — met in the one dimension where it can be met.**
+
+**What stays irreducible, and is not a defect**: the register file (`m`,
+`mf`, `callee_saved`), the stack budget `K`, the program counter. This is a
+WP over machine code; a friendly layer can bundle the file system's world
+but not the machine's own state.
+
+### chdir was staged as "the NO-DELTA case"; both halves of that are wrong
+
+* Its `iput(p->cwd)` can be the last reference to an unlinked inode and then
+  truncates and FREES it — `used' ⊆ used` is the visible half
+  (`SpecSysChdir.v:279`). The node store CAN lose a node across a chdir.
+  What is untouched is the REACHABLE tree, and saying so needs the ambient
+  tree S2 says does not exist.
+* The interesting half — "the new cwd is what `path` resolves to" — is
+  **unstatable, and R8 is why**: `SpecNamex.v:113-124` rules there is no
+  path → inode functional statement. The seal says what it can: the process
+  returns at `upd_cwd V ipv` for an EXISTENTIAL `ipv`
+  (`SpecSysChdir.v:161-166`). **That existential is not slack — it is R8 at
+  the syscall boundary.**
+
+### For the remaining syscall wrappers
+
+* **`sys_open`** is the next one worth writing and the best-placed: its post
+  is already friendly in the FD dimension (`SpecSysOpen.v:240-256`), it takes
+  the same three bundles plus `fd_slot` and the ftable pair, and its tree
+  half stops at S1 exactly as mkdir's does. **Name collision to expect:**
+  `FdSlots`' `fnode k` (a file-table node) versus `FsRep.fnode γi γfs i n`.
+  Nothing imports both today; the first wrapper that wants FD *and* tree
+  content will, and one of the two needs qualifying.
+* **`sys_link` / `sys_unlink`** inherit S1 and S3 unchanged (unlink's seal is
+  in flight at V3/V5′). Unlink is where R2's uniqueness invariant was made
+  load-bearing for a friendly delta that, per S1/S2, cannot yet be stated —
+  the invariant is not wasted (it is what makes the delta TRUE), but its
+  consumer is still missing.
+* Any wrapper for a syscall that does **not** close its ledgers gets S3's
+  treatment: state the interval, and say in the header that the triple is
+  single-shot. Composability is the friendly layer's real acceptance test,
+  and today only chdir passes it.
+
+### Gate
+
+`FsSyscalls.vo` and `LinkFsSyscalls.vo` both green on the mirror, and
+`proof_coverage.py --check` exits 0 with coverage UNMOVED (186/190, 98 %;
+the increment is additive and flips no seal). The gate was taken at
+`37918d9b`; the fused V4 + V5′-R commit (`412c58ed`) landed in the same
+window and rebuilds the `InodeRegion` cone under these two leaves, so **a
+re-verification at `412c58ed` is OWED** — the leaves name `ireg_inv`,
+`ic_escrows`, `is_itable2` and `bitmap_res` only through the two seals'
+own signatures, none of which moved, so the expectation is a clean
+recompile and nothing more.
