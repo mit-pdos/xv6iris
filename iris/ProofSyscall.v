@@ -43,17 +43,18 @@
                                                 the process triple too;
      k = 14  sys_uptime  (`sysc_arm_uptime`) -- the tickslock and nothing
                                                 else (no `proc_priv` at all);
-     k = 18  sys_unlink  (`sysc_arm_unlink`) -- the shortest arm in the file:
-                                                SpecSysUnlink.v's contract IS
-                                                `wp_syscall_sconf_body` with
-                                                the entry point changed, so
-                                                `syscall_env` goes in as its
-                                                own abstract `R` and its post
-                                                is `sysc_ret_tail`'s premise
-                                                list already.  It stands on
-                                                LinkSysUnlink.v's `Axiom`,
-                                                that being the whole reason
-                                                SpecSysUnlink.v exists.
+     k = 18  sys_unlink  -- NOT WIRED.  Its arm was written against a
+                                                SpecSysUnlink.v whose contract
+                                                was `wp_syscall_sconf_body`
+                                                with the entry point changed
+                                                (`syscall_env` as an abstract
+                                                `R`); that placeholder has
+                                                since been replaced by a REAL
+                                                contract of a different shape,
+                                                and the two disagree.  Index 18
+                                                falls through to the
+                                                placeholder until the shape is
+                                                settled cross-line.
 
    The file's ONE remaining `Admitted` is `sysc_arm_placeholder`, standing
    in for the other thirteen table entries (reached through
@@ -1905,50 +1906,13 @@ Section SyscallArms.
      already.  Nothing here is weaker than the axiom; wiring it is what makes
      [Print Assumptions] name sys_unlink rather than the dispatch's own
      placeholder. *)
-  Lemma sysc_arm_unlink (γf : gname) (pj : mword 64)
-      (γs : list gname) (j : nat) (γl : gname) (bn : bio_names)
-      (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
-      (pid : mword 32) (V : pprivate) (lks : gset string) (av : nat)
-      (m M : regfile) (us : gset Z) :
-    sysc_arm_goal 18 γf pj γs j γl bn fn dqi ip pid V lks av m M us.
-  Proof.
-    rewrite /sysc_arm_goal /sysc_arm_pre.
-    intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
-    assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
-    subst pj.
-    iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
-    assert (Hpce : (mword_of_int (sysc_target 18) : mword 64)
-                   = mword_of_int KernelSyms.sys_unlink) by reflexivity.
-    iEval (rewrite Hpce) in "Hpc".
-    (* ---- the call ---- *)
-    iApply (SysUnlink.wp_sys_unlink_sconf syscall_env γf γs j γl bn fn us ip dqi
-              M (av - 4)%nat pid V lks
-              Hj Hgamma ltac:(unfold K_sys_unlink; lia)
-              with "Hcg Hcpu Htext Hdata Hpc Hprocs Hpanic Hbs Hfc Hip Hfd Hir Henv Hpriv").
-    iIntros (CIDy Hsy mf V' us') "%Hcs %Htfp' Hcg Hcpu Hbs Hfc Hip Hfd Hir Henv2 Hpriv Hpc".
-    assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
-    { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
-    assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt V'))).
-    { rewrite (callee_saved_lookup Hcs Rs2 ltac:(vm_compute; reflexivity)).
-      rewrite Htfp'. exact HMs2. }
-    assert (Hmfrest : forall r : mword 5, is_cs_idx r = true ->
-              r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
-              mf !!! Regidx r = m !!! Regidx r).
-    { intros r Hr Ncsp N8 N9 N18.
-      rewrite (callee_saved_lookup Hcs r Hr). exact (HMother r Hr Ncsp N8 N9 N18). }
-    assert (Hret : ret_pc (M !!! Regidx Rra)
-                   = (mword_of_int (KernelSyms.syscall + 0x3a) : mword 64))
-      by (rewrite HMra; apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hret) in "Hpc".
-    assert (Hcry : true = false \/ proc_addr j = zero_reg -> (CIDy : CPU) = (CID : CPU))
-      by wp_next_chain.
-    iDestruct (wp_next_retarget CID CIDy true (proc_addr j) _ Hcry with "Hcont") as "Hcont".
-    iApply (sysc_ret_tail (CID := CIDy) γf (proc_addr j) bn fn dqi ip pid V V' lks av us' m mf
-              Hmfsp Hmfs2 Hmfrest ltac:(lia) Htfp'
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hfc Hip Hfd Hir Henv2 Hpriv Hpc Hcont").
-  Qed.
+  (* sys_unlink's ARM IS WITHDRAWN, not written.  Origin's arm applied
+     [SysUnlink.wp_sys_unlink_sconf] at a leading [syscall_env] bundle;
+     our line's b284fecb replaced the syscall-shaped placeholder with a
+     REAL contract taking [(γf) (γa) (γpr) (gs) (j) (gl) (gu) (gd) (gk)
+     (pd pav pu) ...].  Both are real, the shapes disagree, and index 18
+     falls through to [sysc_arm_placeholder] until that is settled --
+     see claude-notes/projects/fs-sysfile.md, "S7-unlink". *)
 
   (* THE COMBINATOR.  One [decide (k = <literal>)] branch per wired entry,
      ahead of the generic placeholder: adding an arm is adding a branch, and
@@ -1979,8 +1943,9 @@ Section SyscallArms.
     { exact (sysc_arm_pause γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
     destruct (decide (k = 14%nat)) as [-> | _].
     { exact (sysc_arm_uptime γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
-    destruct (decide (k = 18%nat)) as [-> | _].
-    { exact (sysc_arm_unlink γf pj γs j γl bn fn dqi ip pid V lks av m M us). }
+    (* index 18 (sys_unlink) is NOT wired: both lines made SpecSysUnlink real
+       in incompatible shapes, so it falls through to the placeholder pending
+       the cross-line shape decision.  See the header note. *)
     exact (sysc_arm_placeholder k γf pj γs j γl bn fn dqi ip pid V lks av m M us Hk).
   Qed.
 
