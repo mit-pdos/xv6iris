@@ -2157,3 +2157,130 @@ re-verification at `412c58ed` is OWED** — the leaves name `ireg_inv`,
 `ic_escrows`, `is_itable2` and `bitmap_res` only through the two seals'
 own signatures, none of which moved, so the expectation is a clean
 recompile and nothing more.
+
+---
+
+## THE EQUIVALENCE PACKAGE — **`create_fresh_ty` IS REDUCED TO ONE
+## SENTENCE OVER A THREE-INSTRUCTION WINDOW, AND THE THREE FLANKS THAT
+## BOUND IT ARE MACHINE-CHECKED.  `iris/IregBox.v` (new leaf)**
+
+### What the package is
+
+The axiom is not retirable (§7's ruling, upgraded to a LAW wall by
+§7.10.6's station exhaustion).  What it *is* is reducible, and the
+reduction was owed as prose in four probes' reports.  It is now a file:
+
+> `create_fresh_ty` ⟺ **no foreign `ireg_free_au` at the claimed inum
+> between `ialloc`'s `brelse` and `ialloc`'s `iget`.**
+
+Left to right: the only way create's `ilock` reads a type other than
+`ty` is for the claimed record to be REWRITTEN, and the only mover that
+writes a type-0 record over a claim box is `ireg_free_au` — a foreign
+`ireg_withdraw` alone changes no byte, so a stranger who merely fills
+reads `ty` too.  Right to left: a free in that interval is §17.6.1's
+machine-legal trace and it makes the conclusion false.
+
+### The seven lemmas, all `Closed under the global context`
+
+`iris/IregBox.v` — a LEAF (zero dependents), for `IregLinkNz.v`'s and
+`IregDirBit.v`'s reason; fold all three back into `InodeRegion.v` /
+`FsBlocks.v` at a milestone.
+
+| lemma | content |
+|---|---|
+| `ireg_box_fresh` | `ireg_in d ∧ type ≠ 0 → fresh_shape d` (pure; the IN arm's two sub-cases are disjoint) |
+| `ireg_box_w0` | …and (L1) at `nlink = 0` collapses the ternary sum: **no live record of any flavour names a box** |
+| `ireg_box_excl` | T1 over the slot, as a **DICHOTOMY**: a nonzero-type slot is either CHECKED OUT (region holds the marker) or a BOX, and at a box `fresh_shape` ∧ no `ilink_fl` ∧ no client `dinode_at` |
+| `ireg_claim_box_freeze` | the mover-by-mover refutation from the box's fragment alone: `type ≠ 0` kills the CLAIM's premise, no `dinode_at` kills the four record-movers, `ireg_withdraw` alone survives |
+| `ireg_box_no_payload` | §16.4's exhaustiveness **without the itable**: no `ipool_alloc` and no `ic_loaded` names a boxed inum, so every `ilock` there must take the fill arm |
+| `fsL_block_exclusive` | §7.2.4 phase 1, generalised from `q : Qp` to an arbitrary `dfrac` |
+| `iref_two_not_ref1` | §7.2.4 phase 3: two reference fragments at one slot ⟹ count ≥ 2, so a slot at REF-1 carries only one — no foreign `iput` free while create's reference lives |
+
+### Three findings worth keeping
+
+1. **`ireg_box_excl` CANNOT be stated under an IN-arm hypothesis.**
+   IN-ness is the region's own existential and the one witness that
+   picks it — the marker — is in the pool at a claim box, behind the
+   itable spinlock `ialloc` does not hold (§7.4.3).  A pure `ireg_in d`
+   premise does *not* select the arm (the OUT arm is compatible with it).
+   The dichotomy is the only faithful form, and it is also the useful
+   one: a caller holding `dinode_at` at the inum lands in the LEFT
+   disjunct by its own fragment, which is exactly what `ireg_free_au`
+   does today.
+2. **THE "VALID BIT" IS NOT THE MODEL'S CARRIER, AND THE MODEL'S IS
+   STRONGER.**  At the C level "every free passes through a fill" is
+   `iput`'s `ip->valid` test plus "`valid` is written 1 only in `ilock`".
+   The model needs no bit: `ireg_free_au` takes ONE caller-side resource,
+   `dinode_at γi inum dn`, and at a box that fragment is in the region
+   (`ireg_claim_box_freeze` + `ireg_box_no_payload` between them refute
+   every other custodian).  So it is a **custody theorem about the
+   fragment**, not a control-flow claim about a word — and the fragment
+   is strictly stronger, because the bit is per-ENTRY and dies at
+   eviction while the fragment is per-INUM and is conserved (§7.7).
+   Recorded as a delta, not as a weakening.
+3. **THE WINDOW IS THREE INSTRUCTIONS, NOT FOUR, AND THE TWO COUNTS HAVE
+   BEEN CONFUSED.**  `brelse` returns to `ialloc`+0xa4 and the `jal iget`
+   is at +0xaa, so the gap is `+0xa4 addiw a1,s2,0`, `+0xa8 c.mv a0,s5`,
+   `+0xaa jal ra,iget`, plus `iget`'s prologue to the reference mint.
+   The FOUR instructions in `SpecCreateFreshTy.v`'s header are a
+   different measurement — create's own span, +0xa4..+0xb0.  Both are now
+   spelled out there.  Neither is a bound on TIME: the claimant can be
+   preempted inside the gap arbitrarily long.
+
+### The header
+
+`SpecCreateFreshTy.v`'s header (comment-only edit) now carries: the
+equivalence and the three flanks with lemma names; the ten-formulation
+reduction history as §(E) — C′, adequacy coupling, entry-keyed payload
+certificate, the escort, span-stability, harmlessness, record-backed
+greys, the reference/occupancy certificate, ownership transfer, the
+protocol ghost — each with its wall; and §(F), the three open routes.
+It also CORRECTS §20.17.7's "those are the two doors" to **one**
+(§7.4.6 killed the withdraw door independently, at `ireg_claim_au`'s
+re-mint).
+
+### The three open routes, as recorded in §(F)
+
+- **(F1) K-F2** — move `ialloc`'s `brelse` after its `iget`.  Designed,
+  priced, rejected by policy (R13(iii)).  The unique change that deletes
+  the window, because it is the unique change that puts a revocable
+  resource — flank (i)'s buffer half — into the gap.  With it flanks (i)
+  and (ii) meet and there is no residue.
+- **(F2) CLOSED-WORLD ADEQUACY** — not a resource route; discharge the
+  sentence at the adequacy theorem as a property of the closed program.
+  §7.2.2's certificate is against the RESOURCE form only.  Unaudited;
+  its cost is abandoning thread-modularity for one fact.
+- **(F3) PROPHECY / LATE LINEARIZATION** — **NOT PREVIOUSLY RECORDED**,
+  and the only mechanism §7.10.6's station exhaustion does not literally
+  name: a prophecy pins a FUTURE OBSERVATION, not an EPISODE, so the
+  four carrier assignments do not obviously cover it.  Expected outcome
+  is that clause (i) covers it anyway (prophecy resolution is itself a
+  frame-preserving update), i.e. an ∃-typed payout.  **If an eleventh
+  probe is opened, this is the only one worth opening.**
+
+### Gate
+
+MIRROR (`ec2-18-206-159-30`), never local; scp + block-md5 verified on
+both sides before each build.  `IregBox.v` is a leaf, so a single-file
+`coqc` IS its whole cone: prerequisites verified non-stale first
+(`make -n IcacheEscrow.vo IcacheInv.vo InodeRegion.vo FsBlocks.vo
+LogInv.vo IrefSlots.vo IcacheRef.vo InodeInv.vo DinodeEnc.vo` emits **0**
+compile lines, and the `.vo` mtimes are per-file, not a sync artefact),
+then `IregBox.vo` deleted and rebuilt from scratch — **EXIT=0**.
+`Print Assumptions` on all **seven** new lemmas: **Closed under the
+global context**.  `SpecCreateFreshTy.v` recompiles (comment-only) and
+`LinkCreateFreshTy.v` — the Module Type instantiation, the one consumer
+that would catch a statement move — rebuilds green, so no statement
+moved.  `tools/lemma_diff.py`: **CLEAN**.  Committed by explicit path;
+the live `DirLinks.v` lane's edit was present in the tree throughout and
+was not touched.
+
+### Owed
+
+- Fold `IregBox.v` + `IregLinkNz.v` + `IregDirBit.v` back into
+  `InodeRegion.v` (and `fsL_block_exclusive` into `FsBlocks.v`) at the
+  next `InodeRegion`-cone milestone.
+- Nothing in `IregBox.v` has a consumer yet.  `ireg_box_no_payload` is
+  the load-bearing one if K-F2 ever lands: it turns "`ialloc`'s `iget`
+  finds either the pool's marker or an unloaded entry's marker, and
+  never a loaded record" from a paragraph into a theorem.

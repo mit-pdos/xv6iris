@@ -932,6 +932,7 @@ FsRep.v
 IregLinkNz.v
 IregDirBit.v
 IcacheEscrow.v
+IregBox.v
 IcacheBoot.v
 CodeIget.v
 CodeDirlink.v

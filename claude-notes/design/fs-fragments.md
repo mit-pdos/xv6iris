@@ -1266,9 +1266,10 @@ At the free's fupd iput holds *both* halves (its own buffer's, plus the
 region's through the AU).  At `ireg_withdraw` the same is already true
 and already used (`ghost_map_elem_agree with "Hhalf Hfsb"`).  So **at
 either of those two fupds, no other thread is inside a bread/brelse
-window on that dinode block.**  ~5 lines, provable today, no contract
-moves.  This is the honest formal content of "the buffer serialises the
-region" — the licence composes because it is a *fraction*, not a handle.
+window on that dinode block.**  This is the honest formal content of
+"the buffer serialises the region" — the licence composes because it is
+a *fraction*, not a handle.  **LANDED as `IregBox.fsL_block_exclusive`**,
+generalised from the sketch's `q : Qp` to an arbitrary `dfrac`.
 
 **Phase 3 (post-iget): REFUTED, but at +0x50 only.**  REF-1 +
 `ci`-injectivity.  Genuine absence; genuinely stronger than §20.15
@@ -2494,8 +2495,17 @@ The probes read `c105ad60` / `3e8d4c3e`.  Verified at HEAD `e50a6508`:
   `ProofSysUnlinkParts` is a new `igrey` consumer — **the grey
   conversion is becoming live**, which is R12's condition for building
   on grey provenance.
-- **T1 / `ireg_box_excl` is still UNWRITTEN** — no `ireg_box_excl`,
-  `ireg_claim_box_freeze` or `ireg_box_no_payload` exists in `iris/`.
+- **T1 IS LANDED.** `iris/IregBox.v` (a leaf, zero dependents, folded back
+  into `InodeRegion.v`/`FsBlocks.v` at a milestone) carries
+  `ireg_box_fresh`, `ireg_box_w0`, `ireg_box_excl`,
+  `ireg_claim_box_freeze` and `ireg_box_no_payload`, plus the two flanks
+  `fsL_block_exclusive` (§7.2.4 phase 1) and `iref_two_not_ref1` (§7.2.4
+  phase 3, REF-1 as a refutation).  All seven are `Closed under the global
+  context`.  `ireg_box_excl` is stated as a **dichotomy** rather than under
+  an IN-arm hypothesis, because IN-ness is not nameable from outside the
+  region (§7.4.3): at a nonzero-type slot either the region holds the
+  MARKER (the record is checked out) or the slot is a box, and then
+  `fresh_shape`, no `ilink_fl` of any flavour, and no client `dinode_at`.
 - **C′ is still unlanded**: no `IgetLic.v`, no `ilic`, and `SpecIget`'s
   only resource premise is still `iref_slot`.
 
@@ -2822,5 +2832,5 @@ this route and life.**
 - **Nothing new to build.**  H1's machinery (~100–150 lines,
   `InodeRegion.v` only, zero contract moves) is **buildable and
   worthless** — its entire payout is already landed as `filled` +
-  `fresh_shape` + ∃ty′.  The one still-unwritten lemma worth landing
-  remains §7.6.9's `ireg_box_excl` (confirmed still absent at HEAD).
+  `fresh_shape` + ∃ty′.  §7.6.9's `ireg_box_excl` was the one lemma still
+  worth landing and it is now landed in `iris/IregBox.v` (§7.8).
