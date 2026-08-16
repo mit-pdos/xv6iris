@@ -41,9 +41,58 @@ Proof.
   rewrite HC. d_cbn. apply hfrun_ret.
 Qed.
 
+(* THE POST-STATE of one cycle body.  Three writes are PINNED -- the
+   minstret_increment flag, nextPC (the compressed instruction is 2 bytes)
+   and PC (tick_pc commits nextPC) -- and minstret is left as a parameter.
+   Naming the file is what lets a caller say where the machine ended; an
+   existential over the WHOLE file says only that the frames came back,
+   which specifies nothing, since a frame constrains only its own
+   footprint and agreement-on-nothing is vacuous.
+
+   MINSTRET IS THE ONE CELL WORTH QUANTIFYING, and quantifying its VALUE
+   rather than pinning it is what makes the statement branch-free: whether
+   the counter bumps depends on a config bit, and BOTH branches are
+   value-agnostic, so a caller that does not care what minstret holds
+   needs no premise about it.  That is the raw-cell shadow of what design
+   §5 actually prescribes -- minstret and minstret_increment belong in
+   [MinstretInv], touched by single-node rules that open the invariant
+   around exactly that node, and the invariant pins no value for exactly
+   this reason.  [MinstretInv] is above the red line, so it cannot be
+   named here yet; B′ replaces this parameter with the invariant. *)
+Definition hp_post (rs : regstate) (mi : SailStdpp.Values.mword 64)
+    : regstate :=
+  register_set (R_bitvector_64 minstret) mi
+    (register_set (R_bitvector_64 PC) (add_vec_int hp_pc 2)
+       (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+          (register_set (R_bool minstret_increment)
+             (minstret_inc_flag
+                (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))).
+
+(* setting a register to the value it already has changes no lookup *)
+Lemma reg_set_id_agree (D : gset register) (r : register) (rs : regstate) :
+  reg_agree_on D (register_set r (register_lookup r rs) rs) rs.
+Proof.
+  intros r' Hr'. destruct (decide (r' = r)) as [->|Hne].
+  - by rewrite register_lookup_set.
+  - by rewrite (irrelevant_register_set r' r rs _
+                  (register_beq_false r' r Hne)).
+Qed.
+
 Section leaf.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* the read-only frame's counterpart of [hreg_frame_ext] (HartSpan keeps
+     its copy Local) *)
+  Local Lemma hreg_frame_ro_ext' (Df : register -> dfrac) (rs rs' : regstate)
+      (Dro : gset register) :
+    reg_agree_on Dro rs rs' ->
+    hreg_frame_ro Df rs Dro ⊣⊢ hreg_frame_ro Df rs' Dro.
+  Proof.
+    intros Hag. rewrite /hreg_frame_ro. apply big_sepS_proper.
+    intros r Hr. by rewrite (Hag r Hr).
+  Qed.
 
   (* [run_hart_active] at the pilot's word: dispatch, fetch, decode,
      execute.  Everything below the [swp_use_cer] peels is a fact that
@@ -328,10 +377,12 @@ Section leaf.
                          (TypeCasts.autocast (subrange_vec_dec d 31 0)))))
                 σ.(mdev)))) -∗
     swp (try_step 0 false)
-      (fun _ => ∃ rs' : regstate,
-                  hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I.
+      (fun _ => ∃ mi : SailStdpp.Values.mword 64,
+                  hreg_frame (hp_post rs mi) Drw ∗
+                  hreg_frame_ro Df (hp_post rs mi) Dro)%I.
   Proof.
-    intros Hdisj HDpriv HDmisa HDmst HDhart HDmc HDcfg HDmi HDmi' HDms HDms'
+    intros Hdisj HDpriv HDmisa HDmst HDhart HDmc HDcfg HDmi HDmi'
+      HDms HDms'
       HWpc HDpc HDnpc HDnpc' HDpma HDcfg2 HDhtif
       Hpriv Hhart Hpc Hpma Hpcfg Hhtif HmisaS HmisaC HmIE Hmprv Hlpad
       Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa Hsram Hsva Hspa Hsplit Hrx Hgta.
@@ -408,12 +459,15 @@ Section leaf.
     { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDmi'
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". t_peel. l_glue.
-    (* the minstret bump.  The two branches leave DIFFERENT files, so the
-       case split has to come before the binds -- an intermediate
-       postcondition cannot be shared across it. *)
+    (* THE MINSTRET BUMP.  The branch is left OPEN: both arms reach the
+       same post-state shape, differing only in what minstret holds, and
+       the postcondition quantifies that value.  A caller that does not
+       care what the counter reads therefore needs no premise about the
+       config bit at all -- which is the raw-cell shadow of minstret
+       living in an invariant that pins no value. *)
     destruct (minstret_inc_flag
                 (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                (register_lookup (R_bitvector_64 minstretcfg) rs)).
+                (register_lookup (R_bitvector_64 minstretcfg) rs)) eqn:Hmi.
     - iApply (swp_bind0_use _ _
                 (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
                 with "[Hrw Hro] [-]").
@@ -424,11 +478,13 @@ Section leaf.
                     _ _ _ with "[Hrw Hro] [-]").
           { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDms'
                       with "Hcert Hrw Hro"). }
-          iIntros (v) "(-> & Hrw & Hro)".
+          iIntros (v0) "(-> & Hrw & Hro)".
           iApply (swp_write_reg_owned Drw Dro Df _ _ _ Hdisj HDms
                     with "Hcert Hrw Hro"). }
         iIntros (u0) "[Hrw Hro]". l_glue. iApply swp_ret. iFrame. }
-      iIntros (u1) "[Hrw Hro]". iApply swp_ret. iExists _. iFrame.
+      iIntros (u1) "[Hrw Hro]".
+      iEval (t_peel) in "Hrw". iEval (t_peel) in "Hro".
+      iApply swp_ret. iExists _. unfold hp_post. rewrite Hmi. iFrame.
     - iApply (swp_bind0_use _ _
                 (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
                 with "[Hrw Hro] [-]").
@@ -437,7 +493,19 @@ Section leaf.
                   with "[Hrw Hro] [-]").
         { iApply swp_ret. iFrame. }
         iIntros (u2) "[Hrw Hro]". l_glue. iApply swp_ret. iFrame. }
-      iIntros (u3) "[Hrw Hro]". iApply swp_ret. iExists _. iFrame.
+      iIntros (u3) "[Hrw Hro]".
+      iEval (t_peel) in "Hrw". iEval (t_peel) in "Hro".
+      iApply swp_ret.
+      iExists (register_lookup (R_bitvector_64 minstret)
+                 (register_set (R_bitvector_64 PC) (add_vec_int hp_pc 2)
+                    (register_set (R_bitvector_64 nextPC)
+                       (add_vec_int hp_pc 2)
+                       (register_set (R_bool minstret_increment)
+                          false rs)))).
+      unfold hp_post. rewrite Hmi.
+      rewrite (hreg_frame_ext _ _ Drw (reg_set_id_agree Drw _ _)).
+      rewrite (hreg_frame_ro_ext' Df _ _ Dro (reg_set_id_agree Dro _ _)).
+      iFrame.
   Qed.
 
 End leaf.
