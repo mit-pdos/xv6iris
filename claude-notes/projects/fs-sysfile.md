@@ -8779,6 +8779,41 @@ Three shape decisions the walk inherits and should not re-litigate:
   writei's `de` — which is why it is saved before `ilock(ip)` and reloaded
   on every arm at or below the isdirempty test.
 
+### FINDING (not sys_unlink's — the DISPATCH effort's): **`K_syscall` IS
+### FAR TOO SMALL FOR THE TABLE IT NAMES**
+
+`SpecSyscall.v`:140-145 computes `K_syscall = 4 + K_sys_exit` and its
+comment calls sys_exit "the deepest entry in the table".  It was, once.
+`K_sys_exit = 4 + K_kexit = 78`, and the table now holds **`K_sys_exec` =
+234**, `K_sys_link` = 144, `K_sys_open` = 138, `K_sys_mknod`/`K_sys_unlink`
+= 134, `K_sys_mkdir` = 132, `K_sys_chdir` = 126.  So `K_syscall` = 82 is
+short of its own deepest entry by 156 slots.
+
+Nothing is broken TODAY, because the wired arms (`sysc_arm_wait` /
+`_getpid` / `_sbrk` / `_uptime`) are all shallow and every other index goes
+through `sysc_arm_placeholder`, which applies no callee.  It bites the
+moment a DEEP arm is wired: the arm has to discharge its own
+`K_sys_xxx <= av` from `K_syscall <= av`, and `lia` cannot.  The fix is one
+line at the definition (`4 + K_sys_exec`, or a `max` over the table) plus
+whatever its consumers' bounds then need; it is the dispatch effort's, not
+this walk's, and it should be made BEFORE the first deep arm is written
+rather than discovered inside one.
+
+### Gate
+
+Lane `/shared/xv6iris-u7` on the mirror — a `cp -a` of the PASS-2-gated
+`/shared/xv6iris-p2` at `09281a86`, verified at staleness 0 (`make -n`
+emits 0 compile lines) BEFORE any edit.  The reverse cone of the four
+touched files is exactly `{SpecSysUnlink, ProofSysUnlinkParts,
+LinkSysUnlink, ProofSyscall}` (`grep -l` over every `.v`), and every one of
+them was rebuilt from a DELETED `.vo`, `MAKEEXIT=0`, zero `Error` lines.
+Whole tree afterwards: **1153 `.vo` for 1153 `.v`**, `MAKEEXIT=0`, and
+`make -n` emits 0 compile lines.  `tools/proof_coverage.py --check` exits 0
+with the two new `_CoqProject` rows; `lemma_diff` CLEAN (two new files, no
+deletion, and the one `Axiom` that moved is `LinkSysUnlink`'s own, restated
+at the real shape).  Coverage **186/190, sysfile.c 15/16 — unmoved**, which
+is what it must be until the `Link` flips.
+
 ### FINDING 0 — **`isdirempty` HAS NO SYMBOL.  It is inlined into
 ### sys_unlink, so there is no `CodeIsdirempty.v`, no contract, no
 ### coverage row, and never will be**
