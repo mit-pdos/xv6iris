@@ -200,7 +200,62 @@ Evidence:
    the pattern (b) wants.
    **The design doc's Phase B/C gate — leaf specs preserved verbatim — is
    still open.  Do not report it as met before a statement diff is empty.**
-2. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
+2. **Phase B′ — reconnect the tree** (the 971 files).
+
+   **THE LADDER, MEASURED.**  Between the 135 leaf-instruction call sites
+   and what this port has already rebuilt there are exactly four rungs:
+
+   | rung | what | count |
+   |---|---|---|
+   | leaves | `wp_or_gpr`, `wp_jalr_gpr`, … | 135 sites / 38 files |
+   | wrappers | `wp_instr` (33), `wp_instr_s_sconf` (68), `wp_instr_s_config_regime` (14), `wp_instr_config` (3), `wp_instr_s_regime` (2), `wp_instr_s_intr` (1) | 6 |
+   | decode+execute | `InstrBytes.wp_exec_step_decode_execute_inv`, `SmodeCore.wp_exec_step_decode_execute_inv_priv` | 2 |
+   | cycle | `wp_exec_step_hart_active_inv` → … → `wp_exec_step` | DONE (deleted; `HartMCycle.swp_try_step_gen` / `wp_loop_cycle`) |
+
+   **THE LEAF STATEMENTS SURVIVE VERBATIM, and that is the thing to
+   protect.**  They are resource-shaped -- `mmode_config dq`, `pmpcfg_n ↦ᵣ`,
+   `pc_is`, `gpr_file m`, `instr pc is_rvc i`, continuation, `WP Loop` -- with
+   no σ, no `exec`, no fupd anywhere.  `mmode_config` is one of their premises,
+   which is exactly where the counter/clock cells are going, so even that stays
+   byte-identical.
+
+   **WHAT CANNOT SURVIVE is the wrapper's OBLIGATION**, and it is the port's
+   real semantic content rather than an artefact:
+
+       (∀ σ, register_lookup PC σ.(sregs) = pc ->
+          mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
+          ∃ s_exec, ⌜exec (execute i) (set_reg σ nextPC …)
+                      = Some (RETIRE_SUCCESS, s_exec)⌝ ∗
+                    mstate_interp s_exec ∗ (… -∗ ▷ WP Loop))
+
+   It hands the caller ALL of σ and asks for the successor in ONE fupd.  Under
+   per-node stepping other harts run between the instruction's nodes, so a
+   successor computed from the σ you saw is stale unless you can argue nothing
+   you depend on changed -- and THAT argument is exactly a declared footprint,
+   i.e. a frame.  (`prim_step_hart_regs_frame` would rescue the register-only
+   families, since `sig_seip` is the only cross-hart register write; it does
+   not rescue memory, and the SAME wrapper carries loads and stores --
+   `WpMmodeLoad`/`WpMmodeStore` both go through `wp_instr`.)
+
+   **THE REPLACEMENT** is one uniform obligation, `swp (execute i) Φ`:
+   register-only instructions discharge it with `swp_hfrun` off `hfrun` twins
+   of the `exec_execute_*` catalogue; memory instructions with the event rules
+   plus the `R`-threaded memory obligation, which is the shape
+   `HartMStore.swp_execute_STORE` already has.  Uniformity is preserved --
+   the old obligation was uniform too.
+
+   **COST, and why it may be cheaper than it looks:** the 135 proof SCRIPTS
+   change, the statements do not.  A typical leaf (`WpMmodeRtype.wp_or_gpr`)
+   is ~50 lines of which ~40 are σ plumbing -- `reg_update`, `gpr_pt_value`
+   off `Hreg`, naming `s_exec` as a `set_reg` tower -- that a frame-shaped
+   obligation deletes outright.  `gpr_file m` IS already a frame: the leaves
+   already declare their footprint and merely convert it into σ-reasoning.
+
+   **DO NOT GRIND.**  Rebuild the 2 decode+execute rules and the 6 wrappers,
+   then convert ONE leaf of each family by hand -- an ALU one, a JALR, a load,
+   a store -- before touching the other 131.  If those four diffs are not
+   mechanical, the wrapper shape is wrong and wants redesigning, not grinding.
+  Findings that set
    the plan, surveyed against the real statements:
    - Leaf SPECS are resource-shaped (cells in, cells out — no σ, no
      `exec`, no fupd), so "verbatim" is achievable; the σ-callback
