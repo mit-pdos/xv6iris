@@ -64,6 +64,9 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -102,7 +105,100 @@ Local Ltac regne :=
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.
 
-Module SysUnlinkTails (Iunlockput : IUNLOCKPUT) (EndOp : END_OP).
+(* ===================================================================== *)
+(*  THE THREE PANIC MESSAGES.  Named pure lemmas, never inline [ltac:]     *)
+(*  (optimization.md).  Addresses and byte counts measured off the image.  *)
+(* ===================================================================== *)
+Definition su_nlink_a : Z := 0x800075f0.
+Definition su_nlink_s : string := "unlink: nlink < 1".
+
+Lemma su_nlink_nonul : PrintkFmt.nonul su_nlink_s = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma su_nlink_nz : eq_vec (mword_of_int su_nlink_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma su_nlink_bytes :
+  forall j b, cstring_bytes su_nlink_s !! j = Some b ->
+    KernelData.kernel_data !! (su_nlink_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 18 (destruct j as [|j];
+        [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+  vm_compute in Hj; discriminate.
+Qed.
+
+Definition su_readi_a : Z := 0x80007608.
+Definition su_readi_s : string := "isdirempty: readi".
+
+Lemma su_readi_nonul : PrintkFmt.nonul su_readi_s = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma su_readi_nz : eq_vec (mword_of_int su_readi_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma su_readi_bytes :
+  forall j b, cstring_bytes su_readi_s !! j = Some b ->
+    KernelData.kernel_data !! (su_readi_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 18 (destruct j as [|j];
+        [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+  vm_compute in Hj; discriminate.
+Qed.
+
+Definition su_writei_a : Z := 0x80007620.
+Definition su_writei_s : string := "unlink: writei".
+
+Lemma su_writei_nonul : PrintkFmt.nonul su_writei_s = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma su_writei_nz : eq_vec (mword_of_int su_writei_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma su_writei_bytes :
+  forall j b, cstring_bytes su_writei_s !! j = Some b ->
+    KernelData.kernel_data !! (su_writei_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 15 (destruct j as [|j];
+        [vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity |]);
+  vm_compute in Hj; discriminate.
+Qed.
+
+Lemma su_panic_noff (n : nat) : (n = 0)%nat -> (Z.of_nat n + 2 < 2 ^ 31)%Z.
+Proof. intros ->. lia. Qed.
+
+Section SuMsgStr.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma su_nlink_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int su_nlink_a : mword 64) ↦ₛ□ su_nlink_s.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string su_nlink_a su_nlink_s _ eq_refl
+              ltac:(unfold text_end, su_nlink_a; lia) su_nlink_bytes with "Hd").
+  Qed.
+
+  Lemma su_readi_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int su_readi_a : mword 64) ↦ₛ□ su_readi_s.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string su_readi_a su_readi_s _ eq_refl
+              ltac:(unfold text_end, su_readi_a; lia) su_readi_bytes with "Hd").
+  Qed.
+
+  Lemma su_writei_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int su_writei_a : mword 64) ↦ₛ□ su_writei_s.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string su_writei_a su_writei_s _ eq_refl
+              ltac:(unfold text_end, su_writei_a; lia) su_writei_bytes with "Hd").
+  Qed.
+End SuMsgStr.
+
+Module SysUnlinkTails (Iunlockput : IUNLOCKPUT) (EndOp : END_OP) (PN : PANIC).
 
 Section ProofSysUnlinkTails.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -232,13 +328,19 @@ Section ProofSysUnlinkTails.
   (*  message strings).                                                   *)
   (* ================================================================== *)
   Lemma su_panic_nlink `{GEN : GenId} `{CID0 : CpuId}
-      (M : regfile) (K : nat) (b : bool) (pj : mword 64) :
+      (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
+      (lks : gset string) :
+    (panic_stack <= K)%nat ->
+    (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+    locks_below lks "pr" ->
     sie_cap_gpr M K b pj -∗
-    kernel_text -∗ panic_wp_any -∗
+    cpu_own n eb pj b lks -∗
+    kernel_text -∗ kernel_data -∗ panic_env -∗
     pc_is (mword_of_int (SU + 0xec)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg #Htext #Hpanic Hpc".
+    intros HKp Hn31 Hbelow.
+    iIntros "Hcg Hown #Htext #Hkd #Hpenv Hpc".
     iPoseProof (suli_0ec with "Htext") as "Hi0".
     iPoseProof (suli_0f0 with "Htext") as "Hi1".
     iPoseProof (suli_0f4 with "Htext") as "Hi2".
@@ -271,18 +373,38 @@ Section ProofSysUnlinkTails.
                      (sign_extend' 64 (mword_of_int 2078700 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
-    iPoseProof (panic_wp_any_at CID3 with "Hpanic") as "Hpan".
-    iApply ("Hpan" with "Htext Hpc Hcg").
+    (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
+       [ra].  a0 is untouched, but prove it on P3 directly -- deriving it
+       across the write with [upd_ne] costs two orders of magnitude more. *)
+    pose (P3 := <[Regidx Rra := regval_into_reg
+                   (add_vec_int (mword_of_int (SU + 0xf4) : mword 64) 4)]> P2).
+    assert (Ha0 : P3 !!! Regidx Ra0 = (mword_of_int su_nlink_a : mword 64)) by pcw.
+    iPoseProof (su_nlink_str with "Hkd") as "#Hstr".
+    iDestruct (cpu_own_transport CID0 CID3 n eb pj b ltac:(wp_next_chain)
+                 with "Hown") as "Hown".
+    iApply (PN.wp_panic_sconf (CID := CID3) P3 K n eb b pj
+              (PkAStr DfracDiscarded su_nlink_s) lks
+              HKp eq_refl Hn31 Hbelow
+              with "Hcg Hown Htext Hkd Hpc Hpenv [Hstr]").
+    { rewrite /pk_desc_res Ha0.
+      iSplit; [iPureIntro; exact su_nlink_nonul|].
+      iSplit; [iPureIntro; exact su_nlink_nz|]. iExact "Hstr". }
   Qed.
 
   Lemma su_panic_readi `{GEN : GenId} `{CID0 : CpuId}
-      (M : regfile) (K : nat) (b : bool) (pj : mword 64) :
+      (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
+      (lks : gset string) :
+    (panic_stack <= K)%nat ->
+    (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+    locks_below lks "pr" ->
     sie_cap_gpr M K b pj -∗
-    kernel_text -∗ panic_wp_any -∗
+    cpu_own n eb pj b lks -∗
+    kernel_text -∗ kernel_data -∗ panic_env -∗
     pc_is (mword_of_int (SU + 0x12e)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg #Htext #Hpanic Hpc".
+    intros HKp Hn31 Hbelow.
+    iIntros "Hcg Hown #Htext #Hkd #Hpenv Hpc".
     iPoseProof (suli_12e with "Htext") as "Hi0".
     iPoseProof (suli_132 with "Htext") as "Hi1".
     iPoseProof (suli_136 with "Htext") as "Hi2".
@@ -315,18 +437,38 @@ Section ProofSysUnlinkTails.
                      (sign_extend' 64 (mword_of_int 2078634 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
-    iPoseProof (panic_wp_any_at CID3 with "Hpanic") as "Hpan".
-    iApply ("Hpan" with "Htext Hpc Hcg").
+    (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
+       [ra].  a0 is untouched, but prove it on P3 directly -- deriving it
+       across the write with [upd_ne] costs two orders of magnitude more. *)
+    pose (P3 := <[Regidx Rra := regval_into_reg
+                   (add_vec_int (mword_of_int (SU + 0x136) : mword 64) 4)]> P2).
+    assert (Ha0 : P3 !!! Regidx Ra0 = (mword_of_int su_readi_a : mword 64)) by pcw.
+    iPoseProof (su_readi_str with "Hkd") as "#Hstr".
+    iDestruct (cpu_own_transport CID0 CID3 n eb pj b ltac:(wp_next_chain)
+                 with "Hown") as "Hown".
+    iApply (PN.wp_panic_sconf (CID := CID3) P3 K n eb b pj
+              (PkAStr DfracDiscarded su_readi_s) lks
+              HKp eq_refl Hn31 Hbelow
+              with "Hcg Hown Htext Hkd Hpc Hpenv [Hstr]").
+    { rewrite /pk_desc_res Ha0.
+      iSplit; [iPureIntro; exact su_readi_nonul|].
+      iSplit; [iPureIntro; exact su_readi_nz|]. iExact "Hstr". }
   Qed.
 
   Lemma su_panic_writei `{GEN : GenId} `{CID0 : CpuId}
-      (M : regfile) (K : nat) (b : bool) (pj : mword 64) :
+      (M : regfile) (K : nat) (n : nat) (eb b : bool) (pj : mword 64)
+      (lks : gset string) :
+    (panic_stack <= K)%nat ->
+    (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+    locks_below lks "pr" ->
     sie_cap_gpr M K b pj -∗
-    kernel_text -∗ panic_wp_any -∗
+    cpu_own n eb pj b lks -∗
+    kernel_text -∗ kernel_data -∗ panic_env -∗
     pc_is (mword_of_int (SU + 0x13a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg #Htext #Hpanic Hpc".
+    intros HKp Hn31 Hbelow.
+    iIntros "Hcg Hown #Htext #Hkd #Hpenv Hpc".
     iPoseProof (suli_13a with "Htext") as "Hi0".
     iPoseProof (suli_13e with "Htext") as "Hi1".
     iPoseProof (suli_142 with "Htext") as "Hi2".
@@ -359,8 +501,22 @@ Section ProofSysUnlinkTails.
                      (sign_extend' 64 (mword_of_int 2078622 : mword 21))
                    = mword_of_int KernelSyms.panic) by pcw.
     iEval (rewrite Htgt) in "Hpc".
-    iPoseProof (panic_wp_any_at CID3 with "Hpanic") as "Hpan".
-    iApply ("Hpan" with "Htext Hpc Hcg").
+    (* the regfile the spec wants is the POST-JAL one: [wp_jal_s_sconf] wrote
+       [ra].  a0 is untouched, but prove it on P3 directly -- deriving it
+       across the write with [upd_ne] costs two orders of magnitude more. *)
+    pose (P3 := <[Regidx Rra := regval_into_reg
+                   (add_vec_int (mword_of_int (SU + 0x142) : mword 64) 4)]> P2).
+    assert (Ha0 : P3 !!! Regidx Ra0 = (mword_of_int su_writei_a : mword 64)) by pcw.
+    iPoseProof (su_writei_str with "Hkd") as "#Hstr".
+    iDestruct (cpu_own_transport CID0 CID3 n eb pj b ltac:(wp_next_chain)
+                 with "Hown") as "Hown".
+    iApply (PN.wp_panic_sconf (CID := CID3) P3 K n eb b pj
+              (PkAStr DfracDiscarded su_writei_s) lks
+              HKp eq_refl Hn31 Hbelow
+              with "Hcg Hown Htext Hkd Hpc Hpenv [Hstr]").
+    { rewrite /pk_desc_res Ha0.
+      iSplit; [iPureIntro; exact su_writei_nonul|].
+      iSplit; [iPureIntro; exact su_writei_nz|]. iExact "Hstr". }
   Qed.
 
   (* ================================================================== *)

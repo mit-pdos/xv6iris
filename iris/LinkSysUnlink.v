@@ -43,9 +43,9 @@ From Stdlib Require Import ZArith List.
    same note for the same reason. *)
 Require Import LinkArgstr LinkBeginOp LinkNameiparent LinkIlock LinkNamecmp
         LinkDirlookup LinkMemsetArray LinkReadi LinkWritei LinkIupdate
-        LinkIunlockput LinkEndOp
+        LinkIunlockput LinkEndOp LinkPanic
         ProofSysUnlink.
 
 Module SysUnlink := SysUnlinkProof Argstr BeginOp Nameiparent Ilock Namecmp
                                    Dirlookup MemsetArray Readi Writei Iupdate
-                                   Iunlockput EndOp.
+                                   Iunlockput EndOp Panic.
