@@ -3295,23 +3295,38 @@ Section ProofCreateMain.
         iEval (rewrite -HD4a1) in "Hnb14".
         iDestruct (cpu_own_transport CIDil CID23 0%nat eb (proc_addr j) b
                      ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+        (* THE BORROWED LICENCE (fs-fragments.md §7.5.6, row 2).  The LEFT
+           disjunct is what create brings, and the guard that earns it is
+           [sysfile.c:269]'s [dp->nlink == 0] refusal at +0x2a/+0x2e: this
+           branch is the [c.beqz] at +0x2e FALLING THROUGH, whose own
+           hypothesis [Hnl0] says the parent's count is not zero.  The
+           ticket list [Hdlnk] and the home's record [Hdiat] are lent to
+           dirlookup's iget and come straight back on both arms -- nothing
+           is spent, and both are already in hand out of
+           [IcacheEscrow.ic_loaded]. *)
         iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn
-                  gtl γa γf cov logstart nib dev (ientry kd) bml datl dnl nfp
+                  gtl γa γf cov logstart nib dev (ientry kd) dind bml datl
+                  dnl dnl nfp
                   false (mword_of_int 0 : mword 32)
                   pidv (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                   D4 (K - 10)%nat eb b lks
                   ltac:(exact HKdlu) Htydir Hlg Hbmwf Hbmcov Hszcap
-                  ltac:(rewrite Hnib; exact (Hdok Hdz)) Hj Hgs HD4a0
+                  ltac:(rewrite Hnib; exact (Hdok Hdz))
+                  ltac:(left; exact (cr_nl0z dnl Hnl0))
+                  ltac:(exact Hdoc)
+                  ltac:(rewrite Hdz; unfold T_DIR_z; lia)
+                  Hj Hgs HD4a0
                   ltac:(cbn [negb]; rewrite HD4a2 dlk_zero_moi;
                         exact (eq_vec_refl _))
                   Heb
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hnb14 [] Hppid Hprocs Hdevi Hgeom Hdlk Hbs1
-                        Hitb2 Hitbl Hesc Hisl1").
+                        Hitb2 Hitbl Hesc Hisl1 Hdlnk Hdiat").
         all: try lkbelow.
         { done. }
         iIntros (CIDdl Hsdl mdl found kk kslot qq)
-          "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnb14 Hppid Hbs1 Hres2".
+          "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hnb14 Hppid Hbs1
+           Hdlnk Hdiat Hres2".
         iEval (rewrite HD4a1) in "Hnb14".
         assert (Hpcdl : ret_pc (D4 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x4a)) by (rewrite HD4ra; pcw).
@@ -5185,6 +5200,11 @@ Section ProofCreateMain.
                   X4 (K - 10)%nat eb b lks
                   ltac:(exact HKdlk) Htydir Hbmcov Hszcap
                   ltac:(exact (Hdok Hdz))
+                  (* THE RELAYED LICENCE (§7.5.6, row 5).  LEFT disjunct,
+                     earned by the same [sysfile.c:269] guard the found half
+                     fell through at +0x2a/+0x2e and froze into [Hnl0]. *)
+                  ltac:(left; exact (cr_nl0z dn Hnl0))
+                  ltac:(exact (cr_doc_of_live dn dn data eq_refl Hnl0))
                   ltac:(exact (di_type_stable_refl dn))
                   ltac:(exact (di_nlink_stable_refl dn Htynzd))
                   Hlg Hbmwf Hholes Hdaddr Hsz31 Hist0 Hdblk Hdblog Hdib
@@ -5194,12 +5214,12 @@ Section ProofCreateMain.
                   with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
                         Hbmr Hiregi Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                        Hitb2 Hitbl Hesc Hslks Hislk Hop").
+                        Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
         all: try lkbelow.
         iIntros (CIDdl Hsdl mdl found bm' data' dn' dn0' n' used' Sb' tot)
           "%Hcsdl Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs
-           Hsbb Hbmr Hdiat Hppid Hbsl Hislk %Hn' %Hsb' %Hdl16 %Hfd0 Hop %Hcapp
-           %Hsizedp %Harm".
+           Hsbb Hbmr Hdiat Hppid Hbsl Hislk Hdlnk %Hn' %Hsb' %Hdl16 %Hfd0 Hop
+           %Hcapp %Hsizedp %Harm".
         iEval (rewrite HX4a1) in "Hnb14".
         assert (Hpcdl : ret_pc (X4 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0xdc)) by (rewrite HX4ra; pcw).
@@ -7594,6 +7614,32 @@ Section ProofCreateMain.
     iAssert (inode_map γfs (ientry kslot) bmc) with "[Hcaddrs Hcind]"
       as "Hcmap".
     { rewrite /inode_map. iFrame. }
+    (* THE BORROWED TICKET LIST FOR THE CHILD'S OWN [dirlink], hoisted here
+       because the call now takes it (§7.5.6, row 3).  The body hands the
+       child's ledger at [dnc]; [cr_setf] moves only [nlink]/[major]/[minor]
+       and at a FRESH child the big-op is empty either way, so it is rebuilt
+       rather than transported.  It comes back verbatim on both arms. *)
+    iAssert (dir_links (bv_unsigned cinum)
+               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc)%I
+      as "Hcdlnk0i".
+    { rewrite /dir_links.
+      destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
+                  (mword_of_int 1 : mword 16))) = T_DIR_z)) as [_ | Hnd];
+        [| exfalso; exact (Hnd Hcdz)].
+      (* ...AND SO IS V2's COUNT CLAUSE: a directory with no records at
+         all has no subdirectories, and the fresh child's count is the
+         ONE its parent's entry pays for -- [1 <= 1 + 0], exactly. *)
+      iExists (fun _ => false).
+      iSplitR; [iPureIntro; apply dlc_bound_le1;
+                rewrite cr_setf_nlink; vm_compute; discriminate |].
+      iSplitR; [iPureIntro; exact (dlc_lower_false _ _) |].
+      (* V5': a fresh child has no records at all, so it has no [".."]
+         and the tie's guard is false *)
+      iSplitR; [iApply dir_par_tie_small; rewrite Hcnrec0; lia |].
+      rewrite Hcnrec0. done. }
+    (* THE LICENCE'S LEFT DISJUNCT HERE IS [ip->nlink = 1], flushed by the
+       three [sh]s at +0xfc..+0x102 before this call (§7.5.6, row 3): the
+       record the contract runs at IS [cr_setf dnc _ _ 1]. *)
     iApply (DLK.wp_dirlink_gen γs j γl γu γd γk pd pav pu bn γ γfs γi cn
               gtl γa γf γpr cov logstart inodestart nib bmapstart size dev
               used3 (ientry kslot) cinum bmc datc
@@ -7605,6 +7651,9 @@ Section ProofCreateMain.
               Z5 (K - 10)%nat eb b lks
               ltac:(exact HKdlk) Hcty Hcbmcov Hccap
               ltac:(exact (Hcdok' Hcdz))
+              ltac:(left; rewrite cr_setf_nlink; vm_compute; discriminate)
+              ltac:(apply dir_orphan_clean_live;
+                    rewrite cr_setf_nlink; vm_compute; discriminate)
               ltac:(exact (di_type_stable_refl _))
               ltac:(exact (di_nlink_stable_refl _ Hctynz))
               Hlg Hcbmwf Hcholes Hcaddr Hcsz31 Hist0 Hcblk Hcblog Hcinb
@@ -7615,12 +7664,12 @@ Section ProofCreateMain.
               with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
                     Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw Hsbi Hsbs Hsbb
                     Hbmr Hiregi Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                    Hitb2 Hitbl Hesc Hslks Hislk Hop").
+                    Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk0i Hop").
     all: try lkbelow.
     iIntros (CIDd1 Hsd1 md1 found1 bm1 dat1 dc1 dc01 n4 usd1 Sb4 tot1)
       "%Hcsd1 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hdotw1 Hsbi
-       Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk %Hn4c %Hsb4 %Hdlp1 %Hfd1 Hop %Hcap1
-       %Hsizedp1 %Harm1".
+       Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk Hcdlnk0 %Hn4c %Hsb4 %Hdlp1 %Hfd1
+       Hop %Hcap1 %Hsizedp1 %Harm1".
     assert (Hpcd1 : ret_pc (Z5 !!! Regidx Rra : mword 64)
                     = mword_of_int (CK + 0x10a)) by (rewrite HZ5ra; pcw).
     iEval (rewrite Hpcd1) in "Hpc".
@@ -7751,26 +7800,8 @@ Section ProofCreateMain.
         iApply (dir_link_at_dirlink_self (bv_unsigned (cr_low16 cinum)) dc1
                   datc dat1 (cr_low16 cinum) (bname 14 cr_dot_f) 0%nat tot1
                   Htot1ge2 eq_refl Hrng1). }
-      (* the body hands the child's ledger at [dnc]; [cr_setf] moves only
-         [nlink], and at a FRESH child the big-op is empty either way. *)
-      iAssert (dir_links (bv_unsigned cinum)
-                 (cr_setf dnc major minor (mword_of_int 1 : mword 16)) datc)%I
-        as "Hcdlnk0".
-      { rewrite /dir_links.
-        destruct (decide (bv_unsigned (di_type (cr_setf dnc major minor
-                    (mword_of_int 1 : mword 16))) = T_DIR_z)) as [_ | Hnd];
-          [| exfalso; exact (Hnd Hcdz)].
-        (* ...AND SO IS V2's COUNT CLAUSE: a directory with no records at
-           all has no subdirectories, and the fresh child's count is the
-           ONE its parent's entry pays for -- [1 <= 1 + 0], exactly. *)
-        iExists (fun _ => false).
-        iSplitR; [iPureIntro; apply dlc_bound_le1;
-                  rewrite cr_setf_nlink; vm_compute; discriminate |].
-        iSplitR; [iPureIntro; exact (dlc_lower_false _ _) |].
-        (* V5': a fresh child has no records at all, so it has no [".."]
-           and the tie's guard is false *)
-        iSplitR; [iApply dir_par_tie_small; rewrite Hcnrec0; lia |].
-        rewrite Hcnrec0. done. }
+      (* the child's ledger came back from the ["."] link verbatim, at the
+         PRE-state record [cr_setf dnc _ _ 1] the borrow was lent at *)
       iDestruct (dir_links_dirlink (bv_unsigned cinum)
                    (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dc1
                    datc dat1 (cr_low16 cinum) (bname 14 cr_dot_f)
@@ -7963,6 +7994,12 @@ Section ProofCreateMain.
                 ltac:(exact HKdlk) Hc1tyd Hcov1 (Hcap1 Hccap)
                 ltac:(exact (Hc1dok ltac:(rewrite Hc1ty Htdir;
                                           vm_compute; reflexivity)))
+                (* §7.5.6, row 4: LEFT disjunct from [ip->nlink = 1], the
+                   value the three [sh]s flushed before the ["."] link and
+                   which that link carried through unchanged ([Hc1nl]). *)
+                ltac:(left; rewrite Hc1nl; vm_compute; discriminate)
+                ltac:(apply dir_orphan_clean_live;
+                      rewrite Hc1nl; vm_compute; discriminate)
                 ltac:(exact (di_type_stable_refl _))
                 ltac:(exact (di_nlink_stable_refl _ Hc1tynz))
                 Hlg Hwf1 Hholes1 Haddr1 Hsz311 Hist0 Hcblk Hcblog Hcinb
@@ -7972,12 +8009,12 @@ Section ProofCreateMain.
                 with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
                       Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw Hsbi Hsbs Hsbb
                       Hbmr Hiregi Hcdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                      Hitb2 Hitbl Hesc Hslks Hislk Hop").
+                      Hitb2 Hitbl Hesc Hslks Hislk Hcdlnk1 Hop").
       all: try lkbelow.
       iIntros (CIDd2 Hsd2 md2 found2 bm2 dat2 dc2 dc02 n5 usd2 Sb5 tot2)
         "%Hcsd2 Hcg Hcnt Hpc Hcidev Hciinum Hcmeta Hcmap Hcblocks Hddw2 Hsbi
-         Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk %Hn5c %Hsb5 %Hdlp2 %Hfd2 Hop %Hcap2
-         %Hsizedp2 %Harm2".
+         Hsbs Hsbb Hbmr Hcdiat Hppid Hbsl Hislk Hcdlnk1 %Hn5c %Hsb5 %Hdlp2 %Hfd2
+         Hop %Hcap2 %Hsizedp2 %Harm2".
       assert (Hpcd2 : ret_pc (Y5 !!! Regidx Rra : mword 64)
                       = mword_of_int (CK + 0x11e)) by (rewrite HY5ra; pcw).
       iEval (rewrite Hpcd2) in "Hpc".
@@ -8301,6 +8338,11 @@ Section ProofCreateMain.
                   W4 (K - 10)%nat eb b lks
                   ltac:(exact HKdlk) Htydir Hbmcov Hszcap
                   ltac:(exact (Hdok Hdz))
+                  (* §7.5.6, row 5 again, on the mkdir arm: LEFT disjunct
+                     from the same [sysfile.c:269] guard, relayed into this
+                     body as [Hnl0]. *)
+                  ltac:(left; exact (cr_nl0z dn Hnl0))
+                  ltac:(exact (cr_doc_of_live dn dn data eq_refl Hnl0))
                   ltac:(exact (di_type_stable_refl dn))
                   ltac:(exact (di_nlink_stable_refl dn Htynzd))
                   Hlg Hbmwf Hholes Hdaddr Hsz31 Hist0 Hdblk Hdblog Hdib
@@ -8312,12 +8354,12 @@ Section ProofCreateMain.
                   with "Hcg Hcnt Htext Hpc Hpanic Hkd Hpk Hbio Hlogc Hkenv
                         Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi Hsbs Hsbb
                         Hbmr Hiregi Hdiat Hppid Hprocs Hdevi Hgeom Hdlk Hbsl
-                        Hitb2 Hitbl Hesc Hslks Hislk Hop").
+                        Hitb2 Hitbl Hesc Hslks Hislk Hdlnk Hop").
         all: try lkbelow.
         iIntros (CIDd3 Hsd3 md3 found3 bm3 dat3 dp3 dp03 n6 usd3 Sb6 tot3)
           "%Hcsd3 Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnb14 Hsbi
-           Hsbs Hsbb Hbmr Hdiat Hppid Hbsl Hislk %Hn6c %Hsb6 %Hdlp3 %Hfd3 Hop %Hcap3
-           %Hsizedp3 %Harm3".
+           Hsbs Hsbb Hbmr Hdiat Hppid Hbsl Hislk Hdlnk %Hn6c %Hsb6 %Hdlp3 %Hfd3
+           Hop %Hcap3 %Hsizedp3 %Harm3".
         iEval (rewrite HW4a1) in "Hnb14".
         assert (Hpcd3 : ret_pc (W4 !!! Regidx Rra : mword 64)
                         = mword_of_int (CK + 0x130)) by (rewrite HW4ra; pcw).

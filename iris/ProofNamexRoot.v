@@ -71,6 +71,8 @@ Require Import DirentEnc.
 Require Import PathElems.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import IregLinkNz.
+Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheEscrow.
@@ -536,11 +538,24 @@ Section ProofNamexRoot.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := b) (CIDa := CID) (CIDb := CID23)
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    (* THE LICENCE (increment C'-lite, fs-fragments.md §7.1), licence (f).
+       namex's very first [iget] is the one xv6 does not look up at all --
+       it hands [ROOTINO] to [iget] on the strength of the path starting
+       with '/', and nothing on the walk has read a directory yet.  What
+       founds it is the landed ROOT CLAUSE: [InodeRegion.ireg_root_ok] is
+       (L1) MADE STRICT at [ireg_root], so the root's count is at least one
+       and (L3) then gives it a nonzero type ([IgetLic.iname_root_alloc]).
+       The licence itself is PURE -- the evidence lives in the region's
+       invariant, not in the caller's hands -- which is exactly why it costs
+       this walk nothing.  This is the root clause's first consumer. *)
+    iAssert (iname gi gfs ROOTINO RootL) as "Hlic";
+      [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
     iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
+              RootL
               A3 n eb p (K - 12)%nat b lks
               Kig Hn Hrino HA3a0 HA3a1 Hbelow
-              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl").
-    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href".
+              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl Hlic").
+    iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
     destruct Higp as (Hcsig & Hkig & Higa0).
     assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
     { rewrite HA3ra. pcw. }

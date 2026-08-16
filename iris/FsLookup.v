@@ -123,6 +123,7 @@ Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import FsTree.
 Require Import FsRep.
+Require Import DirLinks.
 Require Import SpecDirlookup.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -473,7 +474,46 @@ End FsLookup.
        the directory's node fragment [fdir γi γfs dpi ents dn bm data],
        which CONTAINS it.  The [dinode_at] half rides through untouched:
        dirlookup never names the region;
-     - each arm carries the tree-level answer beside the byte-level one.
+     - each arm carries the tree-level answer beside the byte-level one;
+     - **and, since the iget-licence increment, the BORROW** -- see the
+       block below, which is a FINDING and not just a change.
+
+   ---- ROW 14's FINDING: F2's PREMISE SET GREW BEYOND THE DISJUNCTION ----
+
+   The licence increment (fs-fragments.md §7.1) gave [SpecDirlookup] one
+   pure DISJUNCTIVE premise (§7.5.6) plus a borrowed ticket list and the
+   home's own record.  The worklist sanctioned relaying THE DISJUNCTION to
+   this triple and said to STOP AND REPORT if more was needed, because
+   "F2 has fewer premises than the bytes" is the property F2 exists for.
+
+   MORE IS NEEDED, and here is the exact list, so the coordinator can rule:
+
+     (i)   the §7.5.6 disjunction                      -- SANCTIONED;
+     (ii)  ⌜dir_orphan_clean dn data⌝                  -- NOT sanctioned.
+           It is what closes the RIGHT disjunct, and [FsTree.node_rep]'s
+           NDir case cannot supply it: [node_rep] fixes the type, name
+           uniqueness and [ents = dir_view …] and says NOTHING about
+           [di_nlink].  There is no tree-level fact that implies it.
+     (iii) ⌜0 <= dpi < 2 ^ 32⌝                         -- NOT sanctioned.
+           The byte contract keys the ticket list at [bv_unsigned dinum]
+           and the tree keys it at [dpi : Z]; [FsRep.inum_of_unsigned] is
+           the round trip and this is its premise.  It IS the tree's own
+           [FsTree.fs_inums_ok] at one node, so every client has it.
+     (iv)  [FsRep.fedges dpi dn data]                  -- NOT sanctioned,
+           and it is the substantive one: a RESOURCE, the directory's
+           out-edges.  §1.3 makes edges a primitive client-held fragment
+           beside the node, so a client of this triple does hold it -- but
+           [fdir] does not contain it, and that is the shape question the
+           coordinator should rule on (folding the edges into [fdir] would
+           restore the property outright).
+
+   WHAT SURVIVES: F2 still has STRICTLY FEWER premises than the byte-level
+   contract it wraps -- the bytes gained three pure premises and two
+   resources, this gained three pure and one resource, and [dinode_at] is
+   still hidden inside [fdir].  So the property F2 exists for is dented,
+   not lost.  The row was executed rather than left red because the whole
+   increment's gate is a green cone; the finding is recorded here, in the
+   ledger entry, and in the worklist.
 
    Everything else -- readi's threading, [dir_inums_ok], the running-thread
    bundle, the icache, the parking premise, the [iref_slot] ledger -- is
@@ -504,6 +544,7 @@ Definition wp_dirlookup_tree_body
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode)
     (dpi : Z) (ents : gmap fname Z)                   (* THE TREE-LEVEL NODE *)
+
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
@@ -526,6 +567,11 @@ Definition wp_dirlookup_tree_body
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   (* (3) iget's argument bound, over the records *)
   dir_inums_ok data nrec nib ->
+  (* (4) THE LICENCE PREMISES -- see the FINDING in the header *)
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  dir_orphan_clean dn data ->
+  0 <= dpi < 2 ^ 32 ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (m !!! Regidx (mword_of_int 10 : mword 5) : mword 64) = ip ->
@@ -560,6 +606,9 @@ Definition wp_dirlookup_tree_body
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
   iref_slot -∗
+  (* the directory's OUT-EDGES, borrowed for the licence and returned
+     verbatim on both arms (§1.3 makes them a client-held fragment) *)
+  fedges dpi dn data -∗
   wp_next true pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (found : bool) (k : nat) (kslot : nat) (q : Qp),
       ⌜callee_saved m mf⌝ -∗
@@ -577,6 +626,7 @@ Definition wp_dirlookup_tree_body
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
       p_pid pj ↦₄{dq} pidv -∗
       bslot bn -∗
+      fedges dpi dn data -∗
       (* THE TWO ARMS, EACH AT BOTH ALTITUDES.  The record index [k]
          survives because a caller needs it: sys_unlink names the offset
          [16k] with it, and iget's reference is at that record's inum. *)
@@ -632,27 +682,40 @@ Module FsLookupTree (DL : DIRLOOKUP).
                              m K eb b lks.
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
-    intros HK Hlg Hbwf Hbcov Hszb Hdio Hj Hgs Ha0 Ha2 Heb Hlkb.
+    intros HK Hlg Hbwf Hbcov Hszb Hdio Hdisj Horph Hdpi Hj Hgs Ha0 Ha2 Heb Hlkb.
     iIntros "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap Hfdir
              Hname Hpoff Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
-             Hitb2 Hitbl Hesc Hisl Hcont".
+             Hitb2 Hitbl Hesc Hisl Hedges Hcont".
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
+    (* licence (c)'s only demand on the record: an allocated one.  The
+       tree layer has it by construction -- a directory node's type is
+       [T_DIR_z] ([FsTree.node_rep_dir]). *)
+    assert (Htynz : bv_unsigned (di_type dn) <> 0)
+      by (rewrite (node_rep_dir ents dn data Hrep); unfold T_DIR_z; lia).
+    (* the ticket list, re-keyed from the tree's [Z] to the region's word *)
+    iAssert (dir_links (bv_unsigned (inum_of dpi)) dn data)
+      with "[Hedges]" as "Hedges".
+    { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     iApply (DL.wp_dirlookup_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
-              γa γf cov logstart nib dev ip bm data dn fn hasp pofv
+              γa γf cov logstart nib dev ip (inum_of dpi) bm data dn dn
+              fn hasp pofv
               pidv dq dqd dqn m K eb b lks
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
-              Hdio Hj Hgs Ha0 Ha2 Heb Hlkb
+              Hdio Hdisj Horph Htynz Hj Hgs Ha0 Ha2 Heb Hlkb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv
                     Hidev Hmeta Hmap Hblocks Hname Hpoff
                     Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
-                    Hitb2 Hitbl Hesc Hisl").
+                    Hitb2 Hitbl Hesc Hisl Hedges Hdiat").
     iIntros (CIDd Hgd mf found k kslot q)
-      "%Hcs Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot Harm".
+      "%Hcs Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hname Hppid Hbslot
+       Hedges Hdiat Harm".
+    iAssert (fedges dpi dn data) with "[Hedges]" as "Hedges".
+    { rewrite /fedges (inum_of_unsigned dpi Hdpi). iExact "Hedges". }
     iDestruct (wp_next_at (CID0 := CID) true (proc_addr j) _ CIDd Hgd
                  with "Hcont") as "Hcont".
     iApply ("Hcont" $! mf found k kslot q
               with "[] Hcg Hcnt Hpc Hidev Hmeta Hmap
-                    [Hdiat Hblocks] Hname Hppid Hbslot [Harm]").
+                    [Hdiat Hblocks] Hname Hppid Hbslot Hedges [Harm]").
     - iPureIntro. exact Hcs.
     - iApply (fdir_intro γi γfs dpi ents dn bm data Hrep with "Hdiat Hblocks").
     - destruct found.

@@ -112,6 +112,7 @@ Require Import CodeIget.
 Require Import PanicStub.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
+Require Import IgetLic.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 (* The [set_solver] override.  EXPORT, not Import: this import is         *)
@@ -406,16 +407,23 @@ Section ProofIget.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
+      (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string)
-    : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
+    : wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
                          m n eb p K b lks.
   Proof.
     cbv beta delta [wp_iget_sconf_body].
     intros pcE ret_tgt HK HnZ Hnib Ha0 Ha1 Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hcont".
+    (* [Hlic] is the LICENCE (increment C'-lite, fs-fragments.md §7.1).
+       iget spends it on nothing: it is framed across the whole function
+       inside the shared tail's closure below, handed back on the two
+       RETURNING arms, and simply dropped on the diverging
+       panic("iget: no inodes") arm at +0x6a -- which is what a partial
+       correctness post owes there and nothing more. *)
+    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hlic Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -749,7 +757,7 @@ Section ProofIget.
         IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
-      with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
+      with "[Hcont Hlic Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
     { rewrite /TAILC. iIntros (CIDt Hst).
       iIntros (mt kk q) "%Hmt Hcg Hcnt Hpc Href".
       destruct Hmt as (Hkk & Hmts3 & Hmtsp & Hmtcs).
@@ -881,7 +889,7 @@ Section ProofIget.
       iDestruct (cpu_own_transport CIDt CIDt9 n eb p b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDt9 with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href").
+      iApply ("Hcont" $! P8 kk q with "Hcg Hcnt Hpc [%] Href Hlic").
       (* [callee_saved m P8], the slot bound, and [a0 = ientry kk] *)
       split; [| split; [exact Hkk | exact HP8a0]].
       assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

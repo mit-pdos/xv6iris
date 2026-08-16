@@ -123,7 +123,37 @@
    takes no sleeplock and never sleeps, its whole body runs inside one
    fully-nested acquire/release, and [n], [eb] and the SIE index [b]
    therefore come back exactly as they went in.  It is NOT the
-   running-process bundle ilock threads -- nothing here can park.        *)
+   running-process bundle ilock threads -- nothing here can park.
+
+   ---- THE LICENCE (increment C'-lite, fs-fragments.md §7.1) ------------
+
+   iget is where a REFERENCE is minted for an inum that came off a disk
+   block, and nothing in the scan can say the inum names a live inode.
+   §20.17.5 answered that with a paragraph -- the enumeration of the six
+   reasons a caller believes its inum -- and [IgetLic.v] makes it a type:
+   one binder [l : ilic] and one premise [iname γi γfs inum l].  The user's
+   invariant ("the kernel will never invoke iget on inode numbers in
+   directories in a disconnected subtree") is not statable about the
+   machine's traces; it IS statable here, at DELIVERY, and that is why the
+   enumeration lives on THIS contract and not on a payload.
+
+   BORROWED AND RETURNED, AT THE SAME [l] (§7.1.2).  The licence comes back
+   in the postcondition, unspent and at the SAME constructor.  Both halves
+   are load-bearing.  Returning it is what keeps this increment
+   caller-side: the borrow lives inside one call, so no syscall-level
+   contract sees it and [SpecNamex] / [SpecCreate] / [SpecSysLink] /
+   [SpecIalloc] / [SpecIlock] / [SpecIput] / [SpecIupdate] are all
+   byte-identical.  Returning it at the SAME [l] -- rather than at a [∃ l']
+   -- is what keeps the audit a grep: a [∃ l'] post is equally sound and
+   silently permits a licence swap, which would destroy the per-site
+   documentation the increment exists for.
+
+   iget SPENDS IT ON NOTHING.  The proof frames it across the whole
+   function and hands it back on the two returning arms; the diverging
+   panic arm drops it.  That is the honest shape -- iget never reads a
+   dinode, so there is nothing here that COULD consume a licence, and
+   §7.1.6's death certificate says so: the licence is returned at the iget,
+   [iput] holds none, and §20.7's ordering wall is untouched.           *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -149,6 +179,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
+Require Import IgetLic.
 From Kernel Require KernelSyms.
 Require Import LogInv.  (* [logG]: the region's zero-receipt, fs-log.md G.17 *)
 Local Open Scope Z_scope.
@@ -165,6 +196,7 @@ Definition wp_iget_sconf_body
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
     (dev inum : mword 32)
+    (l : ilic)                                   (* THE LICENCE, §7.1 *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64)
     (K : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iget in
@@ -195,6 +227,8 @@ Definition wp_iget_sconf_body
   panic_wp_any -∗
   (* THE precondition that makes the mint safe, on both arms *)
   iref_slot -∗
+  (* THE LICENCE: borrowed here, returned below at the SAME [l] *)
+  iname γi γfs inum l -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile) (k : nat) (q : Qp),
     sie_cap_gpr mr K b p -∗
@@ -204,6 +238,8 @@ Definition wp_iget_sconf_body
       /\ (k < NINODE)%nat
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
     inode_ref k q dev inum -∗
+    (* ...and BACK, unspent and at the SAME [l] *)
+    iname γi γfs inum l -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -215,8 +251,9 @@ Module Type IGET.
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (dev inum : mword 32)
+      (l : ilic)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64)
       (K : nat) (b : bool) (lks : gset string),
-      wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum
+      wp_iget_sconf_body γl cn γfs γi cov logstart nib dev inum l
                          m n eb p K b lks.
 End IGET.

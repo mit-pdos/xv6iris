@@ -2311,24 +2311,41 @@ Section ProofSysUnlinkBody.
         { rewrite /iref_slot. iExact "Hir". }
         iDestruct (cpu_own_transport CID13 CID19 0 eb (proc_addr jx) b
                      ltac:(wp_next_chain) with "Hown") as "Hown".
+        (* THE LICENCE PREMISE (fs-fragments §7.5.6, last row of the supplier
+           table).  THIS is the site the disjunction exists for: sys_unlink
+           runs nameiparent -> ilock(dp) -> dirlookup(dp,name,&off) with NO
+           [dp->nlink == 0] re-check anywhere, so the LEFT disjunct -- a live
+           home -- is UNSUPPLIABLE here and no reordering of this walk makes
+           it suppliable.  What sys_unlink has instead is the pair of
+           [namecmp] refusals at sysfile.c:220-221
+             if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0) goto bad;
+           whose fall-through arms are the two [decide]s at +0x44 and +0x58
+           above; they left [Hnotdot]/[Hnotdd], which IS the RIGHT disjunct.
+           Under [dir_orphan_clean] an orphaned home's live records are all
+           dot records, so a non-dot match cannot be live and the borrowed
+           ticket is only ever cashed under a live home. *)
         iApply (Dirlookup.wp_dirlookup_sconf (CID := CID19) gs jx gl gu gd gk
                   pd pav pu bn gfs gi cn gtl ga gf cov logstart nib dev
-                  (ientry kd) bmd datd dnd nf true (word_hi w27) pid
+                  (ientry kd) dinum bmd datd dnd dnd nf true (word_hi w27) pid
                   (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn 1)
                   R12 (K - 30)%nat eb b lks
                   ltac:(exact Kdl) Htydir Hgeom Hbmwf Hbmcv Hszcap Hinums
+                  ltac:(right; exact (conj Hnotdot Hnotdd)) Hdoc Htynz
                   Hj Hgl HR12a0
                   ltac:(cbn [negb]; apply (proj2 (eq_vec_false_iff _ _));
                         exact Hoffnz)
                   Heb (Hlb "bcache"%string)
                   with "Hcg Hown Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta
                         [Haddrs Hind] Hblocks [Hnm14] [H27hi] Hpidq Hprocs
-                        Hdev Hgeo Hdlk Hbs1 Hitab Hitinv Hescrows Hislot").
+                        Hdev Hgeo Hdlk Hbs1 Hitab Hitinv Hescrows Hislot
+                        Hdlnk Hdiat").
         { rewrite /inode_map. iFrame "Haddrs Hind". }
         { iEval (rewrite HR12a1). iExact "Hnm14". }
         { cbn [negb]. iEval (rewrite HR12a2). iExact "H27hi". }
+        (* ...and the borrow comes straight back, on both arms, verbatim *)
         iIntros (CID20 Hq20 mdl found kk kslot qs)
-          "%Hcsdl Hcg Hown Hpc Hidev Hmeta Hmap Hblocks Hnm14 Hpidq Hbs1 Hres".
+          "%Hcsdl Hcg Hown Hpc Hidev Hmeta Hmap Hblocks Hnm14 Hpidq Hbs1
+           Hdlnk Hdiat Hres".
         iEval (rewrite HR12a1) in "Hnm14".
         assert (Hpc6c : ret_pc (R12 !!! Regidx Rra : mword 64)
                         = mword_of_int (SU + 0x6c)) by (rewrite HR12ra; pcw).

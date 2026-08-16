@@ -106,6 +106,7 @@ Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -922,7 +923,7 @@ Section IreclaimOrphan.
       (cov : gset Z) (logstart bmapstart inodestart ninodes size : Z)
       (nib : nat) (used usedn : gset Z)
       (dev inum bno : mword 32) (kk : nat)
-      (bs bsd0 : list (bv 8)) (d0 : bool) (fuel : nat)
+      (bs bsd0 : list (bv 8)) (ds : list dinode) (d0 : bool) (fuel : nat)
       (pidv : mword 32) (dq dqb dqs dqn : dfrac)
       (m Ml : regfile) (K : nat) (b : bool) (lks : gset string) :
     (K_ireclaim <= K)%nat ->
@@ -943,6 +944,17 @@ Section IreclaimOrphan.
     0 < bv_unsigned inum < ninodes ->
     usedn ⊆ used ->
     (kk < NBUF)%nat ->
+    (* ---- LICENCE (e)'s PREMISES (increment C'-lite, fs-fragments.md §7.1).
+       This lemma runs from +0x38, i.e. AFTER the scan has bread the inode
+       block and decoded it, and it holds the handle until the brelse at
+       +0x4c -- which is two instructions PAST the iget at +0x44.  So what
+       the caller already knows about those bytes is exactly what founds the
+       iget's licence, at the cost of four pure premises here and four
+       [exact]s at the one call site. ---- *)
+    bs = diblk_bytes ds ->
+    diblk_wf ds ->
+    bv_unsigned (di_type (ds !!! DinodeEnc.islot inum)) <> 0 ->
+    uint bno = IBLOCK inum inodestart ->
     irc_sp m Ml ->
     irc_thr8 m Ml ->
     Ml !!! Regidx Rs1 = (sign_extend' 64 inum : mword 64) ->
@@ -990,7 +1002,8 @@ Section IreclaimOrphan.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
-           Hj Hgl Hfuel Hinum Hsub Hkk Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
+           Hj Hgl Hfuel Hinum Hsub Hkk Hbseq Hdswf Htnz Hbnoeq
+           Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
     pose proof HK as HK'. 
     pose proof irc_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
@@ -1257,14 +1270,51 @@ Section IreclaimOrphan.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID7) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
+    (* ================================================================== *)
+    (*  THE LICENCE (increment C'-lite, fs-fragments.md §7.1), licence (e)  *)
+    (* ================================================================== *)
+    (*  ireclaim's iget is at +0x44 and its brelse is at +0x4c, so THE
+        BUFFER IS STILL IN HAND: [DinodeSlot.ds_held_L] takes the block's
+        client half out of the handle and hands back a wand to return it.
+        That half, at bytes which decode to a record with a nonzero type,
+        IS licence (e) -- and it is STRONGER than §20.4's [bio_locked]
+        sketch: the [fs_L] element sits at half-plus-half, so while this
+        walk holds one half no [ireg_write_au] / [ireg_claim_au] /
+        [ireg_free_au] at ANY inum of this block can fire (§7.1.3, §16.2's
+        serialiser as a resource fact rather than a paragraph).
+
+        BOOT-ONLY: sheltered by the pre-userspace one-shot [ireg_boot]
+        (plank 3, iget-licence follow-on; see fs-fragments.md §7.1.7).  The
+        record ireclaim igets here is CLAIM-SHAPED -- type nonzero, nlink
+        zero -- and §7.1.7's finding is that the licence alone does not
+        exclude that; what excludes it is that ireclaim is reachable only
+        from fsinit, i.e. before [kexec("/init")] and before any second
+        process exists.  That is a boot-order fact, [ireg_boot] is the
+        shelter's DESIGNATED CARRIER for it, and the model does not state
+        it here. *)
+    iEval (rewrite /bio_locked) in "Hlk".
+    iDestruct (ds_held_L with "Hlk") as "[HpL Hlkback]".
+    iAssert (iname γi γfs inum (BufL (uint bno) ds)) with "[HpL]" as "Hlic".
+    { rewrite /iname /fsblock -Hbseq. iFrame "HpL". iPureIntro.
+      split; [exact Hdswf | exact Htnz]. }
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
+              (BufL (uint bno) ds)
               O6 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
+              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref Hlic").
     all: try lkbelow.
-    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href".
+    iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href Hlic".
+    (* ...and the half goes straight back into the handle, unspent.  The
+       unfolding is done IN the hypothesis: [fs_L]'s ghost_map notation is
+       not in scope in this file, and writing the target proposition out
+       would import it for one line. *)
+    iEval (rewrite /iname /fsblock -Hbseq) in "Hlic".
+    iDestruct "Hlic" as "(HpL & _ & _)".
+    iDestruct ("Hlkback" with "HpL") as "Hlk".
+    iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno bs bsd0 d0)
+      with "[Hlk]" as "Hlk"; [rewrite /bio_locked; iExact "Hlk" |].
     destruct Higfacts as (Hcsig & Hkslot & HmIa0).
     assert (Hpc48 : ret_pc (O6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ireclaim + 0x48))
@@ -2843,10 +2893,15 @@ Section IreclaimScan.
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iApply (irc_orphan (CID0 := CID16) γs j γl γu γd γk pd pav pu bn γ γfs
                     γi cn gtl γpr cov logstart bmapstart inodestart ninodes size
-                    nib used usedn dev inum bno kk (diblk_bytes ds) bsd0 d0 fuel
+                    nib used usedn dev inum bno kk (diblk_bytes ds) bsd0 ds d0
+                    fuel
                     pidv dq dqb dqs dqn m WD K b lks
                     HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31
-                    Hpk Hj Hgl Hfuel Hinum Hsub Hkk HWDsp HWDthr
+                    Hpk Hj Hgl Hfuel Hinum Hsub Hkk
+                    (* LICENCE (e)'s four premises (§7.1): the block this
+                       walk bread, decoded, with the claim-shaped record the
+                       [c.beqz] at +0xa2 has just refuted a zero type for. *)
+                    eq_refl Hdswf Ht0 Hbno HWDsp HWDthr
                     HWDs1 HWDs2 HWDs3 HWDs4 HWDs5 HWDs6
                     Hbelow
                     with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hlctx

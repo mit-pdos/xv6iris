@@ -190,6 +190,7 @@ Require Import SpecPrintk.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -489,6 +490,22 @@ Definition wp_dirlink_sconf_body
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->
+  (* ---- THE BORROWED LICENCE, RELAYED TO THE INNER dirlookup (R13(ii),
+     fs-fragments.md §7.1/§7.5.6).  dirlink's own lookup is where the name
+     it is about to link is checked for, and that lookup's [iget] on the
+     FOUND arm needs a licence.  So the two things dirlookup borrows travel
+     one level up: the pure disjunction (verbatim -- see SpecDirlookup's
+     header for why it is a disjunction and not "the home is live"), and the
+     ticket list, over the PRE-state and handed back VERBATIM on both arms.
+     The record dirlookup's licence (c) wants is the one this contract
+     already takes, [dinode_at γi dinum dn0]; its nonzero type follows from
+     [Htype] and [di_type_stable] and costs no premise.  §20.18 ruling 1 is
+     untouched: this is a BORROW, not an obligation -- no [dir_links]
+     obligation at dirlink, and the re-park at the post-state stays exactly
+     where it was, at the caller. ---- *)
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  dir_orphan_clean dn data ->
   (* NO "THE APPEND FITS" PREMISE.  It used to sit here, killing writei's
      own -1 return; it was unsuppliable (see the header) and the return is
      routed through the [tot = 0] corner of the append arm instead. *)
@@ -583,6 +600,8 @@ Definition wp_dirlink_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   ic_sleeplocks cn -∗
   iref_slot -∗
+  (* the borrowed ticket list, over the PRE-state *)
+  dir_links (bv_unsigned dinum) dn data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_op γ ncount -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -617,6 +636,10 @@ Definition wp_dirlink_sconf_body
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
       iref_slot -∗
+      (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
+         which is what R13(ii) admits and what the caller's own re-park
+         movers ([DirLinks.dir_link_at_dirlink] and its siblings) take. *)
+      dir_links (bv_unsigned dinum) dn data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       log_op γ n' -∗
@@ -735,6 +758,22 @@ Definition wp_dirlink_gen_body
   bm_covers bm (bv_unsigned (di_size dn)) ->
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   dir_inums_ok data nrec nib ->
+  (* ---- THE BORROWED LICENCE, RELAYED TO THE INNER dirlookup (R13(ii),
+     fs-fragments.md §7.1/§7.5.6).  dirlink's own lookup is where the name
+     it is about to link is checked for, and that lookup's [iget] on the
+     FOUND arm needs a licence.  So the two things dirlookup borrows travel
+     one level up: the pure disjunction (verbatim -- see SpecDirlookup's
+     header for why it is a disjunction and not "the home is live"), and the
+     ticket list, over the PRE-state and handed back VERBATIM on both arms.
+     The record dirlookup's licence (c) wants is the one this contract
+     already takes, [dinode_at γi dinum dn0]; its nonzero type follows from
+     [Htype] and [di_type_stable] and costs no premise.  §20.18 ruling 1 is
+     untouched: this is a BORROW, not an obligation -- no [dir_links]
+     obligation at dirlink, and the re-park at the post-state stays exactly
+     where it was, at the caller. ---- *)
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  dir_orphan_clean dn data ->
   (* NO "THE APPEND FITS" PREMISE.  It used to sit here, killing writei's
      own -1 return; it was unsuppliable (see the header) and the return is
      routed through the [tot = 0] corner of the append arm instead. *)
@@ -836,6 +875,8 @@ Definition wp_dirlink_gen_body
   ic_escrows cn γfs γi cov logstart -∗
   ic_sleeplocks cn -∗
   iref_slot -∗
+  (* the borrowed ticket list, over the PRE-state *)
+  dir_links (bv_unsigned dinum) dn data -∗
   (* ---- THIS OPERATION'S RESERVATION ---- *)
   log_opS γ ncount Sb -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP,
@@ -870,6 +911,10 @@ Definition wp_dirlink_gen_body
       (* NET ZERO on the ledger: dirlookup's iget spends one and iput
          returns one on the found arm; nothing is spent on the other. *)
       iref_slot -∗
+      (* ...and the borrow, back VERBATIM -- at the PRE-state's [dn]/[data],
+         which is what R13(ii) admits and what the caller's own re-park
+         movers ([DirLinks.dir_link_at_dirlink] and its siblings) take. *)
+      dir_links (bv_unsigned dinum) dn data -∗
       (* at most [dirlink_units] gone, and none gained *)
       ⌜((ncount - dirlink_units)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       (* THE SET ONLY GROWS.  No ceiling -- SpecWritei's header's reason

@@ -2515,6 +2515,18 @@ Section ProofSysLinkBody.
                              ltac:(rewrite Hcnib;
                                    exact (Hddok ltac:(rewrite Htyd;
                                                       vm_compute; reflexivity)))
+                             (* THE BORROWED LICENCE, LEFT DISJUNCT: earned by
+                                sys_link's OWN orphan guard at [sysfile.c:161]
+                                ([if(dp->nlink == 0) goto bad;], the +0x84/+0x88
+                                pair above).  The fall-through REFUTED it and
+                                left [Hdnl0], so the directory this [dirlink]
+                                appends into is live and the inner [dirlookup]'s
+                                [iget] needs no name-side excuse.
+                                (fs-fragments.md §7.5.6, the sys_link row.) *)
+                             ltac:(left; clear -Hdnl0; intro Hc; apply Hdnl0;
+                                   apply bv_eq; rewrite Hc; vm_compute;
+                                   reflexivity)
+                             Hdocd
                              ltac:(exact (di_type_stable_refl _))
                              ltac:(exact (di_nlink_stable_refl _
                                      (proj1 (proj2 (proj2 (proj2 Hdiok))))))
@@ -2531,11 +2543,11 @@ Section ProofSysLinkBody.
                                    Hkenv Hidevd Hiinumd Hmetad Hmapd Hblocksd
                                    [Hnm14] Hsbi Hsbs Hsbb Hbmres Hireg Hdiatd Hpidq
                                    Hprocs Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows
-                                   Hslks Hir1c HopS").
+                                   Hslks Hir1c Hdlnkd HopS").
                    { iEval (rewrite HU6a1). iExact "Hnm14". }
                    iIntros (CID60 Hq60 mdl found bmd' datd' dnd' dnd0' n3 used3 Sb3 tot)
                      "%Hcsdl Hcg Hown Hpc Hidevd Hiinumd Hmetad Hmapd Hblocksd
-                      Hnm14 Hsbi Hsbs Hsbb Hbmres Hdiatd Hpidq Hbsl Hir1c %Hn3
+                      Hnm14 Hsbi Hsbs Hsbb Hbmres Hdiatd Hpidq Hbsl Hir1c Hdlnkd %Hn3
                       %HSb3 %Hdlp %Hfnd HopS %Hcapd %Hsizedd %Harm".
                    iEval (rewrite HU6a1) in "Hnm14".
                    assert (Hpca0 : ret_pc (U6 !!! Regidx Rra : mword 64)

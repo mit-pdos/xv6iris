@@ -139,6 +139,8 @@ Require Import PathElems.
 Require Import DirView.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import IregLinkNz.
+Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import FsTree.
@@ -3735,6 +3737,10 @@ Section ProofNamexMain.
                        iPoseProof (nxi_094 with "Htext") as "Hj8a".
                        assert (Htyd : di_type dnl = T_DIR)
                          by (unfold T_DIR; exact Hty).
+                       (* licence (c)'s only demand on the record the ["."]
+                          lookup returns: an allocated one (§7.1) *)
+                       assert (Htydnz : bv_unsigned (di_type dnl) <> 0)
+                         by (rewrite Htyd; vm_compute; discriminate).
                        assert (Hbwf : blkmap_wf cov logstart bml)
                          by (destruct Hiok as (Hq & _); exact Hq).
                        assert (Hbcov : bm_covers bml
@@ -3891,24 +3897,50 @@ Section ProofNamexMain.
                                       with "Hcnt") as "Hcnt".
                          iApply (DL.wp_dirlookup_sconf gs j gl gu gd gk
                                    pd pav pu bn gfs gi cn gtl ga gf cov
-                                   logstart nib dev (ientry ik) bml datl dnl
+                                   logstart nib dev (ientry ik) iinum
+                                   bml datl dnl dnl
                                    nf' false (mword_of_int 0 : mword 32)
                                    pidv dq (DfracOwn (1/2)) (DfracOwn 1)
                                    GA4 (K - 12)%nat eb b lks
-                                   Kdl Htyd Hlg Hbwf Hbcov Hszb Hdio Hj Hgs
+                                   Kdl Htyd Hlg Hbwf Hbcov Hszb Hdio
+                                   (* ---- THE LICENCE PREMISE, AND THIS IS
+                                      THE SITE WHERE THE USER'S INVARIANT IS
+                                      EARNED (fs-fragments.md §7.5.6, TRACE
+                                      G).  The LEFT disjunct comes off
+                                      [Hnl0] -- the [fs.c:693] guard
+                                      [if(ip->nlink == 0) return 0] that the
+                                      walk fell through two instructions
+                                      ago.  That guard is the ONLY thing in
+                                      xv6 stopping a chdir'd process from
+                                      walking ".." out of an orphaned
+                                      directory into a claim box (§7.5.4's
+                                      trace), and turning it into this
+                                      premise is what makes "the kernel
+                                      never igets an inum in a disconnected
+                                      subtree" a THEOREM of every licensed
+                                      iget rather than a paragraph.  Note
+                                      the ORDER the trace turns on: ilock
+                                      happens BEFORE the guard, so the
+                                      licence is HELD there and merely never
+                                      DELIVERED -- which is why the
+                                      enumeration lives at SpecIget and not
+                                      on the payload. ---- *)
+                                   (or_introl (nx_nlink_nz _ Hnl0))
+                                   Hdoc Htydnz
+                                   Hj Hgs
                                    HGA4a0
                                    ltac:(rewrite HGA4a2; vm_compute;
                                          reflexivity) Heb
                                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv
                                          Hidev Hmeta Hmap Hblocks [Hname] []
                                          Hppid Hprocs Hdev Hgeom Hdlk Hbs1
-                                         Hitb2 Hitbl Hesc Hisl").
+                                         Hitb2 Hitbl Hesc Hisl Hdlnk Hdiat").
                          all: try lkbelow.
                          { iEval (rewrite HGA4a1). iExact "Hname". }
                          { done. }
                          iIntros (CIDdl Hqdl mdl found kdir kslot qq)
                            "%Hcsdl Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks
-                            Hname Hppid Hbs1 Harm".
+                            Hname Hppid Hbs1 Hdlnk Hdiat Harm".
                          iEval (rewrite HGA4a1) in "Hname".
                          assert (Hpcd8 : ret_pc (GA4 !!! Regidx Rra)
                                   = mword_of_int (NX + 0xe8)).
@@ -5351,13 +5383,26 @@ Section ProofNamexMain.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID23)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      (* THE LICENCE (increment C'-lite, fs-fragments.md §7.1), licence (f).
+         namex's FIRST iget is the one nothing looked up: an absolute path
+         starts at the root and the walk has read no directory yet.  What
+         founds it is the landed ROOT CLAUSE -- [InodeRegion.ireg_root_ok]
+         is (L1) MADE STRICT at [ireg_root], so the root's count is at
+         least one and (L3) gives it a nonzero type
+         ([IgetLic.iname_root_alloc]).  The licence is PURE: the evidence
+         lives in the region's invariant, not in this walk's hands, which
+         is why it costs the walk nothing. *)
+      iAssert (iname gi gfs ROOTINO RootL) as "Hlicr";
+        [rewrite /iname; iPureIntro; exact ireg_root_ROOTINO |].
       iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev ROOTINO
+                RootL
                 A3 0%nat eb (proc_addr j) (K - 12)%nat b lks
                 Kig ltac:(vm_compute; reflexivity)
                 Hrino HA3a0 HA3a1 ltac:(lkbelow)
-                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl1").
+                with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hisl1
+                      Hlicr").
       all: try lkbelow.
-      iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href".
+      iIntros (CIDig Hqig mig kig qig) "Hcg Hcnt Hpc %Higp Href _".
       destruct Higp as (Hcsig & Hkig & Higa0).
       assert (Hpc050 : ret_pc (A3 !!! Regidx Rra) = mword_of_int (NX + 0x50)).
       { rewrite HA3ra. pcw. }

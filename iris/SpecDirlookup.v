@@ -97,6 +97,54 @@
    [inode_blocks] -- comes back LITERALLY unchanged on both arms: readi
    modifies nothing and iget touches only icache state.
 
+   ---- THE BORROWED LICENCE (increment C'-lite, fs-fragments.md §7.1) ----
+
+   dirlookup is where the kernel turns a NAME into an inum and hands that
+   inum to [iget], so it is where §20.17.5's enumeration has to be paid for.
+   [SpecIget] now demands an [IgetLic.iname] and dirlookup's proof produces
+   one at the matched record -- out of the directory's own ticket list, which
+   this contract therefore BORROWS.
+
+   THREE THINGS COME IN AND GO BACK OUT VERBATIM, ON BOTH ARMS (R13(ii)):
+
+   [dir_links (bv_unsigned dinum) dn data] -- the payload's per-record ticket
+   big-op, over the PRE-state (there is no post-state: dirlookup writes
+   nothing).  At the matched index it is the payment unit that founds licence
+   (a).  Nothing is spent: the ticket is lent to [iget] and handed straight
+   back, which is why the borrow costs the six call sites nothing but a
+   [iFrame] -- every one of them holds it already, out of
+   [IcacheEscrow.ic_loaded].
+
+   [dinode_at γi dinum dr] -- the HOME's own record, which is licence (c) at
+   the SELF record.  A lookup of ["."] returns the inum of the very
+   directory the caller has locked, and the self record carries NO ticket
+   (the source comment is "No ip->nlink++ for '.': avoid cyclic ref count",
+   and [DirLinks.dir_link_at]'s guard is false there) -- so the ticket list
+   cannot found that iget and the home's own record must.  This is why the
+   contract gains an inum parameter [dinum] it never reads.  The record is a
+   SEPARATE binder [dr] rather than the in-core [dn], because dirlink's inner
+   lookup holds the region's own (possibly stale) copy [dn0] and not the
+   in-core one -- and licence (c) needs nothing about the record beyond a
+   nonzero type, which is premise (6).
+
+   THE PURE PREMISE IS A DISJUNCTION, AND THAT IS FORCED (§7.5.6).  The
+   ticket at the matched index is [ilink]-coloured only under a LIVE home
+   ([DirLinks.dir_link_at_live]) -- and a bare "the home's count is nonzero"
+   premise is UNSUPPLIABLE at sys_unlink, which does nameiparent, ilock(dp),
+   dirlookup(dp,name,&off) with no [dp->nlink == 0] re-check anywhere.  The
+   right disjunct is what sys_unlink brings instead: its two [namecmp]
+   refusals at sysfile.c:220-221 mean the name it is looking up is neither
+   ["."] nor [".."], and under [dir_orphan_clean] an ORPHANED directory's
+   live records are all dot records -- so the matched record is not live,
+   the found arm is vacuous, and the ticket is only ever cashed under a live
+   home.  [dl_lic_live] below is that argument in five lines; the supplier
+   table is §7.5.6's.
+
+   [dir_orphan_clean dn data] rides beside it because it is what makes the
+   right disjunct close, and it costs nothing: it is already a conjunct of
+   [IcacheEscrow.ic_loaded], landed, and every caller destructs it out of
+   ilock's postcondition already.
+
    dirlookup SLEEPS (readi does), so it threads the full running-process
    bundle and takes the parking premise.  It enters and returns at noff 0. *)
 From Stdlib Require Import ZArith Lia List.
@@ -129,6 +177,7 @@ Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.
 Require Import DirView.
+Require Import DirLinks.
 Require Import InodeInv.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -159,6 +208,39 @@ Notation K_dirlookup := (100%nat) (only parsing).
    against. *)
 Definition T_DIR : mword 16 := mword_of_int 1.
 
+(* ====================================================================== *)
+(*  THE DISJUNCTION, RESOLVED AT A HIT                                     *)
+(* ====================================================================== *)
+
+(* The premise below is a disjunction because of who can SUPPLY it (§7.5.6);
+   what the PROOF needs is the left half, and this is the one step between
+   them.  At a hit the matched record is live and its canonical name is the
+   [s] the caller asked for; if the home were orphaned, [dir_orphan_clean]
+   would make that name one of the two dots, which the right disjunct
+   refuses.  So a hit under either disjunct is a hit under a live home --
+   and the found arm is where the whole borrow is cashed.
+
+   Stated here rather than in [DirView.v] for the cone's sake: it is about
+   THIS contract's premise, and a spec file costs 3-29 dependents where
+   DirView costs the fs layer. *)
+Lemma dl_lic_live (dn : dinode) (data : nat -> list (bv 8))
+    (s : list (bv 8)) (k : nat) :
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  dir_orphan_clean dn data ->
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  dir_first data (dir_nrec (bv_unsigned (di_size dn))) s = Some k ->
+  bv_unsigned (di_nlink dn) <> 0.
+Proof.
+  intros Hty Hoc Hdisj Hf.
+  destruct Hdisj as [Hlive | [Hd Hdd]]; [exact Hlive |].
+  intro Hz.
+  destruct (Hoc Hty Hz k (dir_first_lt _ _ _ _ Hf)
+                (dir_first_live _ _ _ _ Hf)) as [Hn | Hn];
+    rewrite (dir_first_name _ _ _ _ Hf) in Hn;
+    [exact (Hd Hn) | exact (Hdd Hn)].
+Qed.
+
 (* [dir_inums_ok] -- the premise iget's argument bound forces on the CALLER
    (see the header) -- used to be defined here.  fs-icache.md §15(a) made it
    a conjunct of the icache's escrow payloads, which are defined far below
@@ -179,9 +261,9 @@ Definition wp_dirlookup_sconf_body
     (cn : ic_names) (gtl : gname)                     (* the icache + itable *)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
     (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
-    (ip : mword 64)
+    (ip : mword 64) (dinum : mword 32)                (* the HOME's inum     *)
     (bm : blkmap) (data : nat -> list (bv 8))
-    (dn : dinode)
+    (dn : dinode) (dr : dinode)                       (* in-core / REGION    *)
     (fn : nat -> bv 8)                                (* the caller's name   *)
     (hasp : bool) (pofv : mword 32)                   (* poff, two-armed     *)
     (pidv : mword 32) (dq dqd dqn : dfrac)
@@ -205,6 +287,14 @@ Definition wp_dirlookup_sconf_body
   bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE ->
   (* (3) iget's argument bound, over the records -- see the header *)
   dir_inums_ok data nrec nib ->
+  (* (4) THE LICENCE PREMISE, §7.5.6 verbatim.  See the header for why it
+     is a disjunction and which of the six call sites brings which half. *)
+  (bv_unsigned (di_nlink dn) <> 0
+   \/ (s <> dot_name /\ s <> dotdot_name)) ->
+  (* (5) ...and the payload clause that makes the RIGHT disjunct close *)
+  dir_orphan_clean dn data ->
+  (* (6) the borrowed region record is allocated -- all licence (c) needs *)
+  bv_unsigned (di_type dr) <> 0 ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = dp *)
@@ -245,6 +335,9 @@ Definition wp_dirlookup_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   (* ONE ledger unit for the iget on the found arm; RETURNED on the other *)
   iref_slot -∗
+  (* ---- THE BORROWED TICKET LIST AND THE HOME'S OWN RECORD ---- *)
+  dir_links (bv_unsigned dinum) dn data -∗
+  dinode_at γi dinum dr -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  This function can SLEEP
      (through namex / dirlookup, down to ilock and sleep), so a park moves
      the hart with interrupts off and the crossing has nothing to do with
@@ -264,6 +357,9 @@ Definition wp_dirlookup_sconf_body
       ([∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i) -∗
       p_pid pj ↦₄{dq} pidv -∗
       bslot bn -∗
+      (* ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS *)
+      dir_links (bv_unsigned dinum) dn data -∗
+      dinode_at γi dinum dr -∗
       (* THE TWO ARMS *)
       (if found
        then ⌜dir_first data nrec s = Some k
@@ -296,15 +392,15 @@ Module Type DIRLOOKUP.
       (cn : ic_names) (gtl : gname)
       (γa : gname) (γf : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
-      (ip : mword 64)
+      (ip : mword 64) (dinum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (dn : dinode)
+      (dn : dinode) (dr : dinode)
       (fn : nat -> bv 8)
       (hasp : bool) (pofv : mword 32)
       (pidv : mword 32) (dq dqd dqn : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
       wp_dirlookup_sconf_body γs j γl γu γd γk pd pav pu bn γfs γi cn gtl
-                              γa γf cov logstart nib dev ip bm data dn
+                              γa γf cov logstart nib dev ip dinum bm data dn dr
                               fn hasp pofv pidv dq dqd dqn m K eb b lks.
 End DIRLOOKUP.

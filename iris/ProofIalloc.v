@@ -105,6 +105,7 @@ Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import InodeInv.
 Require Import InodeRegion.
+Require Import IgetLic.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
@@ -1656,14 +1657,34 @@ Section IallocClaim.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID11) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
+    (* ==================================================================== *)
+    (*  R14: THE SPAN LICENCE -- THE ONE PERMITTED [SpanL] SITE IN THE TREE   *)
+    (* ==================================================================== *)
+    (*  ialloc has claimed the inum, written [dip->type = ty], [log_write]d
+        it and BRELSE'd; at this [iget] it holds nothing revocable at all --
+        no buffer half (so licence (e) is unavailable, and §7.2's CURRENCY
+        GAP is why no epoch device recovers it), no reference, no fragment.
+        The licence the record deserves is (d), [ClaimL], and (d) is
+        foreclosed by §7.1.5's theorem until F1.5c mints an [iclaim].
+
+        So this iget presents [SpanL], whose [iname] is [⌜True⌝]: a licence
+        that licenses nothing.  The span it names is exactly the gap
+        [create_fresh_ty] axiomatizes, and naming it here is what turns the
+        axiom's delivery-side perimeter from a paragraph into a grep line --
+        [grep -n "SpanL" iris/Proof*.v] must name THIS site and no other.
+        It deletes when F1.5c lands (the site becomes [ClaimL], no signature
+        moves) or when the axiom retires.  See IgetLic.v's R14 header. *)
+    iAssert (iname γi γfs inum SpanL) as "Hlic";
+      [rewrite /iname; iPureIntro; exact I |].
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
+              SpanL
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
               ltac:(lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
+              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref Hlic").
     all: try lkbelow.
-    iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href".
+    iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href _".
     destruct Higp as (Hcsi & Hkslot & Higa0).
     assert (Hpcae : ret_pc (WA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ialloc + 0xae)) by (rewrite HWAra; pcw).

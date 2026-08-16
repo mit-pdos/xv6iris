@@ -237,18 +237,44 @@
    [WP] in the fs tree would be stated against a whole-system side
    condition.  Recorded, not designed.
 
-   (F3) PROPHECY / LATE LINEARIZATION.  NOT PREVIOUSLY RECORDED, and it
-   is written here because it is the one mechanism (D)'s station
-   exhaustion does not literally name: a prophecy variable is not a pin
-   on an EPISODE, it is a pin on a FUTURE OBSERVATION, so the four
-   carrier assignments do not obviously cover it.  The claim would
-   prophesy the type its own fill will read and resolve at the fill.
-   CAUTION, and the reason it is filed as a route rather than as a plan:
-   (D)'s clause (i) appears to cover it anyway -- prophecy resolution is
-   itself a frame-preserving update and the mint must stay universally
-   firable -- so the expected outcome is that the resolved value is
-   existentially typed exactly as H1's payout is.  Nobody has run it.  If
-   an eleventh probe is opened, THIS is the only one worth opening.
+   (F3) PROPHECY / LATE LINEARIZATION.  **RUN, AND DEAD** (probe 8,
+   fs-fragments.md §7.11).  It was filed here as the one mechanism (D)'s
+   station exhaustion does not literally name -- a prophecy variable is
+   not a pin on an EPISODE, it is a pin on a FUTURE OBSERVATION, so the
+   four carrier assignments do not obviously cover it -- and the caution
+   recorded was that (D)'s clause (i) would probably cover it anyway, the
+   resolved value coming back existentially typed as H1's payout does.
+   THAT GUESS WAS WRONG IN BOTH DIRECTIONS, which is why running it was
+   worth it:
+
+   * the language HAS no observations (`mobs := Empty_set`, κ = [] in
+     every arm, `state_interp` discards κs), and adding them is a sound,
+     conservative, ~8-file-deep extension of the WP-adequacy chain -- NOT
+     the obstacle;
+   * with them, a region-resident per-inum prophecy plus H1's phase does
+     carry the episode pin ON THE TRACE -- a FIFTH carrier, genuinely
+     outside §7.10.6's exhaustion -- and the prophesied-MINE branch
+     delivers [di_type dn = ty] past all five named walls, THE CURRENCY
+     GAP INCLUDED.  Branch A works.
+
+   It dies in the prophesied-FOREIGN branch, at a SIXTH named wall:
+   **THE ADVERSARY RESOLVES CONSISTENTLY.**  Resolution refutes
+   mis-ordered observations, never a foreign resolver -- every
+   model-consistent future in which the excluded interference occurs is
+   realized by resolutions each consistent at its own step, so the
+   foreign branch survives every resolution the claimant can reach except
+   in the no-interference sub-world, and "no interference" IS §19.6's
+   allocatedness: the debt the probes could not source, conserved to the
+   letter.  Prophecy lets a spec condition on the actual future of this
+   trace; it does not let a proof EXCLUDE a future the model deems
+   possible, and excluding that future was the entire problem.  The
+   vacuity of the foreign branch is a fact about the BINARY's traces, not
+   about the model's continuations, and Iris discharges branches against
+   the latter.
+
+   So there is no eleventh route worth opening on this side.  See
+   fs-fragments.md §7.11.5 for the certificate and §7.11.6 for the
+   one-bit factorization it leaves behind.
 
    ==== WHY THE SPAN IS THE TWO CALLS, AND NOT A NARROW FACT ============
 
