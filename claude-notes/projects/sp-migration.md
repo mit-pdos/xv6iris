@@ -402,9 +402,13 @@ declaration order.
 - **Phase C** (design §1, §4, §6; the big one — branch until green): the
   `ktier` lattice + `KtierLe` (new bottom file), ktier-indexed `mem_pointsto`
   (KT0 = pinned conjunct, KT1 = the RED definition), `CurKtier` class +
-  notation + the global KT0 default, tier-preserving leaf rules with the
-  ~14 `%Hid` sites as the KT0 arm, `WpSconfMem.v:242`'s `pa` binder
-  renamed in passing (design §9 step 6). Recon facts (measured, 2026-08-16):
+  notation + the global KT0 default, the ~14 `%Hid` sites repaired as the
+  KT0 path (pin → `pa_of_id` → `sr_adm_id`; the leaf STATEMENTS keep their
+  current shapes at the ambient tier, so no function proof changes — the
+  generic witness rules are phase D), `WpSconfMem.v:242`'s `pa` binder
+  renamed in passing (design §9 step 6). Suite lemmas are stated over an
+  EXPLICIT kt (bracket notation `↦ₘ[kt]`), never the ambient notation —
+  ambient-stated lemmas would elaborate pinned at the default. Recon facts (measured, 2026-08-16):
   - Definitions to index, all top-level in RiscvPtsto.v, no shared
     Section: `mem_pointsto` (923), `word_pointsto` (1100), `word2_` (1186),
     `word4_` (1238), `string_pointsto` (1337; the design sketches say
@@ -441,8 +445,13 @@ declaration order.
     it goes live at the dual-regime phase, when files gain a real
     `` `{CG : CurKtier} `` — 114 Module-Type files mention family notations
     in Parameter signatures and must then be swept in matching pairs.
-- **Phase D** (design §5): `sie_cap` g-index + `ktier_wit` + `sie_cap_ktier_up`
-  at kvminithart; the SIE='1' arm pins KT1.
+- **Phase D** (design §4 + §5 — THE KT1 ACCESS PATH END-TO-END): the
+  regime-relative witness `sr_ktier_wit R kt` (KT0 ↦ emp, KT1 ↦ sr_kwit R),
+  the GENERIC tier-indexed leaf rules (`KtierLe kt' kt` + `sr_ktier_wit`,
+  KT1 arm via `sr_absorb_wit`; the existing leaf names remain as KT0
+  corollaries so no function proof changes), the `sie_cap` ktier-index +
+  `ktier_wit` + `sie_cap_ktier_up` at kvminithart; the SIE='1' arm pins
+  KT1.
 - **Phase E** (design §9 step 7, later): `text_pointsto`/TRAMPOLINE.
 
 ### Phase A findings (LANDED)
@@ -571,11 +580,187 @@ three fields at the end of `SRegime.s_regime` was a pure extension).
   sketched in design §4, handing it whatever `ktier_wit g` unfolds to at
   the ambient regime.
 
+### Phase C findings (LANDED)
+
+The datum is tier-indexed and the whole tree is green with **six** source
+files touched (`Ktier.v` new, `RiscvPtsto.v`, `KMap.v`, `StackOwn.v`,
+`WpSconfMem.v`, `_CoqProject`). Nothing else in the tree changed — no
+consumer, no leaf, none of the 14 `%Hid` sites, none of the bridge
+callers. Three deviations from the written design, all forced, all
+recorded below.
+
+- **THE TIER IS AN INSTANCE-IMPLICIT ARGUMENT, NOT A POSITIONAL ONE.** Each
+  family member gains `` `{KTR : !CurKtier} `` immediately after its
+  `riscvGS` binder and reads the tier as `cur_ktier`. The plan of "leading
+  `(kt : ktier)` parameter + rename the primitive + re-export the old name
+  as a notation" is NOT viable here: `word_pointsto` is used BY NAME at 560
+  sites in 56 files and `stack_own` at 334 sites in 187, and four of those
+  (`ProcDefs.v:60`, `ProofSwtch.v:71`, `SwtchCtx.v:118`, `ProcGeom.v:905`)
+  do `rewrite /word_pointsto /mem_pointsto`, which a notation alias breaks
+  (the inner name no longer occurs after unfolding the alias). With the
+  instance argument every one of those sites is byte-identical.
+- **A SECTION `Context `{KTR : !CurKtier}` IS WHAT MAKES A SUITE LEMMA
+  TIER-GENERIC — restating over an explicit `kt` is not needed and is the
+  worse tool.** Inside such a section the *ambient* spelling elaborates at
+  the ∀-bound section variable (a section instance beats the priority-100
+  global default), so every existing lemma statement stays character-for-
+  character the same and is nonetheless generic. The warning "an
+  ambient-stated lemma pins at the default" is true only in a file with NO
+  `CurKtier` in scope. Explicit tiers are then needed for exactly two
+  things: HETEROGENEOUS statements (`mem_pointsto_agree`,
+  `mem_pointsto_ne`, `mem_bytes_agree`, `mem_bytes_notin`, and the three
+  tower `_agree`s all take `{kt1 kt2 : ktier}` — IMPLICIT, so positional
+  callers like `mem_bytes_notin pu … 0 4096` are unaffected), and
+  CONSTRUCTORS where the caller picks (`phys_to_mem_map` takes a leading
+  explicit `kt`).
+- **BRACKET NOTATION MUST GO THROUGH IRIS'S CUSTOM `dfrac` ENTRY — and this
+  one bites the whole tree from a file that mentions no `↦ₘ`.** Writing
+  `Notation "a ↦ₘ[ kt ]{ dq } v"` creates the LEXER TOKEN `]{`; longest
+  match then wins everywhere, and `ghost_map`'s `k ↪[ γ ] dq v` (whose
+  `{dq}`/`□`/`{#q}`/empty come from `Declare Custom Entry dfrac`, i.e. `]`
+  is its own token) stops parsing. Symptom: `Syntax error: ']' expected
+  after [term level 50]` at `FsBlocks.v:71` and `FsCrash.v`, files with no
+  points-to of ours in them at all. The correct form is ONE notation per
+  member, covering all four dfrac spellings:
+  ```coq
+  Notation "a ↦ₘ[ kt ] dq v" := (mem_pointsto (KTR := kt) a dq v)
+    (at level 20, kt at level 50, dq custom dfrac at level 1,
+     format "a  ↦ₘ[ kt ] dq  v") : bi_scope.
+  ```
+  **RULE for phases D/E: never spell `]{` or `]□` inside a notation
+  string; reuse `custom dfrac`.**
+
+**The notation table** (spelling → elaboration; `mem_pointsto` shown, the
+other four members are identical with `↦₈`/`↦₂`/`↦₄`/`↦ₛ` and their own
+value metavariable):
+
+| spelling | elaborates to |
+|---|---|
+| `a ↦ₘ v` | `mem_pointsto a (DfracOwn 1) v` at the ambient `CurKtier` |
+| `a ↦ₘ{dq} v` | `mem_pointsto a dq v`, ambient |
+| `a ↦ₘ□ v` | `mem_pointsto a DfracDiscarded v`, ambient |
+| `a ↦ₘ[kt] v` | `mem_pointsto (KTR := kt) a (DfracOwn 1) v` |
+| `a ↦ₘ[kt]{dq} v` | `mem_pointsto (KTR := kt) a dq v` |
+| `a ↦ₘ[kt]{#q} v` | `mem_pointsto (KTR := kt) a (DfracOwn q) v` |
+| `a ↦ₘ[kt]□ v` | `mem_pointsto (KTR := kt) a DfracDiscarded v` |
+| `stack_own sp n` | `stack_own sp n` at the ambient `CurKtier` (plain name, no notation; the tier rides the instance argument) |
+
+The three ambient rows are the PRE-EXISTING notation lines, unchanged.
+`↦ₚ`/`↦ₚ₈`/`↦ₓ` are not indexed (physical tier; text is phase E).
+
+- **THE KT0 PIN IS THE IDENTITY ALONE**, not
+  `ppn = kpt_leaf_ppn (svpn_of va) /\ kmap_static (svpn_of va) KP_rw`:
+  ```coq
+  Definition ktier_pin (kt : ktier) (ppn : mword 44) (va : mword 64) : Prop :=
+    match kt with KT0 => pa_of ppn va = va | KT1 => True end.
+  ```
+  Forced: `kpt_leaf_ppn`/`kmap_class`/`kmap_static` live in **KptPt.v,
+  which REQUIRES RiscvPtsto** (the recon's "RiscvPtsto already imports
+  them" is wrong), and **17 files name `KptPt.kmap_static` QUALIFIED**
+  (`ProofSpin`, `WpGprCsr*` ×5, `WpMmode*` ×11), so moving the classifier
+  under the datum is a far wider change than the phase's budget. Nothing
+  is lost: the two forms are interchangeable under the datum's own
+  canonicality conjunct (`KptPt.pa_of_id`), the identity is EXACTLY what
+  KT0 must promise (Bare's `sr_adm` IS `kadm_ident va ppn := pa_of ppn va
+  = va`), and the static class stays available where every consumer
+  already gets it — the ambient `kmap_static_claims` bundle, now via
+  `KMap.mem_ktier_pin_intro`.
+  **This deviation is what made the phase cost six files.** Because the
+  KT0 pin IS the old conjunct:
+  - `phys_to_mem_claim` / `mem_to_phys_claim` keep their exact signatures
+    and become tier-GENERIC (`ktier_pin_of_id` gives the pin at every
+    tier from an identity), so `KptTree.v:509/529` and
+    `ProcInv.v:742/761` needed nothing;
+  - `KMap`'s `mem_ident_phys` / `phys_ident_mem` / `mem_page_to_phys` are
+    tier-generic with no premise change, so `DiskInv.v`, `BootCarve.v`,
+    `BootBridge.v` and the whole `RiscvAdequacy` image mint (which goes
+    through `BootCarve.boot_data_own` → `phys_ident_mem`) needed nothing;
+  - **all 14 `%Hid` sites compile UNTOUCHED**: `mem_pointsto_acc` now
+    yields `⌜ktier_pin cur_ktier ppn a⌝`, and at a file with no local pin
+    that is `ktier_pin (@cur_ktier curktier_default) ppn a`, which is
+    CONVERTIBLE to `kadm_ident a ppn`; `sr_adm_id R a ppn Hid` typechecks
+    as written. Same for `SmodeCorePt.s_win_write`'s re-mint (`exact Hid`
+    against a goal of the same pin) and `ProofAcquiresleep.v:220`'s
+    `rewrite Hid`.
+  If a later phase wants the static class in the pin, it is self-contained:
+  strengthen `ktier_pin`'s KT0 arm, move `kmap_class`/`kmap_static` into
+  `RiscvPtsto.v` (leaving `Notation kmap_static := RiscvPtsto.kmap_static.`
+  in `KptPt.v` for the 17 qualified references), and give
+  `phys_to_mem_claim` a `kmap_static` premise, which its two callers can
+  supply — both hold `pt_node_claim`, hence `page_valid (page_base b)`,
+  hence `PtTree.page_valid_node_kdata`'s `text_end <= b*4096`, hence
+  `KptPt.kdata_svpn_class`.
+
+- **`Ktier.v` is a pure bottom file** (no project imports), placed
+  immediately before `RiscvPtsto.v` in `_CoqProject`, and RiscvPtsto
+  `Require Export`s it — Export, not Import, or the 796 direct importers
+  would not see the `CurKtier` default instance and would silently
+  generalize a fresh variable (durable-notes typeclass trap one).
+  `curktier_default : CurKtier | 100 := KT0`. The order class is
+  `KtierLe`, backed by `ktier_leb`, with `ktier_le_bot`/`_top`/`_refl`
+  plus the eliminator `ktier_le_cases : KtierLe t1 t2 -> t1 = t2 \/ (t1 =
+  KT0 /\ t2 = KT1)`, which is what every monotonicity proof runs on.
+
+- **New lemmas** (all in the RiscvPtsto/KMap suite): `ktier_pin_mono`,
+  `ktier_pin_id`, `ktier_pin_of_id` (pure); `mem_ktier_mono`,
+  `word_ktier_mono`, `word2_ktier_mono`, `word4_ktier_mono`,
+  `string_ktier_mono` (weakening along `KtierLe`); and
+  `KMap.mem_ktier_pin_intro : kmap_static (svpn_of va) KP_rw ->
+  kmap_static_claims -∗ va ↦ₘ[kt]{dq} b -∗ va ↦ₘ[KT0]{dq} b` (the
+  strengthening — a complete round trip, because the pin is PURE).
+  `phys_to_mem_map` lost its identity premise and took a leading explicit
+  `kt` with a `ktier_pin kt ppn va` premise; ONE lemma serves both tiers.
+
+- **`WpSconfMem.v`'s mis-named binder**: `wp_load_s_sconf_au`'s
+  `let pa := add_vec (rget m rs1) (sign_extend' 64 imm)` is renamed `ea`
+  (35 occurrences in that statement and proof). The SAME misnomer remains
+  at 24 more sites in `WpSconfMem.v` and 11 in `WpSconfLock.v`; they are a
+  pure rename with no semantic content, deferred so this phase's diff stays
+  reviewable. The binder is a `let` inside the statement, so renaming it
+  is invisible to every caller.
+
+- **The RED branch was not needed as a quarry.** Because KT0 keeps the
+  identity as its pin, every suite proof in `RiscvPtsto.v` threads the
+  4th conjunct exactly as before — the repairs the RED branch made (which
+  DELETED the conjunct) apply only to the KT1 arm, and at KT1 the conjunct
+  is `True`, so there is nothing to repair. `sp-migration-red` can be
+  deleted.
+
+**What phase D needs.** The generic leaf rule is a strict generalization
+of today's statements in one step, because the KT0 arm's obligation is
+already what the current leaves discharge:
+
+```coq
+Lemma wp_load_s_… (kt kt' : ktier) `{!KtierLe kt' kt} … :
+  sr_ktier_wit R kt -∗            (* KT0 ↦ emp, KT1 ↦ sr_kwit R *)
+  va ↦ₘ[kt']{dq} v -∗ … (va ↦ₘ[kt']{dq} v -∗ …) -∗ …
+```
+- The KT0 arm is LITERALLY the present proof: destructure
+  `⌜ktier_pin kt' ppn va⌝`, which at `kt' = KT0` IS `pa_of ppn va = va`,
+  and feed it to `sr_adm_id` unchanged.
+- The KT1 arm has `KtierLe KT1 kt` forcing `kt = KT1`, so
+  `sr_ktier_wit R KT1 = sr_kwit R` is in hand and `sr_absorb_wit` (phase B,
+  whose statement is `sr_absorb`'s with the `sr_adm` conjunct deleted and
+  `sr_kwit -∗` at the head) replaces the `sr_absorb` call one-for-one.
+- The datum comes back at `kt'`, so tier is preserved across an access and
+  no strengthening dance is needed at a re-deposit.
+- Keeping the CURRENT leaf names as the `kt := kt' := KT0` corollaries
+  means no function proof changes, and — because the ambient default IS
+  KT0 — a corollary stated at explicit `KT0` unifies with a consumer's
+  ambient datum by conversion (measured: the whole tree does this today
+  through `mem_pointsto_acc`).
+- `sie_cap`'s index and `ktier_wit` are still to do; nothing in phase C
+  constrains their shape.
+- When a file first needs KT1 facts it adds ONE line,
+  `Local Instance : CurKtier := KT1.`, and its spec text does not move.
+  Two tiers in scope at a seam (kvminithart, scheduler entry) must be
+  spelled `[KT0]`/`[KT1]` explicitly — with two instances in scope
+  resolution silently takes the last declared one.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
-  sketch; nothing of it implemented yet. `main` is GREEN — the RED
-  experiment does not live on it.
+  sketch. Phases A, B and C are LANDED; `main` is GREEN.
 - **Branch `sp-migration-red`** (local, one squashed commit off `4019ec33`)
   holds the RED experiment as a QUARRY for step 3, not as a base: the
   identity conjunct removed from `mem_pointsto`, with `RiscvPtsto.v`'s own

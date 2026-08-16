@@ -22,6 +22,7 @@ RegFile.v
 HartTp.v
 WpNext.v
 PtreeType.v
+Ktier.v
 RiscvPtsto.v
 PermInv.v
 PageGeom.v

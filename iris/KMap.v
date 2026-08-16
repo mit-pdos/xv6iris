@@ -48,6 +48,11 @@ Qed.
 
 Section KMap.
   Context `{!riscvGS Σ}.
+  (* the ambient TIER: the ↦ₘ ⇄ ↦ₚ bridge below is tier-generic -- it
+     never looks at the pin in the consuming direction, and in the
+     producing direction the static claim it already demands gives the
+     identity, hence the pin at EVERY tier ([ktier_pin_of_id]). *)
+  Context `{KTR : !CurKtier}.
 
   (* ===================================================================== *)
   (* The bare auth.                                                         *)
@@ -162,7 +167,30 @@ Section KMap.
     iEval (rewrite /phys_pointsto) in "H". iDestruct "H" as "[Hp _]".
     rewrite /mem_pointsto. iExists (kpt_leaf_ppn (svpn_of pa)).
     rewrite (pa_of_id pa Hc). iFrame "Hk0 Hp". iPureIntro.
-    split; [exact Hc | split; [exact Hram | reflexivity]].
+    split; [exact Hc | split; [exact Hram |
+      exact (ktier_pin_of_id cur_ktier (kpt_leaf_ppn (svpn_of pa)) pa (pa_of_id pa Hc))]].
+  Qed.
+
+  (* ---- TIER STRENGTHENING (the counterpart of [mem_ktier_mono]).  The pin
+     is PURE, so a datum that LOST it by weakening -- or one minted at KT1 --
+     can be brought back to KT0 with no ghost cost, given only the pure
+     static class of its va: the ambient bundle supplies that vpn's identity
+     claim, [kmap_at_agree] forces the datum's existential ppn to match it,
+     and [pa_of_id] turns that into the identity.  This is exactly the dance
+     [mem_ident_phys] runs, stopped one step earlier, and it is what makes
+     "weaken to pass through a KT1 context, strengthen on the way back" a
+     complete round trip rather than a one-way door. ---- *)
+  Lemma mem_ktier_pin_intro (kt : ktier) (va : mword 64) dq b :
+    kmap_static (svpn_of va) KP_rw ->
+    kmap_static_claims -∗ va ↦ₘ[kt]{dq} b -∗ va ↦ₘ[KT0]{dq} b.
+  Proof.
+    iIntros (Hs) "#Hb H".
+    iDestruct (kmap_static_claims_at (svpn_of va) KP_rw Hs with "Hb") as "#Hk0".
+    iDestruct (mem_pointsto_pin (KTR := kt) va dq b (kpt_leaf_ppn (svpn_of va))
+                 with "Hk0 H") as "(%Hc & %Hd & _ & Hp & _)".
+    rewrite /mem_pointsto. iExists (kpt_leaf_ppn (svpn_of va)).
+    iFrame "Hk0 Hp". iPureIntro.
+    split; [exact Hc | split; [exact Hd | exact (pa_of_id va Hc)]].
   Qed.
 
   (* text tier: ↦ₓ ⇄ ↦ₚ at KP_rx / addr_is_text *)
