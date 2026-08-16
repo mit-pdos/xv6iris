@@ -69,6 +69,8 @@ Require Import KallocInv KvmSpec PageGeom.
    [KptShare.kpt_inv_alloc], [KvmMap.kvm_bridge]) and the deposit wand
    carries the resulting [kpt_inv] / 65 claims / persistent root cell *)
 Require Import KptGhost KptShare KptExecMap KvmMap.
+(* K1 of the KSTACK campaign: the boot-arm mint of the 64 kernel stacks *)
+Require Import KstackOwn.
 Require Import PtreeType.
 Require Import WpKvminithart.
 Require Import ProcGeom CpuOwn SchedCtx FdSlots.
@@ -844,6 +846,15 @@ Section ProofMain.
     iApply fupd_wp.
     iMod (word_pointsto_persist with "Hkpt") as "#Hkptp".
     iMod (kvm_M_mint pas with "Hkauth") as "(Hauth & #Htramp & #Hkstx)".
+    (* ---- K1 -- THE MINT (claude-notes/projects/sp-migration.md).  The 64
+       claims just minted, against the 64 identity-mapped pages kvminit
+       handed out, ARE the 64 process kernel stacks owned at their KSTACK
+       virtual addresses -- at KT1, the tree's first real KT1 facts.  This
+       is the one point in the tree where both halves are in hand.
+       The bank is DROPPED here (affine): routing it into procinit /
+       [proc_dormant] is increment K3.  What this line buys today is that
+       the pipeline is PAYABLE inside the real boot proof. ---- *)
+    iDestruct (kstack_bank_intro pas Hpasok with "Hkstx Hkstacks") as "Hbank".
     iMod (kpt_inv_alloc (pt_base t) t (kvm_M pas) ⊤
             (kvm_bridge pas t (pt_base t) Hpasok eq_refl Hrep)
             with "Htree Hauth Hunset") as "[#Hkinv #Hlbt]".

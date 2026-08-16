@@ -1031,15 +1031,7 @@ KSTACK va is UNSATISFIABLE. Those proofs are sound but conditionally
 vacuous upstream (the stacks trace to the SpecUserinit axiom). Making
 the paid park FEEDABLE means flipping that cone to KT1.
 
-- [ ] **K1 — the mint** (green, standalone): `kstack_own_intro i` —
-  `kmap_at (kstack_vpn i) (pas i) KP_rw -∗ page_own (pa_of_pas i) -∗
-  stack_own (KTR := KT1) (kstack_va i + 4096) 512` (whole page;
-  premises: canonicality of KSTACK vas < 2^38, `addr_is_ram` off
-  `page_valid`, `ktier_pin KT1 = I`; per-byte `phys_to_mem_map KT1`,
-  bytes→words→`stack_own`). Thread main's boot arm to run it 64× after
-  kvminithart, park the results in a boot-side bank the later increments
-  draw from. Validates the whole KT1 pipeline with the tree's FIRST real
-  KT1 facts.
+- [x] **K1 — the mint** — LANDED; see "K1 findings" below.
 - [ ] **K2 — the post-boot tier flip** (DESIGN FORK, coordinator+user):
   the trap fixpoint's tier (`ihs_*_of` chain takes the binder), the
   uservec/usertrap/forkret cone's stack conjuncts to `(KTR := KT1)`,
@@ -1081,13 +1073,149 @@ the paid park FEEDABLE means flipping that cone to KT1.
   same index and witness; TRAMPOLINE fetch ownership becomes
   expressible.
 
+### K1 findings (LANDED)
+
+The mint is one new leaf file, `iris/KstackOwn.v`, plus a two-line
+insertion in `ProofMain.mn_grp_kvm`. Nothing in `RiscvPtsto.v`,
+`StackOwn.v`, `PageFields.v` or any `Spec*` file moved; no escalation was
+needed. The whole tree is green.
+
+**The two deliverables:**
+
+```coq
+Lemma kstack_own_intro `{!riscvGS Σ} (i : nat) (ppn : mword 44) :
+  (i < 64)%nat -> node_kdata ppn ->
+  kmap_at (kstack_vpn i) ppn KP_rw -∗
+  page_own (page_base ppn) -∗
+  stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) 512.
+
+Definition kstack_bank `{!riscvGS Σ} : iProp Σ :=
+  ([∗ list] i ∈ seq 0 64,
+     stack_own (KTR := KT1) (add_vec (kstack_va i) (mword_of_int 4096)) 512)%I.
+
+Lemma kstack_bank_intro `{!riscvGS Σ} (pas : nat -> mword 44) :
+  kvm_pas_ok pas ->
+  ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
+  ([∗ list] i ∈ seq 0 64, page_own (page_base (pas i))) -∗
+  kstack_bank.
+```
+
+`kstack_bank` takes NO `pas` argument: the addresses are the static
+`kstack_va i` and `stack_own`'s contents are existential, so the physical
+pages are already forgotten. An argument the body does not mention would
+be a phantom (durable-notes, `co_license`).
+
+**THE THREE PURE FACTS THAT TIE THE HALVES TOGETHER — this is what K3
+needs and it is all already in `KvmMap.v`.** They were written for this
+increment ("the downstream `page_own_kstack` capstone") and had no
+consumer until now:
+
+| fact | content |
+|---|---|
+| `kstack_va_svpn_add i j` | `svpn_of (kstack_va i + j) = kstack_vpn i` — the claim's vpn IS every byte's vpn |
+| `kstack_va_pa_of ppn i j` | `pa_of ppn (kstack_va i + j) = pa_add (page_base ppn) j` — the claim takes KSTACK(i)+j to byte j of the identity page |
+| `kstack_ident_ram ppn j` | `node_kdata ppn -> addr_is_ram (pa_add (page_base ppn) j)` |
+
+plus `kstack_va_canon_add` (< 2^38). `page_own`'s argument in
+`SpecKvminit`/`SpecProcMapstacks` is spelled
+`zero_extend' 64 (concat_vec (pas i) (zeros' 12))`, which IS
+`PageGeom.page_base (pas i)` definitionally — `iApply` crosses it with no
+rewrite.
+
+**`ktier_pin` DOES THE `↦ₘ → ↦ₚ` STEP FOR FREE, and that is the surprise.**
+`page_own` is a `↦ₘ` family (`KallocInv.byte_any`), not `↦ₚ`, and it
+elaborates at the **KT0 default** — `KallocInv`/`PageFields` have no
+`CurKtier` in their sections, so `page_own`/`page_words8`/`bytes_word8`
+are KT0-pinned tree-wide, deterministically. A KT0 datum's pin IS
+`pa_of ppn va = va`, so
+
+```coq
+Lemma mem_kt0_phys (va : mword 64) dq b : va ↦ₘ[KT0]{dq} b ⊢ va ↦ₚ{dq} b.
+```
+
+is four lines and needs NO claim, NO `kmap_static_claims`, NO ambient
+bundle — unlike its twins `KMap.mem_ident_phys` and
+`RiscvPtsto.mem_to_phys_claim`, both of which ask for something the pin
+already carries. Reach for `mem_kt0_phys` whenever a KT0 fact has to be
+re-keyed anywhere.
+
+**THE ONE PIECE OF NEW MACHINERY, and why it was needed:**
+`PageFields.page_words8` (bytes → doubleword run) demands `page_valid p`,
+and a stack page carries only `node_kdata` (`kvm_pas_ok`) — genuinely
+weaker (a page between `etext` and `end` is RAM but not kalloc'able), and
+`page_valid` is not derivable from what kvminit's contract exports.
+`KstackOwn.bwin_words8` is `page_words8` with the alignment side
+condition taken as a per-offset HYPOTHESIS instead of derived from
+`page_valid`; the two instantiations (`page_base_aligned8`,
+`kstack_va_aligned8`) go through one shared
+`aligned8_of_page_base : bv_unsigned a mod 4096 = 0 -> … -> is_aligned_paddr …`.
+That form also covers the KSTACK va, which `page_off_aligned` could never
+have: `page_valid`'s upper bound is `kmem_hi`, and KSTACK(i) ≈ 2^38.
+
+**The ladder, top to bottom** (all in `KstackOwn.v`): `mem_kt0_phys` →
+`kstack_byte_rekey` (byte j of the identity page → byte j of KSTACK(i),
+via `phys_to_mem_map KT1` with `ktier_pin KT1 = I`) → `kstack_word_rekey`
+(eight of them; the KSTACK side's 8-alignment is RE-DERIVED, not
+transported — the two addresses are congruent mod 4096 but nothing in the
+`↦₈` bundle says so) → `bwin_words8` → `stack_own_of_words` →
+`kstack_own_intro`.
+
+`stack_own_of_words` is the reusable half and is tier- and base-generic:
+
+```coq
+Lemma stack_own_of_words (kt : ktier) (base : mword 64) (n : nat) (ws : list (bv 64)) :
+  length ws = n ->
+  ([∗ list] k ↦ w ∈ ws, word_pointsto (KTR := kt) (pa_add base (8 * k)%nat) (DfracOwn 1) w)
+  ⊢ stack_own (KTR := kt) (pa_add base (8 * n)%nat) n.
+```
+
+`StackOwn.stack_own_base` does the work (the region is base-anchored
+ascending; the run's TOP is the region's sp, because the stack grows
+down), and the index-forgetting step is `bigsep_ws_seq`. **WHEN THE
+LADDER IS FOLDED BACK AT A MILESTONE:** `stack_own_of_words` +
+`bigsep_ws_seq` belong beside `stack_own_base` in `StackOwn.v`, and
+`bwin_words8` beside `page_words8` in `PageFields.v`. They are in the
+leaf file only to keep the iteration cone small (durable-notes: an
+additive change to a shared file belongs in a new leaf file).
+
+**WHERE THE BANK MATERIALIZES.** `ProofMain.mn_grp_kvm`, immediately
+after `iMod (kvm_M_mint pas …) as "(Hauth & #Htramp & #Hkstx)"` — the
+ONLY point in the tree where both halves are in hand:
+
+- `#Hkstx` (persistent) — the 64 `kmap_at (kstack_vpn i) (pas i) KP_rw`,
+  minted right there out of `kmap_auth kmap_M0`;
+- `Hkstacks` — the 64 `page_own`, delivered by kvminit's post at
+  `iIntros (mkv t pas) "… %Hpasok Hkstacks"` and, before this increment,
+  simply dropped;
+- `%Hpasok : kvm_pas_ok pas`, from the same post.
+
+The insertion is one `iDestruct (kstack_bank_intro pas Hpasok with
+"Hkstx Hkstacks") as "Hbank"`, and `Hbank` is then DROPPED (affine).
+Ordering matters only in that it must precede nothing — it can sit
+anywhere between the mint and the end of the lemma.
+
+**What K3 has to do with it.** `mn_grp_kvm`'s continuation must grow a
+`kstack_bank` premise (or the 64 conjuncts individually) so the bank
+survives to `procs_inv_alloc` / procinit; today the continuation ends at
+`main+0x7e` with the 64 claims and nothing else about the stacks. Two
+sizing facts for that increment: the bank hands out **512** slots per
+stack while `ProcDefs.KSTACK_AV` is **400** — peel with
+`stack_own_split_1` — and `ProcDefs.kstack_free`/`kstack_closer` predate
+ktier, so their `stack_own` conjuncts elaborate at the KT0 default and
+must be re-pinned `(KTR := KT1)` before a bank slot can feed them
+(`is_kstack` itself stays KT0: the `p->kstack` FIELD is static proc-table
+data). Also unresolved for K3: the bank is keyed by the stack INDEX `i`,
+while `proc_dormant` is keyed by the slot address `proc_addr i` — the
+correspondence `KSTACK(i) = p->kstack` for slot `i` is what procinit
+stores, and `KstackArith.v` is the arithmetic that proves it.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
   sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) and D are
   LANDED, and so is the `sie_cap` tier index on top of them; `main` is
-  GREEN. NEXT: the KSTACK campaign — see "What the KSTACK campaign can now
-  write" at the end of the sie_cap tier index findings. The one design
+  GREEN. NEXT: the KSTACK campaign — K1 (the mint) is LANDED, so the tree
+  now carries real KT1 facts; see "K1 findings" and then K2. The one design
   question still open in this area is the TRAP CONTRACT's tier: the Banach
   fixpoint's bundle is pinned at KT0 and moving it is a decision, not a
   mechanical step.

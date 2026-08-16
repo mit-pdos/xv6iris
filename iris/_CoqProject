@@ -504,6 +504,7 @@ SpecFileclose.v
 ProofFilecloseParts.v
 LinkFilealloc.v
 PageFields.v
+KstackOwn.v
 PipeInvDefs.v
 PipeInv.v
 CodePipealloc.v
