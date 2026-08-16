@@ -726,7 +726,9 @@ file will take out the wrong one.
 facts the algebra could not supply, and both are closed below — one by the
 kernel fix, one by the payload passes.  The walk that SPENDS the ticket is
 still being written, so `dir_links_unlink` has no compiled consumer yet:
-that verdict is owed when `ProofSysUnlink.v` lands.  **`ProofSysUnlinkTails.v`
+that verdict is owed when `ProofSysUnlink.v` lands, and the walk is
+STOPPED before it (S7-unlink FINDING 3), so **all three verdicts are still
+owed and none of them is refuted.**  **`ProofSysUnlinkTails.v`
 does not discharge it and never could** — every branch into an exit block is
 ABOVE the zeroing `writei`, so no exit arm holds an `ilink` at all.  The same
 is true of `dir_link_at_zeroed` and of the `dir_dots_ix` /
@@ -769,6 +771,23 @@ grey directly — was proposed and is **SUPERSEDED: do not pursue it.**  It
 bought only `sys_unlink`'s own zeroing and left §20.6's itrunc row open,
 whereas the strong invariant discharges both.  fs-icache.md §20.17.4
 sharpening (b)'s name-blindness therefore STANDS.
+
+### THE THIRD FACT THE ROAD TEST FOUND, AND IT IS NOT THE CAMPAIGN'S TO
+### SUPPLY: **the DELETE constructor's inverse is not the problem, the
+### RE-PARK behind it is**
+
+`dir_links_unlink` fits and `dir_links_dotdot_out` names the right ticket.
+What neither can do — and neither should — is put a ticket BACK into the
+record whose `ilink` the caller just spent.  `sys_unlink`'s T_DIR arm spends
+the `ilink dp` out of `ip`'s `".."` and must then hand `ip`'s whole payload
+back at `iunlockput(ip)`; `dir_link_at`'s only remaining route is the grey
+disjunct, whose HOME condition is `di_nlink ip = 0`, i.e. that an EMPTY
+directory's link count is 1.  The ledger states `w <= nlink` ((L1)) and
+nothing states the converse, so the fact has no carrier.  Full record:
+[`fs-sysfile.md`](fs-sysfile.md), S7-unlink FINDING 3.  It bears on the
+campaign only as a warning about what a payload conjunct can and cannot
+carry: **`dir_dots_ix` and `dir_orphan_clean` partition the directory case by
+the COUNT, so neither of them can ever say anything about the count itself.**
 
 ### AMENDMENT (2) IS CLOSED TOO — the `".."`-location fact has its SUPPLIER
 

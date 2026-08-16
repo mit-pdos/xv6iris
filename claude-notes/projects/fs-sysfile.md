@@ -8664,10 +8664,11 @@ one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
-## S7-unlink — **IN FLIGHT.  Both blockers are CLOSED; the budget audit,
-## the REAL contract, the pure+frame layer and EVERY EXIT BLOCK are landed
-## and gated.  What is left is the WALK ITSELF.**  sysfile.c stays 15/16
-## until `LinkSysUnlink.v` flips
+## S7-unlink — **IN FLIGHT, AND STOPPED ON THE T_DIR ARM.**  The budget
+## audit, the REAL contract, the pure+frame+register layer and EVERY EXIT
+## BLOCK are landed and gated.  The WALK is not written, and it cannot be
+## finished as designed: **FINDING 3 below is a missing MODEL fact, not a
+## proof obligation.**  sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
 
 Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
 every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
@@ -8800,10 +8801,23 @@ guard is a `blez`, i.e. a `bge` with **x0 in rs1**, so the leaf is
 `WpSconfBtype.wp_bge_x0_*` and not `wp_bge_*`; and `uint off` at `s0-212`
 is the UPPER word of slot 27, the function's one non-slot-aligned address.
 
+### THE REGISTER BUNDLE IS LANDED — `ProofSysUnlinkParts.v`
+
+`su_regs m sp0 dpv ipv s3v Mx` is `ProofSysLink.sl_regs`' shape at FIVE
+pinned registers (sp, s0 = the entry sp, s1 = dp, s2 = ip, s3 the dual-use
+counter/address) with `su_thr` as the fifth conjunct, plus six projections
+and three movers — `su_regs_caller` (a caller-saved write), `su_regs_cs` (a
+callee's `callee_saved` report) and `su_regs_wr_s1` / `_s2` / `_s3`.
+Beside it, `su_dir_links_orphan`, the T_DIR arm's re-park constructor (see
+FINDING 3).  `Print Assumptions` on all six headline lemmas: **closed under
+the global context.**
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
-`ProofSysUnlink.v` — the WALK and the seal, and nothing else is owed before
-it.  The walk's own decomposition, with every exit already in hand:
+`ProofSysUnlink.v` — the WALK and the seal.  **W1–W4 and the FILE half of
+W5 are unobstructed; the T_DIR half of W5 is not** (FINDING 3), so the walk
+as decomposed below cannot reach the seal until that ruling lands.  The
+decomposition, with every exit already in hand:
 
 * **W1, +0x00..+0x2e** — the prologue and the push, `su_frame_carve`,
   `li a2,128` / `addi a1,s0,-208` / `c.li a0,0` / `jal argstr`, the `bltz`
@@ -8887,6 +8901,22 @@ this walk's, and it should be made BEFORE the first deep arm is written
 rather than discovered inside one.
 
 ### Gate
+
+**The register-bundle increment's gate.**  The GCP build VM is not reachable
+from every container (`gcp-rocq/run-on-gcp` needs `gcloud`, which is not
+always installed — it exits 127), so the lane was rebuilt LOCALLY: a `cp -a`
+of `/shared/xv6iris` at `46d6e875` into `/shared/xv6iris-u7`, base verified
+by `git merge-base --is-ancestor` against `ec4c7ffb` / `9c549a5f` /
+`46d6e875`, then `make -f CoqMakefile -j3 ProofSysUnlinkTails.vo` from a tree
+whose `.v` were almost all newer than their `.vo` — 137 compiles, `MAKEEXIT=0`,
+zero `Error`, and `make -n` on the target emits 0 compile lines afterwards.
+**Build the CHAIN, not the tree, when the box is small**: the reverse-closure
+of `ProofSysUnlinkTails.vo` is 201 files against the tree's 1154, because
+`Spec*` files depend on no `Proof*` file — the whole-function proofs, which
+are the slow ones, are not in a syscall walk's chain at all.  Then
+`ProofSysUnlinkParts.v` and its ONE consumer `ProofSysUnlinkTails.v` each
+`EXIT=0` with zero `Error`.  `-j3` is the RAM bound on a 15 GB box, not the
+core count.  Coverage **186/190, sysfile.c 15/16 — unmoved**.
 
 Lane `/shared/xv6iris-u7` on the mirror — a `cp -a` of the PASS-2-gated
 `/shared/xv6iris-p2` at `09281a86`, verified at staleness 0 (`make -n`
@@ -9036,6 +9066,66 @@ Note that isdirempty NARROWS the search and does not close it: after the
 loop, `ip`'s live records are among indices 0 and 1, index 0's ticket is
 `emp` if it is the self-record — but the inum at index 1 is unconstrained
 by any landed statement, so the `ilink` it holds is for an unknown target.
+
+### FINDING 3 — **THE T_DIR ARM CANNOT RE-PARK `ip`.  The grey ticket's
+### HOME condition needs `di_nlink ip = 1` BEFORE the decrement, and the
+### model bounds the ledger only from BELOW.  STOP-AND-REPORT**
+
+FINDING 2 closed the EXTRACTION — which `ilink dp` the `dp->nlink--` spends.
+It did not close the RETURN, and nothing else did either.
+
+The arm's order is fixed by the binary: `dp->nlink--` at +0x146 spends the
+`ilink dp` that lives in **`ip`**'s `dir_links`, at `ip`'s `".."` (record 1);
+`iunlockput(dp)` at +0xb8; `ip->nlink--` at +0xbe; `iupdate(ip)`;
+`iunlockput(ip)` at +0xd0.  That last call takes `ic_loaded … ki inumi dn' bm`
+whose `dir_links (bv_unsigned inumi) dn' data` conjunct still demands a
+ticket at record 1 — the record is not zeroed (`namecmp` refuses `".."`), so
+`DirLinks.dir_link_at` offers exactly two live routes and both are shut:
+
+* the LEFT disjunct is `ilink dp`, and it was **spent** four instruction
+  groups earlier;
+* the RIGHT disjunct is `igrey dp ∗ ⌜bv_unsigned (di_nlink dn') = 0⌝`.  The
+  grey half is FREE (`InodeRegion.ireg_link_grey` mints it from `ireg_inv`
+  with no fragment in, no premise but the inum range).  **The home half is
+  the blocker**: it says `ip`'s count reached zero at the decrement, i.e.
+  that it was ONE going in.
+
+`di_nlink ip = 1` is TRUE of xv6 — a directory's count is `1 + its
+subdirectory count`, and the walk has just run `isdirempty(ip)` — but it is
+**stated nowhere in the model**.  `InodeRegion.ireg_link_ok` is (L1)
+`w <= nlink`, (L3) and (L4): the ledger is bounded BELOW the count and
+nothing bounds it above, so the walk's `blez` fall-through and the `ilink ip`
+it holds each give `1 <= nlink` and neither gives `nlink <= 1`.
+`design/fs-icache.md` §20.17.4 sharpening (a) states the fact outright — *"the
+home still has `nlink = 1`"* — as part of an argument about WHERE the clause
+belongs, and no carrier was ever chartered for it.  Grep confirms it is the
+only occurrence in the design.
+
+**WHAT IS LANDED AGAINST IT.**  `ProofSysUnlinkParts.su_dir_links_orphan`
+takes that one fact as a PREMISE and discharges everything else the re-park
+needs: `igrey (dir_inum data 1)` in, `dir_links self dn' data` out, with
+record 0 closed as the SELF record (`dir_dots_ix`) and records 2.. closed as
+dead (the isdirempty loop's own conclusion).  So the arm is one pure premise
+from done and the premise is named in one place.
+
+**THE FILE HALF IS UNAFFECTED.**  When `ip` is not a directory `dir_links` is
+`emp` by `dir_links_not_dir` and `dir_dots_ix` / `dir_orphan_clean` are
+discharged by their `_not_dir` lemmas, so the success arm's non-T_DIR route,
+every `bad:` route and W1–W4 are all clear.  **What is blocked is exactly the
+`beq a4,1` at +0xb4 taken.**
+
+**THE SHAPE OF A REPAIR, and why it is not a walk's to make.**  The honest
+carrier is a strengthening of (L1) at directories — the ledger count and the
+link count are EQUAL for a `T_DIR` record (`w = nlink`), because a
+directory's records-that-name-it are exactly its parent's entry plus one
+`".."` per subdirectory, which is what `nlink` counts; the ROOT's `w < nlink`
+is already `ireg_root_ok` and is the same statement one off.  That is a
+region-invariant change with six movers to re-prove, it interacts with
+`ireg_link_grey` (which moves `g`, not `w`, so it is free) and with create's
+mkdir arm (which moves both together), and it still leaves the walk needing
+`w_ip = 1` locally — which the equality does NOT give.  **So the ruling
+needed is a DESIGN ruling on how an empty directory's count becomes
+readable, not a proof.**  Do not start the walk's T_DIR arm before it lands.
 
 ### THE TWO CLAUSES THE WALK SPENDS, and what each hands back
 
