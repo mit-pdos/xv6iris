@@ -33,6 +33,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartSpan
         HartRegNode RegFile WpGpr.
+Require Import ColdBoot.
 Local Open Scope Z_scope.
 
 (* collapse the closed [Z.eqb] tests of the model's rX/wX cascades *)
@@ -132,6 +133,94 @@ Lemma mm_in_htif : (htif_tohost_base : register) ∈ mm_Drw ∪ mm_Dro.
 Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
 Lemma mm_in_elp : (elp : register) ∈ mm_Drw ∪ mm_Dro.
 Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+
+(* ====================================================================== *)
+(* THE ANCHOR TOWER.  A register file is a total function, so a rule that   *)
+(* wants to name one has to build it; every cell outside [mm_Drw ∪ mm_Dro]  *)
+(* is irrelevant (no frame mentions it), so the base is the cold file and   *)
+(* only the footprint's nineteen cells are set.  Three of them are PINNED   *)
+(* rather than parameters: this is the M-mode wrapper, so cur_privilege is  *)
+(* Machine, hart_state is ACTIVE, and htif_tohost_base is None.            *)
+(* ====================================================================== *)
+
+Section tower.
+  Context (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool)
+          (cy ti ip : SailStdpp.Values.mword 64)
+          (mst0 : SailStdpp.Values.mword 64)
+          (pcfg : type_of_register pmpcfg_n)
+          (mc : SailStdpp.Values.mword 32)
+          (micfg misa0 mseccfg0 : SailStdpp.Values.mword 64)
+          (pmar0 : list PMA_Region) (elp0 : type_of_register elp)
+          (senv0 : SailStdpp.Values.mword 64).
+
+  Definition mm_rs : regstate :=
+    register_set (R_bitvector_64 PC) pc
+    (    register_set (R_bitvector_64 nextPC) npc
+    (    register_set (R_bitvector_64 minstret) ms
+    (    register_set (R_bool minstret_increment) bmi
+    (    register_set (R_bitvector_64 mcycle) cy
+    (    register_set (R_bitvector_64 mtime) ti
+    (    register_set (R_bitvector_64 mip) ip
+    (    register_set cur_privilege Machine
+    (    register_set mstatus mst0
+    (    register_set hart_state (HART_ACTIVE tt)
+    (    register_set pmpcfg_n pcfg
+    (    register_set (R_bitvector_32 mcountinhibit) mc
+    (    register_set (R_bitvector_64 minstretcfg) micfg
+    (    register_set misa misa0
+    (    register_set mseccfg mseccfg0
+    (    register_set pma_regions pmar0
+    (    register_set htif_tohost_base None
+    (    register_set elp elp0
+    (    register_set senvcfg senv0
+    (ColdBoot.cold_regs (SailStdpp.Values.mword_of_int 0)))))))))))))))))))).
+
+  Local Ltac lk :=
+    unfold mm_rs;
+    repeat first
+      [ rewrite register_lookup_set; reflexivity
+      | rewrite irrelevant_register_set; [ | reflexivity ] ].
+
+  Lemma mm_rs_PC : register_lookup (R_bitvector_64 PC) mm_rs = pc.
+  Proof. lk. Qed.
+  Lemma mm_rs_nPC : register_lookup (R_bitvector_64 nextPC) mm_rs = npc.
+  Proof. lk. Qed.
+  Lemma mm_rs_ms : register_lookup (R_bitvector_64 minstret) mm_rs = ms.
+  Proof. lk. Qed.
+  Lemma mm_rs_mi : register_lookup (R_bool minstret_increment) mm_rs = bmi.
+  Proof. lk. Qed.
+  Lemma mm_rs_cy : register_lookup (R_bitvector_64 mcycle) mm_rs = cy.
+  Proof. lk. Qed.
+  Lemma mm_rs_ti : register_lookup (R_bitvector_64 mtime) mm_rs = ti.
+  Proof. lk. Qed.
+  Lemma mm_rs_ip : register_lookup (R_bitvector_64 mip) mm_rs = ip.
+  Proof. lk. Qed.
+  Lemma mm_rs_priv : register_lookup cur_privilege mm_rs = Machine.
+  Proof. lk. Qed.
+  Lemma mm_rs_mst : register_lookup mstatus mm_rs = mst0.
+  Proof. lk. Qed.
+  Lemma mm_rs_hart : register_lookup hart_state mm_rs = (HART_ACTIVE tt).
+  Proof. lk. Qed.
+  Lemma mm_rs_pcfg : register_lookup pmpcfg_n mm_rs = pcfg.
+  Proof. lk. Qed.
+  Lemma mm_rs_mc : register_lookup (R_bitvector_32 mcountinhibit) mm_rs = mc.
+  Proof. lk. Qed.
+  Lemma mm_rs_micfg : register_lookup (R_bitvector_64 minstretcfg) mm_rs = micfg.
+  Proof. lk. Qed.
+  Lemma mm_rs_misa : register_lookup misa mm_rs = misa0.
+  Proof. lk. Qed.
+  Lemma mm_rs_sec : register_lookup mseccfg mm_rs = mseccfg0.
+  Proof. lk. Qed.
+  Lemma mm_rs_pma : register_lookup pma_regions mm_rs = pmar0.
+  Proof. lk. Qed.
+  Lemma mm_rs_htif : register_lookup htif_tohost_base mm_rs = None.
+  Proof. lk. Qed.
+  Lemma mm_rs_elp : register_lookup elp mm_rs = elp0.
+  Proof. lk. Qed.
+  Lemma mm_rs_senv : register_lookup senvcfg mm_rs = senv0.
+  Proof. lk. Qed.
+
+End tower.
 
 Section gpr.
   Context `{!riscvGS Σ}.
@@ -237,7 +326,9 @@ Section gpr.
 
   (* THE DFRAC ASSIGNMENT for the read-only frame: [hw_config]'s six cells
      are persistent, the rest fractional at the caller's [q]. *)
-  Definition mm_Df (q : Qp) : register -> dfrac := fun r =>
+  (* dfrac-generic, because [wp_instr] takes its fraction as a [dfrac]
+     (the leaves pass [DfracOwn q]) *)
+  Definition mm_Df (dq : dfrac) : register -> dfrac := fun r =>
     if decide (r = (misa : register)) then DfracDiscarded
     else if decide (r = (mseccfg : register)) then DfracDiscarded
     else if decide (r = (pma_regions : register)) then DfracDiscarded
@@ -248,7 +339,7 @@ Section gpr.
     then DfracDiscarded
     else if decide (r = (R_bitvector_64 minstretcfg : register))
     then DfracDiscarded
-    else DfracOwn q.
+    else dq.
 
   Local Ltac dfq :=
     unfold mm_Df;
@@ -256,21 +347,21 @@ Section gpr.
                  | rewrite decide_False; [|discriminate] ];
     reflexivity.
 
-  Lemma mm_Df_misa q : mm_Df q misa = DfracDiscarded.
+  Lemma mm_Df_misa dq : mm_Df dq misa = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_sec q : mm_Df q mseccfg = DfracDiscarded.
+  Lemma mm_Df_sec dq : mm_Df dq mseccfg = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_pma q : mm_Df q pma_regions = DfracDiscarded.
+  Lemma mm_Df_pma dq : mm_Df dq pma_regions = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_htif q : mm_Df q htif_tohost_base = DfracDiscarded.
+  Lemma mm_Df_htif dq : mm_Df dq htif_tohost_base = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_elp q : mm_Df q elp = DfracDiscarded.
+  Lemma mm_Df_elp dq : mm_Df dq elp = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_senv q : mm_Df q senvcfg = DfracDiscarded.
+  Lemma mm_Df_senv dq : mm_Df dq senvcfg = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_mc q : mm_Df q (R_bitvector_32 mcountinhibit) = DfracDiscarded.
+  Lemma mm_Df_mc dq : mm_Df dq (R_bitvector_32 mcountinhibit) = DfracDiscarded.
   Proof. dfq. Qed.
-  Lemma mm_Df_micfg q : mm_Df q (R_bitvector_64 minstretcfg) = DfracDiscarded.
+  Lemma mm_Df_micfg dq : mm_Df dq (R_bitvector_64 minstretcfg) = DfracDiscarded.
   Proof. dfq. Qed.
 
   (* THE FRAME <-> POINTS-TO BRIDGE, at the size it should have been all
@@ -293,13 +384,12 @@ Section gpr.
     by rewrite !bi.sep_assoc.
   Qed.
 
-  Lemma mm_ro_split (q : Qp) (rs : regstate) :
-    (hreg_frame_ro (mm_Df q) rs mm_Dro : iProp Σ) ⊣⊢
-    (reg_pointsto cur_privilege (DfracOwn q)
-       (register_lookup cur_privilege rs) ∗
-     reg_pointsto mstatus (DfracOwn q) (register_lookup mstatus rs) ∗
-     reg_pointsto hart_state (DfracOwn q) (register_lookup hart_state rs) ∗
-     reg_pointsto pmpcfg_n (DfracOwn q) (register_lookup pmpcfg_n rs) ∗
+  Lemma mm_ro_split (dq : dfrac) (rs : regstate) :
+    (hreg_frame_ro (mm_Df dq) rs mm_Dro : iProp Σ) ⊣⊢
+    (reg_pointsto cur_privilege dq (register_lookup cur_privilege rs) ∗
+     reg_pointsto mstatus dq (register_lookup mstatus rs) ∗
+     reg_pointsto hart_state dq (register_lookup hart_state rs) ∗
+     reg_pointsto pmpcfg_n dq (register_lookup pmpcfg_n rs) ∗
      reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded
        (register_lookup (R_bitvector_32 mcountinhibit) rs) ∗
      reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded
@@ -316,8 +406,8 @@ Section gpr.
     rewrite /hreg_frame_ro /mm_Dro.
     repeat (rewrite big_sepS_union; last set_solver).
     rewrite !big_sepS_singleton.
-    rewrite !(mm_Df_misa q) !(mm_Df_sec q) !(mm_Df_pma q) !(mm_Df_htif q)
-      !(mm_Df_elp q) !(mm_Df_senv q) !(mm_Df_mc q) !(mm_Df_micfg q).
+    rewrite !(mm_Df_misa dq) !(mm_Df_sec dq) !(mm_Df_pma dq) !(mm_Df_htif dq)
+      !(mm_Df_elp dq) !(mm_Df_senv dq) !(mm_Df_mc dq) !(mm_Df_micfg dq).
     unfold mm_Df.
     repeat (rewrite decide_False; [|discriminate]).
     by rewrite !bi.sep_assoc.
