@@ -95,8 +95,7 @@ Local Open Scope Z_scope.
 (* bfree's own frame is 32 bytes (4 slots) -- [c.addi16sp sp,-32] at +0x00,
    ra/s0/s1/s2 pushed.  Its deepest callee is bread (40); brelse wants 26
    and log_write 18. *)
-Definition K_bfree : nat := 44%nat.
-
+Notation K_bfree := (62%nat) (only parsing).
 Definition wp_bfree_gen_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}

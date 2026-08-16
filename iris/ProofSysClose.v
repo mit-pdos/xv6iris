@@ -141,7 +141,7 @@ Section ProofSysClose.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)
@@ -333,7 +333,7 @@ Section ProofSysClose.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hbelow.
-    unfold sys_close_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
     set (s00 := m !!! Regidx (mword_of_int 8 : mword 5)).
@@ -545,7 +545,7 @@ Section ProofSysClose.
     iApply (Argfd.wp_argfd_sconf γf M6 (av - 4)%nat n eb p 0%nat v
               pid V (word_hi w3) w4 b lks
               ltac:(unfold NARG; lia) HM6a0 Harg Hnzf Hn
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [Hs3hi] Hs4").
     { (* sys_close DOES want the descriptor index, so its [pfd] is a real
          stack address -- [ofd_out]'s non-null case *)
@@ -851,7 +851,7 @@ Section ProofSysClose.
       iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
       iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p (av - 4)%nat b lks
-                ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
+                ltac:(lia) Hn HDa0
                 Hbelow
                 with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href Hfcenv").
       all: try lkbelow.

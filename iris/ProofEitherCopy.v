@@ -414,7 +414,7 @@ Section ProofEitherCopyout.
   Proof.
     cbv beta delta [wp_either_copyout_sconf_body].
     intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl Hlkbelow.
-    unfold either_copyout_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -1130,7 +1130,7 @@ Section ProofEitherCopyin.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
     intros pcE dst src ret_tgt Hav Hflag Hlenw Hlen Hlvl Hlkbelow.
-    unfold either_copyin_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).

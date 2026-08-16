@@ -429,7 +429,7 @@ Lemma vdrwf_dbnds (i : nat) : (i < 8)%nat ->
 Proof. intro Hi. split_and!; lia. Qed.
 
 Lemma vdrwf_Kk (K : nat) : (K_virtio_disk_rw <= K)%nat -> ((K - 12) + 12)%nat = K.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 
 Lemma vdrwf_pop_z : (- (8 * Z.of_nat 12) + 96)%Z = 0%Z.
 Proof. lia. Qed.

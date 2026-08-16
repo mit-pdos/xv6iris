@@ -52,8 +52,7 @@ Import Defs.
 
 (* brelse's own frame is 32 bytes (4 slots); its deepest callee is
    releasesleep (22). *)
-Definition K_brelse : nat := 26%nat.
-
+Notation K_brelse := (26%nat) (only parsing).
 Definition wp_brelse_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}

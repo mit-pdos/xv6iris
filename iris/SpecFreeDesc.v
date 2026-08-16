@@ -38,8 +38,7 @@ Require Import ProcAvail.
 Import Defs.
 
 (* free_desc's own frame is 16 bytes (2 slots); its only callee is wakeup (18) *)
-Definition K_free_desc : nat := 20%nat.
-
+Notation K_free_desc := (20%nat) (only parsing).
 Definition wp_free_desc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)

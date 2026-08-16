@@ -86,8 +86,7 @@ Import Defs.
 
 (* 4 slots for sys_exit's own frame, and below it kexit's 74 -- argint's 18
    (4 + 18 = 22) is smaller and subsumed. *)
-Definition K_sys_exit : nat := (4 + K_kexit)%nat.
-
+Notation K_sys_exit := ((4 + K_kexit)%nat) (only parsing).
 Definition wp_sys_exit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,

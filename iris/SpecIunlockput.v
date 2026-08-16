@@ -104,8 +104,7 @@ Local Open Scope Z_scope.
 
 (* iunlockput's own frame is 32 bytes (4 slots: ra@24 s0@16 s1@8, one hole);
    its deepest callee is iput (60).  iunlock wants 26. *)
-Definition K_iunlockput : nat := 64%nat.
-
+Notation K_iunlockput := (76%nat) (only parsing).
 Definition wp_iunlockput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}

@@ -517,7 +517,7 @@ Section ProofFreeDesc.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
     intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl Hbelow.
-    unfold K_free_desc in HK.
+    
     assert (HK2 : (2 <= K)%nat) by lia.
     assert (HKw : (18 <= K - 2)%nat) by lia.
     assert (Hnk : ((K - 2) + 2)%nat = K) by lia.

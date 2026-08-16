@@ -109,8 +109,7 @@ Local Open Scope Z_scope.
    4-page consumption -- by the kalloc chain's counted-arm convention: a
    [Some 0] remainder would leave the last mappages' [avail_zero] arm
    unrefutable. *)
-Definition K_allocproc : nat := 4.
-
+Notation K_allocproc := (7%nat) (only parsing).
 (* the value [p->context.ra] is left holding *)
 Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 

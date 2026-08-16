@@ -151,6 +151,7 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import ProcInv.
 Require Import FileInvDefs.
+Require Import SpecIlock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -173,8 +174,7 @@ Local Open Scope Z_scope.
    the same accounting as [SpecKwait.K_kwait], and the opposite of
    [SpecPiperead.piperead_stack], whose copyout call DOES sit inside the
    reserve and so needed no rise. *)
-Definition filestat_stack : nat := (10 + 52)%nat.
-
+Notation filestat_stack := ((10 + K_ilock)%nat) (only parsing).
 (* WHAT FILESTAT RETURNS.  copyout answers 0 or -1 and [sraiw a0,a0,31] maps
    that pair to itself; the type-error arm answers -1 outright. *)
 Definition filestat_ret (r : mword 64) : Prop :=

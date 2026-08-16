@@ -84,7 +84,7 @@ Proof. apply nmr_frm. apply bv_eq; vm_compute; reflexivity. Qed.
 (* K_namei_root's single premise, in the three forms the call and the pop want *)
 Lemma nmr_kb (K : nat) : (K_namei_root <= K)%nat ->
   (K_namex_root <= K - 4)%nat /\ (4 <= K)%nat /\ ((K - 4) + 4 = K)%nat.
-Proof. unfold K_namei_root, K_namex_root. intro H. split_and!; lia. Qed.
+Proof. intro H. split_and!; lia. Qed.
 
 (* [c.li a1,0] really writes the zero register's value *)
 Lemma nmr_a1_zero : (mword_of_int 0 : mword 64) = (zero_reg : mword 64).

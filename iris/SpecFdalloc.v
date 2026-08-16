@@ -100,8 +100,7 @@ Local Open Scope Z_scope.
 
 (* fdalloc's own frame is 4 slots (addi sp,sp,-32) and myproc wants 10
    below it. *)
-Definition fdalloc_stack : nat := 14%nat.
-
+Notation fdalloc_stack := (14%nat) (only parsing).
 (* ===================================================================== *)
 (*  What fdalloc COMPUTES: the free descriptors, least first.             *)
 (* ===================================================================== *)

@@ -95,7 +95,7 @@ Section ProofSysFork.
   Proof.
     cbv beta delta [wp_sys_fork_sconf_body].
     intros pcE ret_tgt Hav Hlvl Hbelow.
-    unfold K_sys_fork in Hav.
+    
     set (imm_entry := (mword_of_int 48 : mword 6)).
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
     set (nzimm_s0 := (mword_of_int 4 : mword 8)).

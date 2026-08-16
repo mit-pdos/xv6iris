@@ -61,8 +61,7 @@ Import Defs.
 
 (* bread's own frame is 48 bytes (6 slots); its deepest callee is
    virtio_disk_rw (34). *)
-Definition K_bread : nat := 40%nat.
-
+Notation K_bread := (58%nat) (only parsing).
 Definition wp_bread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}

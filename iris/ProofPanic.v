@@ -44,6 +44,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs WpNext.
 Require Import WpLock CpuOwn.
 Require Import DiskPtsto WpUart.
+Require Import UartTxInv.
 Require Import PrintkArgs.
 Require Import SpecPrintk.
 Require Import SpecPanic.
@@ -58,10 +59,10 @@ Notation PA := KernelSyms.panic.
 (* 0.  The numeric side conditions, mword-free and at the top level.      *)
 (* ===================================================================== *)
 Lemma pn_K4 (K : nat) : (panic_stack <= K)%nat -> (4 <= K)%nat.
-Proof. unfold panic_stack. lia. Qed.
+Proof. lia. Qed.
 
 Lemma pn_Kpk (K : nat) : (panic_stack <= K)%nat -> (printk_stack <= K - 4)%nat.
-Proof. unfold panic_stack, printk_stack. lia. Qed.
+Proof. lia. Qed.
 
 (* ===================================================================== *)
 (* 1.  The two .rodata literals.                                          *)
@@ -191,15 +192,23 @@ Section ProofPanic.
 
   Lemma wp_panic_sconf
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
-      (m : regfile) (K : nat) (bs : list (bv 8))
+      (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string)
-    : wp_panic_sconf_body γpr γl γd γv m K bs n eb b p dm lks.
+    : wp_panic_sconf_body γpr γl γd γv m K n eb b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31 Hbelow.
-    iIntros "Hcg Hown #Htext #Hkdata Hpc #Henv #Hsub Hmsg".
+    iIntros "Hcg Hown #Htext #Hkdata Hpc #Henv Hmsg".
     iDestruct "Henv" as "(#Hlk & #Hdev & #Htx)".
+    (* THE TRACE BASELINE, MINTED HERE RATHER THAN DEMANDED.  printk wants a
+       [uart_sent_sub] to extend, but it never inspects it -- see SpecPanic.v's
+       header -- and panic has no postcondition to report the extension in, so
+       the contract does not ask the caller for one.  [◯ML []] is the unit of
+       the mono-list RA, so this costs a basic update and nothing else. *)
+    iApply fupd_wp.
+    iMod (uart_sent_sub_nil_free γd) as "#Hsub".
+    iModIntro.
     iPoseProof (pni_00 with "Htext") as "Hi00".
     iPoseProof (pni_02 with "Htext") as "Hi02".
     iPoseProof (pni_04 with "Htext") as "Hi04".
@@ -365,7 +374,7 @@ Section ProofPanic.
     iDestruct (cpu_own_transport CID CID9 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID9) (dqf := DfracDiscarded)
-              γpr γl γd γv P5 (K - 4)%nat bs n eb pn_hdr [] b p lks
+              γpr γl γd γv P5 (K - 4)%nat [] n eb pn_hdr [] b p lks
               (pn_Kpk K HK) pn_hdr_len pn_hdr_nonul
               ltac:(rewrite pn_hdr_kinds; reflexivity)
               ltac:(cbn [length]; lia) Hn31 Hbelow
@@ -454,7 +463,7 @@ Section ProofPanic.
     iDestruct (cpu_own_transport CID10 CID14 n eb p b
                  ltac:(wp_next_chain) with "Hown") as "Hown".
     iApply (Printk.wp_printk_sconf (CID := CID14) (dqf := DfracDiscarded)
-              γpr γl γd γv Q3 (K - 4)%nat (bs ++ cs)%list n eb pn_fmt [dm] b p lks
+              γpr γl γd γv Q3 (K - 4)%nat cs n eb pn_fmt [dm] b p lks
               (pn_Kpk K HK) pn_fmt_len pn_fmt_nonul
               ltac:(rewrite pn_fmt_kinds; cbn [map pk_desc_kind];
                     rewrite Hdm; reflexivity)

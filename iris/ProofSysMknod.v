@@ -236,8 +236,7 @@ Lemma mn_kb (K : nat) : (K_sys_mknod <= K)%nat ->
   (K_iunlockput <= K - 20)%nat /\ (18 <= K - 20)%nat /\
   (20 <= K)%nat /\ ((K - 20) + 20 = K)%nat.
 Proof.
-  unfold K_sys_mknod, K_create, argstr_stack, K_begin_op, K_end_op,
-         K_iunlockput.
+  
   intro H. split_and!; lia.
 Qed.
 

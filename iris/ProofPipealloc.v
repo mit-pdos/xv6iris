@@ -725,7 +725,7 @@ Section ProofPipealloc.
         iDestruct (cpu_claim_ext_transport CIDt CIDt5 eb p ltac:(ext_chain Hbf)
                      with "Hextm") as "Hextm".
         iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p (K - 6)%nat b lks
-                  ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0 Hbelow
+                  ltac:(lia) Hnoffpos HU4a0 Hbelow
                   with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href1 []").
         all: try lkbelow.
         { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
@@ -803,7 +803,7 @@ Section ProofPipealloc.
       iDestruct (cpu_claim_ext_transport CIDu CIDu1 eb p ltac:(ext_chain Hbf)
                    with "Hextm") as "Hextm".
       iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p (K - 6)%nat b lks
-                ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0 Hbelow
+                ltac:(lia) Hnoffpos HV1a0 Hbelow
                 with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href0 []").
       all: try lkbelow.
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no

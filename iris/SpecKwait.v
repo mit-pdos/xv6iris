@@ -139,8 +139,7 @@ Import Defs.
    obligation at [52 <= 50].  copyout's own budget went 50 -> 52 because
    [psz] has to outlive walkaddr / vmfault / memmove, so gcc gave it a
    callee-saved home in s11 and the frame grew to 14 slots (SpecCopyout.v). *)
-Definition K_kwait : nat := 62%nat.
-
+Notation K_kwait := (62%nat) (only parsing).
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool)

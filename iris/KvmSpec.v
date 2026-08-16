@@ -102,6 +102,8 @@ Import Defs.
 (*    [kalloc_env] (kalloc's ambient resources) and [panic_wp].            *)
 (* ===================================================================== *)
 
+Notation K_kvmmake := (166%nat) (only parsing).
+
 Section KvmSpecs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -191,6 +193,5 @@ Section KvmSpecs.
      3 L1 group tables + 98 L0 tables -- see the node accounting in
      claude-notes/completed/kvm-spec.md,
      pinned to [pt_nodes = 102] in the proof) + 64 kstack leaf pages. *)
-  Definition K_kvmmake : nat := 166.
 
 End KvmSpecs.

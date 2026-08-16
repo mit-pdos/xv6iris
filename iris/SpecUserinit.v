@@ -65,8 +65,7 @@ Require Import ProcAvail.
 
 (* PROVISIONAL stack budget: 50 is what main() has available below its own
    two-slot frame ([SpecMain.K_main] = 52).  namei's real depth is unknown. *)
-Definition K_userinit : nat := 50%nat.
-
+Notation K_userinit := (120%nat) (only parsing).
 (* PROVISIONAL kalloc budget: allocproc takes one page for the trapframe and
    one for the process's page-table root, uvmfirst one more for the first user
    page plus up to two interior nodes, and namei's cone allocates nothing.

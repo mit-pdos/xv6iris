@@ -424,21 +424,21 @@ Proof. change (2^31)%Z with 2147483648%Z. lia. Qed.
 
 (* the K budgets *)
 Lemma eo_Kbread (K : nat) : (K_end_op <= K)%nat -> (K_bread <= K - 8)%nat.
-Proof. unfold K_end_op, K_bread. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Kbwrite (K : nat) : (K_end_op <= K)%nat -> (K_bwrite <= K - 8)%nat.
-Proof. unfold K_end_op, K_bwrite. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Kbrelse (K : nat) : (K_end_op <= K)%nat -> (K_brelse <= K - 8)%nat.
-Proof. unfold K_end_op, K_brelse. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Kmm (K : nat) : (K_end_op <= K)%nat -> (2 <= K - 8)%nat.
-Proof. unfold K_end_op. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Kwh (K : nat) : (K_end_op <= K)%nat -> (K_write_head <= K - 8)%nat.
-Proof. unfold K_end_op, K_write_head. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Kit (K : nat) : (K_end_op <= K)%nat -> (K_install_trans <= K - 8)%nat.
-Proof. unfold K_end_op, K_install_trans. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Klk (K : nat) : (K_end_op <= K)%nat -> (10 <= K - 8)%nat.
-Proof. unfold K_end_op. lia. Qed.
+Proof. lia. Qed.
 Lemma eo_Kwk (K : nat) : (K_end_op <= K)%nat -> (18 <= K - 8)%nat.
-Proof. unfold K_end_op. lia. Qed.
+Proof. lia. Qed.
 
 (* the outstanding cell's small-integer traffic: out is at most 3 *)
 Lemma eo_out_sext (out : nat) : (out <= 3)%nat ->
@@ -1049,7 +1049,7 @@ Section EndOpBlocks.
     pose (P5 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))))]> P4).
-    assert (Hnk : ((K - 8) + 8)%nat = K) by (unfold K_end_op in HK; lia).
+    assert (Hnk : ((K - 8) + 8)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     clear Hnk.
     assert (Hpp9c : add_vec_int (mword_of_int (KernelSyms.end_op + 0x9a) : mword 64) 2
@@ -3750,7 +3750,7 @@ Section ProofEndOp.
     iPoseProof (eoi_00 with "Htext") as "Hi00".
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int KernelSyms.end_op : mword 64)
               (mword_of_int 60 : mword 6) m K 8 eb
-              ltac:(unfold K_end_op in HK; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hstk Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1 : mword 64)

@@ -318,8 +318,7 @@ Local Open Scope Z_scope.
    is itself dominated by printk's own real stack need, printk_stack = 48;
    see SpecReadi.v's header); either_copyin wants 56 (unaffected -- it does
    not reach printk), iupdate 44, bread 40, brelse 26, log_write 18. *)
-Definition K_writei : nat := 78%nat.
-
+Notation K_writei := (88%nat) (only parsing).
 (* [file_byte], [file_byte_block] and [blk_holes_zero] live in InodeInv.v,
    next to [inode_blocks] whose flat view they are.  They were parked here
    while editing InodeInv.v was too expensive; both are shared with readi. *)

@@ -63,7 +63,7 @@ Section ProofArgaddr.
   Proof.
     cbv beta delta [wp_argaddr_sconf_body].
     intros pcE ip ret_tgt Hi Ha0 Hargs Hn Hav Hpv.
-    unfold argaddr_stack in Hav.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Htfp Htfa Hip Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)

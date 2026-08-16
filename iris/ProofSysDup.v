@@ -153,7 +153,7 @@ Section ProofSysDup.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res bb + k)%nat with "Hstk").
-    destruct bb; unfold trap_res, kv_frame_slots; lia.
+    destruct bb; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)
@@ -342,7 +342,7 @@ Section ProofSysDup.
   Proof.
     cbv beta delta [wp_sys_dup_sconf_body].
     intros pcE ret_tgt Harg Hn Hav Hftno.
-    unfold sys_dup_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -556,7 +556,7 @@ Section ProofSysDup.
     iApply (Argfd.wp_argfd_sconf γf M6 (av - 6)%nat n eb p 0%nat v pid V
               (word_lo w5) w5 b lks
               ltac:(unfold NARG; lia) HM6a0' Harg Hs5nz Hn
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs5").
     { (* sys_dup passes [pfd = 0]: no cell, and none is written *)
       iApply (ofd_out_null _ (word_lo w5)). exact HM6a1. }
@@ -746,7 +746,7 @@ Section ProofSysDup.
       as "Hcpu".
     iApply (Fdalloc.wp_fdalloc_sconf γf k {[fd0]} B4 (av - 6)%nat n eb p pid V b lks
               ltac:(rewrite HB4a0 Hfvk; reflexivity) Hklt Hn
-              ltac:(unfold fdalloc_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hcore Hof").
     iIntros (CID17 Hk17 D0) "%HcsD0 Hcg Hcpu Hpc Hcore Hpost2".
     assert (Hpc28 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_dup + 0x28))

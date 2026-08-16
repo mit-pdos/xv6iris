@@ -100,8 +100,7 @@ Local Open Scope Z_scope.
 
 (* iunlock's own frame is 32 bytes (4 slots); its deepest callee is
    releasesleep (22), holdingsleep wanting 16. *)
-Definition K_iunlock : nat := 26%nat.
-
+Notation K_iunlock := (26%nat) (only parsing).
 Definition wp_iunlock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
       !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}

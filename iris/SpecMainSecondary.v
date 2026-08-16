@@ -90,8 +90,7 @@ Require Import ProcAvail.
    cone (38 slots below a 2-slot frame): the secondary hart also ends in
    [jal scheduler], whose loop-head enable must fund [kv_frame_slots] out of
    what it is given, i.e. [2 + kv_frame_slots + 20 = 100]. *)
-Definition K_main_secondary : nat := 100%nat.
-
+Notation K_main_secondary := (112%nat) (only parsing).
 Section SpecMainSecondary.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.

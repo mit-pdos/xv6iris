@@ -79,8 +79,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* nameiparent's own frame is 16 bytes (2 slots) over namex's 102. *)
-Definition K_nameiparent : nat := 104%nat.
-
+Notation K_nameiparent := (114%nat) (only parsing).
 Definition wp_nameiparent_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,

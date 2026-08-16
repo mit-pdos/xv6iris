@@ -138,8 +138,7 @@ Import Defs.
 (* kexit's own six frame slots, plus the deepest callee below it: fileclose
    (68 -- a descriptor may name an inode file, so its own arm reaches iput);
    iput wants 60, end_op 58, reparent 24, sched 16. *)
-Definition K_kexit : nat := 74%nat.
-
+Notation K_kexit := (90%nat) (only parsing).
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,

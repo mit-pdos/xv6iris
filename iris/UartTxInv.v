@@ -67,6 +67,14 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
+(* [◯ML []] is the UNIT of the mono-list resource algebra
+   ([mono_listUR A := authUR (max_prefix_listUR A)], and [to_max_prefix_list []]
+   is the empty map).  Stated outside the section because it is pure algebra --
+   no ghost state, no [Σ]. *)
+Lemma mono_list_lb_nil_is_unit (A : ofe) :
+  (◯ML ([] : list A)) ≡ (ε : mono_listUR A).
+Proof. done. Qed.
+
 Section UartTxInv.
   Context `{!riscvGS Σ, !lockG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
@@ -157,6 +165,25 @@ Section UartTxInv.
     uart_sent γu tr -∗ uart_sent_sub γu [].
   Proof.
     iIntros "H". iExists tr. iFrame "H". iPureIntro. apply stdpp.list_relations.sublist_nil_l.
+  Qed.
+
+  (* THE EMPTY CLAIM IS FREE, AND FROM NOTHING AT ALL -- no [dev_inv], no
+     invariant to open, no mask side condition, not even an allocated
+     authority.  [uart_sent γ l] is [own γ.(un_acc) (◯ML l)] and [◯ML []] is
+     the UNIT of [mono_listUR], so [own_unit] hands it over under a plain
+     [|==>].  ([uart_sent_sub_nil] above is the route for a holder who already
+     has a trace in hand; this is the route for one who has nothing.)
+
+     This is what lets a spec whose only use of the trace claim is to feed a
+     POSTCONDITION drop it from its precondition outright -- see SpecPanic.v,
+     which has no postcondition and therefore no use for [bs]. *)
+  Lemma uart_sent_sub_nil_free (γu : uart_names) :
+    ⊢ |==> uart_sent_sub γu [].
+  Proof.
+    iMod (own_unit (mono_listUR (leibnizO (bv 8))) γu.(un_acc)) as "H".
+    iModIntro. rewrite /uart_sent_sub. iExists []. iSplitL "H"; last first.
+    { iPureIntro. apply stdpp.list_relations.sublist_nil_l. }
+    rewrite /uart_sent -(mono_list_lb_nil_is_unit (leibnizO (bv 8))). done.
   Qed.
 
   (* the step: one more byte accepted at the END of a trace that already

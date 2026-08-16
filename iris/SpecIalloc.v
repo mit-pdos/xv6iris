@@ -151,8 +151,7 @@ Local Open Scope Z_scope.
    with ra/s0/s1/s2/s3/s4/s5/s6 pushed at 56/48/40/32/24/16/8/0.  Its
    deepest callee is now printk on the out-of-inodes path (48, printk_stack);
    bread wants 40, brelse 26, log_write 18, iget 16 and memset 2. *)
-Definition K_ialloc : nat := 56%nat.
-
+Notation K_ialloc := (66%nat) (only parsing).
 (* THE RECORD THE CLAIM WRITES.  [memset(dip, 0, 64)] at +0x90 followed by
    [sh s6,0(s3)] at +0x94 -- the type halfword and nothing else.  Stated as
    a named constructor rather than inline so that [create]'s own contract,

@@ -182,8 +182,7 @@ Local Open Scope Z_scope.
    fileread wants [fileread_stack] = 76, which dominates argfd's 24 and
    argint's / argaddr's 18.  An expression, not a literal, so a change to
    readi's budget cannot silently leave this one behind. *)
-Definition sys_read_stack : nat := (6 + fileread_stack)%nat.
-
+Notation sys_read_stack := ((6 + fileread_stack)%nat) (only parsing).
 (* THE COUNT THAT REACHES file.c, as a function of the trapframe word the
    user wrote: argint's [c.sw] narrowing followed by the [lw]'s sign
    extension.  Shared with sys_write, whose +0x30 is the same instruction. *)

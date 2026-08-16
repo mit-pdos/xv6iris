@@ -132,18 +132,19 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SleepLock.
 Require Import SpecIput.
+Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
 Local Open Scope Z_scope.
 
 
 (* fileclose's own frame is 8 slots ([addi sp,sp,-64]: ra, s0..s5 saved), and
-   its deepest callee is iput ([SpecIput.K_iput] = 60, itself sized by bread
-   under itrunc).  The others are smaller: end_op 58, begin_op 26, pipeclose
-   22, acquire/release 10.  A CONSTANT, not a per-arm bound: the stack a
+   its deepest callee is end_op ([SpecEndOp.K_end_op] = 76, sized by
+   write_head / install_trans under bread).  iput (72, itself sized by bread
+   under itrunc) is just below it; begin_op 26, pipeclose 22,
+   acquire/release 10.  end_op OVERTOOK iput when the panic budget landed.  A CONSTANT, not a per-arm bound: the stack a
    function may need is a property of the function (durable-notes.md). *)
-Definition fileclose_stack : nat := (8 + K_iput)%nat.
-
+Notation fileclose_stack := ((8 + K_end_op)%nat) (only parsing).
 (* ---------------------------------------------------------------------- *)
 (* The ghost names and geometry the last-reference arm's callees are        *)
 (* indexed by, in one bundle.                                              *)

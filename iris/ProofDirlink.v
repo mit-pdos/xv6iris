@@ -302,7 +302,7 @@ Lemma dl_kb (K : nat) : (K_dirlink <= K)%nat ->
   /\ (K_iput <= K - 10)%nat /\ (K_writei <= K - 10)%nat /\ (2 <= K - 10)%nat
   /\ ((K - 10) + 10)%nat = K.
 Proof.
-  unfold K_dirlink, K_dirlookup, K_readi, K_iput, K_writei. lia.
+  lia.
 Qed.
 
 Lemma dl_bltu (x y : Z) : (0 <= x < 2 ^ 64) -> (0 <= y < 2 ^ 64) ->

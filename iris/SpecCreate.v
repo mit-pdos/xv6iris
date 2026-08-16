@@ -374,8 +374,7 @@ Local Open Scope Z_scope.
    (104), SpecDirlink.v (100), SpecDirlookup.v (90), SpecIunlockput.v (64),
    SpecIalloc.v (56), SpecIlock.v (44), SpecIupdate.v (44).
    [ProofCreateParts.cr_K_value] carries the same number. *)
-Definition K_create : nat := 114%nat.
-
+Notation K_create := (124%nat) (only parsing).
 (* THE LEDGER UNITS create must have in hand.  nameiparent takes two and
    returns one on success; dirlookup's iget takes the second on the found
    arm; ialloc takes one on the allocate half; dirlink is NET ZERO but

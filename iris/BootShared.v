@@ -212,10 +212,10 @@ Proof. unfold sp_of. lia. Qed.
    runs (durable-notes' zify hook: this file requires [SpecFreerange]). *)
 Lemma z_stk_lo (A : Z) :
   ram_lo <= A -> ram_lo + 8 * Z.of_nat boot_stack_depth <= A + 4096.
-Proof. unfold boot_stack_depth. lia. Qed.
+Proof. lia. Qed.
 
 Lemma z_stk_base (A : Z) : A = A + 4096 - 8 * Z.of_nat boot_stack_depth.
-Proof. unfold boot_stack_depth. lia. Qed.
+Proof. lia. Qed.
 
 Lemma z_stk_top (A : Z) : A + 4096 <= ram_hi -> A + 4096 <= ram_hi.
 Proof. exact (fun H => H). Qed.
@@ -355,7 +355,7 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma kinit_budget : (K_kvmmake + 64 + 3 < kinit_pages)%nat.
 Proof.
   apply (proj1 (Nat.ltb_lt _ _)).
-  unfold K_kvmmake, kinit_pages. vm_compute. reflexivity.
+  unfold kinit_pages. vm_compute. reflexivity.
 Qed.
 
 Section BootBssChain.

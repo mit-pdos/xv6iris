@@ -232,8 +232,7 @@ Local Open Scope Z_scope.
    90, and dirlookup's dominant chain is now bmap's, not copyout's --
    SpecDirlink.v's header has the arithmetic.  Nothing else in namex's list
    moved. *)
-Definition K_namex : nat := 102%nat.
-
+Notation K_namex := (112%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE WALK'S LEDGER FIGURES (fs-log.md §G.24/§G.25)                     *)
 (*                                                                        *)
@@ -798,8 +797,7 @@ End NAMEX.
 (* ===================================================================== *)
 
 (* 12 slots for namex's own frame, over iget's 16. *)
-Definition K_namex_root : nat := 28%nat.
-
+Notation K_namex_root := (70%nat) (only parsing).
 Definition wp_namex_root_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}

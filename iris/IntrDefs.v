@@ -25,7 +25,7 @@
        live bit, menvcfg bundled),
        the kernel-code capability [sie_cap m avail b] -- the
        [trap_res b + avail] free-stack slots below sp, i.e. [avail] usable
-       plus the ARM-DEPENDENT trap reserve [trap_res b] (78 at b = true,
+       plus the ARM-DEPENDENT trap reserve [trap_res b] (90 at b = true,
        0 at b = false -- see [trap_res]; sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
        SLOT [strans_inv] (Bare-with-stvec ∨ ∃root kernel-PT, consumed
@@ -275,6 +275,8 @@ Proof.
   vm_compute. reflexivity.
 Qed.
 
+Notation kv_frame_slots := (90%nat) (only parsing).
+
 Section IntrDefsBase.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -505,7 +507,6 @@ Section IntrDefsBase.
      cannot drift silently -- growing kerneltrap's cone without growing this
      would otherwise still compile and only fail deep inside the handler
      proof. *)
-  Definition kv_frame_slots : nat := 78.
 
   (* ------------------------------------------------------------------- *)
   (* THE TRAP RESERVE IS ARM-DEPENDENT, AND THAT IS NOT AN OPTIMISATION  *)

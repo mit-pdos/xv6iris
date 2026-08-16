@@ -159,17 +159,17 @@ Proof. by destruct V. Qed.
    [bv_unsigned]s, so an inline [ltac:(lia)] answers "Cannot find witness" --
    the zify-hook rule in durable-notes, hit at every call site. *)
 Lemma kw_K10 (K : nat) : (K_kwait <= K)%nat -> (10 <= K - 10)%nat.
-Proof. unfold K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma kw_K10K (K : nat) : (K_kwait <= K)%nat -> (10 <= K)%nat.
-Proof. unfold K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma kw_K14 (K : nat) : (K_kwait <= K)%nat -> (14 <= K - 10)%nat.
-Proof. unfold K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma kw_K22 (K : nat) : (K_kwait <= K)%nat -> (22 <= K - 10)%nat.
-Proof. unfold K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma kw_K44 (K : nat) : (K_kwait <= K)%nat -> (44 <= K - 10)%nat.
-Proof. unfold K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma kw_K52 (K : nat) : (K_kwait <= K)%nat -> (52 <= K - 10)%nat.
-Proof. unfold K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma kw_ilvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
 Lemma kw_ilvl1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.

@@ -37,9 +37,21 @@
    4. [panic_env], the persistent credentials printk needs, bundled so a call
       site threads one hypothesis and not four: pr.lock's [is_lock] (whose
       resource is [emp] -- see [SpecPrintk.pr_res]), the device invariant
-      and the tx_lock credential.  A [uart_sent_sub] rides beside it, indexed
-      by the trace prefix, because printk threads that claim in as well as
-      out.
+      and the tx_lock credential.
+
+      AND NOT A [uart_sent_sub].  printk threads that claim IN as well as out
+      ([SpecPrintk.v]: [uart_sent_sub γd bs] in, [uart_sent_sub γd (bs ++ cs)]
+      out, [bs] universally quantified), but the precondition slot is an
+      ACCUMULATOR FOR THE POSTCONDITION, not a gate: [bs] is never inspected,
+      it is only re-emitted with printk's own bytes appended, so a caller who
+      does not want the ordering claim instantiates it at [[]] and pays
+      nothing.  panic has NO POSTCONDITION -- its last instruction is a
+      self-jump and the contract is a bare [WP Loop] -- so a premise whose
+      only purpose is to feed a postcondition has no purpose here at all.
+      [ProofPanic] mints its own [uart_sent_sub γd []] with
+      [UartTxInv.uart_sent_sub_nil_free], which needs nothing whatsoever
+      ([◯ML []] is the unit of the mono-list RA), and the [bs] parameter is
+      gone from this file.
 
    AND THERE IS NO LONGER A PREMISE THAT IS NOT ABOUT panic.  This contract
    used to ask for [PanicStub.panic_wp_any] as well, because printk's own
@@ -50,7 +62,9 @@
    arm is refuted now (SpecAcquire.v), so the whole printk cone -- printk,
    printint, consputc, uartputc_sync -- asks for no panic credential at all,
    and panic's contract is self-contained.  What is left of the splice is the
-   18 functions that reach a [jal panic] of their own. *)
+   NINE functions that reach a [jal panic] of their own on a LIVE arm (bread,
+   ilock, iget, dirlookup, dirlink, fileread, filewriteParts, kexit (two arms),
+   kexecB2) -- kvmmap left the list when SpecKvmmap went counted-only. *)
 From Stdlib Require Import ZArith Bool Lia List String Ascii.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import dfrac.
@@ -77,8 +91,7 @@ Import Defs.
 
 (* panic's own 4-slot frame, over printk's 48 ([SpecPrintk.printk_stack]; not
    named here, because that file sits above this one). *)
-Definition panic_stack : nat := 52%nat.
-
+Notation panic_stack := (52%nat) (only parsing).
 Section PanicEnv.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
@@ -101,7 +114,7 @@ End PanicEnv.
 Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr γl : gname) (γd : uart_names) (γv : disk_names)
-    (m : regfile) (K : nat) (bs : list (bv 8))
+    (m : regfile) (K : nat)
     (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -114,14 +127,11 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   (* panic is printk + printk + self-jump; printk's bound is "pr" (14),
      and it reaches "uart" (15) under it via consputc. *)
   locks_below lks "pr" ->
-  (* NOT about panic -- printk's precondition for acquire's panic arm.  See
-     the header and PanicStub.v. *)
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗
   pc_is (mword_of_int KernelSyms.panic) -∗
   panic_env γpr γl γd γv -∗
-  uart_sent_sub γd bs -∗
   pk_desc_res msg dm -∗
   WP (Loop : expr riscv_lang).
 
@@ -130,8 +140,8 @@ Module Type PANIC.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γpr γl : gname) (γd : uart_names) (γv : disk_names)
-      (m : regfile) (K : nat) (bs : list (bv 8))
+      (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),
-      wp_panic_sconf_body γpr γl γd γv m K bs n eb b p dm lks.
+      wp_panic_sconf_body γpr γl γd γv m K n eb b p dm lks.
 End PANIC.

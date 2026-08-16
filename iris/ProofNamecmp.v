@@ -162,7 +162,7 @@ Section ProofNamecmpMain.
   Proof.
     cbv beta delta [wp_namecmp_sconf_body].
     intros pcE s1 s2 ret_tgt HK.
-    pose proof HK as HK'. unfold K_namecmp in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hcont".
     iPoseProof (nci_00 with "Htext") as "Hi00".
     iPoseProof (nci_02 with "Htext") as "Hi02".

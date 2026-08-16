@@ -82,7 +82,7 @@ Import Defs.
    callee is exactly [consputc_stack]. *)
 Lemma pi_cap_bounds (K : nat) :
   (printint_stack <= K)%nat -> (8 <= K)%nat /\ (consputc_stack <= K - 8)%nat.
-Proof. unfold printint_stack, consputc_stack. lia. Qed.
+Proof. lia. Qed.
 
 Lemma pi_nk (K : nat) : (8 <= K)%nat -> ((K - 8) + 8)%nat = K.
 Proof. lia. Qed.
@@ -678,7 +678,7 @@ Section ProofPrintint.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31.
-    assert (HK16 : (consputc_stack <= K - 8)%nat) by (unfold consputc_stack; lia).
+    assert (HK16 : (consputc_stack <= K - 8)%nat) by (lia).
     assert (Hz0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hm1 : sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)) = (mword_of_int (-1) : mword 64))
@@ -1366,7 +1366,7 @@ Section ProofPrintint.
     cbv beta delta [wp_printint_sconf_body].
     intros ra_i a1_i pcE ra0 ret_tgt HK Hbase Hn31 Hlkbelow.
     pose proof (pi_cap_bounds K HK) as (HK8 & HK16).
-    assert (HK24 : (24 <= K)%nat) by (unfold printint_stack in HK; lia).
+    assert (HK24 : (24 <= K)%nat) by (lia).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hdev #Htxl #Hsent Hcont".
     iPoseProof (digits_from_data with "Hkdata") as "#Hdig".
     iPoseProof (pii_00 with "Htext") as "Hi00".

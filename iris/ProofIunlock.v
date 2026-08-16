@@ -151,7 +151,7 @@ Section ProofIunlockMain.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
     intros pcE ip ret_tgt HK Hk Ha0 Hfresh.
-    pose proof HK as HK'. unfold K_iunlock in HK'.
+    pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).

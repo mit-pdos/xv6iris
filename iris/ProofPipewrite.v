@@ -1076,7 +1076,7 @@ Section ProofPipewrite.
        region-crossing threading), so this one lift covers all of them. *)
     assert (Hbelowproc : locks_below lks "proc")
       by lkbelow.
-    assert (Hav64 : (64 <= av)%nat) by (unfold pipewrite_stack in Hav; exact Hav).
+    assert (Hav64 : (64 <= av)%nat) by (exact Hav).
     assert (H31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
     assert (H63 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).

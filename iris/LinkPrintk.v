@@ -51,7 +51,7 @@ Module PrintkGen : PRINTK_GEN.
     iDestruct "Hpenv" as "(#Hprlk & #Hdoff & #Hdev & [%γl #Htxl] & #Hsub0)".
     iApply (Printk.wp_printk_sconf γpr γl γd γv m0 K [] 0%nat eb
               (dqf := dqf) f descs b pj lks
-              ltac:(rewrite /printk_stack; lia)
+              ltac:(lia)
               Hlen Hnonul Hkinds Hdlen ltac:(lia)
               with "Hcap Hcpu Htext Hkdata Hpc Hfmt Hdescs Hprlk Hdev Htxl Hsub0").
     all: try lkbelow.

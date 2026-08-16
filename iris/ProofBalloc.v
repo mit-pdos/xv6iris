@@ -358,7 +358,7 @@ Section BallocEpilogue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
               Harms Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
@@ -630,7 +630,7 @@ Section BallocOut.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hsp Hthr.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     pose proof ba_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpanic #Hpenv Hframe Hppid
               Hsbsz Hsbbm Hsl Hbmr Hop Hcont".
@@ -1023,7 +1023,7 @@ Section BallocExhaust.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk Hbelow.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     pose proof Hsize as Hsize'. rewrite BPB_value in Hsize'.
     iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hprocs Hframe Hppid Hsbsz Hsbbm Hsl Hbmr Hop Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
@@ -1088,7 +1088,7 @@ Section BallocExhaust.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 10)%nat) by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq E1 (K - 10)%nat eb (proc_addr j) bsX bsdX dX b lks
               HKbl Hkk HE1a0
@@ -1243,7 +1243,7 @@ Section BallocRestore.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hnz Hcv Hlg.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsbsz Hsbbm Hsl
               Hfsb Hown Hbmr Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm. cbn in Hbm.
@@ -1528,7 +1528,7 @@ Section BallocBzero.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl Hsp Hthr Hs1 Hs7 Hbelow.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     assert (HbiBPB : 0 <= bi < BPB) by lia.
     destruct (ba_range bi ltac:(lia))
       as (Hbi0 & Hbi8192 & Hbi31 & Hbi32 & Hbi64 & Hrmod & Hqrange & Hbilt).
@@ -1647,7 +1647,7 @@ Section BallocBzero.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 10)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 10)%nat) by (lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoD dq
@@ -1899,7 +1899,7 @@ Section BallocBzero.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKlw2 : (K_log_write <= K - 10)%nat) by (unfold K_log_write; lia).
+    assert (HKlw2 : (K_log_write <= K - 10)%nat) by (lia).
     (* THE FRESH BLOCK'S log_write, UNCREDITED: a freshly allocated block is
        not one the caller can claim this op already logged.  What matters is
        the OUTPUT -- [bnoD] joins the op's set, which is what lets writei
@@ -1987,7 +1987,7 @@ Section BallocBzero.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID12) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl2 : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
+    assert (HKbl2 : (K_brelse <= K - 10)%nat) by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk2
               pidv dev bnoD dq ZB (K - 10)%nat eb (proc_addr j)
               (replicate BSIZE (bv_0 8)) bsd0 true b lks
@@ -2112,7 +2112,7 @@ Section BallocAlloc.
   Proof.
     intros HK Hgeom Hsize Hbirange Hbinu Hok HbnoB Hbmcov Hbmlog Hkk Hj Hgl
            Hsp Hthr Ha5 Ha2 Ha3 Hs1 Hs2 Hs7 Hcred Hbelow.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     (* ---- all the arithmetic, over plain [Z], before a single step ---- *)
     assert (HbiBPB : 0 <= bi < BPB) by lia.
@@ -2331,7 +2331,7 @@ Section BallocAlloc.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKlw : (K_log_write <= K - 10)%nat) by (unfold K_log_write; lia).
+    assert (HKlw : (K_log_write <= K - 10)%nat) by (lia).
     iEval (rewrite -HbnoB) in "Hfsbm".
     (* THE BITMAP BLOCK'S log_write, CREDITED: there is exactly ONE bitmap
        block, so a caller that has already logged it in this batch pays
@@ -2428,7 +2428,7 @@ Section BallocAlloc.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 10)%nat) by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq A5 (K - 10)%nat eb (proc_addr j)
               (bitmap_bytes (used ∪ {[ bi ]})) bsdX true b lks
@@ -2569,7 +2569,7 @@ Section BallocScan.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hgeom Hsize HbnoB Hbmcov Hbmlog Hok Hkk Hj Hgl Hcred.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     pose proof Hsize as Hsz'. rewrite BPB_value in Hsz'.
     pose proof Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
@@ -3449,7 +3449,7 @@ Section BallocMain.
       WP (Loop : expr riscv_lang).
   Proof.
     intros pcE pj ret_tgt HK Hgeom Hpk Hsize Hbm0 Hbmcov Hbmlog Hcred Hj Hgl Ha0 Hbelow.
-    pose proof HK as HK'. unfold K_balloc in HK'.
+    pose proof HK as HK'. 
     pose proof Hsize as Hsz'. rewrite BPB_value in Hsz'.
     pose proof Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hbmcov) as [Hbmpos Hbmlt].
@@ -4142,7 +4142,7 @@ Section BallocMain.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDb28) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 10)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 10)%nat) by (lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq

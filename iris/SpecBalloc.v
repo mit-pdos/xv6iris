@@ -140,8 +140,7 @@ Local Open Scope Z_scope.
 (* balloc's own frame is 80 bytes (10 slots) -- [c.addi16sp sp,-80] at
    +0x00; its deepest callee is now printk on the out-of-blocks path (48,
    printk_stack).  bread wants 40, log_write 18 and brelse less. *)
-Definition K_balloc : nat := 58%nat.
-
+Notation K_balloc := (68%nat) (only parsing).
 Definition wp_balloc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}

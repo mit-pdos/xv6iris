@@ -61,8 +61,7 @@ From Kernel Require KernelSyms.
 
 (* uartputc_sync's own frame is 4 slots ([c.addi16sp sp,-32] at 0x8000094c),
    and its only callees are acquire and release, which want 10 below it. *)
-Definition uartputc_stack : nat := 14%nat.
-
+Notation uartputc_stack := (14%nat) (only parsing).
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=

@@ -56,8 +56,7 @@ Import Defs.
 
 (* 4 slots for argaddr's own frame, 14 for argraw's -- argint's number,
    since the two functions have identical frames. *)
-Definition argaddr_stack : nat := 18%nat.
-
+Notation argaddr_stack := (18%nat) (only parsing).
 Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)

@@ -65,8 +65,7 @@ From Kernel Require KernelSyms.
 Require Import ProcAvail.
 
 (* six frame slots of reparent's own, plus wakeup's 18. *)
-Definition K_reparent : nat := 24%nat.
-
+Notation K_reparent := (24%nat) (only parsing).
 Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
      (m : regfile) (γs : list gname) (pme ip : mword 64)
     (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (b : bool) (lks : gset string) :=

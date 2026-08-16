@@ -230,7 +230,7 @@ Definition boot_stack_slots (K : nat) : nat := (2 + (kv_frame_slots + K))%nat.
    [kv_frame_slots] did (32 -> 78, to cover the whole trap path and not just
    kernelvec's own frame), and again from 132 when [K_main] did (52 -> 100, so
    that the scheduler's loop-head enable can fund its own reserve). *)
-Lemma boot_stack_slots_main : boot_stack_slots K_main = 180%nat.
+Lemma boot_stack_slots_main : boot_stack_slots K_main = 214%nat.
 Proof. reflexivity. Qed.
 
 (* ------------------------------------------------------------------- *)
@@ -417,7 +417,7 @@ Section BootBridge.
                ltac:(unfold boot_stack_slots in Hn; lia)).
     iDestruct "Hstk" as "[Hstk _]".
     assert (Hst2 : (8 * Z.of_nat 2 <= uint sp0)%Z).
-    { unfold boot_stack_slots, kv_frame_slots, text_end in Hlo. lia. }
+    { unfold boot_stack_slots, text_end in Hlo. lia. }
     pose proof (uint_pa_stk sp0 2 Hst2) as Hu2.
     iDestruct (stack_own_phys_to_stack (pa_stk sp0 2) (kv_frame_slots + K)
                  (stack_kdata_range (pa_stk sp0 2) (kv_frame_slots + K)

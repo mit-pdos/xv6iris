@@ -122,8 +122,7 @@ Import Defs.
 
 (* prepare_return's own 16-byte frame is 2 slots; below it myproc's 10.  The
    four trapframe stores and the five CSR writes are all leaf-level. *)
-Definition K_prepare_return : nat := 12%nat.
-
+Notation K_prepare_return := (12%nat) (only parsing).
 (* THE WORD [csrw stvec] WRITES.  The C computes
    [TRAMPOLINE + (uservec - trampoline)] and uservec IS the first byte of
    trampoline.S, so the difference is 0 and the vector is TRAMPOLINE itself

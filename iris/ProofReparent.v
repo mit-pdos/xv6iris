@@ -1056,7 +1056,7 @@ Section ProofReparent.
     iDestruct (parents_own_length with "Hpar") as %Hpslen.
     iIntros "Hcont".
     (* ---- prologue ---- *)
-    iApply (rp_prologue (CID := CID0) m K b pme ltac:(unfold K_reparent in HK; lia) Hdom
+    iApply (rp_prologue (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc").
     iIntros (CIDpro Hspro M) "%Hpro Hcg Hpc Hframe".
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme b ltac:(wp_next_chain)
@@ -1073,7 +1073,7 @@ Section ProofReparent.
                   (m !!! Regidx (mword_of_int 25 : mword 5)) (m !!! Regidx (mword_of_int 26 : mword 5))
                   (m !!! Regidx (mword_of_int 27 : mword 5))
                   lvl (K - 6)%nat eb b lks
-                  Hlen Hpslen Hlvl ltac:(unfold K_reparent in HK; lia) Hno
+                  Hlen Hpslen Hlvl ltac:(lia) Hno
                   with "Hpinv Hpanic") as "Hloop".
     iSpecialize ("Hloop" with "[Hcont]").
     { (* exit continuation = the epilogue at +0x46 *)
@@ -1084,7 +1084,7 @@ Section ProofReparent.
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
                 b pme
-                ltac:(unfold K_reparent in HK; lia) Hedom
+                ltac:(lia) Hedom
                 with "Hcg Htextx Hpc [Hframe]").
       { iEval (rewrite Hecsp). iExact "Hframe". }
       iIntros (CIDend Hsend Mf) "%Hepi Hcg Hpc".

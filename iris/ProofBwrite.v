@@ -136,7 +136,7 @@ Section ProofBwrite.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Hbelow.
-    unfold K_bwrite in HK.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanicany #Hbio Hppid Hprocs
               Hdev Hgeom Hdlock Hlocked Hperm Hcont".
@@ -420,7 +420,7 @@ Section ProofBwrite.
               addr_is_kdata (pa_add (b_data (D3 !!! Regidx Ra0)) kk)).
     { intros kk Hkk. rewrite HD3a0. exact (bnode_data_kdata k kk Hk Hkk). }
     assert (HKrw : (K_virtio_disk_rw <= K - 4)%nat)
-      by (unfold K_virtio_disk_rw; lia).
+      by (lia).
     iDestruct (cpu_own_transport CID9 CID13 0 eb pj b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     (* [Hextc]/[Hextm] were never handed to holdingsleep (not in its

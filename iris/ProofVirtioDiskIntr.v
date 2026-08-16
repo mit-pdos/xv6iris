@@ -3018,7 +3018,7 @@ Section ProofVirtioDiskIntr.
   Proof.
     cbv beta delta [wp_virtio_disk_intr_sconf_body].
     intros pcE ret_tgt HK Hdom Hlen Hlvl Hfresh.
-    assert (HKav : (22 <= K)%nat) by (unfold K_virtio_disk_intr in HK; exact HK).
+    assert (HKav : (22 <= K)%nat) by (exact HK).
     pose proof (vt_lvl_weaken lvl Hlvl) as Hlvl1.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpi #Hdinv #Hgeom #Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq.

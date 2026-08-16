@@ -114,13 +114,13 @@ Notation Rs2 := (mword_of_int 18 : mword 5).
 
 (* the stack budget: the 4-slot frame, then sleep's 22 (acquire/release's 10) *)
 Lemma ss_K4  (K : nat) : (K_sys_sync <= K)%nat -> (4 <= K)%nat.
-Proof. rewrite /K_sys_sync. lia. Qed.
+Proof. lia. Qed.
 Lemma ss_K10 (K : nat) : (K_sys_sync <= K)%nat -> (10 <= K - 4)%nat.
-Proof. rewrite /K_sys_sync. lia. Qed.
+Proof. lia. Qed.
 Lemma ss_K22 (K : nat) : (K_sys_sync <= K)%nat -> (22 <= K - 4)%nat.
-Proof. rewrite /K_sys_sync. lia. Qed.
+Proof. lia. Qed.
 Lemma ss_Kback (K : nat) : (K_sys_sync <= K)%nat -> ((K - 4) + 4)%nat = K.
-Proof. rewrite /K_sys_sync. lia. Qed.
+Proof. lia. Qed.
 Lemma ss_noff1 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 Lemma ss_noff2 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.

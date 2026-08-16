@@ -90,8 +90,7 @@ Import Defs.
    callee is sleep, whose interface demands 22 available below it
    (SpecSleep.v's [22 <= av]).  acquire / release / sleep_prepare want only
    10.  Same budget as begin_op, and for the same reason. *)
-Definition K_sys_sync : nat := 26%nat.
-
+Notation K_sys_sync := (26%nat) (only parsing).
 Definition wp_sys_sync_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}

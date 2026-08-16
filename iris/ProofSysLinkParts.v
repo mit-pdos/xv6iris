@@ -173,9 +173,7 @@ Lemma sl_kb (K : nat) : (K_sys_link <= K)%nat ->
   (K_iput <= K - 38)%nat /\ (K_iunlockput <= K - 38)%nat /\
   (10 <= K - 38)%nat /\ (38 <= K)%nat /\ ((K - 38) + 38 = K)%nat.
 Proof.
-  unfold K_sys_link, K_namei, K_nameiparent, K_dirlink, argstr_stack,
-         K_begin_op, K_end_op, K_ilock, K_iunlock, K_iupdate, K_iput,
-         K_iunlockput.
+  
   intro H. split_and!; lia.
 Qed.
 

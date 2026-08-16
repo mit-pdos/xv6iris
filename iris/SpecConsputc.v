@@ -62,8 +62,7 @@ From Kernel Require KernelSyms.
 
 (* consputc's own frame is 2 slots ([c.addi16sp sp,-16] at 0x8000028a), over
    uartputc_sync's 14. *)
-Definition consputc_stack : nat := 16%nat.
-
+Notation consputc_stack := (16%nat) (only parsing).
 Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=

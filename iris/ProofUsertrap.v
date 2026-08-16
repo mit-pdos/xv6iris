@@ -212,7 +212,7 @@ Section UtEntry.
     destruct Htms as (Hsxl & Hmprv & Hmxr & Hspp & Hsie & Htvm & Htsr).
     pose proof (ut_nx_bound false av (av - 4)%nat Hav (trap_res_off (av - 4)%nat))
       as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     iIntros "#Htext Hpc #Hhw #Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
              Hmie Hmdl Hmenv Hgpr Htrap Henv Hcont".
     iDestruct (ut_trap_open (un_pj N) ksp av m ms_v mie_v mdv0 menvcfg0 ∅
@@ -742,7 +742,7 @@ Section UtDispatch.
   Proof.
     intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hraw Henv Hframe Hcont".
     iDestruct "Henv" as "[#Hcaps Hown]".
@@ -868,7 +868,7 @@ Section UtDispatch.
                 (un_pd N) (un_pav N) (un_pu N)
                 D3 nx 0 false (un_pj N) (DfracOwn 1) sc ∅
                 Hlen ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia)
-                ltac:(unfold devintr_stack; lia)
+                ltac:(lia)
                 with "Hcg Hcpu Htext Hpc Hsc Hdc [-]").
       all: try lkbelow.
       iIntros (mg) "[%Hcsg %Hga0] Hcg Hcpu Hsc Hpc".

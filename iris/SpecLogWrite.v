@@ -86,8 +86,7 @@ Local Open Scope Z_scope.
 (* log_write's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
    deepest callee is bpin, which wants 14 (its own 4 plus acquire/release's
    10).  acquire/release directly want only 10. *)
-Definition K_log_write : nat := 18%nat.
-
+Notation K_log_write := (18%nat) (only parsing).
 Definition wp_log_write_gen_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}

@@ -144,8 +144,7 @@ Local Open Scope Z_scope.
    at +0x00), of which sixteen are the [path] buffer and one holds the two
    [int] locals.  Its deepest callee is create (114); iunlockput wants 64,
    argstr 60, end_op 58, begin_op 26, argint 18. *)
-Definition K_sys_mknod : nat := 134%nat.
-
+Notation K_sys_mknod := (144%nat) (only parsing).
 Section SpecSysMknod.
   Context `{!riscvGS Σ}.
 

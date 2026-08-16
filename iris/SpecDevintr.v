@@ -165,8 +165,7 @@ End DevintrCaps.
 (* devintr's own frame is 4 slots; the deepest callee is uartintr at
    [SpecUartintr.uartintr_stack] = 36 (virtio_disk_intr wants 22, clockintr
    20, plic_complete 6, plic_claim 4). *)
-Definition devintr_stack : nat := 40%nat.
-
+Notation devintr_stack := (52%nat) (only parsing).
 Definition wp_devintr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}

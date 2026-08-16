@@ -143,13 +143,13 @@ Proof. intro H. lia. Qed.
 
 (* the stack budget: the 4-slot frame, then sleep's 22 (acquire/release's 10) *)
 Lemma bo_K4  (K : nat) : (K_begin_op <= K)%nat -> (4 <= K)%nat.
-Proof. rewrite /K_begin_op. lia. Qed.
+Proof. lia. Qed.
 Lemma bo_K10 (K : nat) : (K_begin_op <= K)%nat -> (10 <= K - 4)%nat.
-Proof. rewrite /K_begin_op. lia. Qed.
+Proof. lia. Qed.
 Lemma bo_K22 (K : nat) : (K_begin_op <= K)%nat -> (22 <= K - 4)%nat.
-Proof. rewrite /K_begin_op. lia. Qed.
+Proof. lia. Qed.
 Lemma bo_Kback (K : nat) : (K_begin_op <= K)%nat -> ((K - 4) + 4)%nat = K.
-Proof. rewrite /K_begin_op. lia. Qed.
+Proof. lia. Qed.
 Lemma bo_noff2 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
 Lemma bo_noff1 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
@@ -596,7 +596,7 @@ Section BoBodies.
     iApply (Release.wp_release_sconf (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) X3 0%nat eb pj (K - 4)%nat
               ({["log"]} ∪ lks)
-              Hrel_lka ltac:(rewrite /K_begin_op in HK; lia)
+              Hrel_lka ltac:(lia)
               with "Hcg Htext Hpc Hislock Htok Hres Hown Hpay").
     iIntros (CIDr Hsr mrel) "Hcg Hpc %Hrelcs Hown".
     (* back to the OUTER set, matching [Hcont]'s expectation unmodified. *)
@@ -684,7 +684,7 @@ Section BoBodies.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.begin_op + 0x88)) (mword_of_int 2 : mword 6) Q6a (K - 4)%nat 4 eb Hpop
               with "Hcg Hpc Hi6c Hframe4").
     iIntros (CIDe5 Hse5) "Hcg Hpc".
-    assert (Hnk : ((K - 4) + 4)%nat = K) by (rewrite /K_begin_op in HK; lia).
+    assert (Hnk : ((K - 4) + 4)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     set (Q6c := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (Q6a !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> Q6a).

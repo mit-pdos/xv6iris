@@ -76,11 +76,11 @@ Qed.
    [ltac:(lia)] answers "Cannot find witness" under the zify hook once the
    context carries [bv_unsigned]s. *)
 Lemma sex_frame (av : nat) : (K_sys_exit <= av)%nat -> (4 <= av)%nat.
-Proof. unfold K_sys_exit. lia. Qed.
+Proof. lia. Qed.
 Lemma sex_Kai (av : nat) : (K_sys_exit <= av)%nat -> (18 <= av - 4)%nat.
-Proof. unfold K_sys_exit, SpecKexit.K_kexit. lia. Qed.
+Proof. lia. Qed.
 Lemma sex_Kke (av : nat) : (K_sys_exit <= av)%nat -> (SpecKexit.K_kexit <= av - 4)%nat.
-Proof. unfold K_sys_exit. lia. Qed.
+Proof. lia. Qed.
 Lemma sex_ilvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
 Lemma sex_arg0 : (0 < NARG)%nat.

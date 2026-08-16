@@ -12,7 +12,7 @@
 
    * the [csrsi sstatus,2] at +0x9e is where [K_usertrap]'s [kv_frame_slots]
      summand is SPENT.  [WpSconfCsr.wp_csrsi_sstatus_x0_enable_s_sconf] is
-     stated at pre index [trap_res true + n] and post index [n], so the 78
+     stated at pre index [trap_res true + n] and post index [n], so the 90
      slots a NESTED kernelvec trap would need come out of usertrap's own budget
      here -- and [UsertrapRes.ut_nx_bound_off] is the bound that says they are
      there, available on THIS arm precisely because it has not spent a reserve
@@ -145,7 +145,7 @@ Section UtSysBlock.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hma0 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
     pose proof (ut_nx_bound_off av nx Hav Hnx) as Hkso.
-    unfold K_syscall, K_sys_exit, K_kexit, kv_frame_slots in Hks, Hkso.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct "Hhold" as "(Hcpu & Hcsrs & Hclm & [#Hcaps Hown])".
@@ -251,7 +251,7 @@ Section UtSysBlock.
       iApply (T.ut_kexit SY.syscall_env N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xca) : mword 64) 4)]> K1)
-                nx false lks Hwf' ltac:(unfold K_kexit; lia)
+                nx false lks Hwf' ltac:(lia)
                 with "Htext Hpc Hcg [-]").
       all: try lkbelow.
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
@@ -390,7 +390,7 @@ Section UtSysBlock.
       pose (n2 := (nx - kv_frame_slots)%nat).
       assert (Hn2 : n2 = (nx - kv_frame_slots)%nat) by reflexivity.
       assert (Hcarve : nx = (trap_res true + n2)%nat)
-        by (rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia).
+        by (rewrite Hn2; unfold trap_res in *; lia).
       iEval (rewrite Hcarve) in "Hcg".
       iApply (wp_csrsi_sstatus_x0_enable_s_sconf (mword_of_int (UT + 0x9e)) false
                 S3 n2
@@ -439,8 +439,7 @@ Section UtSysBlock.
       iApply (SY.wp_syscall_sconf (CID := CID1) (un_f N) (un_s N) (un_j N) (un_l N)
                 (un_bn N) (un_fn N) (un_us N) (un_ip N) (un_dqi N)
                 S4 n2 (un_pid N) V1 lks
-                Hj Hjl ltac:(rewrite Hn2; unfold K_syscall, K_sys_exit, K_kexit,
-                                            kv_frame_slots; lia)
+                Hj Hjl ltac:(rewrite Hn2; lia)
                 with "Hcg [] Htext Hkd Hpc Hpi Hpa Hbs Hbm Hip Hfd Hir Hsy Hpv [-]").
       (* [cpu_own_on_intro] mints the bundle at the literal [∅]; [lks = ∅]
          at depth 0 makes that the set syscall's contract names.  It now
@@ -474,7 +473,7 @@ Section UtSysBlock.
       iApply (T.ut_a6 (CID := CID2) SY.syscall_env N2 V2 pt ksp m0 mg av
                 n2 true
                 mie_v menvcfg0 lks
-                Hwf' Hav ltac:(rewrite Hn2; unfold trap_res, kv_frame_slots in *; lia)
+                Hwf' Hav ltac:(rewrite Hn2; unfold trap_res in *; lia)
                 ltac:(rewrite Htfg HV1upt; exact Htfpe) Hksp Hm0sp
                 Hmgsp Hmgs1 Hcsmg
                 Hmiev Hmenvv

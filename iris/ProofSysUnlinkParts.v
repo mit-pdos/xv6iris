@@ -386,9 +386,7 @@ Lemma su_kb (K : nat) : (K_sys_unlink <= K)%nat ->
   (2 <= K - 30)%nat /\ (10 <= K - 30)%nat /\
   (30 <= K)%nat /\ ((K - 30) + 30 = K)%nat.
 Proof.
-  unfold K_sys_unlink, K_nameiparent, K_dirlookup, K_readi, K_writei,
-         argstr_stack, K_begin_op, K_end_op, K_ilock, K_iupdate,
-         K_iunlockput, K_namecmp.
+  
   intro H. split_and!; lia.
 Qed.
 

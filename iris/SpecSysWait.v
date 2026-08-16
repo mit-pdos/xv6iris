@@ -85,8 +85,7 @@ Import Defs.
 
 (* 4 slots for sys_wait's own frame, and below it the deeper of its two
    callees: kwait's 60 (argaddr's is 18). *)
-Definition sys_wait_stack : nat := (4 + K_kwait)%nat.
-
+Notation sys_wait_stack := ((4 + K_kwait)%nat) (only parsing).
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (b : bool) (lks : gset string)

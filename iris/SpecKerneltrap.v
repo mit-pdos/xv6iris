@@ -226,8 +226,7 @@ End KERNELTRAP_RETURNS.
 
 (* kerneltrap's own frame is 6 slots; the deepest callee is devintr at
    [SpecDevintr.devintr_stack] = 40 (myproc wants 10, yield 20). *)
-Definition kerneltrap_stack : nat := 46%nat.
-
+Notation kerneltrap_stack := (58%nat) (only parsing).
 (* THE CHECK THAT KEEPS [IntrDefs.kv_frame_slots] HONEST.  That constant is
    the stack a trap may consume below the interrupted sp, and it has to cover
    kernelvec's own 32-slot frame PLUS this whole cone.  It is written as a
@@ -236,7 +235,7 @@ Definition kerneltrap_stack : nat := 46%nat.
    kerneltrap's cone still compiles and only fails deep inside the handler
    proof, at a place that looks unrelated. *)
 Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
-Proof. unfold kerneltrap_stack, kv_frame_slots. lia. Qed.
+Proof. lia. Qed.
 
 Definition wp_kerneltrap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}

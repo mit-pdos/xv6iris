@@ -146,8 +146,7 @@ Local Open Scope Z_scope.
    wants [filestat_stack] = 62, which dominates argfd's 24 and argaddr's 18.
    Written as an expression so that a change to filestat's budget cannot
    silently leave this one behind. *)
-Definition sys_fstat_stack : nat := (4 + filestat_stack)%nat.
-
+Notation sys_fstat_stack := ((4 + filestat_stack)%nat) (only parsing).
 (* WHAT SYS_FSTAT RETURNS, as a function of what the caller already knows.
    The disjunction is indexed by [arg_fd], not by [r]: filestat's own -1
    (copyout faulted) is not distinguishable from argfd's by the value. *)

@@ -396,7 +396,7 @@ Section ProofDirlookupMain.
     cbv beta delta [wp_dirlookup_sconf_body].
     intros pcE pj nb pf ret_tgt nrec s HK Htype Hlg Hbmwf Hbmcov Hszb
            Hinums Hj Hgs Ha0 Hposs Heb Hbelow.
-    pose proof HK as HK'. unfold K_dirlookup in HK'.
+    pose proof HK as HK'. 
     (* readi's contract has its OWN [let pj := proc_addr j], so everything it
        hands back is phrased at [proc_addr j] while ours is phrased at the
        [let]-bound [pj].  The two are convertible but [iSpecialize] matches
@@ -1527,7 +1527,7 @@ Section ProofDirlookupMain.
                   cov logstart dev ip bm data dn
                   false (16 * i)%nat 16%nat dol dlk_dummyV
                   pidv dq dqd L6 (K - 12)%nat eb b lks
-                  ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+                  ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                   ltac:(lia)
                   ltac:(intros _; change (Z.of_nat 16) with 16; lia)
                   Hj Hgs HL6a0
@@ -1771,7 +1771,7 @@ Section ProofDirlookupMain.
           iEval (rewrite -HN4a0) in "Hnm".
           iEval (rewrite -HN4a1) in "Hdenm".
           iApply (NC.wp_namecmp_sconf N4 fn (dir_name data i) (K - 12)%nat
-                    dqn (DfracOwn 1) b pj ltac:(unfold K_namecmp; lia)
+                    dqn (DfracOwn 1) b pj ltac:(lia)
                     with "Hcg Htext Hpc Hnm Hdenm").
           iIntros (CIDnc Hsnc mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
           iEval (rewrite HN4a0) in "Hnm".
@@ -1935,7 +1935,7 @@ Section ProofDirlookupMain.
             iApply (IG.wp_iget_sconf gtl cn gfs gi cov logstart nib dev
                       (zero_extend' 32 (dir_inum data i : mword 16) : mword 32)
                       N7 0%nat eb pj (K - 12)%nat b lks
-                      ltac:(unfold K_iget; lia)
+                      ltac:(lia)
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)

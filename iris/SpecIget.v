@@ -157,8 +157,7 @@ Local Open Scope Z_scope.
    s1 / s2 / s3 / s4 pushed at 40 / 32 / 24 / 16 / 8 / 0 and [c.addi4spn
    s0,sp,48] on top); acquire and release want 10 below that, and panic wants
    none.  [K_idup]'s budget for a frame half again as deep. *)
-Definition K_iget : nat := 16%nat.
-
+Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}

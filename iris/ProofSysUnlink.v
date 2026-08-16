@@ -1367,7 +1367,7 @@ Section ProofSysUnlinkBody.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* ================================================================== *)

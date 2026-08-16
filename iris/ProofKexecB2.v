@@ -264,7 +264,7 @@ Section KexecB2Body.
     cbv beta delta [kxc_bad324_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs Hu2
            Hsp Hra Hs0 Hs1 Hs2 HMtsp HMts0 HMts4 HMts6 Hal Hbelow Hcov.
-    pose proof HK as HK'. unfold K_kexec in HK'.
+    pose proof HK as HK'. 
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
     (* [kalloc_env γa None] is PERSISTENT (KvmSpec.v) and MUST be introduced
        with [#]: proc_freepagetable consumes it and its postcondition does not
@@ -743,7 +743,7 @@ Section KexecB2Loops.
     cbv beta delta [kxc_ls_body].
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hib Hn2 Hjp Hgs Hu2
            Hdevc Hsp Hra Hs0 Hs1 Hs2 Hal Hbelow Hcovp Hfzr Hpor.
-    pose proof HK as HK'. unfold K_kexec in HK'.
+    pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
     intro W. revert CID0.
@@ -1279,7 +1279,7 @@ Section KexecB2Loops.
       iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
                 cov logstart dev (ientry kf) bmf datl dnf false offn nn fpg V
                 pidv (DfracOwn (1/4)) (DfracOwn (1/2)) D6 (K - 68)%nat true
-                true lks ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+                true lks ltac:(lia) Hlg Hbmwf Hbmcov Hszb
                 ltac:(rewrite HoffnZ; lia)
                 ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
                       pose proof Hszb as Hs; rewrite Hmb in Hs; lia)

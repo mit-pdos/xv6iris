@@ -943,7 +943,7 @@ Section KexecDCommit.
        exit's [alen na] and the state's [alen c] are the same term.  [subst
        na], not [subst c]: the block's own text is written in [c]. *)
     subst na.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hpc Hcg Hcnt #Hka Hres Hcont".
     rewrite /kxd_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & Hpt & Hpriv &
@@ -1898,7 +1898,7 @@ Section KexecDMain.
   Proof.
     intros HK Hcstr Hnamax Hsz1ge Havf_nz Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hst Hcont".
     rewrite /kxc_at_2a6.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
@@ -2143,7 +2143,7 @@ Section KexecDMain.
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa m D3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0%nat
-                ltac:(unfold K_kexec; lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
+                ltac:(lia) Hcstr ltac:(lia) Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
@@ -2276,7 +2276,7 @@ Section KexecDMain.
                 inodestart size used2 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa m Mf K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c q'
-                ltac:(unfold K_kexec; lia) Hcstr Hq' Hnamax Hsz1ge Hceq
+                ltac:(lia) Hcstr Hq' Hnamax Hsz1ge Hceq
                 ltac:(rewrite -Hceq; exact Hstackok) HPtfp Hbelow Hcov Hal
                 Hmsp Hmra Hms0 Hms1 Hms2
                 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13

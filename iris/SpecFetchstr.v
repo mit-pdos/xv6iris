@@ -96,8 +96,7 @@ Local Open Scope Z_scope.
 
 (* fetchstr's own frame is 6 slots; below it sit myproc's 10, copyinstr's 20
    (its own 10 plus walkaddr's 10) and strlen's 2, so 20 covers every call. *)
-Definition fetchstr_stack : nat := 56%nat.
-
+Notation fetchstr_stack := (56%nat) (only parsing).
 (* fetchstr's answer, keyed by the returned a0 -- and, unlike copyinstr's,
    the success arm names the return value, because that value IS the [k] the
    buffer's shape is stated at. *)

@@ -70,13 +70,13 @@ Qed.
    [nat]/[Z] in scope: an inline [ltac:(lia)] answers "Cannot find witness"
    under the zify hook once the context carries [bv_unsigned]s. *)
 Lemma sw_frame (av : nat) : (sys_wait_stack <= av)%nat -> (4 <= av)%nat.
-Proof. unfold sys_wait_stack, K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_Kaa (av : nat) : (sys_wait_stack <= av)%nat -> (argaddr_stack <= av - 4)%nat.
-Proof. unfold sys_wait_stack, K_kwait, argaddr_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_Kkw (av : nat) : (sys_wait_stack <= av)%nat -> (K_kwait <= av - 4)%nat.
-Proof. unfold sys_wait_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_back (av : nat) : (sys_wait_stack <= av)%nat -> ((av - 4) + 4)%nat = av.
-Proof. unfold sys_wait_stack, K_kwait. lia. Qed.
+Proof. lia. Qed.
 Lemma sw_ilvl0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. vm_compute. reflexivity. Qed.
 Lemma sw_arg0 : (0 < NARG)%nat.

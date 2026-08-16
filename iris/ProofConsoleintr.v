@@ -463,7 +463,7 @@ Section CtBodies.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (CT + 0x116)) (mword_of_int 3 : mword 6)
               E3 (K - 6)%nat 6%nat b Hpop with "Hcg Hpc Hi116 Hframe").
     iIntros (CIDp Hsp') "Hcg Hpc".
-    assert (Havx : (K - 6 + 6)%nat = K) by (unfold consoleintr_stack in HK; lia).
+    assert (Havx : (K - 6 + 6)%nat = K) by (lia).
     iEval (rewrite Havx) in "Hcg".
     set (E4 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E3 !!! Regidx csp_rs1)
@@ -620,7 +620,7 @@ Section ProofConsoleintr.
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
     iApply (Release.wp_release_sconf γc a_cons "cons"%string cons_res X3
               lvl eb pme (K - 6)%nat ({["cons"]} ∪ lks) HX3lka
-              ltac:(unfold consoleintr_stack in HK; lia)
+              ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcnt". rgall.
     assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
@@ -767,7 +767,7 @@ Section ProofConsoleintr.
     iApply (Wakeup.wp_wakeup_sconf W4 γs pme (S lvl)
               (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat eb false
               ({["cons"]} ∪ lks)
-              ltac:(unfold consoleintr_stack in HK; lia)
+              ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia) Hbelow_proc
               with "Hcg Hcnt Ht Hpc Hpanic Hpinv").
     all: try lkbelow.
@@ -1109,7 +1109,7 @@ Section ProofConsoleintr.
     iApply (Consputc.wp_consputc_sconf γtx γu γv L6
               (trap_res (match lvl with O => eb | S _ => false end) + (K - 6))%nat
               [] (S lvl) eb false pme ({["cons"]} ∪ lks)
-              ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
+              ltac:(lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
@@ -1279,7 +1279,7 @@ Section ProofConsoleintr.
       by (rewrite /D2; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv D2
               (trap_res b + (K - 6))%nat [] (S lvl) eb false pme ({["cons"]} ∪ lks)
-              ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
+              ltac:(lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
@@ -1641,7 +1641,7 @@ Section ProofConsoleintr.
       by (rewrite /B8; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv B8
               (trap_res b + (K - 6))%nat [] (S lvl) eb false pme ({["cons"]} ∪ lks)
-              ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
+              ltac:(lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
@@ -1968,7 +1968,7 @@ Section ProofConsoleintr.
       by (rewrite /F2; apply upd_eq).
     iApply (Consputc.wp_consputc_sconf γtx γu γv F2
               (trap_res b + (K - 6))%nat [] (S lvl) eb false pme ({["cons"]} ∪ lks)
-              ltac:(unfold consoleintr_stack, consputc_stack in *; lia) ltac:(lia)
+              ltac:(lia) ltac:(lia)
               with "Hcg Hcnt Ht Hpc Hdev Htxl Hsub").
     all: try lkbelow.
     iApply wp_next_off_intro. iIntros (mcp cs) "Hcg Hcnt Hpc [%Hcpcs %Hcpra] _". rgall.
@@ -2593,7 +2593,7 @@ Section ProofConsoleintr.
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (cnti_000 with "Ht") as "Hi000".
     iApply (wp_caddi16sp_push_s_sconf (mword_of_int CT) (mword_of_int 61 : mword 6) m K 6%nat b
-              ltac:(unfold consoleintr_stack in HK; lia) Hpush with "Hcg Hpc Hi000").
+              ltac:(lia) Hpush with "Hcg Hpc Hi000").
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc". rgall.
     iEval (rewrite Hspm) in "Hframe".
     set (P0 := <[Regidx csp_rs1 := regval_into_reg
@@ -2756,7 +2756,7 @@ Section ProofConsoleintr.
     iDestruct (cpu_own_transport CID CIDp9 lvl eb pme b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γc "cons"%string cons_res P5 lvl eb pme
-              (K - 6)%nat b lks ltac:(lia) ltac:(unfold consoleintr_stack in HK; lia) Hbelow
+              (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
     { iEval (rewrite HP5a0). iExact "Hlk". }

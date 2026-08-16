@@ -161,8 +161,7 @@ Local Open Scope Z_scope.
    [argv[MAXARG]].  Its deepest callee is kexec by a wide margin
    ([SpecKexec.K_kexec] = 174); argstr wants 60, fetchstr 56, fetchaddr and
    memset and kalloc and kfree less. *)
-Definition K_sys_exec : nat := 234%nat.
-
+Notation K_sys_exec := (244%nat) (only parsing).
 Section SpecSysExec.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.

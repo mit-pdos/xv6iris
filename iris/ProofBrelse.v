@@ -287,7 +287,7 @@ Section ProofBrelse.
   Proof.
     intros HK HMsp HMthr Hbelow0.
     pose proof (locks_below_not_elem _ _ Hbelow0) as Hfresh0.
-    assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).
+    assert (HK26 : (26 <= K)%nat) by (exact HK).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
@@ -544,7 +544,7 @@ Section ProofBrelse.
     assert (Hbelow_sl : locks_below lks "sleep lock")
       by ltac:(lkbelow).
     pose proof (locks_below_not_elem _ _ Hbelow_sl) as Hfresh_sl.
-    assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).
+    assert (HK26 : (26 <= K)%nat) by (exact HK).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid Hprocs Hlocked Hcont".
     (* brelse enters at level 0, so the saved base enable IS the live SIE

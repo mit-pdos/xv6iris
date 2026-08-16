@@ -414,7 +414,7 @@ Section CwBodies.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (CW + 0x9e)) (mword_of_int 8 : mword 6)
               E4 (av - 16)%nat 16%nat true Hpop with "Hcg Hpc Hi9e Hframe").
     iIntros (CID5 Hs5) "Hcg Hpc".
-    assert (Havx : (av - 16 + 16)%nat = av) by (unfold consolewrite_stack in Hav; lia).
+    assert (Havx : (av - 16 + 16)%nat = av) by (lia).
     iEval (rewrite Havx) in "Hcg".
     set (E5 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E4 !!! Regidx csp_rs1)
@@ -1135,7 +1135,7 @@ Section CwBodies.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (EitherCopyin.wp_either_copyin_sconf γa γf B6 (av - 16)%nat 0%nat
                 eb pj pid V true nnN (fun _ => bv_0 8) fb true lks
-                ltac:(unfold consolewrite_stack, either_copyin_stack in *; lia)
+                ltac:(lia)
                 ltac:(rewrite HB6a1; vm_compute; reflexivity)
                 ltac:(rewrite HB6a3 HnnN; reflexivity)
                 ltac:(rewrite HnnN; lia) ltac:(lia)
@@ -1259,7 +1259,7 @@ Section CwBodies.
                   eb nnN fb' (DfracOwn 1) true pid (DfracOwn (1/2)) lks
                   Hj Hjlp ltac:(rewrite HD3a1 HnnN; reflexivity)
                   ltac:(rewrite HnnN; lia)
-                  ltac:(unfold consolewrite_stack, uartwrite_stack in *; lia) Heb
+                  ltac:(lia) Heb
                   (* Uartwrite's premise is at "proc" too -- same rank,
                      [Hbelow] passed directly. *)
                   Hbelow
@@ -1545,7 +1545,7 @@ Section CwBodies.
                     = pa_stk sp0 16%nat).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 56 : mword 6) m av 16%nat true
-              ltac:(unfold consolewrite_stack in Hav; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     set (A0 := <[Regidx csp_rs1 := regval_into_reg

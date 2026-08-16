@@ -98,7 +98,7 @@ Section ProofKerneltrap.
        trivial. *)
     iDestruct (CpuOwn.cpu_own_zero_empty with "Hcpu") as "[%Hlkempty Hcpu]".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
-    iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
+    iApply (kt_pro m av ep sc ltac:(lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause").
     iIntros (M ms0) "%HMsp %HMs2 %HMs1 %Hms0f %Hsie0 %Hspp0 %Hspie0 %Hthr
                      Hcg Hmir Hsepc Hscause Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6".
@@ -134,7 +134,7 @@ Section ProofKerneltrap.
     iApply (Devintr.wp_devintr_sconf γu γv γdk γtl γs pd pav pu
               D0 (av - 6)%nat 0 false p (DfracOwn 1) sc lks
               Hlen ltac:(change (2^31)%Z with 2147483648%Z; lia)
-              ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
+              ltac:(lia)
               Hbelow
               with "Hcg Hcpu Htext Hpc Hscause Hcaps").
     all: try lkbelow.
@@ -246,7 +246,7 @@ Section ProofKerneltrap.
         rewrite /D2 upd_ne; [| ktne_ra ]. apply HD1thr; assumption. }
       iApply (Myproc.wp_myproc_sconf D2 (av - 6)%nat 0 false p false _
                 ltac:(change (2^31)%Z with 2147483648%Z; lia)
-              ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
+              ltac:(lia)
                 with "Hcg Hcpu Htext Hpc").
       iApply wp_next_off_intro.
       iIntros (msmp mmp) "%Hmpf Hcg Hcpu Hpc [%Hcs_mp %Hmpa0]".
@@ -286,7 +286,7 @@ Section ProofKerneltrap.
                   with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
         iIntros (mf ms_f) "%Hcsf %Hsppf %Hspief %Hsief Hcgat Hmir Hcpu Hsepc Hpc".
         assert (Hav6 : ((av - 6) + 6)%nat = av)
-          by (unfold kerneltrap_stack in Hav; lia).
+          by (lia).
         iEval (rewrite Hav6) in "Hcgat".
         (* the hart cannot have moved: no yield on this path. *)
         (* NO RE-SEAL NEEDED.  [intr_res] is [Typeclasses Opaque], so a
@@ -365,7 +365,7 @@ Section ProofKerneltrap.
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].
         iEval (rewrite Hlkempty) in "Hcpu".
         iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false
-                  Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
+                  Hj Hgl ltac:(lia)
                   with "Hcg Hcpu Htext Hpc Hprocs [Hsepc Hscause Hstval Hmir Havail Hkptr] [Hclm]").
         (* THE HANDLER RESOURCE GOES INTO THE PARK, as the fifth member of
            [trap_csrs] -- and comes back out of yield's post as the RESUMING
@@ -424,7 +424,7 @@ Section ProofKerneltrap.
                   with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
         iIntros (mf ms_f) "%Hcsf %Hsppf %Hspief %Hsief Hcgat Hmir Hcpu Hsepc Hpc".
         assert (Hav6 : ((av - 6) + 6)%nat = av)
-          by (unfold kerneltrap_stack in Hav; lia).
+          by (lia).
         iEval (rewrite Hav6) in "Hcgat".
         (* THE HART MAY HAVE MOVED (yield parks).  The crossing index is the
            literal [true], so the left disjunct is absurd, and the right one
@@ -464,7 +464,7 @@ Section ProofKerneltrap.
                 with "Hcg Hmir Hcpu Htext Hpc Hsepc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6").
       iIntros (mf ms_f) "%Hcsf %Hsppf %Hspief %Hsief Hcgat Hmir Hcpu Hsepc Hpc".
         assert (Hav6 : ((av - 6) + 6)%nat = av)
-          by (unfold kerneltrap_stack in Hav; lia).
+          by (lia).
         iEval (rewrite Hav6) in "Hcgat".
       (* NO RE-SEAL NEEDED -- see the twin above. *)
       iRename "Havail" into "Havz".

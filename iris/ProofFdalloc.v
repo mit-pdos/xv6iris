@@ -429,7 +429,7 @@ Section ProofFdalloc.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].
     intros pcE ret_tgt Ha0 Hk Hn Hav.
-    unfold fdalloc_stack in Hav.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Hcore Hpv Hcont".
     iDestruct (proc_ofiles_owe_len with "Hpv") as "%Hlen".

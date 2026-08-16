@@ -981,7 +981,7 @@ Section KexitPark.
       lkbelow. }
     iApply (Reparent.wp_reparent_sconf (CID := CIDa)  P4 γs pj ip ps dqi 1%nat (trap_res b + av)%nat eb false
               ({["wait_lock"]} ∪ lks)
-              ltac:(unfold K_reparent; lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
+              ltac:(lia) ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
               Hfresh_proc
               with "Hcg Hown Htext Hpc Hpanic Hprocs Hinit Hpar").
     all: try lkbelow.
@@ -1385,7 +1385,7 @@ Section KexitRest.
     let pj := proc_addr j in
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
-    (60 <= av)%nat ->
+    (K_end_op <= av)%nat ->
     log_geom_ok cov logstart ->
     kxt_regs M pj sv ->
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
@@ -1498,7 +1498,7 @@ Section KexitRest.
                  ltac:(rewrite Hb; wp_next_chain) with "Hcce") as "Hcce".
     iApply (BeginOp.wp_begin_op_sconf (CID := CID1)  γs j γl bn γ γfs cov logstart dev
               pid (DfracOwn (1/4)) Q0 av eb b lks
-              ltac:(unfold K_begin_op; lia) Hj Hgl
+              ltac:(lia) Hj Hgl
               (* "log" (3) outranks "itable" (2), [Hfresh]'s own bound. *)
               ltac:(lkbelow)
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hlog Hpidq Hprocs").
@@ -1565,7 +1565,7 @@ Section KexitRest.
               γi cn γtl gil gisl cov logstart bmapstart inodestart nib size
               dev us kk qq inum MAXOPBLOCKS pid (DfracOwn (1/4)) dqb dqs
               Q2 av eb b lks
-              ltac:(unfold K_iput; lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              ltac:(lia) Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hiblk Hiblog Hinb Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
@@ -1616,7 +1616,7 @@ Section KexitRest.
       by lkbelow.
     iApply (EndOp.wp_end_op_sconf (CID := CID6)  γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb b lks
-              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
+              ltac:(lia) Hgeom Hj Hgl
               Hfresh_log
               with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
     all: try lkbelow.
@@ -1706,7 +1706,7 @@ Section ProofKexit.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
     intros pcE pj Hfn Hj Hgl HK Hgeom Hfresh. subst fn.
-    unfold K_kexit in HK.
+    
     iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl #Hft".
     iIntros "#Hkmem Hav0".
     iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl #Hicenv Hbm".
@@ -2007,7 +2007,7 @@ Section ProofKexit.
                        γi cn γtl bmapstart inodestart nib size dqb dqs) j pid
                     (m !!! Regidx (mword_of_int 10 : mword 5)) (pv_cwd V)
                     (av - 6)%nat eb b lks Hj eq_refl eq_refl eq_refl
-                    ltac:(unfold fileclose_stack, K_iput; lia)
+                    ltac:(lia)
                     Hfresh
                     with "Htext Hft Hpanic") as "Hloop".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hframe]").

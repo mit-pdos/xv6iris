@@ -192,8 +192,7 @@ Local Open Scope Z_scope.
    ra/s0/s1 pushed there and s2 pushed on the uncached arm only.  Its
    deepest callee is bread (40); acquiresleep wants 26, brelse 26,
    memmove 2. *)
-Definition K_ilock : nat := 44%nat.
-
+Notation K_ilock := (62%nat) (only parsing).
 Definition wp_ilock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}

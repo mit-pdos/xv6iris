@@ -80,8 +80,7 @@ Local Open Scope Z_scope.
 
 (* fetchaddr's own frame is 4 slots; copyin wants 50 below it (walkaddr 10,
    vmfault 38, memmove 2) and myproc 10, so 50 covers both calls. *)
-Definition fetchaddr_stack : nat := 54%nat.
-
+Notation fetchaddr_stack := (54%nat) (only parsing).
 (* ===================================================================== *)
 (*  What fetchaddr TESTS.                                                 *)
 (* ===================================================================== *)

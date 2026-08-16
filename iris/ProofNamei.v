@@ -117,7 +117,7 @@ Proof. apply stk_push. apply bv_eq; vm_compute; reflexivity. Qed.
    the [sie_cap_gpr] pop want *)
 Lemma nam_kb (K : nat) : (K_namei <= K)%nat ->
   (K_namex <= K - 4)%nat /\ (4 <= K)%nat /\ ((K - 4) + 4 = K)%nat.
-Proof. unfold K_namei, K_namex. intro H. split_and!; lia. Qed.
+Proof. intro H. split_and!; lia. Qed.
 
 (* [li a1,0] makes namex's ghost flag FALSE *)
 Lemma nam_a1_false :

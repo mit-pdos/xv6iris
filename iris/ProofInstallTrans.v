@@ -457,15 +457,15 @@ Proof. rewrite /log_slot_bno. lia. Qed.
 
 (* the stack budget: the ten-slot frame, then each callee's own depth *)
 Lemma it_Kbread (K : nat) : (K_install_trans <= K)%nat -> (K_bread <= K - 10)%nat.
-Proof. rewrite /K_install_trans /K_bread. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kbwrite (K : nat) : (K_install_trans <= K)%nat -> (K_bwrite <= K - 10)%nat.
-Proof. rewrite /K_install_trans /K_bwrite. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kbrelse (K : nat) : (K_install_trans <= K)%nat -> (K_brelse <= K - 10)%nat.
-Proof. rewrite /K_install_trans /K_brelse. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kbunpin (K : nat) : (K_install_trans <= K)%nat -> (14 <= K - 10)%nat.
-Proof. rewrite /K_install_trans. lia. Qed.
+Proof. lia. Qed.
 Lemma it_Kmm (K : nat) : (K_install_trans <= K)%nat -> (2 <= K - 10)%nat.
-Proof. rewrite /K_install_trans. lia. Qed.
+Proof. lia. Qed.
 
 (* the dirty authority's step *)
 Lemma it_dirty_flip_step (D : gmap Z bool) (W : list (mword 32)) (t : nat) (w : mword 32) :
@@ -1032,7 +1032,7 @@ Section InstallTransBlocks.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.install_trans + 0xc6)) (mword_of_int 5 : mword 6)
               P10 (K - 10)%nat 10 eb Hpop with "Hcg Hpc Hic6 Hstk").
     iIntros (CID11 Hs11') "Hcg Hpc".
-    assert (Hnk : ((K - 10) + 10)%nat = K) by (unfold K_install_trans in HK; lia).
+    assert (Hnk : ((K - 10) + 10)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     set (P11 := <[Regidx csp_rs1 := regval_into_reg
                    (add_vec (P10 !!! Regidx csp_rs1 : mword 64)
@@ -2334,7 +2334,7 @@ Section ProofInstallTrans.
         apply bv_eq; vm_compute; reflexivity. }
       iApply (wp_caddi16sp_push_s_sconf (mword_of_int (KernelSyms.install_trans + 0x0c))
                 (mword_of_int 59 : mword 6) R2 K 10 eb
-                ltac:(unfold K_install_trans in HK; lia) Hpush
+                ltac:(lia) Hpush
                 with "Hcg Hpc Hi0c").
       iIntros (CID4 Hs4) "Hcg Hframe Hpc".
       set (Q1 := <[Regidx csp_rs1 := regval_into_reg

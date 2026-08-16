@@ -291,8 +291,7 @@ Lemma sx_kb (K : nat) : (K_sys_exec <= K)%nat ->
   (fetchstr_stack <= K - 60)%nat /\ (14 <= K - 60)%nat /\ (2 <= K - 60)%nat /\
   (60 <= K)%nat /\ ((K - 60) + 60 = K)%nat.
 Proof.
-  unfold K_sys_exec, K_kexec, argstr_stack, argaddr_stack, fetchaddr_stack,
-         fetchstr_stack.
+  
   intro H. split_and!; lia.
 Qed.
 

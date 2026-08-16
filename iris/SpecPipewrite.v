@@ -78,8 +78,7 @@ Local Open Scope Z_scope.
 (* pipewrite's own frame is 14 slots; the deepest callee is copyin at 50
    (walkaddr 10 / vmfault 38 / memmove 2); sleep wants 22, wakeup 18,
    killed 14, myproc/acquire/release 10. *)
-Definition pipewrite_stack : nat := 64%nat.
-
+Notation pipewrite_stack := (64%nat) (only parsing).
 Definition wp_pipewrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)

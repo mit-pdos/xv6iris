@@ -171,11 +171,11 @@ Notation KF := KernelSyms.kfork (only parsing).
    a [bv_unsigned] is merely in the ambient proof context, not just the
    goal). ---- *)
 Lemma wpk_K_ge8 (K : nat) : (K_kfork <= K)%nat -> (8 <= K)%nat.
-Proof. unfold K_kfork. lia. Qed.
+Proof. lia. Qed.
 Lemma wpk_K_ge52 (K : nat) : (K_kfork <= K)%nat -> (52 <= K)%nat.
-Proof. unfold K_kfork. lia. Qed.
+Proof. lia. Qed.
 Lemma wpk_K_ge56 (K : nat) : (K_kfork <= K)%nat -> (56 <= K)%nat.
-Proof. unfold K_kfork. lia. Qed.
+Proof. lia. Qed.
 
 (* Re-anchoring a [wp_next] FORWARD, i.e. handing the caller's exit -- which
    is anchored at the function's entry hart -- to a block that resumed

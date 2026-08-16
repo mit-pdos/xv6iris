@@ -294,7 +294,7 @@ Section ProofInitlog.
     intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1 Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
-    unfold K_initlog in HK.
+    
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio #Hseam #Hcert Hmirf
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
@@ -811,7 +811,7 @@ Section ProofInitlog.
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 6)%nat) by (lia).
     iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true b
@@ -969,7 +969,7 @@ Section ProofInitlog.
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID21) (CIDb := CID26) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 6)%nat) by (lia).
     iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
               (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj
               bs_hdr bsd0 d0 b _ HKbl HA HB2a0
@@ -1054,7 +1054,7 @@ Section ProofInitlog.
     iDestruct (wp_next_shift (b := true) (CIDa := CID26) (CIDb := CID29) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKit : (K_install_trans <= K - 6)%nat)
-      by (unfold K_install_trans; lia).
+      by (lia).
     (* the empty batch's pure shape, as NAMED facts: a tactic in an argument
        position whose expected type is still an evar diverges
        (claude-notes/durable-notes.md) *)
@@ -1189,7 +1189,7 @@ Section ProofInitlog.
                  with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID29) (CIDb := CID33) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKwh : (K_write_head <= K - 6)%nat) by (unfold K_write_head; lia).
+    assert (HKwh : (K_write_head <= K - 6)%nat) by (lia).
     iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs

@@ -126,17 +126,17 @@ Qed.
    [lia] that discharges them cannot run at the call site, where the context
    holds a register file (durable-notes, "an [mword] merely in CONTEXT"). *)
 Lemma fr_K6 (K : nat) : (6 + K_readi <= K)%nat -> (6 <= K)%nat.
-Proof. unfold K_readi. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_pipe (K : nat) : (6 + K_readi <= K)%nat -> (piperead_stack <= K - 6)%nat.
-Proof. unfold K_readi, piperead_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_cons (K : nat) : (6 + K_readi <= K)%nat -> (consoleread_stack <= K - 6)%nat.
-Proof. unfold K_readi, consoleread_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_ilock (K : nat) : (6 + K_readi <= K)%nat -> (K_ilock <= K - 6)%nat.
-Proof. unfold K_readi, K_ilock. lia. Qed.
+Proof. lia. Qed.
 Lemma fr_av_readi (K : nat) : (6 + K_readi <= K)%nat -> (K_readi <= K - 6)%nat.
 Proof. lia. Qed.
 Lemma fr_av_iunlock (K : nat) : (6 + K_readi <= K)%nat -> (K_iunlock <= K - 6)%nat.
-Proof. unfold K_readi, K_iunlock. lia. Qed.
+Proof. lia. Qed.
 
 (* a [short] field's unsigned value is below 2^16 -- the range the major's
    zero extension and the [devsw] index arithmetic both need. *)
@@ -346,7 +346,7 @@ Section ProofFileread.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb Hbelow.
-    unfold fileread_stack in HK.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.

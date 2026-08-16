@@ -79,8 +79,7 @@ Import Defs.
 (* begin_op's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
    deepest callee is sleep, whose interface demands 22 available below it
    (SpecSleep.v's [22 <= av]).  acquire/release want only 10. *)
-Definition K_begin_op : nat := 26%nat.
-
+Notation K_begin_op := (26%nat) (only parsing).
 Definition wp_begin_op_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}

@@ -86,8 +86,7 @@ Require Import ProcAvail.
 (* consoleintr's own frame (48 bytes = 6 slots) plus its deepest callee
    (wakeup, 18) is 24; this is that with slack.  consputc (16) and the two
    lock calls (10) are all shallower than wakeup. *)
-Definition consoleintr_stack : nat := 32%nat.
-
+Notation consoleintr_stack := (32%nat) (only parsing).
 Section ConsoleCaps.
   Context `{!riscvGS Σ, !lockG Σ} `{!uartGhostG Σ}.
 

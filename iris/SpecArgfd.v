@@ -92,8 +92,7 @@ Local Open Scope Z_scope.
 
 (* argfd's own frame is 6 slots (addi sp,sp,-48); argint wants 18 below it
    (4 for itself, 14 for argraw's) and myproc 10, so 24 covers both calls. *)
-Definition argfd_stack : nat := 24%nat.
-
+Notation argfd_stack := (24%nat) (only parsing).
 (* ===================================================================== *)
 (*  What argfd COMPUTES.                                                  *)
 (* ===================================================================== *)

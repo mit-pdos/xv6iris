@@ -256,7 +256,7 @@ Section ItruncTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl Hsp Hthr Hs3 Hlkbelow.
-    pose proof HK as HK'. unfold K_itrunc in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl #Hcrdu Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -344,7 +344,7 @@ Section ItruncTail.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKiu : (K_iupdate <= K - 6)%nat) by (unfold K_iupdate; lia).
+    assert (HKiu : (K_iupdate <= K - 6)%nat) by (lia).
     (* iupdate wants two; the third is parked across the call *)
     assert (Hthree : (3 = 2 + 1)%nat) by lia.
     iEval (rewrite Hthree bslots_op) in "Hsl".
@@ -763,7 +763,7 @@ Section ItruncDLoop.
       [ exfalso; unfold NDIRECT in Hk, Hfuel; lia |].
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
-    pose proof HK as HK'. unfold K_itrunc in HK'.
+    pose proof HK as HK'. 
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hzlen : length (bm_dir (bm_dir_zeroed bm k)) = NDIRECT)
       by (rewrite bm_dir_zeroed_len; [exact Hdirlen | lia]).
@@ -1059,7 +1059,7 @@ Section ItruncDLoop.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
-      assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
+      assert (HKbf : (K_bfree <= K - 6)%nat) by (lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev (used ∖ bm_dir_freed bm k)
                 (bm_dir bm !!! k : mword 32) (data k) u' cr Sq e0
@@ -1342,7 +1342,7 @@ Section ItruncELoop.
       [ exfalso; unfold NINDIRECT in Hq, Hfuel; lia |].
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
-    pose proof HK as HK'. unfold K_itrunc in HK'.
+    pose proof HK as HK'. 
     pose proof (blkmap_wf_ent_len _ _ _ Hwf) as Hentlen.
     iDestruct (it_ent_state_open with "Hst") as "(Hres & Hbmr & Hpaid)".
     iPoseProof (iti_6c with "Htext") as "Hi6c".
@@ -1620,7 +1620,7 @@ Section ItruncELoop.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDz)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
-      assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
+      assert (HKbf : (K_bfree <= K - 6)%nat) by (lia).
       iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev
                 (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q))
@@ -1878,7 +1878,7 @@ Section ItruncIArm.
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hindnz Hj Hgl
            Hsp Hthr Hs3 Ha1 Hlkbelow.
-    pose proof HK as HK'. unfold K_itrunc in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
               Hres Hbmr Hpaid Hexit".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -1995,7 +1995,7 @@ Section ItruncIArm.
     assert (HA1thr : it_thr m A1).
     { intros c Hcs2 N2 N8 N9 N18 N19.
       rewrite /A1 upd_ne; [| regne]. exact (HA0thr c Hcs2 N2 N8 N9 N18 N19). }
-    assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 6)%nat) by (lia).
     (* bread states its two block-number premises on [uint]; blkmap_wf gives
        them on [bv_unsigned].  bb_uint32 is the bridge at width 32. *)
     assert (Huc : uint (bm_ind bm : mword 32) = bv_unsigned (bm_ind bm))
@@ -2238,7 +2238,7 @@ Section ItruncIArm.
     assert (HB1thr : it_thr4 m B1).
     { intros c Hcs2 N2 N8 N9 N18 N19 N20.
       rewrite /B1 upd_ne; [| regne]. exact (HB0thr c Hcs2 N2 N8 N9 N18 N19 N20). }
-    assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 6)%nat) by (lia).
     (* Hcnt arrived with the loop's exit at CID9 *)
     iDestruct (cpu_own_transport CID9 CID11 0 eb (proc_addr jx) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
@@ -2373,7 +2373,7 @@ Section ItruncIArm.
     (* Hexit was already moved to CID3 before the bread *)
     iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID15)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
-    assert (HKbf2 : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
+    assert (HKbf2 : (K_bfree <= K - 6)%nat) by (lia).
     iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev
               (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT))
@@ -2552,7 +2552,7 @@ Section ItruncMain.
     cbv beta delta [wp_itrunc_gen_body].
     intros pcE pj ret_tgt HK Hcrb Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hdtnz Hstab Hnlk Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Hlkbelow.
-    pose proof HK as HK'. unfold K_itrunc in HK'.
+    pose proof HK as HK'. 
     (* THE PER-SLOT RANGE FACT, no longer a premise: [blkmap_wf] already
        says every block the map names is covered, and [cov_below] bounds a
        covered block by the FS size (design §6(i)).  Everything below is

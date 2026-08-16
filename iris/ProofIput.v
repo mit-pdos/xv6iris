@@ -584,7 +584,7 @@ Section IputTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj ret_tgt spd HK Hanch Hsp0 Hregs Hlo Hhi Hsub Hssub Hwm Hwc Hfresh.
-    unfold K_iput in HK.
+    
     destruct Hregs as (HDs1 & HDsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hlock Hpc Hcg Hcnt Hpay Hextc Hextm Htok HRres Hislot
              Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm Hbslots Hop Hcont".
@@ -883,7 +883,7 @@ Section IputTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj ret_tgt spd HK Hk Hanch Hsp0 Hregs Hwf Hciwf Hlo Hhi Hsub Hssub Hwm Hwc Hfresh.
-    pose proof HK as HK'. unfold K_iput in HK'.
+    pose proof HK as HK'. 
     pose proof Hregs as Hregs0.
     destruct Hregs as (HMs1 & HMsp & H18 & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iIntros "#Htext #Hlock #Hinv #Hesc Hpc Hcg Hcnt Hpay Hextc Hextm Htok
@@ -1202,7 +1202,7 @@ Section ProofIput.
        shared tail) each want the bound at "itable" (14), which [mono]
        supplies once here rather than three times below. *)
     assert (Hitbelow : locks_below lks "itable") by lkbelow.
-    pose proof HK as HK'. unfold K_iput in HK'.
+    pose proof HK as HK'. 
     unfold iput_units in Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
@@ -2219,7 +2219,7 @@ Section ProofIput.
               (ientry k) inum dn dn bm data2 uit Sb crb (cru || crz)%bool e0
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
               eb eb lks
-              ltac:(unfold K_itrunc; lia) Hcrb
+              ltac:(lia) Hcrb
               Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Htyne2
               (* §19.6 Part 1: iput hands itrunc ONE record for both slots. *)
@@ -2349,7 +2349,7 @@ Section ProofIput.
               (di_free dn) (di_trunc dn) bm_empty (u' - 1)%nat Sb1 true e1 0%nat
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqs J4 (K - 4)%nat
               eb eb lks
-              ltac:(unfold K_iupdate; lia)
+              ltac:(lia)
               Hgeom Hist Hicov Hilog Hnib
               (* §19.6 Part 1, THE LEFT DISJUNCT: this is the free path's
                  [ip->type = 0] flush, the one place in the kernel where a

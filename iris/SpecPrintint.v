@@ -69,8 +69,7 @@ From Kernel Require KernelSyms.
 
 (* printint's own frame is 8 slots ([c.addi16sp sp,-64] at 0x80000474), over
    consputc's 16. *)
-Definition printint_stack : nat := 24%nat.
-
+Notation printint_stack := (24%nat) (only parsing).
 Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (bs : list (bv 8)) (n : nat) (eb : bool) (b : bool) (p : mword 64) (lks : gset string) :=

@@ -248,7 +248,7 @@ Section Ut56.
   Proof.
     intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct (ua_hold_off Rsys N V with "Hhold") as
@@ -677,7 +677,7 @@ Section UtD0.
   Proof.
     intros Hpk Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct (ua_hold_off Rsys N V with "Hhold") as
@@ -1044,7 +1044,7 @@ Section UtE8.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound false av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iDestruct (ua_hold_off Rsys N V with "Hhold") as
@@ -1200,7 +1200,7 @@ Section UtE8.
       iApply (T.ut_kexit Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K1)
-                nx false lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
+                nx false lks Hwf' ltac:(lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg [-]").
       iApply (ua_hold_on Rsys N V with "Hcpu Hcsrs Hclm [-]").
       rewrite /ut_env. iSplitR; [iExact "Hcaps" | iExact "Hown"].

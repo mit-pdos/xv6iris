@@ -485,7 +485,7 @@ Section BreadBlocks.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.bread + 0xc4)) (mword_of_int 3 : mword 6)
               E6 (K - 6)%nat 6 eb Hpop with "Hcg Hpc Hic4 Hframe6").
     iIntros (CIDe7 Hse7) "Hcg Hpc".
-    assert (Hnk : ((K - 6) + 6)%nat = K) by (unfold K_bread in HK; lia).
+    assert (Hnk : ((K - 6) + 6)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg
       (add_vec (E6 !!! Regidx csp_rs1)
@@ -794,7 +794,7 @@ Section BreadBlocks.
                 addr_is_kdata (pa_add (b_data (T4 !!! Regidx Ra0)) kk)).
       { intros kk Hkk. rewrite HT4a0. exact (bnode_data_kdata k kk Hk Hkk). }
       assert (HKrw : (K_virtio_disk_rw <= K - 6)%nat)
-        by (unfold K_virtio_disk_rw, K_bread in *; lia).
+        by (lia).
       iDestruct (cpu_own_transport CIDt1 CIDt5 0%nat eb (proc_addr j) eb 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (trap_csrs_ext_transport CID0 CIDt5 eb (proc_addr j)
@@ -1096,7 +1096,7 @@ Section BreadBlocks.
     iApply (R.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) H5
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HH5a0; apply bv_eq; vm_compute; reflexivity)
-              ltac:(unfold K_bread in HK; lia)
+              ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
@@ -1157,7 +1157,7 @@ Section BreadBlocks.
        [arm_pay] its acquire minted) is exactly what acquiresleep asks for. *)
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H7 pidv (K - 6)%nat eb eb lks
-              Hj ltac:(unfold K_bread in HK; lia)
+              Hj ltac:(lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     all: try lkbelow.
@@ -1470,7 +1470,7 @@ Section BreadBlocks.
     iApply (R.wp_release_sconf (bn_lk bn) bcache_addr "bcache"%string (bcache_res bn V) C4
               0%nat eb (proc_addr j) (K - 6)%nat ({["bcache"]} ∪ lks)
               ltac:(rewrite HC4a0; apply bv_eq; vm_compute; reflexivity)
-              ltac:(unfold K_bread in HK; lia)
+              ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hrelpins Hcnt".
@@ -1529,7 +1529,7 @@ Section BreadBlocks.
        since entry) is exactly what acquiresleep asks for. *)
     iApply (ASL.wp_acquiresleep_sconf (dq := dq)  γs j (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) C6 pidv (K - 6)%nat eb eb lks
-              Hj ltac:(unfold K_bread in HK; lia)
+              Hj ltac:(lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Hextc Hextm Htext Hpc [] Hpanic Hppid Hprocs").
     all: try lkbelow.
@@ -2503,7 +2503,7 @@ Section ProofBread.
                     = pa_stk (m !!! Regidx csp_rs1) 6).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 61 : mword 6) m K 6 eb
-              ltac:(unfold K_bread in HK; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
@@ -2712,7 +2712,7 @@ Section ProofBread.
                  with "Hcnt") as "Hcnt".
     iApply (A.wp_acquire_sconf (bn_lk bn) "bcache"%string (bcache_res bn V) R7
               0%nat eb pj (K - 6)%nat eb lks
-              ltac:(vm_compute; reflexivity) ltac:(unfold K_bread in HK; lia)
+              ltac:(vm_compute; reflexivity) ltac:(lia)
               Hbelow
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
