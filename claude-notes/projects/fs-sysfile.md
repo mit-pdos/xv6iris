@@ -9070,12 +9070,149 @@ five in-chain V2 files re-synced, 26-file chain remake, `MAKEEXIT=0`, zero
 `Error`) — `su_w3` needed **no adaptation**: it names `dir_links` only
 opaquely.  Coverage **186/190, sysfile.c 15/16 — unmoved**.
 
+### W5'S EXECUTION BLUEPRINT — every ingredient verified against the tree
+### at `df9d501d`, so the next session starts at the Edit, not the survey
+
+W5 is TWO lemmas off the +0x8a seam's `isdir` index, composed by the seal's
+seam continuation (`destruct isdir`): **`su_w5_file`** at the payload's
+`bv_unsigned (di_type dni) <> T_DIR_z` and **`su_w5_dir`** at the `true`
+triple.  Both start with the SHARED zeroing (+0x8a..+0xb4); V2 is committed
+(`b3df99d8`), so BOTH are unblocked.  What follows is the file arm's walk,
+instruction-checked and contract-checked.
+
+**Statement.**  su_w3's parameter/premise list, plus the seam's ∀-bound
+(`gili gisli gyi si qsi dni bmi dati s3x bex`, `M3` for `M2`), plus
+`γpr : gname`, `g = icfg_log` (the top-level contract has it, W1–W3 never
+threaded it), `printk_gen_contract γpr gu gd`, and the seam's pure facts
+with the payload at `false`.  Spatial = W3's ambient set **plus
+`kernel_data` and `printk_env γpr gu gd`** (writei's two printk
+credentials, persistent, taken directly per the settled fact (iii)), then
+the +0x8a seam's linear list verbatim, then the caller's exit.
+
+**The walk, +0x8a..+0xa4.**  `addi s3,s0,-64` (`su_bufde`, `su_regs_wr_s3`
+— the `de` buffer is slot 8's `bd`, NOT the loop's slot-29 `bex`);
+`c.li a2,16; c.li a1,0; c.mv a0,s3`; `jal memset` (`suli_094`, imm
+2079922) — `Memset.wp_memset_sconf M (K-30) 16 (mword_of_int 0) bd b pj`,
+premises `K2`/`16 < 2^32`/a1/a2, post: buffer at `cbyte`; assert
+`cbyte = NUL` by `vm_compute`.  Then `c.li a4,16` / `lw a3,-212(s0)`
+(`wp_lw_s_sconf` on `H27hi` via `su_regs_s0` + `su_offcell`; the value is
+`moi32 (16*kk)` and `su_size_sext` + `RiscvExtras.moi32_small` make a3 the
+literal — the bound `16*kk < 2^31` comes from `Hkklt` + `su_nrec16` +
+`inode_ok`'s size cap 274432) / `c.mv a2,s3; c.li a1,0; c.mv a0,s1`
+(`suli_098/09a/09e/0a0/0a2`); `jal writei` (`suli_0a4`, imm 2090658).
+
+**The zeroing is `Writei.wp_writei_gen`** — the SET form; the counted form
+forgets `Sb` and loses the membership trio the whole tail is priced on.
+Instantiate: `user := false`, `off := (16*kk)%nat`, `n := 16`,
+`src_bytes := fun _ => NUL`, `dn := dn0 := dnd`, `V := su_dummyV`,
+`ncount := n1`, `Sb := Sb1`.  Premise crib: cost = `wi_cost_bmonly` at
+FOUR — restate `ProofDirlink.dl_wi_blocks` / `dl_wi_cost_bmonly` as
+`su_wi_blocks`/`su_wi_cost` (the walk-file-restates rule); stabilities are
+`di_type_stable`/`di_nlink_stable` REFLEXIVE; `bitmap_geom_ok` is
+`split_and!` of `Hsize Hbm0 Hbmcov Hbmlog`; the a1 test is
+`eq_vec (moi 0) zero = true = negb false` by `vm_compute`;
+`blkmap_wf`/`holes`/`covers`/`addrs`/type-nz/size-cap all come out of
+`inode_ok`'s seven conjuncts (`InodeLock.inode_ok`).
+
+**The `bne` at +0xaa** (`c.li a5,16` first; two-source ⇒ `rgne; rgne`):
+destruct the post's two-arm disjunct — LEFT (`a0 = -1`) is TAKEN into
+`Tails.su_panic_writei`; RIGHT destructs `decide (tot = 16)` with
+`su_tot16_ne`/`su_li16` (taken ⇒ panic) and the `tot = 16` fall-through is
+the success spine: `dist = 0` (kernel arm), `dn' = wi_dinode dnd bm'
+(16*kk) 16`, whose size is UNCHANGED (`decide_False` via `su_nrec16`:
+`16*kk + 16 <= size`), type/nlink unchanged by `wi_dinode`'s definition.
+
+**VERDICT #3 fires here** — the home-live derivation:
+`bv_unsigned (di_nlink dnd) <> 0` by contradiction from `Hdoc Htydz`
+(`dir_orphan_clean` = orphan ⇒ dots-only) against `dir_first_name Hfst` +
+`Hnotdot`/`Hnotdd` — the matched record's name is neither dot, so the home
+cannot be orphaned.  Then `kk ∉ {0,1}` falls out of `dir_dots_ix`'s two
+name clauses the same way (needed below and for `k0 <> 1`).
+
+**VERDICT #1 fires here** — `DirLinks.dir_links_unlink` at V2's shape,
+`d := DirentEnc.dirent_zero` (`dirent_bytes_zero`; a 16-way `destruct j`
+gives `dirent_bytes dirent_zero !!! j = NUL`).  The range clause is
+writei's post at `dist = 0` + `wrote i = src_bytes i = NUL`.  The
+not-self premise is **VERDICT #1's `dinode_at_excl` half**: under
+`decide (bv_unsigned (dir_inum datd kk) = bv_unsigned dinum)`, `bv_eq` +
+`su_zext32_unsigned` make the two inums EQUAL words and
+`InodeRegion.dinode_at_excl` on dp's and ip's `dinode_at` closes by
+`iExFalso`.  The payout is `∃ b, ilink_fl (dlc_fl b) …`:
+
+  * `b = true` ⇒ the ticket is `ilinkd`; `iMod` of
+    **`IregDirBit.ireg_dirbit_ty`** (a `={E}=∗`; the WP's ⊤ mask admits
+    it; `Require Import IregDirBit` is a NEW import — the .vo is outside
+    the old 209-chain, freshly synced, so remake by target, mtimes fixpoint
+    on suspicion) against ip's `dinode_at` reads
+    `di_type dni = T_DIR_z`, refuted by the arm's payload.  This is the
+    file arm's V2 adaptation, exactly as the V2 ledger predicted.
+  * `b = false` ⇒ plain `ilink`; the re-park wand's premise is
+    `nlink' + 0 <= nlink`, an equality (`wi_dinode` keeps nlink).
+
+**dp's re-pack + credited `iunlockput(dp)`.**  Rebuild `ic_loaded` at
+`(dn', bm', data')`: `inode_ok` is writei's posts + the preserved
+type/size; `dir_ok`/`dir_dots_ix` transfer through three data' facts
+proven from the range clause exactly as inside `dir_links_unlink` —
+`dir_inum data' kk = bv_0 16` (`DirView.dir_inum_of_two` + zero bytes),
+`dir_inum data' q = dir_inum datd q` and
+`bname 14 (dir_name data' q) = bname 14 (dir_name datd q)` for `q <> kk`
+(`decide_False` pointwise; `DirentEnc.bview_ext` for the names) —
+`dir_orphan_clean` is `_live` at the nonzero nlink.  Then
+`Iunlockput.wp_iunlockput_gen` (ProofCreate:2925's exact pattern:
+`log_opS_named` first, `crz`-slot closed by
+`iEval (cbn beta iota); iEmpIntro`, `all: try lkbelow`) at `crb := false`,
+**`cru := true` from `wi16_post`'s membership trio** (`0 < 16` and
+`su_wi_blocks`), `iput_units <= n'` by `lia` from the spend clause +
+`su_wi_cost` (n' ≥ n1 − 4 ≥ 5).
+
+**ip's decrement.**  `lhu a5,74(s2)` (`wp_lhu_s_sconf` on ip's `i_nlink`,
+the one-field `inode_meta` open/rebuild); `c.addiw a5,a5,-1`
+(`wp_caddiw_s_sconf` — its `wval` is LITERALLY `su_nlink_decr`'s LHS);
+`sh a5,74(s2)` (`wp_sh_s_sconf`); the new record is
+`su_setnl dni (trunc16 …)` and the whole preservation cluster
+(`su_setnl_*`) plus `su_nlink_decr` (at the `blez`'s `Hnlzi`) is
+pre-landed in the parts file.  Then `Iupdate.wp_iupdate_unlink` at
+`fl := None`, `cru := false`, `dn := su_setnl …`, `dn0 := dni`, spending
+the released `ilink` (rewrite its index by `su_zext32_unsigned`), receipt
+= **the LEFT disjunct** (`iLeft`; `g = icfg_log` ∧ `inodestart =
+icfg_ist`) — settled fact (i): a FILE's decrement can land at zero.
+Count: `log_opS (S u)` needs `1 <=` current, `lia` (n ≥ n1 − 4 − 1).
+
+**`iunlockput(ip)`, `end_op`, the return.**  ip's `ic_loaded` re-packs at
+`(su_setnl dni …, bmi, dati)` — `dir_links` at a non-directory is minted
+outright by `dir_links_not_dir` (⊢-form), `dir_ok`/`dots_ix`/
+`orphan_clean` by their `_not_dir` discharges, `ity_shot` rides
+`su_setnl_type` — and `wp_iunlockput_gen` runs **`cru := true` off
+`iupdate`'s own `∪ {IBLOCK inumi}`** (the budget's
+`su_ok_file_closes` shape: `iput_units <=` by `lia`, n ≥ n1 − 4 − 1 − 1 −
+1 ≥ 3 at `ip_spend_w _ true false <= 1`).  Then `end_op`
+(su_tail_b:476's pattern — it consumes `fs_crash_seam`/`gen_cert`/
+`log_op`), `c.li a0,0`, the THREE `c.ldsp`s (slots 3/4/5 at
+`m !!! Rs1/Rs2/Rs3` — slot 5 is FILLED, W3's own store; su_tail_e's
+reload code is the verbatim model), `c.j +0x168` (`suli_0e0`, target
+offset 68), `su_epilogue`, and the caller's exit at
+`sys_unlink_ret` RIGHT (`a0 = 0`), `iref_slots 2 = 1 + 1` from the two
+returned `iref_slot`s (W2 ARM D's `iref_slots_op` line), `P' := P1`.
+
+**su_w5_dir differs after +0xb4 only** (the `beq` TAKEN into +0x146):
+`dp->nlink--` spends the `".."` ticket (`dir_links_dotdot_out`, ∃b out —
+**VERDICT #2's site**), `iupdate(dp)` CREDITED, `j +0xb8` joins the file
+spine below the test, and the re-park of ip is `su_dir_links_orphan`
+whose one premise is now `DirLinks.dir_links_empty_nlink` (V2) fed by the
+seam's `true`-payload dead-scan + the `blez`'s `1 <=`.  Budget:
+`su_ok_dir_closes`.
+
+**Order of goals in the file**: put `su_w5_file` (and `_dir`) after
+`su_w3`; the seal's `Module … <: SYSUNLINK` instantiation then composes
+W1∘W2∘W3∘{W5-FILE, W5-DIR} + `LinkSysUnlink`'s flip + `_CoqProject` rows
+SAME-COMMIT + coverage 187/190, sysfile 16/16.
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
-`ProofSysUnlink.v` — **W3, W4, the FILE half of W5, and the seal.**
-W3–W4 and the FILE half of W5 are unobstructed; **the T_DIR half of W5 is
-not** (FINDING 3), so the walk cannot reach the seal until that ruling
-lands.  The decomposition, with every exit already in hand:
+`ProofSysUnlink.v` — **W5 (both halves) and the seal.**  W1–W4 are landed;
+V2's commit (`b3df99d8`) lifted FINDING 3's stop, so BOTH halves of W5 are
+unobstructed — the blueprint above is the construction.  The
+decomposition, with every exit already in hand:
 
 * **W1, +0x00..+0x2e — DONE.**  The prologue and the push, `su_frame_carve`,
   `li a2,128` / `addi a1,s0,-208` / `c.li a0,0` / `jal argstr`, the `bltz`
