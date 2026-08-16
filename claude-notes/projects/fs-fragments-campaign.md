@@ -615,6 +615,14 @@ first; what actually ran was a whole-tree build: **1152 compiles, 1152
 `make -n` afterwards emits 0 compile lines.** `lemma_diff` over all
 eighteen: CLEAN. Coverage 186/190 (98%), unmoved.
 
+Upstream (GR-31/GR-32, the dispatch arms) landed while the sweep was in
+flight, so the same lane was re-pointed at the merged commit and rebuilt:
+**168 compiles** — the 165-file cone plus the three files GR-31/32 moved —
+`EXIT=0`, zero `Error`, 1152/1152, staleness 0, `make -n` 0 compile lines,
+working tree clean. The two change sets are disjoint by inspection:
+`ProofSyscall.v` / `SpecSysUptime.v` / `ProofSysUptime.v` mention
+`ic_loaded` / `ipool_alloc` / `ic_payload` **zero** times.
+
 ## `iunlock` STOPS ERASING THE GENERATION — the carrier PASS 2 needed
 
 `SpecIunlock`'s post returns `inode_shr_gen k s dev inum g` at the generation
