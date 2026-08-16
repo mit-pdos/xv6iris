@@ -79,7 +79,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   lvl = 0%nat ->
   (2 <= K)%nat ->
   sie_cap_gpr mm K false p -∗
-  strans_bit strans_bit_bare -∗
+  strans_pending -∗
   kernel_text -∗
   pc_is pcE -∗
   tlb ↦ᵣ tlbvec0 -∗
@@ -93,7 +93,7 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
     sie_cap_gpr mr K false p -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

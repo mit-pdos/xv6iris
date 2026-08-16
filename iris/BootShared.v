@@ -749,8 +749,8 @@ Section BootAlloc.
      !big_sepL_sep] would split those too, leaving [iFrame] unable to match the
      paired big-op [power_boot_res] actually hands over. *)
   Definition hart_strans (c : CPU) : iProp Σ :=
-    (ghost_var (strans_name c) (1/2)%Qp strans_bit_bare ∗
-     ghost_var (strans_name c) (1/2)%Qp strans_bit_bare)%I.
+    (strans_pending_at (strans_name c) ∗
+     strans_pending_at (strans_name c))%I.
 
   Definition hart_sie (c : CPU) : iProp Σ :=
     (ghost_var (sie_name c) (1/2)%Qp sie_bit_off ∗
@@ -887,7 +887,7 @@ Section BootAlloc.
     iModIntro. iFrame "Hseip Hmeip".
     iDestruct "Hint" as (iv) "Hint".
     iExists iv.
-    rewrite /boot_hart_res /strans_bit /sie_gname /sret_bits /spp_gname
+    rewrite /boot_hart_res /strans_pending /sie_gname /sret_bits /spp_gname
             /spie_gname /cpu_ctx_free /cid_word.
     iEval (rewrite /own_ctx) in "Hctx".
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv

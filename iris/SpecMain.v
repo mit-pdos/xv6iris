@@ -322,7 +322,7 @@ Section SpecMain.
   (* ------------------------------------------------------------------- *)
   Definition main_hart_raw
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) : iProp Σ :=
-    (strans_bit strans_bit_bare ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs_raw)%I.
+    (strans_pending ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs_raw)%I.
 
   (* ------------------------------------------------------------------- *)
   (* main(), entered on the BOOT hart.                                    *)

@@ -47,7 +47,7 @@
        ([mmode_config_persist] below is the one-liner that keeps a copy
        on the caller's side);
      - both halves of the Bare arm bit
-       [strans_bit strans_bit_bare], the three pieces of this hart's SIE
+       [strans_pending], the three pieces of this hart's SIE
        ghost at [sie_gname], the [tlb] cell and the three trap
        CSRs: minted by [RiscvAdequacy.riscv_system_adequacy].  The two
        GLOBAL boot tokens adequacy also mints -- [KptGhost.kpt_unset] and
@@ -352,8 +352,8 @@ Section BootBridge.
     menvcfg ↦ᵣ menvcfgf -∗
     stack_own_phys sp0 n -∗
     (* --- the adequacy-minted inputs --- *)
-    strans_bit strans_bit_bare -∗
-    strans_bit strans_bit_bare -∗
+    strans_pending -∗
+    strans_pending -∗
     (* this hart's SIE ghost, in the three pieces the choreography splits it
        into (IntrDefs.v §2), all at '0' -- interrupts are off at boot.  The
        NAME is canonical ([sie_gname]), so there is nothing to allocate and

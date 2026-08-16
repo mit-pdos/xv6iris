@@ -94,6 +94,7 @@ Require Import WpLock.
 Require Import CpuOwn.
 Require Import UartTxInv.
 Require Export PrintkArgs.
+Require Import SpecPanic.
 From Kernel Require KernelSyms.
 
 
@@ -226,6 +227,20 @@ Section PrintkGen.
 
   Global Instance printk_env_persistent γpr γd γv : Persistent (printk_env γpr γd γv).
   Proof. apply _. Qed.
+
+  (* printk_env IS panic_env plus an existential [γl] and the trivial trace
+     witness: pr.lock's resource is [emp] on both sides ([pr_res] is [emp])
+     and the address is the same [KernelSyms.pr] under two names.  So any site
+     already carrying the general printk credential can call panic without
+     gaining a premise -- which is what makes the first conversions free. *)
+  Lemma printk_env_panic γpr γd γv :
+    printk_env γpr γd γv -∗ SpecPanic.panic_env.
+  Proof.
+    iIntros "(#Hlk & _ & #Hdev & Htx & _)".
+    iDestruct "Htx" as (γl) "#Htx".
+    iApply (SpecPanic.panic_env_of γpr γl γd γv with "[] Hdev Htx").
+    rewrite /pr_res /pr_lock /PrintkArgs.pk_pr_lock. iExact "Hlk".
+  Qed.
 
 End PrintkGen.
 

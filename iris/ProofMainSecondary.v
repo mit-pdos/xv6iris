@@ -581,7 +581,7 @@ Section ProofMainSecondary.
     cpu_ctx_free -∗
     cpu_own 0 false p0 false ∅ -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ trap_csrs_raw -∗
+    strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ trap_csrs_raw -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗

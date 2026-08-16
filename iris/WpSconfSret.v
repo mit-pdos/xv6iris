@@ -115,7 +115,7 @@ Section WpSconfSret.
        builds carries the receipt, and nothing can reach [b = true] without
        one.  A caller has it from its own [intr_off], which is where the
        matching csrci put it. *)
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     (* ∅, NOT a threaded set: sret re-enables interrupts, and the enabled arm
        carries [lks = ∅] ([CpuOwn.cpu_own_on]).  So "you may only turn
        interrupts back on holding no spinlock" is enforced HERE, at the one

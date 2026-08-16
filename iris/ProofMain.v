@@ -742,7 +742,7 @@ Section ProofMain.
     ([∗ list] p ∈ ps, page_own p) -∗
     (∃ kpt0 : mword 64,
        (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈ kpt0) -∗
-    strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
+    strans_pending -∗ tlb ↦ᵣ tlbvec0 -∗ kpt_unset -∗
     kmap_auth kmap_M0 -∗
     lk_raw pid_lock_addr -∗ lk_raw wait_lock_addr -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_raw (proc_addr i)) -∗
@@ -761,7 +761,7 @@ Section ProofMain.
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
         procs_inv γs -∗
         (* the KPT receipt kvminithart minted, on its way to [trap_csrs] *)
-        strans_bit strans_bit_kpt -∗
+        kpt_on cpu_id -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
         (* what kvminithart published about the kernel page table: all four
            PERSISTENT, and exactly what the [started] deposit carries *)

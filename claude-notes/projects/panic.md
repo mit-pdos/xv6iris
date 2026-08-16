@@ -63,8 +63,16 @@ it the `"%s"` vararg of the second call.
 
 ### Git state
 
-`main` = the commit this note lands in, GREEN (`MAKEEXIT=0`, 1159 files, a
-`make -n` dry run schedules nothing).  Rebased onto `19cc4717`.
+Three commits landed: `507b7e60` (stack budgets), `801d6d30` (existential
+ghost names), `1f1b328d` (**dirlink — the first call site off the
+placeholder**).  All pushed, tree GREEN (`MAKEEXIT=0`).
+
+FOURTEEN arms left, at nine functions.  Next up, in this order, because they
+are the only ones whose callers pay nothing: **filewrite** (1 arm),
+**sys_unlink** (3 arms, all in `ProofSysUnlinkTails.v` at `CID3`, but its three
+`su_panic_*` helpers carry no `cpu_own`/`kernel_data` so those must be threaded
+in from the caller).  Then the remaining seven, which need `kernel_data` and
+`panic_env` threaded from boot.
 
 **Branch `panic-kvmmap-wip` is SUPERSEDED — delete it, do not rebase it.**
 `main` retired kvmmap's panic arm by a better route at `be67d08a`: `SpecKvmmap`
@@ -205,56 +213,164 @@ nothing carries yet".  The useful axis is not dead/live but **does the
 refuting hypothesis get discharged by real callers, or does it survive as an
 assumption?**
 
-### STILL OPEN — the bundle shape (USER DECISION, not yet made)
+### THE BUNDLE SHAPE — DECIDED: (A) FULLY EXISTENTIAL, and implemented
 
-The nine/ten sites cannot be converted until this is settled.  After the `bs`
-removal, all four names in `panic_env γpr γl γd γv` occur EXACTLY ONCE in
-`wp_panic_sconf_body` — inside that one persistent conjunct — and none occurs
-in the conclusion (a bare `WP Loop`).  So
+`panic_env` is `∃ γpr γl γd γv, panic_env_at γpr γl γd γv`.  A site threads ONE
+nameless persistent token; no spec below panic gains a parameter.  Landed at
+`801d6d30`; the reasoning is in `SpecPanic.v`'s own header, in full, so it does
+not have to be re-derived.  Two independent legs:
 
-    (∀ γ⃗, panic_env γ⃗ -∗ WP Loop)  ≡  ((∃ γ⃗, panic_env γ⃗) -∗ WP Loop)
+- **Logically it is ∃-elimination, not a weakening.**  With `uart_sent_sub`
+  gone, all four names occur EXACTLY ONCE in `wp_panic_sconf_body` — inside
+  that one conjunct — and none occurs in the conclusion (a bare `WP Loop`).
+  This is precisely what is NOT true of `SpecConsoleintr.console_caps`, which
+  binds its two lock names but keeps `γu` a parameter because its `γu` occurs
+  again in the contract proper.  **The rule: a ghost name may be existentially
+  bound iff it occurs nowhere else in the statement.**
+- **Physically a caller cannot supply a bogus console.**  `lock_inv γ lk s R`
+  contains `lock_word lk v`, the lock word itself, so γpr/γl are pinned by the
+  addresses the definition already names; `dev_inv`'s body holds `uart_frag u`,
+  the ghost half of the PHYSICAL device state paired with `uart_auth` inside
+  `state_interp`, so at most one (γd, γv) can have a live `dev_inv`.
 
-is ∃-elimination: **the fully-existential form is LOSSLESS here, provably.**
-That is NOT true of `SpecConsoleintr.console_caps`, which is the hybrid shape
-(existential `γtx`/`γc`, parameter `γu`) precisely because its `γu` occurs
-elsewhere.  The rule: *a ghost name can be existentially bound iff it occurs
-nowhere else in the statement.*
+What the names are, since that is what the choice turned on: γpr and γl key
+nothing but their own lock's held-state ghost (pr.lock's resource is `emp`;
+tx_lock's is `tx_res γd`, keyed by γd and NOT by γl).  γd is the only one
+indexing real resources (`uart_tx_own`, `uart_sent`, `uart_dlab_off`).  γv is
+baggage — panic touches nothing disk, and it rides along only because
+`dev_inv` bundles all four devices.
 
-Options: **(A) fully existential** (recommended), **(B) hybrid à la
-`console_caps`** — costs only `iget`, since 8 of 9 sites already carry
-`γd`/`γv` — or **(C) a global `ConsoleNames` class**.  (C) is worse than it
-looks: a class makes the INDEX implicit but not the RESOURCE free (the site
-still supplies `dev_inv`), while adding a binder to every section plus the
-"Import is not transitive" instance trap.  The `GenId` analogy does not carry —
-`gen_id` is consumed by the `Loop` notation in every WP in the tree.
+### THE RECIPE — proven on dirlink (`1f1b328d`), follow it verbatim
 
-Good news for whichever is chosen: **the class ripple is small.** 8 of 9 spec
-files already have `!uartGhostG Σ, !diskGhostG Σ`; only `SpecIget`/`ProofIget`
-(diskGhostG but not uartGhostG) and `ProofFilewriteParts` need propagation.
-kvmmap was painful because it sits in the device-free kvm/boot cone; the fs
-cone already has the device.
+**Pick the next site by RIPPLE, not by order — and TEST THE RIGHT THING.**
+The cheap sites are the ones whose credentials are in scope AT THE PANIC ARM.
+**Grepping a spec file for `kernel_data`/`printk_env` does NOT establish that**,
+and I got filewrite wrong that way: both appear in `SpecFilewrite`, but inside
+`filewrite_fs_env`, which is reached only on the FD_INODE path.  filewrite's
+arm is the "neither pipe, nor device, nor inode" branch, where
+`filewrite_env` reduces to `emp` — so on exactly the path that needs them,
+there are none, and its caller `sys_write` has top-level `kernel_data` but no
+`printk_env`.  filewrite belongs with the expensive sites.
 
-### Message addresses (extracted from the kernel image, reusable)
+So: **dirlink and sys_unlink were the only cheap ones, and both are DONE.**
+Every one of the remaining eight functions needs `kernel_data` + `panic_env`
+threaded from boot.  That is ONE SWEEP, not eight conversions — do it as such.
+Both are persistent and both come from `ProofMain.mn_grp_printk`, exactly like
+the `panic_wp_any` that is threaded through those files already, so the sweep
+is shaped like the existing threading rather than like new plumbing.
 
-`objdump -s -j .rodata xv6-riscv/kernel/kernel` and search; these are already
-confirmed:
+If a Parts file is a plain `Section` rather than a `Module` (ProofFilewriteParts
+is), the shape that works is a NESTED section carrying the ghost classes plus
+panic's contract as a `Hypothesis`, so only the panic lemma gains an argument
+and the caller supplies it from its own `(PN : PANIC)`.  That much was verified
+to compile before filewrite was backed out for the reason above.
 
-| message | address |
-|---|---|
-| `bget: no buffers` | `0x800073c0` |
-| `ilock` | `0x80007468` |
-| `ilock: no type` | `0x80007470` |
-| `iget: no inodes` | `0x80007430` |
-| `dirlookup not DIR` | `0x800074c0` |
-| `dirlookup read` | `0x800074d8` |
-| `dirlink read` | `0x800074e8` |
-| `fileread` | `0x80007598` |
-| `filewrite` | `0x800075a8` |
-| `kvmmap` | `0x80007118` |
-| `init exiting` | `0x80007200` |
+`SpecPrintk.printk_env_panic : printk_env γpr γd γv -∗ panic_env` is what makes
+them cheap: printk_env IS panic_env plus an existential γl and the trace
+witness (`pr_res` is `emp`; both name the same `KernelSyms.pr`).  No cycle —
+SpecPanic sits below SpecPrintk and does not require it back.
 
-The bytes lemma is `do (len+1) (destruct j …); vm_compute in Hj; discriminate`
-— see `ProofIalloc.ia_msg_bytes` or the kvmmap one for the exact shape.
+Per site: functor gains `(PN : PANIC)`, Link passes `Panic`, message lemmas
+hoisted as NAMED pure lemmas (optimization.md), and the arm becomes an
+ordinary application.  **LEAVE the now-unused `panic_wp_any` premise in the
+spec** — dropping it is a separate 163-file sweep, and the arm conversion is
+green without it.
+
+**FOUR TRAPS, all of which recur at every remaining arm:**
+
+1. **THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE.**  `wp_jal_s_sconf`
+   returns `sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m)
+   n b p`, so passing the regfile posed BEFORE the jump makes the unifier grind
+   on `PB2 =?= <[Rra := _]> PB2` — which cannot succeed — and `iSpecialize`
+   NEVER RETURNS.  Every arm reaches panic through a `jal`, so every arm has
+   this.  The placeholder hid it: `panic_wp` inferred `m` from `Hcg`.  Pose the
+   post-jal file and pass that.
+2. **PROVE a0's VALUE DIRECTLY ON THE POST-JAL FILE WITH `pcw`**, and state it
+   in the goal's `!!!` form.  Deriving it across the `ra` write with
+   `rewrite upd_ne` cost 100s in the tactic and another 110s at `Qed`;
+   `by pcw` costs nothing.  And `rget f r` is a DEFINITION, so `rewrite` cannot
+   match it against `f !!! Regidx (mword_of_int 10)` however convertible.
+3. **NO INLINE `ltac:` IN THE APPLICATION.**  `lia` with a bitvector anywhere
+   in the context is the documented search-forever case, and `lkbelow` against
+   an evar-valued `lks` is worse.  Pass `lks` EXPLICITLY and discharge every
+   side condition with a closed lemma over plain nat/Z/gset
+   (`dl_panic_K`, `dl_panic_noff`, `dl_panic_below`, `dl_msg_nz`).
+4. **THE `cpu_own` SOURCE HART IS THE LAST CALLEE'S CONTINUATION**, not where
+   that callee was called: readi is invoked at `CID6` and hands `Hown` back at
+   `CID7`, ilock at `CID3`, writei at `D13`.  Read the continuation's
+   `iIntros`, not the application.  `wp_next_chain` spans ONE link, so
+   `CID7 -> CID9` is two hops written out.  Getting it wrong gives
+   "iSpecialize: cannot instantiate (cpu_own ...)".
+5. **`nonul` IS AMBIGUOUS in the fs cone** — `DirentEnc`'s is over
+   `list (bv 8)`, `PrintkFmt`'s over `string`.  Qualify it.  And `Require
+   Import` is not transitive: `SpecPrintk` must be imported explicitly for
+   `printk_env_panic`, even where the contract already mentions `printk_env`.
+
+The shape, from `ProofDirlink.v`:
+
+```coq
+pose (PB3 := <[Regidx Rra := regval_into_reg
+                (add_vec_int (mword_of_int (DK + 0x68) : mword 64) 4)]> PB2).
+assert (Ha0msg3 : PB3 !!! Regidx Ra0 = (mword_of_int dl_msg_a : mword 64)) by pcw.
+iPoseProof (dl_msg_str with "Hkd") as "#Hstr".
+iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
+iDestruct (cpu_own_transport CIDrd CIDpa4 0%nat eb (proc_addr j) b
+             ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+iApply (PN.wp_panic_sconf (CID := CIDpa4) PB3 (K - 10)%nat
+          0%nat eb b (proc_addr j) (PkAStr DfracDiscarded dl_msg) lks
+          (dl_panic_K K HK) eq_refl dl_panic_noff (dl_panic_below lks Hbelow)
+          with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+{ rewrite /pk_desc_res Ha0msg3.
+  iSplit; [iPureIntro; exact dl_msg_nonul|].
+  iSplit; [iPureIntro; exact dl_msg_nz|]. iExact "Hstr". }
+```
+
+Cost when done right: **0.4s** (48.6s against a 48.2s baseline for the file).
+
+### HOW TO PROFILE ONE OF THESE — do this BEFORE changing anything
+
+A wrong arm does not fail, it HANGS, and an unbounded compile teaches nothing.
+
+```
+timeout 260 coqc -time ... Foo.v          # hard cap, per-statement timings
+Timeout 25 <tactic>.                       # Rocq combinator, bounds ONE step
+```
+
+Bisect with `Timeout` (split `iApply` into `iPoseProof` + per-hypothesis
+`iSpecialize`) and each run finishes in ~2 minutes naming the exact offender.
+Get the TRUE baseline by timing the unmodified HEAD version of the same file —
+the checked-in `.v.timing` files are stale (dirlink's said 130s; the real
+figure was 48s).  **I changed three things before profiling and two of them
+were real defects that were not the cause; the third became the new
+bottleneck.  Profile first.**
+
+### Message addresses AND BYTE COUNTS (measured; reusable)
+
+`riscv64-linux-gnu-objdump -d` the kernel and follow each `jal <panic>` back to
+its `addi a0,a0,..` annotation.  The byte count is what the
+`do N (destruct j …)` in each `*_msg_bytes` lemma needs (length + 1 for NUL).
+
+| function | address | bytes | message |
+|---|---|---|---|
+| bread | `0x800073c0` | 17 | `bget: no buffers` |
+| iget | `0x80007430` | 16 | `iget: no inodes` |
+| ilock | `0x80007468` | 6 | `ilock` |
+| ilock | `0x80007470` | 15 | `ilock: no type` |
+| dirlookup | `0x800074c0` | 18 | `dirlookup not DIR` |
+| dirlookup | `0x800074d8` | 15 | `dirlookup read` |
+| dirlink | `0x800074e8` | 13 | `dirlink read` (DONE) |
+| fileread | `0x80007598` | 9 | `fileread` |
+| filewrite | `0x800075a8` | 10 | `filewrite` |
+| kexit | `0x80007200` | 13 | `init exiting` |
+| kexit | `0x80007210` | 12 | `zombie exit` |
+| kexec | `0x800075c0` | 30 | `loadseg: address should exist` |
+| sys_unlink | `0x800075f0` | 18 | `unlink: nlink < 1` |
+| sys_unlink | `0x80007608` | 18 | `isdirempty: readi` |
+| sys_unlink | `0x80007620` | 15 | `unlink: writei` |
+
+The bytes lemma: prefer `ProofIalloc.ia_msg_bytes`' form
+(`vm_compute in Hj; injection Hj as <-; vm_compute; reflexivity`) over
+`ProofPanic`'s `vm_compute in Hj |- *; congruence`.
 
 ### REJECTED — do not rebuild
 

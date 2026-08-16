@@ -310,7 +310,7 @@ Section KvminithartBody.
                  (tlb_ok_pt_empty (mword_of_int 0) t0 tlbz1 (fun vpn' => Hnone1 _ (tlb_hash_range vpn')))
                  with "Hsatpc Htlb Hlbt [Hpmp] Hkinv") as "Htlbinv".
     { iApply (pmp_config_reindex (mword_of_int 0) root with "Hpmp"). }
-    iMod (strans_bit_flip with "Hbit Hbit2") as "[Hbitkpt Hbitkpt2]".
+    iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
     iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
     iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
@@ -363,8 +363,7 @@ Section KvminithartBody.
     (* open the KPT arm to reach the tlb cell; flush; re-seal *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Htr" as "[(Hbit0 & _ & _) | (Hbit1 & Hk)]".
-    { iDestruct (strans_bit_agree with "Hbitkpt Hbit0") as %Hbad.
-      apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate. }
+    { iDestruct (kpt_on_pending_False with "Hbitkpt Hbit0") as %[]. }
     iDestruct "Hk" as (root_ppn) "Htlbinv".
     (* the flush touches only THIS hart's tlb cell: the tree stays inside
        [kpt_inv], and the post-flush coherence is [tlb_ok_pt_empty] at the

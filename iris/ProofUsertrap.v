@@ -688,7 +688,7 @@ Section UtDispatch.
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     ut_env SY.syscall_env N V -∗
     ut_hold SY.syscall_env N V false ∅.
   Proof.

@@ -65,6 +65,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import SpecPrintk.
 Require Import WpUart.
 Require Import ByteBuf.
@@ -432,14 +433,30 @@ Proof. intros. lia. Qed.
 Lemma su_decr_zero (x y : Z) : y = x + 1 -> y = 1 -> x = 0.
 Proof. intros. lia. Qed.
 
+(* panic's side conditions as CLOSED lemmas over plain nat/gset -- never an
+   inline [ltac:] in the application (see claude-notes/projects/panic.md). *)
+Lemma su_pn_K (K : nat) : (K_sys_unlink <= K)%nat -> (panic_stack <= K - 30)%nat.
+Proof. lia. Qed.
+
+Lemma su_pn_K_readi (K : nat) :
+  (K_readi <= K - 30)%nat -> (panic_stack <= K - 30)%nat.
+Proof. lia. Qed.
+
+Lemma su_pn_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+Lemma su_pn_below (lks : gset string) :
+  locks_below lks "log" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
+
 Module SysUnlinkProof (Argstr : ARGSTR) (BeginOp : BEGIN_OP)
                       (Nameiparent : NAMEIPARENT) (Ilock : ILOCK)
                       (Namecmp : NAMECMP) (Dirlookup : DIRLOOKUP)
                       (Memset : MEMSET) (Readi : READI) (Writei : WRITEI)
                       (Iupdate : IUPDATE) (Iunlockput : IUNLOCKPUT)
-                      (EndOp : END_OP) : SYSUNLINK.
+                      (EndOp : END_OP) (PN : PANIC) : SYSUNLINK.
 
-Module Tails := SysUnlinkTails Iunlockput EndOp.
+Module Tails := SysUnlinkTails Iunlockput EndOp PN.
 
 Section ProofSysUnlinkBody.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -2636,6 +2653,8 @@ Section ProofSysUnlinkBody.
     sie_cap_gpr M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗
+    kernel_data -∗
+    panic_env -∗
     pc_is (mword_of_int (SU + 0x106)) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -2688,7 +2707,7 @@ Section ProofSysUnlinkBody.
     assert (H16jj : Z.of_nat (16 * jj) < 2 ^ 31)
       by (assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity);
           lia).
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hkenv #Hprocs #Hdev #Hgeo
+    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hpanic #Hbio #Hkenv #Hprocs #Hdev #Hgeo
              #Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot HcE HcD HX".
     iPoseProof (suli_106 with "Htext") as "Hi106".
     iPoseProof (suli_108 with "Htext") as "Hi108".
@@ -2903,8 +2922,13 @@ Section ProofSysUnlinkBody.
                          (sign_extend' 64 (mword_of_int 22 : mword 13))
                        = mword_of_int (SU + 0x12e)) by pcw.
       iEval (rewrite Htg12e) in "Hpc".
-      iApply (Tails.su_panic_readi (CID0 := CID9) N7 (K - 30)%nat b
-                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+      iDestruct (cpu_own_transport CID7 CID8 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iDestruct (cpu_own_transport CID8 CID9 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iApply (Tails.su_panic_readi (CID0 := CID9) N7 (K - 30)%nat 0%nat eb b
+                (proc_addr jx) lks (su_pn_K_readi K Kre) su_pn_noff (Hlb "pr"%string)
+                with "Hcg Hown Htext Hkd Hpe Hpc"). }
     (* the read was FULL: sixteen bytes, and they are the record's *)
     assert (Hin16 : (16 * jj + 16 <= Z.to_nat (bv_unsigned (di_size dni)))%nat)
       by (apply su_clamp16_in; symmetry; exact Htoteq).
@@ -3064,7 +3088,7 @@ Section ProofSysUnlinkBody.
         iApply (IH CID14 (S jj) N10
                   (fun jj0 => file_byte dati (16 * jj + jj0)%nat)
                   ltac:(lia) Hmore ltac:(lia) Hdead' HN10regs
-                  with "Hcg Hown Htext Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
+                  with "Hcg Hown Htext Hkd Hpe Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
                         Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot
                         HcE HcD HX").
       + (* ---- the EMPTY EXIT: fall to +0x12c, j to +0x8a ---- *)
@@ -3178,6 +3202,8 @@ Section ProofSysUnlinkBody.
     sie_cap_gpr M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗
+    kernel_data -∗
+    panic_env -∗
     pc_is (mword_of_int (SU + 0xf8)) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -3213,7 +3239,7 @@ Section ProofSysUnlinkBody.
           lia).
     assert (Hcsa4 : is_cs_idx Ra4 = false) by (vm_compute; reflexivity).
     assert (Hcsa5 : is_cs_idx Ra5 = false) by (vm_compute; reflexivity).
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hkenv #Hprocs #Hdev #Hgeo
+    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hpanic #Hbio #Hkenv #Hprocs #Hdev #Hgeo
              #Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot HcE HcD HX".
     iPoseProof (suli_0f8 with "Htext") as "Hif8".
     iPoseProof (suli_0fc with "Htext") as "Hifc".
@@ -3330,7 +3356,7 @@ Section ProofSysUnlinkBody.
                 ltac:(lia) ltac:(lia) ltac:(lia)
                 ltac:(intros k Hk2 Hklt; exfalso; lia)
                 HM3regs
-                with "Hcg Hown Htext Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
+                with "Hcg Hown Htext Hkd Hpe Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
                       Hdlk Hidev Hmeta Hmap Hblocks Hbuf Hpidq Hbslot
                       HcE HcD HX").
   Qed.
@@ -3425,6 +3451,8 @@ Section ProofSysUnlinkBody.
     sie_cap_gpr M2 (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗
+    kernel_data -∗
+    panic_env -∗
     pc_is (mword_of_int (SU + 0x72)) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
@@ -3622,7 +3650,7 @@ Section ProofSysUnlinkBody.
            Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd Hfst Hma0 Hal27.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hdev #Hgeo
+    iIntros "Hcg Hown #Htext #Hkd #Hpe Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hdev #Hgeo
              #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg Hsbb Hsbi Hsbs
              Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq Hslpidd Hdepd Hidevd
              Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
@@ -3791,8 +3819,11 @@ Section ProofSysUnlinkBody.
                         (sign_extend' 64 (mword_of_int 112 : mword 13))
                       = mword_of_int (SU + 0xec)) by pcw.
       iEval (rewrite Htgec) in "Hpc".
-      iApply (Tails.su_panic_nlink (CID0 := CID5) M3 (K - 30)%nat b
-                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+      iDestruct (cpu_own_transport CID3 CID5 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iApply (Tails.su_panic_nlink (CID0 := CID5) M3 (K - 30)%nat 0%nat eb b
+                (proc_addr jx) lks (su_pn_K K HK) su_pn_noff (Hlb "pr"%string)
+                with "Hcg Hown Htext Hkd Hpe Hpc"). }
     (* FALL-THROUGH: the count is signed-positive, so it is NONZERO -- the
        one fact every route below +0x7c carries *)
     iApply (wp_bge_x0_fall_s_sconf (CID := CID4) (mword_of_int (SU + 0x7c))
@@ -3883,7 +3914,7 @@ Section ProofSysUnlinkBody.
                 m M5 sp0 K eb b lks _
                 Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal eq_refl Hioki Htyzi
                 Hnlzi Hddixi HM5regs
-                with "Hcg Hown Htext Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
+                with "Hcg Hown Htext Hkd Hpe Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
                       Hdlk Hidevi Hmetai [Haddrsi Hindi] Hblocksi HbE Hpidq
                       Hbs1 [] [] HX").
       { rewrite /inode_map. iFrame "Haddrsi Hindi". }
@@ -4699,8 +4730,12 @@ Section ProofSysUnlinkBody.
                          (sign_extend' 64 (mword_of_int 144 : mword 13))
                        = mword_of_int (SU + 0x13a)) by pcw.
       iEval (rewrite Htg13a) in "Hpc".
-      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat b
-                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+      iPoseProof (printk_env_panic with "Hprenv") as "#Hpe5".
+      iDestruct (cpu_own_transport D13 D15 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat 0%nat eb b
+                (proc_addr jx) lks (su_pn_K K HK) su_pn_noff (Hlb "pr"%string)
+                with "Hcg Hown Htext Hdata Hpe5 Hpc"). }
     destruct (decide (tot = 16%nat)) as [-> | Hne16].
     2:{ (* the SHORT WRITE: taken, panic *)
       iApply (wp_bne_taken_s_sconf (CID := D14) (mword_of_int (SU + 0xaa))
@@ -4716,8 +4751,12 @@ Section ProofSysUnlinkBody.
                          (sign_extend' 64 (mword_of_int 144 : mword 13))
                        = mword_of_int (SU + 0x13a)) by pcw.
       iEval (rewrite Htg13a) in "Hpc".
-      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat b
-                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+      iPoseProof (printk_env_panic with "Hprenv") as "#Hpe5".
+      iDestruct (cpu_own_transport D13 D15 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat 0%nat eb b
+                (proc_addr jx) lks (su_pn_K K HK) su_pn_noff (Hlb "pr"%string)
+                with "Hcg Hown Htext Hdata Hpe5 Hpc"). }
     (* ===== the write is FULL: sixteen bytes, the record is DEAD ===== *)
     iApply (wp_bne_fall_s_sconf (CID := D14) (mword_of_int (SU + 0xaa))
               (mword_of_int 144 : mword 13) Ra5 Ra0 C1 (K - 30)%nat b
@@ -6136,8 +6175,12 @@ Section ProofSysUnlinkBody.
                          (sign_extend' 64 (mword_of_int 144 : mword 13))
                        = mword_of_int (SU + 0x13a)) by pcw.
       iEval (rewrite Htg13a) in "Hpc".
-      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat b
-                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+      iPoseProof (printk_env_panic with "Hprenv") as "#Hpe5".
+      iDestruct (cpu_own_transport D13 D15 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat 0%nat eb b
+                (proc_addr jx) lks (su_pn_K K HK) su_pn_noff (Hlb "pr"%string)
+                with "Hcg Hown Htext Hdata Hpe5 Hpc"). }
     destruct (decide (tot = 16%nat)) as [-> | Hne16].
     2:{ (* the SHORT WRITE: taken, panic *)
       iApply (wp_bne_taken_s_sconf (CID := D14) (mword_of_int (SU + 0xaa))
@@ -6153,8 +6196,12 @@ Section ProofSysUnlinkBody.
                          (sign_extend' 64 (mword_of_int 144 : mword 13))
                        = mword_of_int (SU + 0x13a)) by pcw.
       iEval (rewrite Htg13a) in "Hpc".
-      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat b
-                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+      iPoseProof (printk_env_panic with "Hprenv") as "#Hpe5".
+      iDestruct (cpu_own_transport D13 D15 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iApply (Tails.su_panic_writei (CID0 := D15) C1 (K - 30)%nat 0%nat eb b
+                (proc_addr jx) lks (su_pn_K K HK) su_pn_noff (Hlb "pr"%string)
+                with "Hcg Hown Htext Hdata Hpe5 Hpc"). }
     (* ===== the write is FULL: sixteen bytes, the record is DEAD ===== *)
     iApply (wp_bne_fall_s_sconf (CID := D14) (mword_of_int (SU + 0xaa))
               (mword_of_int 144 : mword 13) Ra5 Ra0 C1 (K - 30)%nat b
@@ -7423,6 +7470,7 @@ Section ProofSysUnlinkBody.
              Hcont".
     (* ---- W3, +0x72..+0x88: ilock(ip), the nlink panic, the T_DIR test
        (and, on the taken arm, the whole isdirempty loop through W4) ---- *)
+    iPoseProof (printk_env_panic with "Hprenv") as "#Hpetop".
     iApply (su_w3 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
               logstart bmapstart inodestart nib size dev used1 dqb dqs dqbs
               pid V P1 n1 Sb1 w1 kd ks kk gild gisld gyd qdi sd qs
@@ -7432,7 +7480,7 @@ Section ProofSysUnlinkBody.
               Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hn1 Hupt1 Hregs2
               Hkd Hks Hdinb Htydir Hiok Hdok Hddix Hdoc Hduq Hnotdot Hnotdd
               Hfst Hma02 Hal27
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hdev Hgeo
+              with "Hcg Hown Htext Hdata Hpetop Hpc Hpanic Hbio Hlog Hseam Hgen Hdev Hgeo
                     Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg Hsbb Hsbi
                     Hsbs Hbmres Hkenv Hprocs Hpriv Hslkd Hslkdq Hslpidd
                     Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad
