@@ -147,6 +147,7 @@ Require Import SpecDirlink.
 Require Import SpecNamex.
 Require Import SpecCreate.
 Require Import SpecSysMkdir.
+Require Import SpecPanic.
 Require Import SpecSysChdir.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -535,12 +536,13 @@ Module FsSysChdir (M : SYSCHDIR).
                         Hseam & Hgc & Hdev & Hdgeom & Hdlk & Hitb2 & Hitbl &
                         Hesc & Hisl & Hireg & Hkenv & Hprocs)".
     iDestruct "Hres" as "(Hbsl & Hsbn & Hsbi & Hsbs & Hsbb & Hbm & Hir)".
+    iPoseProof (printk_env_panic with "Hpr") as "#Hpe".
     iApply (M.wp_sys_chdir_sconf γf γa γs j γl γu γd γk pd pav pu bn
               glog γfs γi cn gtl cov logstart bmapstart inodestart nib
               size dev used dqb dqs v pid V m K true b lks
               HK Hdev Hnib Hlog Hist Hroot Hnibp Hlg Hsz Hbnn Hbcov Hbout
               Histnn Hcb Hib Hj Hgs eq_refl Htf
-              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hbio Hlogc
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlogc
                     Hseam Hgc Hdev Hdgeom Hdlk Hbsl Hitb2 Hitbl Hesc Hisl
                     Hireg Hsbb Hsbi Hbm Hkenv Hprocs Hir Hpriv").
     { rewrite /trap_csrs_ext. done. }

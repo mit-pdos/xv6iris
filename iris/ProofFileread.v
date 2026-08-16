@@ -97,6 +97,9 @@ Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
 Require Import DinodeEnc.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
 Require Import SpecPiperead SpecIlock SpecReadi SpecIunlock SpecConsoleread.
 Require Import SpecFileread.
 Require Import CodeFileread ProofFilereadParts.
@@ -235,8 +238,63 @@ Qed.
 Lemma fr_upd_upt_id (V : pprivate) : upd_upt V (pv_upt V) = V.
 Proof. destruct V; reflexivity. Qed.
 
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  fileread's one live arm is [panic("fileread")] at  *)
+(*  +0xa6 -- the default of the type dispatch; the literal sits at         *)
+(*  0x80007598 in .rodata, eight characters and a NUL.  Hoisted as NAMED   *)
+(*  pure lemmas rather than inline [ltac:] -- see optimization.md, and the *)
+(*  panic recipe's third trap ([lia]/[lkbelow] against an evar).           *)
+(* ===================================================================== *)
+Definition fr_msg_a : Z := 0x80007598.
+Definition fr_msg : string := "fileread".
+
+Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
+
+Lemma fr_panic_K (K : nat) : (fileread_stack <= K)%nat -> (panic_stack <= K - 6)%nat.
+Proof. lia. Qed.
+
+Lemma fr_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+(* "bcache" (rank 2) is below "pr" (16).  A CLOSED lemma over the plain
+   gset, not an inline [ltac:(lkbelow)]: that backtracks across four rules
+   and each arm ends in [vm_compute; lia], the documented search-forever
+   case once a bitvector is in the context. *)
+Lemma fr_panic_below (lks : gset string) :
+  locks_below lks "bcache" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "bcache" "pr" H). vm_compute; lia. Qed.
+
+Lemma fr_msg_nz : eq_vec (mword_of_int fr_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fr_msg_nonul : PrintkFmt.nonul fr_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fr_msg_bytes :
+  forall j b, cstring_bytes fr_msg !! j = Some b ->
+    KernelData.kernel_data !! (fr_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 9 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section FilereadMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma fr_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int fr_msg_a : mword 64) ↦ₛ□ fr_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string fr_msg_a fr_msg _ eq_refl
+              ltac:(unfold text_end, fr_msg_a; lia) fr_msg_bytes with "Hd").
+  Qed.
+End FilereadMsg.
+
 Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
-                     (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD) : FILEREAD.
+                     (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD)
+                     (PN : PANIC) : FILEREAD.
 
 Section ProofFileread.
   (* NO [!icacheG Σ]: [fileG] bundles it, and binding both gives two
@@ -348,7 +406,7 @@ Section ProofFileread.
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb Hbelow.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -1752,7 +1810,7 @@ Section ProofFileread.
                        I2 (K - 6)%nat eb b
                        _ (fr_av_ilock K HK) Hik Hlg Hist Hibcov Hinlt Hj Hgs
                        ltac:(rewrite HI2a0; exact Hipk) Hbelow
-                       with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hesc Hireg
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitbl Hesc Hireg
                              Hslk Href Hsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot").
              all: try lkbelow.
@@ -1988,7 +2046,7 @@ Section ProofFileread.
                        _ (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb
                        Hoff32 Hjoint32 Hj Hgs
                        HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3' HJ6a4' Hbelow
-                       with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                       with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
                              Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot").
              all: try lkbelow.
@@ -2569,8 +2627,30 @@ Section ProofFileread.
                        = mword_of_int KernelSyms.panic)
                by (apply bv_eq; vm_compute; reflexivity).
              iEval (rewrite Htgtpanic) in "Hpc".
-             iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpanic0".
-             iApply ("Hpanic0" with "Htext Hpc Hcg").
+             (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+                a0 holds &"fileread"; [kernel_data] mints the literal and
+                [panic_env] is the console bundle printk needs.  [cpu_own]
+                has to arrive AT THE PANIC HART (CID22), not at the one the
+                arm was entered on. *)
+             iPoseProof (fr_msg_str with "Hkd") as "#Hstr".
+             iDestruct (cpu_own_transport CID CID22 0%nat eb pj b
+                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+             (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE.
+                [wp_jal_s_sconf] hands back [sie_cap_gpr (<[rd := pc+4]> m)],
+                so passing [P2] makes the unifier grind on
+                [P2 =?= <[Rra := _]> P2] and [iSpecialize] never returns. *)
+             pose (P3 := <[Regidx Rra := regval_into_reg
+                            (add_vec_int (mword_of_int (FR + 0xa6) : mword 64) 4)]> P2).
+             assert (Ha0msg : P3 !!! Regidx Ra0 = (mword_of_int fr_msg_a : mword 64))
+               by pcw.
+             iApply (PN.wp_panic_sconf (CID := CID22) P3 (K - 6)%nat
+                       0%nat eb b pj (PkAStr DfracDiscarded fr_msg) lks
+                       (fr_panic_K K HK) eq_refl fr_panic_noff
+                       (fr_panic_below lks Hbelow)
+                       with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+             { rewrite /pk_desc_res Ha0msg.
+               iSplit; [iPureIntro; exact fr_msg_nonul|].
+               iSplit; [iPureIntro; exact fr_msg_nz|]. iExact "Hstr". }
   Qed.
 
 End ProofFileread.

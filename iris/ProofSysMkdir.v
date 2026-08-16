@@ -97,6 +97,9 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPrintk.
+Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
@@ -588,8 +591,9 @@ Section ProofSysMkdirM1Tail.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
-    kernel_text -∗ pc_is (mword_of_int (MD + 0x40)) -∗
+    kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (MD + 0x40)) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
@@ -617,7 +621,7 @@ Section ProofSysMkdirM1Tail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HKeo HK18 Kpop Hgeom Hj Hgl Hlkempty Hsp0 HMsp HMthr Hal.
-    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen
               Hpid #Hprocs #Hdev #Hgeo #Hdlk Hop Hf1 Hf2 Hbuf Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
     iPoseProof (smdi_40 with "Htext") as "Hi40".
@@ -652,7 +656,7 @@ Section ProofSysMkdirM1Tail.
     iApply (EndOp.wp_end_op_sconf (CID := CID1) gs jx gl gu gd gk pd pav pu bn
               g gfs cov logstart dev u pidv dq M1 (K - 18)%nat eb b lks
               HKeo Hgeom Hj Hgl ltac:(lkbelow)
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
                     Hpid Hprocs Hdev Hgeo Hdlk Hop").
     iIntros (CID2 Hq2 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpid".
     assert (Hpc44 : ret_pc (M1 !!! Regidx Rra : mword 64)
@@ -780,6 +784,7 @@ Section ProofSysMkdirBody.
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpanic #Hpre #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg Hsbn Hsbi Hsbs Hsbb Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+    iPoseProof (printk_env_panic with "Hpre") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
@@ -1284,7 +1289,7 @@ Section ProofSysMkdirBody.
                   Hibcov Hiblog ltac:(lia) Hcovb
                   ltac:(exact (proj2 (proj2 Hun1) eq_refl)) Hj Hgl HP0a0
                   (Hlb "log"%string)
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hitab Hitinv
                         Hesc Hireg Hslk Hslkd Hslpid Hdep Hidev Hiinum Hivalid
                         Hload Hshot Href Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                         Hgeo Hdlk Hbsl [HopS]").
@@ -1329,7 +1334,7 @@ Section ProofSysMkdirBody.
                   bn g gfs cov logstart dev n2 pid (DfracOwn (1/4))
                   P1 (K - 18)%nat eb b lks
                   ltac:(lia) Hgeom Hj Hgl (Hlb "log"%string)
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk Hop").
         { rewrite Heb /trap_csrs_ext. done. }
         { rewrite Heb /cpu_claim_ext. done. }
@@ -1412,7 +1417,7 @@ Section ProofSysMkdirBody.
                   m mcr sp0 K eb b lks bf1
                   ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) Hcrsp Hcrthr Hal
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hbuf
                         [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hbmres Hir Hcont]").
         { rewrite Heb /trap_csrs_ext. done. }
@@ -1450,7 +1455,7 @@ Section ProofSysMkdirBody.
                 m mas sp0 K eb b lks bf
                 ltac:(lia) ltac:(lia) Kpop Hgeom Hj Hgl Hlkempty
                 ltac:(reflexivity) Hassp Hasthr Hal
-                with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                       Hpidq Hprocs Hdev Hgeo Hdlk Hop Hf1 Hf2 Hbuf
                       [Hpback Hbsl Hsbn Hsbi Hsbs Hsbb Hbmres Hir Hcont]").
       { rewrite Heb /trap_csrs_ext. done. }

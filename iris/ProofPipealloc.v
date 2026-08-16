@@ -60,6 +60,7 @@ Require Import DiskPtsto.
 Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+Require Import SpecPanic.
 Require Import SpecFilealloc SpecKalloc SpecInitlock SpecIput SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecPipealloc.
@@ -138,7 +139,7 @@ Section ProofPipealloc.
        kalloc's. *)
     intros pcE pf0 pf1 ret_tgt HK Hfl Hnoffpos Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hftab #Hkmem Hav #Hpanic
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkdata Hpc #Hftab #Hkmem Hav #Hpanic #Hpe
               Hslota Hslotb Hc0 Hc1 Hcont".
     (* the one fact [ext_chain] runs on.  Do NOT [subst] [b] or [eb] -- both
        are spelled by name in every leaf-instruction argument below. *)
@@ -726,7 +727,7 @@ Section ProofPipealloc.
                      with "Hextm") as "Hextm".
         iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on (∅ : gset Z) U4 n eb p (K - 6)%nat b lks
                   ltac:(lia) Hnoffpos HU4a0 Hbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href1 []").
+                  with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpanic Hpe Href1 []").
         all: try lkbelow.
         { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
         (* fileclose hands back the unit the reference was holding: it is
@@ -804,7 +805,7 @@ Section ProofPipealloc.
                    with "Hextm") as "Hextm".
       iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on (∅ : gset Z) V1 n eb p (K - 6)%nat b lks
                 ltac:(lia) Hnoffpos HV1a0 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hftab Hpanic Href0 []").
+                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hftab Hpanic Hpe Href0 []").
       all: try lkbelow.
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no
          file system.  [inhabitant] above is the ghost bundle the arms this

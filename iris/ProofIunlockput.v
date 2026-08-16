@@ -46,6 +46,8 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheEscrow.
 Require Import CodeIunlockput.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import SpecIunlock SpecIput.
 Require Import SpecIunlockput.
 From Kernel Require KernelSyms.
@@ -117,7 +119,7 @@ Section ProofIunlockputMain.
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
     pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
-    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hnlz Hlogop
               Hcont".
@@ -358,7 +360,7 @@ Section ProofIunlockputMain.
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl ltac:(rewrite HR6a0; exact Hipe)
               Hfresh
-              with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Href Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk
                     Hbslots Hnlz Hlogop").
     all: try lkbelow.
@@ -596,7 +598,7 @@ Section ProofIunlockputMain.
     cbv beta delta [wp_iunlockput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0
            Hiblk Hiblklog Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh.
-    iIntros "Hcg Hcnt Htc Hclm #Htext Hpc #Hpanic Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
+    iIntros "Hcg Hcnt Htc Hclm #Htext #Hkd Hpc #Hpanic #Hpenv Hbio Hlogc Hitb2 #Hitbl #Hesc Hireg
               #Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hpar
               Hbms Hins Hbitmap Hppid #Hprocs Hdev Hgeom Hdlk Hbslots Hlogop
               Hcont".
@@ -609,7 +611,7 @@ Section ProofIunlockputMain.
               HK Hk ltac:(discriminate) ltac:(discriminate)
               Hlg Hsize Hbm0 Hbmcov Hbmlog Hins0 Hiblk Hiblklog
               Hinumb Hcovb Hnu Hj Hgl Ha0 Hfresh
-              with "Hcg Hcnt Htc Hclm Htext Hpc Hpanic Hbio Hlogc Hitb2 Hitbl Hesc Hireg
+              with "Hcg Hcnt Htc Hclm Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitb2 Hitbl Hesc Hireg
                     Hslk Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk Hshot Hpar
                     Hbms Hins Hbitmap Hppid Hprocs Hdev Hgeom Hdlk Hbslots []
                     Hlogop [Hcont]").

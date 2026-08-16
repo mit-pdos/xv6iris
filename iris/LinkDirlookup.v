@@ -15,6 +15,6 @@
 
    So this cone's assumption count stays at the five platform axioms plus
    funext. *)
-Require Import LinkReadi LinkNamecmp LinkIget ProofDirlookup.
+Require Import LinkReadi LinkNamecmp LinkIget LinkPanic ProofDirlookup.
 
-Module Dirlookup := DirlookupProof Readi Namecmp Iget.
+Module Dirlookup := DirlookupProof Readi Namecmp Iget Panic.

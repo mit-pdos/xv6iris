@@ -68,6 +68,8 @@ Require Import IrefSlots.
 Require Import WpUart DiskPtsto FsBlocks LogInv FsCrash.
 Require Import BioDefs.
 Require Import WpLock.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
 Require Import IrefSlots InodeRegion.
@@ -154,7 +156,7 @@ Section ProofFileclose.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hlock #Hpanic Href Henv Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hlock #Hpanic #Hpenv Href Henv Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     (* THE ONE FACT THE COMPLEMENT'S TRANSPORTS NEED (see [ext_chain]): the
        disabled base forces the disabled arm, at any nesting depth. *)
@@ -1483,7 +1485,7 @@ Section ProofFileclose.
                     ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
                     ltac:(rewrite HB3a0; exact Hipe)
                     ltac:(lkbelow)
-                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitab Hitinv
                           Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
                           Hdev Hgeo Hdlk Hbsl Hop").
           all: try lkbelow.
@@ -1526,7 +1528,7 @@ Section ProofFileclose.
                     B4 (K - 8)%nat eb b lks
                     ltac:(lia) Hgeom Hjlt Hgl
                     ltac:(lkbelow)
-                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
+                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen Hpid
                           Hprocs Hdev Hgeo Hdlk Hop").
           all: try lkbelow.
           iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hextc Hextm Hpc Hpid".

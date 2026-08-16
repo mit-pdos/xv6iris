@@ -112,6 +112,7 @@ Require Import IcacheEscrow.
 Require Import CodeIalloc.
 Require Import PanicStub.
 Require Import SpecPrintk.
+Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset SpecIget.
 Require Import SpecIalloc.
 From Kernel Require KernelSyms.
@@ -1124,9 +1125,10 @@ Section IallocClaim.
     locks_below lks "log" ->
     sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) b lks -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x88) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     ireg_inv γi γfs inodestart nib -∗
@@ -1154,7 +1156,7 @@ Section IallocClaim.
            Hnib Hdswf Ht0 Hty Hinum Halign Hbelow.
     pose proof HK as HK'. 
     pose proof (DinodeEnc.islot_lt inum) as Hsl16.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hireg #Hprocs
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpanenv #Hbio #Hlctx #Hireg #Hprocs
               #Hdevi #Hdgeom #Hdlock Hitb2 Hitbl Hesc Hiref
               Hframe Hppid Hsbn Hsbi Hsl Hop Hheld Hcont".
     iPoseProof (iali_88 with "Htext") as "Hi88".
@@ -1661,7 +1663,7 @@ Section IallocClaim.
               ltac:(lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanic Hpanenv Hiref").
     all: try lkbelow.
     iIntros (CID16 Hq16 mI kslot q) "Hcg Hcnt Hpc %Higp Href".
     destruct Higp as (Hcsi & Hkslot & Higa0).
@@ -1950,6 +1952,7 @@ Section IallocScan.
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "#Htext #Hkdata #Hpanic #Hpenv #Hbio #Hlctx #Hireg #Hprocs
               #Hdevi #Hdgeom #Hdlock #Hitb2 #Hitbl #Hesc".
+    iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iIntros (fuel).
     iInduction fuel as [|fuel] "IH".
     - (* ---- FUEL 0: unreachable, [inum < ninodes] leaves at least one turn ---- *)
@@ -2167,7 +2170,7 @@ Section IallocScan.
                 (* bread's bound is "bcache"(4); ia_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
-                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -2471,7 +2474,7 @@ Section IallocScan.
                   HK Hgeom HGAsp HGAthr HGAs1 HGAs3 HGAs5 HGAs6 HGAs2 Hkk
                   Hbno Hcov Hlog Hnib Hdswf Ht0 Hty Hinum Hslotal
                   Hbelow
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hireg Hprocs
+                  with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hireg Hprocs
                         Hdevi Hdgeom Hdlock Hitb2 Hitbl Hesc Hiref Hframe
                         Hppid Hsbn Hsbi Hsl Hop Hheld [Hcont]").
         { iApply (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID13)

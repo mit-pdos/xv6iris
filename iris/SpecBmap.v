@@ -107,6 +107,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -324,6 +326,7 @@ Definition wp_bmap_sconf_body
   (* the two PERSISTENT printk credentials, forwarded to balloc *)
   kernel_data -∗
   printk_env γpr γu γd -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev, read (never written) on all four balloc/bread call paths --
@@ -508,6 +511,7 @@ Definition wp_bmap_gen_body
   panic_wp_any -∗
   kernel_data -∗
   printk_env γpr γu γd -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -720,8 +724,9 @@ Definition wp_bmap_noalloc_sconf_body
      pure pass-through here too. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   i_dev ip ↦₄{dqd} dev -∗
   inode_map γfs ip bm -∗

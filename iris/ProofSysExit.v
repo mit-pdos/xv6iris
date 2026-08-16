@@ -125,7 +125,7 @@ Section ProofSysExit.
     cbv beta delta [wp_sys_exit_sconf_body].
     intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic #Hpenv
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
              #Hdlk Hbs #Hicenv Hbm Hip Hfds Hirs Hpriv".
     iPoseProof (se_00 with "Htext") as "Hi00".
@@ -313,7 +313,7 @@ Section ProofSysExit.
               γi cn γtl bmapstart inodestart nib size dqb dqs us
               on fn B2 (av - 4)%nat eb b lks pid V
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Hbelow
-              with "Hcg Hcpu [] [] Htext Hpc Hprocs Hpanic Hlk
+              with "Hcg Hcpu [] [] Htext Hdata Hpc Hprocs Hpanic Hpenv Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
                     Hicenv Hbm Hip Hfds Hirs Hpriv").
     all: try lkbelow.

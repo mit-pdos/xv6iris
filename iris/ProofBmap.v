@@ -104,6 +104,7 @@ Require Import KernelDataInv.
 Require Import SpecPrintk.
 Require Import CodeBmap.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import SpecBalloc SpecBread SpecBrelse SpecLogWrite.
 Require Import ProofBmapParts.
 Require Import SpecBmap.
@@ -462,8 +463,9 @@ Definition bm_gen_stmt
   cpu_own 0 eb pj b lks -∗
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bm_prk ak γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   i_dev ip ↦₄{dqd} dev -∗
@@ -1236,9 +1238,10 @@ Section BmapTail.
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.bmap + 0x62) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bm_prk ak γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv γs -∗
@@ -1283,7 +1286,7 @@ Section BmapTail.
       by exact (blkmap_wf_ent_len cov logstart bmI HwfI).
     assert (Hfbnlt : (fbn < MAXFILE)%nat)
       by (unfold MAXFILE, NDIRECT, NINDIRECT in *; lia).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hprk #Hbio #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hprk #Hbio #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev
               Haddrs Hindblk Hindtok Hblocks Hsl1 Hkit Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -1378,7 +1381,7 @@ Section BmapTail.
               (fs_view γfs γd dev cov) pidv dev (bm_ind bmI) dq
               I2 (K - 6)%nat eb b lks
               HKbr Hilt' eq_refl Hicov' eq_refl Hj Hgl HI2a0 HI2a1 Hbc
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -2188,7 +2191,7 @@ Section ProofBmapMain.
     pose proof Hfbn as Hfbn0. unfold MAXFILE in Hfbn0.
     pose proof (blkmap_wf_dir_len cov logstart bm Hwf) as Hdirlen.
     pose proof (blkmap_wf_ent_len cov logstart bm Hwf) as Hentlen.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hprk #Hbio Hidev Hmap Hblocks Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hprk #Hbio Hidev Hmap Hblocks Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hkit Hcont".
     iAssert (bm_cont (CID0 := CID) γfs bn ak cov logstart dev ip bm data fbn n cr Sb
                pidv dq dqd j m K eb b lks)%I with "[Hcont]" as "Hcont";
@@ -3463,7 +3466,7 @@ Section ProofBmapMain.
                           exact (HP2thr c Hcs N2 N8 N9 N18 N19))
                     ltac:(rewrite /bmI; cbn [bm_ind]; exact HP2s1) HP2s2 HP2s3
                     Hbc Hlog
-                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hprocs
+                    with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hprk Hbio Hprocs
                           Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                           Haddrs Hindblk2 Hindtok2 Hblocks Hsl Hkit [Hcont]").
           iApply (wp_next_shift (b := true) (CIDa := CID19) (CIDb := CID25) ltac:(wp_next_chain)
@@ -3538,7 +3541,7 @@ Section ProofBmapMain.
                         exact (HJ4thr c Hcs N2 N8 N9 N18 N19))
                   HJ4s1 HJ4s2 HJ4s3
                   Hbc Hlog
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hprocs
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hprk Hbio Hprocs
                         Hdevi Hdgeom Hdlock Hframe Hppid Hidev
                         Haddrs Hindblk Hindtok Hblocks Hsl Hkit [Hcont]").
         iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID18) ltac:(wp_next_chain)
@@ -3582,7 +3585,7 @@ Section BmapSeal.
   Proof.
     cbv beta delta [wp_bmap_sconf_body].
     intros pcE pj ret_tgt bnw HK Hn5 Hgeom Hbgok Hprkc Hfbn Hwf Hj Hgl Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hpanenv #Hbio #Hlctx
               Hidev Hmap Hblocks Hppid
               Hsbsz Hsbbm Hbmres
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
@@ -3615,7 +3618,7 @@ Section BmapSeal.
               ltac:(intros Hc; discriminate Hc)
               ltac:(intros Hc; discriminate Hc)
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hidev Hmap Hblocks Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hprk Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
@@ -3670,7 +3673,7 @@ Section BmapSeal.
     cbv beta delta [wp_bmap_gen_body].
     intros pcE pj ret_tgt bnw HK Hneed Hgeom Hbgok Hprkc Hcrp Hfbn Hwf Hj Hgl
            Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx
+    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hpanenv #Hbio #Hlctx
               Hidev Hmap Hblocks Hppid
               Hsbsz Hsbbm Hbmres
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
@@ -3697,7 +3700,7 @@ Section BmapSeal.
                     exact (bmset_sing_sub _ _ (Hcrp Hc)))
               ltac:(intros Hc; discriminate Hc)
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hprk Hbio Hidev Hmap Hblocks Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hprk Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl1 Hkit [Hcont]").
     all: try lkbelow.
     iEval (rewrite /wp_next).
@@ -3756,7 +3759,7 @@ Section BmapNoallocSeal.
   Proof.
     cbv beta delta [wp_bmap_noalloc_sconf_body].
     intros pcE pj ret_tgt bnw HK Hgeom Hfbn Hwf Hnz Hj Hgl Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio Hidev Hmap Hblocks Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio Hidev Hmap Hblocks Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn None γfs
               cov logstart dev ip bm data fbn 0%nat false ∅ pidv dq dqd m K eb b lks
@@ -3768,7 +3771,7 @@ Section BmapNoallocSeal.
               ltac:(intros Hc; discriminate Hc)
               ltac:(intros _; exact Hnz)
               Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic [] Hbio Hidev Hmap Hblocks Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv [] Hbio Hidev Hmap Hblocks Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl [] [Hcont]").
     all: try lkbelow.
     { iApply bm_prk_none. }

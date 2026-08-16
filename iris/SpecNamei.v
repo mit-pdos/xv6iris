@@ -44,6 +44,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -138,8 +140,9 @@ Definition wp_namei_sconf_body
   eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
@@ -260,8 +263,9 @@ Definition wp_namei_gen_body
   eb = true ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   kalloc_env ga None -∗
@@ -398,7 +402,7 @@ End NAMEI.
 Notation K_namei_root := (74%nat) (only parsing).
 Definition wp_namei_root_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
-      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)
@@ -409,7 +413,9 @@ Definition wp_namei_root_body
   let pv := m !!! Regidx (mword_of_int 10 : mword 5) in    (* a0 = path *)
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_namei_root <= K)%nat ->
-  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* [+3], not [+1]: namex's iget acquires itable.lock and its LIVE panic
+     arm fires inside that critical section, where printk takes two more. *)
+  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   dev = icfg_dev ->
   nib = icfg_nib ->
   dev = ROOTDEV ->
@@ -417,8 +423,9 @@ Definition wp_namei_root_body
   locks_below lks "itable" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn gfs gi cov logstart -∗
@@ -441,7 +448,7 @@ Definition wp_namei_root_body
 Module Type NAMEI_ROOT.
   Parameter wp_namei_root :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
-             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+             !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gtl : gname) (cn : ic_names) (gfs : fs_names) (gi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dev : mword 32)

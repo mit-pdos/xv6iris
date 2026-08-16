@@ -114,6 +114,7 @@ Require Import IcacheBoot.
 Require Import CodeIreclaim.
 Require Import PanicStub.
 Require Import SpecPrintk.
+Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecIget.
 Require Import SpecBeginOp SpecEndOp.
 Require Import SpecIlock SpecIunlock SpecIput.
@@ -999,6 +1000,7 @@ Section IreclaimOrphan.
               #Hseam #Hgen #Hireg #Hitb2 #Hitbl #Hesc #Hslks #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref
               Hbm Hlk Hloop Hcont".
+    iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iPoseProof (kernel_data_string irc_msg_addr irc_msg
                   (mword_of_int irc_msg_addr) eq_refl
                   ltac:(unfold text_end, irc_msg_addr; lia) irc_msg_bytes
@@ -1262,7 +1264,7 @@ Section IreclaimOrphan.
               ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
+              with "Hcg Hcnt Htext Hkdata Hpc Hitb2 Hitbl Hesc Hpanic Hpanenv Hiref").
     all: try lkbelow.
     iIntros (CID8 Hq8 mI kslot q) "Hcg Hcnt Hpc %Higfacts Href".
     destruct Higfacts as (Hcsig & Hkslot & HmIa0).
@@ -1593,7 +1595,7 @@ Section IreclaimOrphan.
               (* ilock's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitbl Hescrow Hireg Hslk
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hitbl Hescrow Hireg Hslk
                     Hshr Hsbi Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1805,7 +1807,7 @@ Section IreclaimOrphan.
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hitb2 Hitbl Hescrow
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hitb2 Hitbl Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbm Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
     all: try lkbelow.
@@ -1877,7 +1879,7 @@ Section IreclaimOrphan.
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlctx Hseam Hgen Hppid
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hseam Hgen Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hop").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -2174,6 +2176,7 @@ Section IreclaimScan.
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "#Htext #Hkdata #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hgen #Hireg
               #Hitb2 #Hitbl #Hesc #Hslks #Hprocs #Hdevi #Hdgeom #Hdlock".
+    iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iIntros (fuel).
     iInduction fuel as [|fuel] "IH".
     - (* ---- FUEL 0: unreachable, [inum < ninodes] leaves at least one turn ---- *)
@@ -2433,7 +2436,7 @@ Section IreclaimScan.
                 (* bread's bound is "bcache"(4); irc_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
                 ltac:(lkbelow)
-                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
+                with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }

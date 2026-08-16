@@ -93,6 +93,9 @@ Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
 Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import DirView.
@@ -111,7 +114,55 @@ Set Printing Depth 40.
 (*  6.  THE PROOF                                                         *)
 (* ===================================================================== *)
 
-Module DirlookupProof (RD : READI) (NC : NAMECMP) (IG : IGET) : DIRLOOKUP.
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  dirlookup's one live arm is the SHORT READ,       *)
+(*  [panic("dirlookup read")] at +0x4e; the literal sits at 0x800074d8    *)
+(*  in .rodata, fourteen characters and a NUL.  NAMED pure lemmas, not    *)
+(*  inline [ltac:] -- see optimization.md and the panic recipe.           *)
+(* ===================================================================== *)
+Definition dlk_msg_a : Z := 0x800074d8.
+Definition dlk_msg : string := "dirlookup read".
+
+Lemma dlk_panic_K (K : nat) : (K_dirlookup <= K)%nat -> (panic_stack <= K - 12)%nat.
+Proof. lia. Qed.
+
+Lemma dlk_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+Lemma dlk_panic_below (lks : gset string) :
+  locks_below lks "bcache" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "bcache" "pr" H). vm_compute; lia. Qed.
+
+Lemma dlk_msg_nz : eq_vec (mword_of_int dlk_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma dlk_msg_nonul : PrintkFmt.nonul dlk_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma dlk_msg_bytes :
+  forall j b, cstring_bytes dlk_msg !! j = Some b ->
+    KernelData.kernel_data !! (dlk_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 15 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section DirlookupMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma dlk_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int dlk_msg_a : mword 64) ↦ₛ□ dlk_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string dlk_msg_a dlk_msg _ eq_refl
+              ltac:(unfold text_end, dlk_msg_a; lia) dlk_msg_bytes with "Hd").
+  Qed.
+End DirlookupMsg.
+
+Module DirlookupProof (RD : READI) (NC : NAMECMP) (IG : IGET) (PN : PANIC)
+  : DIRLOOKUP.
 
 Notation DL := KernelSyms.dirlookup (only parsing).
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -402,7 +453,7 @@ Section ProofDirlookupMain.
        [let]-bound [pj].  The two are convertible but [iSpecialize] matches
        syntactically, so fold them back at the seam. *)
     assert (Hpjd : proc_addr j = pj) by reflexivity.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hkenv Hidev Hmeta Hmap Hblocks
               Hnm Hpoff Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbslot #Hitb2 #Hitbl
               #Hesc Hislot Hcont".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
@@ -1534,7 +1585,7 @@ Section ProofDirlookupMain.
                   ltac:(rewrite HL6a1 dlk_zero_moi; exact (eq_vec_refl _))
                   HL6a3' HL6a4'
                   ltac:(lkbelow)
-                  with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                  with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
                         Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbslot").
         all: try lkbelow.
         { rewrite Heb /trap_csrs_ext. done. }
@@ -1622,8 +1673,26 @@ Section ProofDirlookupMain.
                              (sign_extend' 64 (mword_of_int 2084912 : mword 21))
                            = mword_of_int KernelSyms.panic) by pcw.
           iEval (rewrite Htgtpn) in "Hpc".
-          iPoseProof (panic_wp_any_at CIDpa4 with "Hpanic") as "Hpan".
-          iApply ("Hpan" with "Htext Hpc Hcg"). }
+          (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+             a0 holds &"dirlookup read"; [kernel_data] mints the literal.
+             [cpu_own] has to arrive AT THE PANIC HART (CIDpa4), and its
+             source is readi's continuation, not where readi was called. *)
+          iPoseProof (dlk_msg_str with "Hkd") as "#Hstr".
+          iDestruct (cpu_own_transport CIDrd CIDpa4 0%nat eb pj b
+                       ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+          (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+          pose (PA3 := <[Regidx Rra := regval_into_reg
+                          (add_vec_int (mword_of_int (DL + 0x4e) : mword 64) 4)]> PA2).
+          assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int dlk_msg_a : mword 64))
+            by pcw.
+          iApply (PN.wp_panic_sconf (CID := CIDpa4) PA3 (K - 12)%nat
+                    0%nat eb b pj (PkAStr DfracDiscarded dlk_msg) lks
+                    (dlk_panic_K K HK) eq_refl dlk_panic_noff
+                    (dlk_panic_below lks Hbelow)
+                    with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+          { rewrite /pk_desc_res Ha0msg.
+            iSplit; [iPureIntro; exact dlk_msg_nonul|].
+            iSplit; [iPureIntro; exact dlk_msg_nz|]. iExact "Hstr". } }
         (* ---------------- THE FULL READ: exactly as before ----------- *)
         assert (Hclamp : rd_clamp (di_size dn) (16 * i) 16 = 16%nat)
           by exact (dlk_rd_clamp_full' (di_size dn) i Hfull).
@@ -1939,7 +2008,7 @@ Section ProofDirlookupMain.
                       ltac:(vm_compute; reflexivity) Hinumb HN7a0
                       ltac:(rewrite dlk_sext_zext_16_32_64; exact HN7a1)
                       ltac:(lkbelow)
-                      with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hislot").
+                      with "Hcg Hcnt Htext Hkd Hpc Hitb2 Hitbl Hesc Hpanic Hpenv Hislot").
             all: try lkbelow.
             iIntros (CIDig Hsig mig kslot q) "Hcg Hcnt Hpc %Higp Href".
             destruct Higp as (Hcsig & Hkslot & Higa0).

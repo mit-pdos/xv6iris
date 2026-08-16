@@ -11,6 +11,6 @@
    "iget: no inodes" arm is LIVE (SpecIget.v's header), and it diverges
    through the [panic_wp_any] resource the contract already takes, so no
    further instantiation is needed for it. *)
-Require Import LinkAcquire LinkRelease ProofIget.
+Require Import LinkAcquire LinkRelease LinkPanic ProofIget.
 
-Module Iget := IgetProof Acquire Release.
+Module Iget := IgetProof Acquire Release Panic.

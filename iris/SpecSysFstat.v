@@ -116,6 +116,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -223,6 +225,7 @@ Definition wp_sys_fstat_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* filestat itself never panics; ilock and iunlock do, and this is theirs *)
   panic_wp_any -∗
+  panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗

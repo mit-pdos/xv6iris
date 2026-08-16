@@ -427,7 +427,7 @@ Section KexecABody.
     (* depth 0 forces the held set empty, so begin_op's order premise ("log",
        3) needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- open the process's private block ONCE (convention 2) ---- *)
@@ -575,7 +575,7 @@ Section KexecABody.
               ltac:(unfold walk_need, iput_units, MAXOPBLOCKS;
                     destruct (length (path_elems (bview plen pfun))); lia)
               Hjp Hgs eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hka Hitab Hitinv Hesc
+              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hka Hitab Hitinv Hesc
                     Hslks Hireg Hprocs Hdevi Hdgeom Hdlock Hbm Hins Hbits Hppid
                     Hcwd Hcref Hpath Hbs Hirs Hlog").
     iIntros (CIDn Hsn M4 n1 used1 Sb1 ok ipv w) "%Hcsn Hcg Hcnt Hpc Hbm Hins %Hused1
@@ -723,7 +723,7 @@ Section KexecABody.
       iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
                 cov logstart dev n1 pidv (DfracOwn (1/4)) P1 (K - 68)%nat
                 true true lks ltac:(lia) Hlg Hjp Hgs
-                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcrash Hcert
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -970,7 +970,7 @@ Section KexecABody.
     (* depth 0 forces the held set empty, so the ilock/end_op order premises
        need no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     (* ---- the inode: slot, share, and the region facts ---- *)
@@ -1082,7 +1082,7 @@ Section KexecABody.
               gilk gislk cov logstart inodestart nib k (q/2)%Qp gy dev inum
               pidv (DfracOwn (1/4)) dqs Q2 (K - 68)%nat true true lks
               ltac:(lia) Hk Hlg Hins0 Hibc Hib' Hjp Hgs HQ2a0
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hitinv Hesck Hireg Hslkk
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hitinv Hesck Hireg Hslkk
                     Hshr Hins Hppid Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1269,7 +1269,7 @@ Section KexecABody.
               ltac:(vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity) Hjp Hgs HQ8a0
               ltac:(rewrite HQ8a1; vm_compute; reflexivity) HQ8a3' HQ8a4'
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap Hblocks
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hka Hidev Hmeta Hmap Hblocks
                     [Helfb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1535,7 +1535,7 @@ Section KexecABody.
                   with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
                         Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                         Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-        { iApply (T.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
+        { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
                                        Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
         rewrite /kxc_frameA6.
         iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".
@@ -1608,7 +1608,7 @@ Section KexecABody.
                 with "Hcg Hcnt Htext Hpanic Hpc [] Hslkk Hslkd Hslpid Hdep
                       Hidev Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits Hka
                       Hpriv Hpath Hargv Hargs Hbs Hirs Hlog [-Hcont] Hcont").
-      { iApply (T.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
+      { iApply (T.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc
                                      Hslks Hireg Hprocs Hdevi Hdgeom Hdlock"). }
       rewrite /kxc_frameA6.
       iDestruct (kxc_mid_join sp0 with "Hust Helf Hph") as "Hmid".

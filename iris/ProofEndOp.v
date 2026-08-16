@@ -110,6 +110,8 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeEndOp.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecBread SpecBwrite SpecBrelse SpecMemmove.
 Require Import SpecWriteHead SpecInstallTrans.
@@ -1710,9 +1712,10 @@ Section EndOpBlocks.
     cpu_own 0 eb (proc_addr j) eb lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x104) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     (* the crash seam and the era certificate: what turns this block's
@@ -1734,7 +1737,7 @@ Section EndOpBlocks.
     intros HK Hgeom Hj Hgl Hshape Hnd Hwok HLw Hregs Hbelow.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
               Hopen Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
@@ -1782,7 +1785,7 @@ Section EndOpBlocks.
               (log_mirror_at (n, map uint W)
                ∗ ∃ Dc : gmap Z (list (bv 8)), fs_receipt_any Dc)%I lks
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl (conj HnW Hn30)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
                     [Hmirc]").
     all: try lkbelow.
     (* THE COMMIT POINT's fupd (phase C2b/D1 stage 4).  The durable state
@@ -1895,7 +1898,7 @@ Section EndOpBlocks.
               pidv dq A3 (K - 8)%nat eb eb (log_mirror_at (n, map uint W)) lks
               ltac:(pose proof (eo_Kit K HK); lia) Hgeom Hj Hgl (or_introl eq_refl) HA3a0
               (conj HnW Hn30) Hnd Hwok HLw'
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
                     [] [Hmirc]").
     all: try lkbelow.
     (* THE INSTALL fupds, one per entry, out of one generator: each reads the
@@ -2009,7 +2012,7 @@ Section EndOpBlocks.
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
               A5 (K - 8)%nat eb eb log_mirror_clean lks
               ltac:(pose proof (eo_Kwh K HK); lia) Hgeom Hj Hgl Hshape0
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
                     [Hmirc]").
     all: try lkbelow.
     { by iApply big_sepL_nil. }
@@ -2241,9 +2244,10 @@ Section EndOpBlocks.
     cpu_own 0 eb (proc_addr j) eb lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0xb4) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     (* the crash seam and the era certificate: what turns this block's
@@ -2269,7 +2273,7 @@ Section EndOpBlocks.
       intros CID0 t M L Lw Ht Hfuel HLw Hregs HMs2 HMs4 HMs5;
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
               Hopen Hcont".
     iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
@@ -2481,7 +2485,7 @@ Section EndOpBlocks.
               ltac:(reflexivity) ltac:(rewrite Hubnol; exact Hslotcov) ltac:(reflexivity)
               Hj Hgl HA5a0 HA5a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu1").
     all: try lkbelow.
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
@@ -2655,7 +2659,7 @@ Section EndOpBlocks.
               ltac:(reflexivity) ltac:(exact Hwcov) ltac:(reflexivity)
               Hj Hgl HB4a0 HB4a1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hu2").
     all: try lkbelow.
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
@@ -3408,7 +3412,7 @@ Section EndOpBlocks.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Hlt
                 (eo_fuel_step t n fuel Hfuel) HLw' HJ3regs HJ3s2 HJ3s4 HJ3s5
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                       Hopen Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
       assert (Htn : S t = n) by lia.
@@ -3445,7 +3449,7 @@ Section EndOpBlocks.
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
                 HJ3regs Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                       Hopen Hcont").
   Qed.
 
@@ -3713,7 +3717,7 @@ Section ProofEndOp.
     intros HK Hgeom Hj Hgl Hbelow.
     pose proof (locks_below_not_elem _ _ Hbelow) as Hfresh.
     pose proof Hgeom as [Hcovok Hlogsub].
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hop Hcont".
     iDestruct "Hcert" as "(_ & _ & #Hregc)".
     (* [b] and [eb] AGREE at depth 0 -- [CpuOwn.cpu_own_eb_agree], the general
        (index-free) fact, not [cpu_own_forces_on] which needed [eb = true].
@@ -4652,7 +4656,7 @@ Section ProofEndOp.
                   HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok Hbelow
                   CIDs9 0%nat Y4 L (fun _ => []) ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HY4regs HY4s2 HY4s4 HY4s5
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hseam Hregc Hppid Hprocs Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
                         Hopen Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = true).

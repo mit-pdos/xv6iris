@@ -19,8 +19,8 @@
    BeginOp, EndOp, Consolewrite -- see [ProofFilewrite.v]'s [Module
    FilewriteProof] line, which is the only authority on it. *)
 Require Import LinkPipewrite LinkIlock LinkWritei LinkIunlock LinkBeginOp
-                LinkEndOp LinkConsolewrite
+                LinkEndOp LinkConsolewrite LinkPanic
                 ProofFilewrite.
 
 Module Filewrite := FilewriteProof Pipewrite Ilock Writei Iunlock BeginOp
-                                   EndOp Consolewrite.
+                                   EndOp Consolewrite Panic.

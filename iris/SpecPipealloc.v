@@ -70,6 +70,7 @@ Require Import KallocInv.
 Require Import WpLock.
 Require Import WpNext.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpUart.
@@ -140,7 +141,7 @@ Section SpecPipealloc.
 End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !kallocG Σ, !uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
@@ -186,6 +187,7 @@ Definition wp_pipealloc_sconf_body
   kalloc_avail γk on -∗
   (* acquire's [if(holding(lk)) panic] arm, in filealloc / kalloc / fileclose *)
   panic_wp_any -∗
+  panic_env -∗
   (* pipealloc creates TWO references, so it needs two fd slots -- one per
      end of the pipe.  Both come back from the fileclose calls on the error
      paths. *)

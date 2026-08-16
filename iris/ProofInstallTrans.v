@@ -94,6 +94,8 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import CodeInstallTrans.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import SpecBread SpecBwrite SpecBunpin SpecBrelse SpecMemmove.
 Require Import SpecInstallTrans.
 From Kernel Require KernelSyms.
@@ -1223,9 +1225,10 @@ Section InstallTransBlocks.
     cpu_own 0 eb (proc_addr j) eb lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_frozen logstart dev -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1258,7 +1261,7 @@ Section InstallTransBlocks.
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Hregs Hbelow.
     { exfalso. exact (it_fuel_absurd t n Ht Hfuel). }
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlfz Hppid #Hprocs".
     iIntros "#Hdev #Hgeo #Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hrest Hslots".
     iIntros "#Hperm HR Hcont".
     pose proof Hregs as (HMsp & HMs3 & HMs4 & HMs5 & HMs6 & HMs7 & HMs9 & HMs10 & HMs11).
@@ -1453,7 +1456,7 @@ Section InstallTransBlocks.
               ltac:(reflexivity) ltac:(rewrite Hubnol; exact Hslotcov) ltac:(reflexivity)
               Hj Hgl HA5a0 HA5a1
               Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu1").
     all: try lkbelow.
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk1".
@@ -1565,7 +1568,7 @@ Section InstallTransBlocks.
               ltac:(reflexivity) ltac:(exact Hwcov) ltac:(reflexivity)
               Hj Hgl HA9a0 HA9a1
               Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdev Hgeo Hdlock Hu2").
     all: try lkbelow.
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hextc Hextm Hpc Hppid Hlk2".
@@ -2162,7 +2165,7 @@ Section InstallTransBlocks.
                    Lw L D pidv dq m K eb eb R lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa30 (S t) B16 (it_more t n Ht Hmore) (it_fuel_step t n fuel Hfuel)
                 HB16regs Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio [] Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio [] Hppid Hprocs
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hrest
                       Hslots Hperm HR Hcont").
       rewrite /log_frozen. iFrame "Hdevc Hstc".
@@ -2197,7 +2200,7 @@ Section ProofInstallTrans.
     cbv beta delta [wp_install_trans_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hj Hgl Hstage Ha0 Hshape Hnd Hwok HLw Hbelow.
     destruct Hshape as [HnW Hn30].
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlfz Hppid #Hprocs".
     iIntros "#Hdev #Hgeo #Hdlock Hncell Hblks HauthL HauthD Hents Hslots #Hperm HR Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbe. cbn in Hbe. subst b.
     iAssert (it_cont (CID0 := CID)  j bn γfs logstart n W Lw L D pidv dq m K eb eb R lks)
@@ -2768,7 +2771,7 @@ Section ProofInstallTrans.
                 n W Lw L D pidv dq m K eb R lks
                 HK Hgeom Hj Hgl (conj HnW Hn30) Hnd Hwok HLw
                 CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlfz Hppid Hprocs
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hents
                       Hslots Hperm HR Hcont").
   Qed.

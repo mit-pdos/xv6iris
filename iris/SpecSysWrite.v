@@ -88,6 +88,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -219,6 +220,9 @@ Definition wp_sys_write_sconf_body
   (* filewrite's default arm is [panic("filewrite")], and its callees panic
      too; this is theirs *)
   panic_wp_any -∗
+  (* ...and that arm calls panic as an ORDINARY call: [kernel_data] above
+     mints the literal, and this is the console bundle printk needs. *)
+  panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗

@@ -872,7 +872,7 @@ Section KexecB3Body.
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
@@ -1110,7 +1110,7 @@ Section KexecB3Body.
                     change (2 ^ 32)%Z with 4294967296%Z; lia)
               Hjp Hgs HU5a0
               ltac:(rewrite HU5a1; vm_compute; reflexivity) HU5a3 HU5a4'
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hka Hidev Hmeta Hmap
                     Hblocks [Hphb Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1444,7 +1444,7 @@ Section KexecB3Body.
                     with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
                           Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                           Hcont").
-          { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                          Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                          Hdlock"). }
         * (* well-formed so far *)
@@ -1577,7 +1577,7 @@ Section KexecB3Body.
                        with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
                              Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                              Hcont").
-             { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+             { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                             Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                             Hdlock"). }
           -- iApply (wp_bltu_fall_s_sconf (mword_of_int (KXB + 0x15e))
@@ -1710,7 +1710,7 @@ Section KexecB3Body.
                           with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
                                 Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                                 Hcont").
-                { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+                { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                                Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                                Hdlock"). }
              ++ iApply (wp_bnez_x0_fall_s_sconf (mword_of_int (KXB + 0x168))
@@ -2186,7 +2186,7 @@ Section KexecB3Body.
                              with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins
                                    Hbits Hka Hpt Hpriv Hpath Hargv Hargs Helf
                                    Hbs Hirs Hlog Hframe Hcont").
-                   { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab
+                   { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab
                                                   Hitinv Hesc Hslks Hireg Hprocs
                                                   Hdevi Hdgeom Hdlock"). }
                 ** (* ---- the table grew ---- *)
@@ -2634,7 +2634,7 @@ Section KexecB3Body.
                                  HU24s11
                                  with "Hcg Hcnt Htext Hpanic Hpc [] Hka
                                        [-Hcont Hout] Hcont [Hout]").
-                       { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert
+                       { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert
                                                       Hitab Hitinv Hesc Hslks
                                                       Hireg Hprocs Hdevi Hdgeom
                                                       Hdlock"). }
@@ -2830,7 +2830,7 @@ Section KexecB3Body.
                 with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
                       Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                       Hcont").
-      { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+      { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                      Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                      Hdlock"). }
   Qed.
@@ -3187,7 +3187,7 @@ Section KexecB3Close.
                          Hbits & Hbs & #Hka & Hpt & Hpriv & Hpath & Hargv &
                          Hargs & Helf & Hframe)".
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
@@ -3254,7 +3254,7 @@ Section KexecB3Close.
               dqb dqs B2 (K - 68)%nat true true ∅
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock
                     Hbs Hlog").
@@ -3309,7 +3309,7 @@ Section KexecB3Close.
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
               true true ∅ ltac:(lia) Hlg Hjp Hgs
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcrash Hcert
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

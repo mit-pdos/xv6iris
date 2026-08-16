@@ -8,6 +8,6 @@
    piperead, ilock, readi, iunlock -- are real proofs, and readi reaches bmap
    through [BMAP_NOALLOC], so balloc's Axiom does NOT appear here. *)
 Require Import LinkPiperead LinkIlock LinkReadi LinkIunlock LinkConsoleread
-                ProofFileread.
+                LinkPanic ProofFileread.
 
-Module Fileread := FilereadProof Piperead Ilock Readi Iunlock Consoleread.
+Module Fileread := FilereadProof Piperead Ilock Readi Iunlock Consoleread Panic.

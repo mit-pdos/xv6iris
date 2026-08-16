@@ -116,6 +116,8 @@ Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import ProofKforkParts.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioDefs.
@@ -601,10 +603,11 @@ Section ProofSysPipe.
        block cannot frame it: its two crossings are the literal [true]. *)
     trap_csrs_ext eb -∗
     cpu_claim_ext eb p -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int za : mword 64) -∗
     is_ftable γfl γf -∗
     panic_wp_any -∗
+    panic_env -∗
     instr (mword_of_int za : mword 64) false
       (LOAD (mword_of_int 0xfd0 : mword 12, Regidx Rs0, Regidx Ra0, false, 8)) -∗
     instr (mword_of_int zb : mword 64) false (JAL (imm1, Regidx Rra)) -∗
@@ -641,7 +644,7 @@ Section ProofSysPipe.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hnav Hs0 Hr1 Hr2 Hs04 Hs812 Hs1618 Ht1 Ht2 Hbelow.
-    iIntros "Hcg Hcpu Hextc Hextm #Htext Hpc #Hftab #Hpanic Hi0 Hi4 Hi8 Hic Hi10
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hkd Hpc #Hftab #Hpanic #Hpe Hi0 Hi4 Hi8 Hic Hi10
               Hc6 Hc7 Href0 Href1 Hpenv Hfenv Hcont".
     (* depth 0 forces the held set empty, so every [locks_below] the callees
        raise is [locks_below ∅ _], which [lkbelow] closes outright. *)
@@ -684,7 +687,7 @@ Section ProofSysPipe.
       as "[Hfcenv0 Hfcback0]".
     iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on us D2 0%nat eb p nav b lks
               Hnav sp_noff0 HD2a0 Hbelow
-              with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href0 Hfcenv0").
+              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpanic Hpe Href0 Hfcenv0").
     all: try lkbelow.
     iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hextc Hextm Hpc %HcsE1 Hunit0 Hout0".
     iDestruct ("Hfcback0" with "Hout0") as "[Hpenv Hfenv]".
@@ -735,7 +738,7 @@ Section ProofSysPipe.
       as "[Hfcenv1 Hfcback1]".
     iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 us1 F2 0%nat eb p nav b lks
               Hnav sp_noff0 HF2a0 Hbelow
-              with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Href1 Hfcenv1").
+              with "Hcg Hcpu Hextc Hextm Htext Hkd Hpc Hftab Hpanic Hpe Href1 Hfcenv1").
     all: try lkbelow.
     iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hextc Hextm Hpc %HcsG1 Hunit1 Hout1".
     iDestruct ("Hfcback1" with "Hout1") as "[Hpenv Hfenv]".
@@ -980,7 +983,7 @@ Section ProofSysPipe.
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
     set (s10 := m !!! Regidx Rs1).
-    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hftab #Henv Hpriv Hua Hub
+    iIntros "Hcg Hcpu Hextc Hextm #Htext #Hdata Hpc #Hpe #Hftab #Henv Hpriv Hua Hub
               Hpenv Hfenv Hcont".
     (* [eb = b]: sys_pipe's contract pins push_off level 0, so
        [CpuOwn.cpu_own_eb_agree] gives it.  Used ONLY to align the
@@ -1400,7 +1403,7 @@ Section ProofSysPipe.
     iApply (Pipealloc.wp_pipealloc_sconf γfl γf γa γk
               (mword_of_int (KernelSyms.kmem + 24)) Q3 u6 u7 None 0%nat eb p (av - 8)%nat b lks
               Hav24 eq_refl sp_noff0
-              with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpanic Hua Hub Hb6 Hb7").
+              with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hkmem Hkav Hpanic Hpe Hua Hub Hb6 Hb7").
     all: try lkbelow.
     iIntros (CID34 Hcr34 W0) "Hcg Hcpu Hextc Hextm Hpc %HcsW0 Hpost".
     assert (Hpc26 : ret_pc (Q3 !!! Regidx Rra) = mword_of_int (KernelSyms.sys_pipe + 0x26))
@@ -1673,7 +1676,7 @@ Section ProofSysPipe.
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpanic Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID44 Hcr44 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       iSpecialize ("Hepi" $! CID44 with "[%]"); [wp_next_chain|].
       iApply ("Hepi" $! Mr (pv_upt V) (mword_of_int (-1) : mword 64)
@@ -1896,7 +1899,7 @@ Section ProofSysPipe.
                 (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd8) (KernelSyms.sys_pipe + 0xda)
                 (mword_of_int 2091976 : mword 21) (mword_of_int 2091968 : mword 21) b lks
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpanic Hpe Hic8 Hicc Hid0 Hid4 Hid8 Hb6 Hb7 Href0 Href1 Hpenv Hfenv").
       iIntros (CID54 Hcr54 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       iSpecialize ("Hepi" $! CID54 with "[%]"); [wp_next_chain|].
       iApply ("Hepi" $! Mr (pv_upt V) (mword_of_int (-1) : mword 64)
@@ -2395,7 +2398,7 @@ Section ProofSysPipe.
                 (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xb0) (KernelSyms.sys_pipe + 0xb2)
                 (mword_of_int 2092016 : mword 21) (mword_of_int 2092008 : mword 21) b lks
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg Hbelow
-                with "Hcg Hcpu Hextc Hextm Htext Hpc Hftab Hpanic Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
+                with "Hcg Hcpu Hextc Hextm Htext Hdata Hpc Hftab Hpanic Hpe Hia0 Hia4 Hia8 Hiac Hib0 Hb6 Hb7 Hrf0 Hrf1 Hpenv Hfenv").
       iIntros (CID66 Hcr66 Mr) "[%Hmrcs %Hmra5] Hcg Hcpu Hextc Hextm Hpc Hb6 Hb7 Hua Hub Hpenv Hfenv".
       (* +0xb2 c.j +0x28 -- into the shared epilogue *)
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.sys_pipe + 0xb2))

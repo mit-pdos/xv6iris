@@ -8,7 +8,7 @@
    else: the exit path carries no file-system assumption. *)
 Require Import LinkMyproc LinkFileclose LinkBeginOp LinkIput LinkEndOp
                 LinkAcquire LinkReparent LinkWakeup LinkRelease LinkSched
-                ProofKexit.
+                ProofKexit LinkPanic.
 
 Module Kexit := KexitProof Myproc Fileclose BeginOp Iput EndOp
-                          Acquire Reparent Wakeup Release Sched.
+                          Acquire Reparent Wakeup Release Sched Panic.

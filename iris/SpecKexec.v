@@ -159,6 +159,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -344,7 +346,15 @@ Definition fs_fabric
     (g : log_names) (gfs : fs_names) (gi : gname) (cn : ic_names) (gtl : gname)
     (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
     : iProp Σ :=
-  (bio_ctx bn (fs_view gfs gd dev cov) ∗
+  (* THE AMBIENT KERNEL ENVIRONMENT, which every fs contract below this one
+     now also asks for by name: the .rodata image the panic literals come
+     out of, and the console credentials [panic] hands to printk.  Both are
+     persistent and both are supplied once at boot, so putting them in the
+     fabric rather than in each block lemma's premise list is what keeps the
+     kexec cone's dozen internal lemmas unchanged. *)
+  (kernel_data ∗
+   panic_env ∗
+   bio_ctx bn (fs_view gfs gd dev cov) ∗
    log_ctx g bn gfs cov logstart dev ∗
    fs_crash_seam cov logstart ∗
    gen_cert ∗
