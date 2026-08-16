@@ -8938,6 +8938,93 @@ the ingredients of verdict #1 — but spends neither, because the zeroing
 is in W5.  Verdicts #1 and #3 remain W4/W5's to record; #2 is W5-DIR's
 and stays parked.
 
+### W4 IS LANDED — `su_w4` / `su_w4_loop`, AND THE +0x72 SEAM GREW TWO FACTS
+
+`ProofSysUnlink.su_w4` (+0xf8..+0x104, the entry test) and the `Local`
+`su_w4_loop` (+0x106..+0x12c, a fuel induction over the remaining BYTES —
+`Z.to_nat sz <= 16*jj + 16*W`, whose base case is refuted by the loop's own
+`16*jj < Z.to_nat sz`) are the inlined isdirempty.  The interface is exactly
+the recorded one: ip's locked CONTENT (the readi set — `i_dev` half,
+`inode_meta`, `inode_map`, `inode_blocks`), TWO continuations, and an OPAQUE
+frame **`X : iProp Σ`**:
+
+* **`su_w4_exitE`** — ARM E's entry at +0x174, registers at `su_regs` with
+  s3 existential, the buffer back at the found record's bytes.
+* **`su_w4_exitD`** — the empty exit at +0x8a; its payload is BOTH
+  `dir_dots_only dni dati` (the recorded clause) and the raw dead-scan fact
+  `forall k, 2 <= k < nrec -> dir_inum dati k = bv_0 16` — the latter is
+  verbatim `su_dir_links_orphan`'s third premise, so W5-DIR never re-derives
+  it from the dots.
+* **`X` IS HOW ONE LINEAR PACKET SERVES TWO ∗-SEPARATED CONTINUATIONS.**
+  dp's twelve components, the ledger, the frame and the caller's exit all
+  ride in `X`, which the LOOP threads and hands to whichever exit fires —
+  they cannot live in either closure (both would need them) and they must
+  not thread the loop by name (the recorded rule).  The loop spends no log
+  budget and no `dir_*` fragment, as designed; the short read is
+  `Tails.su_panic_readi` and the leftovers drop (iProp is affine).
+* The `tot = 16` fall-through of readi's exact post forces
+  `16*jj + 16 <= sz` (`su_clamp16_in`), so the scanned record is whole and
+  `su_rdd_view`/`su_de_view` (ProofDirlookupParts' byte views, restated)
+  turn the delivered bytes into the `lhu`'s halfword `dir_inum dati jj`.
+* New pure layer: `su_align_8_2` (the lhu's 2-alignment off `su_al`'s
+  slot-29 clause), `su_dots_only_scan` (dots_ix + dead tail →
+  `dir_dots_only`), `su_size_sext`/`su_moi32_id` (the `lw` of ip->size at
+  the compare literal), `su_clamp_le16`/`su_clamp16_in`,
+  `su_nrec_le`/`su_nrec16`, `su_neq_of_eq_*`, `su_rdd_eq`,
+  `su_zext32_unsigned` (W3's inum-bound bridge, pre-landed), `su_dummyV`.
+  `W32Arith.w32_caddiw_moi` is the `c.addiw s3,s3,16` bump — a leaf import,
+  not a parts-file restatement.
+
+**THE SEAM AT +0x72 GAINED TWO PURE FACTS, and `su_w2` was edited and
+re-proven to supply them** — W3 is unwritable against the seam as first
+recorded:
+
+* `⌜(M2 !!! Ra0) = ientry ks⌝` — the a0 dirlookup left, which +0x74's
+  `jal ilock(ip)` reads.  a0 is caller-saved junk in `su_regs`, so no
+  seal-time consumer could reconstruct it (W2's proof has it as
+  `HR13a0`/`Hdla0`).
+* `⌜is_aligned_paddr (Physaddr (pa_stk sp0 27)) 8 = true⌝` — slot 27's own
+  alignment, taken off the points-to at the ONE site that splits it (the
+  recorded rule) and now carried: the epilogue's `su_off_join` needs it
+  back and `su_al` deliberately does not cover slot 27.
+
+**FIVE TRAPS THIS INCREMENT FOUND.**
+
+* **`rgne` REWRITES ONE `rget` OCCURRENCE.**  Every TWO-SOURCE branch leaf
+  (`bne`/`bltu`/`bgeu`) needs `rgne; rgne` before the value rewrites; the
+  failure is *"The LHS of H … does not match any subterm"* on the second
+  register's fact, which reads like a wrong hypothesis and is not.
+* **A RECORD PROJECTION IS A `bv n`, AND EVERY LEAF SLOT WANTS `mword n`.**
+  `dir_inum dati jj` and `di_size dni` both fail elaboration as leaf
+  arguments ("has type bv 16 while it is expected to have type mword ?n").
+  Ascribe at the call AND inside the `set` that names the handed-back map —
+  the ascription leaves no term, so the set still folds.
+* **An `iAssert` OF A `[∗ list]` BIG-OP NEEDS ITS `%I`** or it dies at parse
+  time with *"Unknown interpretation for notation"*.
+* **A FUEL LOOP NEEDS A `cpu_own_transport` AT ITS IH AND AT EVERY EXIT** —
+  five sites in this one lemma.  The callee's continuation rebinds the hart
+  and every plain instruction after it moves it again; the tell is the
+  recorded both-print-identically `iSpecialize` failure at the IH.
+* **REBUILDING `inode_meta` AFTER OPENING ONE FIELD: unfold ONLY that
+  field** in the iAssert goal (`rewrite /inode_meta /i_size; iFrame`) — the
+  other four cells are still in FOLDED form in the context and a
+  fully-unfolded goal sends `iFrame` into conversion.
+
+**The W4 increment's gate.**  Lane `/shared/xv6iris-u7`; the chain was
+verified md5-identical to the working tree as a block before the edit (the
+nine differing files — V1's `ProofCreate`/`ProofSysLink`/`IregDirBit`/... —
+are all OUTSIDE the 208-file chain).  One real staleness trap fired: the
+new `Require Import W32Arith` reached a `.vo` OUTSIDE the old chain, built
+before V1's `RiscvExtras` rebuild — the recorded "partially-built lane"
+inconsistent-assumptions failure, fixed by `make -f CoqMakefile -j3
+ProofSysUnlink.vo` (make sees the dependency mtimes).  `coqc
+ProofSysUnlink.v` ends `EXIT=0`, zero `Error`.  `Print Assumptions` (gate
+compile, in-functor): see the increment's commit message; `su_w4` names
+`Readi.wp_readi_sconf` and (through `Tails.su_panic_readi`) `Iunlockput`/
+`EndOp` module parameters at most, and **no `dir_*` fragment lemma** —
+verdicts #1/#3 are exactly as open as before, W5's to record.  Coverage
+**186/190, sysfile.c 15/16 — unmoved**.
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
 `ProofSysUnlink.v` — **W3, W4, the FILE half of W5, and the seal.**
@@ -8966,11 +9053,21 @@ lands.  The decomposition, with every exit already in hand:
   Its seam is at +0x72 and is described below.
 * **W3, +0x72..+0x88** — `c.sdsp s3`, `ilock(ip)`, the `blez` at +0x7c
   (**`su_panic_nlink`**; its FALL-THROUGH is the only source of
-  `di_nlink ip <> 0`), the T_DIR test at +0x86.
-* **W4, +0x0f8..+0x12c** — the inlined isdirempty, a block lemma whose
-  invariant is `DirView.dir_dots_only` on the SCANNED PREFIX; the short
-  read is **`su_panic_readi`**, the live-record exit is **`su_tail_e`**,
-  and the empty exit rejoins +0x8a.
+  `di_nlink ip <> 0`), the T_DIR test at +0x86.  The T_DIR arm APPLIES
+  `su_w4` (instantiating its `X` with dp's bundle ∗ ledger ∗ frame ∗ the
+  exit; `su_w4_exitE` := destruct `X`, repack both `ic_loaded`s,
+  `Tails.su_tail_e` — its `2*iput_units <= u` from `su_u1_ge9`); both the
+  non-dir fall-through and `su_w4_exitD` land on W3's own +0x8a seam,
+  indexed by `isdir : bool` (payload at `true`: T_DIR ∧ `dir_dots_only` ∧
+  the dead-scan; at `false`: `di_type <> T_DIR_z`), with ip's bundle
+  ∀-bound (`dni bmi dati gili gisli gyi` + the two ref fractions) and the
+  exit handed back.  W5-FILE consumes `isdir = false`; W5-DIR (parked on
+  V2/V3) consumes `true`.
+* **W4, +0x0f8..+0x12c — DONE** (`su_w4` / `su_w4_loop`, see the W4
+  section above): invariant = the DEAD SCANNED PREFIX, exit payload =
+  `dir_dots_only` + the raw dead-scan fact; short read closed by
+  **`su_panic_readi`**; ARM E and the empty exit are the two continuation
+  parameters, `X` the opaque frame both hand back.
 * **W5, +0x8a..+0x0d8** — `memset(&de,0,16)`, `writei(dp,0,&de,off,16)`
   (**`su_panic_writei`** on the short write), where `dir_links_unlink`
   fires CALLER-side and releases the `ilink`; the second T_DIR test at
