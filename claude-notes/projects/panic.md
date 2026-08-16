@@ -242,11 +242,28 @@ baggage — panic touches nothing disk, and it rides along only because
 
 ### THE RECIPE — proven on dirlink (`1f1b328d`), follow it verbatim
 
-**Pick the next site by RIPPLE, not by order.**  Only three of the ten already
-carry `kernel_data` AND `printk_env`, so only those three cost their callers
-nothing: **dirlink (done), filewrite (1 arm), sys_unlink (3 arms)**.  The other
-seven have neither and need both threaded from boot — bread alone has fifteen
-callers.  Do the cheap three first.
+**Pick the next site by RIPPLE, not by order — and TEST THE RIGHT THING.**
+The cheap sites are the ones whose credentials are in scope AT THE PANIC ARM.
+**Grepping a spec file for `kernel_data`/`printk_env` does NOT establish that**,
+and I got filewrite wrong that way: both appear in `SpecFilewrite`, but inside
+`filewrite_fs_env`, which is reached only on the FD_INODE path.  filewrite's
+arm is the "neither pipe, nor device, nor inode" branch, where
+`filewrite_env` reduces to `emp` — so on exactly the path that needs them,
+there are none, and its caller `sys_write` has top-level `kernel_data` but no
+`printk_env`.  filewrite belongs with the expensive sites.
+
+So: **dirlink and sys_unlink were the only cheap ones, and both are DONE.**
+Every one of the remaining eight functions needs `kernel_data` + `panic_env`
+threaded from boot.  That is ONE SWEEP, not eight conversions — do it as such.
+Both are persistent and both come from `ProofMain.mn_grp_printk`, exactly like
+the `panic_wp_any` that is threaded through those files already, so the sweep
+is shaped like the existing threading rather than like new plumbing.
+
+If a Parts file is a plain `Section` rather than a `Module` (ProofFilewriteParts
+is), the shape that works is a NESTED section carrying the ghost classes plus
+panic's contract as a `Hypothesis`, so only the panic lemma gains an argument
+and the caller supplies it from its own `(PN : PANIC)`.  That much was verified
+to compile before filewrite was backed out for the reason above.
 
 `SpecPrintk.printk_env_panic : printk_env γpr γd γv -∗ panic_env` is what makes
 them cheap: printk_env IS panic_env plus an existential γl and the trace
@@ -278,7 +295,13 @@ green without it.
    an evar-valued `lks` is worse.  Pass `lks` EXPLICITLY and discharge every
    side condition with a closed lemma over plain nat/Z/gset
    (`dl_panic_K`, `dl_panic_noff`, `dl_panic_below`, `dl_msg_nz`).
-4. **`nonul` IS AMBIGUOUS in the fs cone** — `DirentEnc`'s is over
+4. **THE `cpu_own` SOURCE HART IS THE LAST CALLEE'S CONTINUATION**, not where
+   that callee was called: readi is invoked at `CID6` and hands `Hown` back at
+   `CID7`, ilock at `CID3`, writei at `D13`.  Read the continuation's
+   `iIntros`, not the application.  `wp_next_chain` spans ONE link, so
+   `CID7 -> CID9` is two hops written out.  Getting it wrong gives
+   "iSpecialize: cannot instantiate (cpu_own ...)".
+5. **`nonul` IS AMBIGUOUS in the fs cone** — `DirentEnc`'s is over
    `list (bv 8)`, `PrintkFmt`'s over `string`.  Qualify it.  And `Require
    Import` is not transitive: `SpecPrintk` must be imported explicitly for
    `printk_env_panic`, even where the contract already mentions `printk_env`.
