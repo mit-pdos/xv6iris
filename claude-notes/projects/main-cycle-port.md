@@ -93,13 +93,15 @@ segment):
   ifetch PMP check allows at Machine with entries unlocked; **fuel
   induction** over `foreach_ZM_up'` with the loop body captured by ltac
   `context` match (never transcribed).  4.9 s, zero axioms.
-- `iris/HartMFetch.v` — `swp_fetch`: the WHOLE fetch, 2.7 s, ~40 lines of
-  script, **taking the `fetch_bytes` fact as a premise**.  It is also the
-  worked example of the early-return walk; read its header for the recipe.
-  What the 4-aligned M-mode path touches is now visible in the statement:
-  seven PC reads and nothing else (Ext_Zca is never read — with bit 1
-  clear the `and_boolM` short-circuits before it — and Ext_Ziccif is a
-  constant true from the config).
+- `iris/HartMFetch.v` — the fetch chain down to the memory-access layer,
+  4.2 s for the file: `hfrun_translateAddr_M` / `swp_translateAddr_M`,
+  `swp_mem_read_M`, `swp_fetch_bytes_M`, `swp_fetch`, and `swp_fetch_M`
+  composing them.  **The one obligation left is `checked_mem_read`.**
+  Read its header for the early-return recipe and for the which-tool
+  judgement.  What the 4-aligned M-mode path touches is now visible in the
+  statements: seven PC reads, mstatus, cur_privilege, and nothing else
+  (Ext_Zca is never read — with bit 1 clear the `and_boolM` short-circuits
+  before it — and Ext_Ziccif is a constant true from the config).
 
 Evidence:
 
@@ -108,24 +110,30 @@ Evidence:
 
 ## Left, in order
 
-1. **`swp_fetch_bytes`, the premise `swp_fetch` is stated against.**
-   `fetch_bytes` is `translateAddr` then `mem_read`; `mem_read` is a
-   PLAIN-`M` bind spine (`swp_bind` applies directly, no context needed)
-   down to `mem_read_priv` → `checked_mem_read`, which is a `cer` region
-   containing `check_pma_with_pmp_priority`, an `untilMT` misalignment
-   loop, `pmpCheck` (HartMPmp's fact) and the memory event.
-   **Which tool where** — this is the one judgement the walk needs:
-   `hfrun` for any maximal stretch whose reads are all pinned and which
-   contains NO memory event (`translateAddr` at Bare, `effectivePrivilege`,
-   `check_pma_with_pmp_priority`); `swp_bind` at plain-`M` spines;
-   `swp_use_cer{,2,3}` inside `cer` regions; the ∀-peel only where reads
-   leave `D` (`pmpCheck`, already done).
+1. **`swp_checked_mem_read`, the one premise the fetch chain is stated
+   against.**  A `cer` region: `check_pma_with_pmp_priority` (hfrun — it
+   reads `pma_regions`, and the PMA region premise is the old file's
+   `Hpallow`), `split_misaligned` and `read_kind_of_flags` (pure), then an
+   `untilMT` loop that runs ONCE for an aligned 4-byte fetch, whose body is
+   `pmpCheck` (HartMPmp's fact) → `within_mmio_readable` (hfrun, reads
+   `htif_tohost_base`) → `read_ram` (THE MEMORY EVENT, `swp_hart_ram_read`
+   with `hread_req_at` computed).
+   **The one unknown is unrolling `untilMT`**: it recurses on an
+   `Acc (Zwf 0) limit` built by `Zwf_guarded`, so a step is a conversion
+   rather than an iota — the `foreach_ZM_up'` fuel trick HartMPmp uses does
+   NOT apply.  Establish a reduction equation for it at an abstract
+   body/cond before walking anything.
+   **Which tool where** — the judgement the whole walk turns on: `hfrun`
+   for any maximal stretch whose reads are all pinned and which contains
+   NO memory event (it does not care about `cer` wrappers); `swp_bind_use`
+   at plain-`M` spines; `swp_use_cer{,2,3}` inside `cer` regions; the
+   ∀-peel only where reads leave `D`.
    **This is also the Qed-debt experiment.**  The old 665 s / 671 s `Qed`s
    covered exactly this stretch — the walk from the minstret chop down to
-   the fetch's `MemRead` — as ONE monolithic goal-side chain.  The fetch
-   layer above it already went from 912 lines / 665 s to 136 lines /
-   2.7 s; whether the rest follows is the real test.  If it does not, that
-   is a finding that changes the plan for item 3.
+   the fetch's `MemRead` — as ONE monolithic goal-side chain.  Everything
+   above `checked_mem_read` has now been rebuilt at 4.2 s for the whole
+   file; whether the last layer follows is the remaining test.  If it does
+   not, that is a finding that changes the plan for item 4.
 2. **`HartMLeaf.v`, rebuilt on `swp`.**  Still RED: it names the deleted
    segment apparatus.  It becomes the composition of the per-function
    facts along `try_step`'s own spine, with the invariant-cell writes
