@@ -200,6 +200,27 @@ Proof.
   cbn [hwrite_resume]. reflexivity.
 Qed.
 
+(* the Bare translation at a STORE: HartMFetch's generic walk, with the two
+   access-dependent premises discharged.  [effectivePrivilege] is the one
+   that needs work -- a store consults MPRV where a fetch short-circuits. *)
+Lemma hfrun_translateAddr_M_store (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) :
+  (mstatus : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  register_lookup cur_privilege rs = Machine ->
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+    (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+  hfrun 8 D Drw rs (translateAddr (Virtaddr pa) (Store Data))
+  = Some (Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), rs).
+Proof.
+  intros HD1 HD2 Hpriv Hmprv.
+  apply (hfrun_translateAddr_M D Drw rs pa _ HD1 HD2 Hpriv); [|reflexivity].
+  unfold effectivePrivilege.
+  change (Instances.generic_neq (Store Data) (InstructionFetch tt))
+    with true.
+  s_glue. rewrite Hmprv. by s_glue.
+Qed.
+
 (* ====================================================================== *)
 (* 2. [mem_write_ea]: the announce pass.  Same shape as                    *)
 (*    [checked_mem_read] -- the PMA check, the split, an [untilMT] that    *)
@@ -369,6 +390,74 @@ Section store.
     rewrite mbind_ret. s_glue.
     rewrite mcer_ret.
     iApply ("Hcont" $! (Values.Ok true)). by iFrame.
+  Qed.
+
+  (* [mem_write_value] -> [mem_write_value_meta] (a plain-M spine) ->
+     [mem_write_value_priv_meta] (one bind over the checked write and a
+     pure callback). *)
+  Lemma swp_mem_write_value (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 4
+                   (Interface.WriteReq.value (mwrite_req pa v)))
+                σ.(mdev)))) -∗
+    swp (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
+           false false false)
+      (fun r => ⌜r = Values.Ok true⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
+      Hmprv Hunlock Hpallow Hram Hpa.
+    iIntros "#Hcert Hrw Hro Hmem".
+    unfold mem_write_value, mem_write_value_meta.
+    iApply (swp_bind_use (Defs.read_reg mstatus) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". rewrite Hpriv.
+    unfold effectivePrivilege.
+    change (Instances.generic_neq (Store Data) (InstructionFetch tt))
+      with true.
+    s_glue. rewrite Hmprv. s_glue.
+    rewrite mbind_ret. s_glue.
+    unfold mem_write_value_priv_meta.
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok true⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+              with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_checked_mem_write Drw Dro Df rs pa v pmar0 pcfg Hdisj
+                HDpma HDcfg HDhtif Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hpa
+                with "Hcert Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    iApply swp_ret. by iFrame.
   Qed.
 
 End store.

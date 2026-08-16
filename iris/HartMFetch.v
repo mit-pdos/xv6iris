@@ -85,7 +85,35 @@ Local Lemma zext_pc_id (x : SailStdpp.Values.mword 64) :
   zero_extend' 64 (bits_of_virtaddr (Virtaddr x)) = x.
 Proof. exact (fetch_pa_id x). Qed.
 
+(* GENERIC IN THE ACCESS.  The Bare-mode translation is access-agnostic;
+   the access enters in exactly two places, and each is a one-line premise
+   the caller discharges -- so the fetch and the store share this walk
+   rather than owning a copy each. *)
 Lemma hfrun_translateAddr_M (D Drw : gset register) (rs : regstate)
+    (pc : SailStdpp.Values.mword 64)
+    (acc : MemoryAccessType mem_payload) :
+  (mstatus : register) ∈ D ->
+  (cur_privilege : register) ∈ D ->
+  register_lookup cur_privilege rs = Machine ->
+  effectivePrivilege acc (register_lookup mstatus rs) Machine
+    = returnM Machine ->
+  is_shadow_stack_access acc = returnM false ->
+  hfrun 8 D Drw rs (translateAddr (Virtaddr pc) acc)
+  = Some (Values.Ok (Physaddr pc, PBMT_PMA, init_ext_ptw), rs).
+Proof.
+  intros HD1 HD2 Hpriv Hep Hss.
+  unfold translateAddr. tr_cbn.
+  tr_read. tr_cbn.
+  tr_read. rewrite Hpriv. tr_cbn.
+  rewrite Hep. tr_cbn.
+  unfold translationMode.
+  change (Instances.generic_eq Machine Machine) with true. tr_cbn.
+  rewrite Hss. tr_cbn.
+  change (Instances.generic_eq Bare Bare) with true. tr_cbn.
+  rewrite zext_pc_id. apply hfrun_ret.
+Qed.
+
+Lemma hfrun_translateAddr_M_ifetch (D Drw : gset register) (rs : regstate)
     (pc : SailStdpp.Values.mword 64) :
   (mstatus : register) ∈ D ->
   (cur_privilege : register) ∈ D ->
@@ -94,17 +122,8 @@ Lemma hfrun_translateAddr_M (D Drw : gset register) (rs : regstate)
   = Some (Values.Ok (Physaddr pc, PBMT_PMA, init_ext_ptw), rs).
 Proof.
   intros HD1 HD2 Hpriv.
-  unfold translateAddr. tr_cbn.
-  tr_read. tr_cbn.
-  tr_read. rewrite Hpriv. tr_cbn.
-  unfold effectivePrivilege.
-  change (Instances.generic_neq (InstructionFetch tt) (InstructionFetch tt))
-    with false. tr_cbn.
-  unfold translationMode.
-  change (Instances.generic_eq Machine Machine) with true. tr_cbn.
-  unfold is_shadow_stack_access. tr_cbn.
-  change (Instances.generic_eq Bare Bare) with true. tr_cbn.
-  rewrite zext_pc_id. apply hfrun_ret.
+  apply (hfrun_translateAddr_M D Drw rs pc _ HD1 HD2 Hpriv);
+    reflexivity.
 Qed.
 
 (* stdpp flags the Z/Pos arithmetic [simpl never], which blocks cbn even
@@ -380,7 +399,8 @@ Section fetch.
   Proof.
     intros Hdisj HDmst HDpriv Hpriv.
     apply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj).
-    exact (hfrun_translateAddr_M (Drw ∪ Dro) Drw rs pc HDmst HDpriv Hpriv).
+    exact (hfrun_translateAddr_M_ifetch (Drw ∪ Dro) Drw rs pc
+             HDmst HDpriv Hpriv).
   Qed.
 
   Lemma swp_mem_read_M (Drw Dro : gset register) (Df : register -> dfrac)
