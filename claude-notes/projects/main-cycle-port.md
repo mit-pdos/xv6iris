@@ -13,11 +13,25 @@ Branch `hart-node-port` (off `main`). The port replaces the whole-instruction
 hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
-**The tree is RED from `MinstretInv.v` up — 971 files — and stays red until
-item 2 lands.** This is by design (design doc §6): `wp_exec_step`'s
-whole-instruction, one-σ witness is unsound under per-node interleaving and
-cannot be re-derived as stated. Iterate with single-file `coqc` or
-`make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a milestone.
+**The tree is RED from `MinstretInv.v` up — 994 of 1181 `.vo` targets — and
+stays red until item 2 lands.** This is by design (design doc §6):
+`wp_exec_step`'s whole-instruction, one-σ witness is unsound under per-node
+interleaving and cannot be re-derived as stated, and `MinstretInv.v:384` is
+the one place that names it — confirmed by a full `make -k`: it is the SOLE
+red root, every other red file is downstream of it.  The 994 is the
+transitive closure of `MinstretInv.vo` in `.CoqMakefile.d` — recount it
+there rather than trusting this number, which has already been stale once.  Iterate with single-file
+`coqc` or `make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a
+milestone (and `-k`, or it stops at the first red root).
+
+**A `.vo` on disk does NOT mean the file is green.**  Measured: 1110 of the
+1173 `.v` have a `.vo`, but only 65 of the 994 red ones are actually
+missing — the other ~929 carry PRE-PORT `.vo` artifacts that `make` never
+touched, because it does not rebuild dependents of a target that failed.
+`coqc` on anything importing one reports *"makes inconsistent assumptions
+over library X"*, which is the real signal and is easy to misread as a
+fresh breakage.  When that appears, rebuild the named dependency; do not
+debug the file.
 
 **The whole-cycle leaf is back.**  `HartMLeaf.wp_word_main_b0` is
 `WP Loop ⊢ WP Loop` for one real kernel instruction (`c.sw a4,0(a5)` at
@@ -169,9 +183,12 @@ Evidence:
 
 1. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
    raw-cell; the old tree's statement for this instruction is the
-   shape-generic, bundle-taking leaf.  (a) the bundles (`mmode_config`/
-   `pc_is`/`gpr_file`/`instr`/`minstret_inv`) are defined at or above the
-   red line, so they cannot be named until item 2; (b) ∀-operand shapes
+   shape-generic, bundle-taking leaf.  (a) FOUR of the five bundles are
+   above the red line — `minstret_inv` (`MinstretInv.v`, the root itself)
+   and `pc_is`/`instr`/`mmode_config` (`InstrBytes.v`, above it) — so they
+   cannot be named until item 2.  **`gpr_file` (`WpGpr.v`) is GREEN and
+   usable today**; do not assume the whole bundle vocabulary is blocked.
+   (b) ∀-operand shapes
    need a once-per-INSTRUCTION-SHAPE decode characterization over the
    ENCODING FUNCTION — the seam is that `instr` pins `decode w = i`, not
    `w = encode i`; (c) `swp_execute_C_SW` is already per-shape, which is
