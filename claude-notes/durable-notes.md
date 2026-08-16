@@ -1322,3 +1322,16 @@ The number goes up; that is the real one.
   our fs contracts' disk-fabric resources (gu/gd/gk) at index 18 —
   the shape decision is the user's conversation with the other line,
   with both parameter lists side by side in the GR-33 ledger entry.
+
+- **THE MIRROR-ONLY RULE ERODES ACROSS RELAY HANDOFFS (2026-08-16
+  incident, second occurrence of the violation class):** compressed
+  relay briefs said "lane tree, -j3" without the EC2 ssh recipe, and
+  successive walk/ledger agents drifted onto the local laptop ("-j3 at
+  15 GB" in several gate reports WAS the laptop; the mirror is 32
+  cores/246GB). RULE: every brief that authorizes a compile must carry
+  the full recipe VERBATIM — ssh -i /shared/xv6iris/aws/ags-fk.pem
+  ubuntu@<mirror-host>, checkout /shared/xv6iris, scp+md5 as a block,
+  build there — and a lane tree is a MIRROR-side object. A gate that
+  ran locally is still a sound gate (a green compile is host-independent);
+  the rule protects the user's machine, so relocation forward suffices —
+  no re-verification owed.
