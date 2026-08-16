@@ -99,21 +99,68 @@ Section PanicEnv.
 
   (* the three persistent credentials the printk cone needs, as one
      hypothesis.  All hart-free, so this crosses a migration untouched. *)
-  Definition panic_env (γpr γl : gname) (γd : uart_names) (γv : disk_names)
+  Definition panic_env_at (γpr γl : gname) (γd : uart_names) (γv : disk_names)
     : iProp Σ :=
     (is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) ∗
      dev_inv γd γv ∗
      is_txlock γl γd)%I.
 
-  Global Instance panic_env_persistent γpr γl γd γv :
-    Persistent (panic_env γpr γl γd γv).
+  Global Instance panic_env_at_persistent γpr γl γd γv :
+    Persistent (panic_env_at γpr γl γd γv).
   Proof. apply _. Qed.
+
+  (* ---- THE GHOST NAMES ARE EXISTENTIAL, AND NOTHING IS LOST BY IT --------
+     A call site threads ONE nameless persistent token; no spec below panic
+     gains a parameter.  Two independent reasons this is not a weakening.
+
+     LOGICALLY it is an equivalence, not an approximation.  With the
+     [uart_sent_sub] premise gone (see the header), all four names occur
+     EXACTLY ONCE in [wp_panic_sconf_body] -- inside this one conjunct -- and
+     none occurs in the conclusion, which is the bare [WP Loop].  So
+     [(∀ γ⃗, panic_env_at γ⃗ -∗ WP Loop)] and [((∃ γ⃗, panic_env_at γ⃗) -∗ WP Loop)]
+     are interderivable by ∃-elimination.  Contrast [SpecConsoleintr.console_caps],
+     which binds its two LOCK names but keeps [γu] a parameter for precisely
+     the missing reason: its [γu] occurs again, in the contract proper.
+
+     PHYSICALLY a caller cannot supply a bogus console, even though the logic
+     cannot state uniqueness.  Every name here is pinned by an exclusive
+     physical resource: [lock_inv γ lk s R] contains [lock_word lk v], the
+     lock word itself, so γpr and γl are determined by the addresses
+     [pk_pr_lock] / [a_tx_lock] that this very definition names; and
+     [dev_inv]'s body holds [uart_frag u], the ghost half of the PHYSICAL
+     device state paired with [uart_auth] inside [state_interp], so at most
+     one (γd, γv) can have a live [dev_inv] at all.
+
+     What each name is: γpr and γl key nothing but their own lock's
+     held-state ghost (pr.lock's resource is [emp]; tx_lock's is [tx_res γd],
+     keyed by γd, NOT by γl).  γd is the only one indexing real resources
+     ([uart_tx_own], [uart_sent], [uart_dlab_off]).  γv is baggage: panic
+     touches nothing disk, and it is here only because [dev_inv] bundles all
+     four devices. *)
+  Definition panic_env : iProp Σ :=
+    (∃ (γpr γl : gname) (γd : uart_names) (γv : disk_names),
+       panic_env_at γpr γl γd γv)%I.
+
+  Global Instance panic_env_persistent : Persistent panic_env.
+  Proof. apply _. Qed.
+
+  Lemma panic_env_intro γpr γl γd γv :
+    panic_env_at γpr γl γd γv -∗ panic_env.
+  Proof. iIntros "#H". iExists γpr, γl, γd, γv. iExact "H". Qed.
+
+  (* the shape a site actually has in hand: the three credentials loose. *)
+  Lemma panic_env_of γpr γl γd γv :
+    is_lock γpr pk_pr_lock "pr"%string (emp : iProp Σ) -∗
+    dev_inv γd γv -∗ is_txlock γl γd -∗ panic_env.
+  Proof.
+    iIntros "#Hl #Hd #Ht". iExists γpr, γl, γd, γv.
+    rewrite /panic_env_at. by iFrame "Hl Hd Ht".
+  Qed.
 
 End PanicEnv.
 
 Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γpr γl : gname) (γd : uart_names) (γv : disk_names)
     (m : regfile) (K : nat)
     (n : nat) (eb : bool) (b : bool) (p : mword 64)
     (dm : pk_arg_desc) (lks : gset string) :=
@@ -131,7 +178,7 @@ Definition wp_panic_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗
   pc_is (mword_of_int KernelSyms.panic) -∗
-  panic_env γpr γl γd γv -∗
+  panic_env -∗
   pk_desc_res msg dm -∗
   WP (Loop : expr riscv_lang).
 
@@ -139,9 +186,8 @@ Module Type PANIC.
   Parameter wp_panic_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string),
-      wp_panic_sconf_body γpr γl γd γv m K n eb b p dm lks.
+      wp_panic_sconf_body m K n eb b p dm lks.
 End PANIC.

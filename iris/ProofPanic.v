@@ -191,15 +191,15 @@ Section ProofPanic.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma wp_panic_sconf
-      (γpr γl : gname) (γd : uart_names) (γv : disk_names)
       (m : regfile) (K : nat)
       (n : nat) (eb : bool) (b : bool) (p : mword 64)
       (dm : pk_arg_desc) (lks : gset string)
-    : wp_panic_sconf_body γpr γl γd γv m K n eb b p dm lks.
+    : wp_panic_sconf_body m K n eb b p dm lks.
   Proof.
     cbv beta zeta delta [wp_panic_sconf_body].
     intros HK Hdm Hn31 Hbelow.
-    iIntros "Hcg Hown #Htext #Hkdata Hpc #Henv Hmsg".
+    iIntros "Hcg Hown #Htext #Hkdata Hpc #Henv0 Hmsg".
+    iDestruct "Henv0" as (γpr γl γd γv) "#Henv".
     iDestruct "Henv" as "(#Hlk & #Hdev & #Htx)".
     (* THE TRACE BASELINE, MINTED HERE RATHER THAN DEMANDED.  printk wants a
        [uart_sent_sub] to extend, but it never inspects it -- see SpecPanic.v's
