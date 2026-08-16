@@ -1784,7 +1784,10 @@ Section ProofSysLinkBody.
                           Hiblk Hiblog Hinb
                           ltac:(exact (sl_setnl_type_stable dn _))
                           ltac:(rewrite /sl_incnl sl_setnl_type; exact Htynz)
-                          ltac:(discriminate)
+                          ltac:(intros od Hc; discriminate Hc)
+                          ltac:(intros _; rewrite /sl_incnl sl_setnl_type;
+                                exact (sl_tdir_zne _ Hty))
+                          ltac:(intros pv Hc; discriminate Hc)
                           ltac:(rewrite /sl_incnl; apply sl_setnl_nlink)
                           Hnl
                           ltac:(rewrite /sl_incnl sl_setnl_addrs; exact Haddreq)

@@ -10779,3 +10779,43 @@ free-slot home in `fslot`'s free arm (`FileInvDefs.v`:849) stands; and
 (B)'s two imports still close no cycle.  **The cone figures did not move at
 all**: 352 / 63 / 12, plus `SpecFilestat.vo` at 5.
 
+
+### THE FUSED V4 + V5′-R INCREMENT LANDS: **(D2) HAS ITS SUPPLIER
+### (`IregDirBit.dir_links_subdir_nlink2`), the T_DIR arm's `b = false`
+### IS REFUTED IN THE WALK, and the seal now waits on (D1) ALONE**
+
+The campaign's V4 (T1′ + the flip + `dlc_lower`) and V5′'s region half
+(the `(wdu, wdt)` split + the fractional parent register + the tagged
+movers) landed as ONE InodeRegion-cone pass — the full record, layer by
+layer, is `fs-fragments-campaign.md`'s fused-increment entry; the V5′
+design of record (the transcribed D1 probe) is the entry above it.
+What this walk's ledger needs to know:
+
+* **`su_w5_dir`'s (D2) premise `2 <= bv_unsigned (di_nlink dnd)` is now
+  SUPPLIED**: the seal derives it by one application of
+  `IregDirBit.dir_links_subdir_nlink2` at the +0x8a seam's T_DIR arm
+  (holdings: dp's `dir_links` + `ireg_inv` + ip's `dinode_at` and its
+  T_DIR test + the found-record facts `kk ∉ {0,1}`, live, non-self —
+  all in the seam's hands), then feeds the premise.  The premise's
+  banner in `ProofSysUnlink.v` says so at the point of use.
+* **`su_w5_dir`'s zeroing now REFUTES `b = false`** through
+  `IregDirBit.ireg_link_not_dir` ((T1′)'s reader) — the exact mirror of
+  the file arm's `ireg_dirbit_ty` step — and pays
+  `dir_links_unlink`'s NEW equality wand (`nlink' + 1 = nlink`, off the
+  landed `su_decr` chain) on the `b = true` arm alone.  `su_w5_file`
+  pays the same wand at `+ 0 =` off `Hnl'v`.  Both calls gained the
+  `kk <> 0` premise, off the already-derived `Hkk0`.
+* **(D1) is the seal's ONLY remaining stop.**  Its carrier is V5′; the
+  region half is BANKED (the register, both fragments, `iparent_agree`,
+  both tagged movers, `ireg_link_root_min2`); the payload half
+  (ticket index-split, the tie, create's tagged mint, the `dotdot_out`
+  extension) and the walk composition are the successor increment's.
+  Do not attempt the `Module … <: SYSUNLINK` seal before it lands.
+* Coverage is UNMOVED; `LinkSysUnlink.v` still supplies `SYSUNLINK`
+  with the Axiom.
+
+**The fused increment's gate figures are in the campaign ledger's entry
+(mirror lane `/home/ubuntu/v4lane`, 334-file closure, EXIT=0, lemma_diff
+CLEAN, coverage 186/190 sysfile 15/16 unmoved, the four seals at the
+standing sets, seven new lemmas Closed).  The mirror lane is left in
+place for the successor increment (P: payload half; W: walk + seal).**

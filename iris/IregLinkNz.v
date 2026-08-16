@@ -94,7 +94,7 @@ Section IregLinkNz.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wd & %gl & %rl & %cl & Hla & %Hlok & %Hrt & %Hdir) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
     iDestruct (link_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -116,8 +116,124 @@ Section IregLinkNz.
       iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
-                wl wd gl cl rl Hlok Hrt Hdir with "Hla Hep"). iExact "Harm". }
+                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
+                with "Hla Hep"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
+  Qed.
+
+  (* ...AND ITS FLAVOURED FORM.  After V4's flip create's [dp->nlink++]
+     mints [ilinkd], and the read-back the fused deposit needs
+     ([DirLinks.dlc_bv_add1_nz_eq]'s nonzero premise) is this same fact
+     off the d-flavoured unit.  Any flavour bounds the SUM below, and
+     (L1) does the rest. *)
+  Lemma ireg_link_nz_fl (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
+      (fl : option (option Z)) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn -∗
+    ilink_fl fl (bv_unsigned inum) ={E}=∗
+    ⌜bv_unsigned (di_nlink dn) <> 0⌝ ∗
+    dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum).
+  Proof.
+    iIntros (HE Hin) "#Hinv Hdn Hfrag".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct (link_wsum_ge with "Hla Hfrag") as %Hw1.
+    rewrite /dinode_at.
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
+    assert (Hdeq : ds !!! islot inum = dn).
+    { specialize (Hcp (islot inum) Hsl).
+      rewrite -ireg_key_split in Hcp. congruence. }
+    assert (Hnz : bv_unsigned (di_nlink dn) <> 0).
+    { rewrite -Hdeq. pose proof (di_nlink_nonneg (ds !!! islot inum)) as Hnn.
+      destruct Hlok as [Hle _]. lia. }
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    { iNext. iExists m. iFrame "Ha".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
+                with "Hla Hep"). iExact "Harm". }
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
+  Qed.
+
+  (* THE ROOT'S MINIMUM AT A HELD UNIT (V5''s consumption, step 2): the
+     strict root clause plus ANY outstanding unit put the root's count at
+     TWO or more -- so a directory whose count is ONE is not the root,
+     which is what lets [dir_links_dotdot_out]'s V5' extension name a
+     create-episode for [ip].  FINDING 3's [nlink ip = 1] is the consumer. *)
+  Lemma ireg_link_root_min2 (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn : dinode)
+      (fl : option (option Z)) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn -∗
+    ilink_fl fl (bv_unsigned inum) ={E}=∗
+    ⌜bv_unsigned inum = ireg_root -> 2 <= bv_unsigned (di_nlink dn)⌝ ∗
+    dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum).
+  Proof.
+    iIntros (HE Hin) "#Hinv Hdn Hfrag".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct (link_wsum_ge with "Hla Hfrag") as %Hw1.
+    rewrite /dinode_at.
+    iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
+    assert (Hdeq : ds !!! islot inum = dn).
+    { specialize (Hcp (islot inum) Hsl).
+      rewrite -ireg_key_split in Hcp. congruence. }
+    rewrite Hdeq in Hrt.
+    assert (Hmin2 : bv_unsigned inum = ireg_root ->
+                    2 <= bv_unsigned (di_nlink dn)).
+    { intro Hz. pose proof (Hrt Hz) as Hlt.
+      pose proof (di_nlink_nonneg dn). lia. }
+    rewrite -Hdeq in Hrt.
+    assert (Hins : <[islot inum := ds !!! islot inum]> ds = ds).
+    { apply list_insert_id, list_lookup_lookup_total_lt. lia. }
+    iMod ("Hclose" with "[Ha Hfsb Harm Hla Hep Hslback Hback]") as "_".
+    { iNext. iExists m. iFrame "Ha".
+      iApply ("Hback" $! m with "[%] [Hfsb Harm Hla Hep Hslback]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |].
+      iSplitL "Hfsb"; [iExact "Hfsb" |].
+      iEval (rewrite -Hins).
+      iApply ("Hslback" $! (ds !!! islot inum) with "[Harm Hla Hep]").
+      rewrite Hkey.
+      iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
+                wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
+                with "Hla Hep"). iExact "Harm". }
+    iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin2.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -165,26 +281,21 @@ Section IregLinkNz.
      which is the only direction this lemma was ever applied in (sys_link's
      [bad:] tail, sys_unlink's decrements).  The tickets themselves still
      say nothing about the home. *)
+  (* V4 NARROWED THIS TO NON-DIRECTORIES, and that is its honest scope:
+     [dlc_lower] pins a LIVE directory's count to exactly [1 + count], so
+     no directory's [nlink] can move with its bytes fixed except by the
+     movers that price the count ([dir_links_dirlink_d], the unlink wand).
+     Every landed caller is at a FILE (sys_link's [bad:] tail refuted
+     T_DIR at ARM E2), where both sides are [emp]. *)
   Lemma dir_links_nlink_drop (self : Z) (dn dn' : dinode)
       (data : nat -> list (bv 8)) :
-    bv_unsigned (di_nlink dn) <> 0 ->
-    bv_unsigned (di_nlink dn') <= bv_unsigned (di_nlink dn) ->
+    bv_unsigned (di_type dn) <> T_DIR_z ->
     di_type dn' = di_type dn ->
-    di_size dn' = di_size dn ->
     dir_links self dn data -∗ dir_links self dn' data.
   Proof.
-    intros Hnz Hle Hty Hsz. rewrite /dir_links Hty Hsz.
-    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z));
-      [| iIntros "_"; done].
-    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
-    iExists F. iSplitR.
-    { iPureIntro.
-      apply (dlc_bound_le F F dn dn' data data Hle); [| exact Hbnd].
-      rewrite Hsz. lia. }
-    iApply (big_sepL_mono with "H").
-    iIntros (kk k0 _) "Hk".
-    iApply (dir_link_at_f_live_agree F F self dn dn' data data k0 Hnz
-              eq_refl eq_refl with "Hk").
+    intros Hnd Hty. rewrite /dir_links Hty.
+    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [Hc | _];
+      [exfalso; exact (Hnd Hc) | iIntros "_"; done].
   Qed.
 
 End IregLinkNz.

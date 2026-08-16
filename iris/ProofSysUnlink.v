@@ -4787,7 +4787,7 @@ Section ProofSysUnlinkBody.
     iDestruct (dir_links_unlink (bv_unsigned dinum) dnd dnW datd data'
                  dirent_zero (dir_nrec (bv_unsigned (di_size dnd))) kk 16
                  Htydz eq_refl Hkklt ltac:(lia) ltac:(lia) su_dz_inum
-                 Hdplive Hkklive Hnotself Hkk1 Hty'v Hsz'v Hrng16
+                 Hdplive Hkklive Hnotself Hkk0 Hkk1 Hty'v Hsz'v Hrng16
                  with "Hdlnkd") as (bfl) "[Hticket Hrepark]".
     destruct bfl.
     { (* [b = true]: the ticket is d-flavoured, so the REGION says the
@@ -5498,18 +5498,21 @@ Section ProofSysUnlinkBody.
     (forall k : nat, (2 <= k)%nat ->
        (k < dir_nrec (bv_unsigned (di_size dni)))%nat ->
        dir_inum dati k = bv_0 16) ->
-    (* ==== THE TWO UNSUPPLIED DESIGN FACTS, taken as PREMISES (FINDING
-       3's precedent: name the wall in ONE place).  Both are true of every
-       reachable state and stated NOWHERE in the model:
-         (D1) the child's [".."] names the parent -- fs-icache
-              §20.17.4's chartered parent-edge carrier, still unwritten as
-              a WALK-reachable fact (the [fdir_dots_index] join serves
-              only a TREE-fragment holder, and this walk holds none);
+    (* ==== THE TWO DESIGN-FACT PREMISES (FINDING 3's precedent: name the
+       wall in ONE place):
+         (D1) the child's [".."] names the parent -- STILL UNSUPPLIED;
+              its carrier is the campaign's V5' (the fractional parent
+              register; increment R is landed, the payload half and the
+              extraction are the successor's).  The seal stays stopped
+              on this one alone.
          (D2) a directory with a live subdirectory entry has [2 <= nlink]
-              -- the ledger bounds the count only from BELOW the other
-              way ((L1): [w <= nlink]), so [dp]'s post-decrement
-              [dir_orphan_clean] re-park has no discharge without it.
-       THE SEAL CANNOT SUPPLY EITHER; see fs-sysfile.md, S7-unlink W5-DIR.
+              -- SUPPLIED since the fused V4+V5' region increment:
+              [IregDirBit.dir_links_subdir_nlink2] derives exactly this
+              conclusion from holdings the +0x8a seam has (dp's payload,
+              the found record's facts, ip's [dinode_at] and its T_DIR
+              test), through (T1')'s plain-flavour refutation and
+              [DirView.dlc_lower].  The seal discharges this premise by
+              ONE application of that lemma before applying this one.
        ==== *)
     bv_unsigned (dir_inum dati 1) = bv_unsigned dinum ->
     2 <= bv_unsigned (di_nlink dnd) ->
@@ -6246,11 +6249,25 @@ Section ProofSysUnlinkBody.
                  datd data'
                  dirent_zero (dir_nrec (bv_unsigned (di_size dnd))) kk 16
                  Htydz eq_refl Hkklt ltac:(lia) ltac:(lia) su_dz_inum
-                 Hdplive Hkklive Hnotself Hkk1 HtyF2 HszF2 Hrng16
+                 Hdplive Hkklive Hnotself Hkk0 Hkk1 HtyF2 HszF2 Hrng16
                  with "Hdlnkd") as (bfl) "[Hticket Hrepark]".
+    (* ===== V4's PAYOFF: the [b = false] flavour is REFUTED, the exact
+       MIRROR of the file arm's [b = true] refutation.  The record being
+       zeroed names [ip], the walk holds [ip]'s own [dinode_at] and its
+       T_DIR test, and a PLAIN ticket against a directory dies on (T1')
+       ([IregDirBit.ireg_link_not_dir]).  The wand's equality then prices
+       the [b = true] arm alone -- the decrement pays exactly one. ===== *)
+    destruct bfl; last first.
+    { iEval (cbn [dlc_fl ilink_fl]) in "Hticket".
+      iEval (rewrite -(su_zext32_unsigned (dir_inum datd kk))) in "Hticket".
+      iApply fupd_wp.
+      iMod (ireg_link_not_dir ⊤ gi gfs inodestart nib
+              (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni
+              ltac:(solve_ndisj) Hinb with "Hireg Hdiati Hticket")
+        as "(%Hndi & _ & _)".
+      destruct (Hndi Htyzi). }
     iDestruct ("Hrepark" with "[%]") as "Hdlnkd2".
-    { rewrite su_setnl_nlink. rewrite <- HdWnd.
-      exact (su_decr_pay _ _ bfl HdecrW). }
+    { cbn. rewrite <- HdWnd. exact (eq_sym HdecrW). }
     (* [dp]'s pure re-park facts, moved DOWN to the decremented record *)
     assert (HiokF2 : inode_ok cov logstart (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
@@ -6768,7 +6785,7 @@ Section ProofSysUnlinkBody.
                     (sign_extend' 64
                        (sign_extend' 12 (mword_of_int 63 : mword 6))
                      : mword 64)) 31 0))))
-              dni bmi c2 (Sb2 : gset Z) false (dlc_fl bfl) pid
+              dni bmi c2 (Sb2 : gset Z) false (dlc_fl true) pid
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               C9 (K - 30)%nat eb b lks
               ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0 Hiblki

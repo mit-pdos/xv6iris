@@ -76,6 +76,7 @@
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers agree csum excl updates local_updates.
+From iris.algebra.lib Require Import dfrac_agree.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
@@ -305,17 +306,38 @@ Definition ityR : cmra := csumR (exclR unitO) (agreeR (leibnizO (bv 16))).
    Filed as a [gmap] under ONE ambient gname ([icfg_link] below) rather
    than one gname per inum, for [icfg_iref]'s reason: a per-inum name
    could not be read off a class. *)
+(* THE d-COMPONENT IS A PAIR AND THE ELEMENT CARRIES A PARENT REGISTER
+   SINCE V5' (fs-fragments-campaign.md, the transcribed probe report).
+   [wd] split into [(wdu, wdt)]: [wdu] counts the [".."]-units (untagged
+   d-flavour -- after V4's flip a directory's [".."] tickets are
+   d-flavoured too, so this component is NOT bounded), [wdt] the ONE
+   parent-record unit (tagged, <= 1 by [InodeRegion.ireg_par_ok]).  [p]
+   is the parent REGISTER: fractional agreement on the parent's inum,
+   allocated at create's tagged mint, reset to [None] at the tagged
+   spend -- fractional and not persistent, because a persistent agree
+   would survive a free and block (or falsify) the re-mint at inum reuse
+   (V5' Correction 1, §20.9(b)). *)
 Definition linkElemUR : ucmra :=
-  prodUR (prodUR (prodUR (prodUR natUR natUR) natUR)
-                 (optionUR (exclR unitO))) natUR.
+  prodUR (prodUR (prodUR (prodUR (prodUR natUR (prodUR natUR natUR)) natUR)
+                 (optionUR (exclR unitO))) natUR)
+         (optionUR (dfrac_agreeR (leibnizO Z))).
 
 Definition linkUR : ucmra := gmapUR Z (authR linkElemUR).
 
-(* the ledger element, spelled so no proof below has to nest five
+(* the ledger element, spelled so no proof below has to nest seven
    projections by hand.  [lelem] is named ONLY inside this file (verified
-   by grep), which is what made the [w]-widening a local edit. *)
-Definition lelem (wl wd g : nat) (c : option (excl unit)) (r : nat)
-  : linkElemUR := ((((wl, wd), g), c), r).
+   by grep), which is what made the [w]-widening -- and now the V5'
+   widening -- a local edit. *)
+Definition lelem (wl wdu wdt g : nat) (c : option (excl unit)) (r : nat)
+    (p : option (dfrac_agreeR (leibnizO Z)))
+  : linkElemUR := (((((wl, (wdu, wdt)), g), c), r), p).
+
+(* the register's two spellings: the WHOLE register (authority side) and
+   a HALF (each fragment side) *)
+Definition lreg (pv : Z) : dfrac_agreeR (leibnizO Z) :=
+  to_frac_agree 1 (pv : leibnizO Z).
+Definition lreg_half (pv : Z) : dfrac_agreeR (leibnizO Z) :=
+  to_frac_agree (1/2) (pv : leibnizO Z).
 
 (* ---- THE CHECKOUT DEPOSIT'S DESCRIPTOR (design §14.8) ----------------
 
@@ -662,13 +684,15 @@ Section IcacheLink.
   Definition link_frag_e (z : Z) (b : linkElemUR) : iProp Σ :=
     own icfg_link ({[ z := ◯ b ]} : linkUR).
 
-  Definition link_auth (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) : iProp Σ := link_auth_e z (lelem wl wd g c r).
+  Definition link_auth (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) : iProp Σ :=
+    link_auth_e z (lelem wl wdu wdt g c r p).
 
   (* THE THREE COLOURS, THE DIRECTORY FLAVOUR AND THE REFERENCE LICENCE.
      Each is one unit of one component and nothing of the others, so they
      compose freely. *)
-  Definition ilink (z : Z) : iProp Σ := link_frag_e z (lelem 1 0 0 None 0).
+  Definition ilink (z : Z) : iProp Σ :=
+    link_frag_e z (lelem 1 0 0 0 None 0 None).
 
   (* THE COUNT-FACT CARRIER (S7-unlink FINDING 3, V1).  [ilinkd z] is an
      [ilink z] that ALSO certifies [z] is a directory: it pays for exactly
@@ -683,34 +707,66 @@ Section IcacheLink.
      would have to move the authority, which no consumer holds.  A caller
      that wants the plain reading spends its [ilinkd] at the flavoured
      contract. *)
-  Definition ilinkd (z : Z) : iProp Σ := link_frag_e z (lelem 0 1 0 None 0).
+  (* SINCE V5' [ilinkd] IS THE *UNTAGGED* d-UNIT ([wdu]): a [".."]-record's
+     ticket, of which a directory holds one per subdirectory.  V1's
+     consumers are unchanged -- (T1) reads the d-SUM [wdu + wdt]. *)
+  Definition ilinkd (z : Z) : iProp Σ :=
+    link_frag_e z (lelem 0 1 0 0 None 0 None).
 
-  Definition igrey (z : Z) : iProp Σ := link_frag_e z (lelem 0 0 1 None 0).
+  (* THE TAGGED PARENT-RECORD UNIT AND ITS PAYLOAD HALF (V5').  [ilinkdp
+     z pv] is ONE unit of payment ([wdt = 1]) that also carries half the
+     parent register -- "z's record in its parent, and that parent is
+     [pv]".  [iparent z pv] is the other half, fraction only: it pays for
+     nothing and rides in z's OWN payload as the [".."]-tie.  Their
+     composition holds the register at fraction 1, which is what makes
+     the tagged spend's reset ([Some (lreg pv) -> None]) frame-preserving
+     -- and is why neither half is persistent (V5' Correction 1). *)
+  Definition ilinkdp (z : Z) (pv : Z) : iProp Σ :=
+    link_frag_e z (lelem 0 0 1 0 None 0 (Some (lreg_half pv))).
+  Definition iparent (z : Z) (pv : Z) : iProp Σ :=
+    link_frag_e z (lelem 0 0 0 0 None 0 (Some (lreg_half pv))).
+
+  Definition igrey (z : Z) : iProp Σ :=
+    link_frag_e z (lelem 0 0 0 1 None 0 None).
   Definition iclaim (z : Z) : iProp Σ :=
-    link_frag_e z (lelem 0 0 0 (Some (Excl tt)) 0).
-  Definition iref_lic (z : Z) : iProp Σ := link_frag_e z (lelem 0 0 0 None 1).
+    link_frag_e z (lelem 0 0 0 0 (Some (Excl tt)) 0 None).
+  Definition iref_lic (z : Z) : iProp Σ :=
+    link_frag_e z (lelem 0 0 0 0 None 1 None).
 
-  (* THE OPTION-FLAVOUR INDEX (R6's [filled]-retrofit precedent).  Every
-     landed consumer instantiates [None] and reads [ilink] verbatim, by
-     iota; [Some tt] is the d-flavoured form.  It lives here, beside the two
-     fragments, so that [SpecIupdate]'s indexed contracts need no import
-     they do not already have. *)
-  Definition ilink_fl (fl : option unit) (z : Z) : iProp Σ :=
-    match fl with None => ilink z | Some _ => ilinkd z end.
+  (* THE OPTION-FLAVOUR INDEX (R6's [filled]-retrofit precedent), WIDENED
+     BY V5' from [option unit] to [option (option Z)].  Every landed
+     consumer instantiates [None] and reads [ilink] verbatim, by iota;
+     [Some None] is the untagged d-flavour (V1's [Some tt]); [Some (Some
+     pv)] is the TAGGED form, and it is the PAIR -- the payment unit and
+     the payload half travel together out of the mint and back into the
+     spend, and the one consumer that splits them (create's mkdir
+     deposits) does so explicitly.  It lives here, beside the fragments,
+     so that [SpecIupdate]'s indexed contracts need no import they do not
+     already have. *)
+  Definition ilink_fl (fl : option (option Z)) (z : Z) : iProp Σ :=
+    match fl with
+    | None => ilink z
+    | Some None => ilinkd z
+    | Some (Some pv) => (ilinkdp z pv ∗ iparent z pv)%I
+    end.
 
   Global Instance link_auth_e_timeless z a : Timeless (link_auth_e z a).
   Proof. apply _. Qed.
   Global Instance link_frag_e_timeless z b : Timeless (link_frag_e z b).
   Proof. apply _. Qed.
-  Global Instance link_auth_timeless z wl wd g c r :
-    Timeless (link_auth z wl wd g c r).
+  Global Instance link_auth_timeless z wl wdu wdt g c r p :
+    Timeless (link_auth z wl wdu wdt g c r p).
   Proof. apply _. Qed.
   Global Instance ilink_timeless z : Timeless (ilink z).
   Proof. apply _. Qed.
   Global Instance ilinkd_timeless z : Timeless (ilinkd z).
   Proof. apply _. Qed.
+  Global Instance ilinkdp_timeless z pv : Timeless (ilinkdp z pv).
+  Proof. apply _. Qed.
+  Global Instance iparent_timeless z pv : Timeless (iparent z pv).
+  Proof. apply _. Qed.
   Global Instance ilink_fl_timeless fl z : Timeless (ilink_fl fl z).
-  Proof. destruct fl; apply _. Qed.
+  Proof. destruct fl as [[pv |] |]; apply _. Qed.
   Global Instance igrey_timeless z : Timeless (igrey z).
   Proof. apply _. Qed.
   Global Instance iclaim_timeless z : Timeless (iclaim z).
@@ -734,63 +790,118 @@ Section IcacheLink.
     iPureIntro. exact (proj1 (proj1 (auth_both_valid_discrete _ _) Hv)).
   Qed.
 
-  Lemma link_agree (z : Z) (wl wd g : nat) (c : option (excl unit)) (r : nat)
-      (wl' wd' g' : nat) (c' : option (excl unit)) (r' : nat) :
-    link_auth z wl wd g c r -∗ link_frag_e z (lelem wl' wd' g' c' r') -∗
-    ⌜(wl' <= wl)%nat /\ (wd' <= wd)%nat /\ (g' <= g)%nat /\ (r' <= r)%nat⌝.
+  Lemma link_agree (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z)))
+      (wl' wdu' wdt' g' : nat) (c' : option (excl unit)) (r' : nat)
+      (p' : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p -∗
+    link_frag_e z (lelem wl' wdu' wdt' g' c' r' p') -∗
+    ⌜(wl' <= wl)%nat /\ (wdu' <= wdu)%nat /\ (wdt' <= wdt)%nat
+     /\ (g' <= g)%nat /\ (r' <= r)%nat /\ p' ≼ p⌝.
   Proof.
     iIntros "Ha Hb".
     iDestruct (link_agree_e with "Ha Hb") as %Hincl.
     iPureIntro.
     rewrite /lelem in Hincl.
+    apply prod_included in Hincl as [Hincl Hp].
     apply prod_included in Hincl as [Hincl Hr].
     apply prod_included in Hincl as [Hincl _].
     apply prod_included in Hincl as [Hincl Hg].
     apply prod_included in Hincl as [Hwl Hwd].
-    apply nat_included in Hwl. apply nat_included in Hwd.
-    apply nat_included in Hg. apply nat_included in Hr. auto.
+    apply prod_included in Hwd as [Hwdu Hwdt].
+    apply nat_included in Hwl. apply nat_included in Hwdu.
+    apply nat_included in Hwdt.
+    apply nat_included in Hg. apply nat_included in Hr.
+    split_and!; assumption.
   Qed.
 
   (* THE ONE LINE §20.2 CALLS THE PAYOFF's first half. *)
-  Lemma link_w_ge (z : Z) (wl wd g : nat) (c : option (excl unit)) (r : nat) :
-    link_auth z wl wd g c r -∗ ilink z -∗ ⌜(1 <= wl)%nat⌝.
+  Lemma link_w_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p -∗ ilink z -∗ ⌜(1 <= wl)%nat⌝.
   Proof.
     iIntros "Ha Hb". rewrite /ilink.
-    iDestruct (link_agree with "Ha Hb") as %(H & _ & _ & _). done.
+    iDestruct (link_agree with "Ha Hb") as %(H & _ & _ & _ & _ & _). done.
   Qed.
 
   (* ...and its d-flavoured twin, which is what the region's (T1) clause is
-     read through ([InodeRegion.ireg_dir_ok], [IregDirBit.ireg_dirbit_ty]). *)
-  Lemma link_wd_ge (z : Z) (wl wd g : nat) (c : option (excl unit)) (r : nat) :
-    link_auth z wl wd g c r -∗ ilinkd z -∗ ⌜(1 <= wd)%nat⌝.
+     read through ([InodeRegion.ireg_dir_ok], [IregDirBit.ireg_dirbit_ty]).
+     Since V5' this is the UNTAGGED component's bound. *)
+  Lemma link_wd_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p -∗ ilinkd z -∗ ⌜(1 <= wdu)%nat⌝.
   Proof.
     iIntros "Ha Hb". rewrite /ilinkd.
-    iDestruct (link_agree with "Ha Hb") as %(_ & H & _ & _). done.
+    iDestruct (link_agree with "Ha Hb") as %(_ & H & _ & _ & _ & _). done.
   Qed.
 
-  (* the flavour-indexed reading: EITHER flavour forces the SUM up, which is
-     (L1)'s side of the widening and the only thing a spender needs. *)
-  Lemma link_wsum_ge (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) (fl : option unit) :
-    link_auth z wl wd g c r -∗ ilink_fl fl z -∗ ⌜(1 <= wl + wd)%nat⌝.
+  (* ...the TAGGED unit's: it forces [wdt] up AND pins the register's
+     value (fractional inclusion + the slot clause's full-fraction shape
+     is read region-side; here only the count and the raw inclusion). *)
+  Lemma link_wdt_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (pv : Z) :
+    link_auth z wl wdu wdt g c r p -∗ ilinkdp z pv -∗
+    ⌜(1 <= wdt)%nat /\ Some (lreg_half pv) ≼ p⌝.
   Proof.
-    iIntros "Ha Hb". destruct fl as [[] |]; cbn.
+    iIntros "Ha Hb". rewrite /ilinkdp.
+    iDestruct (link_agree with "Ha Hb") as %(_ & _ & H & _ & _ & Hp).
+    iPureIntro. split; [exact H | exact Hp].
+  Qed.
+
+  (* ...and the payload half's: inclusion of the register only. *)
+  Lemma link_par_incl (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) (pv : Z) :
+    link_auth z wl wdu wdt g c r p -∗ iparent z pv -∗
+    ⌜Some (lreg_half pv) ≼ p⌝.
+  Proof.
+    iIntros "Ha Hb". rewrite /iparent.
+    iDestruct (link_agree with "Ha Hb") as %(_ & _ & _ & _ & _ & Hp). done.
+  Qed.
+
+  (* THE AGREEMENT, FRAGMENT AGAINST FRAGMENT (V5''s payoff): no region
+     open, no authority -- ½ + ½ <= 1 and the agree component collapse
+     the two values.  This is the one line D1 falls through. *)
+  Lemma iparent_agree (z : Z) (pv pv' : Z) :
+    ilinkdp z pv -∗ iparent z pv' -∗ ⌜pv = pv'⌝.
+  Proof.
+    rewrite /ilinkdp /iparent /link_frag_e. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    rewrite singleton_op singleton_valid -auth_frag_op auth_frag_valid in Hv.
+    iPureIntro. rewrite /lelem in Hv.
+    destruct Hv as [_ Hp]. cbn in Hp.
+    rewrite Some_valid /lreg_half in Hp.
+    apply frac_agree_op_valid_L in Hp as [_ Heq].
+    exact Heq.
+  Qed.
+
+  (* the flavour-indexed reading: EVERY flavour forces the SUM up, which is
+     (L1)'s side of the widening and the only thing a spender needs. *)
+  Lemma link_wsum_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z)))
+      (fl : option (option Z)) :
+    link_auth z wl wdu wdt g c r p -∗ ilink_fl fl z -∗
+    ⌜(1 <= wl + wdu + wdt)%nat⌝.
+  Proof.
+    iIntros "Ha Hb". destruct fl as [[pv |] |]; cbn.
+    - iDestruct "Hb" as "[Hb _]".
+      iDestruct (link_wdt_ge with "Ha Hb") as %[H _]. iPureIntro. lia.
     - iDestruct (link_wd_ge with "Ha Hb") as %H. iPureIntro. lia.
     - iDestruct (link_w_ge with "Ha Hb") as %H. iPureIntro. lia.
   Qed.
 
-  Lemma link_r_ge (z : Z) (wl wd g : nat) (c : option (excl unit)) (r : nat) :
-    link_auth z wl wd g c r -∗ iref_lic z -∗ ⌜(1 <= r)%nat⌝.
+  Lemma link_r_ge (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p -∗ iref_lic z -∗ ⌜(1 <= r)%nat⌝.
   Proof.
     iIntros "Ha Hb". rewrite /iref_lic.
-    iDestruct (link_agree with "Ha Hb") as %(_ & _ & _ & H). done.
+    iDestruct (link_agree with "Ha Hb") as %(_ & _ & _ & _ & H & _). done.
   Qed.
 
   (* THE CLAIM AGREES rather than bounds: [Excl ()] has no proper
      extension, so an outstanding token pins the authority's slot. *)
-  Lemma link_claim_agree (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c r -∗ iclaim z -∗ ⌜c = Some (Excl tt)⌝.
+  Lemma link_claim_agree (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p -∗ iclaim z -∗ ⌜c = Some (Excl tt)⌝.
   Proof.
     rewrite /link_auth /iclaim /link_auth_e /link_frag_e. iIntros "Ha Hb".
     iDestruct (own_valid_2 with "Ha Hb") as %Hv.
@@ -798,8 +909,9 @@ Section IcacheLink.
     apply auth_both_valid_discrete in Hv as [Hincl Hval].
     iPureIntro. rewrite /lelem in Hincl, Hval.
     apply prod_included in Hincl as [Hincl _].
+    apply prod_included in Hincl as [Hincl _].
     apply prod_included in Hincl as [_ Hc]. cbn in Hc.
-    destruct Hval as [[_ Hcv] _]. cbn in Hcv.
+    destruct Hval as [[[_ Hcv] _] _]. cbn in Hcv.
     destruct c as [y |]; last first.
     { exfalso. apply option_included in Hc as [Hc | (x & y & _ & Hy & _)];
         [discriminate | discriminate]. }
@@ -813,7 +925,7 @@ Section IcacheLink.
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
     rewrite singleton_op singleton_valid -auth_frag_op auth_frag_valid in Hv.
     iPureIntro. rewrite /lelem in Hv.
-    destruct Hv as [[_ Hc] _]. cbn in Hc. exact Hc.
+    destruct Hv as [[[_ Hc] _] _]. cbn in Hc. exact Hc.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -833,7 +945,7 @@ Section IcacheLink.
      ("Cannot find witness"), so the allocating form takes the spelled
      one and the conversion happens once, here. *)
   Lemma link_update_alloc (z : Z) (a a' b' : linkElemUR) :
-    (a, lelem 0 0 0 None 0) ~l~> (a', b') ->
+    (a, lelem 0 0 0 0 None 0 None) ~l~> (a', b') ->
     link_auth_e z a ==∗ link_auth_e z a' ∗ link_frag_e z b'.
   Proof.
     intros Hlu. rewrite /link_auth_e /link_frag_e. iIntros "Ha".
@@ -857,9 +969,10 @@ Section IcacheLink.
 
   (* MINT ONE [ilink] -- the record's own [nlink++] is what pays for it
      (§20.6's mkdir/sys_link rows), so the caller re-establishes (L1). *)
-  Lemma link_mint_link (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c r ==∗ link_auth z (S wl) wd g c r ∗ ilink z.
+  Lemma link_mint_link (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p ==∗
+    link_auth z (S wl) wdu wdt g c r p ∗ ilink z.
   Proof.
     rewrite /link_auth /ilink. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
@@ -868,16 +981,18 @@ Section IcacheLink.
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
     apply nat_local_update. lia.
   Qed.
 
-  (* ...AND ITS d-FLAVOURED TWIN.  The same one unit of payment, filed in
-     the component that carries (T1); the caller owes the region the type
-     fact, which is exactly [InodeRegion.ireg_write_link_fl]'s extra
-     premise. *)
-  Lemma link_mint_linkd (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c r ==∗ link_auth z wl (S wd) g c r ∗ ilinkd z.
+  (* ...AND ITS UNTAGGED d-FLAVOURED TWIN.  The same one unit of payment,
+     filed in the component that carries (T1); the caller owes the region
+     the type fact, which is exactly [InodeRegion.ireg_write_link_fl]'s
+     extra premise. *)
+  Lemma link_mint_linkd (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p ==∗
+    link_auth z wl (S wdu) wdt g c r p ∗ ilinkd z.
   Proof.
     rewrite /link_auth /ilinkd. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
@@ -885,19 +1000,68 @@ Section IcacheLink.
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [apply link_lu_id |].
+    apply prod_local_update'; [| apply link_lu_id].
     apply nat_local_update. lia.
+  Qed.
+
+  (* ...AND THE TAGGED MINT (V5').  Legal only at [wdt = 0] and
+     [p = None] -- which is what [InodeRegion.ireg_par_ok] hands the one
+     minting site (create's +0xc4, where the pre-record's [nlink = 0]
+     collapses every count).  It allocates the register at fraction ONE
+     and pays out the two halves: the payment unit [ilinkdp] and the
+     payload half [iparent]. *)
+  Lemma link_mint_linkdp (z : Z) (wl wdu g : nat) (c : option (excl unit))
+      (r : nat) (pv : Z) :
+    link_auth z wl wdu 0 g c r None ==∗
+    link_auth z wl wdu 1 g c r (Some (lreg pv))
+    ∗ ilinkdp z pv ∗ iparent z pv.
+  Proof.
+    rewrite /link_auth /ilinkdp /iparent. iIntros "Ha".
+    assert (Hsp : (lelem 0 0 1 0 None 0 (Some (lreg pv)) : linkElemUR)
+                  ≡ lelem 0 0 1 0 None 0 (Some (lreg_half pv))
+                    ⋅ lelem 0 0 0 0 None 0 (Some (lreg_half pv))).
+    { rewrite /lelem /lreg /lreg_half.
+      rewrite -!pair_op -Some_op -frac_agree_op Qp.div_2. reflexivity. }
+    iAssert (|==> link_auth_e z (lelem wl wdu 1 g c r (Some (lreg pv)))
+             ∗ link_frag_e z
+                 (lelem 0 0 1 0 None 0 (Some (lreg_half pv))
+                  ⋅ lelem 0 0 0 0 None 0 (Some (lreg_half pv))))%I
+      with "[Ha]" as ">[Hauth Hfr]".
+    { iApply (link_update_alloc with "Ha").
+      rewrite -Hsp.
+      rewrite /lelem.
+      apply prod_local_update'.
+      - apply prod_local_update'; [| apply link_lu_id].
+        apply prod_local_update'; [| apply link_lu_id].
+        apply prod_local_update'; [| apply link_lu_id].
+        apply prod_local_update'; [apply link_lu_id |].
+        apply prod_local_update'; [apply link_lu_id |].
+        apply nat_local_update. lia.
+      - apply alloc_option_local_update.
+        rewrite /lreg /to_frac_agree.
+        apply pair_valid. split; done. }
+    rewrite /link_frag_e.
+    iEval (rewrite auth_frag_op -singleton_op own_op) in "Hfr".
+    iDestruct "Hfr" as "[Hf1 Hf2]".
+    iModIntro.
+    iSplitL "Hauth"; [iExact "Hauth" |].
+    iSplitL "Hf1"; [iExact "Hf1" | iExact "Hf2"].
   Qed.
 
   (* SPEND ONE -- sys_unlink's [ip->nlink--] (§20.6), the only lowering. *)
-  Lemma link_spend_link (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z (S wl) wd g c r -∗ ilink z ==∗ link_auth z wl wd g c r.
+  Lemma link_spend_link (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z (S wl) wdu wdt g c r p -∗ ilink z ==∗
+    link_auth z wl wdu wdt g c r p.
   Proof.
     rewrite /link_auth /ilink. iIntros "Ha Hb".
-    iMod (link_update _ _ _ (lelem wl wd g c r) (lelem 0 0 0 None 0)
+    iMod (link_update _ _ _ (lelem wl wdu wdt g c r p)
+            (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
     rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
@@ -905,31 +1069,76 @@ Section IcacheLink.
     apply nat_local_update. lia.
   Qed.
 
-  Lemma link_spend_linkd (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl (S wd) g c r -∗ ilinkd z ==∗ link_auth z wl wd g c r.
+  Lemma link_spend_linkd (z : Z) (wl wdu wdt g : nat)
+      (c : option (excl unit)) (r : nat)
+      (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl (S wdu) wdt g c r p -∗ ilinkd z ==∗
+    link_auth z wl wdu wdt g c r p.
   Proof.
     rewrite /link_auth /ilinkd. iIntros "Ha Hb".
-    iMod (link_update _ _ _ (lelem wl wd g c r) (lelem 0 0 0 None 0)
+    iMod (link_update _ _ _ (lelem wl wdu wdt g c r p)
+            (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
     rewrite /lelem.
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [apply link_lu_id |].
+    apply prod_local_update'; [| apply link_lu_id].
     apply nat_local_update. lia.
+  Qed.
+
+  (* ...AND THE TAGGED SPEND (V5').  Consumes BOTH halves -- fraction ONE
+     of the register -- so the reset to [None] is frame-preserving: any
+     third frame of the register would push the fraction past one.  The
+     register is clean before the inum can ever be reclaimed, which is
+     the whole of Correction 1. *)
+  Lemma link_spend_linkdp (z : Z) (wl wdu g : nat) (c : option (excl unit))
+      (r : nat) (pv : Z) :
+    link_auth z wl wdu 1 g c r (Some (lreg pv)) -∗
+    ilinkdp z pv -∗ iparent z pv ==∗
+    link_auth z wl wdu 0 g c r None.
+  Proof.
+    rewrite /link_auth /ilinkdp /iparent /link_frag_e. iIntros "Ha Hb Hc".
+    assert (Hsp : (lelem 0 0 1 0 None 0 (Some (lreg pv)) : linkElemUR)
+                  ≡ lelem 0 0 1 0 None 0 (Some (lreg_half pv))
+                    ⋅ lelem 0 0 0 0 None 0 (Some (lreg_half pv))).
+    { rewrite /lelem /lreg /lreg_half.
+      rewrite -!pair_op -Some_op -frac_agree_op Qp.div_2. reflexivity. }
+    iDestruct (own_op with "[$Hb $Hc]") as "Hb".
+    iEval (rewrite singleton_op -auth_frag_op) in "Hb".
+    iAssert (|==> link_auth_e z (lelem wl wdu 0 g c r None)
+             ∗ link_frag_e z (lelem 0 0 0 0 None 0 None))%I
+      with "[Ha Hb]" as ">[Hauth _]"; last first.
+    { iModIntro. iExact "Hauth". }
+    iApply (link_update with "Ha [Hb]").
+    2:{ rewrite /link_frag_e. iExact "Hb". }
+    rewrite -Hsp.
+    rewrite /lelem.
+    apply prod_local_update'.
+    - apply prod_local_update'; [| apply link_lu_id].
+      apply prod_local_update'; [| apply link_lu_id].
+      apply prod_local_update'; [| apply link_lu_id].
+      apply prod_local_update'; [apply link_lu_id |].
+      apply prod_local_update'; [apply link_lu_id |].
+      apply nat_local_update. lia.
+    - apply delete_option_local_update.
+      rewrite /lreg /to_frac_agree. apply _.
   Qed.
 
   (* THE GREY CONVERSION (§20.8): one paid record becomes an unpaid one,
      and (L1) falls on both sides at once. *)
-  Lemma link_grey_of_link (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z (S wl) wd g c r -∗ ilink z ==∗
-    link_auth z wl wd (S g) c r ∗ igrey z.
+  Lemma link_grey_of_link (z : Z) (wl wdu wdt g : nat)
+      (c : option (excl unit)) (r : nat)
+      (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z (S wl) wdu wdt g c r p -∗ ilink z ==∗
+    link_auth z wl wdu wdt (S g) c r p ∗ igrey z.
   Proof.
     rewrite /link_auth /ilink /igrey. iIntros "Ha Hb".
     iApply (link_update with "Ha Hb").
     rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update';
@@ -962,13 +1171,15 @@ Section IcacheLink.
      that observed nothing.  §20.16.3's wall is independent of this (it is
      [ireg_withdraw]'s, not [g]'s), so nothing that stands today falls; what
      is given up is a repair route, knowingly. *)
-  Lemma link_mint_grey (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c r ==∗ link_auth z wl wd (S g) c r ∗ igrey z.
+  Lemma link_mint_grey (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p ==∗
+    link_auth z wl wdu wdt (S g) c r p ∗ igrey z.
   Proof.
     rewrite /link_auth /igrey. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
     rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [apply link_lu_id |].
@@ -978,52 +1189,63 @@ Section IcacheLink.
   (* THE CLAIM.  Mintable exactly when the slot is empty, which is what
      (L3)'s second half delivers at a type-0 record (§20.5) -- and what
      the free must re-establish, §20.7's open obligation. *)
-  Lemma link_mint_claim (z : Z) (wl wd g r : nat) :
-    link_auth z wl wd g None r ==∗
-    link_auth z wl wd g (Some (Excl tt)) r ∗ iclaim z.
+  Lemma link_mint_claim (z : Z) (wl wdu wdt g r : nat)
+      (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g None r p ==∗
+    link_auth z wl wdu wdt g (Some (Excl tt)) r p ∗ iclaim z.
   Proof.
     rewrite /link_auth /iclaim. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
     rewrite /lelem.
     apply prod_local_update'; [| apply link_lu_id].
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply alloc_option_local_update; done].
     apply link_lu_id.
   Qed.
 
-  Lemma link_spend_claim (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c r -∗ iclaim z ==∗ link_auth z wl wd g None r.
+  Lemma link_spend_claim (z : Z) (wl wdu wdt g : nat)
+      (c : option (excl unit)) (r : nat)
+      (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p -∗ iclaim z ==∗
+    link_auth z wl wdu wdt g None r p.
   Proof.
     rewrite /link_auth /iclaim. iIntros "Ha Hb".
     iDestruct (link_claim_agree with "Ha Hb") as %->.
-    iMod (link_update _ _ _ (lelem wl wd g None r) (lelem 0 0 0 None 0)
+    iMod (link_update _ _ _ (lelem wl wdu wdt g None r p)
+            (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
     rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [| apply delete_option_local_update, _].
     apply link_lu_id.
   Qed.
 
   (* THE REFERENCE LICENCE (§20.7's (M1)). *)
-  Lemma link_mint_ref (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c r ==∗ link_auth z wl wd g c (S r) ∗ iref_lic z.
+  Lemma link_mint_ref (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c r p ==∗
+    link_auth z wl wdu wdt g c (S r) p ∗ iref_lic z.
   Proof.
     rewrite /link_auth /iref_lic. iIntros "Ha".
     iApply (link_update_alloc with "Ha").
     rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [apply link_lu_id |].
     apply nat_local_update. lia.
   Qed.
 
-  Lemma link_spend_ref (z : Z) (wl wd g : nat) (c : option (excl unit))
-      (r : nat) :
-    link_auth z wl wd g c (S r) -∗ iref_lic z ==∗ link_auth z wl wd g c r.
+  Lemma link_spend_ref (z : Z) (wl wdu wdt g : nat) (c : option (excl unit))
+      (r : nat) (p : option (dfrac_agreeR (leibnizO Z))) :
+    link_auth z wl wdu wdt g c (S r) p -∗ iref_lic z ==∗
+    link_auth z wl wdu wdt g c r p.
   Proof.
     rewrite /link_auth /iref_lic. iIntros "Ha Hb".
-    iMod (link_update _ _ _ (lelem wl wd g c r) (lelem 0 0 0 None 0)
+    iMod (link_update _ _ _ (lelem wl wdu wdt g c r p)
+            (lelem 0 0 0 0 None 0 None)
             with "Ha Hb") as "[$ _]"; [| done].
     rewrite /lelem.
+    apply prod_local_update'; [| apply link_lu_id].
     apply prod_local_update'; [apply link_lu_id |].
     apply nat_local_update. lia.
   Qed.

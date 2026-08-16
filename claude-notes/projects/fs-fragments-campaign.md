@@ -19,7 +19,7 @@ diverged from the design's sketches, and what is left.
 | **V2** | the `DirLinks`/`DirView` COUNT CLAUSE + the d-flavoured mint ESTABLISHED at create's mkdir arm | DirView, DirLinks, InodeRegion, IregLinkNz, FsRep, IcacheBoot, ProofIlock, ProofCreate, ProofSysLinkTails, ProofSysUnlinkParts | full cone | **LANDED** |
 | **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | **LANDED with W5-DIR (increment 9), at two premises D1/D2** |
 | **S2-0** | the NAME-UNIQUENESS payload clause `dir_uniq`, and the payload → tree constructor it unlocks | FsTree, FsLookup, IcacheEscrow, IcacheBoot + 18 walk/spec files | full cone | **LANDED** |
-| **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | DESIGNED, NOT STARTED — see below |
+| **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | **LANDED, fused with V5′'s increment R** — see the fused-increment entry below |
 | **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | SUPERSEDED by **V5′** — the sketch is unsound (Correction 1) and unprovable (Correction 2) as written; see the V5′ entry |
 | **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | DESIGNED (probe report transcribed below); increment R IN FLIGHT fused with V4 |
 
@@ -1852,3 +1852,132 @@ opaquely.  The cost concentrates where `dir_links` is opened.
 complete, park-audited, graveyard-clean carrier; with V4 (whose region
 half co-lands), `su_w5_dir` loses both premises and the seal flips
 sysfile.c to 16/16.
+
+## THE FUSED V4 + V5′-INCREMENT-R PASS — **EXECUTED.  (T1′), `dlc_lower`,
+## the flip, the (wdu, wdt)/register widening and the two tagged movers,
+## one InodeRegion-cone iteration; (D2) HAS ITS SUPPLIER**
+
+Ruled fused because the two designs edit THE SAME movers (the campaign's
+own "V5 reuses V4's flavour work", taken literally).  What landed, layer
+by layer:
+
+* **`IcacheRef.v`** — `lelem` is `wl (wdu, wdt) g c r p` with
+  `p : optionUR (dfrac_agreeR (leibnizO Z))` (`lreg`/`lreg_half` are the
+  full/half registers).  `ilinkd` re-reads as the UNTAGGED d-unit;
+  **`ilinkdp z pv`** (wdt-unit + half register) and **`iparent z pv`**
+  (half register only) are new; **`iparent_agree`** is the no-region-open
+  agreement.  `ilink_fl`'s index widened `option unit -> option (option
+  Z)` with the TAGGED arm the PAIR `ilinkdp ∗ iparent` -- one payout
+  slot, so every contract keeps one shape.  New movers
+  `link_mint_linkdp` (alloc at fraction one, split into the two halves)
+  and `link_spend_linkdp` (both halves in, register reset -- the
+  `delete_option_local_update` at `Exclusive (to_frac_agree 1 _)`).
+* **`InodeRegion.v`** — the slot's pure block is FIVE clauses: (L1) and
+  the root clause at `wl + wdu + wdt`, (T1) at `wdu + wdt`, **(T1′)
+  `ireg_dir_wl0 d wl`** (`di_type = T_DIR -> wl = 0`), and
+  **`ireg_par_ok wdt p`** (`wdt <= 1` ∧ `p = None <-> wdt = 0` ∧ the
+  full-fraction shape).  `ireg_write_link_fl`/`_unlink_fl` widened to
+  the three-arm index; the tagged mint's `p = None` derives INSIDE the
+  mover from its own `nlink dn = 0` premise ((L1) collapses the counts,
+  the iff frees the register -- nothing remembered across a free).  New
+  wrappers **`ireg_write_link_p`** / **`ireg_write_unlink_p`**;
+  `ireg_write_link` (plain) gains V4's premise
+  `bv_unsigned (di_type dn') <> ireg_dir_ty`.
+* **`IregDirBit.v`** — **`ireg_link_not_dir`** ((T1′)'s reader, the
+  mirror of `ireg_dirbit_ty`) and **`dir_links_subdir_nlink2`** — (D2)'s
+  three-step consumption bridge packaged as ONE mask-preserving lemma:
+  borrow the found record's ticket, refute the plain flavour against the
+  child's T_DIR through (T1′), read `2 <= nlink` off `dlc_lower` at the
+  counted record.  `su_w5_dir`'s (D2) premise is exactly its conclusion;
+  the premise's banner in `ProofSysUnlink.v` now points HERE.  (D1)
+  stays V5′'s -- the seal remains stopped on it alone.
+* **`IregLinkNz.v`** — `ireg_link_nz_fl` (the nonzero read-back at any
+  flavour; create's flipped mint uses it) and `ireg_link_root_min2`
+  (V5′ consumption step 2's root exclusion, banked ahead).
+  `dir_links_nlink_drop` NARROWED to non-directories -- `dlc_lower`
+  makes the old "count may fall with bytes fixed" false at a live
+  directory, and its one landed caller (sys_link's `bad:` tail) is at a
+  refuted-T_DIR file where both sides are `emp`.
+* **`DirView.v`** — **`dlc_lower`** (guarded: `nlink <> 0 -> 1 + count
+  <= nlink`) + movers (`_false`, `_nl0`, `_eq`, `_bump`) + the count
+  comparisons (`dcnt_slot_le`/`dcnt_set_le`/`dlc_count_ctb_le`/
+  `dlc_count_set_le`/`dlc_count_kill_counted`/`dlc_count_pos`).
+* **`DirLinks.v`** — `dir_links` carries `⌜dlc_lower F dn data⌝` beside
+  the bound (separate conjunct).  Every park re-audited per the V4
+  table; the two INTERFACE moves the audit priced:
+  `dir_links_dirlink_d`'s nlink premise is the EXACT `+1` (the wrap
+  would otherwise slip under the lower clause; `dlc_bv_add1_nz_eq` +
+  the flush's own nonzero read-back derive it), and
+  **`dir_links_unlink`'s wand premise is the EQUALITY**
+  `nlink' + (if b then 1 else 0) = nlink` **plus `k0 <> 0`** (at
+  `b = true` the count falls only if the killed slot is counted).  New
+  **`dir_links_dirlink_dot`** — the d-flavoured COUNT-NEUTRAL deposit at
+  a dot slot (create's `".."` after the flip; V5′'s tie-establishment
+  fuses into this same lemma next).  `dir_links_live`/`_of_ilink` carry
+  the lower clause through the round trip.
+* **`IcacheBoot.v`** — arity only (`link_auth z 0 0 0 0 None 0 None`);
+  (T1′) and `ireg_par_ok` are zero/vacuous at the all-plain stock -- as
+  priced, NOT EVEN AN IMAGE FACT.
+* **`SpecIupdate.v` / `ProofIupdate.v`** — the flavour index widened;
+  `wp_iupdate_link` takes the three flavour premises ((T1) ∀-od, (T1′)
+  at None, the tagged zero); `wp_iupdate_unlink` unchanged beyond the
+  index.  Landed `None` callers unchanged to the character (R6 again).
+* **`ProofCreate.v`** — **THE FLIP**: the `dp->nlink++` flush at +0x140
+  passes `Some None`; the `".."` deposit consumes the resulting
+  `ilinkd dp` through `dir_links_dirlink_dot`; the FUSED name-record
+  deposit (`dir_links_dirlink_d`) is DEFERRED three instructions to
+  after the flush, where `ireg_link_nz_fl`'s read-back turns the
+  machine `++` into the exact `+1`.  `cr_flav` widened (`Some None` at
+  T_DIR; the tagged form is the successor's) with `cr_flav_nty`/
+  `cr_flav_ntag` discharging the new premises.
+* **`ProofSysUnlink.v`** — both W5 halves supply the equality wand and
+  `kk <> 0`; **the T_DIR arm now REFUTES `b = false`** through
+  `ireg_link_not_dir` (the exact mirror of the file arm's
+  `ireg_dirbit_ty` step), so the `dp->nlink--` prices the zeroing
+  exactly.  `su_w5_dir` still takes (D1)/(D2) as premises; (D2)'s
+  banner re-pointed to its supplier.
+
+**WHAT THE SUCCESSOR (increment P + W) INHERITS**, per the V5′ entry
+above: the ticket index-split in `dir_link_at_f` (k=1 untagged, k≥2
+tagged at `self`), the tie inside `dir_links`' T_DIR branch (guard =
+`nlink <> 0 ∧ 2 <= nrec ∧ self <> ROOTINO_z`, spelled through
+`ireg_root_ROOTINO`), `dir_links_dirlink_dot` extended to ESTABLISH the
+tie, `dotdot_out` extended to hand it out, create's tagged mint
+(`cr_flav ty = Some (Some dp_inum)`, `ireg_write_link_p` at +0xc4 --
+both movers and `cr_flav_ntag`'s retirement), the fail-arm tagged
+spends, boot's one image fact ("every live image directory is root"),
+and then `su_w5_dir` deriving BOTH premises internally + the seal.
+The grey conversion's constraint stands: **no `wdt -> g` lemma is ever
+written** (the tagged unit is spent one instruction before the orphan
+park).
+
+### The fused increment's gate
+
+Lane `/home/ubuntu/v4lane` ON THE EC2 MIRROR (local compiles are ruled
+out; the lane is a `cp -a` of the mirror's checkout at `cff29d43` with
+the 14-file edited set scp'd in and **block-md5-verified** before the
+build).  Rebuild closure of the edited set: **334 files** (measured from
+`.CoqMakefile.d`), matching the design's ~350 price.  Final pass:
+`make -f CoqMakefile -j24 -k` **EXIT=0**; `make -n` emits **0** compile
+lines; the `.v`-vs-`.vo` staleness sweep over the `_CoqProject` rows
+reports **0**; `tools/lemma_diff.py --ref HEAD` over the 14 files:
+**CLEAN** (nothing dropped, nothing admitted, no new assumption).
+`proof_coverage.py --check` exits 0; coverage **186/190 (98 %),
+sysfile.c 15/16 — UNMOVED** (the seal still awaits (D1)).
+`Print Assumptions`: `Create.wp_create_sconf` = the standing set +
+`create_fresh_ty`; `SysLink.wp_sys_link_sconf`, `Iput.wp_iput_sconf`,
+`Iupdate.wp_iupdate_link`, `Iupdate.wp_iupdate_unlink` = the standing
+set only; and the seven new headline lemmas
+(`dir_links_subdir_nlink2`, `ireg_link_not_dir`, `iparent_agree`,
+`ireg_write_link_p`, `ireg_write_unlink_p`, `dir_links_dirlink_dot`,
+`ireg_link_root_min2`) are **Closed under the global context**.
+
+**THE TWO NEW TRAPS THIS INCREMENT PAID FOR** are in durable-notes'
+proofmode section: the `iMod`-with-explicit-op-term divergence (state
+the ghost step as a goal and `iApply`; combine `own`s with `own_op` +
+eq-rewrites, never `iCombine`), and the ~8 s/`apply`
+`prod_local_update'` cost at a 7-component element (a composed
+local-update helper is OWED as an optimization).  A third, smaller one:
+`destruct (F kk) eqn:` substitutes into HYPOTHESES but not into a
+wand's not-yet-unfolded premise, so a re-park after a flavour destruct
+needs `rewrite EFkk` on the goal side only.

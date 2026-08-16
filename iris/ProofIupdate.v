@@ -210,7 +210,8 @@ Section IupdateDefs.
      flushed one's at least one. *)
   Lemma iu_step_link (γ : log_names) (γfs : fs_names) (γi : gname)
       (inodestart : Z) (nib : nat)
-      (inum : mword 32) (dn dn0 : dinode) (e0 : nat) (fl : option unit) :
+      (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
+      (fl : option (option Z)) :
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     bv_unsigned (di_type dn) <> 0 ->
@@ -222,21 +223,25 @@ Section IupdateDefs.
        (fs-sysfile.md's twelfth stop). *)
     di_nlink dn = add_vec (di_nlink dn0 : mword 16) (mword_of_int 1) ->
     di_nlink dn0 <> (mword_of_int 32767 : mword 16) ->
-    (* V1's flavour premise, relayed verbatim to
-       [InodeRegion.ireg_write_link_fl]: vacuous at [None]. *)
-    (fl = Some tt -> bv_unsigned (di_type dn) = ireg_dir_ty) ->
+    (* the three flavour premises, relayed verbatim to
+       [InodeRegion.ireg_write_link_fl] (V1 + V4 + V5'). *)
+    (forall od : option Z,
+       fl = Some od -> bv_unsigned (di_type dn) = ireg_dir_ty) ->
+    (fl = None -> bv_unsigned (di_type dn) <> ireg_dir_ty) ->
+    (forall pv : Z, fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
     ireg_inv γi γfs inodestart nib -∗
     iu_region_step γ γfs γi inodestart inum dn dn0 e0
       (dinode_at γi inum dn ∗ ilink_fl fl (bv_unsigned inum)).
   Proof.
-    intros Hnib Hdnwf Hnz Hstab Hbump Hgrd Hfl.
+    intros Hnib Hdnwf Hnz Hstab Hbump Hgrd Hfl Hnfl Hflp.
     iIntros "#Hireg" (ds) "%Hdswf Hdn".
     (* nlink RISES here, so the receipt is vacuous at the written record
        and the anchor is the unit -- the same one adapter line the ordinary
        step takes. *)
     rewrite /iu_region_au. iApply lw_au_lb0.
     iApply (ireg_write_link_fl ⊤ γi γfs inodestart nib inum dn0 dn ds fl
-              ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hbump Hgrd Hfl
+              ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hnz Hstab Hbump Hgrd
+              Hfl Hnfl Hflp
               with "Hireg Hdn").
   Qed.
 
@@ -261,7 +266,8 @@ Section IupdateDefs.
        which is why this arm needs neither tie. *)
   Lemma iu_step_unlink (γ : log_names) (γfs : fs_names) (γi : gname)
       (inodestart : Z) (nib : nat)
-      (inum : mword 32) (dn dn0 : dinode) (e0 : nat) (fl : option unit) :
+      (inum : mword 32) (dn dn0 : dinode) (e0 : nat)
+      (fl : option (option Z)) :
     bv_unsigned inum < 16 * Z.of_nat nib ->
     dinode_wf dn ->
     bv_unsigned (di_type dn) <> 0 ->
@@ -2181,7 +2187,7 @@ Qed.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
@@ -2190,7 +2196,8 @@ Qed.
                            pidv dq dqd dqn dqs m K eb b lks.
   Proof.
     cbv beta delta [wp_iupdate_link_body].
-    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hfl Hbump Hgrd
+    intros pcE pj ret_tgt HK Hcru Hgeom Hst Hcov Hlog Hnib Hstab Hnz Hfl Hnfl
+           Hflp Hbump Hgrd
            Hda Hdirlen Hj Hgl Ha0 Heb Hbelow.
     subst eb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
@@ -2205,6 +2212,7 @@ Qed.
     (* THE ONE SUBSTITUTION *)
     iPoseProof (iu_step_link γ γfs γi inodestart nib inum dn dn0 e0 fl Hnib
                   (iu_dinode_wf dn bm Hda Hdirlen) Hnz Hstab Hbump Hgrd Hfl
+                  Hnfl Hflp
                   with "Hireg") as "Hstep".
     iApply (iu_main_gen γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev ip inum dn dn0 bm u Sb cru e0 0%nat
@@ -2245,7 +2253,7 @@ Qed.
       (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)

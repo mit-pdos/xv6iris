@@ -810,7 +810,7 @@ Definition wp_iupdate_link_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -828,13 +828,21 @@ Definition wp_iupdate_link_body
   (* THE ADDED PREMISE (see the banner): (L3) plus the increment below make
      a type-0 flush contradictory, so the region cannot take one here. *)
   bv_unsigned (di_type dn) <> 0 ->
-  (* THE FLAVOUR'S OWN PREMISE (see the banner): (T1) at the flushed record.
-     Vacuous at [fl = None], where every landed caller stands; at [Some tt]
-     it is what makes [InodeRegion.ireg_write_link_d]'s mint legal.  Stated
-     at [InodeRegion.ireg_dir_ty] rather than [DirView.T_DIR_z] so this file
-     acquires no import ([IregDirBit.ireg_dir_ty_T_DIR_z] is the bridge, one
+  (* THE FLAVOUR'S OWN PREMISES (see the banner; the index is widened to
+     [option (option Z)] by V5' -- [None] plain, [Some None] untagged-d,
+     [Some (Some pv)] tagged).  (T1) at the flushed record for EITHER d
+     flavour; (T1')'s mirror at the plain one (V4): a plain mint's record
+     is NOT a directory -- a walk-level fact at every plain-minting site;
+     and the tagged mint's legality (V5'): the pre-record is the fresh
+     child's, its count zero.  Stated at [InodeRegion.ireg_dir_ty] rather
+     than [DirView.T_DIR_z] so this file acquires no import
+     ([IregDirBit.ireg_dir_ty_T_DIR_z] is the bridge, one
      [reflexivity]). *)
-  (fl = Some tt -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty) ->
+  (forall od : option Z,
+     fl = Some od -> bv_unsigned (di_type dn) = InodeRegion.ireg_dir_ty) ->
+  (fl = None -> bv_unsigned (di_type dn) <> InodeRegion.ireg_dir_ty) ->
+  (forall pv : Z,
+     fl = Some (Some pv) -> bv_unsigned (di_nlink dn0) = 0) ->
   (* THE INCREMENT ITSELF, in place of [di_nlink_stable]: this flush RAISES
      the count by exactly one, and that one unit is what pays for the
      [ilink] the post hands out (§20.6's mkdir/sys_link rows).
@@ -983,7 +991,7 @@ Definition wp_iupdate_unlink_body
     (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
     (dn dn0 : dinode) (bm : blkmap)
-    (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+    (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool)
     (b : bool) (lks : gset string) :=
@@ -1190,7 +1198,7 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),
@@ -1215,7 +1223,7 @@ Module Type IUPDATE.
       (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (dn dn0 : dinode) (bm : blkmap)
-      (u : nat) (Sb : gset Z) (cru : bool) (fl : option unit)
+      (u : nat) (Sb : gset Z) (cru : bool) (fl : option (option Z))
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string),

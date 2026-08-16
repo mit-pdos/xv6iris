@@ -141,11 +141,16 @@ Section DirLinks.
      -- record [k]'s ticket is [ilinkd] when [F k] and [ilink] otherwise --
      and the clause counts exactly the records where [F] is set.
 
-     [dlc_fl] is spelled at [option unit] rather than at [bool] because that
-     is the index [SpecIupdate.wp_iupdate_link] / [_unlink] take: a walk
-     that extracts a ticket out of this big-op feeds it STRAIGHT to the
-     spending contract, with no conversion (V3's shape). *)
-  Definition dlc_fl (b : bool) : option unit := if b then Some tt else None.
+     [dlc_fl] is spelled at the contracts' own index type rather than at
+     [bool] because that is what [SpecIupdate.wp_iupdate_link] / [_unlink]
+     take: a walk that extracts a ticket out of this big-op feeds it
+     STRAIGHT to the spending contract, with no conversion (V3's shape). *)
+  (* WIDENED BY V5' along with [IcacheRef.ilink_fl]: the payload's own
+     tickets are plain or UNTAGGED-d ([Some None]); the TAGGED form
+     ([Some (Some pv)]) enters the payload only through the successor
+     increment's index-aware ticket split (V5' increment P). *)
+  Definition dlc_fl (b : bool) : option (option Z) :=
+    if b then Some None else None.
 
   (* THE MACHINE'S [++], CROSSED WITH NO GUARD AT ALL.  [DirView.dlc_bound]
      is an INEQUALITY, so create's [dp->nlink++] needs only that a
@@ -167,6 +172,30 @@ Section DirLinks.
     change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z
       in Hr |- *.
     apply Z.mod_le; lia.
+  Qed.
+
+  (* ...AND ITS EXACT FORM UNDER A NONZERO READ-BACK (V4's [dlc_lower]).
+     A sixteen-bit [++] wraps only at 65535, where it lands at ZERO -- so
+     an increment whose result is known nonzero did not wrap, and the
+     lower clause's EXACT [+1] is free.  The nonzero fact is the flush's
+     own read-back ([IregLinkNz.ireg_link_nz] at the bumped record). *)
+  Lemma dlc_bv_add1_nz_eq (h : mword 16) :
+    bv_unsigned (add_vec h (mword_of_int 1 : mword 16)) <> 0 ->
+    bv_unsigned (add_vec h (mword_of_int 1 : mword 16))
+    = bv_unsigned h + 1.
+  Proof.
+    rewrite add_vec_unsigned.
+    assert (H1 : bv_unsigned (mword_of_int 1 : mword 16) = 1)
+      by (vm_compute; reflexivity).
+    rewrite H1.
+    pose proof (bv_unsigned_in_range _ h) as Hr.
+    unfold bv_wrap. unfold bv_modulus in Hr |- *.
+    change (2 ^ Z.of_N (MachineWord.MachineWord.Z_idx 16))%Z with 65536%Z
+      in Hr |- *.
+    intro Hnz.
+    destruct (Z.eq_dec (bv_unsigned h) 65535) as [He | Hne].
+    - exfalso. apply Hnz. rewrite He. vm_compute. reflexivity.
+    - rewrite Z.mod_small; lia.
   Qed.
 
   Definition dir_link_at_f (F : nat -> bool) (self : Z) (dn : dinode)
@@ -266,11 +295,18 @@ Section DirLinks.
      THE EXISTENTIAL IS INSIDE THE [if], so a non-directory's payload is
      still literally [emp] and every landed discharge that opens this
      definition on a refuted type is unchanged.  Arity does not move. *)
+  (* THE LOWER CLAUSE RIDES BESIDE THE BOUND (V4, S7-unlink (D2)'s
+     carrier).  [DirView.dlc_lower] is the mirror inequality -- a LIVE
+     directory's count is at least one plus its d-flavoured record count
+     -- and at the same [F] the two clauses pin [nlink = 1 + count].  A
+     SEPARATE conjunct, not a strengthening of [dlc_bound]: every
+     discharge below reads them by position and half the parks pay for
+     exactly one of the two. *)
   Definition dir_links (self : Z) (dn : dinode) (data : nat -> list (bv 8))
     : iProp Σ :=
     (if decide (bv_unsigned (di_type dn) = T_DIR_z)
      then ∃ F : nat -> bool,
-            ⌜dlc_bound F dn data⌝ ∗
+            ⌜dlc_bound F dn data⌝ ∗ ⌜dlc_lower F dn data⌝ ∗
             ([∗ list] k ∈ seq 0 (dir_nrec (bv_unsigned (di_size dn))),
                dir_link_at_f F self dn data k)
      else emp)%I.
@@ -294,6 +330,9 @@ Section DirLinks.
   Proof.
     intros Hty Hb. iIntros "H". rewrite /dir_links decide_True; [| exact Hty].
     iExists (fun _ => false). iSplitR; [iPureIntro; exact Hb |].
+    (* V4: the LOWER clause is free at the all-plain stock -- [nlink <> 0
+       -> 1 <= nlink] is true of any bitvector, so boot owes nothing *)
+    iSplitR; [iPureIntro; exact (dlc_lower_false dn data) |].
     iApply (big_sepL_mono with "H"). intros i k Hik. iIntros "Hx".
     rewrite (dir_link_at_f_plain (fun _ => false) self dn data k eq_refl).
     iExact "Hx".
@@ -340,6 +379,7 @@ Section DirLinks.
       [| done].
     iExists (fun _ => false).
     iSplitR; [iPureIntro; exact (dlc_bound_le1 _ dn data Hnl) |].
+    iSplitR; [iPureIntro; exact (dlc_lower_false dn data) |].
     rewrite Hsz /dir_nrec.
     assert (Hz : Z.to_nat (0 / 16) = 0%nat) by (vm_compute; reflexivity).
     rewrite Hz /=. done.
@@ -456,13 +496,18 @@ Section DirLinks.
       rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
       reflexivity. }
     rewrite <- Hnrec.
-    iIntros "Hk0 H". iDestruct "H" as (F) "[%Hbnd H]".
+    iIntros "Hk0 H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
     destruct (dlc_upd_map F k0 false) as (G & HGk0 & HGoff).
     (* the written slot was FREE below the record count and out of range at
        it -- [dir_slot]'s own two readings, and what makes the count
        monotone either way *)
     assert (Hslot : (k0 < nrec)%nat -> dir_inum data k0 = bv_0 16).
     { intro Hlt. rewrite Hk0. apply dir_slot_free. rewrite <- Hk0. exact Hlt. }
+    assert (Hcalt2 : dir_nrec (bv_unsigned (di_size dn')) = nrec
+                     \/ (dir_nrec (bv_unsigned (di_size dn')) = S nrec
+                         /\ k0 = nrec))
+      by (destruct Hcalt as [H1 | (H1 & H2 & _)]; [left; exact H1
+                                                  | right; split; assumption]).
     iExists G. iSplitR.
     { iPureIntro.
       apply (dlc_bound_le F G dn dn' data data'); [rewrite Hnl; lia | | exact Hbnd].
@@ -471,6 +516,15 @@ Section DirLinks.
                                                            | exact HGoff
                                                            | exact Hslot].
       pose proof Hcalt as Hc2. destruct Hc2 as [Hn' | (Hn' & _ & _)]; lia. }
+    (* V4: THE LOWER CLAUSE RIDES TOO -- the deposited ticket is PLAIN, so
+       the written slot stays uncounted and the count cannot RISE either *)
+    iSplitR.
+    { iPureIntro.
+      apply (dlc_lower_eq F G dn dn' data data');
+        [rewrite Hnl; reflexivity | | exact Hlow].
+      rewrite <- Hnrec.
+      apply (dlc_count_ctb_le F G data data' nrec _ k0 Hcalt2 Hagree HGoff
+               (dlc_ctb_flav G data' k0 HGk0)). }
     destruct Hcalt as [Hn' | (Hn' & Hkn & Ht16)]; rewrite Hn'.
     - (* ======== the record COUNT did not move ======== *)
       destruct (Nat.lt_ge_cases k0 nrec) as [Hlt | Hge].
@@ -647,10 +701,17 @@ Section DirLinks.
     rewrite /dir_links Hty Hszeq.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
       [| by iIntros "_"].
-    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
+    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
     iExists F. iSplitR.
     { iPureIntro.
       apply (dlc_bound_le F F dn dn' data data'); [rewrite Hnl; lia | | exact Hbnd].
+      rewrite Hszeq.
+      rewrite (dlc_count_agree F F data data' _ Hagree ltac:(intro k; reflexivity)).
+      lia. }
+    iSplitR.
+    { iPureIntro.
+      apply (dlc_lower_eq F F dn dn' data data');
+        [rewrite Hnl; reflexivity | | exact Hlow].
       rewrite Hszeq.
       rewrite (dlc_count_agree F F data data' _ Hagree ltac:(intro k; reflexivity)).
       lia. }
@@ -677,9 +738,14 @@ Section DirLinks.
      record at [k0] is set".  So the deposit and the [++] are crossed
      together, and the caller applies this where it holds both.
 
-     ITS [nlink] PREMISE IS AN INEQUALITY, so the machine's [++] crosses it
-     with [dlc_bv_add1_le] and NOTHING ELSE -- no (L4), no kernel guard
-     (see there).
+     ITS [nlink] PREMISE IS AN EQUALITY SINCE V4: [dlc_bound] alone needed
+     only [<=] (the wrap lands at zero, below any bound), but [dlc_lower]
+     needs the exact [+1] -- an [<=] would let the wrap under the clause.
+     The caller derives it from the machine's [++] plus the flush's own
+     nonzero read-back ([dlc_bv_add1_nz_eq]; the read-back is
+     [IregLinkNz.ireg_link_nz] at the bumped record, which create's site
+     already fires for [dir_orphan_clean]) -- still no (L4) and no kernel
+     guard.
 
      [2 <= k0] IS NOT A PREMISE: [dir_dots_ix] says records 0 and 1 are
      live, and [dir_slot] never returns a live record below the count, so
@@ -705,7 +771,7 @@ Section DirLinks.
     inum <> bv_0 16 ->
     bv_unsigned inum <> self ->
     di_type dn' = di_type dn ->
-    bv_unsigned (di_nlink dn') <= bv_unsigned (di_nlink dn) + 1 ->
+    bv_unsigned (di_nlink dn') = bv_unsigned (di_nlink dn) + 1 ->
     bv_unsigned (di_size dn')
       = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
     (forall x : nat,
@@ -762,17 +828,31 @@ Section DirLinks.
     rewrite /dir_links Hty' decide_True; [| exact Hty].
     rewrite decide_True; [| exact Hty].
     rewrite <- Hnrec.
-    iIntros "Hd H". iDestruct "H" as (F) "[%Hbnd H]".
+    iIntros "Hd H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
     destruct (dlc_upd_map F k0 true) as (G & HGk0 & HGoff).
+    assert (Hcalt2 : dir_nrec (bv_unsigned (di_size dn')) = nrec
+                     \/ (dir_nrec (bv_unsigned (di_size dn')) = S nrec
+                         /\ k0 = nrec))
+      by (destruct Hcalt as [H1 | (H1 & H2 & _)]; [left; exact H1
+                                                  | right; split; assumption]).
     iExists G. iSplitR.
     { iPureIntro.
-      apply (dlc_bound_bump F G dn dn' data data'); [exact Hnl | | exact Hbnd].
+      apply (dlc_bound_bump F G dn dn' data data');
+        [rewrite Hnl; lia | | exact Hbnd].
       rewrite <- Hnrec.
       apply (dlc_count_set_ge F G data data' nrec _ k0);
         [ destruct Hcalt as [H | (H & _ & _)]; lia
         | exact Hk2 | exact Hk0lt | exact Hagree | exact HGoff | exact Hslot
         | rewrite /dir_live Hrec; exact Hinz
         | exact HGk0 ]. }
+    (* V4: THE LOWER CLAUSE -- both sides rise by EXACTLY one: the count
+       by the flipped-on slot (at most one, [dlc_count_set_le]) and the
+       home by the exact increment premise *)
+    iSplitR.
+    { iPureIntro.
+      apply (dlc_lower_bump F G dn dn' data data' Hnlnz Hnl); [| exact Hlow].
+      rewrite <- Hnrec.
+      apply (dlc_count_set_le F G data data' nrec _ k0 Hcalt2 Hagree HGoff). }
     (* the deposited ticket, at its own flavour *)
     iAssert (dir_link_at_f G self dn' data' k0) with "[Hd]" as "Hk0".
     { iApply (dir_link_at_f_dirlink G self dn' data data' inum s k0 tot
@@ -797,6 +877,126 @@ Section DirLinks.
         apply lookup_seq in Hik. destruct Hik as [Hk Hi].
         iIntros "Hx".
         iApply (dir_link_at_f_live_agree F G self dn dn' data data' k Hnlnz
+                  ltac:(apply Hagree; lia) ltac:(apply HGoff; lia) with "Hx").
+      + simpl. iSplitL "Hk0"; [| done]. rewrite <- Hkn. iExact "Hk0".
+  Qed.
+
+  (* ==================================================================== *)
+  (*  (v'') THE DOT DEPOSIT -- a d-flavoured ticket at a DOT slot, and     *)
+  (*        the count does not move (V4; V5''s fusion point)              *)
+  (* ==================================================================== *)
+
+  (* create's mkdir writes the child's [".."] at index 1, and since V4's
+     flip the ticket it deposits is the [ilinkd dp] the [dp->nlink++]
+     minted -- d-flavoured, because [dp] IS a directory.  [DirView.dlc_ctb]
+     refuses the two dot indices whatever the flavour map says, so the
+     deposit is COUNT-NEUTRAL on both clauses and the home's [nlink] does
+     not move.  The V5' successor extends this same lemma with the
+     [".."]-tie's establishment (the [iparent] half plus the bytes just
+     written); it is the one place both halves of the tagged mint meet
+     the payload. *)
+  Lemma dir_links_dirlink_dot (self : Z) (dn dn' : dinode)
+      (data data' : nat -> list (bv 8))
+      (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
+    nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+    k0 = dir_slot data nrec ->
+    (k0 < 2)%nat ->
+    (2 <= tot)%nat -> (tot <= 16)%nat ->
+    di_type dn' = di_type dn ->
+    di_nlink dn' = di_nlink dn ->
+    bv_unsigned (di_size dn')
+      = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+    (forall x : nat,
+       file_byte data' x
+       = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+         then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+         else file_byte data x) ->
+    ilinkd (bv_unsigned inum) -∗
+    dir_links self dn data -∗ dir_links self dn' data'.
+  Proof.
+    intros Hnrec Hk0 Hk02 Htot2 Htot16 Hty Hnl Hsz Hrng.
+    (* the type is unmoved, so the two big-ops are both live or both [emp] *)
+    rewrite /dir_links Hty.
+    destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | _];
+      [| iIntros "_ _"; done].
+    (* ---- the count arithmetic, [dir_links_dirlink]'s verbatim ---- *)
+    assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+    assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+      by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+    destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+    destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn')
+      as [Hnr1' Hnr2'].
+    rewrite <- Hnrec in Hnr1, Hnr2.
+    assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+    assert (Hcalt : dir_nrec (bv_unsigned (di_size dn')) = nrec
+                    \/ (dir_nrec (bv_unsigned (di_size dn')) = S nrec
+                        /\ k0 = nrec /\ tot = 16%nat)) by lia.
+    assert (Hagree : forall q : nat, q <> k0 ->
+                       dir_inum data' q = dir_inum data q).
+    { intros q Hq. unfold dir_inum.
+      rewrite (Hrng (16 * q)%nat). rewrite (Hrng (16 * q + 1)%nat).
+      rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+      reflexivity. }
+    assert (Hslot : (k0 < nrec)%nat -> dir_inum data k0 = bv_0 16).
+    { intro Hlt. rewrite Hk0. apply dir_slot_free. rewrite <- Hk0. exact Hlt. }
+    assert (Hcalt2 : dir_nrec (bv_unsigned (di_size dn')) = nrec
+                     \/ (dir_nrec (bv_unsigned (di_size dn')) = S nrec
+                         /\ k0 = nrec))
+      by (destruct Hcalt as [H1 | (H1 & H2 & _)]; [left; exact H1
+                                                  | right; split; assumption]).
+    rewrite <- Hnrec.
+    iIntros "Hd H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
+    destruct (dlc_upd_map F k0 true) as (G & HGk0 & HGoff).
+    (* the DOT index is refused by the counter at any flavour *)
+    assert (Hctb : dlc_ctb G data' k0 = false)
+      by exact (dlc_ctb_dot G data' k0 Hk02).
+    iExists G. iSplitR.
+    { iPureIntro.
+      apply (dlc_bound_le F G dn dn' data data'); [rewrite Hnl; lia | | exact Hbnd].
+      rewrite <- Hnrec.
+      apply (dlc_count_slot_ge F G data data' nrec _ k0); [| exact Hagree
+                                                           | exact HGoff
+                                                           | exact Hslot].
+      destruct Hcalt as [Hn' | (Hn' & _ & _)]; lia. }
+    iSplitR.
+    { iPureIntro.
+      apply (dlc_lower_eq F G dn dn' data data');
+        [rewrite Hnl; reflexivity | | exact Hlow].
+      rewrite <- Hnrec.
+      apply (dlc_count_ctb_le F G data data' nrec _ k0 Hcalt2 Hagree HGoff
+               Hctb). }
+    (* the deposited ticket, at its own flavour *)
+    iAssert (dir_link_at_f G self dn' data' k0) with "[Hd]" as "Hk0".
+    { iApply (dir_link_at_f_dirlink G self dn' data data' inum s k0 tot
+                Htot2 Hrng with "[Hd]").
+      rewrite HGk0. cbn. iExact "Hd". }
+    destruct Hcalt as [Hn' | (Hn' & Hkn & _)]; rewrite Hn'.
+    - destruct (Nat.lt_ge_cases k0 nrec) as [Hlt | Hge].
+      + rewrite (big_sepL_delete
+                   (fun _ k => dir_link_at_f G self dn' data' k)
+                   (seq 0 nrec) k0 k0).
+        2:{ apply lookup_seq; lia. }
+        iSplitL "Hk0"; [iExact "Hk0" |].
+        iApply (big_sepL_mono with "H"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        destruct (decide (i = k0)) as [_ | Hne]; [by iIntros "_" |].
+        iIntros "Hx".
+        iApply (dir_link_at_f_agree F G self dn dn' data data' k Hnl
+                  ltac:(apply Hagree; lia) ltac:(apply HGoff; lia) with "Hx").
+      + (* the written slot is at or past the end: nothing in range moved,
+           and the ticket is dropped (affine) *)
+        iClear "Hk0".
+        iApply (big_sepL_mono with "H"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        iIntros "Hx".
+        iApply (dir_link_at_f_agree F G self dn dn' data data' k Hnl
+                  ltac:(apply Hagree; lia) ltac:(apply HGoff; lia) with "Hx").
+    - rewrite seq_S big_sepL_app. iSplitL "H".
+      + iApply (big_sepL_mono with "H"). intros i k Hik.
+        apply lookup_seq in Hik. destruct Hik as [Hk Hi].
+        iIntros "Hx".
+        iApply (dir_link_at_f_agree F G self dn dn' data data' k Hnl
                   ltac:(apply Hagree; lia) ltac:(apply HGoff; lia) with "Hx").
       + simpl. iSplitL "Hk0"; [| done]. rewrite <- Hkn. iExact "Hk0".
   Qed.
@@ -856,14 +1056,17 @@ Section DirLinks.
     dir_links self dn data -∗
       ∃ F : nat -> bool,
         ⌜bv_unsigned (di_type dn) = T_DIR_z -> dlc_bound F dn data⌝
+        ∗ ⌜bv_unsigned (di_type dn) = T_DIR_z -> dlc_lower F dn data⌝
         ∗ dir_ilinks F self dn data.
   Proof.
     intros Hnz. rewrite /dir_links /dir_ilinks.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [Hd | Hd];
       [| iIntros "_"; iExists (fun _ => false); iSplitR;
-         [iPureIntro; intro Hc; exfalso; exact (Hd Hc) | done]].
-    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
+         [iPureIntro; intro Hc; exfalso; exact (Hd Hc) |
+          iSplitR; [iPureIntro; intro Hc; exfalso; exact (Hd Hc) | done]]].
+    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
     iExists F. iSplitR; [iPureIntro; intros _; exact Hbnd |].
+    iSplitR; [iPureIntro; intros _; exact Hlow |].
     iApply (big_sepL_mono with "H"). intros i k Hik.
     iIntros "Hx". iApply (dir_link_at_live F self dn data k Hnz with "Hx").
   Qed.
@@ -902,12 +1105,14 @@ Section DirLinks.
   Lemma dir_links_of_ilink (F : nat -> bool) (self : Z) (dn' : dinode)
       (data : nat -> list (bv 8)) :
     dlc_bound F dn' data ->
+    dlc_lower F dn' data ->
     dir_ilinks F self dn' data -∗ dir_links self dn' data.
   Proof.
-    intro Hbnd. rewrite /dir_links /dir_ilinks.
+    intros Hbnd Hlow. rewrite /dir_links /dir_ilinks.
     destruct (decide (bv_unsigned (di_type dn') = T_DIR_z)) as [_ | _];
       [| by iIntros "_"].
     iIntros "H". iExists F. iSplitR; [iPureIntro; exact Hbnd |].
+    iSplitR; [iPureIntro; exact Hlow |].
     iApply (big_sepL_mono with "H"). intros i k Hik.
     iIntros "Hx". iApply (dir_link_at_of_ilink F self dn' data k with "Hx").
   Qed.
@@ -1022,20 +1227,35 @@ Section DirLinks.
      existential -- and the re-park is a WAND whose premise prices exactly
      what the zeroing costs the count clause:
 
-       * at [b = false] the count does not move and the caller need only
-         say its own [nlink] did not rise.  sys_unlink's FILE arm gets
-         there by REFUTING [b = true]: it holds [ilinkd] of a record whose
-         type it has just tested at the [beq] on +0xb4, and
+       * at [b = false] the count does not move and the caller's [nlink]
+         must not move either.  sys_unlink's FILE arm gets there by
+         REFUTING [b = true]: it holds [ilinkd] of a record whose type it
+         has just tested at the [beq] on +0xb4, and
          [IregDirBit.ireg_dirbit_ty] reads the type off the fragment.
+         The T_DIR arm refutes [b = false] through the MIRROR,
+         [IregDirBit.ireg_link_not_dir] off (T1') -- V4's whole point.
        * at [b = true] the count falls by one and the caller owes one unit
          of [nlink] -- which is exactly the [dp->nlink--] the T_DIR arm
          performs, so the arm pays with the instruction it was going to
          execute anyway.
 
-     The [di_nlink dn' = di_nlink dn] premise is GONE for the same reason:
-     the tickets that ride across say nothing about the home (the grey
-     disjunct is refuted by the live-home premise), so the only constraint
-     left on the two counts is the wand's. *)
+     THE WAND'S PREMISE IS AN EQUALITY SINCE V4 ([dlc_lower] rides in the
+     payload, so the zeroing must account for the count EXACTLY): at
+     [b = false] the home did not move, at [b = true] it fell by exactly
+     one.  Both landed consumers have it -- the FILE arm re-parks the
+     SAME record, the T_DIR arm decrements by exactly one -- and the
+     T_DIR arm's [b = false] case, where the equality would be false, is
+     the case (T1') refutes.
+
+     [k0 <> 0] IS NEW WITH V4 for the same clause: at [b = true] the
+     count falls only if the killed slot was COUNTED, and index 0 is a
+     dot index.  Both consumers derive [kk ∉ {0,1}] off [dir_dots_ix]'s
+     two name clauses already (VERDICT #3's move).
+
+     The [di_nlink dn' = di_nlink dn] premise is GONE for the same reason
+     as before: the tickets that ride across say nothing about the home
+     (the grey disjunct is refuted by the live-home premise), so the only
+     constraint left on the two counts is the wand's. *)
   Lemma dir_links_unlink (self : Z) (dn dn' : dinode)
       (data data' : nat -> list (bv 8))
       (d : dirent) (nrec k0 tot : nat) :
@@ -1053,6 +1273,7 @@ Section DirLinks.
        [dirlookup] matched on a caller-supplied name.  Additive: this lemma
        has no consumers yet, and the premise is what keeps the index bridge
        alive across the delete. *)
+    k0 <> 0%nat ->
     k0 <> 1%nat ->
     di_type dn' = di_type dn ->
     di_size dn' = di_size dn ->
@@ -1064,10 +1285,11 @@ Section DirLinks.
     dir_links self dn data -∗
       ∃ b : bool,
         ilink_fl (dlc_fl b) (bv_unsigned (dir_inum data k0))
-        ∗ (⌜bv_unsigned (di_nlink dn') + (if b then 1 else 0)
-             <= bv_unsigned (di_nlink dn)⌝ -∗ dir_links self dn' data').
+        ∗ (⌜(bv_unsigned (di_nlink dn') + (if b then 1 else 0)
+             = bv_unsigned (di_nlink dn))%Z⌝ -∗ dir_links self dn' data').
   Proof.
-    intros Hty Hnrec Hk0 Htot2 Htot16 Hde Hnl Hlv Hself Hdd Hty' Hsz' Hrng.
+    intros Hty Hnrec Hk0 Htot2 Htot16 Hde Hnl Hlv Hself Hk00 Hdd Hty' Hsz'
+           Hrng.
     (* the written slot is dead: its two inum bytes came out of [d] *)
     assert (Hz : dir_inum data' k0 = bv_0 16).
     { rewrite (dir_inum_of_two data' k0 d); [exact Hde |].
@@ -1087,7 +1309,7 @@ Section DirLinks.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [_ | Hnd];
       [| destruct (Hnd Hty)].
     rewrite <- Hnrec.
-    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
+    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
     rewrite (big_sepL_delete (fun _ k => dir_link_at_f F self dn data k)
                (seq 0 nrec) k0 k0).
     2:{ apply lookup_seq. lia. }
@@ -1095,6 +1317,9 @@ Section DirLinks.
     iExists (F k0). iSplitL "Hk0".
     { iApply (dir_link_at_unlink F self dn data k0 Hnl Hlv Hself with "Hk0"). }
     iIntros "%Hcnt".
+    (* the killed slot is DEAD on the new side, at any flavour *)
+    assert (Hz'lb : dir_liveb data' k0 = false)
+      by exact (proj2 (dir_liveb_false data' k0) Hz).
     iExists F. iSplitR.
     { (* THE COUNT CLAUSE ACROSS THE ZEROING.  The record at [k0] dies, so
          the right-hand side falls by at most one -- and by NOTHING unless
@@ -1106,6 +1331,28 @@ Section DirLinks.
       pose proof (dlc_count_kill F data data'
                     (dir_nrec (bv_unsigned (di_size dn))) k0 Hagree) as Hk.
       unfold dlc_bound in Hbnd. destruct (F k0); lia. }
+    (* V4: THE LOWER CLAUSE ACROSS THE ZEROING, priced by the same wand
+       premise -- now an equality, so both arms balance exactly *)
+    iSplitR.
+    { iPureIntro. destruct (F k0) eqn:EFk0.
+      - (* d-flavoured: the slot WAS counted (it is live, non-dot), so the
+           count falls by exactly the one unit the home just paid *)
+        assert (Hct : dlc_ctb F data k0 = true)
+          by (apply dlc_ctb_true; [lia | exact Hlv | exact EFk0]).
+        pose proof (dlc_count_kill_counted F data data'
+                      (dir_nrec (bv_unsigned (di_size dn))) k0
+                      ltac:(lia) Hagree Hct Hz'lb) as Hkc.
+        unfold dlc_lower in Hlow |- *. rewrite Hsz'.
+        intro Hnz'. pose proof (Hlow Hnl). cbn in Hcnt. lia.
+      - (* plain: the slot was never counted, and the home did not move *)
+        apply (dlc_lower_eq F F dn dn' data data');
+          [cbn in Hcnt; lia | | exact Hlow].
+        rewrite Hsz'.
+        apply (dlc_count_ctb_le F F data data'
+                 (dir_nrec (bv_unsigned (di_size dn))) _ k0
+                 ltac:(left; reflexivity) Hagree
+                 ltac:(intros k _; reflexivity)
+                 (dlc_ctb_dead F data' k0 Hz'lb)). }
     rewrite (big_sepL_delete (fun _ k => dir_link_at_f F self dn' data' k)
                (seq 0 nrec) k0 k0).
     2:{ apply lookup_seq. lia. }
@@ -1162,19 +1409,20 @@ Section DirLinks.
     intros Hty Hnl Hdd Hself.
     destruct (Hdd Hty Hnl) as (Hnrec & _ & _ & _ & Hlive & _).
     rewrite /dir_links decide_True; [| exact Hty].
-    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
+    iIntros "H". iDestruct "H" as (F) "(%Hbnd & %Hlow & H)".
     iDestruct (big_sepL_lookup_acc _
                  (seq 0 (dir_nrec (bv_unsigned (di_size dn)))) 1%nat 1%nat
                  with "H") as "[H1 Hback]".
     { apply lookup_seq. lia. }
     (* THE BORROW IS AT THE RECORD'S OWN FLAVOUR, and it is the [".."]
        slot -- index 1, which [DirView.dlc_ctb] refuses whatever [F] says
-       of it.  So the count clause does not move and the return leg needs
+       of it.  So neither count clause moves and the return leg needs
        no premise: a [".."] pays for the PARENT's count, never for this
        directory's. *)
     iExists (F 1%nat). iSplitL "H1".
     { iApply (dir_link_at_unlink F self dn data 1 Hnl Hlive Hself with "H1"). }
     iIntros "Ht". iExists F. iSplitR; [iPureIntro; exact Hbnd |].
+    iSplitR; [iPureIntro; exact Hlow |].
     iApply "Hback". rewrite /dir_link_at_f.
     rewrite (proj2 (dir_liveb_true data 1) Hlive).
     rewrite (bool_decide_eq_false_2
@@ -1214,7 +1462,7 @@ Section DirLinks.
     intros Hdead. rewrite /dir_links.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z)) as [Hd | Hd];
       [| iIntros "_"; iPureIntro; intro Hc; exfalso; exact (Hd Hc)].
-    iIntros "H". iDestruct "H" as (F) "[%Hbnd _]".
+    iIntros "H". iDestruct "H" as (F) "(%Hbnd & _ & _)".
     iPureIntro. intros _. exact (dlc_bound_empty F dn data Hdead Hbnd).
   Qed.
 
@@ -1257,6 +1505,7 @@ Section DirLinks.
       [| iClear "Hg"; done].
     iExists (fun _ => false).
     iSplitR; [iPureIntro; apply dlc_bound_le1; lia |].
+    iSplitR; [iPureIntro; exact (dlc_lower_nl0 _ dn' data Hnl) |].
     destruct (decide (1 < dir_nrec (bv_unsigned (di_size dn')))%nat)
       as [Hlt | Hge].
     - rewrite (big_sepL_delete

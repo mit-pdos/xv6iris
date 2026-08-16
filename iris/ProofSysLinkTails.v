@@ -1380,10 +1380,9 @@ Section ProofSysLinkTails.
        ([sl_setnl] moves one halfword); the ledger big-op rides by
        [IregLinkNz.dir_links_nlink_drop], whose whole content is that at a
        nonzero count no ticket in it can be grey. *)
-    iDestruct (dir_links_nlink_drop (bv_unsigned inum) dn dn' dat Hnz
-                 ltac:(clear -Hdec; lia)
+    iDestruct (dir_links_nlink_drop (bv_unsigned inum) dn dn' dat
+                 Hnotdir
                  ltac:(exact (sl_setnl_type dn (sl_ndec (di_nlink dn))))
-                 ltac:(exact (sl_setnl_size dn (sl_ndec (di_nlink dn))))
                  with "Hdlnk") as "Hdlnk".
     iAssert (ity_shot gy (di_type dn')) as "#Hshot'".
     { rewrite /dn' sl_setnl_type. iExact "Hshot". }
