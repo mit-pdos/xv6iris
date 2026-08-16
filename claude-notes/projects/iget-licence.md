@@ -1,13 +1,45 @@
 # The iget licence increment (C′-lite) — build worklist
 
-STATUS: BRIEF READY (2026-08-16, coordinator).  NOT YET LAUNCHED — see
-LAUNCH CONDITION.  Design of record: `design/fs-fragments.md` §7.1 (the
-C′ verification report, R13(i)/(ii) adopted) as amended by **R14**
+STATUS: **LANDED** at `35bc973b` (2026-08-16).  Rows 1-13 built as
+written; **row 14 deviated and is REPORTED, not absorbed** — see "Row 14"
+below.  The campaign-ledger entry is in
+[`fs-fragments-campaign.md`](fs-fragments-campaign.md) ("THE iget LICENCE
+INCREMENT (C′-lite)"), and it carries the two audit greps, the four
+findings and the gate.  Design of record: `design/fs-fragments.md` §7.1
+(the C′ verification report, R13(i)/(ii) adopted) as amended by **R14**
 (C′ un-parked, licence (d) foreclosed, the `SpanL` transitional
 constructor).  Supplier table: §7.5.6.  Mandate: the user's invariant —
 *"the kernel will never invoke iget on inode numbers in directories in
 a disconnected subtree"* — built in its statable form, a licence
 premise on `SpecIget`, per the user's direction of 2026-08-16.
+
+## WHAT IS LEFT
+
+Three things, none of them blocking:
+
+1. **Row 14's shape question, owed to the coordinator.**  F2's
+   client-facing premise set grew beyond §7.5.6's disjunction by three
+   items — `⌜dir_orphan_clean dn data⌝`, `⌜0 <= dpi < 2 ^ 32⌝` and the
+   RESOURCE `FsRep.fedges dpi dn data`.  The exact list, and why no
+   tree-level fact supplies (ii), is in `FsLookup.v`'s own header.  **The
+   fix that would restore the property outright is folding the edges into
+   `fdir`**; that is a change to F1b's landed fragment and is not this
+   increment's to make.  F2 still has strictly fewer premises than the
+   bytes, so the property is dented, not lost.
+2. **`IgetLic.v` folds back at a milestone**, into `InodeRegion.v` /
+   `DirLinks.v`, for the reason `IregLinkNz.v` does.  In particular
+   `dir_links_borrow` belongs beside `dir_links_dotdot_out`.
+3. **`SpanL` and `GreyL` delete**, on the schedule R14 sets: `SpanL` when
+   F1.5c mints an `iclaim` (the site becomes `ClaimL`, no signature moves
+   — that is why (d) is kept) or when `create_fresh_ty` retires; `GreyL`
+   with G1's token deletion, at the same milestone fold-back (it touches
+   `IcacheRef`/`InodeRegion`, which this increment could not).
+
+The four readings in `IgetLic.v` (`iname_linked_alloc`,
+`iname_held_alloc`, `iname_root_alloc`, `iname_buf_alloc`) have **no
+consumer in the tree** — they are the payoff the enumeration makes
+available and the proof that the constructors are not vacuous.  Do not
+delete them as dead code.
 
 ## Goal / non-goal
 
@@ -81,7 +113,27 @@ rebuild green as the statement-drift catch.
   iris/Proof*.v` → zero instantiation sites; `grep -n "SpanL"
   iris/Proof*.v` → exactly `ProofIalloc.v`'s iget.
 
-## LAUNCH CONDITION
+## Row 14 — the deviation, in full
+
+The row said: re-supply F2's wrapper over the new `SpecDirlookup` shape,
+and **STOP AND REPORT if its CLIENT-facing premise set must grow beyond
+the §7.5.6 disjunction**, because "fewer premises than the bytes" is the
+property F2 exists for.  It had to grow, by three items beyond the
+disjunction:
+
+| # | what | why it is unavoidable |
+|---|---|---|
+| (ii) | `⌜dir_orphan_clean dn data⌝` | `FsTree.node_rep`'s NDir case fixes the type, `dir_names_unique` and `ents = dir_view …` and says NOTHING about `di_nlink`.  No tree-level fact implies it. |
+| (iii) | `⌜0 <= dpi < 2 ^ 32⌝` | the bytes key the ticket list at `bv_unsigned dinum`, the tree at `dpi : Z`; this is `FsRep.inum_of_unsigned`'s premise, i.e. `FsTree.fs_inums_ok` at one node. |
+| (iv) | `FsRep.fedges dpi dn data` | a RESOURCE — the substantive one.  §1.3 makes edges a primitive client-held fragment BESIDE the node, so a client holds it; `fdir` does not contain it. |
+
+The row was EXECUTED rather than left red, because the increment's gate is
+a green cone and thirteen rows cannot land behind one red file.  The
+finding is recorded in three places (`FsLookup.v`'s header, the campaign
+ledger, here) so it cannot be lost, and the ruling owed is item 1 of WHAT
+IS LEFT above.
+
+## LAUNCH CONDITION (historical)
 
 AFTER the V5′ P+W closer lands: it holds `ProofCreate.v`,
 `ProofSysLink.v`, `ProofSysUnlink.v`, `DirLinks.v`, `FsRep.v`,

@@ -2484,3 +2484,160 @@ consumer that would catch a statement move) rebuilt: **EXIT=0**, so no
 statement moved.  Committed by explicit path; the live `DirLinks.v` /
 `ProofCreate.v` / `IregDirBit.v` lanes' edits were present in the tree
 throughout and were not touched.
+
+---
+
+## THE iget LICENCE INCREMENT (C′-lite) — **§20.17.5's PARAGRAPH IS NOW A
+## TYPE.  `iris/IgetLic.v` (new leaf); every `iget` in the tree presents a
+## licence, and the user's invariant is a theorem of each one**
+
+Design of record: `design/fs-fragments.md` §7.1 (R13(i)) as amended by
+**R14** (C′ un-parked, licence (d) foreclosed, the `SpanL` transitional
+constructor); supplier table §7.5.6.  Worklist: `projects/iget-licence.md`.
+
+### What landed
+
+`SpecIget` gains ONE binder `l : ilic` and ONE premise
+`IgetLic.iname γi γfs inum l`, returned in the postcondition **unspent and
+at the SAME `l`**.  `ProofIget` frames it across the whole function inside
+the shared tail's closure and drops it on the diverging
+`panic("iget: no inodes")` arm.  `SpecDirlookup` borrows the directory's
+ticket list and the home's own record to produce one at the matched index;
+`SpecDirlink` relays that borrow to its inner lookup.  All eight delivery
+sites in the tree now name their licence in their own `iApply` line:
+
+| site | licence | what earns it |
+|---|---|---|
+| `ProofNamexRoot`'s `+0x4c` iget | `RootL` | the landed ROOT CLAUSE, its first consumer |
+| `ProofNamex`'s `+0x4c` iget | `RootL` | same |
+| `ProofDirlookup`'s iget, non-self record | `LinkedL fl` | the payload's own ticket at the matched index |
+| `ProofDirlookup`'s iget, SELF record (`"."`) | `HeldL dr` | the home's `dinode_at`; xv6 files no ticket for `"."` |
+| `ProofIreclaim`'s `+0x44` iget | `BufL bno ds` | the block half still in hand (brelse is at `+0x4c`) |
+| `ProofIalloc`'s `+0xaa` iget | `SpanL` | **nothing** — R14's one permitted site |
+
+**THE TWO AUDIT GREPS, captured (`iris/`, at the landed tree):**
+
+```
+$ grep -n "GreyL" iris/Proof*.v
+                                   (no output; exit 1)
+$ grep -n "SpanL" iris/Proof*.v
+iris/ProofIalloc.v:1661:    (*  R14: THE SPAN LICENCE -- THE ONE PERMITTED [SpanL] SITE IN THE TREE   *)
+iris/ProofIalloc.v:1670:        So this iget presents [SpanL], whose [iname] is [⌜True⌝]: a licence
+iris/ProofIalloc.v:1674:        [grep -n "SpanL" iris/Proof*.v] must name THIS site and no other.
+iris/ProofIalloc.v:1677:    iAssert (iname γi γfs inum SpanL) as "Hlic";
+iris/ProofIalloc.v:1680:              SpanL
+```
+
+So §20.17.5's box is a proposition a build checks: **zero sites instantiate
+the grey licence, and exactly one site — `ProofIalloc`'s iget — presents no
+evidence at all.**  The axiom's delivery-side perimeter is a grep line.
+
+### Where the user's invariant is earned
+
+`ProofNamex`'s `dirlookup(ip,name,0)`, at the `fs.c:693` guard
+`if(ip->nlink == 0) return 0` the walk fell through two instructions
+earlier.  That guard is the only thing in xv6 stopping a `chdir`'d process
+from walking `".."` out of an orphaned directory into a claim box (§7.5.4's
+TRACE G), and turning it into `SpecDirlookup`'s premise is what makes *"the
+kernel never invokes iget on inode numbers in directories in a disconnected
+subtree"* a **theorem of every licensed iget** rather than a paragraph.
+Note the order the trace turns on: `ilock` happens BEFORE the guard, so the
+licence is *held* there and merely never *delivered* — which is why the
+enumeration lives at `SpecIget` and not on the payload.
+
+### Four findings
+
+- **THREE CONSTRUCTORS HAVE TO CARRY DATA, and "the same `l`" is what
+  forces it.**  §7.1.1 wrote (a)/(c)/(e) with the content behind a `∃`
+  (`∃ d, dinode_at …`, `∃ ds, fsblock …`).  A post returning the licence
+  "at the same `l`" then returns a DIFFERENT resource — the caller lends
+  `dinode_at γi inum dn` and gets back `∃ d, dinode_at γi inum d`, which no
+  walk can put back into its payload.  **A borrow is only a borrow if the
+  index pins the content.**  `HeldL (d : dinode)`, `BufL (bno : Z) (ds :
+  list dinode)`, `LinkedL (fl : option (option Z))`.  Still seven
+  constructors, still closed, both greps unaffected.
+- **LICENCE (a) IS THE PAYMENT UNIT AT ANY FLAVOUR, not `ilink`.**  §7.1.1
+  predates V5′'s flavour split: a record's ticket is
+  `DirLinks.dlc_tick self k (F k) z`, i.e. `ilink` / `ilinkd` / `ilinkdp z
+  self` — three fragments in three ledger components with no weakening
+  between them.  Spelling (a) as the plain `ilink` would have made it
+  **unsuppliable at the commonest iget in the kernel**, namex's walk into a
+  subdirectory.  `IgetLic.ipaid` indexes it; (L1) bounds the SUM, so any one
+  unit is the allocatedness witness (`link_paid_ge`, three lines).
+- **THE (a)/(c) BOUNDARY IS THE KERNEL'S OWN.**  A lookup of `"."` matches
+  the home's SELF record, and xv6 deliberately files no ticket for it ("No
+  ip->nlink++ for '.': avoid cyclic ref count"), so `dir_link_at`'s guard is
+  false there and (a) has nothing to lend.  The case split in
+  `ProofDirlookup`'s found arm is not a proof artefact — it is §20.4's
+  (a)-vs-(c) line, drawn where the source draws it.
+- **THE READING THAT MAY NOT TAKE A CALLER'S RECORD.**  `dinode_at` is a
+  full-fraction ghost_map element, so the accessor-family shape for (c) —
+  `ireg_inv -∗ dinode_at γi inum dn -∗ iname … HeldL ={E}=∗ ⌜…⌝` — has an
+  UNSATISFIABLE premise set and says nothing about anything.  That is
+  §4.1's twice-instantiate failure one tier up, and it would have compiled.
+  `iname_held_alloc` is the unpack instead, and the header says why.
+
+### Row 14 — **the one row that did not fit, reported rather than absorbed**
+
+`FsLookup.v` (F2's atomic triple) was to re-supply the wrapper over the new
+`SpecDirlookup` shape, with instructions to STOP AND REPORT if its
+CLIENT-facing premise set had to grow beyond §7.5.6's disjunction.  **It
+did.**  The exact list, for the coordinator to rule on, is in the file's own
+header and is: (i) the disjunction — sanctioned; (ii) `⌜dir_orphan_clean dn
+data⌝` — `FsTree.node_rep`'s NDir case fixes the type, name uniqueness and
+`ents = dir_view …` and says NOTHING about `di_nlink`, so no tree-level fact
+implies it; (iii) `⌜0 <= dpi < 2 ^ 32⌝` — the `Z`-key/word-key round trip
+(`FsRep.inum_of_unsigned`), which IS `FsTree.fs_inums_ok` at one node;
+(iv) **`FsRep.fedges dpi dn data`** — a RESOURCE, the substantive one.
+§1.3 makes edges a primitive client-held fragment beside the node, so a
+client does hold it, but `fdir` does not contain it — **folding the edges
+into `fdir` would restore the property outright, and that is the shape
+question owed.**  What survives: F2 still has strictly fewer premises than
+the bytes (the bytes gained three pure + two resources, F2 three pure + one,
+and `dinode_at` is still hidden inside `fdir`).  The row was executed rather
+than left red because the increment's gate is a green cone; the finding is
+recorded in `FsLookup.v`'s header, here, and in the worklist.
+
+### What this does NOT do (R14(iii), restated so it is not oversold)
+
+The free-side wall is untouched.  §7.1.6's death certificate stands
+verbatim — the licence is BORROWED at the iget and RETURNED before the call
+ends, so `iput` holds none and §20.7's "the reference that outlives its
+licence" is exactly where it was.  `create_fresh_ty` stands; the gate does
+not open.  This retires §20.17.5's PARAGRAPH, not §20.7's WALL.
+
+### Byte-stability, verified
+
+`SpecNamex`, `SpecCreate`, `SpecSysLink`, `SpecSysUnlink`, `SpecIalloc`,
+`SpecIlock`, `SpecIput`, `SpecIupdate`, `InodeRegion.v`, `IcacheRef.v`,
+`IcacheEscrow.v`, `IcacheBoot.v`, `DirLinks.v` are all **byte-identical**:
+the licence is borrowed within one call, so no syscall-level contract sees
+it.  The borrow accessor `IgetLic.dir_links_borrow` — `dir_links_dotdot_out`'s
+shape at an arbitrary index — lives in the new leaf precisely so `DirLinks.v`
+need not move.
+
+### APPENDIX — `SpecCreateFreshTy.v` §(F3)
+
+Rewritten from *"Nobody has run it.  If an eleventh probe is opened, THIS is
+the only one worth opening"* to probe 8's outcome: **RUN, AND DEAD** at the
+sixth wall, THE ADVERSARY RESOLVES CONSISTENTLY (§7.11).  Both halves of the
+recorded guess were wrong and that is why running it paid — the language
+extension is NOT the obstacle, and branch A genuinely delivers past all five
+named walls including the currency gap; it dies in the prophesied-FOREIGN
+branch.  Comment-only; `LinkCreateFreshTy.vo` rebuilt green in the cone,
+which is the statement-drift catch.
+
+### Gate
+
+MIRROR ONLY (`ec2-18-206-159-30`, lane `/home/ubuntu/gr36lane`, verified
+clean and at this tree before use); never local.  Full cone
+`make -f CoqMakefile -j24 -k` → **MAKEEXIT=0**, `make -n` → **0 compile
+lines**, staleness sweep (the "older than a `.vo` it DEPENDS on, to a
+fixpoint" form) → **0 stale, 0 missing**, 1164 `.vo` (1163 + `IgetLic.vo`).
+`tools/proof_coverage.py --check` → exit 0, **187/190**, `sysfile.c` 16/16.
+`tools/lemma_diff.py` → CLEAN across all 16 files.  `Print Assumptions` on
+`Iget.wp_iget_sconf`, `SysUnlink.wp_sys_unlink_sconf`,
+`Create.wp_create_sconf` and `SysLink.wp_sys_link_sconf` captured verbatim:
+**the increment adds ZERO assumptions** — sys_unlink and sys_link keep THE
+STANDING SIX, create's cone keeps those plus `create_fresh_ty` and nothing
+new, and iget's own instantiation is clean.
