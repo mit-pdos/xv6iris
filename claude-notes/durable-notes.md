@@ -252,6 +252,29 @@ Qed.
 the two instances. Same family as the inline-`ltac:` trap: a hole whose
 expected type is still an evar at splice time.
 
+## TWO TRAPS AT THE *SHAPE* OF A HYPOTHESIS, both of which report the wrong thing
+
+- **A MOVER WHOSE CONCLUSION DROPS ONE OF ITS ARGUMENTS CANNOT INFER IT,
+  AND THE ERROR NAMES AN UNRELATED GOAL.** A register-bundle mover
+  (`su_regs_wr_s2 m sp0 dpv ipv ipv' s3v Mx v` — "s2 was `ipv`, is now
+  `ipv'`") mentions the OLD value only in its hypothesis, so writing it
+  with `_` there fails with *"Cannot infer this placeholder of type
+  `mword 64`"* — reported at a `pcw`-closed `assert` from further down the
+  proof, because that is where the elaborator finally gave up. Spell out
+  every argument the conclusion does not mention. Same family as
+  `co_license`'s dropped arguments (see the `Qed`-time symptom above), one
+  tier up and with a different message.
+- **NEVER RE-ASSEMBLE A RECORD-SHAPED `Prop` CONJUNCT BY CONJUNCT.** A
+  bundle like `InodeLock.inode_ok` is a right-nested seven-way `/\`;
+  destructuring it to feed a callee's three numeric premises and then
+  rebuilding it with `split_and!` fails with *"The term `Hrest` has type
+  `A /\ B` while it is expected to have type `A`"*, which reads like a
+  wrong conjunct ORDER and is not — it is an off-by-one in how many
+  conjuncts the pattern named. Keep the whole fact (`pose proof Hiok as
+  Hiok0`) and rebuild with `exact Hiok0`. The rule generalizes: a `Prop`
+  you only ever pass along should be destructured for READING and
+  reconstructed from the SAVED original, never from its pieces.
+
 ## Typeclass sweeps: the three traps that do not look like typeclass problems
 
 Adding a class constraint to a bottom-of-the-tree predicate (e.g. giving
