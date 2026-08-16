@@ -20,7 +20,8 @@ diverged from the design's sketches, and what is left.
 | **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | **LANDED with W5-DIR (increment 9), at two premises D1/D2** |
 | **S2-0** | the NAME-UNIQUENESS payload clause `dir_uniq`, and the payload → tree constructor it unlocks | FsTree, FsLookup, IcacheEscrow, IcacheBoot + 18 walk/spec files | full cone | **LANDED** |
 | **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | DESIGNED, NOT STARTED — see below |
-| **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | DESIGNED, NOT STARTED — see below |
+| **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | SUPERSEDED by **V5′** — the sketch is unsound (Correction 1) and unprovable (Correction 2) as written; see the V5′ entry |
+| **V5′** | D1's carrier, PROBED AND CORRECTED: the ledger-resident FRACTIONAL parent register (`p : option (frac_agree Z)`), the `(wdu, wdt)` split, `ilinkdp`/`iparent`, the tie inside `dir_links` | Increment R: IcacheRef, InodeRegion, IregDirBit, IregLinkNz, IcacheBoot, SpecIupdate (+ProofIupdate) — **fused with V4's region half**; Increment P: DirLinks, DirView, ProofCreate; Increment W: ProofSysUnlink + seal | full cone | DESIGNED (probe report transcribed below); increment R IN FLIGHT fused with V4 |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
 landed contract and no landed proof moved.
@@ -1523,6 +1524,13 @@ files, so it is its own increment and must be gated on its own lane.
 ## V5 — **D1's CARRIER, DESIGNED.  The parent edge must be an AGREED TAG
 ## ON THE d-FLAVOURED UNIT; no payload and no tree reading can supply it**
 
+**SUPERSEDED BY V5′ (next section).  Do not implement from this sketch**:
+as written it is UNSOUND at free-reclaim re-mint (the persistent agree is
+§20.9(b)'s corpse — V5′ Correction 1) and its `(if wd then 1 else 0)`
+arithmetic is wrong once V4 flips the `".."`-units d-flavoured (`wd` is
+not `<= 1` — V5′ Correction 2).  The section is kept for what it got
+right: the one sound cross-inode channel is the per-inum ledger.
+
 `(D1) bv_unsigned (dir_inum dati 1) = bv_unsigned dinum`.  What died:
 
 * **the payload** — §20.17.4 sharpening (b)'s constraint, restated: one
@@ -1553,3 +1561,294 @@ This is a payload conjunct carrying a RESOURCE (the first one beside
 `dir_links`), so it is a full ~45-site sweep on top of a CMRA widening.
 **Do not start it before V4 lands** — V4 is strictly smaller, closes the
 half of W5-DIR that has no alternative, and V5 reuses its flavour work.
+
+## V5′ — **D1's CARRIER, PROBED: candidate (γ) is ALIVE in its
+## LEDGER-RESIDENT FRACTIONAL form.  The probe's full report, transcribed
+## as the design of record; implement from HERE, not from V5**
+
+The D1 probe read the W5/V4/V5 records, fs-fragments R1–R13 + §7,
+fs-icache §20.9/§20.17.4, and the live code (`IcacheRef.v`'s ledger CMRA,
+`InodeRegion.ireg_slot`, `DirLinks.dir_link_at_f`/`dir_links`,
+`DirView.dir_dots_ix`).  Verdict: **D1 does NOT join the create_fresh_ty
+class.**  The design below (V5′) is the prompt's candidate (γ) collapsed
+into V5, with two corrections without which V5-as-sketched is
+respectively UNSOUND and UNPROVABLE.
+
+### The two corrections to the recorded V5 sketch
+
+* **CORRECTION 1 — a persistent agree is §20.9(b)'s corpse revived.**  A
+  persistent `iparent z p` fragment survives `z`'s free; at the next
+  mkdir reusing inum `z` under a different parent `p'`, the authority
+  can never move `Some (ag p)` to `Some (ag p')` (not frame-preserving
+  against the old fragment — and a LEAKED fragment blocks forever, since
+  frame-preservation quantifies over all outstanding frames).  The mint
+  at the reused inum is unprovable; forced through, it would agree
+  falsely.  §20.9(b)'s own footnote is the fix: *evidence in the
+  present*.  The tag must be **fractional agreement**
+  (`frac × agree Z`, the ghost-var discipline): fractions are collected
+  at the child's own unlink-decrement, full ownership at the authority
+  makes the reset `Some (1, ag p) -> None` frame-preserving, and the
+  next mint checks `p = None` against the authority AT THE INSTANT of
+  minting, remembering nothing.
+* **CORRECTION 2 — `(if wd then 1 else 0)` is wrong arithmetic: `wd` is
+  NOT `<= 1`.**  After V4's flip a directory's `".."`-units are
+  d-flavoured too, so `wd` at a directory = 1 (its record in its parent)
+  + #subdirectories — unbounded.  The fix is to **split** `wd` into
+  `(wdu, wdt)`: `wdu` the `".."`-units (untagged), `wdt` the
+  parent-record unit (tagged, `<= 1`).  The split is not decoration —
+  it is what makes the reset-precondition SYNTACTICALLY preservable at
+  every mover (see "why the split is forced" below).
+
+### The mechanism
+
+**CMRA** (`IcacheRef.v`, local — `lelem` is named in only that file,
+verified by V1): `linkElemUR`'s element becomes
+`lelem wl (wdu, wdt) g c r p` with
+`p : optionUR (dfrac_agreeR (leibnizO Z))` (the pinned Iris spells
+frac-agree as `dfrac_agree` + `to_frac_agree`).  New fragments, both
+timeless:
+
+* `ilinkd z` — re-reads as the **untagged** d-unit (`wdu = 1`); V1's
+  consumers unchanged ((T1) now reads `wdu + wdt`).
+* `ilinkdp z pv` — `wdt = 1` + the half-register
+  (`p = Some (to_frac_agree (1/2) pv)`): the **parent-record unit**, one
+  unit of payment that also says "`z`'s parent-register reads `pv`".
+* `iparent z pv` — the payload half, fraction only.
+* `iparent_agree : ilinkdp z pv ∗ iparent z pv' ⊢ ⌜pv = pv'⌝` — pure
+  fragment validity (`own_valid_2`; ½+½ ≤ 1 ∧ agree), **no region open
+  needed**.
+
+**Slot clauses** (`ireg_slot`, separate-conjunct discipline as the root
+clause and (T1)):
+
+    ireg_par_ok wdt p := (wdt <= 1)
+                         ∧ (p = None <-> wdt = 0)
+                         ∧ (p = None ∨ ∃ pv, p = Some (to_frac_agree 1 pv)).
+
+(L1)/(root) apply at `wl + wdu + wdt`; (T1) at `wdu + wdt`; V4's (T1′)
+at `wl`.  R5 respected: nothing relates `p` to `inreg`.
+
+**The tickets** (`DirLinks.dir_link_at_f`, d-branch becomes
+index-aware — increment P): at `k = 1` the d-ticket is
+`ilinkd (dir_inum data k)` (the `".."`-unit, untagged); at `k >= 2` it
+is `ilinkdp (dir_inum data k) self` — **the tag is literally `self`**,
+the parameter dp's payload already carries.  Sound because the only way
+a directory record enters a directory is create's dirlink (sys_link
+refuses T_DIR, there is no rename): every k≥2 d-ticket is a
+create-minted parent-record unit whose parent IS `self`.  Root's `".."`
+is a self-record (guard `<> self`) → `emp`, unchanged.
+
+**The tie** — rides INSIDE `dir_links`' T_DIR branch, beside `∃ F` (not
+beside `dir_links` — this kills the sketch's "~45-site sweep"):
+
+    if decide (bv_unsigned (di_nlink dn) <> 0
+               ∧ (2 <= dir_nrec (bv_unsigned (di_size dn)))%nat
+               ∧ self <> ROOTINO_z)
+    then ∃ pv, iparent self pv ∗ ⌜bv_unsigned (dir_inum data 1) = pv⌝
+    else emp
+
+The guard's first two conjuncts copy `dir_dots_ix`'s antecedent shape
+(which already proves `2 <= nrec ∧ dir_live data 1` under them, so every
+discharge co-fires); the root exclusion is because root has no
+create-episode.  `dir_links`' parameters already supply everything —
+**arity does not move anywhere**.  (Spelling: DirLinks cannot import
+InodeRegion; `InodeInv.ROOTINO` + the landed `ireg_root_ROOTINO` bridge
+is the route.)
+
+**Establishment** — create's mkdir arm, both inums in hand at every
+step: +0xc4 (`ip->nlink = 1; iupdate`) mints via the tagged mover: the
+pre-record has `nlink = 0` (fresh shape) → (L1) → sum 0 → `wdt = 0` →
+`ireg_par_ok` → `p = None` → the alloc `None -> Some (1, ag dp)` is
+frame-preserving, paying out `ilinkdp ip dp ∗ iparent ip dp`.  The
+`ilinkdp` half deposits into dp's payload at the name-record (the
+`dir_links_dirlink_d` shape, whose premise now forces tag = self = dp);
+the `iparent` half plus the `".."`-write's bytes establish the tie at
+ip's park (the guard turns true exactly at the `".."`-write: nrec
+reaches 2).  V4's index-1 count-neutral d-deposit lemma is the **fusion
+point** — it deposits the `".."`-`ilinkd dp` AND establishes the tie in
+one statement.  `cr_flav ty` becomes
+`if decide (ty = T_DIR) then Some (Some dp_inum) else None`; dp's inum
+is in create's hand at +0xc4.
+
+**Consumption — D1 falls in three steps** inside `su_w5_dir` (the
+premise becomes an internal derivation; the seal then composes
+premise-free):
+
+1. The zeroing's `dir_links_unlink` at record kk (kk ∉ {0,1} —
+   compiled already) releases
+   `∃ b, if b then ilinkdp (bv ip) dp else ilink (bv ip)`; V4's (T1′)
+   mirror-refutation kills `b = false`; the walk holds
+   **`ilinkdp ip dp` — the tag is `dp` verbatim**, off dp's own `self`
+   parameter.
+2. The extended `dir_links_dotdot_out` on ip's payload (guard live:
+   T_DIR from the seam, `nlink <> 0` from `su_panic_nlink`'s
+   fall-through, `2 <= nrec` from `dir_dots_ix`, `ip <> root` from a
+   new `IregLinkNz`-style leaf: the released unit + `ireg_root_ok` give
+   `root -> 2 <= nlink`, against FINDING 3's `nlink ip = 1` — exactly
+   the free fact V4's certificate (c) recorded) hands out
+   `iparent ip pv ∗ ⌜bv_unsigned (dir_inum dati 1) = pv⌝` along with
+   the `".."`-ticket.
+3. `iparent_agree`: `pv = dp`.  **D1.**  The `".."`-ticket's index
+   rewrites to dp and feeds `wp_iupdate_unlink(dp)` (whose fragment
+   index is fixed at the flushed inum — the W5 blocker, now fed).
+   Later, `wp_iupdate_unlink(ip)` at the new tagged index spends
+   `ilinkdp ip dp ∗ iparent ip dp` (full fraction 1), decrements `wdt`
+   1→0, and **resets `p` to `None`** — the register is clean before the
+   inum can ever be reclaimed.  The orphan re-park owes no tie (guard
+   false at `nlink = 0`); `su_dir_links_orphan` untouched.
+
+The lock answers episode-blindness (probe-7's H1 concern): the walk
+holds ip's reference and sleeplock continuously from ilock to the
+spend, the fragments are HELD resources, and the only authority reads
+are at the mint and the spend, both same-episode by the lock.  No
+payout-time window exists.
+
+### The park audit — every site, disposition
+
+| site | tie | tickets/tag |
+|---|---|---|
+| transfer parks (namex, chdir, kexec, fileread/stat, iput peels, …) | **invisible** — the tie is inside `dir_links`, which these move whole and never open | — |
+| `dir_links_dirlink` / `_nop` (plain deposit, k0 ≥ 2 forced by `dir_dots_ix`) | cong (record 1 untouched, nlink same, size grows monotone) | — |
+| `dir_links_dirlink_d` (create's fused name-deposit + `++`) | cong at dp (nlink rises) | deposits `ilinkdp ip dp`; tag = self forced by the lemma's shape |
+| the index-1 `".."`-deposit (V4's lemma, extended) | **establishes** the tie at ip (pv := dp, bytes just written, half from +0xc4) | deposits `ilinkd dp` (untagged) |
+| `dir_links_unlink` (zeroing at dp) | cong: record 1's bytes untouched (kk ≥ 2, pointwise off writei's post — the landed `su_dz_byte` move), `nlink' <> 0` from D2 (already owed for `dir_orphan_clean`, no new premise) | releases the tagged ticket |
+| `dir_links_dotdot_out` | extended to hand the tie out (consumed; never returned — the next park is the orphan) | index-1 untagged ticket out |
+| `dir_links_orphan` (ip at nlink 0) | guard false — statement untouched | grey at index 1: **grey conversion sources from `wdu`, never `wdt`** (constraint: no `wdt -> g` lemma is ever written; the tagged unit was already spent one instruction earlier) |
+| `dir_links_size_zero` (ilock claim box) | guard false (`nrec 0 = 0`) | — |
+| `dir_links_of_plain` (boot) | one computational image fact: **every live image directory is root** — true of mkfs (root only), same precedent class as V2's `nlink <= 1` fact | all-plain, `p = None` everywhere, zero region obligation |
+| create `fail:` arms (T_DIR child) | guard false at the parked `nlink = 0`; the walk still holds both halves and returns them at the fail-flush's **tagged** `wp_iupdate_unlink` — reset fires, symmetric with the unlink path | |
+| sys_link `ip->nlink++`, `bad:`, O_TRUNC, filewrite | files only (sys_link refuses T_DIR; open refuses writable dirs) — `dir_links = emp` | — |
+| itrunc/free of the orphan | nlink = 0 throughout, then type 0 → `emp` | `p = None` already (reset at the spend); free's own obligations untouched — it never reads `p` |
+
+**Region mover table** (the ~350-file cone): `ireg_write_au` — arith
+only, `p` untouched; `_link_fl`/`_unlink_fl` (plain/untagged) — V1's
+arithmetic rewrite, `wdt`/`p` untouched so `ireg_par_ok` rides; the
+TAGGED mint/spend — the `_fl` pair's third arm (or structural copies)
+plus the alloc/dealloc local updates above (the spend's receipt mirrors
+`wp_iupdate_unlink`'s left disjunct); `ireg_claim_au`/`ireg_free_au` —
+sum-split as V1, `ireg_par_ok` gives `p = None` at `w = 0` for free;
+`ireg_withdraw`, `ireg_link_grey`, `ireg_link_alloc` —
+untouched/arith.  `SpecIupdate`'s flavour index widens
+`option unit -> option (option Z)` (`None` = plain, `Some None` =
+untagged-d, `Some (Some pv)` = tagged); `ilink_fl None` stays `ilink`
+by iota, so **every landed `None` caller is unchanged to the
+character** — R6's precedent a second time.
+
+### Why the (wdu, wdt) split is forced — the one subtle obligation
+
+The mint needs `auth p = None` in scope.  Derivation: pre-`nlink = 0` →
+(L1) → all counts 0 → `wdt = 0` → `ireg_par_ok` → `p = None`.  For that
+clause to be an invariant, every mover must preserve
+`p = None <-> wdt = 0` **syntactically**.  With a single `wd`: an
+untagged spend decrements `wd`, and at the state `wd = 1 ∧ p = Some`
+(consistent slot-clause-wise — the 1 "is" the tagged unit) the clause's
+preservation would require refuting the spend, which the authority
+cannot do — the fragment being spent is untagged and the tagged unit's
+outstandingness is invisible to counts.  With the split, untagged
+movers touch `wdu` only and the clause never moves; tagged movers move
+`wdt` and `p` together.  Every obligation in the table is then a
+projection or a `lia`.
+
+### Graveyard audit — §20.9 (a)–(j), R3, R5, §20.16.3, §20.17.4
+
+* **(a)** not a pure strengthening — resource-backed, re-establishable
+  by the holder's own fragment.  **(b)** dodged BY THE FRACTION
+  DISCIPLINE, not by luck: the mint's `p = None` is checked against the
+  authority at the instant of use; nothing is remembered across a free
+  (§20.9(b)'s own escape clause, extended from counts to a resettable
+  register).  **(c)** no global authority — rides in the existing
+  per-inum `lelem`.  **(d)** authority stays in `ireg_slot`.  **(e)**
+  no new gname — the register rides under `icfg_link`'s existing gmap
+  (and see certificate 4 for why a per-mkdir gname dies anyway).
+  **(f)** SpecIget untouched.  **(g)** self-records still `emp`.
+  **(h)/(i)** grey scoping untouched; tagged units are never greyed
+  (structural: the tagged unit is spent at `ip->nlink--`, one
+  instruction before the orphan park; no `wdt -> g` lemma exists).
+  **(j)** claim component untouched.
+* **R3**: no whole-tree anything — the relation is between exactly two
+  payloads through one per-inum register; `fs_rep`/`fnode` untouched.
+  **R5**: (L6) not stated; `ireg_par_ok` relates `p` to `wdt` only.
+  **§20.16.3**: `ireg_withdraw` unchanged.  **§20.17.4(a)**: the
+  momentary-falseness window (between the `".."`-write and the park,
+  and between the two decrements) is covered by the checked-out payload
+  under the sleeplock — the clause is an obligation at the park,
+  exactly the chartered placement.
+
+### Price and staging
+
+The sketch's "~45-site payload sweep" DOES NOT HAPPEN: the tie rides
+inside `dir_links`, and the ~30 transfer sites move `dir_links`
+opaquely.  The cost concentrates where `dir_links` is opened.
+
+* **Increment R (region)** — `IcacheRef` (lelem widening, fragments,
+  agreement lemma) + `InodeRegion` (slot, `ireg_par_ok` + projections,
+  the movers' arith, the tagged mint/spend) + `IregDirBit`/`IregLinkNz`
+  (arith + the root-min2 leaf, `ireg_link_nz`'s structural copy) +
+  `IcacheBoot` (arity) + `SpecIupdate` (index widen, frozen-file
+  discipline per V1).  **FUSED WITH V4's region half** — (T1′), the
+  `fl = None` mover premise, and V5′ edit the same six movers; two
+  separate ~350-file cone iterations would redo identical arithmetic
+  twice.  This is the campaign's own "V5 reuses V4's flavour work",
+  taken literally.
+* **Increment P (payloads + producer)** — `DirLinks` (ticket
+  index-split, the tie, the cong/mover lemmas, the fused index-1
+  deposit, `dotdot_out` extension, `unlink`'s released-ticket shape,
+  the new extraction) + boot's one image fact + `ProofCreate` (the
+  tagged mint, deposits, fail arms).  V2-scale.
+* **Increment W (the walk + seal)** — `su_w5_dir` derives D1 and D2
+  internally and drops both premises; the `Module … <: SYSUNLINK` seal;
+  `LinkSysUnlink` flip; coverage 187/190, **sysfile.c 16/16**.
+
+### Death certificates (filed with §7)
+
+1. **(α)-simple, namex/nameiparent exporting the relation** — DEAD:
+   namex reads each PARENT's records on the way down and arrives at ip
+   via dp's record; it never reads ip's record 1, R8 rules out any
+   path→byte functional post, and the W5 record already verified
+   nameiparent/dirlookup/ilock hand back no `ents` fact.  The exported
+   fact would itself be D1 needing a carrier.
+2. **(α)-widen `ilinkd` to a persistent/plain agree payload** (the V5
+   sketch's literal form) — DEAD at free-reclaim re-mint, §20.9(b)
+   (Correction 1).  Only the fraction-collected form survives, and it
+   is V5′.
+3. **(β) existential `pdp` in the payload / strengthened `dir_dots_ix`**
+   — DEAD: with nothing external pinning it,
+   `pdp := dir_inum dati 1` satisfies it trivially and it carries
+   nothing; with an external pin, the pin IS the carrier and the
+   payload clause is just the tie (which V5′ keeps — the tie alone,
+   minus the register, is the circular version).
+4. **(γ)-as-packaged: fresh gname per mkdir, halves in the two
+   payloads** — DEAD AT THE JOIN: the two halves' gnames are
+   independently ∃-bound in two payloads; extraction yields fragments
+   at γ and γ′ with nothing forcing γ = γ′, and the only sound channel
+   to agree on the gname is a per-inum register — at which point the
+   gname is dead weight and the tag itself moves into the ledger.
+5. **"Spend at X instead of dp" / "does the walk need D1 at all"** — it
+   does: the kernel's store targets dp's disk block (the pointer it
+   holds), so the model's flush is at dp and `ireg_write_unlink_fl`'s
+   fragment index is fixed there; and the walk holds no other
+   `ilink dp` (dirlookup minted `inode_ref` for ip; nameiparent's path
+   units aren't held; the walker's own resolving edge was consumed in
+   dp's parent).  The `".."`-ticket's index identity is irreducibly D1.
+
+### Honest residue
+
+* `ROOTINO` vs `ireg_root` spelling in DirLinks' guard — layering:
+  DirLinks cannot import InodeRegion; `InodeInv.ROOTINO` + the landed
+  `ireg_root_ROOTINO` bridge is the route.
+* frac-agree under the pinned Iris: `iris.algebra.lib.dfrac_agree`
+  (`dfrac_agreeR`, `to_frac_agree`) — confirmed present.
+* The boot obligation "every live image directory is root" is
+  mkfs-true but would break on a rich (post-crash) image; a crash model
+  would then mint the registers computationally from record 1 at boot —
+  noted for the crash effort, not this one.
+* V4 coordination note, found while auditing: the grey conversion's
+  `".."`-unit sources from `wdu`, never `wdt` (the flip changes the
+  greyed unit's flavour) — a constraint on which lemmas may exist, not
+  a new obligation.
+
+**Bottom line**: D1 does not join the create_fresh_ty class.  Candidate
+(γ), corrected into the ledger-resident fractional form V5′, is a
+complete, park-audited, graveyard-clean carrier; with V4 (whose region
+half co-lands), `su_w5_dir` loses both premises and the seal flips
+sysfile.c to 16/16.
