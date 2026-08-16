@@ -226,6 +226,7 @@ Section run.
     addr_is_ram pc ->
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
     is_aligned_paddr (Physaddr pc) 2 = true ->
     addr_is_ram (add_vec_int pc 2) ->
     is_aligned_paddr (Physaddr (add_vec_int pc 2)) 2 = true ->
@@ -261,7 +262,7 @@ Section run.
   Proof.
     intros Hdisj HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE Hunlock Hpallow Hram
-      Hb0 Hb1 Hpa Hram2 Hpa2 HmisaC Hnrvc Hdec Hlpad.
+      Hb0 Hb1 Hal4 Hpa Hram2 Hpa2 HmisaC Hnrvc Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hlo Hhi Hinstr".
     unfold run_hart_active.
     rewrite /swp. iIntros (C) "%HC Hcont".
@@ -280,7 +281,7 @@ Section run.
               with "[Hrw Hro Hlo Hhi] [-]").
     { iApply (swp_fetch_ram_base2 Drw Dro Df rs pc pmar0 pcfg ilo ihi Hdisj
                 HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc Hpriv Hpma
-                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2 Hb0 Hb1 Hpa
+                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2 Hb0 Hb1 Hal4 Hpa
                 Hpa2 Hnrvc with "Hcert Hrw Hro Hlo Hhi"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
@@ -484,6 +485,7 @@ Section run.
     addr_is_ram pc ->
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
     is_aligned_paddr (Physaddr pc) 2 = true ->
     isRVC h = true ->
     hval (Drw ∪ Dro) Drw rs
@@ -515,7 +517,7 @@ Section run.
   Proof.
     intros Hdisj HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
       Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC Hunlock Hpallow Hram
-      Hb0 Hb1 Hpa Hrvc Hdec Hlpad.
+      Hb0 Hb1 Hal4 Hpa Hrvc Hdec Hlpad.
     iIntros "#Hcert Hrw Hro Hmem Hexp Hinstr".
     unfold run_hart_active.
     rewrite /swp. iIntros (C) "%HC Hcont".
@@ -533,7 +535,7 @@ Section run.
     iApply (swp_use_cer (fetch tt) _ _ C HC with "[Hrw Hro Hmem] [-]").
     { iApply (swp_fetch_ram_rvc2 Drw Dro Df rs pc pmar0 pcfg h Hdisj
                 HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc Hpriv Hpma
-                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hpa Hrvc
+                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hal4 Hpa Hrvc
                 with "Hcert Hrw Hro Hmem"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce

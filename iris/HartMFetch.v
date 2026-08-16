@@ -50,7 +50,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp.
-Require Import RiscvTryStep RiscvExtras RiscvFetchExec HartAlign.
+Require Import RiscvTryStep RiscvExtras RiscvFetchExec.
 Local Open Scope Z_scope.
 
 Local Notation zerobit :=
@@ -910,6 +910,10 @@ Section fetch.
     register_lookup (R_bitvector_64 PC) rs = pc ->
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = true ->
+    (* NOT derived here: [InstrBytes.align2_not4_facts] already gives the
+       caller this together with the two bit tests, off [instr_bytes]'s own
+       2-alignment. *)
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
     eq_vec (_get_Misa_C (register_lookup misa rs))
       (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
     isRVC h = true ->
@@ -924,7 +928,7 @@ Section fetch.
       (fun r => ⌜r = F_RVC h⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
-    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 HmisaC Hrvc.
+    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hrvc.
     iIntros "#Hcert Hrw Hro Hfb".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold fetch. mf_glue.
@@ -969,7 +973,7 @@ Section fetch.
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)".
     rewrite Hpc mbind_ret. cbn beta.
-    rewrite (mf_align4_false pc Hb1). cbn beta iota.
+    rewrite Hal4. cbn beta iota.
     rewrite mbind_ret. cbn beta.
     (* the two PC reads feeding the halfword fetch_bytes *)
     iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
@@ -1006,6 +1010,10 @@ Section fetch.
     register_lookup (R_bitvector_64 PC) rs = pc ->
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = true ->
+    (* NOT derived here: [InstrBytes.align2_not4_facts] already gives the
+       caller this together with the two bit tests, off [instr_bytes]'s own
+       2-alignment. *)
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
     eq_vec (_get_Misa_C (register_lookup misa rs))
       (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
     isRVC ilo = false ->
@@ -1024,7 +1032,7 @@ Section fetch.
       (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
-    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 HmisaC Hnrvc.
+    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 Hal4 HmisaC Hnrvc.
     iIntros "#Hcert Hrw Hro Hlo Hhi".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold fetch. mf_glue.
@@ -1069,7 +1077,7 @@ Section fetch.
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)".
     rewrite Hpc mbind_ret. cbn beta.
-    rewrite (mf_align4_false pc Hb1). cbn beta iota.
+    rewrite Hal4. cbn beta iota.
     rewrite mbind_ret. cbn beta.
     (* the two PC reads feeding the FIRST halfword fetch *)
     iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
@@ -1221,6 +1229,7 @@ Section fetch.
     addr_is_ram pc ->
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
     is_aligned_paddr (Physaddr pc) 2 = true ->
     isRVC h = true ->
     gen_cert -∗
@@ -1234,11 +1243,11 @@ Section fetch.
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
     intros Hdisj HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif
-      Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hpa
-      Hrvc.
+      Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hal4
+      Hpa Hrvc.
     iIntros "#Hcert Hrw Hro Hmem".
     iApply (swp_fetch_rvc2 Drw Dro Df rs pc h Hdisj HDpc HDmisa Hpc Hb0 Hb1
-              HmisaC Hrvc with "Hcert Hrw Hro [Hmem]").
+              Hal4 HmisaC Hrvc with "Hcert Hrw Hro [Hmem]").
     iIntros "Hrw Hro".
     iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc pc h Hdisj HDmst HDpriv Hpriv
               with "Hcert Hrw Hro [Hmem]").
@@ -1280,6 +1289,7 @@ Section fetch.
     addr_is_ram (add_vec_int pc 2) ->
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_vaddr (Virtaddr pc) 4 = false ->
     is_aligned_paddr (Physaddr pc) 2 = true ->
     is_aligned_paddr (Physaddr (add_vec_int pc 2)) 2 = true ->
     isRVC ilo = false ->
@@ -1298,10 +1308,10 @@ Section fetch.
   Proof.
     intros Hdisj HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif
       Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2
-      Hb0 Hb1 Hpa Hpa2 Hnrvc.
+      Hb0 Hb1 Hal4 Hpa Hpa2 Hnrvc.
     iIntros "#Hcert Hrw Hro Hlo Hhi".
     iApply (swp_fetch_base2 Drw Dro Df rs pc ilo ihi Hdisj HDpc HDmisa Hpc
-              Hb0 Hb1 HmisaC Hnrvc with "Hcert Hrw Hro [Hlo] [Hhi]").
+              Hb0 Hb1 Hal4 HmisaC Hnrvc with "Hcert Hrw Hro [Hlo] [Hhi]").
     - iIntros "Hrw Hro".
       iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc pc ilo Hdisj HDmst HDpriv
                 Hpriv with "Hcert Hrw Hro [Hlo]").
