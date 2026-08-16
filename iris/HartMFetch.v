@@ -1248,4 +1248,74 @@ Section fetch.
               Hram Hpa with "Hcert Hrw Hro Hmem").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE BASE-AT-2-mod-4 FETCH, from owned bytes.  The first place TWO    *)
+  (* memory obligations appear: one per halfword, at [pc] and [pc+2].     *)
+  (* [pc] is 2-mod-4, so [pc+2] is 4-aligned and a fortiori 2-aligned --  *)
+  (* but it is a DIFFERENT address, so it carries its own RAM and         *)
+  (* alignment premises rather than inheriting [pc]'s.                    *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_fetch_ram_base2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (ilo ihi : SailStdpp.Values.mword 16) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pc ->
+    addr_is_ram (add_vec_int pc 2) ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_paddr (Physaddr pc) 2 = true ->
+    is_aligned_paddr (Physaddr (add_vec_int pc 2)) 2 = true ->
+    isRVC ilo = false ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) pc 2 = Some ilo⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) (add_vec_int pc 2) 2 = Some ihi⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif
+      Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hram2
+      Hb0 Hb1 Hpa Hpa2 Hnrvc.
+    iIntros "#Hcert Hrw Hro Hlo Hhi".
+    iApply (swp_fetch_base2 Drw Dro Df rs pc ilo ihi Hdisj HDpc HDmisa Hpc
+              Hb0 Hb1 HmisaC Hnrvc with "Hcert Hrw Hro [Hlo] [Hhi]").
+    - iIntros "Hrw Hro".
+      iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc pc ilo Hdisj HDmst HDpriv
+                Hpriv with "Hcert Hrw Hro [Hlo]").
+      iIntros "Hrw Hro".
+      iApply (swp_checked_mem_read_ifetch2 Drw Dro Df rs pc pmar0 pcfg ilo
+                Hdisj HDpma HDcfg HDhtif Hhtif Hpma Hpcfg Hunlock Hpallow
+                Hram Hpa with "Hcert Hrw Hro Hlo").
+    - iIntros "Hrw Hro".
+      iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc (add_vec_int pc 2) ihi
+                Hdisj HDmst HDpriv Hpriv with "Hcert Hrw Hro [Hhi]").
+      iIntros "Hrw Hro".
+      iApply (swp_checked_mem_read_ifetch2 Drw Dro Df rs (add_vec_int pc 2)
+                pmar0 pcfg ihi Hdisj HDpma HDcfg HDhtif Hhtif Hpma Hpcfg
+                Hunlock Hpallow Hram2 Hpa2 with "Hcert Hrw Hro Hhi").
+  Qed.
+
 End fetch.
