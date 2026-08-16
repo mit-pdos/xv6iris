@@ -813,6 +813,9 @@ the load-bearing half of `SpecForkretParkPaid.forkret_park_pkg` below.
   `ProcPtOwn.ud_pas_cov` and the `ud_data pt = ud_pas pt` premise.
 
 **What is left**: the `if (first)` arm (fsinit + kexec + the panic tail).
+Its `panic("exec")` is the last panic arm in the kernel that is excluded by a
+premise rather than discharged; the recipe for discharging one is
+[`../completed/panic.md`](../completed/panic.md) §"THE RECIPE FOR A PANIC ARM".
 
 ## Parking a fresh process: A THEOREM over forkret, and what it costs
 

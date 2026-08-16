@@ -158,12 +158,6 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   100 % covered): the boundary specs, the TVM/TSR mstatus-pin extension, the
   proof's file split, and the whole-trap-loop Löb theorem
   (`SpecUserretClosed`), which is now built.
-- **[`panic.md`](projects/panic.md)** — `panic()`, proven, spliced and the
-  placeholder RETIRED: adequacy is down to one assumed Link. Kept as a
-  reference for the arm recipe and its six traps, how to derive a message's
-  address, why an arm inside a critical section changes its caller's push_off
-  premise — and, in the last two sections, how to delete a resource that 200
-  files name without reflowing all of them.
 - **[`console.md`](projects/console.md)** — console.c, 5/5 functions proven
   and linked: the `cons` module's own state in `ConsoleInv.v` and why its
   resource is deliberately unconstrained, consoleintr's block decomposition,
@@ -187,6 +181,11 @@ true when it was written and may not be now. When a project is fully finished �
 no remaining work and no cleanup — move its file here rather than deleting it,
 and lift any broadly-applicable lesson up into the design or durable notes
 first.
+
+`panic.md` is the one to open before proving any arm that ends in a `jal
+panic` — `forkret`'s `if (first)` is the only such arm left. It carries the arm
+recipe, its six traps, and the rule for deriving a `.rodata` message address
+instead of copying one.
 
 Two are worth reading even if you never touch their subject, because they are
 about failure modes that COMPILE: `explicit-cpuid.md` with its porting guide
