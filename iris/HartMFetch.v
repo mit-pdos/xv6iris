@@ -1073,4 +1073,60 @@ Section fetch.
               Hram Hpa with "Hcert Hrw Hro Hmem").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE 2-mod-4 COMPRESSED FETCH, from owned bytes.  Same composition as *)
+  (* [swp_fetch_ram] one width down, ending at [swp_fetch_rvc2] rather    *)
+  (* than [swp_fetch]: TWO bytes read, and the caller owes only those.    *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_fetch_ram_rvc2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (h : SailStdpp.Values.mword 16) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pc ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_paddr (Physaddr pc) 2 = true ->
+    isRVC h = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) pc 2 = Some h⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = F_RVC h⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif
+      Hpc Hpriv Hpma Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hpa
+      Hrvc.
+    iIntros "#Hcert Hrw Hro Hmem".
+    iApply (swp_fetch_rvc2 Drw Dro Df rs pc h Hdisj HDpc HDmisa Hpc Hb0 Hb1
+              HmisaC Hrvc with "Hcert Hrw Hro [Hmem]").
+    iIntros "Hrw Hro".
+    iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc h Hdisj HDmst HDpriv Hpriv
+              with "Hcert Hrw Hro [Hmem]").
+    iIntros "Hrw Hro".
+    iApply (swp_checked_mem_read_ifetch2 Drw Dro Df rs pc pmar0 pcfg h
+              Hdisj HDpma HDcfg HDhtif Hhtif Hpma Hpcfg Hunlock Hpallow
+              Hram Hpa with "Hcert Hrw Hro Hmem").
+  Qed.
+
 End fetch.

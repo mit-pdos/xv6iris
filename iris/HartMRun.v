@@ -331,4 +331,131 @@ Section run.
     by iFrame.
   Qed.
 
+  (* the 2-mod-4 twin: one HALFWORD fetch, no F_Base branch *)
+  Lemma swp_run_hart_active_rvc2 (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rs2 : regstate)
+      (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
+      (i other : instruction) (pmar0 : list PMA_Region)
+      (pcfg : type_of_register pmpcfg_n) (nl : nat) (R : iProp Σ) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Misa_S (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    eq_vec (_get_Mstatus_MIE (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    (forall j, pmpLocked (SailStdpp.Values.vec_access_dec pcfg j) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pc ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    is_aligned_paddr (Physaddr pc) 2 = true ->
+    isRVC h = true ->
+    hval (Drw ∪ Dro) Drw rs
+      (ext_decode_compressed h) i rs ->
+    hfrun nl (Drw ∪ Dro) Drw rs (is_landing_pad_expected tt) = Some (false, rs) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) pc 2 = Some h⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Dro -∗
+     swp (execute i)
+       (fun e => ⌜e = ExecuteAs other⌝ ∗
+                 hreg_frame (register_set (R_bitvector_64 nextPC)
+                               (add_vec_int pc 2) rs) Drw ∗
+                 hreg_frame_ro Df (register_set (R_bitvector_64 nextPC)
+                                     (add_vec_int pc 2) rs) Dro)) -∗
+    (hreg_frame (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Drw -∗
+     hreg_frame_ro Df (register_set (R_bitvector_64 nextPC) (add_vec_int pc 2) rs) Dro -∗
+     swp (execute other)
+       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
+    swp (run_hart_active 0)
+      (fun st => ⌜st = Step_Execute (RETIRE_SUCCESS,
+                         zero_extend' 32 h)⌝ ∗
+                 hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R).
+  Proof.
+    intros Hdisj HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
+      Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC Hunlock Hpallow Hram
+      Hb0 Hb1 Hpa Hrvc Hdec Hlpad.
+    iIntros "#Hcert Hrw Hro Hmem Hexp Hinstr".
+    unfold run_hart_active.
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
+    iApply (swp_use_cer (dispatchInterrupt Machine) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa HDmst
+                HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mbind0_ret.
+    iApply (swp_use_cer (fetch tt) _ _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_fetch_ram_rvc2 Drw Dro Df rs pc pmar0 pcfg h Hdisj
+                HDpc HDmst HDpriv HDmisa HDpma HDcfg HDhtif Hpc Hpriv Hpma
+                Hpcfg Hhtif HmisaC Hunlock Hpallow Hram Hb0 Hb1 Hpa Hrvc
+                with "Hcert Hrw Hro Hmem"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
+      fetch_callback get_config_print_instr].
+    iApply (swp_use_cer (ext_decode_compressed h)
+              _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". r_glue.
+    rewrite mbind0_ret.
+    iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun nl Drw Dro Df rs rs _ _ Hdisj Hlpad
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". r_glue.
+    rewrite mbind_ret. r_glue.
+    iApply (swp_use_cer (currentlyEnabled Ext_Zca) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 4 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_cE_Zca (Drw ∪ Dro) Drw rs HDmisa HmisaC)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". r_glue.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer2
+              (Defs.write_reg (R_bitvector_64 nextPC)
+                 (add_vec_int pc 2)) _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDnpc
+                with "Hcert Hrw Hro"). }
+    iIntros (u) "[Hrw Hro]".
+    iApply (swp_use_cer (execute i) _ _ C HC with "[Hrw Hro Hexp] [-]").
+    { iApply ("Hexp" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". r_glue.
+    iApply (swp_use_cer (execute other) _ _ C HC
+              with "[Hrw Hro Hinstr] [-]").
+    { iApply ("Hinstr" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro & HR)". r_glue.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS,
+                          zero_extend' 32 h))).
+    by iFrame.
+  Qed.
+
 End run.
