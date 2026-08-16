@@ -726,44 +726,186 @@ The three ambient rows are the PRE-EXISTING notation lines, unchanged.
   is `True`, so there is nothing to repair. `sp-migration-red` can be
   deleted.
 
-**What phase D needs.** The generic leaf rule is a strict generalization
-of today's statements in one step, because the KT0 arm's obligation is
-already what the current leaves discharge:
-
-```coq
-Lemma wp_load_s_… (kt kt' : ktier) `{!KtierLe kt' kt} … :
-  sr_ktier_wit R kt -∗            (* KT0 ↦ emp, KT1 ↦ sr_kwit R *)
-  va ↦ₘ[kt']{dq} v -∗ … (va ↦ₘ[kt']{dq} v -∗ …) -∗ …
-```
-- The KT0 arm is LITERALLY the present proof: destructure
-  `⌜ktier_pin kt' ppn va⌝`, which at `kt' = KT0` IS `pa_of ppn va = va`,
-  and feed it to `sr_adm_id` unchanged.
-- The KT1 arm has `KtierLe KT1 kt` forcing `kt = KT1`, so
-  `sr_ktier_wit R KT1 = sr_kwit R` is in hand and `sr_absorb_wit` (phase B,
-  whose statement is `sr_absorb`'s with the `sr_adm` conjunct deleted and
-  `sr_kwit -∗` at the head) replaces the `sr_absorb` call one-for-one.
-- The datum comes back at `kt'`, so tier is preserved across an access and
-  no strengthening dance is needed at a re-deposit.
-- Keeping the CURRENT leaf names as the `kt := kt' := KT0` corollaries
-  means no function proof changes, and — because the ambient default IS
-  KT0 — a corollary stated at explicit `KT0` unifies with a consumer's
-  ambient datum by conversion (measured: the whole tree does this today
-  through `mem_pointsto_acc`).
-- `sie_cap`'s index and `ktier_wit` are still to do; nothing in phase C
-  constrains their shape.
+- **A COROLLARY STATED AT EXPLICIT `KT0` UNIFIES WITH A CONSUMER'S AMBIENT
+  DATUM BY CONVERSION** (`curktier_default` is a plain definition; only
+  `cur_ktier` is `Typeclasses Opaque`). That is what makes every
+  tier-indexed rule's old name a literal corollary — measured, and phase
+  D's whole roster rests on it.
 - When a file first needs KT1 facts it adds ONE line,
   `Local Instance : CurKtier := KT1.`, and its spec text does not move.
   Two tiers in scope at a seam (kvminithart, scheduler entry) must be
   spelled `[KT0]`/`[KT1]` explicitly — with two instances in scope
   resolution silently takes the last declared one.
 
+### Phase D findings (LANDED)
+
+The KT1 access path exists end to end at the LEAF layer, in six files
+(`SRegime.v`, `IntrDefs.v`, `SmodeCorePt.v`, `WpSconfMem.v`,
+`WpSmodePtMem.v`, `WpSmodePtLeaves.v`). Every function proof and every
+Spec file is byte-identical; `WpSconfLock.v` was assessed and left alone
+(see below). D3's designed form triggered its escalation valve.
+
+**THE GENERALIZATION IS ONE LEMMA, NOT A CASE SPLIT PER LEAF.** The KT0
+and KT1 arms land on *different* record fields (`sr_absorb` + `sr_adm_id`
+vs `sr_absorb_wit`) whose premise lists differ, so case-splitting `kt'`
+inside each leaf would duplicate its ~90-line tail. `SRegime.
+sr_absorb_ktier` absorbs the split once:
+
+```coq
+Lemma sr_absorb_ktier (R : s_regime) (kt kt' : ktier) `{Hle : !KtierLe kt' kt} :
+  forall acc va pa ppn pc σ E, <sr_absorb's pure premises, minus sr_adm> ->
+    ktier_pin kt' ppn va -> ↑kptN ⊆ E ->
+  ⊢ sr_ktier_wit R kt -∗ kmap_at (svpn_of va) ppn pc -∗ … (same conclusion)
+```
+
+so each leaf's diff is exactly: the tier binders, one extra hypothesis,
+`[kt']` on its datum, `sr_absorb …(sr_adm_id R … Hid)… "Hk …"` →
+`sr_absorb_ktier … kt kt' … Hid … "Hwit Hk …"`, and `(KTR := kt')` on the
+datum-shaped helpers it calls. **Build any further tier-indexed leaf the
+same way: put the two-arm reconciliation in a shared lemma, keep the leaf
+body single-path.**
+
+**The rule roster** (old name = the `kt := kt' := KT0` corollary, derived
+in four lines from the generic one, never re-proved):
+
+| file | generic rule | KT0/KT0 corollary |
+|---|---|---|
+| WpSmodePtLeaves.v | `wp_cld_s_r_t` | `wp_cld_s_r` |
+| WpSmodePtLeaves.v | `wp_csd_s_r_t` | `wp_csd_s_r` |
+| WpSmodePtMem.v | `wp_clw_s_r_t` | `wp_clw_s_r` |
+| WpSmodePtMem.v | `wp_ld_s_r_t` | `wp_ld_s_r` |
+| WpSmodePtMem.v | `wp_csw_s_r_t` | `wp_csw_s_r` |
+| WpSmodePtMem.v | `wp_sd_s_r_t` | `wp_sd_s_r` |
+| WpSconfMem.v | `wp_load_s_sconf_au_t` | `wp_load_s_sconf_au` |
+| WpSconfMem.v | `wp_store_s_sconf_au_t` | `wp_store_s_sconf_au` |
+| WpSconfMem.v | `wp_sb_s_sconf_t` | `wp_sb_s_sconf` |
+| WpSconfMem.v | `wp_sd_zero_s_sconf_t` | `wp_sd_zero_s_sconf` |
+| WpSconfMem.v | `wp_sw_zero_s_sconf_t` | `wp_sw_zero_s_sconf` |
+
+Every corollary is `iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit". iApply
+(…_t R KT0 KT0 <the explicit args> <the pure premises> with "Hwit").` —
+the `emp` witness is discharged inside, so the old statement grows
+nothing.
+
+**Datum-shaped helpers become tier-GENERIC IN PLACE** — a `` `{KTR :
+!CurKtier} `` binder, statement character-identical (phase C's section-
+binder finding, applied per-lemma): `SmodeCorePt.s_mem_chunk` /
+`s_win_write` / `word_pointsto_write_c` / `word4_pointsto_write_c`, and
+`WpSconfMem`'s `wordw_pointsto` (the Definition), `wordw_pointsto_write_c`,
+`mem_pointsto_write_c`. These see the pin but never feed `sr_adm`, so they
+need no witness and no `KtierLe` — only the freedom to be at `kt'`.
+**Annotate them `(KTR := kt')` at the call site**: written bare inside a
+tier-generic proof they resolve at the ambient KT0 default before
+unification with the hypothesis can pin them, and the failure is a
+both-sides-print-identically mismatch.
+
+**THE WITNESS IS PER-HART AND THE SCONF FUNNEL REBINDS THE HART — the one
+real obstacle, and both arms pay for it.** `sr_kwit strans_regime` is
+`kpt_on cpu_id`, so a witness stated at the leaf's own hart is NOT the one
+`sr_absorb_ktier` needs inside `wp_instr_s_sconf`'s σ-callback, which runs
+at the rebound hart. `WpSconfMem.sie_ktier_wit_rebind` crosses it with no
+statement-level `∀ h` (which would be far too strong at KT1 — it would
+demand every hart be at KPT):
+
+- `b = false`: the funnel's own guard `b = false \/ p = zero_reg -> CID =
+  CID0` says the harts are equal;
+- `b = true`: the ENABLED ARM the callback hands over already carries
+  `kpt_on` **at the hart it is delivered at** (phase A put the receipt in
+  `sie_arm`), so the witness is free there.
+
+Three traps in that one lemma, all of which compile-or-fail far from the
+cause:
+- It needs **its own SECTION** above the leaves': a lemma in the leaves'
+  section cannot be re-anchored after their `rename CID into CID0`
+  (durable-notes, "CpuId IS A CLASS, SO A CROSSING NEEDS A NEW SECTION").
+- Its hart binder `h : CpuId` **is itself an instance and shadows the
+  section variable**, so every hart-indexed term in the statement must be
+  spelled explicitly — `(CID := CID)` on the caller's side included. Left
+  bare, `cpu_id` means `h`, the guard degrades to `h = h`, and the symptom
+  is a *"Wrong argument name CID (possible names: Σ riscvGS0 sieG0 GEN)"*
+  at the USE site, because the section then discharges no `CID` at all.
+- `subst` fails on the guard (*"Cannot find any non-recursive equality
+  over h"*) — the equation crosses `CpuId`/`CPU` by conversion. Use
+  `assert (Hh : h = CID) by exact (Hs (or_introl eq_refl)); rewrite Hh`;
+  `rewrite` reaches the proofmode context because `envs_entails Δ Q` is
+  one term.
+
+**`WpSconfLock.v` is NOT generalized, and should not be.** Its one `%Hid`
+site is `wp_amoswap_lockopen_s_sconf`, whose datum is not the caller's: it
+comes out of `WpLock.lock_openable` → `lock_word lk v := lk ↦₄ v`, stated
+in `WpLock.v` with no `CurKtier` binder and therefore pinned at KT0 by
+construction. That is exactly design §7 ("a lock invariant's payload
+spells its tier EXPLICITLY, never `cur_ktier`") and it is TRUE — a
+spinlock word lives in static data or in an identity-mapped kalloc page.
+Generalizing the leaf would require editing `WpLock.v`, and would buy
+nothing. Its other eight leaves are wrappers over
+`wp_{load,store}_s_sconf_au`, so they inherit the generalization by
+switching to the `_t` names the day a lock payload wants a tier.
+`ProofAcquiresleep.v:220` is likewise untouched: it is a FUNCTION proof
+reading the pin off its own datum, with no `sr_adm` nearby.
+
+**D3: the escalation valve FIRED on the `sie_cap` conjunct; the fallback
+landed.** Measured: `rewrite /sie_cap` (or `/sie_arm`, or
+`/sie_cap_gpr`) appears in **20 files**, and at least a dozen of the sites
+take the bundle apart with explicit `iSplitL`/`iDestruct` patterns rather
+than `iFrame` — `ProofUsertrap`, `ProofKernelvec`, `ProofSched`,
+`ProofSwtch`, `WpSmodeIntr`, `WpIntrInv`, `WpSconfCsr`, `UsertrapRes`,
+`ProofUsertrapTail`, `ProofMain`, `ProofCopyin`, `ProofCopyinstr` — which
+a fourth conjunct breaks outright even though it is `emp` at the KT0
+default (`iFrame` would have absorbed it; a positional split will not).
+Most of those are FUNCTION proofs well outside the trap-machinery cone.
+What landed instead is
+additive and IntrDefs-only (`§6d`), and it is enough:
+
+- **No new `ktier_wit` name.** `SRegime.sr_ktier_wit strans_regime kt`
+  already unfolds to `emp` / `kpt_on cpu_id`; a second definition would be
+  a second thing to keep in step with the record. Recorded deviation from
+  the phase-D sketch.
+- `IntrDefs.strans_ktier_wit_intro : kpt_on cpu_id -∗ sr_ktier_wit
+  strans_regime kt` — the flip's receipt IS the access right.
+- `IntrDefs.sie_cap_ktier_wit : sie_cap m avail true p -∗ sie_cap m avail
+  true p ∗ sr_ktier_wit strans_regime kt` — the enabled arm, exploited not
+  duplicated (design §5's intent, without the index).
+- `IntrDefs.trap_csrs_ktier_wit` — same for the interrupts-OFF handler
+  bundle, whose receipt is a member for the same reason.
+- `IntrDefs.sie_cap_ktier_up : sie_cap m avail b p -∗ kpt_on cpu_id -∗
+  sie_cap m avail b p ∗ sr_ktier_wit strans_regime kt` — kvminithart's
+  post-flip upgrade in the only shape an UNINDEXED capability admits:
+  keep the capability, take the witness. No function spec changed.
+
+So the only case that still needs an explicit premise is interrupts-OFF
+code holding neither bundle — and that is precisely the phase-D leaf
+shape.
+
+**`pa` → `ea` in passing**: the four WpSconfMem leaves that were restated
+(`wp_store_s_sconf_au`, `wp_sb_s_sconf`, `wp_sd_zero_s_sconf`,
+`wp_sw_zero_s_sconf`) now spell the effective-address binder `ea`,
+corollaries included — it is a `let` inside the statement, invisible to
+callers. Still `pa`: WpSconfMem's 17 thin wrappers and WpSconfLock's 11.
+
+**What the KSTACK campaign needs next.**
+1. **`sie_cap` must become tier-indexed for the STACK, and that is its own
+   increment.** `stack_own` inside `sie_cap`/`sie_cap_of` is pinned at the
+   KT0 default today; a kstack capability needs `` `{KTR : !CurKtier} ``
+   on `sie_arm_of`/`sie_cap_of`/`sie_cap_gpr_of`/`sie_cap`/`sie_cap_gpr`
+   (spellings unchanged, so this is *not* the conjunct ripple above — the
+   `∗`-tree does not move). Do it alone and validate the Banach-fixpoint
+   cone; then `sie_cap_ktier_up` can take its designed
+   `KT0 → KT1` form.
+2. The leaf premise can then be dropped from the sconf leaves in favour of
+   `sie_cap_ktier_wit`, and `sie_ktier_wit_rebind` shrinks to the
+   `b = false` arm only.
+3. A post-boot file needing KT1 data adds `Local Instance : CurKtier :=
+   KT1.` and calls the `_t` names with `kt' := KT1`; a mixed-tier caller
+   pins `[KT0]`/`[KT1]` explicitly.
+4. Nothing here touches the fetch path; `text_pointsto` is still phase E.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
-  sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) are LANDED
-  and pushed; `main` is GREEN. NEXT: phase D — the KT1 access path (see
-  the campaign section's Phase D bullet and "What phase D needs" at the
-  end of the phase C findings).
+  sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) and D are
+  LANDED; `main` is GREEN. NEXT: the KSTACK campaign — see "What the
+  KSTACK campaign needs next" at the end of the phase D findings.
 - The `sp-migration-red` quarry branch is DELETED: the identity-pin
   deviation (phase C findings) left nothing to mine from it.
 - `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch
