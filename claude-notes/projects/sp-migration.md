@@ -362,21 +362,25 @@ dual-regime cone pays one section binder). Kept here only as history.
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
-  sketch; nothing of it implemented yet.
-- `main` green and pushed at `4019ec33`.
-- `3e514034` — **RED, unpushed**: the identity conjunct removed from
-  `mem_pointsto`, with `RiscvPtsto.v`'s own suite repaired
-  (`mem_pointsto_acc`, `_pin`, `_persist`, `mem_canonical`, `mem_ram`,
-  `mem_valid`, `phys_to_mem_map` — which lost its `pa_of ppn va = va` premise
-  — `phys_to_mem_claim`, `mem_to_phys_claim`), plus `KMap.v` and
-  `SmodeCorePt.v` destructure arities.
-- `c1001cc5` — notes.
-- Build stops at `WpSmodePtLeaves.v:427`, the first of ~14 sites that
-  destructure `%Hid` out of the datum and feed it to `sr_adm_id`
-  (`WpSconfMem` ×5, `WpSmodePtMem` ×4, `WpSmodePtLeaves` ×2, `SmodeCorePt`,
-  `WpSconfLock`, `ProofAcquiresleep`). Under the settled design these
-  become the G0 arm of the tier-preserving leaf rules (step 3 of the
-  implementation order).
+  sketch; nothing of it implemented yet. `main` is GREEN — the RED
+  experiment does not live on it.
+- **Branch `sp-migration-red`** (local, one squashed commit off `4019ec33`)
+  holds the RED experiment as a QUARRY for step 3, not as a base: the
+  identity conjunct removed from `mem_pointsto`, with `RiscvPtsto.v`'s own
+  suite repaired (`mem_pointsto_acc`, `_pin`, `_persist`, `mem_canonical`,
+  `mem_ram`, `mem_valid`, `phys_to_mem_map` — which lost its
+  `pa_of ppn va = va` premise — `phys_to_mem_claim`, `mem_to_phys_claim`),
+  plus `KMap.v` and `SmodeCorePt.v` destructure arities. Those repaired
+  lemmas are essentially the G1 tier's suite; step 3 adapts them under the
+  g index rather than rediscovering them.
+- On that branch the build stops at `WpSmodePtLeaves.v:427`, the first of
+  ~14 sites that destructure `%Hid` out of the datum and feed it to
+  `sr_adm_id` (`WpSconfMem` ×5, `WpSmodePtMem` ×4, `WpSmodePtLeaves` ×2,
+  `SmodeCorePt`, `WpSconfLock`, `ProofAcquiresleep`). Under the settled
+  design these become the G0 arm of the tier-preserving leaf rules (step 3
+  of the implementation order). Implementation should START FRESH from
+  green `main` at step 1 (the oneshot refactor, which is independent and
+  lands green), not by resuming the branch.
 - `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch
   path is untouched. It must eventually lose it too (TRAMPOLINE is
   non-identity); the settled design covers it — same index, same witness —
