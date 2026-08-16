@@ -483,7 +483,6 @@ Section fetch.
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = false ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    isRVC (subrange_vec_dec w 15 0) = false ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
@@ -492,10 +491,12 @@ Section fetch.
          (fun r => ⌜r = @FetchBytes_Success 4 w⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
     swp (fetch tt)
-      (fun r => ⌜r = F_Base w⌝ ∗
+      (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
+                      then F_RVC (subrange_vec_dec w 15 0)
+                      else F_Base w)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
-    intros Hdisj HDpc Hpc Hb0 Hb1 Hal Hrvc.
+    intros Hdisj HDpc Hpc Hb0 Hb1 Hal.
     iIntros "#Hcert Hrw Hro Hfb".
     rewrite /swp. iIntros (C) "%HC Hcont".
     unfold fetch. mf_glue.
@@ -552,8 +553,10 @@ Section fetch.
               with "[Hrw Hro Hfb] [-]").
     { iApply ("Hfb" with "Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    rewrite Hrvc mcer_ret.
-    iApply ("Hcont" $! (F_Base w)). by iFrame.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (if isRVC (subrange_vec_dec w 15 0)
+                        then F_RVC (subrange_vec_dec w 15 0)
+                        else F_Base w)). by iFrame.
   Qed.
 
   (* THE COMPOSITION: [fetch] with [fetch_bytes] filled in, leaving only
@@ -571,7 +574,6 @@ Section fetch.
     neq_vec (access_vec_dec pc 0) zerobit = false ->
     neq_vec (access_vec_dec pc 1) zerobit = false ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    isRVC (subrange_vec_dec w 15 0) = false ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
@@ -581,12 +583,14 @@ Section fetch.
          (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)) -∗
     swp (fetch tt)
-      (fun r => ⌜r = F_Base w⌝ ∗
+      (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
+                      then F_RVC (subrange_vec_dec w 15 0)
+                      else F_Base w)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
-    intros Hdisj HDpc HDmst HDpriv Hpc Hpriv Hb0 Hb1 Hal Hrvc.
+    intros Hdisj HDpc HDmst HDpriv Hpc Hpriv Hb0 Hb1 Hal.
     iIntros "#Hcert Hrw Hro Hcmr".
-    iApply (swp_fetch Drw Dro Df rs pc w Hdisj HDpc Hpc Hb0 Hb1 Hal Hrvc
+    iApply (swp_fetch Drw Dro Df rs pc w Hdisj HDpc Hpc Hb0 Hb1 Hal
               with "Hcert Hrw Hro [Hcmr]").
     iIntros "Hrw Hro".
     iApply (swp_fetch_bytes_M Drw Dro Df rs pc w Hdisj HDmst HDpriv Hpriv
@@ -618,7 +622,6 @@ Section fetch.
     neq_vec (access_vec_dec pc 1) zerobit = false ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     is_aligned_paddr (Physaddr pc) 4 = true ->
-    isRVC (subrange_vec_dec w 15 0) = false ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
@@ -626,14 +629,16 @@ Section fetch.
         ⌜read_bytes σ.(mem) pc 4 = Some w⌝ ∗
         ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
     swp (fetch tt)
-      (fun r => ⌜r = F_Base w⌝ ∗
+      (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
+                      then F_RVC (subrange_vec_dec w 15 0)
+                      else F_Base w)⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
     intros Hdisj HDpc HDmst HDpriv HDpma HDcfg HDhtif
-      Hpc Hpriv Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa Hrvc.
+      Hpc Hpriv Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa.
     iIntros "#Hcert Hrw Hro Hmem".
     iApply (swp_fetch_M Drw Dro Df rs pc w Hdisj HDpc HDmst HDpriv
-              Hpc Hpriv Hb0 Hb1 Hva Hrvc with "Hcert Hrw Hro [Hmem]").
+              Hpc Hpriv Hb0 Hb1 Hva with "Hcert Hrw Hro [Hmem]").
     iIntros "Hrw Hro".
     iApply (swp_checked_mem_read_ifetch4 Drw Dro Df rs pc pmar0 pcfg w
               Hdisj HDpma HDcfg HDhtif Hhtif Hpma Hpcfg Hunlock Hpallow
