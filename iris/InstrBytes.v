@@ -681,86 +681,34 @@ Section InstrBytes.
       iDestruct "Hbytes" as %[_ []].
   Qed.
 
-  (* wp_exec_step_decode_execute_inv -- the DECODE/EXECUTE flavour, built on
-     [wp_exec_step_hart_active_inv].  General-purpose over ANY fetch result [r]:
-     the caller supplies the fetch [= r] and decode [decode_fetch r -> i] facts
-     (which don't depend on the width), and ONLY the execute obligation is
-     dispatched on [r], since the two run_hart_active paths differ: F_Base ticks
-     nextPC:=PC+4 and runs [execute i] once (no [ExecuteAs]); F_RVC ticks
-     nextPC:=PC+2, gates on [Ext_Zca] (misa.C), and [execute i] yields
-     [ExecuteAs other] which is then run to [RETIRE_SUCCESS].  The pure
-     [exec_hart_active_progress] / [exec_hart_active_progress_RVC] assemble the
-     run_hart_active fact, forwarded to [wp_exec_step_hart_active_inv]. *)
-  Lemma wp_exec_step_decode_execute_inv {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (r : FetchResult) (i : instruction) (s_exec : mstate),
-         ⌜ register_lookup cur_privilege σ.(sregs) = Machine ⌝ ∗
-         ⌜ exec (dispatchInterrupt Machine) σ = Some (None, σ) ⌝ ∗
-         ⌜ exec (fetch tt) σ = Some (r, σ) ⌝ ∗
-         ⌜ exec (decode_fetch r) σ = Some (i, σ) ⌝ ∗
-         ⌜ eq_vec (register_lookup elp σ.(sregs))
-                  (landing_pad_bits_backwards LP_EXPECTED) = false ⌝ ∗
-         (match r with
-          | F_Base w =>
-              ⌜ is_lpad_instruction i = false ⌝ ∗
-              ⌜ exec (execute i)
-                     (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 4))
-                  = Some (RETIRE_SUCCESS, s_exec) ⌝
-          | F_RVC h =>
-              ⌜ eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ⌝ ∗
-              ∃ other : instruction,
-                ⌜ exec (execute i)
-                       (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
-                    = Some (ExecuteAs other,
-                            set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2)) ⌝ ∗
-                ⌜ exec (execute other)
-                       (set_reg σ nextPC (add_vec_int (register_lookup PC σ.(sregs)) 2))
-                    = Some (RETIRE_SUCCESS, s_exec) ⌝
-          | _ => False
-          end) ∗
-         PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         mstate_interp s_exec ∗
-         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "Hinv Hhs H".
-    iApply (wp_exec_step_hart_active_inv with "Hinv Hhs").
-    iIntros (σ) "Hsi".
-    iMod ("H" $! σ with "Hsi") as (r i s_exec)
-      "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
-    destruct r as [e | w | h | erx].
-    - (* F_Ext_Error: unreachable *) iDestruct "Hrest" as %[].
-    - (* F_Base w : 4-byte, single execute *)
-      iDestruct "Hrest" as "[%Hnotlpad %Hexec]".
-      iModIntro. iExists (zero_extend' 32 w), s_exec. iSplitR.
-      { iPureIntro.
-        exact (exec_hart_active_progress σ σ s_exec σ w i
-                 (register_lookup PC σ.(sregs)) RETIRE_SUCCESS
-                 Hpriv Hdisp Hfetch Hdec Hlpad Hnotlpad eq_refl Hexec I). }
-      iFrame "Hpc Hsi_exec". iExact "Hcont".
-    - (* F_RVC h : 2-byte, ExecuteAs expansion; Ext_Zca from misa.C *)
-      iDestruct "Hrest" as "[%HmisaC Hrest]".
-      iDestruct "Hrest" as (other) "[%Hexec %Hexec2]".
-      iModIntro. iExists (zero_extend' 32 h), s_exec. iSplitR.
-      { iPureIntro.
-        exact (exec_hart_active_progress_RVC σ s_exec h i other
-                 (register_lookup PC σ.(sregs)) RETIRE_SUCCESS
-                 Hpriv Hdisp Hfetch Hdec Hlpad eq_refl
-                 (exec_currentlyEnabled_Zca σ HmisaC) Hexec Hexec2). }
-      iFrame "Hpc Hsi_exec". iExact "Hcont".
-    - (* F_Error: unreachable *) iDestruct "Hrest" as %[].
-  Qed.
+  (* wp_exec_step_decode_execute_inv IS GONE.  It handed the caller the whole
+     machine state and asked for a successor in ONE fupd, which is unsound
+     once an instruction is many nodes (other harts run in between, so a
+     successor computed from the sigma you saw is stale).  Its replacement is
+     HartMRun.swp_run_hart_active_base / _rvc: same role, same decode premise
+     (only the interpreter changes, [exec] -> the footprinted [hfrun]), but
+     the caller's obligation is one [swp] over [execute i] at its own frames.
+     See claude-notes/projects/main-cycle-port.md, "the ladder". *)
 
   (* pc_is x: the program counter is at [x].  During straight-line execution
      PC and nextPC are held in lock-step (the previous step's tick set
      PC := nextPC, and neither has moved since), so a single [x] pins both.
      A step advances [pc_is pc] to [pc_is (pc + width)]. *)
+  (* THE PER-CYCLE MUTABLE CSRs.  PC and nextPC are joined here by the five
+     cells the CYCLE WRAPPER owns: [minstret] and [minstret_increment] (the
+     prelude writes the flag, the tail bumps the counter) and the three the
+     clock tick writes.  They used to live in [MinstretInv]'s Iris
+     invariants; those are gone (see that file's header), and an EXCLUSIVE
+     resource cannot ride in [mmode_config], which is fraction-parameterised
+     and DUPLICATED by [mmode_config_split] (47 sites).  [pc_is] is already
+     exclusive, already threaded in and out of every leaf statement in both
+     modes, and these are exactly the registers a cycle mutates -- so it is
+     the right home, and no leaf STATEMENT changes.
+
+     The name is now too narrow; a rename is a pure token substitution and
+     is deliberately left as its own change rather than mixed in here. *)
   Definition pc_is (x : mword 64) : iProp Σ :=
-    (PC ↦ᵣ x ∗ nextPC ↦ᵣ x)%I.
+    (PC ↦ᵣ x ∗ nextPC ↦ᵣ x ∗ minstret_res ∗ clock_res)%I.
 
   (* mmode_config: the ambient resources a straight-line M-mode kernel
      instruction reads and preserves -- the persistent [hw_config] and
@@ -787,10 +735,18 @@ Section InstrBytes.
      are persistent.  A client owning [mmode_config (DfracOwn 1)] can split off a
      fraction to hand to [wp_instr] while retaining the rest to keep reasoning
      about the config during the instruction. *)
+  (* [minstret_inv] is gone; [gen_cert] now rides in [hw_config] (persistent,
+     and shared with the S-mode bundles), so the slot it used to occupy is
+     simply dropped.  The two counter-CONFIG cells are new: the wrapper's
+     [should_inc_minstret] reads them, and they are READ-ONLY, hence
+     fractional and safe under [mmode_config_split]. *)
   Definition mmode_config (dq : dfrac) : iProp Σ :=
-    (hw_config ∗ minstret_inv ∗
+    (hw_config ∗
      hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
      cur_privilege ↦ᵣ{ dq } Machine ∗
+     (∃ (mc : mword 32) (micfg : mword 64),
+        (R_bitvector_32 mcountinhibit) ↦ᵣ{ dq } mc ∗
+        (R_bitvector_64 minstretcfg) ↦ᵣ{ dq } micfg) ∗
      ∃ mstatus0 : mword 64,
        mstatus ↦ᵣ{ dq } mstatus0 ∗
        ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
@@ -826,9 +782,12 @@ Section InstrBytes.
      definition. *)
   Lemma mmode_config_unbundle (dq : dfrac) :
     mmode_config dq -∗
-    hw_config ∗ minstret_inv ∗
+    hw_config ∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
     cur_privilege ↦ᵣ{ dq } Machine ∗
+    (∃ (mc : mword 32) (micfg : mword 64),
+       (R_bitvector_32 mcountinhibit) ↦ᵣ{ dq } mc ∗
+       (R_bitvector_64 minstretcfg) ↦ᵣ{ dq } micfg) ∗
     ∃ mstatus0 : mword 64,
       mstatus ↦ᵣ{ dq } mstatus0 ∗
       ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
@@ -842,20 +801,24 @@ Section InstrBytes.
      Inverse of [mmode_config_unbundle]; the workhorse for chains that pass
      through a config-WRITING instruction (csrw mstatus / mret) and then want
      the opaque bundle back for the following instructions. *)
-  Lemma mmode_config_rebuild (dq : dfrac) (mstatus0 : mword 64) :
+  Lemma mmode_config_rebuild (dq : dfrac) (mstatus0 : mword 64)
+      (mc : mword 32) (micfg : mword 64) :
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
     mstatus_kernel_facts mstatus0 ->
     hw_config -∗
-    minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Machine -∗
+    (R_bitvector_32 mcountinhibit) ↦ᵣ{ dq } mc -∗
+    (R_bitvector_64 minstretcfg) ↦ᵣ{ dq } micfg -∗
     mstatus ↦ᵣ{ dq } mstatus0 -∗
     mmode_config dq.
   Proof.
-    iIntros (HmIE HMPRV HSXL HKF) "#Hhw #Hinv Hhs Hpriv Hms".
-    iFrame "Hhw Hinv Hhs Hpriv". iExists mstatus0. iFrame "Hms".
+    iIntros (HmIE HMPRV HSXL HKF) "#Hhw Hhs Hpriv Hmc Hmicfg Hms".
+    iFrame "Hhw Hhs Hpriv". iSplitL "Hmc Hmicfg".
+    { iExists mc, micfg. iFrame. }
+    iExists mstatus0. iFrame "Hms".
     iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))).
   Qed.
 
@@ -866,28 +829,43 @@ Section InstrBytes.
     mmode_config (DfracOwn q) ⊢
       mmode_config (DfracOwn (q/2)) ∗ mmode_config (DfracOwn (q/2)).
   Proof.
-    iIntros "(#Hhw & #Hinv & Hhs & Hpriv & Hmst)".
+    iIntros "(#Hhw & Hhs & Hpriv & Hcfg & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL & %HKF)".
+    iDestruct "Hcfg" as (mc micfg) "[Hmc Hmicfg]".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
     iDestruct "Hms" as "[Hms1 Hms2]".
-    iSplitL "Hhs1 Hpriv1 Hms1".
-    - iFrame "Hhw Hinv Hhs1 Hpriv1". iExists ms0. iFrame "Hms1 %".
-    - iFrame "Hhw Hinv Hhs2 Hpriv2". iExists ms0. iFrame "Hms2 %".
+    iDestruct "Hmc" as "[Hmc1 Hmc2]".
+    iDestruct "Hmicfg" as "[Hmicfg1 Hmicfg2]".
+    iSplitL "Hhs1 Hpriv1 Hms1 Hmc1 Hmicfg1".
+    - iFrame "Hhw Hhs1 Hpriv1". iSplitL "Hmc1 Hmicfg1".
+      { iExists mc, micfg. iFrame. }
+      iExists ms0. iFrame "Hms1 %".
+    - iFrame "Hhw Hhs2 Hpriv2". iSplitL "Hmc2 Hmicfg2".
+      { iExists mc, micfg. iFrame. }
+      iExists ms0. iFrame "Hms2 %".
   Qed.
 
   Lemma mmode_config_combine (q : Qp) :
     mmode_config (DfracOwn (q/2)) -∗ mmode_config (DfracOwn (q/2)) -∗
     mmode_config (DfracOwn q).
   Proof.
-    iIntros "(#Hhw & #Hinv & Hhs1 & Hpriv1 & Hmst1) (_ & _ & Hhs2 & Hpriv2 & Hmst2)".
+    iIntros "(#Hhw & Hhs1 & Hpriv1 & Hcfg1 & Hmst1) (_ & Hhs2 & Hpriv2 & Hcfg2 & Hmst2)".
     iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL & %HKF)".
     iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
+    iDestruct "Hcfg1" as (mc micfg) "[Hmc1 Hmicfg1]".
+    iDestruct "Hcfg2" as (mc' micfg') "[Hmc2 Hmicfg2]".
     iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
+    iDestruct (reg_pointsto_agree with "Hmc1 Hmc2") as %<-.
+    iDestruct (reg_pointsto_agree with "Hmicfg1 Hmicfg2") as %<-.
     iCombine "Hhs1 Hhs2" as "Hhs".
     iCombine "Hpriv1 Hpriv2" as "Hpriv".
     iCombine "Hms1 Hms2" as "Hms".
-    iFrame "Hhw Hinv Hhs Hpriv". iExists ms0. iFrame "Hms %".
+    iCombine "Hmc1 Hmc2" as "Hmc".
+    iCombine "Hmicfg1 Hmicfg2" as "Hmicfg".
+    iFrame "Hhw Hhs Hpriv". iSplitL "Hmc Hmicfg".
+    { iExists mc, micfg. iFrame. }
+    iExists ms0. iFrame "Hms %".
   Qed.
 
   (* wp_instr -- the [instr]-driven variant of wp_exec_step_decode_execute_inv.

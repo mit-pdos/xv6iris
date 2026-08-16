@@ -386,10 +386,11 @@ Section BootBundles.
     htif_tohost_base ↦ᵣ None -∗
     elp ↦ᵣ landing_pad_bits_backwards NO_LP_EXPECTED -∗
     senvcfg ↦ᵣ boot_w64 0 -∗
-    kmap_static_claims ==∗
+    kmap_static_claims -∗
+    gen_cert ==∗
     hw_config.
   Proof.
-    iIntros "Hmisa Hsec Hpma Hhtif Help Hsenv #Hb".
+    iIntros "Hmisa Hsec Hpma Hhtif Help Hsenv #Hb #Hcert".
     iMod (reg_pointsto_persist with "Hmisa") as "#Hmisa'".
     iMod (reg_pointsto_persist with "Hsec")  as "#Hsec'".
     iMod (reg_pointsto_persist with "Hpma")  as "#Hpma'".
@@ -415,7 +416,7 @@ Section BootBundles.
                                | apply bv_eq; vm_compute; reflexivity]|].
     iSplit; [iPureIntro; first [reflexivity
                                | apply bv_eq; vm_compute; reflexivity]|].
-    iExact "Hb".
+    iSplit; [iExact "Hb"|]. iExact "Hcert".
   Qed.
 
   (* [mmode_config] at the reset mstatus (0xA00000000: SXL = UXL = 2,

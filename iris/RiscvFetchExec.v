@@ -287,7 +287,12 @@ Section HwConfig.
      (* the static kernel-mapping claims bundle (KMap, uniform-claims):
         persistent, minted at adequacy init -- the ambient source of
         identity-mapping fragments (device vas, boot-time image) *)
-     kmap_static_claims)%I.
+     kmap_static_claims ∗
+     (* the generation certificate rides here: persistent, and common to
+        [mmode_config] and the S-mode bundles alike, so neither has to carry
+        its own copy (it used to arrive bundled inside [minstret_inv], which
+        is gone). *)
+     gen_cert)%I.
 
   Global Instance hw_config_persistent : Persistent hw_config.
   Proof. apply _. Qed.
