@@ -173,36 +173,41 @@ Proof.
               (conj Hlo (fit4_local (uint a) k Hk Hhi))).
 Qed.
 
-Local Lemma clint_gt_local (x : Z) : 2147483648 <= x -> 34340864 < x + 4.
+Local Lemma clint_gt_local (x n : Z) : 0 <= n -> 2147483648 <= x -> 34340864 < x + n.
 Proof. lia. Qed.
 
-Local Lemma clint_false_local (a : SailStdpp.Values.mword 64) :
+Local Lemma clint_false_local (a : SailStdpp.Values.mword 64) (n : Z) :
+  0 <= n ->
   addr_is_ram a ->
   andb (Z.leb (uint plat_clint_base) (uint a))
-       (Z.leb (Z.add (uint a) (__id 4))
+       (Z.leb (Z.add (uint a) (__id n))
               (Z.add (uint plat_clint_base) (uint plat_clint_size)))
   = false.
 Proof.
-  intros [Hlo _]. unfold ram_base in Hlo.
+  intros Hn [Hlo _]. unfold ram_base in Hlo.
   assert (Hsum : Z.add (uint plat_clint_base) (uint plat_clint_size)
                  = 34340864) by (vm_compute; reflexivity).
   rewrite Hsum. unfold __id.
   apply andb_false_intro2. apply Z.leb_gt.
-  exact (clint_gt_local (uint a) Hlo).
+  exact (clint_gt_local (uint a) n Hn Hlo).
 Qed.
 
+(* WIDTH-GENERIC.  The fetch reads FOUR bytes at a 4-aligned pc but only
+   TWO at a 2-mod-4 one (the model branches on PC bit 1), so everything from
+   here up carries the width. *)
 Lemma hfrun_within_mmio_ram (D Drw : gset register) (rs : regstate)
-    (pa : SailStdpp.Values.mword 64) :
+    (pa : SailStdpp.Values.mword 64) (n : Z) :
+  0 <= n ->
   (htif_tohost_base : register) ∈ D ->
   register_lookup htif_tohost_base rs = None ->
   addr_is_ram pa ->
-  hfrun 12 D Drw rs (within_mmio_readable (Physaddr pa) 4) = Some (false, rs).
+  hfrun 12 D Drw rs (within_mmio_readable (Physaddr pa) n) = Some (false, rs).
 Proof.
-  intros HD Hhtif Hram.
+  intros Hn HD Hhtif Hram.
   unfold within_mmio_readable, within_clint, within_sig,
     within_htif_readable, within_htif_writable.
   cmr_cbn.
-  rewrite (clint_false_local pa Hram). cmr_cbn.
+  rewrite (clint_false_local pa n Hn Hram). cmr_cbn.
   cmr_read. rewrite Hhtif. cmr_cbn.
   apply hfrun_ret.
 Qed.
@@ -269,6 +274,39 @@ Proof.
   reflexivity.
 Qed.
 
+(* WIDTH-GENERIC, and the RAM-access fact arrives as a PREMISE rather than
+   being derived here from [addr_is_ram] + 4-alignment.  That is what keeps
+   the chain width-agnostic: the alignment arithmetic is width-specific, so
+   it belongs at the top where the width is known, not buried in the walk.
+   [pma_access_local] is the width-4 discharge. *)
+Lemma hfrun_check_pma_ifetch (D Drw : gset register) (rs : regstate)
+    (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) (n : Z) :
+  (pma_regions : register) ∈ D ->
+  register_lookup pma_regions rs = pmar0 ->
+  pma_allows_ram pmar0 ->
+  pma_ram_access pa n ->
+  is_aligned_paddr (Physaddr pa) n = true ->
+  hfrun 6 D Drw rs
+    (check_pma_with_pmp_priority (InstructionFetch tt) PBMT_PMA Machine
+       (Physaddr pa) n false)
+  = Some (Values.Ok
+            {| Phys_Mem_Access_Info_splittable := CannotSplit;
+               Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
+Proof.
+  intros HD Hpma Hpallow Hacc Hpa.
+  unfold check_pma_with_pmp_priority. cmr_cbn.
+  cmr_read. rewrite Hpma. cmr_cbn.
+  destruct (Hpallow pa n Hacc) as (region & Hmatch & Hgrant).
+  destruct region as [rbase rsize rattr rdtree].
+  destruct Hgrant as (Hx & _).
+  cbn [PMA_Region_attributes] in Hx.
+  rewrite Hmatch. cmr_cbn.
+  rewrite Hx. cmr_cbn.
+  rewrite Hpa. cmr_cbn.
+  apply hfrun_ret.
+Qed.
+
+(* the width-4 instance the 4-aligned fetch path uses *)
 Lemma hfrun_check_pma_ifetch4 (D Drw : gset register) (rs : regstate)
     (pa : SailStdpp.Values.mword 64) (pmar0 : list PMA_Region) :
   (pma_regions : register) ∈ D ->
@@ -284,17 +322,8 @@ Lemma hfrun_check_pma_ifetch4 (D Drw : gset register) (rs : regstate)
                Phys_Mem_Access_Info_granule_size_exp := 0 |}, rs).
 Proof.
   intros HD Hpma Hpallow Hram Hpa.
-  unfold check_pma_with_pmp_priority. cmr_cbn.
-  cmr_read. rewrite Hpma. cmr_cbn.
-  destruct (Hpallow pa 4 (pma_access_local pa Hram Hpa))
-    as (region & Hmatch & Hgrant).
-  destruct region as [rbase rsize rattr rdtree].
-  destruct Hgrant as (Hx & _).
-  cbn [PMA_Region_attributes] in Hx.
-  rewrite Hmatch. cmr_cbn.
-  rewrite Hx. cmr_cbn.
-  rewrite Hpa. cmr_cbn.
-  apply hfrun_ret.
+  exact (hfrun_check_pma_ifetch D Drw rs pa pmar0 4 HD Hpma Hpallow
+           (pma_access_local pa Hram Hpa) Hpa).
 Qed.
 
 Section fetch.
@@ -362,8 +391,9 @@ Section fetch.
     iApply (swp_use_cer3 (within_mmio_readable (Physaddr pa) 4)
               _ _ _ _ C HC with "[Hrw Hro] [-]").
     { iApply (swp_hfrun 12 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa HDhtif Hhtif
-                   Hram) with "Hcert Hrw Hro"). }
+                (hfrun_within_mmio_ram (Drw ∪ Dro) Drw rs pa 4
+                   ltac:(lia) HDhtif Hhtif Hram)
+                with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer4 (read_ram Read_plain (Physaddr pa) 4 false)
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
