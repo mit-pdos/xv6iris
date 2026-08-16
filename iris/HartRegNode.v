@@ -38,7 +38,7 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 
 (* is this node a RegRead of exactly [r]? *)
-Definition hregread_at (r : register) (m : M unit) : bool :=
+Definition hregread_at {X : Type} (r : register) (m : M X) : bool :=
   match m with
   | Interface.Next oc _ =>
       match oc with
@@ -49,11 +49,11 @@ Definition hregread_at (r : register) (m : M unit) : bool :=
   end.
 
 (* answer a RegRead-of-[r] node with [v] *)
-Definition hregread_resume (r : register) (v : type_of_register r)
-    (m : M unit) : M unit :=
+Definition hregread_resume {X : Type} (r : register) (v : type_of_register r)
+    (m : M X) : M X :=
   match m with
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> M unit with
+      (match oc in Interface.outcome _ T return (T -> M X) -> M X with
        | Interface.RegRead r' _ => fun k =>
            match decide (r' = r) with
            | left Heq => k (eq_rect r type_of_register v r' (eq_sym Heq))
@@ -65,7 +65,7 @@ Definition hregread_resume (r : register) (v : type_of_register r)
   end.
 
 (* is this node a RegWrite of exactly [r]?  If so, ITS VALUE. *)
-Definition hregwrite_val_at (r : register) (m : M unit)
+Definition hregwrite_val_at {X : Type} (r : register) (m : M X)
     : option (type_of_register r) :=
   match m with
   | Interface.Next oc _ =>
@@ -81,17 +81,17 @@ Definition hregwrite_val_at (r : register) (m : M unit)
   end.
 
 (* skip a RegWrite node (its effect lives in the successor state) *)
-Definition hregwrite_resume (m : M unit) : M unit :=
+Definition hregwrite_resume {X : Type} (m : M X) : M X :=
   match m with
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> M unit with
+      (match oc in Interface.outcome _ T return (T -> M X) -> M X with
        | Interface.RegWrite _ _ _ => fun k => k tt
        | _ => fun _ => m
        end) k
   | _ => m
   end.
 
-Lemma hregread_at_inv (r : register) (m : M unit) :
+Lemma hregread_at_inv {X : Type} (r : register) (m : M X) :
   hregread_at r m = true ->
   exists ak K, m = Interface.Next (Interface.RegRead r ak) K /\
        forall v : type_of_register r, hregread_resume r v m = K v.
@@ -107,7 +107,7 @@ Proof.
   rewrite (proof_irrel Heq eq_refl). reflexivity.
 Qed.
 
-Lemma hregwrite_val_at_inv (r : register) (m : M unit)
+Lemma hregwrite_val_at_inv {X : Type} (r : register) (m : M X)
     (v : type_of_register r) :
   hregwrite_val_at r m = Some v ->
   exists ak K, m = Interface.Next (Interface.RegWrite r ak v) K /\
@@ -128,8 +128,8 @@ Qed.
    continuation behind an opaque existential, which would strand the NEXT
    projection).  [K] is instantiated by matching the goal's own concrete
    node, so nothing is ever read back. *)
-Lemma hregread_resume_red (r : register) (ak : option unit)
-    (K : type_of_register r -> M unit) (v : type_of_register r) :
+Lemma hregread_resume_red {X : Type} (r : register) (ak : option unit)
+    (K : type_of_register r -> M X) (v : type_of_register r) :
   hregread_resume r v (Interface.Next (Interface.RegRead r ak) K) = K v.
 Proof.
   simpl. destruct (decide _) as [Heq|Hne]; [|congruence].
@@ -137,8 +137,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma hregwrite_resume_red (r : register) (ak : option unit)
-    (v : type_of_register r) (K : unit -> M unit) :
+Lemma hregwrite_resume_red {X : Type} (r : register) (ak : option unit)
+    (v : type_of_register r) (K : unit -> M X) :
   hregwrite_resume (Interface.Next (Interface.RegWrite r ak v) K) = K tt.
 Proof. reflexivity. Qed.
 

@@ -31,11 +31,11 @@ Local Open Scope Z_scope.
 (*    GetCycleCount with its 0).                                           *)
 (* ====================================================================== *)
 
-Definition husilent_resume (m : M unit) : option (M unit) :=
+Definition husilent_resume {X : Type} (m : M X) : option (M X) :=
   match m with
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T
-             return (T -> M unit) -> option (M unit) with
+             return (T -> M X) -> option (M X) with
        | Interface.InstrAnnounce _    => fun k => Some (k tt)
        | Interface.BranchAnnounce _ _ => fun k => Some (k tt)
        | Interface.Barrier _          => fun k => Some (k tt)
@@ -58,8 +58,8 @@ Definition husilent_resume (m : M unit) : option (M unit) :=
 (*    class must be.                                                       *)
 (* ====================================================================== *)
 
-Lemma hspani_usilent_inv (D Drw : gset register) (m m2 : M unit)
-    (rs : regstate) (c : M unit * regstate) :
+Lemma hspani_usilent_inv {X : Type} (D Drw : gset register) (m m2 : M X)
+    (rs : regstate) (c : M X * regstate) :
   husilent_resume m = Some m2 ->
   hspani D Drw (m, rs) c ->
   exists rs1, reg_agree_on D rs1 rs /\ c = (m2, rs1).
@@ -75,8 +75,8 @@ Qed.
 
 (* a read of a register IN D: the value transports through the agreement,
    so the successor is the resume at the CHAIN-side file's value *)
-Lemma hspani_read_D_inv (D Drw : gset register) (r : register)
-    (m : M unit) (rs : regstate) (c : M unit * regstate) :
+Lemma hspani_read_D_inv {X : Type} (D Drw : gset register) (r : register)
+    (m : M X) (rs : regstate) (c : M X * regstate) :
   hregread_at r m = true ->
   r ∈ D ->
   hspani D Drw (m, rs) c ->
@@ -96,8 +96,8 @@ Qed.
 
 (* a read of a register OUTSIDE D: the value is arbitrary -- the ∀-binder
    the class lemma carries *)
-Lemma hspani_read_any_inv (D Drw : gset register) (r : register)
-    (m : M unit) (rs : regstate) (c : M unit * regstate) :
+Lemma hspani_read_any_inv {X : Type} (D Drw : gset register) (r : register)
+    (m : M X) (rs : regstate) (c : M X * regstate) :
   hregread_at r m = true ->
   hspani D Drw (m, rs) c ->
   exists (v : type_of_register r) (rs1 : regstate),
@@ -113,9 +113,9 @@ Qed.
 
 (* a write of a register in Drw: the successor file is the write applied
    to the (perturbed) chain file *)
-Lemma hspani_write_inv (D Drw : gset register) (r : register)
-    (v : type_of_register r) (m : M unit) (rs : regstate)
-    (c : M unit * regstate) :
+Lemma hspani_write_inv {X : Type} (D Drw : gset register) (r : register)
+    (v : type_of_register r) (m : M X) (rs : regstate)
+    (c : M X * regstate) :
   hregwrite_val_at r m = Some v ->
   hspani D Drw (m, rs) c ->
   r ∈ Drw /\
@@ -136,8 +136,8 @@ Qed.
 (* ====================================================================== *)
 
 (* a chain from a STOPPED head is the empty chain *)
-Lemma hspan_stop_refl (D Drw : gset register) (m : M unit) (rs : regstate)
-    (l : M unit * regstate) :
+Lemma hspan_stop_refl {X : Type} (D Drw : gset register) (m : M X)
+    (rs : regstate) (l : M X * regstate) :
   hspan_stops Drw m = true ->
   hspan D Drw (m, rs) l ->
   l = (m, rs).
@@ -156,8 +156,8 @@ Proof.
 Qed.
 
 (* a chain from a NON-stopped head to a stopped landing takes a first step *)
-Lemma hspan_peel (D Drw : gset register) (m : M unit) (rs : regstate)
-    (l : M unit * regstate) :
+Lemma hspan_peel {X : Type} (D Drw : gset register) (m : M X)
+    (rs : regstate) (l : M X * regstate) :
   hspan_stops Drw m = false ->
   hspan_stops Drw l.1 = true ->
   hspan D Drw (m, rs) l ->

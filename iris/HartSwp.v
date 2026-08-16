@@ -156,6 +156,17 @@ Section swp.
   Lemma swp_ret {X} (x : X) (Φ : X -> iProp Σ) : Φ x -∗ swp (Interface.Ret x) Φ.
   Proof. iIntros "HΦ" (C) "_ H". by iApply "H". Qed.
 
+  (* THE ELIMINATION FORM.  Every consumer goes through this rather than
+     through [swp]'s ∀ directly, so no proof outside this file has to know
+     that [swp] is a CPS definition at all. *)
+  Lemma swp_use {X} (m : M X) (Φ : X -> iProp Σ) (C : M X -> M unit) :
+    mctx C ->
+    swp m Φ -∗
+    (∀ v : X, Φ v -∗ WP (HartE gen_id cpu_id (C (Interface.Ret v))
+                         : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
+  Proof. iIntros (HC) "Hswp H". by iApply ("Hswp" $! C with "[%//]"). Qed.
+
   Lemma swp_mono {X} (m : M X) (Φ Ψ : X -> iProp Σ) :
     (∀ v, Φ v -∗ Ψ v) -∗ swp m Φ -∗ swp m Ψ.
   Proof.

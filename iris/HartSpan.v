@@ -37,7 +37,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartLift.
+Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -47,12 +47,13 @@ Local Open Scope Z_scope.
 (* One MACHINE node of a span: reads ungated, writes gated on [Drw],
    silent-class nodes free; memory, device, Ret, Choose and out-of-[Drw]
    writes are NOT span steps -- they are where a span STOPS. *)
-Definition hspan_node (Drw : gset register) (c c' : M unit * regstate)
+Definition hspan_node {X : Type} (Drw : gset register)
+    (c c' : M X * regstate)
     : Prop :=
   match c.1 with
   | Interface.Ret _ => False
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> Prop with
+      (match oc in Interface.outcome _ T return (T -> M X) -> Prop with
        | Interface.RegRead r _        => fun k =>
            c' = (k (register_lookup r c.2), c.2)
        | Interface.RegWrite r _ v     => fun k =>
@@ -76,12 +77,14 @@ Definition hspan_node (Drw : gset register) (c c' : M unit * regstate)
 (* the INTERFERED span step: before the node, every register outside
    [D = Drw ∪ Dro] may have been re-written by the environment.  [rs1] is
    the file the node actually runs on. *)
-Definition hspani (D Drw : gset register) (c c' : M unit * regstate)
+Definition hspani {X : Type} (D Drw : gset register)
+    (c c' : M X * regstate)
     : Prop :=
   exists rs1 : regstate,
     reg_agree_on D rs1 c.2 /\ hspan_node Drw (c.1, rs1) c'.
 
-Definition hspan (D Drw : gset register) : relation (M unit * regstate) :=
+Definition hspan {X : Type} (D Drw : gset register)
+    : relation (M X * regstate) :=
   rtc (hspani D Drw).
 
 (* Where a span stops: the node classes [hspan_node] refuses regardless of
@@ -89,7 +92,7 @@ Definition hspan (D Drw : gset register) : relation (M unit * regstate) :=
    failure -- or a register WRITE outside [Drw].  This is a function of the
    monad's head alone, so the caller's characterization lemma can compute
    it. *)
-Definition hspan_stops (Drw : gset register) (m : M unit) : bool :=
+Definition hspan_stops {X : Type} (Drw : gset register) (m : M X) : bool :=
   match m with
   | Interface.Ret _ => true
   | Interface.Next oc _ =>
@@ -106,6 +109,29 @@ Definition hspan_stops (Drw : gset register) (m : M unit) : bool :=
       end
   end.
 
+(* ---------------------------------------------------------------------- *)
+(* THE PURE CHARACTERIZATION A STRETCH EXPORTS, and the ONE shape every     *)
+(* per-model-function lemma in this port is stated in.                      *)
+(*                                                                          *)
+(*   from any file agreeing with [rs] on [D], every maximal interfered      *)
+(*   span chain of [m] lands at [Ret x], with a file agreeing with [rs']    *)
+(*   on [D].                                                                *)
+(*                                                                          *)
+(* NO continuation, NO landing, NO context -- which is what makes it        *)
+(* reusable at every call site and privilege mode, and what makes the       *)
+(* tick-generic [KT] axis of the earlier characterizations unnecessary:     *)
+(* what follows a sub-monad is not this lemma's business.  [swp_span]       *)
+(* turns one of these into a [swp] fact; that is the only way stretches     *)
+(* enter the proof interface.                                               *)
+(* ---------------------------------------------------------------------- *)
+Definition hval {X : Type} (D Drw : gset register) (rs : regstate)
+    (m : M X) (x : X) (rs' : regstate) : Prop :=
+  forall (rs0 : regstate) (l : M X * regstate),
+    reg_agree_on D rs0 rs ->
+    hspan D Drw (m, rs0) l ->
+    hspan_stops Drw l.1 = true ->
+    l.1 = Interface.Ret x /\ reg_agree_on D l.2 rs'.
+
 (* ====================================================================== *)
 (* 2. Structural well-foundedness of the monad: each span step's           *)
 (*    continuation is an immediate subterm.  The [Acc] fixpoint is what    *)
@@ -119,24 +145,25 @@ Definition hspan_stops (Drw : gset register) (m : M unit) : bool :=
    through the function field, and no dependent inversion (hence no UIP)
    is ever needed.  This is the weak branch's validated
    [WeakSailComplete.mchild] kit, transcribed. *)
-Definition mchild (y m : M unit) : Prop :=
+Definition mchild {X : Type} (y m : M X) : Prop :=
   match m with
   | Interface.Ret _ => False
   | Interface.Next _ k => exists v, y = k v
   end.
 
-Fixpoint macc (m : M unit) {struct m} : Acc mchild m.
+Fixpoint macc {X : Type} (m : M X) {struct m} : Acc mchild m.
 Proof.
   constructor. intros y Hy. destruct m as [x|T oc k]; cbn in Hy.
   - destruct Hy.
   - destruct Hy as [v ->]. apply macc.
 Defined.
 
-Lemma mchild_wf : well_founded mchild.
+Lemma mchild_wf {X : Type} : well_founded (@mchild X).
 Proof. exact macc. Qed.
 
 (* a span step descends the subterm order *)
-Lemma hspan_node_mchild (Drw : gset register) (c c' : M unit * regstate) :
+Lemma hspan_node_mchild {X : Type} (Drw : gset register)
+    (c c' : M X * regstate) :
   hspan_node Drw c c' -> mchild c'.1 c.1.
 Proof.
   (* TODO(agent): destruct the node; each arm's successor is [k v] for the
@@ -192,23 +219,36 @@ Section span.
      witness/inversion and ghost re-establishment done once.  The
      continuation receives the machine's pre file [rsM] (which the frames
      pin on [Drw ∪ Dro]) and the [hspan_node] step it took, with both
-     frames re-anchored at the landing file [rs2]. *)
-  Local Lemma wp_hspan_node_local (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs : regstate) (m : M unit) :
+     frames re-anchored at the landing file [rs2].
+
+     STATED IN A CONTEXT [C] (HartSwp.mctx), at a sub-monad [m : M X]:
+     that is what lets the SAME node proof serve [swp] facts about
+     sub-monads at every type, including sub-monads sitting inside
+     [run_hart_active]'s early-return region.  The pure side
+     ([hspan_node]) stays about [m]'s OWN node -- the context is invisible
+     to it, which is the whole point. *)
+  Local Lemma wp_hspan_node_local {X : Type} (C : M X -> M unit)
+      (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (m : M X) :
+    mctx C ->
     Drw ## Dro ->
     hspan_stops Drw m = false ->
     ⊢ gen_cert -∗
       hreg_frame rs Drw -∗
       hreg_frame_ro Df rs Dro -∗
-      ▷ (∀ (m2 : M unit) (rsM rs2 : regstate),
+      ▷ (∀ (m2 : M X) (rsM rs2 : regstate),
            ⌜reg_agree_on (Drw ∪ Dro) rs rsM⌝ -∗
            ⌜hspan_node Drw (m, rsM) (m2, rs2)⌝ -∗
            hreg_frame rs2 Drw -∗
            hreg_frame_ro Df rs2 Dro -∗
-           WP (HartE gen_id cpu_id m2 : expr riscv_lang)) -∗
-      WP (HartE gen_id cpu_id m : expr riscv_lang).
+           WP (HartE gen_id cpu_id (C m2) : expr riscv_lang)) -∗
+      WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
-    iIntros (Hdisj Hns) "#Hcert Hrf Hro H".
+    iIntros (HC Hdisj Hns) "#Hcert Hrf Hro H".
+    destruct m as [y|T oc k]; [discriminate Hns|].
+    assert (Hoc : is_extra oc = false)
+      by (destruct oc; try reflexivity; discriminate Hns).
+    rewrite (HC _ oc k Hoc).
     iApply (wp_hart_step with "Hcert").
     iIntros (σ) "Hσ". destruct σ as [rsM mem0 dev0].
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
@@ -217,7 +257,6 @@ Section span.
     assert (Hag : reg_agree_on (Drw ∪ Dro) rs rsM).
     { intros r' Hr'. apply elem_of_union in Hr' as [Hr'|Hr'];
         [by apply HagW|by apply HagO]. }
-    destruct m as [y|T oc k]; [discriminate Hns|].
     destruct oc; try discriminate Hns.
     (* 14 goals: RegRead, RegWrite, then the 12 silent classes *)
     2: { (* RegWrite: [hspan_stops = false] forces [reg ∈ Drw] *)
@@ -237,7 +276,7 @@ Section span.
                    (register_beq_false r' reg Hne)).
         by apply HagO. }
       iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".
-      iExists (k tt), (MState (register_set reg regval rsM) mem0 dev0).
+      iExists (C (k tt)), (MState (register_set reg regval rsM) mem0 dev0).
       iSplitR; [iPureIntro; split; reflexivity|].
       iNext. iIntros (m' σ') "%Hstep".
       destruct Hstep as [-> Hσ'].
@@ -272,8 +311,8 @@ Section span.
 
   (* helper: an [hspani] step's ∃rs1 only constrains the start file on
      [D], so the SAME step launches from any [D]-agreeing start file. *)
-  Local Lemma hspani_shift_local (D Drw : gset register)
-      (rsA rsB : regstate) (m : M unit) (c' : M unit * regstate) :
+  Local Lemma hspani_shift_local {X : Type} (D Drw : gset register)
+      (rsA rsB : regstate) (m : M X) (c' : M X * regstate) :
     reg_agree_on D rsA rsB ->
     hspani D Drw (m, rsA) c' -> hspani D Drw (m, rsB) c'.
   Proof.
@@ -305,8 +344,8 @@ Section span.
   Proof.
     intros Hdisj m HAcc. induction HAcc as [m _ IH]. intros rs Hns.
     iIntros "#Hcert Hrf Hro Hcont".
-    iApply (wp_hspan_node_local Drw Dro Df rs m Hdisj Hns
-              with "Hcert Hrf Hro [Hcont]").
+    iApply (wp_hspan_node_local (fun m' : M unit => m') Drw Dro Df rs m
+              mctx_id Hdisj Hns with "Hcert Hrf Hro [Hcont]").
     iNext. iIntros (m2 rsM rs2) "%Hag %Hnode Hrf Hro".
     destruct (hspan_stops Drw m2) eqn:Hs2.
     - (* the successor stops: fire the continuation with a one-step chain *)
@@ -403,6 +442,103 @@ Section span.
        lock-step, so re-anchor [rs := post-write rs]). *)
     intros Hdisj Hns.
     exact (wp_hart_span_acc_local Drw Dro Df Hdisj m (macc m) rs Hns).
+  Qed.
+
+  (* ==================================================================== *)
+  (* 5. THE SWP BRIDGE: a pure [hval] characterization becomes ONE [swp]   *)
+  (*    fact about the sub-monad.                                          *)
+  (*                                                                       *)
+  (* This is where the landing-set quantifier dies for good.  [wp_hart_span]*)
+  (* above hands its caller the whole relational landing set and makes the  *)
+  (* caller kill it with a characterization at every use; here the          *)
+  (* characterization is consumed ONCE, inside the induction, and what      *)
+  (* comes out mentions neither chains nor files -- just the value and the  *)
+  (* re-anchored frames.                                                    *)
+  (* ==================================================================== *)
+
+  Local Lemma reg_agree_refl_local (D : gset register) (rs : regstate) :
+    reg_agree_on D rs rs.
+  Proof. intros r _. reflexivity. Qed.
+
+  Local Lemma reg_agree_mono_local (D D' : gset register) (rs rs' : regstate) :
+    D' ⊆ D -> reg_agree_on D rs rs' -> reg_agree_on D' rs rs'.
+  Proof. intros Hsub Hag r Hr. by apply Hag, Hsub. Qed.
+
+  Local Lemma swp_span_acc_local {X : Type} (Drw Dro : gset register)
+      (Df : register -> dfrac) :
+    Drw ## Dro ->
+    forall (m : M X), Acc mchild m ->
+    forall (rs rs' : regstate) (x : X),
+    hval (Drw ∪ Dro) Drw rs m x rs' ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp m (fun v => ⌜v = x⌝ ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj m HAcc. induction HAcc as [m _ IH]. intros rs rs' x Hval.
+    iIntros "#Hcert Hrf Hro". rewrite /swp. iIntros (C) "%HC Hcont".
+    destruct (hspan_stops Drw m) eqn:Hs.
+    - (* THE STRETCH IS ALREADY OVER.  [hval] at the empty chain forces the
+         head to be [Ret x] and the file to agree with [rs'] already. *)
+      destruct (Hval rs (m, rs) (reg_agree_refl_local _ _)
+                  (rtc_refl _ _) Hs) as [Hm Hag].
+      simpl in Hm, Hag. rewrite Hm.
+      iApply ("Hcont" $! x). iSplitR; [done|].
+      iSplitL "Hrf".
+      + iApply (hreg_frame_ext rs rs' Drw
+                  (reg_agree_mono_local _ Drw _ _ (union_subseteq_l _ _) Hag)
+                 with "Hrf").
+      + iApply (hreg_frame_ro_ext_local Df rs rs' Dro
+                  (reg_agree_mono_local _ Dro _ _ (union_subseteq_r _ _) Hag)
+                 with "Hro").
+    - (* A SPAN CLASS: take the node, transport the characterization across
+         it, and recurse on the subterm. *)
+      iApply (wp_hspan_node_local C Drw Dro Df rs m HC Hdisj Hs
+                with "Hcert Hrf Hro [Hcont]").
+      iNext. iIntros (m2 rsM rs2) "%Hag %Hnode Hrf Hro".
+      (* THE TRANSPORT: a chain of [m2] from any file agreeing with [rs2]
+         is a chain of [m] from [rs], one step longer.  The chain starts at
+         an agreeing [rs0'] rather than at [rs2] itself, so its first step
+         is shifted ([hspani] constrains its start file only on [D]); with
+         no first step, the one-step chain to [(m2, rs2)] is the witness
+         and the files compose. *)
+      assert (Hval2 : hval (Drw ∪ Dro) Drw rs2 m2 x rs').
+      { intros rs0' l Hag0' Hchain Hstop.
+        assert (Hstep1 : hspani (Drw ∪ Dro) Drw (m, rs) (m2, rs2)).
+        { exists rsM. split;
+            [intros r Hr; symmetry; exact (Hag r Hr)|exact Hnode]. }
+        apply rtc_inv in Hchain as [Heq|(cmid & Hfirst & Hrest)].
+        - rewrite <- Heq. rewrite <- Heq in Hstop. simpl in Hstop |- *.
+          destruct (Hval rs (m2, rs2) (reg_agree_refl_local _ _)
+                      (rtc_once _ _ Hstep1) Hstop) as [Hm2 Hag2].
+          simpl in Hm2, Hag2. split; [exact Hm2|].
+          intros r Hr. etrans; [exact (Hag0' r Hr)|exact (Hag2 r Hr)].
+        - assert (Hchain' : hspan (Drw ∪ Dro) Drw (m, rs) l).
+          { eapply rtc_l; [exact Hstep1|].
+            eapply rtc_l; [|exact Hrest].
+            exact (hspani_shift_local (Drw ∪ Dro) Drw rs0' rs2 m2 cmid
+                     Hag0' Hfirst). }
+          exact (Hval rs l (reg_agree_refl_local _ _) Hchain' Hstop). }
+      iApply (swp_use m2 _ C HC with "[Hrf Hro] Hcont").
+      iApply (IH m2 (hspan_node_mchild Drw (m, rsM) (m2, rs2) Hnode)
+                rs2 rs' x Hval2 with "Hcert Hrf Hro").
+  Qed.
+
+  (* THE BRIDGE.  [Drw] is the caller's exclusive footprint (the stretch may
+     write it), [Dro] the dfrac-generic read-only frame (the config bundle);
+     every OTHER register the stretch reads is answered by the machine and
+     its value is irrelevant -- that is what [hval] proves once per class. *)
+  Lemma swp_span {X : Type} (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rs' : regstate) (m : M X) (x : X) :
+    Drw ## Dro ->
+    hval (Drw ∪ Dro) Drw rs m x rs' ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp m (fun v => ⌜v = x⌝ ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj Hval.
+    exact (swp_span_acc_local Drw Dro Df Hdisj m (macc m) rs rs' x Hval).
   Qed.
 
 End span.
