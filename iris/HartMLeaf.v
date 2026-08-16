@@ -1992,8 +1992,9 @@ Section leaf.
       as (Hw2 & Hres2 & Hag2).
     cbn [fst snd] in Hw2, Hres2, Hag2.
     (* stage 3: the chop -- the raw minstret_increment cell *)
-    iApply (wp_hart_regwrite (R_bool minstret_increment) (mseg1_b mc mcfg)
-              m2 Hw2 with "Hcert [-]").
+    iApply (wp_hart_regwrite (fun m' : M unit => m')
+              (R_bool minstret_increment) (mseg1_b mc mcfg)
+              m2 mctx_id Hw2 with "Hcert [-]").
     iIntros (σ) "Hσ". destruct σ as [rsσ memσ devσ].
     rewrite /mstate_interp /=.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
@@ -2027,8 +2028,8 @@ Section leaf.
       as (Hm4eq & Hreq4 & Hag4).
     cbn [fst snd] in Hm4eq, Hreq4, Hag4.
     (* stage 5: the fetch event from the pinned text bytes *)
-    iApply (wp_hart_ram_read 4 (mfetch_req hp_pc) m4 Hreq4 ml_fetch_dev
-              ml_fetch_plain with "Hcert [-]").
+    iApply (wp_hart_ram_read (fun m' : M unit => m') 4 (mfetch_req hp_pc) m4
+              mctx_id Hreq4 ml_fetch_dev ml_fetch_plain with "Hcert [-]").
     iIntros (σ) "Hσ". destruct σ as [rsσ2 memσ2 devσ2].
     rewrite /mstate_interp /=.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
@@ -2080,8 +2081,8 @@ Section leaf.
       as (Hreq6 & Hres6 & Hag6).
     cbn [fst snd] in Hreq6, Hres6, Hag6.
     (* stage 7: the store event *)
-    iApply (wp_hart_ram_write 4 hp_reqw m6 Hreq6 hp_store_ram
-              with "Hcert [-]").
+    iApply (wp_hart_ram_write (fun m' : M unit => m') 4 hp_reqw m6 mctx_id
+              Hreq6 hp_store_ram with "Hcert [-]").
     iIntros (σ) "Hσ". destruct σ as [rsσ3 memσ3 devσ3].
     rewrite /mstate_interp /=.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".

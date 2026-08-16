@@ -132,6 +132,87 @@ Definition hval {X : Type} (D Drw : gset register) (rs : regstate)
     hspan_stops Drw l.1 = true ->
     l.1 = Interface.Ret x /\ reg_agree_on D l.2 rs'.
 
+Lemma reg_agree_refl (D : gset register) (rs : regstate) :
+  reg_agree_on D rs rs.
+Proof. intros r _. reflexivity. Qed.
+
+Lemma reg_agree_trans (D : gset register) (rs1 rs2 rs3 : regstate) :
+  reg_agree_on D rs1 rs2 -> reg_agree_on D rs2 rs3 -> reg_agree_on D rs1 rs3.
+Proof. intros H1 H2 r Hr. etrans; [exact (H1 r Hr)|exact (H2 r Hr)]. Qed.
+
+Lemma reg_agree_mono (D D' : gset register) (rs rs' : regstate) :
+  D' ⊆ D -> reg_agree_on D rs rs' -> reg_agree_on D' rs rs'.
+Proof. intros Hsub Hag r Hr. by apply Hag, Hsub. Qed.
+
+Lemma reg_agree_set (D : gset register) (r : register)
+    (v : type_of_register r) (rs rs' : regstate) :
+  reg_agree_on D rs rs' ->
+  reg_agree_on D (register_set r v rs) (register_set r v rs').
+Proof.
+  intros Hag r' Hr'. destruct (decide (r' = r)) as [->|Hne].
+  - by rewrite !register_lookup_set.
+  - rewrite !(irrelevant_register_set r' r _ v (register_beq_false r' r Hne)).
+    by apply Hag.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE COMPUTATIONAL ROUTE INTO [hval]: a fuel-bounded functional walker    *)
+(* that REFUSES anything it is not entitled to.                            *)
+(*                                                                          *)
+(* It answers a register read from the tracked file only when the register  *)
+(* is in [D] (so interference cannot change the answer), takes a register   *)
+(* write only when the register is in [Drw] (so the caller owns it), passes *)
+(* the silent classes, and stops at [Ret].  EVERYTHING ELSE IS [None]:      *)
+(* memory, devices, [Choose], failures, a read it cannot pin, a write it    *)
+(* cannot make.                                                             *)
+(*                                                                          *)
+(* Because the refusals are built in, [hfrun_hval] needs NO side condition  *)
+(* -- no memory-freeness, no write-freeness, no state-preservation premise. *)
+(* This one lemma covers both jobs the design doc gave to two mechanisms:   *)
+(* the footprinted BATCH (a fully-owned stretch: the walker just runs it)   *)
+(* and the DECODE bridge (a concrete word's decoder reads only config       *)
+(* registers, all in the read-only frame, and returns the instruction) --   *)
+(* so neither an [exec]-at-a-reference-state transport nor a [mem_free]     *)
+(* obligation is needed.  What it does NOT cover is a stretch that reads    *)
+(* registers OUTSIDE [D] (the M-mode prelude's ~54 unownable reads): there  *)
+(* the landing is forced by VALUE-INSENSITIVITY, which is not computable    *)
+(* and is what the ∀-peeled class characterizations prove by hand.          *)
+(* ---------------------------------------------------------------------- *)
+Fixpoint hfrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
+    (m : M X) {struct n} : option (X * regstate) :=
+  match n with
+  | 0%nat => None
+  | S n' =>
+      match m with
+      | Interface.Ret x => Some (x, rs)
+      | Interface.Next oc k =>
+          (match oc in Interface.outcome _ T
+                 return (T -> M X) -> option (X * regstate) with
+           | Interface.RegRead r _ => fun k =>
+               if bool_decide (r ∈ D)
+               then hfrun n' D Drw rs (k (register_lookup r rs))
+               else None
+           | Interface.RegWrite r _ v => fun k =>
+               if bool_decide (r ∈ Drw)
+               then hfrun n' D Drw (register_set r v rs) (k tt)
+               else None
+           | Interface.InstrAnnounce _    => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.BranchAnnounce _ _ => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.Barrier _          => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.CacheOp _          => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.TlbOp _            => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.TakeException _    => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.ReturnException _  => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.TranslationStart _ => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.TranslationEnd _   => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.CycleCount         => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.Message _          => fun k => hfrun n' D Drw rs (k tt)
+           | Interface.GetCycleCount      => fun k => hfrun n' D Drw rs (k 0%Z)
+           | _ => fun _ => None
+           end) k
+      end
+  end.
+
 (* ====================================================================== *)
 (* 2. Structural well-foundedness of the monad: each span step's           *)
 (*    continuation is an immediate subterm.  The [Acc] fixpoint is what    *)

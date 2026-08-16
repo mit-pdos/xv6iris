@@ -22,7 +22,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartLift HartRegNode HartSpan.
+Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode HartSpan.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -170,3 +170,91 @@ Proof.
   - exfalso. rewrite <- Heq in Hstop. simpl in Hstop. congruence.
   - exists c. split; [exact Hstep|exact Hrest].
 Qed.
+
+(* ====================================================================== *)
+(* 4. THE COMPUTATIONAL ROUTE INTO [hval].                                 *)
+(*                                                                         *)
+(* [HartSpan.hfrun] is the fuel-bounded walker that refuses whatever it is *)
+(* not entitled to; this is the theorem that its success certifies EVERY   *)
+(* interfered chain.  Note the absence of side conditions: the walker's    *)
+(* own refusals stand in for the memory-freeness / write-freeness /        *)
+(* state-preservation premises an [exec]-based bridge would have needed.   *)
+(* ====================================================================== *)
+
+Lemma hfrun_hval {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
+    (m : M X) (x : X) (rs' : regstate) :
+  hfrun n D Drw rs m = Some (x, rs') -> hval D Drw rs m x rs'.
+Proof.
+  revert rs m. induction n as [|n IH]; intros rs m Hf; [discriminate Hf|].
+  intros rs0 l Hag0 Hchain Hstop.
+  destruct m as [y|T oc k].
+  - (* [Ret]: the chain is empty and the walker's answer is the file it
+       was handed *)
+    cbn in Hf. injection Hf as <- <-.
+    assert (Hl : l = (Interface.Ret y, rs0))
+      by (apply (hspan_stop_refl D Drw _ rs0 l); [reflexivity|exact Hchain]).
+    rewrite Hl. cbn. split; [reflexivity|exact Hag0].
+  - destruct oc; cbn in Hf; try discriminate Hf.
+    1:{ (* REGISTER READ, pinned by [D]: interference cannot change the
+         answer, so the machine's successor is the walker's *)
+      destruct (bool_decide (reg ∈ D)) eqn:Hin; [|discriminate Hf].
+      apply bool_decide_eq_true_1 in Hin.
+      apply hspan_peel in Hchain; [|reflexivity|exact Hstop].
+      destruct Hchain as (c1 & (rs1 & Hag1 & Hnode) & Hchain).
+      cbn [hspan_node fst snd] in Hnode. subst c1.
+      assert (Hvv : register_lookup reg rs1 = register_lookup reg rs)
+        by (etrans; [exact (Hag1 reg Hin)|exact (Hag0 reg Hin)]).
+      rewrite Hvv in Hchain.
+      exact (IH rs (k (register_lookup reg rs)) Hf rs1 l
+               (reg_agree_trans D rs1 rs0 rs Hag1 Hag0) Hchain Hstop). }
+    1:{ (* REGISTER WRITE inside [Drw]: the tracked file and the machine's
+         move in lock-step, so the agreement survives the write *)
+      destruct (bool_decide (reg ∈ Drw)) eqn:Hin; [|discriminate Hf].
+      apply bool_decide_eq_true_1 in Hin.
+      assert (Hns : hspan_stops Drw
+                      (Interface.Next (Interface.RegWrite reg access_kind
+                                         regval) k) = false)
+        by (cbn; apply bool_decide_eq_false_2; intros Hnin; exact (Hnin Hin)).
+      apply hspan_peel in Hchain; [|exact Hns|exact Hstop].
+      destruct Hchain as (c1 & (rs1 & Hag1 & Hnode) & Hchain).
+      cbn [hspan_node fst snd] in Hnode. destruct Hnode as [_ ->].
+      exact (IH (register_set reg regval rs) (k tt) Hf
+               (register_set reg regval rs1) l
+               (reg_agree_set D reg regval rs1 rs
+                  (reg_agree_trans D rs1 rs0 rs Hag1 Hag0))
+               Hchain Hstop). }
+    (* the twelve silent classes: the file does not move *)
+    all: apply hspan_peel in Hchain; [|reflexivity|exact Hstop];
+           destruct Hchain as (c1 & (rs1 & Hag1 & Hnode) & Hchain);
+           cbn [hspan_node fst snd] in Hnode; subst c1;
+           first [ exact (IH rs (k tt) Hf rs1 l
+                            (reg_agree_trans D rs1 rs0 rs Hag1 Hag0)
+                            Hchain Hstop)
+                 | exact (IH rs (k 0%Z) Hf rs1 l
+                            (reg_agree_trans D rs1 rs0 rs Hag1 Hag0)
+                            Hchain Hstop) ].
+Qed.
+
+(* the two routes into the proof interface, side by side: [swp_span] takes
+   a hand-proven [hval] (the ∀-peeled, value-insensitive stretches);
+   [swp_hfrun] takes a COMPUTED one, which is the whole of the batch story
+   and the whole of the decode story *)
+Section swp_hfrun.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma swp_hfrun {X : Type} (n : nat) (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs rs' : regstate) (m : M X) (x : X) :
+    Drw ## Dro ->
+    hfrun n (Drw ∪ Dro) Drw rs m = Some (x, rs') ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp m (fun v => ⌜v = x⌝ ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj Hf.
+    exact (swp_span Drw Dro Df rs rs' m x Hdisj
+             (hfrun_hval n (Drw ∪ Dro) Drw rs m x rs' Hf)).
+  Qed.
+
+End swp_hfrun.

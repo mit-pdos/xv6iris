@@ -347,7 +347,8 @@ Section pilot.
     iApply (wp_hart_batch D n1 x0 with "Hcert Hrf").
     rewrite -Hx1. iIntros "Hrf".
     (* the fetch read, pinned by the owned bytes *)
-    iApply (wp_hart_ram_read nf reqf x1.2 Hreqf Hdevf Hexf with "Hcert").
+    iApply (wp_hart_ram_read (fun m' : M unit => m') nf reqf x1.2 mctx_id
+              Hreqf Hdevf Hexf with "Hcert").
     iIntros (σ) "Hσ". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iDestruct (phys_read_bytes σ.(mem) (Interface.ReadReq.pa reqf) nf wf dqf
@@ -362,7 +363,8 @@ Section pilot.
               with "Hcert Hrf").
     rewrite -Hx2. iIntros "Hrf".
     (* the store *)
-    iApply (wp_hart_ram_write nw reqw x2.2 Hreqw Hdevw with "Hcert").
+    iApply (wp_hart_ram_write (fun m' : M unit => m') nw reqw x2.2 mctx_id
+              Hreqw Hdevw with "Hcert").
     iIntros (σ') "Hσ". rewrite /mstate_interp.
     iDestruct "Hσ" as "(Hri & Hmem & Hdev)".
     iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hmask".

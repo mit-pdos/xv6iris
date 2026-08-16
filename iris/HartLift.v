@@ -157,20 +157,20 @@ Definition hsil (n : nat) (D : gset register) (x : hcur) : hcur :=
    A read is answered by the VALUE READ, passed as a [Z]: the width lives in
    the node, so a [bv]-typed argument would make the cursor chain dependently
    typed for no gain ([Z_to_bv_bv_unsigned] converts). *)
-Definition hread_resume (v : Z) (m : M unit) : M unit :=
+Definition hread_resume {X : Type} (v : Z) (m : M X) : M X :=
   match m with
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> M unit with
+      (match oc in Interface.outcome _ T return (T -> M X) -> M X with
        | Interface.MemRead n _ => fun k => k (inl (Z_to_bv (8 * n) v, None))
        | _ => fun _ => m
        end) k
   | _ => m
   end.
 
-Definition hwrite_resume (m : M unit) : M unit :=
+Definition hwrite_resume {X : Type} (m : M X) : M X :=
   match m with
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M unit) -> M unit with
+      (match oc in Interface.outcome _ T return (T -> M X) -> M X with
        | Interface.MemWrite _ _ => fun k => k (inl None)
        | _ => fun _ => m
        end) k
@@ -187,7 +187,7 @@ Definition hcur_read (v : Z) (x : hcur) : hcur := (x.1, hread_resume v x.2).
 Definition hcur_write (x : hcur) : hcur := (x.1, hwrite_resume x.2).
 
 (* THE PROJECTIONS.  Every output is a value a caller can write by hand. *)
-Definition hnode_tag (m : M unit) : nat :=
+Definition hnode_tag {X : Type} (m : M X) : nat :=
   match m with
   | Interface.Ret _ => 0
   | Interface.Next oc _ =>
@@ -200,12 +200,12 @@ Definition hnode_tag (m : M unit) : nat :=
       end
   end.
 
-Definition hread_req_at (n : N) (m : M unit)
+Definition hread_req_at {X : Type} (n : N) (m : M X)
     : option (Interface.ReadReq.t n) :=
   match m with
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T
-             return (T -> M unit) -> option (Interface.ReadReq.t n) with
+             return (T -> M X) -> option (Interface.ReadReq.t n) with
        | Interface.MemRead n' req => fun _ =>
            match decide (n' = n) with
            | left Heq => Some (eq_rect n' Interface.ReadReq.t req n Heq)
@@ -216,12 +216,12 @@ Definition hread_req_at (n : N) (m : M unit)
   | _ => None
   end.
 
-Definition hwrite_req_at (n : N) (m : M unit)
+Definition hwrite_req_at {X : Type} (n : N) (m : M X)
     : option (Interface.WriteReq.t n) :=
   match m with
   | Interface.Next oc k =>
       (match oc in Interface.outcome _ T
-             return (T -> M unit) -> option (Interface.WriteReq.t n) with
+             return (T -> M X) -> option (Interface.WriteReq.t n) with
        | Interface.MemWrite n' req => fun _ =>
            match decide (n' = n) with
            | left Heq => Some (eq_rect n' Interface.WriteReq.t req n Heq)
@@ -236,14 +236,15 @@ Definition hwrite_req_at (n : N) (m : M unit)
    projection hid and says what the resume function does to it -- which is
    all any event rule needs, and why no rule ever mentions a [K]. *)
 
-Lemma hnode_tag_ret (m : M unit) :
-  hnode_tag m = 0%nat -> exists u : unit, m = Interface.Ret u.
+Lemma hnode_tag_ret {X : Type} (m : M X) :
+  hnode_tag m = 0%nat -> exists u : X, m = Interface.Ret u.
 Proof.
   intros Ht. destruct m as [y|T oc k]; [by exists y|].
   destruct oc; simpl in Ht; discriminate Ht.
 Qed.
 
-Lemma hread_req_at_inv (n : N) (m : M unit) (req : Interface.ReadReq.t n) :
+Lemma hread_req_at_inv {X : Type} (n : N) (m : M X)
+    (req : Interface.ReadReq.t n) :
   hread_req_at n m = Some req ->
   exists K, m = Interface.Next (Interface.MemRead n req) K /\
        forall w : bv (8 * n), hread_resume (bv_unsigned w) m = K (inl (w, None)).
@@ -256,7 +257,8 @@ Proof.
   intros w. simpl. by rewrite Z_to_bv_bv_unsigned.
 Qed.
 
-Lemma hwrite_req_at_inv (n : N) (m : M unit) (req : Interface.WriteReq.t n) :
+Lemma hwrite_req_at_inv {X : Type} (n : N) (m : M X)
+    (req : Interface.WriteReq.t n) :
   hwrite_req_at n m = Some req ->
   exists K, m = Interface.Next (Interface.MemWrite n req) K /\
        hwrite_resume m = K (inl None).

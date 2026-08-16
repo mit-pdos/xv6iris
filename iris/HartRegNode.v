@@ -30,7 +30,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec HartLift.
+Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
@@ -156,25 +156,28 @@ Section regnode.
   (* inside its fupd (typically: open the invariant holding the cell,     *)
   (* [reg_valid] it against [mstate_interp]'s bridge, close).             *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_hart_regread (r : register) (m : M unit) :
+  Lemma wp_hart_regread {X : Type} (C : M X -> M unit)
+      (r : register) (m : M X) :
+    mctx C ->
     hregread_at r m = true ->
     gen_cert -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp σ ∗
             WP (HartE gen_id cpu_id
-                  (hregread_resume r (register_lookup r σ.(sregs)) m)
+                  (C (hregread_resume r (register_lookup r σ.(sregs)) m))
                 : expr riscv_lang))) -∗
-    WP (HartE gen_id cpu_id m : expr riscv_lang).
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
     (* Proof plan: via wp_hart_step; the RegRead arm is deterministic
        (successor = K (register_lookup r σ.(sregs)), state unchanged). *)
-    iIntros (Hat) "#Hcert H".
+    iIntros (HC Hat) "#Hcert H".
     destruct (hregread_at_inv r m Hat) as (ak & K & -> & Hres).
+    rewrite (HC _ (Interface.RegRead r ak) K eq_refl).
     iApply (wp_hart_step with "Hcert").
     iIntros (σ) "Hσ".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
-    iExists (K (register_lookup r σ.(sregs))), σ.
+    iExists (C (K (register_lookup r σ.(sregs)))), σ.
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. auto. }
     iNext. iIntros (m' σ') "%Hstep".
@@ -190,24 +193,26 @@ Section regnode.
   (* inside its fupd -- note [set_reg]'s sregs IS [register_set r v],     *)
   (* which is exactly what [reg_update] produces.                         *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_hart_regwrite (r : register) (v : type_of_register r)
-      (m : M unit) :
+  Lemma wp_hart_regwrite {X : Type} (C : M X -> M unit)
+      (r : register) (v : type_of_register r) (m : M X) :
+    mctx C ->
     hregwrite_val_at r m = Some v ->
     gen_cert -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ▷ (|={∅,⊤}=> mstate_interp (set_reg σ r v) ∗
-            WP (HartE gen_id cpu_id (hregwrite_resume m)
+            WP (HartE gen_id cpu_id (C (hregwrite_resume m))
                 : expr riscv_lang))) -∗
-    WP (HartE gen_id cpu_id m : expr riscv_lang).
+    WP (HartE gen_id cpu_id (C m) : expr riscv_lang).
   Proof.
     (* Proof plan: via wp_hart_step; the RegWrite arm is deterministic. *)
-    iIntros (Hat) "#Hcert H".
+    iIntros (HC Hat) "#Hcert H".
     destruct (hregwrite_val_at_inv r m v Hat) as (ak & K & -> & Hres).
+    rewrite (HC _ (Interface.RegWrite r ak v) K eq_refl).
     iApply (wp_hart_step with "Hcert").
     iIntros (σ) "Hσ".
     iMod ("H" $! σ with "Hσ") as "H".
     iModIntro.
-    iExists (K tt), (set_reg σ r v).
+    iExists (C (K tt)), (set_reg σ r v).
     iSplitR.
     { iPureIntro. cbv beta iota delta [mnode_step]. auto. }
     iNext. iIntros (m' σ') "%Hstep".
@@ -215,6 +220,42 @@ Section regnode.
     destruct Hstep as [-> ->].
     rewrite -Hres.
     iExact "H".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE [swp] FORMS: one node, then continue in [swp].                   *)
+  (* ------------------------------------------------------------------ *)
+
+  Lemma swp_hart_regread {X : Type} (r : register) (m : M X)
+      (Φ : X -> iProp Σ) :
+    hregread_at r m = true ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+       ▷ (|={∅,⊤}=> mstate_interp σ ∗
+            swp (hregread_resume r (register_lookup r σ.(sregs)) m) Φ)) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hat) "#Hcert H". rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_regread C r m HC Hat with "Hcert [H Hcont]").
+    iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as "Hk". iModIntro. iNext.
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
+    iApply (swp_use _ Φ C HC with "Hswp Hcont").
+  Qed.
+
+  Lemma swp_hart_regwrite {X : Type} (r : register) (v : type_of_register r)
+      (m : M X) (Φ : X -> iProp Σ) :
+    hregwrite_val_at r m = Some v ->
+    gen_cert -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+       ▷ (|={∅,⊤}=> mstate_interp (set_reg σ r v) ∗
+            swp (hregwrite_resume m) Φ)) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hat) "#Hcert H". rewrite /swp. iIntros (C) "%HC Hcont".
+    iApply (wp_hart_regwrite C r v m HC Hat with "Hcert [H Hcont]").
+    iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as "Hk". iModIntro. iNext.
+    iMod "Hk" as "[Hσ Hswp]". iModIntro. iFrame "Hσ".
+    iApply (swp_use _ Φ C HC with "Hswp Hcont").
   Qed.
 
 End regnode.
