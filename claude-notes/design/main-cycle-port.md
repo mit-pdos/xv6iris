@@ -295,6 +295,130 @@ proof interface is:
    Decode is imported, not re-solved: all existing decode
    proof-engineering is consumed inside the reflective stepper's
    computation.
+6. **THE MONADIC WP LAYER (`swp`) — the interface leaves compose in, and
+   why it is DERIVED rather than the language's own.**  Sail code is
+   written with `bind`; the proof interface should decompose along that
+   structure and let the value a continuation receives appear in a
+   postcondition.  Define it in CPS over the existing WP — no language
+   change:
+
+   ```coq
+   Definition swp {X} (m : M X) (Φ : X → iProp Σ) : iProp Σ :=
+     ∀ K : X → M unit,
+       (∀ v, Φ v -∗ WP (HartE gen_id cpu_id (K v))) -∗
+       WP (HartE gen_id cpu_id (Defs.bind m K)).
+   ```
+
+   Laws: `Φ x ⊢ swp (Ret x) Φ` (definitional, `bind (Ret x) K = K x`);
+   `swp m (λ v, swp (f v) Φ) ⊢ swp (bind m f) Φ` (monad associativity);
+   `swp m (λ _, WP LoopE) ⊢ WP (HartE _ _ m)` at `M unit` (right unit —
+   and `LoopE` IS `HartE _ _ (Ret tt)`, so that side is definitional);
+   mono/frame/fupd structurally.  Being DEFINED BY the real WP, it
+   inherits adequacy, laters and masks with no second soundness argument.
+   coq-sail-stdpp proves no monad laws for `iMon`, so associativity is
+   ours: induction + funext at the `Next` case, which pulls
+   `functional_extensionality_dep` (already in the tree's declared budget,
+   but the Hart* files are currently funext-free) into its cone.
+
+   **`swp` IS AN INTERFACE, NOT AN IMPLEMENTATION.**  Unfolding it to
+   per-node WP steps re-incurs the ~1 ms/node cost the batching exists to
+   avoid.  The layering is: `wp_hart_step` (per node) → span / batch
+   (multi-node, absorbing interference and unowned reads — where the
+   expensive proofs live, once per stretch) → **`swp`** (bridge lemmas
+   export each stretch as one `swp` fact) → leaves (compose by `swp_bind`
+   along the model's own structure).
+
+   THE HAND-ROLLED PRECURSOR, so nobody re-invents it a third time: the
+   existing characterizations' conclusions (`∃ rs1, reg_agree_on D rs1 rs
+   ∧ hspan D Drw (K None, rs1) l`) ARE `swp` written out by hand, with the
+   continuation baked in as a specific `K`, the landing threaded
+   explicitly, and the frame agreement carried as a side condition instead
+   of as resources.  The `swp` form —
+   `hreg_frame … -∗ swp (dispatchInterrupt Machine) (λ r, ⌜r = None⌝ ∗
+   hreg_frame …)` — drops all of that bookkeeping into the resources and,
+   because it is a fact about a SUB-MONAD rather than about a landing in
+   one particular chain, is reusable at every call site and privilege mode.
+
+   WHAT `swp` DOES NOT FIX: the decode gap (a monad branching on a
+   symbolic `w` is a headless term — no WP rule can step it; see 7), and
+   the fused AMO (read + window + paired write cross bind boundaries and
+   are one atomic event by design, so there is no `swp` for the exclusive
+   read alone).
+
+7. **THE PURE-EXEC BRIDGE (`swp_of_pure_exec`) — the `goodb` construction,
+   ported.**  `DecodeSetU`'s decode bridge is: `vm_compute` the decoder at
+   a concrete reference state, transport to the real state by read-frame
+   congruence (`exec_goodb_congr`) given `agree_on D`.  Its twin here:
+
+   ```coq
+   Lemma swp_of_pure_exec {X} (m : M X) (x : X) (D : gset register) (rs : regstate) :
+     (∀ s, reg_agree_on D s.(sregs) rs → exec m s = Some (x, s)) →
+     mem_free m →
+     hreg_frame_ro Df rs D -∗ (Φ x -∗ …) -∗ swp m Φ
+   ```
+
+   Two points that make it work where a naive "step the decode" does not:
+   - `m` is UNIVERSALLY QUANTIFIED in the lemma, so its proof may
+     `destruct m` and run the `mchild` induction.  The headless-term
+     obstruction is a USE-SITE problem (a specific stuck term in a goal),
+     never a statement problem — do not conflate the two.
+   - `exec m s = Some (x, s)` already encodes state-preservation (the
+     state returns syntactically identical), so no separate register
+     write-freeness premise is needed.  `mem_free` is the one genuine
+     extra, it is not computable (a `RegRead` node quantifies its
+     continuation over all values), and it goes in the declared,
+     decoder-checkable slot the weak branch used for `sail_live_st`:
+     PROVE IT ONCE for the decoder from its source structure (`read_reg` +
+     pure ops + `Ret`, no `sail_mem_read`), then it is free at every word.
+
+   Use site stays cheap: concrete word ⇒ vm the `exec` fact at the
+   reference state, `agree_on` from the `Dro` frame.  This subsumes the
+   decode cascade that a leaf otherwise peels by hand, which is where most
+   of the per-leaf `Qed` cost lives.
+
+8. **WHY `mval` STAYS `Empty_set` (asked and answered; re-open only with
+   the evidence named below).**  Making the language's values the Sail
+   values fails on TWO independent blockers:
+   - THE LOOP.  Iris's `val_stuck` forbids a value from stepping, and
+     `wp` at a value is `|={E}=> Φ v`.  `LoopE gen cpu` IS
+     `HartE gen cpu (Ret tt)` and must step (the restart rule).  A thread
+     that loops forever cannot bottom out at a value.
+   - THE TYPE.  A cycle's sub-computations are `M X` at many `X`
+     (`bool`, `instruction`, `mword 64`, `ExecutionResult`, …), while
+     `mexpr` holds `M unit`.  Native values need `expr` over
+     `{X : Type & M X}` (pushing it to `Type₁`, with Iris's `language`
+     record and `iProp Σ` downstream of the universe choice) or a
+     Tarski-style CODE UNIVERSE for the model's value types.  The code
+     universe is needed anyway: the restart arm must decide `X = unit`,
+     which a `sigT` over `Type` cannot.
+
+   THE RESTART MARKER dissolves the FIRST blocker only, and it is a clean
+   fix worth recording: make the cycle monad `bind (riscv_step tick)
+   (λ _, RESTART)` with `RESTART` a real outcome node, so the top-level
+   `Ret tt` is unreachable and `Ret` may be a value.  It is constructible
+   — `M = iMon (fun _ => exception)`, so
+   `Interface.ExtraOutcome : exception → outcome A` is available at
+   `A := unit` and currently sits in `mnode_step`'s stuck class — with one
+   caveat: the model DOES emit `ExtraOutcome` inside `catch_early_return`
+   regions, so the marker needs a distinguished `exception` value plus a
+   check that the model never emits it at top level (or a second
+   expression constructor instead).  Cost: `LoopE`'s definition, one
+   `prim_step` arm, and re-spelling every endpoint that currently
+   terminates at `Ret tt` (`HartBlock`'s bracket, `hnode_tag` /
+   `hspan_stops`, the tail characterizations, a leaf's closing stages).
+
+   WHAT THE FULL NATIVE DESIGN WOULD BUY over `swp`: Iris's `wp_bind` and
+   `wp_value` for free, and — the real prize — **`Atomic`**: a focused
+   `mem_read` sub-expression stepping to a value in one step makes `iInv`
+   apply directly, lifting the standing constraint recorded in
+   durable-notes ("`WP Loop` is NOT `Atomic` — the fupd-flavoured step
+   rules are the only route to open an invariant across a step").  That
+   matters for exactly the invariant-heavy leaves (locks, icache, FS).
+   THE EVIDENCE THAT WOULD RE-OPEN IT: once B′ puts those leaves back in
+   scope, if the fupd-style event rules prove painful there.  Decide then,
+   not before; the restart marker is the cheap, independently-landable
+   half that keeps the door open.
+
 5. **Proof-term discipline** per durable-notes: `vm_cast_no_check` for
    reflective equations; compute-once-into-a-`Definition` for VALUES
    (never for monad residuals — that is F8 again); watch the async-`Qed`

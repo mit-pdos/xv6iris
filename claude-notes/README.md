@@ -117,8 +117,10 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   sleeplock DEPOSIT and why a purely pure held arm can never be refuted.
   **The tree now has no admitted statements.**
 - **[`main-cycle-port.md`](projects/main-cycle-port.md)** — the expression-resident
-  monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)):
-  what exists, the ordered remaining work, and the red-tree caveat. **Live.**
+  monad port (design in [`design/main-cycle-port.md`](design/main-cycle-port.md)).
+  **Live, on branch `hart-node-port`, and the tree is RED from `MinstretInv.v`
+  up by design** — open its CHECKPOINT before any work under `iris/`, and its
+  trap list before writing a proof over the new language.
 - **[`fs-sysfile.md`](projects/fs-sysfile.md)** — the syscall-layer campaign
   (file.c's last 2 + sysfile.c's 11). **Live and actively appended to.**
 - **[`fs-fragments-campaign.md`](projects/fs-fragments-campaign.md)** — the
