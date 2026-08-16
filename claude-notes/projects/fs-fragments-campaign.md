@@ -724,14 +724,40 @@ file will take out the wrong one.
 
 ## F1.5b's FIRST-CONSUMER VERDICT (S7-unlink's road test)
 
-**The constructor's SHAPE fits, and its PREMISE SET now has suppliers.**
-`sys_unlink` is F1.5b's designated first consumer; the road test found two
-facts the algebra could not supply, and both are closed below — one by the
-kernel fix, one by the payload passes.  The walk that SPENDS the ticket is
-still being written, so `dir_links_unlink` has no compiled consumer yet:
-that verdict is owed when `ProofSysUnlink.v` lands, and the walk is
-STOPPED before it (S7-unlink FINDING 3), so **all three verdicts are still
-owed and none of them is refuted.**  **`ProofSysUnlinkTails.v`
+### THE FIRST-CONSUMER VERDICTS ARE IN — `ProofSysUnlink.su_w5_file` /
+### `su_w5_dir` are the compiled consumers, and the record is 2 CONFIRMED,
+### 1 SPLIT
+
+* **`dir_links_unlink` — CONFIRMED.**  Fires caller-side in `su_w5_file`
+  AND `su_w5_dir` at V2's `∃ b` shape.  The file arm refutes `b = true`
+  through `IregDirBit.ireg_dirbit_ty` (V1's accessor road-tested; the
+  `={E}=∗` is eliminated with `fupd_wp` mid-walk); the dir arm needs NO
+  refutation — its wand is applied at the DECREMENTED home record, so the
+  `b = true` unit is paid by the `dp->nlink--`, exactly the asymmetry the
+  V2 ledger predicted.  The not-self premise is `dinode_at_excl`, the
+  home-live premise is PASS 2's derivation (below).
+* **`dir_orphan_clean` (PASS 2) — CONFIRMED.**  The home-live derivation
+  compiled verbatim: orphan ⇒ dots-only against `dir_first_name` + the
+  two `namecmp` refusals.  `dir_links_empty_nlink` (V2) and
+  `dir_links_orphan` (through `su_dir_links_orphan`) both have their
+  first compiled consumer in `su_w5_dir`'s re-park; `ireg_link_grey`
+  likewise.
+* **The `dir_dots_ix` / `fdir_dots_index` / `dir_links_dotdot_out` trio —
+  SPLIT.**  `dir_links_dotdot_out` itself fires in `su_w5_dir` (the
+  ticket comes out, the guards are the kernel's own `blez` + the type
+  test).  **But the JOIN does not reach the walk**: `fdir_dots_index`
+  turns `ents !! ".." = Some dp` into `dp = dir_inum data 1`, and the
+  `ents` conjunct lives in a CLIENT-HELD `fnode` — sys_unlink holds no
+  tree fragment and no contract on its path supplies one; instantiating
+  `ents` from the payload's own bytes is circular.  So the identity
+  `dir_inum dati 1 = dinum` is a NAMED PREMISE of `su_w5_dir` ((D1) in
+  fs-sysfile.md's W5 entry), together with the parent's count lower
+  bound (D2).  **The seal is stopped on the two; the ruling they need is
+  a carrier design (the §20.17.4 parent-edge fact made walk-reachable,
+  and a directory count LOWER bound), not a proof.**
+
+**The pre-landing record below is KEPT for the reading; its "all three
+verdicts are still owed" status is superseded by the section above.**  **`ProofSysUnlinkTails.v`
 does not discharge it and never could** — every branch into an exit block is
 ABOVE the zeroing `writei`, so no exit arm holds an `ilink` at all.  The same
 is true of `dir_link_at_zeroed` and of the `dir_dots_ix` /

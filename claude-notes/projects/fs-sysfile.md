@@ -8664,11 +8664,12 @@ one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
-## S7-unlink — **IN FLIGHT, W5 IS THE LAST BLOCK.**  The budget audit, the
-## REAL contract, the pure+frame+register layer, EVERY EXIT BLOCK and the
-## walk's blocks `su_w1`..`su_w4` (W1, W2, W3, W4) are landed and gated;
-## V2's landing LIFTED the T_DIR stop, so both halves of W5 are writable.
-## sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
+## S7-unlink — **W5 IS LANDED (both halves) AND THE SEAL IS STOPPED.**
+## `su_w5_file` is proven WHOLE; `su_w5_dir` is proven AT TWO NAMED PURE
+## PREMISES the model cannot yet supply — the parent-edge identity (D1)
+## and the directory-count lower bound (D2), see the W5 section below.
+## Verdicts #1 and #3 are CONFIRMED by compiled consumers; #2 is SPLIT.
+## sysfile.c stays 15/16 until the D1/D2 carriers land and the seal flips
 
 Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
 every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
@@ -9207,12 +9208,129 @@ seam's `true`-payload dead-scan + the `blez`'s `1 <=`.  Budget:
 W1∘W2∘W3∘{W5-FILE, W5-DIR} + `LinkSysUnlink`'s flip + `_CoqProject` rows
 SAME-COMMIT + coverage 187/190, sysfile 16/16.
 
+### W5 IS LANDED AS TWO LEMMAS — `su_w5_file` WHOLE, `su_w5_dir` AT TWO
+### NAMED PREMISES — **AND THE SEAL IS STOPPED: the T_DIR half's two pure
+### facts have NO WALK SUPPLIER.**  sysfile.c stays 15/16
+
+`ProofSysUnlink.su_w5_file` (+0x8a..+0xe0 at the seam's `isdir = false`)
+is proven with NO extra premise: the blueprint's construction went through
+as written.  What it records:
+
+* **VERDICT #3 — CONFIRMED, compiled.**  The home-live derivation is
+  exactly the PASS-2 reading: `dir_orphan_clean` at `dp` against the two
+  `namecmp` refusals (`dir_first_name` names the matched record, the
+  refusals say it is no dot) closes `di_nlink dp <> 0` in six lines, and
+  `kk ∉ {0,1}` falls out of `dir_dots_ix`'s two name clauses the same way.
+* **VERDICT #1 — CONFIRMED, compiled.**  `DirLinks.dir_links_unlink` fires
+  caller-side at V2's shape: the not-self premise comes off
+  `InodeRegion.dinode_at_excl` (the two full `dinode_at`s collide under
+  `decide`), the range clause is writei's post at `tot = 16 / dist = 0`
+  pointwise (`su_dz_byte` on `dirent_zero`), and the `b = true` flavour is
+  REFUTED through `IregDirBit.ireg_dirbit_ty` against the file payload —
+  V1's carrier road-tested by its designated first consumer.  The released
+  `ilink` is spent by `wp_iupdate_unlink` at the LEFT receipt two
+  instruction groups later, exactly as settled fact (i) said.
+* The tail priced as audited: writei ≤ 4 off `su_wi_cost`,
+  `iunlockput(dp)` CREDITED off `wi16_post`'s membership trio,
+  `iunlockput(ip)` credited off iupdate's own `∪ {IBLOCK ip}`, end_op
+  retires the rest.  `su_w5_file`'s in-functor `Print Assumptions`:
+  the standing six + `functional_extensionality_dep` + the module
+  parameters `Memset.wp_memset_sconf`, `Writei.wp_writei_gen`,
+  `Iupdate.wp_iupdate_unlink`, `Iunlockput.wp_iunlockput_gen`,
+  `EndOp.wp_end_op_sconf` — and every `dir_*` fragment named above is a
+  PROVEN lemma, not an assumption.
+
+**`su_w5_dir` IS LANDED AT TWO PREMISES, AND THEY ARE THE STOP.**  The
+T_DIR half compiles end to end — the shared zeroing, `dir_links_unlink`
+with **no flavour refutation** (the wand is applied at the DECREMENTED
+record, so `b = true`'s unit is paid by the `dp->nlink--` itself, exactly
+as V2 predicted), the `+0x146` tail, `iupdate(dp)` CREDITED,
+`dir_links_dotdot_out`'s extraction (VERDICT #2's constructor half —
+compiled), the orphan re-park (`ireg_link_grey` +
+`ProofSysUnlinkParts.su_dir_links_orphan` fed by
+`DirLinks.dir_links_empty_nlink` + the `blez`, V2's first consumer —
+compiled), and the whole file spine below — **given two pure facts the
+lemma takes as named premises**:
+
+* **(D1) `bv_unsigned (dir_inum dati 1) = bv_unsigned dinum`** — the
+  child's `".."` names the parent.  This is FINDING 2's owed fact
+  RESURFACING AT THE WALK despite the "closed" marker: the closure
+  (`FsLookup.fdir_dots_index`) joins the payload's index to the TREE
+  half `ents !! ".." = Some dp`, and that conjunct lives in a
+  CLIENT-HELD `fnode` fragment — **sys_unlink's walk holds no tree
+  fragment for `ip` and no contract on its path supplies one**
+  (nameiparent, dirlookup and ilock hand back no `ents` fact; building
+  `fdir` from the payload's own bytes is circular — it defines `dp` AS
+  `dir_inum dati 1`).  Without it, `wp_iupdate_unlink(dp)` cannot be fed:
+  its fragment premise is at the FLUSHED inum (`dinum`), the extracted
+  ticket is at index 1's inum, and `ireg_write_unlink_fl` fixes the index.
+* **(D2) `2 <= bv_unsigned (di_nlink dnd)`** — a directory holding a live
+  SUBDIRECTORY entry has at least two links.  Needed because `dp`'s
+  post-decrement re-park owes `dir_orphan_clean` and the only live
+  discharge is `nlink <> 0` of the DECREMENTED record; the model bounds a
+  directory's count only from ABOVE (V2's `dlc_bound`) and (L1) bounds the
+  ledger below the count, so nothing yields a LOWER bound of 2.  Same wall
+  shape as FINDING 3's, one inode over.
+
+Both facts are true of every reachable state of the fixed binary and
+stated nowhere in the model.  **VERDICT #2 is therefore SPLIT: the
+extraction CONSTRUCTOR fires (compiled), the extraction's INDEX IDENTITY
+does not reach this walk.**  The repair is a DESIGN ruling, not a proof:
+either the §20.17.4-chartered parent-edge carrier (a payload conjunct or
+ghost parent map established at create's `dirlink(ip, "..", dp->inum)` —
+noting sharpening (b)'s constraint that one payload cannot state a
+two-inode relation, so the natural home is a ghost edge beside the
+region), or the tree layer made walk-reachable.  (D2)'s honest carrier is
+FINDING 3's own footnote made real — the (L1)-equality at directories, or
+a d-flavour LOWER bound clause.  **Do not attempt the seal before the
+ruling lands.**  `LinkSysUnlink.v` still supplies `SYSUNLINK` with the
+Axiom; coverage **186/190, sysfile.c 15/16 — unmoved**.
+
+**The W5 increment's gate.**  Lane `/shared/xv6iris-u7`, block-verified
+md5-identical to MAIN's working tree across the whole 209-file chain AND
+all 1156 `iris/*.v` before any edit (the lane's own `git show HEAD:` is its
+stale cp-a HEAD — the recorded trap); the one delta was the lane's
+`_CoqProject` missing main's `IregDirBit.v` row, synced, `CoqMakefile`
+regenerated under the 9.0.1 switch, `IregDirBit.vo` built by target.
+`coqc ProofSysUnlink.v` ends `EXIT=0`, zero `Error`; `make -n` on the
+target emits 0 compile lines afterwards.  `Print Assumptions` (gate
+compile, in-functor) — **IDENTICAL for `su_w5_file` and `su_w5_dir`**: the
+standing six (`valid_reservation`, `load_reservation`,
+`match_reservation`, `cancel_reservation`, `plat_term_write`,
+`functional_extensionality_dep`) + the five module parameters
+`Memset.wp_memset_sconf`, `Writei.wp_writei_gen`,
+`Iupdate.wp_iupdate_unlink`, `Iunlockput.wp_iunlockput_gen`,
+`EndOp.wp_end_op_sconf` — and **no `dir_*` fragment lemma**: every
+fragment fact both halves spend is a PROVEN lemma.  `proof_coverage.py
+--check` exits 0, `lemma_diff` CLEAN.
+
+**THREE TRAPS THIS INCREMENT FOUND.**
+
+* **`lia` UNDER THE ZIFY HOOK CANNOT TOUCH A `bv_unsigned` OF A LARGE
+  TERM, and `clear -` DOES NOT SAVE IT.**  The decrement arithmetic
+  (`bv_unsigned (trunc16 (sign_extend' 64 …))` atoms) dies with *"Cannot
+  find witness"* even with the context cleared to the two facts needed.
+  The recorded ProofMemmove recipe is the fix and it is mechanical:
+  package the arithmetic as mword-free `Z` lemmas (`su_decr_pay`,
+  `su_decr_pos`, `su_le1_nz_eq1`, `su_decr_zero`) and close the sites by
+  `exact` — conversion crosses the width-index mismatch that zify cannot.
+* **A CALLEE'S `dn0'`-STYLE EXISTENTIAL IS BEST `subst`ED AT THE ARM.**
+  Threading writei's `dn0' = dn'` as a rewrite at each use site fails
+  inside `iEval` where the two spellings print identically; one
+  `subst dn0W.` right after the arm destruct retires every site at once.
+* **A BORROWED `bslot` DIES IN A SPEC-PATTERN SUBPROOF.**  Splitting
+  `bslots 3` inside a call's `[Hbsl]` subproof leaks the peeled unit into
+  that closed subgoal (affine, silently dropped) and the NEXT callee's
+  `bslots 3` is unpayable — the tell is an `iExact` mismatch two calls
+  later.  Split in the MAIN context, pass the piece, rejoin explicitly.
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
-`ProofSysUnlink.v` — **W5 (both halves) and the seal.**  W1–W4 are landed;
-V2's commit (`b3df99d8`) lifted FINDING 3's stop, so BOTH halves of W5 are
-unobstructed — the blueprint above is the construction.  The
-decomposition, with every exit already in hand:
+`ProofSysUnlink.v` — **THE SEAL ALONE, and it is STOPPED on W5-DIR's two
+premises (D1)/(D2) above.**  W1–W5 are landed; do not write the
+`Module … <: SYSUNLINK` instantiation before the D1/D2 carriers land —
+the seam's `isdir = true` branch cannot supply either fact.  The
+decomposition, every block in hand:
 
 * **W1, +0x00..+0x2e — DONE.**  The prologue and the push, `su_frame_carve`,
   `li a2,128` / `addi a1,s0,-208` / `c.li a0,0` / `jal argstr`, the `bltz`
