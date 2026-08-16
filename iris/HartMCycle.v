@@ -73,6 +73,12 @@ Local Ltac msi_cbn :=
     [Defs.and_boolM Defs.bind Defs.bind0 Interface.iMon_bind Defs.read_reg
      Defs.write_reg returnM Defs.returnm].
 
+Local Ltac t_cbn :=
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.returnm returnM
+     Defs.read_reg Defs.write_reg Defs.and_boolM Defs.or_boolM
+     andb orb negb not get_config_print_clint].
+
 Lemma hfrun_should_inc_minstret (D Drw : gset register) (rs : regstate) :
   (R_bitvector_32 mcountinhibit : register) ∈ D ->
   (R_bitvector_64 minstretcfg : register) ∈ D ->
@@ -98,6 +104,21 @@ Qed.
 (*    tail step has: reads and writes of registers the leaf OWNS, so the   *)
 (*    walker runs it outright.                                             *)
 (* ====================================================================== *)
+
+(* THE FILE-TOWER PEELER.  Every write adds a [register_set] layer, so a
+   later lookup of a DIFFERENT register has to walk down through them.
+   This is the one piece of bookkeeping [swp] does not remove -- it is
+   inherent, since writes change the file -- but it is entirely
+   mechanical: peel any lookup through any set of a different register,
+   the disequality being [eq_refl] because [register_beq] computes. *)
+Ltac t_peel :=
+  repeat match goal with
+  | |- context [ register_lookup ?r (register_set ?r ?v ?f) ] =>
+      rewrite (register_lookup_set r f v)
+  | |- context [ register_lookup ?r (register_set ?r' ?v ?f) ] =>
+      assert_fails (unify r r');
+      rewrite (irrelevant_register_set r r' f v eq_refl)
+  end.
 
 Local Ltac t_read :=
   rewrite hfrun_read;
@@ -127,6 +148,95 @@ Proof.
   t_write. msi_cbn.
   t_read. msi_cbn.
   rewrite register_lookup_set.
+  apply hfrun_ret.
+Qed.
+
+(* THE TICK.  Every register it touches is one the leaf owns or pins, so
+   the walker runs it -- with TWO premises that are genuinely about the
+   machine's state rather than about the walk:
+
+     - the CY config bit, exactly as [should_inc_minstret]'s IR bit;
+     - THAT THE CLINT DISPATCH DOES NOT CHANGE mip.  This one is not
+       cosmetic: if mip changes, [clint_dispatch] re-reads it through
+       [read_mip IncludePlatformInterrupts], which reads [sig_seip] -- the
+       plic's wire, at [DfracOwn 1] inside [WireInv.wire_inv], which NO
+       caller can put in a frame.  So that branch is not walkable at all
+       and would need the ∀-peel treatment [dispatchInterrupt] gets.  This
+       is design §5's [sig_seip] self-enforcement showing up in the tick,
+       exactly where it was predicted to.  The premise holds whenever the
+       timer is not pending, which is the boot state. *)
+
+Definition mcycle_inc_flag (mc : SailStdpp.Values.mword 32)
+    (mcfg : SailStdpp.Values.mword 64) : bool :=
+  if eq_vec (_get_Counterin_CY mc) zerobit
+  then eq_vec (counter_priv_filter_bit mcfg Machine) zerobit
+  else false.
+
+(* the tick's three writes, in the order the model makes them *)
+Definition tick_clock_file (rs : regstate) : regstate :=
+  register_set (R_bitvector_64 mip)
+    (update_subrange_vec_dec
+       (register_lookup (R_bitvector_64 mip) rs) 7 7
+       (bool_to_bit
+          (zopz0zIzJ_u (register_lookup (R_bitvector_64 mtimecmp) rs)
+             (add_vec_int (register_lookup (R_bitvector_64 mtime) rs) 1))))
+    (register_set (R_bitvector_64 mtime)
+       (add_vec_int (register_lookup (R_bitvector_64 mtime) rs) 1)
+       (register_set (R_bitvector_64 mcycle)
+          (add_vec_int (register_lookup (R_bitvector_64 mcycle) rs) 1) rs)).
+
+Lemma hfrun_tick_clock (D Drw : gset register) (rs : regstate) :
+  (cur_privilege : register) ∈ D ->
+  (R_bitvector_32 mcountinhibit : register) ∈ D ->
+  (R_bitvector_64 mcyclecfg : register) ∈ D ->
+  (R_bitvector_64 mcycle : register) ∈ D ->
+  (R_bitvector_64 mcycle : register) ∈ Drw ->
+  (R_bitvector_64 mtime : register) ∈ D ->
+  (R_bitvector_64 mtime : register) ∈ Drw ->
+  (R_bitvector_64 mip : register) ∈ D ->
+  (R_bitvector_64 mip : register) ∈ Drw ->
+  (R_bitvector_64 mtimecmp : register) ∈ D ->
+  (R_bitvector_64 menvcfg : register) ∈ D ->
+  register_lookup cur_privilege rs = Machine ->
+  eq_vec (_get_MEnvcfg_STCE (register_lookup (R_bitvector_64 menvcfg) rs))
+    (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+  neq_vec (register_lookup (R_bitvector_64 mip) rs)
+    (update_subrange_vec_dec (register_lookup (R_bitvector_64 mip) rs) 7 7
+       (bool_to_bit
+          (zopz0zIzJ_u (register_lookup (R_bitvector_64 mtimecmp) rs)
+             (add_vec_int (register_lookup (R_bitvector_64 mtime) rs) 1))))
+  = false ->
+  mcycle_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
+    (register_lookup (R_bitvector_64 mcyclecfg) rs) = true ->
+  hfrun 30 D Drw rs (tick_clock tt) = Some (tt, tick_clock_file rs).
+Proof.
+  intros HD HDmc HDcfg HDcy HWcy HDti HWti HDip HWip HDtc HDenv Hpriv
+    Hstce Hsame Hflag.
+  unfold tick_clock. t_cbn.
+  t_read. rewrite Hpriv. t_cbn.
+  unfold should_inc_mcycle. t_cbn.
+  t_read. t_cbn.
+  unfold mcycle_inc_flag in Hflag.
+  destruct (eq_vec (_get_Counterin_CY
+              (register_lookup (R_bitvector_32 mcountinhibit) rs))
+              zerobit) eqn:Hcy; [|discriminate Hflag].
+  t_cbn. t_read. t_cbn. rewrite Hflag. t_cbn.
+  t_read. t_cbn. t_write. t_cbn.
+  t_read. t_cbn. t_write. t_cbn.
+  unfold clint_dispatch. t_cbn.
+  t_read. t_cbn. t_read. t_cbn. t_read. t_cbn. t_read. t_cbn.
+  t_write. t_cbn.
+  unfold Defs.and_boolM. t_cbn.
+  unfold currentlyEnabled. t_cbn.
+  cbn beta iota zeta delta [_rec_currentlyEnabled currentlyEnabled_measure
+    Defs.Zwf_guarded Z_ge_dec Z_ge_lt_dec Zcompare_rec Z.compare
+    hartSupports].
+  t_cbn.
+  t_read. t_cbn.
+  t_peel. rewrite Hstce. t_cbn.
+  repeat (t_read; t_cbn; t_peel).
+  rewrite ?Hstce. t_cbn.
+  t_peel. rewrite Hsame. t_cbn.
   apply hfrun_ret.
 Qed.
 
@@ -180,6 +290,49 @@ Section mcycle.
       [|iApply (swp_hfrun 6 Drw Dro Df rs _ (tick_pc tt) tt Hdisj
                   (hfrun_tick_pc (Drw ∪ Dro) Drw rs HDn HWpc HDpc)
                   with "Hcert Hrw Hro")].
+    iIntros (u) "(_ & Hrw & Hro)". iFrame.
+  Qed.
+
+  Lemma swp_tick_clock (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) :
+    Drw ## Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_32 mcountinhibit : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 mcyclecfg : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    (R_bitvector_64 mtimecmp : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 menvcfg : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    eq_vec (_get_MEnvcfg_STCE (register_lookup (R_bitvector_64 menvcfg) rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    neq_vec (register_lookup (R_bitvector_64 mip) rs)
+      (update_subrange_vec_dec (register_lookup (R_bitvector_64 mip) rs) 7 7
+         (bool_to_bit
+            (zopz0zIzJ_u (register_lookup (R_bitvector_64 mtimecmp) rs)
+               (add_vec_int (register_lookup (R_bitvector_64 mtime) rs) 1))))
+    = false ->
+    mcycle_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
+      (register_lookup (R_bitvector_64 mcyclecfg) rs) = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (tick_clock tt)
+      (fun _ => hreg_frame (tick_clock_file rs) Drw ∗
+                hreg_frame_ro Df (tick_clock_file rs) Dro).
+  Proof.
+    intros Hdisj HD HDmc HDcfg HDcy HWcy HDti HWti HDip HWip HDtc HDenv
+      Hpriv Hstce Hsame Hflag.
+    iIntros "#Hcert Hrw Hro".
+    iApply (swp_mono with "[] [-]");
+      [|iApply (swp_hfrun 30 Drw Dro Df rs _ (tick_clock tt) tt Hdisj
+                  (hfrun_tick_clock (Drw ∪ Dro) Drw rs HD HDmc HDcfg HDcy
+                     HWcy HDti HWti HDip HWip HDtc HDenv Hpriv Hstce Hsame
+                     Hflag) with "Hcert Hrw Hro")].
     iIntros (u) "(_ & Hrw & Hro)". iFrame.
   Qed.
 
