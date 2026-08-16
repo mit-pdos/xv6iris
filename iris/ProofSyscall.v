@@ -147,9 +147,11 @@
 
    sys_open is PROVEN (SpecSysOpen.v / ProofSysOpen.v / LinkSysOpen.v), so
    index 15 takes the real [SYSOPEN] like any other arm.  sys_unlink is the
-   one table entry with no proof anywhere in the tree; it keeps the
-   axiom-backed stand-in SpecSysUnlink.v -- see
-   claude-notes/projects/fs-sysfile.md for what is still owed there. *)
+   one table entry whose WALK is still being built: [SpecSysUnlink.v] is now
+   the REAL contract (the placeholder that mirrored
+   [wp_syscall_sconf_body] is gone), and LinkSysUnlink.v supplies it with an
+   [Axiom] until [ProofSysUnlink.v] lands -- see
+   claude-notes/projects/fs-sysfile.md, "S7-unlink". *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
