@@ -858,4 +858,46 @@ Section mcycle.
       exists rs1. split; [exact HP|apply reg_agree_refl].
   Qed.
 
+  (* ================================================================== *)
+  (* THE BOUNDARY RULE: [WP Loop] from [WP Loop], for one whole cycle.    *)
+  (*                                                                    *)
+  (* [swp_loop] (the ∀-tick restart) composed with [swp_tick_wrap] (the  *)
+  (* tick axis) over a caller's cycle BODY.  This is what a leaf calls:  *)
+  (* it proves [swp (try_step 0 false) …] once -- tick-free, because the *)
+  (* tick is not part of the body -- and states its result as a          *)
+  (* PREDICATE [P] on the post-file, which survives to the continuation  *)
+  (* weakened only off the three clock cells.                           *)
+  (*                                                                    *)
+  (* [Ψ] rides through untouched: it is where a leaf carries whatever    *)
+  (* its instruction produced besides registers (the store's updated     *)
+  (* points-to, say). *)
+  Lemma wp_loop_cycle (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : iProp Σ) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    ▷ swp (try_step 0 false)
+        (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
+                    hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ) -∗
+    ▷ (∀ rs2 : regstate,
+         ⌜∃ rs1 : regstate, P rs1 /\
+            reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ -∗
+         hreg_frame rs2 Drw -∗ hreg_frame_ro Df rs2 Dro -∗ Ψ -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hdisj HWcy HWti HWip.
+    iIntros "#Hcert Hbody Hcont".
+    iApply (swp_loop with "Hcert").
+    iNext. iIntros (tick).
+    iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
+              with "[Hcont] [-]").
+    2:{ iApply (swp_tick_wrap Drw Dro Df P Ψ tick Hdisj HWcy HWti HWip
+                  with "Hcert Hbody"). }
+    iIntros (u). iDestruct 1 as (rs2) "(%Hex & Hrw & Hro & HPsi)".
+    iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
+  Qed.
+
 End mcycle.

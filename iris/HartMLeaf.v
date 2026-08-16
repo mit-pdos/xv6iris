@@ -1295,40 +1295,33 @@ Section leaf.
     Proof.
       intros HmS HmC HmIE Hmprv Help Hunlock Hpallow.
       iIntros "#Hcert Hrw Hro #Htext Hflag Hcont".
-      iApply (swp_loop with "Hcert"). iNext. iIntros (tick).
-      iApply (swp_mono _ _ (fun _ => WP (Loop : expr riscv_lang))%I
-                with "[Hcont] [-]").
-      2:{ iApply (swp_tick_wrap ml_Drw ml_Dro (ml_Df q)
-                    (fun rs1 => exists mi, rs1 = hp_post mlb_pre mi)
-                    ([∗ list] j ∈ seq 0 4,
-                       (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I tick
-                    ml_disj ml_w_cy ml_w_ti ml_w_ip with "Hcert [-]").
-          iApply (swp_mono _ _
-                    (fun _ => ∃ rs1 : regstate,
-                       ⌜exists mi, rs1 = hp_post mlb_pre mi⌝ ∗
-                       hreg_frame rs1 ml_Drw ∗
-                       hreg_frame_ro (ml_Df q) rs1 ml_Dro ∗
-                       [∗ list] j ∈ seq 0 4,
-                         (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I
-                    with "[] [-]").
-          2:{ iApply (mlb_body vold HmS HmC HmIE Hmprv Help Hunlock Hpallow
-                        with "Hcert Hrw Hro Htext Hflag"). }
-          iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & Hnew)".
-          iExists (hp_post mlb_pre mi). iFrame. iPureIntro. by exists mi. }
-      iIntros (u). iDestruct 1 as (rs2) "(%Hex & Hrw & Hro & Hnew)".
-      destruct Hex as (rs1 & (mi & ->) & Hag).
-      pose proof (mlb_agree mi rs2 Hag) as Hag2.
-      iApply ("Hcont" $! mi
-                (register_lookup (R_bitvector_64 mcycle) rs2)
-                (register_lookup (R_bitvector_64 mtime) rs2)
-                (register_lookup (R_bitvector_64 mip) rs2)
-                with "[Hrw] [Hro] Hnew").
-      - iApply (hreg_frame_ext rs2 _ ml_Drw
-                  (reg_agree_mono _ ml_Drw _ _ (union_subseteq_l _ _) Hag2)
-                 with "Hrw").
-      - iApply (hreg_frame_ro_ext' (ml_Df q) rs2 _ ml_Dro
-                  (reg_agree_mono _ ml_Dro _ _ (union_subseteq_r _ _) Hag2)
-                 with "Hro").
+      iApply (wp_loop_cycle ml_Drw ml_Dro (ml_Df q)
+                (fun rs1 => exists mi, rs1 = hp_post mlb_pre mi)
+                ([∗ list] j ∈ seq 0 4,
+                   (pa_add hp_flag j) ↦ₚ nth_byte hp_one j)%I
+                ml_disj ml_w_cy ml_w_ti ml_w_ip
+                with "Hcert [Hrw Hro Hflag] [Hcont]").
+      - iNext.
+        iApply (swp_mono _ _ _ with "[] [-]").
+        2:{ iApply (mlb_body vold HmS HmC HmIE Hmprv Help Hunlock Hpallow
+                      with "Hcert Hrw Hro Htext Hflag"). }
+        iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & Hnew)".
+        iExists (hp_post mlb_pre mi). iFrame. iPureIntro. by exists mi.
+      - iNext. iIntros (rs2 Hex) "Hrw Hro Hnew".
+        destruct Hex as (rs1 & (mi & ->) & Hag).
+        pose proof (mlb_agree mi rs2 Hag) as Hag2.
+        iApply ("Hcont" $! mi
+                  (register_lookup (R_bitvector_64 mcycle) rs2)
+                  (register_lookup (R_bitvector_64 mtime) rs2)
+                  (register_lookup (R_bitvector_64 mip) rs2)
+                  with "[Hrw] [Hro] [Hnew]").
+        + iApply (hreg_frame_ext rs2 _ ml_Drw
+                    (reg_agree_mono _ ml_Drw _ _ (union_subseteq_l _ _) Hag2)
+                   with "Hrw").
+        + iApply (hreg_frame_ro_ext' (ml_Df q) rs2 _ ml_Dro
+                    (reg_agree_mono _ ml_Dro _ _ (union_subseteq_r _ _) Hag2)
+                   with "Hro").
+        + iExact "Hnew".
     Qed.
 
   End word.

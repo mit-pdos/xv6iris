@@ -13,12 +13,17 @@ Branch `hart-node-port` (off `main`). The port replaces the whole-instruction
 hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
-**The tree is RED from `MinstretInv.v` up — 994 of 1181 `.vo` targets — and
-stays red until item 2 lands.** This is by design (design doc §6):
+**The tree is RED from `InstrBytes.v` up — 993 of 1181 `.vo` targets — and
+stays red until item 2 lands.**  (It was `MinstretInv.v`/994; that file is
+now green, which freed exactly ONE file — itself.  Turning a root green does
+not free the tree, it moves the root up one rung.  Expect the same shape all
+the way up.) This is by design (design doc §6):
 `wp_exec_step`'s whole-instruction, one-σ witness is unsound under per-node
-interleaving and cannot be re-derived as stated, and `MinstretInv.v:384` is
-the one place that names it — confirmed by a full `make -k`: it is the SOLE
-red root, every other red file is downstream of it.  The 994 is the
+interleaving, and the rungs that were built on it come off one at a time.
+Confirmed by full `make -k` at each step: there is always exactly ONE red
+root.  `MinstretInv.v` was the first (`wp_exec_step`); `InstrBytes.v:695` is
+the second (`wp_exec_step_decode_execute_inv`, which wants `minstret_inv` and
+forwards to `wp_exec_step_hart_active_inv`).  The 994 is the
 transitive closure of `MinstretInv.vo` in `.CoqMakefile.d` — recount it
 there rather than trusting this number, which has already been stale once.  Iterate with single-file
 `coqc` or `make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a

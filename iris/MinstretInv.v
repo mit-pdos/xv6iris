@@ -1,32 +1,59 @@
-(* MinstretInv.v -- put the retired-instruction counter [minstret] and its
-   per-cycle increment flag [minstret_increment] into ONE Iris invariant, and
-   provide the leaf-WP step rule [wp_exec_step_minstret] that OPENS that
-   invariant across the single instruction step in order to read/bump them.
+(* MinstretInv.v -- the retired-instruction counter [minstret], its per-cycle
+   increment flag [minstret_increment], and the three cells the clock tick
+   writes ({mcycle, mtime, mip}), as VALUE-AGNOSTIC OWNED RESOURCES.
 
-   Motivation: every instruction step writes both registers
-   (minstret_increment := b; minstret += b), so today every leaf WP must take
-   the two points-to in its precondition and hand them back (bumped) in its
-   postcondition -- they are threaded linearly through the entire boot proof.
-   Their *values* are never actually inspected by callers (minstret is just a
-   counter), so we move them into an invariant whose body pins NEITHER value.
-   The invariant is then persistent (duplicable): a leaf only needs [minstret_inv]
-   (shareable) instead of the two owned cells, and obtains the cells transiently
-   by opening the invariant for the duration of the step.
+   THEY USED TO BE IRIS INVARIANTS, and the step rules that opened them
+   ([wp_exec_step_clock], [wp_exec_step_minstret],
+   [wp_exec_step_hart_active_inv]) were this file's reason to exist.  Both
+   the invariants and the rules are GONE.  Why, in the order the reasons
+   matter:
 
-   CLOCK TICK.  [prim_step] nondeterministically runs [tick_clock] after the
-   instruction ([riscv_step true]), which writes exactly {mcycle, mtime, mip}
-   (mtime += 1 always; mip.MTIP := mtimecmp <=u mtime, and -- STCE is menvcfg
-   bit 63, which MENVCFG_S pins to 1, so the Sstc branch is LIVE -- mip.STIP
-   := stimecmp <=u mtime; mcycle += 1 unless filtered by mcountinhibit.CY /
-   mcyclecfg).  Those three cells live in a SECOND value-agnostic invariant
-   [clock_inv], and the step rule [wp_exec_step_clock] (layered BELOW the
-   minstret rule) handles the tick branch entirely internally: the caller
-   supplies only the no-tick witness [exec (riscv_step false) σ = Some (tt, σ')]
-   and reasons at the FULL mask ⊤ ([WP Loop] is the top level, so masks are
-   pinned to ⊤ throughout -- no [↑N ⊆ E] premises) -- the clock invariant is
-   opened only inside the tick branch, strictly AFTER the caller's
-   continuation, so an instruction whose own execution touches mtime/mip may
-   open [clock_inv] itself. *)
+   1. THE RULES WERE BUILT ON [wp_exec_step], whose whole-instruction,
+      one-sigma witness is unsound under the per-node hart semantics
+      (design/main-cycle-port.md §6).  They cannot be re-derived as stated,
+      and this file was the tree's single red root because of it.
+
+   2. THE INVARIANT WAS THE WRONG SHAPE FOR THE PER-NODE SEMANTICS.  An
+      [inv] opened at a node must close at that node, but the wrapper
+      touches [minstret_increment] and [minstret] at nodes several apart,
+      and [tick_clock] writes the three clock cells at three more.  Held as
+      OWNED cells they simply span the cycle, and the [swp] layer needs no
+      special rule at all.
+
+   3. THE PERSISTENCE WAS WORTH LESS THAN IT LOOKED.  Tree-wide these
+      invariants were ever OPENED in three places, all of them inside this
+      file's own rules plus [WpSconfTimer]; the ~50 files that mention
+      [minstret_inv] only thread it downward.  And IntrDefs §5 already
+      records the general verdict, from converting [intr_inv] back to plain
+      ownership: the credential is PER-HART, so a copy is a copy at ONE
+      hart and is useless after a park -- persistence is not
+      hart-independence.  The dominant pattern for per-hart register state
+      in this tree is already linear bundles ([sconf], [cpu_hart],
+      [trap_csrs], [hart_csrs], [intr_res]); these two resources join it.
+
+   WHERE THE RULES WENT.  [HartMCycle.swp_try_step_gen] is the wrapper,
+   generic in the instruction -- the direct replacement for
+   [wp_exec_step_hart_active_inv] -- and [HartMCycle.wp_loop_cycle] is the
+   boundary rule ([WP Loop] from [WP Loop], both ticks) built from it.  The
+   tick is absorbed by [HartMCycle.swp_tick_wrap], which needs no premise
+   about the machine at all.
+
+   WHERE THE RESOURCES GO.  Into whichever per-hart bundle the mode already
+   threads -- [sie_cap_gpr]/[sconf] in S-mode, [mmode_config] in M-mode, the
+   user-level bundle in U-mode.  That placement is deliberately NOT made
+   here: this file only says what the resources ARE.  [gen_cert] is no
+   longer bundled with them (it is persistent and they are not, so bundling
+   would throw its duplicability away for nothing); it travels on its own.
+
+   WHAT THE TICK ACTUALLY WRITES, for whoever sizes the clock resource:
+   mtime += 1 always; mip.MTIP := mtimecmp <=u mtime, and -- STCE is menvcfg
+   bit 63, which MENVCFG_S pins to 1, so the Sstc branch is LIVE --
+   mip.STIP := stimecmp <=u mtime; mcycle += 1 unless filtered by
+   mcountinhibit.CY / mcyclecfg.
+
+   The pure [exec] lemmas below are unaffected: [exec] is an interpreter and
+   facts about it stay true.  What died is the WP rule that equated one
+   [exec] step with one program step. *)
 From Stdlib Require Import FunctionalExtensionality.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import invariants.
@@ -283,282 +310,53 @@ Section MinstretInv.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* ---------------------------------------------------------------------- *)
-  (* The clock invariant: value-agnostic ownership of the three registers    *)
-  (* [tick_clock] writes.  Same duplicability argument as the minstret one.  *)
-  (* ---------------------------------------------------------------------- *)
-
+  (* The namespaces outlive the invariants: callers still carve masks with
+     them (WpSconfTimer opens [timerN] at [⊤ ∖ ↑minstretN]), and keeping
+     them costs nothing while those callers are reworked. *)
   Definition clockN : namespace := nroot .@ "clock".
-
-  Definition clock_inv_body : iProp Σ :=
-    (∃ (c t p : mword 64), mcycle ↦ᵣ c ∗ mtime ↦ᵣ t ∗ mip ↦ᵣ p)%I.
-
-  Definition clock_inv : iProp Σ := inv clockN clock_inv_body.
-
-  Global Instance clock_inv_persistent : Persistent clock_inv.
-  Proof. apply _. Qed.
-
   Definition minstretN : namespace := nroot .@ "minstret".
 
-  (* Value-agnostic ownership of the two counter cells.  Because it quantifies
-     [mst]/[mi] existentially, re-establishing it after a step (with the bumped
-     values) is trivial, which is precisely what makes the invariant duplicable. *)
-  Definition minstret_inv_body : iProp Σ :=
+  (* ---------------------------------------------------------------------- *)
+  (* THE TWO RESOURCES.  Both bodies are VALUE-AGNOSTIC -- which is what     *)
+  (* makes them cheap to re-establish after a cycle, and is why the tick     *)
+  (* needs no premise about the machine: whatever the three clock cells end  *)
+  (* up holding, [clock_res] holds again.                                    *)
+  (* ---------------------------------------------------------------------- *)
+
+  Definition clock_res : iProp Σ :=
+    (∃ (c t p : mword 64), mcycle ↦ᵣ c ∗ mtime ↦ᵣ t ∗ mip ↦ᵣ p)%I.
+
+  Definition minstret_res : iProp Σ :=
     (∃ (mst : mword 64) (mi : bool),
        minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi)%I.
 
-  (* [minstret_inv] BUNDLES the clock invariant, so the (many) existing
-     callers keep threading a single persistent proposition. *)
-  Definition minstret_inv : iProp Σ :=
-    (inv minstretN minstret_inv_body ∗ clock_inv ∗ gen_cert)%I.
-  (* [gen_cert] (RiscvPtsto.v, the crash/power layer): every WP in the tree
-     threads [minstret_inv], so riding the BIRTH CERTIFICATE here is what
-     hands the base rules their generation certificates (birth bound +
-     started bound + the era registration) with zero statement churn --
-     the same move that folded [clock_inv] in. *)
+  Global Instance clock_res_timeless : Timeless clock_res.
+  Proof. rewrite /clock_res. apply _. Qed.
 
-  Global Instance minstret_inv_persistent : Persistent minstret_inv.
-  Proof. apply _. Qed.
+  Global Instance minstret_res_timeless : Timeless minstret_res.
+  Proof. rewrite /minstret_res. apply _. Qed.
 
   (* ---------------------------------------------------------------------- *)
-  (* THE CONSTRUCTION SITE.  No register is ever minted inside adequacy      *)
-  (* ([RiscvAdequacy.power_boot_res] hands out the era's ghost CELLS at the  *)
-  (* machine's own values), so every invariant over a register is the boot   *)
-  (* client's to allocate -- and while [WireInv.wire_inv_alloc] and          *)
-  (* [IntrDefs.intr_inv_alloc_off] existed, these two did not, which made    *)
-  (* [mmode_config] / [sconf] unconstructible from a reset machine.          *)
-  (*                                                                        *)
-  (* Both bodies are VALUE-AGNOSTIC, so the allocation asks nothing of the   *)
-  (* five values: any five cells will do.  [gen_cert] is not allocated here  *)
-  (* at all -- its three pieces (birth bound, started bound, era             *)
-  (* registration) arrive whole in [power_boot_res] and are simply framed    *)
-  (* in, which is what makes this lemma the client's ONE step from raw       *)
-  (* cells to the bundle every WP in the tree threads.                       *)
-  (* ---------------------------------------------------------------------- *)
-  Lemma clock_inv_alloc (E : coPset) (cy ti ip : mword 64) :
-    mcycle ↦ᵣ cy -∗ mtime ↦ᵣ ti -∗ mip ↦ᵣ ip ={E}=∗ clock_inv.
-  Proof.
-    iIntros "Hcy Hti Hip". rewrite /clock_inv.
-    iApply (inv_alloc clockN E clock_inv_body).
-    iNext. rewrite /clock_inv_body. iExists cy, ti, ip. iFrame "Hcy Hti Hip".
-  Qed.
-
-  Lemma minstret_inv_alloc (E : coPset)
-      (mst : mword 64) (mi : bool) (cy ti ip : mword 64) :
-    gen_cert -∗
-    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi -∗
-    mcycle ↦ᵣ cy -∗ mtime ↦ᵣ ti -∗ mip ↦ᵣ ip ={E}=∗
-    minstret_inv.
-  Proof.
-    iIntros "#Hcert Hmst Hmi Hcy Hti Hip".
-    iMod (clock_inv_alloc E cy ti ip with "Hcy Hti Hip") as "#Hclk".
-    iMod (inv_alloc minstretN E minstret_inv_body with "[Hmst Hmi]") as "#Hmin".
-    { iNext. rewrite /minstret_inv_body. iExists mst, mi. iFrame "Hmst Hmi". }
-    iModIntro. rewrite /minstret_inv. iFrame "Hmin Hclk Hcert".
-  Qed.
-
-  (* ---------------------------------------------------------------------- *)
-  (* wp_exec_step_clock -- the tick-absorbing step rule, layered BELOW the   *)
-  (* minstret rule.  It presents the caller the PRE-TICK interface: one      *)
-  (* successor, one witness ([riscv_step false]), at the FULL mask [⊤] --    *)
-  (* so an instruction whose own execution reads/writes mtime or mip can     *)
-  (* [iInv clock_inv] inside its obligation.  ([WP Loop] is the top level,   *)
-  (* so the mask is pinned to [⊤] rather than an arbitrary [E]; that makes   *)
-  (* the [↑clockN ⊆ E]-style premises vacuous.)  The tick branch is handled  *)
-  (* entirely here: [exec_tick_clock] is total, so the tick witness needs    *)
-  (* no resources, and the post-tick [mstate_interp] is re-established by    *)
-  (* [reg_update]-ing the three invariant-owned cells -- the invariant is    *)
-  (* opened only in the tick branch, strictly AFTER the caller's             *)
-  (* continuation has produced [mstate_interp σ'] and closed its own         *)
-  (* invariants (we are back at mask [⊤]).                                   *)
+  (* Intro / elim.  Both directions are one step, because the resource IS    *)
+  (* the cells -- which is the whole point of dropping the [inv].            *)
   (* ---------------------------------------------------------------------- *)
 
-  Lemma wp_exec_step_clock :
-    gen_cert -∗ clock_inv -∗
-    (∀ σ, mstate_interp σ ={⊤,∅}=∗
-       ∃ σ', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ' ∗ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#Hcert #Hcinv H".
-    iApply (wp_exec_step with "Hcert").
-    iIntros (σ) "Hsi".
-    iMod ("H" $! σ with "Hsi") as (σ') "[%Hexec Hk]".
-    destruct (exec_tick_clock σ') as (c' & t' & p' & Htick).
-    iModIntro.
-    iExists σ', (set_reg (set_reg (set_reg σ' mcycle c') mtime t') mip p').
-    iSplit; first done.
-    iSplit.
-    { iPureIntro. exact (exec_riscv_step_tick _ _ _ Hexec Htick). }
-    iNext. iIntros (tick).
-    iMod "Hk" as "[Hsi' HWP]".
-    destruct tick.
-    - (* tick: scribble the three clock cells under the invariant *)
-      iInv "Hcinv" as ">Hcb" "Hclose".
-      iDestruct "Hcb" as (c0 t0 p0) "(Hc & Ht & Hp)".
-      iDestruct "Hsi'" as "(Hreg & Hmem & Hdev)".
-      iMod (reg_update _ mcycle _ c' with "Hreg Hc") as "[Hreg Hc]".
-      iMod (reg_update _ mtime _ t' with "Hreg Ht") as "[Hreg Ht]".
-      iMod (reg_update _ mip _ p' with "Hreg Hp") as "[Hreg Hp]".
-      iMod ("Hclose" with "[Hc Ht Hp]") as "_".
-      { iNext. iExists c', t', p'. iFrame. }
-      iModIntro. cbn iota. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
-      iFrame "Hreg Hmem Hdev HWP".
-    - iModIntro. cbn iota. iFrame "Hsi' HWP".
-  Qed.
+  Lemma clock_res_intro (cy ti ip : mword 64) :
+    mcycle ↦ᵣ cy -∗ mtime ↦ᵣ ti -∗ mip ↦ᵣ ip -∗ clock_res.
+  Proof. iIntros "Hcy Hti Hip". iExists cy, ti, ip. iFrame. Qed.
 
-  (* The step rule for leaves that need the two counter cells: it [iInv]s
-     [minstret_inv] on top of [wp_exec_step_clock], so a leaf gets
-     [minstret_inv_body] for the step and hands a fresh body back -- without
-     repeating the invariant-opening boilerplate.  The clock tick is fully
-     absorbed one layer down, so the caller supplies only the no-tick witness
-     [riscv_step false]; [clockN] is NOT removed from the caller's mask (an
-     instruction may open [clock_inv] during its own execution).  Unlike the
-     minstret cells, the clock cells are NEVER loaned to the caller.
+  Lemma clock_res_acc :
+    clock_res -∗ ∃ cy ti ip : mword 64,
+      mcycle ↦ᵣ cy ∗ mtime ↦ᵣ ti ∗ mip ↦ᵣ ip.
+  Proof. iIntros "H". iExact "H". Qed.
 
-     Crucially this is itself a FUPD spec: the caller picks the inner mask [Ei],
-     so it can ALSO open its OWN invariants on top of the minstret one.  After the
-     minstret invariant is opened (moving [⊤] -> [⊤∖↑minstretN]) the obligation
-     hands the caller a [={⊤∖↑minstretN, Ei}] fupd; to open a further [inv N P],
-     take [Ei := ⊤ ∖ ↑minstretN ∖ ↑N] and [iInv N] on that fupd, closing it in the
-     [={Ei, ⊤∖↑minstretN}] continuation.  Leaves that need no further invariant just
-     take [Ei := ⊤ ∖ ↑minstretN] (then both fupds are reflexive, discharged by
-     [iModIntro]).  [wp_exec_step_clock] hands us a [={E,∅}] obligation; the
-     [Ei→∅→Ei] detour is a single [fupd_mask_intro].
+  Lemma minstret_res_intro (mst : mword 64) (mi : bool) :
+    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi -∗ minstret_res.
+  Proof. iIntros "Hmst Hmi". iExists mst, mi. iFrame. Qed.
 
-     The obligation must:
-       - produce the next state [σ'] and the exec witness (state [σ'] via
-         [register_lookup minstret σ.(sregs)], a function of σ -- so the cells are
-         NOT needed for the witness, only for the post-step [state_interp] update);
-       - fold the minstret bump into [state_interp σ'] and return a fresh
-         [minstret_inv_body] to close the invariant. *)
-  Lemma wp_exec_step_minstret Ei :
-    minstret_inv -∗
-    (∀ σ, mstate_interp σ -∗ minstret_inv_body
-         ={⊤ ∖ ↑minstretN, Ei}=∗
-       ∃ σ', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
-          ▷ (|={Ei, ⊤ ∖ ↑minstretN}=>
-               mstate_interp σ' ∗ minstret_inv_body ∗
-               WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#(Hinv & Hcinv & Hcert) H".
-    iApply (wp_exec_step_clock with "Hcert Hcinv").
-    iIntros (σ) "Hsi".
-    (* open the minstret invariant ([={E, E∖↑minstretN}]); the caller's fupd
-       supplies [={E∖↑minstretN, Ei}], and a [fupd_mask_intro] bridges [Ei→∅] to
-       meet [wp_exec_step_clock]'s [={E,∅}] obligation. *)
-    iInv "Hinv" as ">Hbody" "Hclose".
-    iMod ("H" $! σ with "Hsi Hbody") as (σ') "[%Hexec Hk]".
-    iApply fupd_mask_intro; [apply empty_subseteq|]. iIntros "Hcl".
-    iExists σ'. iSplit; first done.
-    iNext.
-    iMod "Hcl" as "_".
-    iMod "Hk" as "(Hsi' & Hbody' & HWP)".
-    iMod ("Hclose" with "[$Hbody']") as "_".
-    iModIntro. iFrame.
-  Qed.
-
-  (* ---------------------------------------------------------------------- *)
-  (* wp_exec_step_hart_active_inv -- the [minstret_inv] flavour of the       *)
-  (* run_hart_active leaf rule.  The caller reasons ONLY about the inner     *)
-  (* instruction [run_hart_active]; this rule discharges the whole           *)
-  (* [riscv_step] wrapper (read cur_privilege -> should_inc -> write         *)
-  (* minstret_increment -> run_hart_active -> tick PC -> bump minstret) by    *)
-  (* OPENING [minstret_inv] for the step (via [wp_exec_step_minstret]) and    *)
-  (* the pure [exec_riscv_step_hart_active].  Because the two counter cells   *)
-  (* live in the duplicable invariant, the caller passes only the shareable   *)
-  (* [minstret_inv] and gets NOTHING counter-related back -- it keeps just    *)
-  (* [hart_state] and [PC].  [cur_privilege] stays with the caller (it is     *)
-  (* read by run_hart_active); [should_inc] is total                          *)
-  (* ([exec_should_inc_minstret_Some]), so no privilege / increment premise   *)
-  (* is required.  The caller hands back [state_interp s_exec] directly (not   *)
-  (* behind a later), which lets this rule [reg_valid] the still-invariant-    *)
-  (* owned counter cells to recover the wrapper's post-step reads. *)
-  (* [hart_state] is held at a FRACTION [dq]: the wrapper only ever READS it
-     (hart is still active at the end -- reg_valid_dq off any fraction), never
-     writes it, so the caller may retain the complementary fraction throughout
-     the instruction to keep reasoning about hart_state.  Returned to the
-     continuation unchanged. *)
-  (* The continuation lands on [▷ WP Loop], not [WP Loop]: this rule hands the
-     step's OWN later back to the caller rather than consuming it internally.  A
-     straight-line client doesn't care -- it [iNext]s the [▷] away and keeps its
-     (timeless) resources -- but a client that closes a LOOP back onto the SAME
-     [WP Loop] (the [spin] self-jump, proved by iLöb) needs exactly this later to
-     strip its induction hypothesis.  To thread it, we tick PC / bump minstret
-     UNDER the outer (reflexive) fupd and apply [Hcont] there -- yielding a
-     [▷ WP Loop] hypothesis -- BEFORE the single [iNext] that discharges
-     [wp_exec_step_minstret]'s [▷]; that [iNext] then strips the [Hcont]-produced
-     later in lock-step with the step's, so no second later is needed. *)
-  Lemma wp_exec_step_hart_active_inv {dq : dfrac} :
-    minstret_inv -∗
-    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-    (∀ σ,
-       mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
-       ∃ (retval : mword 32) (s_exec : mstate),
-         ⌜ exec (run_hart_active 0) σ
-             = Some (Step_Execute (RETIRE_SUCCESS, retval), s_exec) ⌝ ∗
-         PC ↦ᵣ (register_lookup PC s_exec.(sregs)) ∗
-         mstate_interp s_exec ∗
-         (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
-          PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
-    iIntros (σ) "[Hreg Hmem] Hbody".
-    iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
-    (* should_inc returns SOME [b]; we neither know nor care which *)
-    destruct (exec_should_inc_minstret_Some
-                (register_lookup cur_privilege σ.(sregs)) σ) as [b Hsi].
-    (* PRE: minstret_increment := b (cell borrowed from the invariant) *)
-    iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
-    iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
-      as (retval s_exec) "(%Hha & Hpc & [Hreg Hmem] & Hcont)".
-    { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    (* wrapper's post-step reads, off the still-owned counter cells *)
-    iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_exec.
-    iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
-    assert (Hhart_a :
-      register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
-        = HART_ACTIVE tt).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
-    (* POST: tick PC and (if b) bump minstret UNDER the outer fupd, then apply the
-       caller's continuation to obtain [HWP : ▷ WP Loop] -- BEFORE the [iNext]. *)
-    iDestruct (reg_valid with "Hreg Hmst") as %Lmst_e.
-    iMod (reg_update _ PC _ (register_lookup nextPC s_exec.(sregs)) with "Hreg Hpc")
-      as "[Hreg Hpc]".
-    assert (Hmst_tick :
-      register_lookup minstret
-        (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs) = mst).
-    { rewrite ?sregs_set_reg.
-      rewrite irrelevant_register_set; [exact Lmst_e | reflexivity]. }
-    iDestruct ("Hcont" with "Hhs Hpc") as "HWP".
-    destruct b.
-    - iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
-        as "[Hreg Hmst]".
-      iModIntro. iExists _. iSplitR.
-      { iPureIntro.
-        exact (exec_riscv_step_hart_active σ s_exec retval true
-                 Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
-      iNext.  (* strips HWP's later in lock-step with the step's later *)
-      iModIntro. rewrite /mstate_interp. cbn [sregs mem]. rewrite Hmst_tick.
-      rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi".
-      { iExists (add_vec_int mst 1), true. iFrame. }
-      iExact "HWP".
-    - iModIntro. iExists _. iSplitR.
-      { iPureIntro.
-        exact (exec_riscv_step_hart_active σ s_exec retval false
-                 Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
-      iNext.
-      iModIntro. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
-      iSplitL "Hmst Hmi".
-      { iExists mst, false. iFrame. }
-      iExact "HWP".
-  Qed.
+  Lemma minstret_res_acc :
+    minstret_res -∗ ∃ (mst : mword 64) (mi : bool),
+      minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi.
+  Proof. iIntros "H". iExact "H". Qed.
 
 End MinstretInv.
