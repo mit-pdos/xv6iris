@@ -33,6 +33,7 @@ HartMDecode.v
 HartMStore.v
 HartLift2.v
 HartMRun.v
+HartMFrame.v
 HartMLeaf.v
 HartMDispatch.v
 HartPilot.v
