@@ -596,23 +596,45 @@ Section InstrBytes.
      a step whose continuation only QUANTIFIES the resuming hart needs: a
      decode fact derived BEFORE the step is still usable after it, at a hart
      the consumer cannot name and so could never re-derive it at. *)
+  (* THE DECODE, FOOTPRINTED.  This used to be a σ-shaped [exec] obligation
+     ([∀ σ, mstate_interp σ -∗ ⌜… exec (decode_fetch r) σ = Some (i, σ)⌝]);
+     it is now a PURE proposition over a register file, because that is what
+     the [swp] layer consumes ([HartMRun.swp_run_hart_active_*] take [hval])
+     and because [hval] needs the register VALUES, never the machine.
+
+     THE ARM CHOICE CARRIES ITS OWN FOOTPRINT.  The decoder reads
+     {cur_privilege, mseccfg, misa} at M-mode and {cur_privilege, menvcfg,
+     misa} at S-mode ([WpDecodeBridge.D_m]/[D_s]).  Demanding both would
+     force every M-mode caller to pin [menvcfg] for nothing, so the
+     disjunction below carries the membership its own arm needs -- an M-mode
+     caller discharges the left arm and never mentions [menvcfg]. *)
+  Definition decode_hval (r : FetchResult) (i : instruction) : Prop :=
+    forall (D Drw : gset register) (rs : regstate),
+      (cur_privilege : register) ∈ D ->
+      (misa : register) ∈ D ->
+      priv_mSU (register_lookup cur_privilege rs) = true ->
+      eq_vec (_get_Misa_C (register_lookup misa rs)) ('b"1") = true ->
+      eq_vec (_get_Misa_A (register_lookup misa rs)) ('b"1") = true ->
+      register_lookup misa rs = MISA_C ->
+      ((mseccfg : register) ∈ D /\
+       register_lookup cur_privilege rs = Machine /\
+       register_lookup mseccfg rs = mword_of_int 0)
+      \/ ((menvcfg : register) ∈ D /\
+          register_lookup cur_privilege rs = Supervisor /\
+          register_lookup menvcfg rs = MENVCFG_S) ->
+      if fetch_is_rvc r
+      then ∃ i0 : instruction,
+             hval D Drw rs (decode_fetch r) i0 rs /\
+             is_lpad_instruction i0 = false /\
+             hval D Drw rs (execute i0) (ExecuteAs i) rs
+      else hval D Drw rs (decode_fetch r) i rs.
+
   Definition instr (pc : mword 64) (is_rvc : bool) (i : instruction) : iProp Σ :=
     (⌜ is_lpad_instruction i = false ⌝ ∗
      ∃ r : FetchResult,
        ⌜ fetch_is_rvc r = is_rvc ⌝ ∗
        instr_bytes pc r ∗
-       (∀ σ (CID : CpuId), mstate_interp σ -∗
-          ⌜ priv_mSU (register_lookup cur_privilege σ.(sregs)) = true ->
-            eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true ->
-            eq_vec (_get_Misa_A (register_lookup misa σ.(sregs))) ('b"1") = true ->
-            register_lookup misa σ.(sregs) = MISA_C ->
-            cfg_ok σ ->
-            if fetch_is_rvc r
-            then ∃ i0 : instruction,
-                   exec (decode_fetch r) σ = Some (i0, σ) /\
-                   is_lpad_instruction i0 = false /\
-                   (forall s : mstate, exec (execute i0) s = Some (ExecuteAs i, s))
-            else exec (decode_fetch r) σ = Some (i, σ) ⌝))%I.
+       ⌜ decode_hval r i ⌝)%I.
 
   (* Lift [instr pc i] to the pure fetch/decode facts a decode/execute WP step
      consumes: the fetch reads the bytes to [r] (via [fetch_from_instr_bytes]),

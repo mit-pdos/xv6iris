@@ -244,11 +244,17 @@ Definition MIE_S : mword 64 := mword_of_int 0x220.
    Supervisor state with menvcfg = MENVCFG_S (the constant post-boot value).
    Supplied to the [instr] decode obligation by the M-/S-mode step engines from
    [hw_config] / [smode_config]; consumed by the per-word bridge lemmas. *)
-Definition cfg_ok (s : mstate) : Prop :=
-  (register_lookup cur_privilege s.(sregs) = Machine /\
-   register_lookup mseccfg s.(sregs) = mword_of_int 0)
-  \/ (register_lookup cur_privilege s.(sregs) = Supervisor /\
-      register_lookup menvcfg s.(sregs) = MENVCFG_S).
+(* the config disjunction, over the REGISTER FILE.  The [mstate] form below
+   is definitionally this one at [s.(sregs)] -- which is what lets the
+   footprinted decode characterization ([instr]'s [decode_hval]) drop σ
+   entirely: it needs the register VALUES, never the machine. *)
+Definition cfg_ok_rs (rs : regstate) : Prop :=
+  (register_lookup cur_privilege rs = Machine /\
+   register_lookup mseccfg rs = mword_of_int 0)
+  \/ (register_lookup cur_privilege rs = Supervisor /\
+      register_lookup menvcfg rs = MENVCFG_S).
+
+Definition cfg_ok (s : mstate) : Prop := cfg_ok_rs s.(sregs).
 
 Section HwConfig.
   Context `{!riscvGS Σ}.

@@ -279,6 +279,22 @@ Evidence:
    interface.  `swp_span` takes `hval` directly, and existing `hfrun` callers
    (the pilot) still reach it through `hfrun_hval`.
 
+   **A GAP THE PILOT HID: THERE IS NO 2-BYTE FETCH PATH.**  Every rule in
+   `HartMFetch` (`swp_fetch_bytes_M`, `swp_fetch`, `swp_fetch_M`,
+   `swp_fetch_ram`) assumes `neq_vec (access_vec_dec pc 0) zerobit = false`
+   AND `... pc 1 ... = false` -- i.e. 4-ALIGNMENT -- and is hardcoded to
+   `fetch_bytes pc pc 4`.  The model's `fetch` branches on bit 1 of the PC:
+   at a 2-mod-4 address it reads a HALFWORD, sees `isRVC`, and stops.
+   `instr_bytes` already knows this -- its `F_RVC` arm carries four bytes
+   when `is_aligned_vaddr … 4` and only TWO otherwise.
+
+   The pilot never exercised it (`main+0xb0` is 4-aligned, which is why its
+   fetch is one 4-byte read), so the gap was invisible until `wp_instr` --
+   which must work at ANY 2-aligned pc, and roughly half the kernel's
+   compressed instructions sit at 2-mod-4 addresses.  `swp_fetch_bytes_2`
+   and the `F_RVC`-at-2-mod-4 fetch rule are REAL WORK and belong before
+   `wp_instr`, not inside it.
+
    THE PLAN, in order:
      1. prove `hval_of_goodb` (induction on the monad; `goodb` and `hfrun`
         are near-identical structural walkers, so the arms line up);
