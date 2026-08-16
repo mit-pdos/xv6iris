@@ -2148,15 +2148,41 @@ but not the machine's own state.
 
 ### Gate
 
-`FsSyscalls.vo` and `LinkFsSyscalls.vo` both green on the mirror, and
-`proof_coverage.py --check` exits 0 with coverage UNMOVED (186/190, 98 %;
-the increment is additive and flips no seal). The gate was taken at
-`37918d9b`; the fused V4 + V5′-R commit (`412c58ed`) landed in the same
-window and rebuilds the `InodeRegion` cone under these two leaves, so **a
-re-verification at `412c58ed` is OWED** — the leaves name `ireg_inv`,
-`ic_escrows`, `is_itable2` and `bitmap_res` only through the two seals'
-own signatures, none of which moved, so the expectation is a clean
-recompile and nothing more.
+`FsSyscalls.vo` and `LinkFsSyscalls.vo` both green on the mirror at
+`37918d9b`, and `proof_coverage.py --check` exits 0 with coverage UNMOVED
+(186/190, 98 %; the increment is additive and flips no seal).
+
+The fused V4 + V5′-R commit (`412c58ed`) landed in the same window and
+rebuilds the `InodeRegion` cone under these leaves, so the mirror was
+brought to it and rebuilt (331 files, `-j24`): **`FsSyscalls.v` recompiles
+GREEN at `412c58ed`** — it carries the wrappers' whole proof, against the
+abstract `SYSMKDIR` / `SYSCHDIR` module types, so this is the substantive
+half of the re-verification. The only error in the whole 331-file rebuild
+is `LinkCreate.vo`'s *"LinkCreateFreshTy makes inconsistent assumptions
+over SpecCreateFreshTy"*, and it is **not this increment's**: a sibling
+lane was editing `iris/SpecCreateFreshTy.v` uncommitted in the shared
+mirror checkout mid-build (source mtime 12:54, `LinkCreateFreshTy.vo`
+12:48). `LinkFsSyscalls.vo` sits behind it in the same cone.
+
+OWED, and both are one command once the shared checkout is quiet:
+`LinkFsSyscalls.vo` at `412c58ed` (a two-line functor application — it can
+only fail if `SysMkdir`/`SysChdir` stop satisfying their own module types,
+which is `LinkSysMkdir`'s business, not this file's), and the per-lemma
+`Print Assumptions` attribution. The one PA run that completed (at
+`37918d9b`, exit 0) shows the expected inhabitants and no others — the five
+Sail platform axioms, `functional_extensionality_dep`, and
+`SpecCreateFreshTy.create_fresh_ty` — but its capture was truncated, so
+**which** of the four queries each line belongs to is not yet on the
+record. Nothing in the two leaves can add an assumption: they contain no
+`Axiom`, no `Parameter`, no `admit`.
+
+**MIRROR HAZARD, recorded because it cost this increment its gate**: two
+lanes were running `make` against `/shared/xv6iris` on the mirror at the
+same time, one of them with uncommitted edits to a file the other's cone
+requires. A lane that is going to edit shared sources needs a lane tree
+(`/shared/xv6iris-*`), and a lane that is going to GATE needs to check
+`git status --porcelain` on the mirror checkout before it starts, not only
+before it commits.
 
 ---
 
