@@ -1248,3 +1248,18 @@ version and was not rebuilt.
 Before trusting a failure count after a semantic change, `rm` the failing
 files' `.vo` and the `.vo` of everything that requires them, then rebuild.
 The number goes up; that is the real one.
+
+- **Contract ownership across the two lines (from the GR-33 sys_unlink
+  collision, 2026-08-16):** the first syscall BOTH lines specified went
+  red on main — each line independently made `SpecSysUnlink` "real", in
+  incompatible shapes, in the same window (their dispatch arm vs our
+  walk's contract), and the merge could keep only one. CONVENTION: a
+  syscall's contract is OWNED by whichever line has started its walk
+  (a Proof*/Budget file in tree beats a dispatch arm's expectation);
+  the other line consumes or stubs, never respecifies. A dispatch arm
+  written against a stub must be re-pointed when the real contract
+  lands — the arm is one iApply, the walk is a campaign. The open
+  cross-line item this leaves: whether the dispatch site can supply
+  our fs contracts' disk-fabric resources (gu/gd/gk) at index 18 —
+  the shape decision is the user's conversation with the other line,
+  with both parameter lists side by side in the GR-33 ledger entry.
