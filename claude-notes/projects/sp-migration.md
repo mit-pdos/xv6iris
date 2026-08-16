@@ -156,8 +156,8 @@ Two more shapes rejected on principle, recorded so they stay dead:
   hart-free; the per-hart part lives only in leaf premises where `cpu_id`
   is ambient and re-bound at `wp_next`.
 
-## THE SETTLED DESIGN (2026-08-16): generation-tiered datum + capability-
-## carried witness + `GenLe` inference
+## THE SETTLED DESIGN (2026-08-16): ktier-indexed datum + capability-
+## carried witness + `KtierLe` inference
 
 The structure the problem forces: the per-hart translation regime is a
 MONOTONE two-point quantity (Bare→KPT, once per era — kexec starts a new
@@ -170,18 +170,21 @@ the bounds are GLOBAL persistent facts (`kmap_at` fragments + a pure class
 conjunct), not hart-relative views, so lock transfer needs no re-indexing
 and no context object. Adopt the pattern, not the machinery.
 
-### 1. The datum: `va ↦ₘ[g] v`, g ∈ {G0, G1}
+### 1. The datum: `va ↦ₘ[kt] v`, kt ∈ {KT0, KT1}
 
-- `↦ₘ[G1]` — EXACTLY the identity-free definition now on the RED branch
+- `↦ₘ[KT1]` — EXACTLY the identity-free definition now on the RED branch
   (`RiscvPtsto.v:925`).
-- `↦ₘ[G0]` — the same PLUS the pure conjunct
-  `⌜kmap_static (svpn_of va) KP_rw⌝`. From it any consumer derives identity
-  with no caller premise: `kmap_static_claims_at` (ambient in `hw_config`) +
-  `kmap_at_agree` + `pa_of_id` — the `mem_ident_phys` dance, performed
-  INSIDE the leaf.
-- Weakening `↦ₘ[G0] ⊢ ↦ₘ[G1]`; strengthening is recoverable because the
+- `↦ₘ[KT0]` — the same PLUS the pure conjunct
+  `⌜ppn = kpt_leaf_ppn (svpn_of va) /\ kmap_static (svpn_of va) KP_rw⌝`
+  (the PINNED form: it names the existential ppn, so a destructor gets the
+  identity by `pa_of_id` alone, with NO ambient bundle needed — today's
+  `%Hid` destructors change one line).  Constructors get the pin from
+  `kmap_static_claims_at` + `kmap_at_agree` (the bundle is ambient in
+  `hw_config`), exactly as `phys_ident_mem` already does; adequacy mints
+  from `kmap_M0`, which is static by definition.
+- Weakening `↦ₘ[KT0] ⊢ ↦ₘ[KT1]`; strengthening is recoverable because the
   tier conjunct is PURE (`mem_gen_strengthen : ⌜kmap_static …⌝ -∗ ↦ₘ[g] ⊢
-  ↦ₘ[G0]`) — extract the class fact before weakening, reapply after. Both
+  ↦ₘ[KT0]`) — extract the class fact before weakening, reapply after. Both
   are fallbacks; the tier-preserving leaf rule (§4) makes them rare.
 - The towers (`↦₂/₄/₈`, `word_pointsto`, `str_bytes`, `stack_own`) inherit
   the index through notation (§6).
@@ -203,7 +206,7 @@ exclusivity, only pending exclusivity, which the oneshot preserves.
 
 ### 3. The regime record: `sr_kwit` + `sr_absorb_wit`
 
-`s_regime` keeps `sr_adm`/`sr_adm_id` (the G0 path) and gains:
+`s_regime` keeps `sr_adm`/`sr_adm_id` (the KT0 path) and gains:
 
 ```coq
 sr_kwit : iProp Σ;               (* persistent: this regime honors ALL claims *)
@@ -219,104 +222,104 @@ witness is unsatisfiable, not the obligation unpayable); `kpt_share_regime`
 `strans_absorb_wit` case-splits the slot: Bare arm's pending × shot =
 contradiction, KPT arm delegates to `res_absorb`.
 
-### 4. The leaf rule: tier-preserving, heterogeneous, `GenLe`-inferred
+### 4. The leaf rule: tier-preserving, heterogeneous, `KtierLe`-inferred
 
 ```coq
-Class GenLe (g1 g2 : gen) : Prop := gen_le : …
-Instance gen_le_bot g  : GenLe G0 g.   (* static usable everywhere *)
-Instance gen_le_top g  : GenLe g G1.   (* a KPT hart honors every claim *)
-Instance gen_le_refl g : GenLe g g.    (* spec arg riding the ambient gen *)
+Class KtierLe (t1 t2 : ktier) : Prop := ktier_le : …
+Instance ktier_le_bot t  : KtierLe KT0 t.   (* static usable everywhere *)
+Instance ktier_le_top t  : KtierLe t KT1.   (* a KPT hart honors every claim *)
+Instance ktier_le_refl t : KtierLe t t.    (* spec arg riding the ambient tier *)
 
-Lemma wp_load_byte g g' `{!GenLe g' g} … :
-  gen_wit g -∗ va ↦ₘ[g'] v -∗ … (va ↦ₘ[g'] v -∗ …) -∗ …
+Lemma wp_load_byte g g' `{!KtierLe g' g} … :
+  ktier_wit g -∗ va ↦ₘ[g'] v -∗ … (va ↦ₘ[g'] v -∗ …) -∗ …
 ```
 
-G0 datum → identity derived internally, absorb via `sr_adm`/`sr_adm_id`
-(this arm is where the ~14 RED `%Hid` sites land, patched ONCE); G1 datum →
-`GenLe` forces `g = G1`, absorb via `sr_absorb_wit`. THE DATUM COMES BACK AT
-ITS OWN TIER — a G0 fact stays G0 through any number of accesses, so
-re-deposit into a G0-stated invariant (kfree → freelist) needs no
+KT0 datum → identity derived internally, absorb via `sr_adm`/`sr_adm_id`
+(this arm is where the ~14 RED `%Hid` sites land, patched ONCE); KT1 datum →
+`KtierLe` forces `g = KT1`, absorb via `sr_absorb_wit`. THE DATUM COMES BACK AT
+ITS OWN TIER — a KT0 fact stays KT0 through any number of accesses, so
+re-deposit into a KT0-stated invariant (kfree → freelist) needs no
 strengthening dance. Instance-set facts: the goal shapes that arise are
-`GenLe g g` (refl), `GenLe G0 g` (bot), `GenLe g G1` (top); all heads are
+`KtierLe g g` (refl), `KtierLe KT0 g` (bot), `KtierLe g KT1` (top); all heads are
 premise-free, so no TC search divergence; closed-corner overlap
-(`GenLe G0 G1` matches two) is benign for a Prop class. `GenLe g1 g2` for
-two UNRELATED variables is correctly unprovable (false at G1,G0) — the
+(`KtierLe KT0 KT1` matches two) is benign for a Prop class. `KtierLe g1 g2` for
+two UNRELATED variables is correctly unprovable (false at KT1,KT0) — the
 caller must pin or weaken. **The set {bot, top, refl} is complete FOR THE
 TWO-POINT LATTICE ONLY**; if the lattice ever grows (kexec era index was
 the candidate), switch to a decision-procedure instance or Hint Extern.
 
-### 5. Witness delivery: the CAPABILITY is g-indexed; nothing new is threaded
+### 5. Witness delivery: the CAPABILITY is ktier-indexed; nothing new is threaded
 
-`sie_cap g m avail b p` carries one persistent conjunct `gen_wit g`
-(`gen_wit G0 = emp`, `gen_wit G1 = kpt_on cpu_id`). The SIE='1' arm PINS
-`g = G1` internally (it owns `intr_res`, post-trapinithart only — this is
+`sie_cap g m avail b p` carries one persistent conjunct `ktier_wit g`
+(`ktier_wit KT0 = emp`, `ktier_wit KT1 = kpt_on cpu_id`). The SIE='1' arm PINS
+`g = KT1` internally (it owns `intr_res`, post-trapinithart only — this is
 the existing "interrupts enabled ⟹ KPT" invariant, `IntrDefs.v:809-816`,
-promoted to an index), so the Banach trap fixpoint stays at G1 unindexed;
+promoted to an index), so the Banach trap fixpoint stays at KT1 unindexed;
 only the SIE=0 capability form is g-polymorphic. Boot's capability is built
-at G0 (`sie_cap_intro_bare`); kvminithart upgrades it once
-(`sie_cap_gen_up : sie_cap G0 … -∗ kpt_on -∗ sie_cap G1 …`, minting
+at KT0 (`sie_cap_intro_bare`); kvminithart upgrades it once
+(`sie_cap_ktier_up : sie_cap KT0 … -∗ kpt_on -∗ sie_cap KT1 …`, minting
 `kpt_on` at the flip — it owns the slot mid-switch). Interrupts-off code
 needs no SIE-based deduction: the capability it already holds WAS BUILT at
-a generation and carries the witness. Leaves get `gen_wit` through the
+a generation and carries the witness. Leaves get `ktier_wit` through the
 engine plumbing that already destructures the capability to feed `sr_inv`.
-NO function spec grows an `sr_gen_ok`-style premise.
+NO function spec grows an `sr_ktier_ok`-style premise.
 
-### 6. Notation: ambient `CurGen` (the weak-memory Stage-1.7 trick)
+### 6. Notation: ambient `CurKtier` (the weak-memory Stage-1.7 trick)
 
 ```coq
-Class CurGen := cur_gen : gen.
-Notation "a ↦ₘ v" := (mem_pointsto cur_gen a … v).  (* + towers, sie_cap *)
+Class CurKtier := cur_ktier : ktier.
+Notation "a ↦ₘ v" := (mem_pointsto cur_ktier a … v).  (* + towers, sie_cap *)
 ```
 
 Per-file deltas — this is the whole answer to "how wide is the cone":
 
 - POST-BOOT-ONLY files (the fs tier, proc, pipe — the bulk):
-  `Local Instance : CurGen := G1.` Spec/proof text otherwise UNCHANGED —
-  `↦ₘ` elaborates to `↦ₘ[G1]`, the RED-branch definition those proofs
+  `Local Instance : CurKtier := KT1.` Spec/proof text otherwise UNCHANGED —
+  `↦ₘ` elaborates to `↦ₘ[KT1]`, the RED-branch definition those proofs
   already use.
 - BOOT-ONLY files (ProofMain, ProofMainSecondary, kvminit):
-  `Local Instance : CurGen := G0.`
+  `Local Instance : CurKtier := KT0.`
 - THE DUAL-REGIME CONE (printk/printf, console, uart, string/memmove/
-  memset, acquire/release, kalloc): section binder `` `{GEN : CurGen} `` —
+  memset, acquire/release, kalloc): section binder `` `{GEN : CurKtier} `` —
   the ∀g is the section variable; statements keep their spelling. Only
-  genuinely mixed-tier ARGUMENTS name an explicit `[g_i]` with a `GenLe`
+  genuinely mixed-tier ARGUMENTS name an explicit `[g_i]` with a `KtierLe`
   premise, e.g. printk with per-`%s` tiers:
 
   ```coq
-  Lemma printk_spec g gf g1 `{!GenLe gf g, !GenLe g1 g} … :
+  Lemma printk_spec g gf g1 `{!KtierLe gf g, !KtierLe g1 g} … :
     { sie_cap g … ∗ stack_own[g] sp n ∗ str_bytes[gf] fmt ∗ str_bytes[g1] s1 }
       printk  { …same back, same tiers… }
   ```
 
-  ONE proof; each region independently G0 or G1; a boot caller instantiates
-  everything at G0 (all premises trivial); a post-boot caller sets g := G1
+  ONE proof; each region independently KT0 or KT1; a boot caller instantiates
+  everything at KT0 (all premises trivial); a post-boot caller sets g := KT1
   and mixes freely (top/bot instances). The stack rides the capability's g
-  — boot stack0 is G0 with the G0 cap, kstack is G1 with the G1 cap; they
+  — boot stack0 is KT0 with the KT0 cap, kstack is KT1 with the KT1 cap; they
   genuinely co-vary, so this is not a restriction.
 - DISCIPLINE, inherited verbatim from the CurCtx scar tissue on the
-  weak-memory branch: `Typeclasses Opaque cur_gen`; NAMED section binders
+  weak-memory branch: `Typeclasses Opaque cur_ktier`; NAMED section binders
   (anonymous instances auto-name `H` and collide with `iIntros "%H"`); the
   boot↔post-boot SEAM proofs (kvminithart above all, scheduler entry) have
-  two generations in scope and must spell `[G0]`/`[G1]` explicitly — with
-  two `CurGen` instances in scope, resolution silently takes the
+  two generations in scope and must spell `[KT0]`/`[KT1]` explicitly — with
+  two `CurKtier` instances in scope, resolution silently takes the
   last-declared one.
 
 ### 7. Locks: NOTHING changes in the lock library
 
-A lock invariant's payload spells its tier EXPLICITLY, never `cur_gen` (an
+A lock invariant's payload spells its tier EXPLICITLY, never `cur_ktier` (an
 invariant is shared across harts in different regimes; an ambient tier
-would let a G1-ambient depositor violate what a G0 acquirer needs). That is
+would let a KT1-ambient depositor violate what a KT0 acquirer needs). That is
 the whole per-lock story: an annotation on the PAYLOAD PROPOSITION, chosen
-once per lock — kalloc/console/uart at G0 (true: their data is static RAM /
+once per lock — kalloc/console/uart at KT0 (true: their data is static RAM /
 .data), fs locks at whatever is true of their data. `is_lock`/`acquire`/
 `release` are untouched; a Bare hart may acquire ANY lock (the lock word is
-static = G0); if the payload hands it G1 facts it can hold, pass, and
+static = KT0); if the payload hands it KT1 facts it can hold, pass, and
 re-deposit them — it just cannot drive leaves with them, for want of
 `kpt_on`. Unsoundness is structurally unreachable, not prohibited by a side
-condition. kalloc end-to-end: freelist stated at G0; kinit/kvminit (Bare)
-deposit and use at G0; post-boot callers get G0 pages, use them directly at
-ambient G1 (bot instance, tier preserved), kfree re-deposits at G0; the ↦ₚ
-conversion for PT nodes gets its static-class premise FROM the G0 datum
+condition. kalloc end-to-end: freelist stated at KT0; kinit/kvminit (Bare)
+deposit and use at KT0; post-boot callers get KT0 pages, use them directly at
+ambient KT1 (bot instance, tier preserved), kfree re-deposits at KT0; the ↦ₚ
+conversion for PT nodes gets its static-class premise FROM the KT0 datum
 (cleaner than today's separate `page_in_range_addr_is_kdata` threading).
 
 The depositor obligation — "deposit at the tier the invariant states" — is
@@ -333,10 +336,10 @@ are HART-RELATIVE, so facts crossing a lock must be re-based (wobj, ξ_L,
 CtxMorph); generation bounds are GLOBAL PERSISTENT facts, so they cross any
 container unchanged and no context object is needed. Merge point when the
 WM port lands: Stage-1.8 `ctx_own ξ`'s ledger clause (i) gains a generation
-component ("ξ's generation bound ≤ this hart's generation"), and `gen_wit`
+component ("ξ's generation bound ≤ this hart's generation"), and `ktier_wit`
 is discharged from `wrunning ξ` instead of the capability — specs written
 against §4-§6 simplify rather than change shape. To keep that merge
-mechanical: keep `gen` a dedicated lattice type (not bool), keep the
+mechanical: keep `ktier` a dedicated lattice type (not bool), keep the
 witness behind the capability interface, and NEVER let `kpt_on` leak into a
 datum definition.
 
@@ -345,10 +348,10 @@ datum definition.
 1. Oneshot refactor of `strans_bit` (§2) — self-contained, check every
    consumer (two accessors, flip, trap_csrs, sie_cap arms).
 2. `sr_kwit`/`sr_absorb_wit` on the record + the three instances (§3).
-3. g-indexed datum + `GenLe` + the tier-preserving leaf rules (§1, §4),
-   patching the ~14 RED `%Hid` sites into the G0 arm.
-4. `sie_cap` index + `gen_wit` + `sie_cap_gen_up` at kvminithart (§5).
-5. `CurGen` class/notation + the per-file sweep (§6); lock payloads pinned
+3. ktier-indexed datum + `KtierLe` + the tier-preserving leaf rules (§1, §4),
+   patching the ~14 RED `%Hid` sites into the KT0 arm.
+4. `sie_cap` index + `ktier_wit` + `sie_cap_ktier_up` at kvminithart (§5).
+5. `CurKtier` class/notation + the per-file sweep (§6); lock payloads pinned
    explicitly (§7).
 6. While the family is open: fix the mis-named `pa` binder at
    `WpSconfMem.v:242` (DEAD END 2's finding).
@@ -358,6 +361,89 @@ The old fallback (move the secondary's `printk("hart %d starting\n")` after
 `kvminithart()` to shrink the Bare cone) is NO LONGER NEEDED — under §6 the
 "cone" question is moot (post-boot files are textually unchanged; the
 dual-regime cone pays one section binder). Kept here only as history.
+
+## Implementation campaign (worklist)
+
+Orchestrated: a coordinator agent owns design coherence; Opus/Sonnet
+subagents execute. Builds run on the GCP VM (`remote-build-gcp.md`) —
+a full clean build is ~6 min there, so even the IntrDefs/SmodeCore cone
+is cheap to validate. One code agent at a time in this checkout (shared-
+tree discipline, `durable-notes.md`); agents leave edits uncommitted and
+the coordinator reviews and commits.
+
+Landing strategy — the key observation making phases A–C individually
+green: TODAY every `↦ₘ` in the tree is at a statically-classified address
+(KSTACK is unownable — that is the project's premise), so the whole tree
+starts at KT0, which is true and closest to the current semantics.
+`CurKtier` gets a LOW-PRIORITY GLOBAL DEFAULT instance `KT0` in RiscvPtsto
+(a recorded deviation from the WM CurCtx zero-instances discipline): the
+~424 use-only consumer files then compile UNCHANGED — no pinning sweep
+exists at all — and a post-boot file adds a `Local Instance : CurKtier :=
+KT1` override only when it first needs KT1 facts (after phase D). The
+default's failure direction is sound: a file that forgets the override
+gets KT0 and an UNPROVABLE goal at its KT1 access, never unsoundness.
+Explicit local pins beat the default via the priority gap regardless of
+declaration order.
+
+- **Phase A** (design §2; lands green on main): `strans_bit` ghost_var →
+  mono_nat-backed oneshot. `strans_pending` := half auth at 0 (the Bare
+  arm's + the boot receipt's halves), KPT arm := full auth at 1,
+  `kpt_on c` := `mono_nat_lb_own (strans_name c) 1` — persistent, timeless.
+  Conflicts: lb 1 × auth 0 → 1 ≤ 0; pending × full auth → fraction > 1.
+  Flip = combine halves, update 0→1, mint lb. Touches: IntrDefs.v (def,
+  arms, accessors, flip, trap_csrs member — becomes a persistent conjunct),
+  SmodeCore.v (`strans_bit_bare/kpt` constants — delete if unconsumed),
+  RiscvAdequacy.v (per-CPU alloc), usertrapret + kvminithart proofs.
+  `ghost_varG (mword 1)` STAYS (sie_gname/intr_count use it); mono_natG is
+  ADDED alongside.
+- **Phase B** (design §3; green on main): `sr_kwit`/`sr_kwit_pers`/
+  `sr_absorb_wit` on `s_regime` + the three instances (bare `False`,
+  kpt_share `emp`, strans `kpt_on cpu_id`).
+- **Phase C** (design §1, §4, §6; the big one — branch until green): the
+  `ktier` lattice + `KtierLe` (new bottom file), ktier-indexed `mem_pointsto`
+  (KT0 = pinned conjunct, KT1 = the RED definition), `CurKtier` class +
+  notation + the global KT0 default, tier-preserving leaf rules with the
+  ~14 `%Hid` sites as the KT0 arm, `WpSconfMem.v:242`'s `pa` binder
+  renamed in passing (design §9 step 6). Recon facts (measured, 2026-08-16):
+  - Definitions to index, all top-level in RiscvPtsto.v, no shared
+    Section: `mem_pointsto` (923), `word_pointsto` (1100), `word2_` (1186),
+    `word4_` (1238), `string_pointsto` (1337; the design sketches say
+    `str_bytes` — THAT NAME DOES NOT EXIST, it is `string_pointsto`/`↦ₛ`),
+    plus `stack_own` (StackOwn.v:136). The PHYSICAL tier (`↦ₚ`, `↦ₚ₈`,
+    `stack_own_phys`) needs NO index; the text tier is Phase E.
+  - Family typeclass instances to re-check under the index:
+    `mem_pointsto_timeless` (943), the `*_discarded_persistent` set
+    (1739/1352/1979/1981/2010); `stack_own` has none of its own.
+  - Destructure footprint beyond RiscvPtsto/KMap/SmodeCorePt is EXACTLY
+    the 14 `%Hid` sites: WpSconfMem 316/947/1430/1732/1940, WpSmodePtMem
+    1046/1252/1457/1659, WpSmodePtLeaves 427/832, SmodeCorePt 258 (via
+    `mem_pointsto_pin`; its write-back re-mint is the precedent for the
+    tier-preserving KT0 arm), WpSconfLock 907, ProofAcquiresleep 220 (odd
+    one out — no adjacent `sr_adm_id`; inspect before patching).
+  - Constructor sites: `phys_ident_mem`/`mem_ident_phys` (KMap.v:155/141,
+    already carry the static premise — trivially KT0), `phys_to_mem_map`
+    (RiscvPtsto.v:1914 — the RED branch already dropped its identity
+    premise; it IS the KT1 constructor), `phys_to_mem_claim`/
+    `mem_to_phys_claim` (1932/1944; callers KptTree.v:509/529,
+    ProcInv.v:742/761), adequacy's whole-image mint
+    (RiscvAdequacy.v:427-434/513/798-816, kmap_M0 ⇒ KT0).
+  - Mine the RED suite via the MERGE-BASE diff
+    (`git diff 4019ec33...sp-migration-red -- iris/`) — a naive two-dot
+    diff is polluted by unrelated main churn. Repaired lemmas reusable
+    as the KT1 suite: agree/ne/frac_split/acc/canonical/ram/persist/pin/
+    phys_to_mem_map/phys_to_mem_claim; `mem_to_phys_claim` keeps its
+    identity hypothesis (inherently KT0-consuming).
+  - **BINDER NAME: never `GEN` for `CurKtier`** — `GEN : GenId` (the kexec
+    era index) is pre-existing and widely threaded (e.g. SpecPrintk.v:202).
+    Reserve `KTR`.
+  - The Module-Type "Parameter binder list must match Definition" trap
+    does NOT bite Phase C (a `Local Instance`/default adds no binder);
+    it goes live at the dual-regime phase, when files gain a real
+    `` `{CG : CurKtier} `` — 114 Module-Type files mention family notations
+    in Parameter signatures and must then be swept in matching pairs.
+- **Phase D** (design §5): `sie_cap` g-index + `ktier_wit` + `sie_cap_ktier_up`
+  at kvminithart; the SIE='1' arm pins KT1.
+- **Phase E** (design §9 step 7, later): `text_pointsto`/TRAMPOLINE.
 
 ## State
 
@@ -371,13 +457,13 @@ dual-regime cone pays one section binder). Kept here only as history.
   `mem_ram`, `mem_valid`, `phys_to_mem_map` — which lost its
   `pa_of ppn va = va` premise — `phys_to_mem_claim`, `mem_to_phys_claim`),
   plus `KMap.v` and `SmodeCorePt.v` destructure arities. Those repaired
-  lemmas are essentially the G1 tier's suite; step 3 adapts them under the
+  lemmas are essentially the KT1 tier's suite; step 3 adapts them under the
   g index rather than rediscovering them.
 - On that branch the build stops at `WpSmodePtLeaves.v:427`, the first of
   ~14 sites that destructure `%Hid` out of the datum and feed it to
   `sr_adm_id` (`WpSconfMem` ×5, `WpSmodePtMem` ×4, `WpSmodePtLeaves` ×2,
   `SmodeCorePt`, `WpSconfLock`, `ProofAcquiresleep`). Under the settled
-  design these become the G0 arm of the tier-preserving leaf rules (step 3
+  design these become the KT0 arm of the tier-preserving leaf rules (step 3
   of the implementation order). Implementation should START FRESH from
   green `main` at step 1 (the oneshot refactor, which is independent and
   lands green), not by resuming the branch.

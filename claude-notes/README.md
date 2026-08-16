@@ -135,9 +135,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   gname must be canonical, and the ordering behind kfork.
 - **[`sp-migration.md`](projects/sp-migration.md)** — owning memory at a
   NON-IDENTITY kernel va (the gate on the process kernel stack): the four
-  dead ends, and THE SETTLED DESIGN — a generation-tiered `↦ₘ[g]` datum, a
-  persistent per-hart `kpt_on` witness carried by a g-indexed `sie_cap`,
-  tier-preserving `GenLe`-inferred leaf rules, ambient `CurGen` notation,
+  dead ends, and THE SETTLED DESIGN — a ktier-indexed `↦ₘ[kt]` datum, a
+  persistent per-hart `kpt_on` witness carried by a ktier-indexed `sie_cap`,
+  tier-preserving `KtierLe`-inferred leaf rules, ambient `CurKtier` notation,
   and lock payloads at explicit tiers.
 - **[`proc-pagetable-ownership.md`](projects/proc-pagetable-ownership.md)** —
   the process page table's OWNERSHIP side (`proc_pt`): the footprint derived
