@@ -900,12 +900,122 @@ callers. Still `pa`: WpSconfMem's 17 thin wrappers and WpSconfLock's 11.
    pins `[KT0]`/`[KT1]` explicitly.
 4. Nothing here touches the fetch path; `text_pointsto` is still phase E.
 
+### sie_cap tier index findings (LANDED)
+
+The capability bundle is tier-indexed, in **two** source files
+(`IntrDefs.v`, `StackOwn.v`) and with **zero** consumer churn: every
+function proof, every `Spec*` file, and the whole Banach-fixpoint cone
+(`WpIntrInv`, `WpNext`, `WpSmodeIntr`, `UsertrapRes`, the `Proof*` trap
+files — 696 files recompiled) is byte-identical. `RiscvPtsto.v` needed
+nothing (`word_ktier_mono` was already there) and `WpSconfMem.v` was left
+alone (see the rebind note below).
+
+**WHAT GOT THE BINDER, AND THE RULE THAT DECIDES IT: a definition takes
+`` `{KTR : !CurKtier} `` iff its own `∗`-tree reaches a tier-dependent
+leaf.** In this family that is exactly the `stack_own` conjunct —
+`strans_inv` is the translation slot (physical tier: `bare_inv`,
+`tlb_res_pt`) and the SIE arm is ghost fractions plus per-hart registers,
+both tier-blind.
+
+| definition | binder | why |
+|---|---|---|
+| `sie_cap_of`, `sie_cap` | yes | hold `stack_own` directly |
+| `sie_cap_gpr_of`, `sie_cap_gpr`, `sie_cap_gpr_at` | yes | hold the capability |
+| `sie_arm_of`, `sie_arm` | **no** | no tier-dependent conjunct |
+| `ihs_entry_of` / `ihs_post_of` / `ihs_trap_of`, `ihs_of`, `ihs_pre`, `ihs`, `intr_handler_spec` | **no** | the fixpoint stays at the ambient default — see below |
+| `trap_csrs` and its `_raw`/`_pay`/`_ext` family, `intr_res`, `intr_count`, `arm_pay` | **no** | inspected: no `stack_own`, no `↦ₘ` tower anywhere in the chain |
+
+Every LEMMA whose statement mentions `sie_cap`/`sie_cap_gpr`/`stack_own`
+took the binder too and is thereby tier-generic with its text unchanged
+(`sie_cap_on_kpt`, `sie_cap_ktier_wit`, `sie_cap_intro_bare`,
+`sie_cap_gpr_at_close`/`_open`, `sie_cap_of_eq`, `sie_cap_gpr_of_eq`, the
+`IntoSep`/`FromSep` instances, `sie_cap_gpr_split`/`_join`/
+`_dup_hw_config`/`_kmap_claims`/`_x0`, and the whole sp algebra
+`sie_cap_retarget`/`_push`/`_pop`/`_grow`/`_shrink`).
+
+**DO NOT give a tier-blind definition the binder "for uniformity".** An
+instance-implicit argument its body never mentions is a phantom, and
+phantoms in this tier surface as shelved evars reported at `Qed` hundreds
+of lines from the cause (durable-notes, `co_license`). `sie_arm_of` is
+where that temptation sits; it is deliberately unindexed.
+
+**THE FIXPOINT NEEDED NO DECISION, AND THAT IS THE PAYOFF OF THE
+INSTANCE-IMPLICIT ROUTE.** `ihs_entry_of`/`ihs_post_of` name
+`sie_cap_gpr_of` bare; with no `CurKtier` in their binder list that
+resolves to `Ktier.curktier_default` (KT0) *at definition time*, so the
+recursion closes over a bundle at a CONSTANT tier and `ires_of`'s
+`Contractive` / `ihs_of`'s `NonExpansive` proofs are unchanged (the
+`rewrite /sie_cap_gpr_of /sie_cap_of /sie_arm_of; solve_proper` script
+still works — delta unfolding does not care about an implicit argument).
+No escalation was needed. When the trap contract does move to KT1, the
+binder goes on all three `ihs_*_of` at once and `ihs_of`/`ihs_pre`/`ihs`/
+`intr_handler_spec` follow; that IS a design decision and it is still open.
+
+**THE BUNDLE IS TIER-COVARIANT, AND THE MOVE COSTS NOTHING — which
+reshapes phase D's `sie_cap_ktier_up`.** New in `StackOwn.v`:
+
+```coq
+Lemma stack_ktier_mono `{!riscvGS Σ} (kt kt' : ktier) `{!KtierLe kt kt'} sp n :
+  stack_own (KTR := kt) sp n ⊢ stack_own (KTR := kt') sp n.
+```
+
+It must live **outside** `Section stack_own`: that section binds `KTR` as a
+`Context`, and a section-local definition is not parameterized over its own
+section variables, so `stack_own (KTR := kt)` written inside fails with
+*"Wrong argument name KTR"* — the same rule as the hart binder's
+("CpuId IS A CLASS, SO A CROSSING NEEDS A NEW SECTION"). **This is why the
+family members here take PER-DEFINITION binders rather than a section
+`Context`: `(KTR := kt)` has to be writable in the same section.**
+
+On top of it, in `IntrDefs.v`:
+
+```coq
+Lemma sie_cap_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} m avail b p :
+  sie_cap (KTR := kt) m avail b p -∗ sie_cap (KTR := kt') m avail b p.
+Lemma sie_cap_gpr_ktier_mono (kt kt' : ktier) `{!KtierLe kt kt'} m avail b p :
+  sie_cap_gpr (KTR := kt) m avail b p -∗ sie_cap_gpr (KTR := kt') m avail b p.
+Lemma sie_cap_ktier_up (kt kt' : ktier) `{!KtierLe kt kt'} m avail b p :
+  sie_cap (KTR := kt) m avail b p -∗ kpt_on cpu_id -∗
+  sie_cap (KTR := kt') m avail b p ∗ sr_ktier_wit strans_regime kt'.
+```
+
+`sie_cap_ktier_up` REPLACES phase D's unindexed lemma of the same name (no
+consumers existed). Note what the honest shape says: **`kpt_on` is NOT
+needed to move the index** — the receipt buys the WITNESS a KT1 *access*
+needs, not the tier of the fact. The two halves are independent
+(`sie_cap_ktier_mono` + `strans_ktier_wit_intro`); `sie_cap_ktier_up` is
+just the pairing kvminithart's exit wants, at `kt := KT0`, `kt' := KT1`.
+
+**`WpSconfMem.sie_ktier_wit_rebind` was NOT shrunk, and the KSTACK
+worklist's item 2 is wrong about why it could be.** Its `b = true` arm
+crosses a HART (the funnel rebinds `CID`), not a tier; the indexed bundle
+changes nothing there, and the arm's `kpt_on` is still the only thing that
+makes the witness free at the rebound hart. The shrink becomes possible
+only if the sconf leaves stop taking the witness as an explicit premise and
+read it off the capability instead — a separate increment that restates
+leaf signatures.
+
+**What the KSTACK campaign can now write.** A kstack-owning proof states
+`sie_cap (KTR := KT1) m avail b p` (or pins `Local Instance : CurKtier :=
+KT1` and keeps its ordinary spelling); it gets the whole sp algebra
+(`push`/`pop`/`grow`/`shrink`/`retarget`) and the bundle split/join at that
+tier for free, converts a boot capability up with `sie_cap_ktier_mono`, and
+pairs the conversion with the flip's receipt via `sie_cap_ktier_up`. The
+one thing it still cannot do is hand such a capability to the TRAP: the
+handler contract's bundle is pinned at KT0 by the fixpoint, so the first
+KSTACK step that needs a trap to be takeable on a kstack frame must first
+carry out the fixpoint's tier move above.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
   sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) and D are
-  LANDED; `main` is GREEN. NEXT: the KSTACK campaign — see "What the
-  KSTACK campaign needs next" at the end of the phase D findings.
+  LANDED, and so is the `sie_cap` tier index on top of them; `main` is
+  GREEN. NEXT: the KSTACK campaign — see "What the KSTACK campaign can now
+  write" at the end of the sie_cap tier index findings. The one design
+  question still open in this area is the TRAP CONTRACT's tier: the Banach
+  fixpoint's bundle is pinned at KT0 and moving it is a decision, not a
+  mechanical step.
 - The `sp-migration-red` quarry branch is DELETED: the identity-pin
   deviation (phase C findings) left nothing to mine from it.
 - `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch
