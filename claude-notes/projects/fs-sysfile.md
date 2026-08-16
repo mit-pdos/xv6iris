@@ -8664,18 +8664,64 @@ one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
-## S7-unlink — **IN FLIGHT.  Both blockers are CLOSED, the budget audit,
-## the REAL contract and the pure layer are landed and gated; the walk is
-## NOT started.**  sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
+## S7-unlink — **IN FLIGHT.  Both blockers are CLOSED; the budget audit,
+## the REAL contract, the pure+frame layer and EVERY EXIT BLOCK are landed
+## and gated.  What is left is the WALK ITSELF.**  sysfile.c stays 15/16
+## until `LinkSysUnlink.v` flips
 
 Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
 every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
 syscall-shaped placeholder whose body was `wp_syscall_sconf_body` with the
-entry pc changed), `ProofSysUnlinkParts.v` (the pure layer), and the
-`_CoqProject` rows.  `LinkSysUnlink.v` still supplies `SYSUNLINK` with an
-`Axiom`, now at the REAL shape.  `Print Assumptions` on every headline
-theorem in the budget file and in the parts file: **closed under the global
-context**.
+entry pc changed), `ProofSysUnlinkParts.v` (the pure layer **plus the frame
+carve and the epilogue**), `ProofSysUnlinkTails.v` (**every exit block**),
+and the `_CoqProject` rows.  `LinkSysUnlink.v` still supplies `SYSUNLINK`
+with an `Axiom`, now at the REAL shape.  `Print Assumptions` on every
+headline theorem in the budget file and in the parts file's PURE half:
+**closed under the global context**.
+
+### WHAT `ProofSysUnlinkParts.v`'s SECOND HALF ADDS — the frame and the exit
+
+`su_al` / `su_frame_carve` / `su_frame_join` (the thirty-slot carve),
+`su_bytes_name` / `su_name_bytes` / `su_buf_split` / `su_buf_join` /
+`su_nm_split` / `su_nm_join` (the four byte windows), `su_off_split` /
+`su_off_join` (slot 27's UPPER word), and `su_epilogue` (+0x168..+0x16e).
+**Slot 27's own alignment is deliberately NOT a conjunct of `su_al`**: it
+comes off the points-to (`word_pointsto_aligned_p`) at the one site that
+splits it, exactly as sys_open's omode cell does — which is why `su_al` is
+four byte-window clauses and nothing else.
+
+### `ProofSysUnlinkTails.v` — the eight exit lemmas
+
+A functor over `Iunlockput` and `EndOp`, and over nothing else: no exit arm
+applies any other contract.
+
+| lemma | block | what it owns |
+|---|---|---|
+| `su_tail_a` | +0x170..+0x172 | a0 = -1, j the epilogue.  NO callee, so its crossing index is `b`, not `true`; no log unit, no reference, no callee-saved slot |
+| `su_tail_b` | +0x0e2..+0x0ea | end_op ; a0 = -1 ; reload s1 ; j the epilogue |
+| `su_tail_bad` | +0x15a..+0x166 | iunlockput(dp) ; end_op ; a0 = -1 ; reload s1 ; FALL into the epilogue |
+| `su_tail_d` | +0x158 | reload s2, then fall into `bad:` |
+| `su_tail_e` | +0x174..+0x17e | iunlockput(ip) ; reload s2 and s3 ; j `bad:` |
+| `su_panic_nlink` / `_readi` / `_writei` | +0x0ec / +0x12e / +0x13a | three instructions each, closed by `panic_wp_any` |
+
+Three things the walk inherits from them and should not re-derive:
+
+* **TWO ENTRIES INTO ONE TAIL ARE TWO LEMMAS.**  ARM D and ARM E both end
+  inside `bad:` but arrive holding different things — D has never locked
+  `ip` and E is still holding it — so the block is `su_tail_bad` and each
+  entry is its own lemma applying it.  `su_tail_bad` therefore takes its
+  s2/s3 equations as PREMISES and its slots 4/5 at existential words, which
+  is what lets ARMS C and C' apply it with nothing reloaded at all.
+* **EVERY ARM HERE CALLS THE *COUNTED* `wp_iunlockput_sconf`, and that is
+  the ledger's word rather than an approximation.**  Every route into
+  `bad:` is ABOVE the zeroing `writei`, so nothing has logged `IBLOCK dp`,
+  no arm holds a credit, and none of them holds an `ilink` either — the
+  release happens at the zeroing and every branch into `bad:` is above it.
+* **ARM E's PREMISE IS `2 * iput_units <= u`**, six against the nine or ten
+  the op still holds.  That is `su_bad_isdirempty_closes` read through the
+  counted contract's INTERVAL (`n - iput_units <= n' <= n`) instead of
+  through `ip_spend_w`; the counted reading is strictly weaker and it is
+  enough, because neither free is credited.
 
 `K_sys_unlink = 134` (a thirty-slot frame over nameiparent's 104),
 `sys_unlink_slots = 2`, `sys_unlink_ret r := r = -1 \/ r = 0`.
@@ -8756,10 +8802,51 @@ is the UPPER word of slot 27, the function's one non-slot-aligned address.
 
 ### WHAT THE WALK STILL OWES — the exact next action
 
-`ProofSysUnlinkTails.v` (the exit blocks: ARM A, ARM B, the shared `bad:`
-tail with ARM D's and ARM E's two entries into it, and the three panic
-arms, all closed by `panic_wp_any`), then `ProofSysUnlink.v` (the block
-lemmas and the seal), then `LinkSysUnlink.v` becomes
+`ProofSysUnlink.v` — the WALK and the seal, and nothing else is owed before
+it.  The walk's own decomposition, with every exit already in hand:
+
+* **W1, +0x00..+0x2e** — the prologue and the push, `su_frame_carve`,
+  `li a2,128` / `addi a1,s0,-208` / `c.li a0,0` / `jal argstr`, the `bltz`
+  at +0x16 (**`su_tail_a`**), the shrink-wrapped `c.sdsp s1` at +0x1a,
+  `jal begin_op`, `addi a1,s0,-80` / `addi a0,s0,-208` / `jal nameiparent`
+  (the **gen** contract, `wp_nameiparent_gen`, for its `w` pay-bit), the
+  `c.mv s1,a0` and the `beqz` at +0x2e (**`su_tail_b`**).  Build a
+  `su_regs` bundle FIRST — `ProofSysLink.sl_regs`' shape at five registers
+  (sp, s0, s1, s2, s3) with `su_thr` as the fifth conjunct, plus
+  `_caller` / `_cs` / `_wr_sN` movers; the per-register `assert` chain the
+  tails use is the same proof three times as long, and at five registers it
+  is worse.  `proc_priv_split_cwd` + `proc_priv_nocwd_cwd_pid` +
+  `cwd_ref_held` is how the process block is opened for the walker, and it
+  stays open until the arm that rebuilds it.
+* **W2, +0x30..+0x6e** — `ilock(dp)`, the two `namecmp` refusals (both
+  branch to `bad:`, i.e. **`su_tail_bad`** with nothing reloaded),
+  `c.sdsp s2` at +0x5c, `dirlookup(dp,name,&off)` (the `off` cell is
+  `su_off_split`'s UPPER word), the `beqz` at +0x6e (**`su_tail_d`**).
+* **W3, +0x72..+0x88** — `c.sdsp s3`, `ilock(ip)`, the `blez` at +0x7c
+  (**`su_panic_nlink`**; its FALL-THROUGH is the only source of
+  `di_nlink ip <> 0`), the T_DIR test at +0x86.
+* **W4, +0x0f8..+0x12c** — the inlined isdirempty, a block lemma whose
+  invariant is `DirView.dir_dots_only` on the SCANNED PREFIX; the short
+  read is **`su_panic_readi`**, the live-record exit is **`su_tail_e`**,
+  and the empty exit rejoins +0x8a.
+* **W5, +0x8a..+0x0d8** — `memset(&de,0,16)`, `writei(dp,0,&de,off,16)`
+  (**`su_panic_writei`** on the short write), where `dir_links_unlink`
+  fires CALLER-side and releases the `ilink`; the second T_DIR test at
+  +0xb4 and the +0x146 tail's `dp->nlink--` (spending the `".."` ticket the
+  `dir_dots_ix` + `fdir_dots_index` + `dir_links_dotdot_out` chain names);
+  `iunlockput(dp)` CREDITED; `ip->nlink--` + `wp_iupdate_unlink`;
+  `iunlockput(ip)`; `end_op`; a0 = 0 and the three reloads at +0xda..+0xde,
+  then `c.j` into `su_epilogue`.
+
+**THE THREE FIRST-CONSUMER VERDICTS ARE STILL OWED, and they are owed by W4
+and W5 alone.**  `DirLinks.dir_links_unlink`, `DirLinks.dir_link_at_zeroed`
+and the `dir_dots_ix` / `fdir_dots_index` / `dir_links_dotdot_out` trio have
+NO compiled consumer until `ProofSysUnlink.v` lands.  Nothing in the exit
+blocks touches any of them — every branch into an exit is above the zeroing
+— so the tails file is not evidence either way, and its green is not a road
+test of the fragment campaign.
+
+Then `LinkSysUnlink.v` becomes
 `Module SysUnlink := SysUnlinkProof Argstr BeginOp Nameiparent Ilock
 Namecmp Dirlookup Memset Readi Writei Iupdate Iunlockput EndOp.` and the
 coverage flips 186 -> 187, sysfile.c 15/16 -> **16/16 COMPLETE**, retiring
@@ -8803,7 +8890,17 @@ rather than discovered inside one.
 
 Lane `/shared/xv6iris-u7` on the mirror — a `cp -a` of the PASS-2-gated
 `/shared/xv6iris-p2` at `09281a86`, verified at staleness 0 (`make -n`
-emits 0 compile lines) BEFORE any edit.  The reverse cone of the four
+emits 0 compile lines) BEFORE any edit, and RE-verified at the start of
+each later increment by md5'ing all seven of its sys_unlink files against
+the working tree as a block.  The frame/epilogue increment and the tails
+increment each compiled `EXIT=0` with zero `Error` lines; afterwards
+**1154 `.vo` for 1154 `.v`**, `make -n` emits 0 compile lines,
+`proof_coverage.py --check` exits 0 with the new row, `lemma_diff` CLEAN.
+Coverage **186/190, sysfile.c 15/16 — unmoved**.  `ProofSysUnlinkParts.v`
+has exactly one consumer (`ProofSysUnlinkTails.v`) and the tails file has
+none, so both cones are closed by hand.
+
+The contract-and-pure-layer increment's own gate, which still stands:  The reverse cone of the four
 touched files is exactly `{SpecSysUnlink, ProofSysUnlinkParts,
 LinkSysUnlink, ProofSyscall}` (`grep -l` over every `.v`), and every one of
 them was rebuilt from a DELETED `.vo`, `MAKEEXIT=0`, zero `Error` lines.

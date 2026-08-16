@@ -726,7 +726,12 @@ file will take out the wrong one.
 facts the algebra could not supply, and both are closed below — one by the
 kernel fix, one by the payload passes.  The walk that SPENDS the ticket is
 still being written, so `dir_links_unlink` has no compiled consumer yet:
-that verdict is owed when `ProofSysUnlink.v` lands.  The full record is in
+that verdict is owed when `ProofSysUnlink.v` lands.  **`ProofSysUnlinkTails.v`
+does not discharge it and never could** — every branch into an exit block is
+ABOVE the zeroing `writei`, so no exit arm holds an `ilink` at all.  The same
+is true of `dir_link_at_zeroed` and of the `dir_dots_ix` /
+`fdir_dots_index` / `dir_links_dotdot_out` trio: all three are spent inside
+the walk's W4/W5 blocks and nowhere else.  The full record is in
 [`fs-sysfile.md`](fs-sysfile.md), "S7-unlink"; what belongs here is what it
 asks of the campaign.
 
