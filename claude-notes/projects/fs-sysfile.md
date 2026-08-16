@@ -8664,16 +8664,120 @@ one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
-## S7-unlink — **STOPPED, AND WAITING ON THE PIN BUMP.**  The budget audit
-## LANDS and every arm closes.  The success arm was blocked on TWO resource
-## facts; the first is RULED and fixed in the C (`sys_link`'s missing
-## guard, xv6-riscv `verified` `f60ff58`), the second — §20.17.4's
-## `".."`-location fact — is the one open design item.  No
-## `Spec`/`Proof`/`Link` file was written and nothing landed moved
+## S7-unlink — **IN FLIGHT.  Both blockers are CLOSED, the budget audit,
+## the REAL contract and the pure layer are landed and gated; the walk is
+## NOT started.**  sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
 
-`SysUnlinkBudget.v` (+ its `_CoqProject` row) is the whole of what landed.
-`Print Assumptions` on every headline theorem in it: **closed under the
-global context**.
+Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
+every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
+syscall-shaped placeholder whose body was `wp_syscall_sconf_body` with the
+entry pc changed), `ProofSysUnlinkParts.v` (the pure layer), and the
+`_CoqProject` rows.  `LinkSysUnlink.v` still supplies `SYSUNLINK` with an
+`Axiom`, now at the REAL shape.  `Print Assumptions` on every headline
+theorem in the budget file and in the parts file: **closed under the global
+context**.
+
+`K_sys_unlink = 134` (a thirty-slot frame over nameiparent's 104),
+`sys_unlink_slots = 2`, `sys_unlink_ret r := r = -1 \/ r = 0`.
+
+**THE TWO BLOCKERS BOTH CLOSED, AND NEITHER IS SOMETHING THE WALK MUST
+ARRANGE.**  Finding 1's home-live premise comes from `DirView.dir_orphan_clean`
+(in the escrow payloads since PASS 2) against the two `namecmp` refusals;
+finding 2's `".."` `ilink dp` comes from `DirView.dir_dots_ix` +
+`FsLookup.fdir_dots_index` + `DirLinks.dir_links_dotdot_out`, whose
+`di_nlink ip <> 0` guard is the kernel's own `blez` at +0x7c.  The pin is
+`f60ff58`, which is what makes the strong isdirempty clause true of the
+binary.  Both findings are kept below for the READING of why a name-blind
+ledger needed a payload conjunct.
+
+### THE ARM GRAPH, verified instruction by instruction against the tracked
+### `kernel.asm` and `CodeSysUnlink.v` at `f60ff58`
+
+`KernelSyms.sys_unlink` = 0x80004f34, **384 bytes / 129 instructions**, a
+THIRTY-slot frame (`c.addi16sp sp,-240` at +0x00, `c.addi4spn s0,sp,240` at
++0x06).  Symbol-relative, so a bump that does not reshape the function
+leaves all of it standing.
+
+    +0x12  jal argstr (a0=0, a1=path, a2=128)
+    +0x16  bltz a0 -> +0x170                    [ARM A] no begin_op, -1
+    +0x1a  c.sdsp s1,216                        (s1 saved LATE)
+    +0x1c  jal begin_op
+    +0x28  jal nameiparent(path, name); s1 = dp
+    +0x2e  beqz a0 -> +0xe2                     [ARM B] end_op; -1
+    +0x30  jal ilock(dp)
+    +0x40  jal namecmp(name, ".")
+    +0x44  beqz a0 -> +0x15a                    [ARM C]  -> bad:
+    +0x54  jal namecmp(name, "..")
+    +0x58  beqz a0 -> +0x15a                    [ARM C'] -> bad:
+    +0x5c  c.sdsp s2,208                        (s2 saved LATER)
+    +0x68  jal dirlookup(dp, name, &off); s2 = ip
+    +0x6e  beqz a0 -> +0x158                    [ARM D] reload s2, fall to bad:
+    +0x72  c.sdsp s3,200                        (s3 saved LATER STILL)
+    +0x74  jal ilock(ip)
+    +0x78  lh a5,74(s2) ; +0x7c blez a5 -> +0xec   [panic "unlink: nlink < 1"]
+    +0x80  lh a4,68(s2) ; +0x86 beq a4,1 -> +0xf8  [the isdirempty block]
+    +0x8a  addi s3,s0,-64 ; memset(&de,0,16)
+    +0xa4  jal writei(dp, 0, &de, off, 16)
+    +0xaa  bne a0,16 -> +0x13a                  [panic "unlink: writei"]
+    +0xae  lh a4,68(s2) ; +0xb4 beq a4,1 -> +0x146  [the T_DIR tail]
+    +0xb8  jal iunlockput(dp)
+    +0xbe  lhu/addiw -1/sh 74(s2)               ip->nlink--
+    +0xca  jal iupdate(ip) ; +0xd0 jal iunlockput(ip) ; +0xd4 jal end_op
+    +0xd8  li a0,0 ; reload s1,s2,s3 ; j +0x168 [ARM S]
+    ---- the inlined isdirempty, +0x0f8..+0x12c ----
+    +0xf8  lw a4,76(s2) ; li a5,32
+    +0x100 bgeu a5,a4 -> +0x8a                  (size <= 32: EMPTY, fall through)
+    +0x104 mv s3,a5                             (off = 32)
+    +0x106 [body] readi(ip, 0, &de@s0-232, s3, 16)
+    +0x118 bne a0,16 -> +0x12e                  [panic "isdirempty: readi"]
+    +0x11c lhu a5,-232(s0) ; +0x120 bnez a5 -> +0x174   [ARM E] NOT empty
+    +0x122 addiw s3,s3,16 ; +0x124 lw a5,76(s2)
+    +0x128 bltu s3,a5 -> +0x106                 (the back edge)
+    +0x12c j +0x8a                              (EMPTY)
+    ---- the T_DIR tail, +0x146..+0x156 ----
+    +0x146 lhu/addiw -1/sh 74(s1)               dp->nlink--
+    +0x152 jal iupdate(dp) ; +0x156 j +0xb8
+    ---- the exits ----
+    +0x158 ld s2,208(sp)                        [ARM D's entry into bad:]
+    +0x15a bad:  iunlockput(dp) ; end_op ; li a0,-1 ; ld s1 ; fall to +0x168
+    +0x168 epilogue: ld ra ; ld s0 ; addi sp,sp,240 ; ret
+    +0x170 li a0,-1 ; j +0x168                  [ARM A]
+    +0x174 iunlockput(ip) ; ld s2 ; ld s3 ; j +0x15a   [ARM E]
+
+The frame map, the two `de` buffers and the shrink-wrapped saves are in
+`SpecSysUnlink.v`'s header; the pure-layer facts each arm needs are in
+`ProofSysUnlinkParts.v`'s.
+
+**THE THREE DECODE FACTS THAT ARE NOT sys_link's**, all paid for in the
+parts file: both `nlink--`s are `lhu` (one cluster, not two); the panic
+guard is a `blez`, i.e. a `bge` with **x0 in rs1**, so the leaf is
+`WpSconfBtype.wp_bge_x0_*` and not `wp_bge_*`; and `uint off` at `s0-212`
+is the UPPER word of slot 27, the function's one non-slot-aligned address.
+
+### WHAT THE WALK STILL OWES — the exact next action
+
+`ProofSysUnlinkTails.v` (the exit blocks: ARM A, ARM B, the shared `bad:`
+tail with ARM D's and ARM E's two entries into it, and the three panic
+arms, all closed by `panic_wp_any`), then `ProofSysUnlink.v` (the block
+lemmas and the seal), then `LinkSysUnlink.v` becomes
+`Module SysUnlink := SysUnlinkProof Argstr BeginOp Nameiparent Ilock
+Namecmp Dirlookup Memset Readi Writei Iupdate Iunlockput EndOp.` and the
+coverage flips 186 -> 187, sysfile.c 15/16 -> **16/16 COMPLETE**, retiring
+the tree's last stub `Axiom`.
+
+Three shape decisions the walk inherits and should not re-litigate:
+
+* **THE FRAME CARVE IS ARM-DEPENDENT** (sys_open's shape, not sys_link's):
+  the three saves are shrink-wrapped at +0x1a / +0x5c / +0x72 and each exit
+  restores exactly its own subset.  ARM A owns no callee-saved slot at all.
+* **THE isdirempty LOOP IS A BLOCK LEMMA, and its invariant is
+  `DirView.dir_dots_only` restricted to the scanned prefix** — the loop
+  exit IS the payload clause and `dir_orphan_clean_of_only` lifts it.
+  `readi` takes no log resource, so the loop is free in the ledger; its
+  short-read arm is `panic_wp_any` and never returns.
+* **`s3` IS DUAL-USE** — isdirempty's `off` counter, then the address of
+  writei's `de` — which is why it is saved before `ilock(ip)` and reloaded
+  on every arm at or below the isdirempty test.
 
 ### FINDING 0 — **`isdirempty` HAS NO SYMBOL.  It is inlined into
 ### sys_unlink, so there is no `CodeIsdirempty.v`, no contract, no
@@ -8801,37 +8905,29 @@ loop, `ip`'s live records are among indices 0 and 1, index 0's ticket is
 `emp` if it is the self-record — but the inum at index 1 is unconstrained
 by any landed statement, so the `ilink` it holds is for an unknown target.
 
-### WHAT THE RESUME OWES
+### THE TWO CLAUSES THE WALK SPENDS, and what each hands back
 
-Provable with what is landed: ARM A (`argstr < 0`), ARM B (`nameiparent`
-returns 0), ARMs C/D (the two `namecmp` guards and `dirlookup` returning
-0), ARM E (the `T_DIR && !isdirempty` refusal), and the whole isdirempty
-loop including its panic arm.  Everything from the `writei` down waits on
-two things, in this order:
+Both ride in `IcacheEscrow.ipool_alloc` and `ic_loaded` since the payload
+passes, and between them they partition the directory case:
 
-1. **the pin bump** carrying `f60ff58`, after which finding 1's premise is
-   derivable and the T_FILE success arm is unblocked;
-2. **finding 2's payload conjunct — LANDED.**  Both halves now ride in
-   `IcacheEscrow.ipool_alloc` and `ic_loaded`:
-   `DirView.dir_dots_ix` (PASS 1) and `DirView.dir_orphan_clean` (PASS 2),
-   which between them partition the directory case.  **Two things S7 must
-   read before spending the `ilink`:** the index clause is guarded by
-   `T_DIR` **and** `di_nlink <> 0`, so S7 supplies the liveness from the
-   kernel's own `if(ip->nlink < 1) panic("unlink: nlink < 1")` — walked
-   before the zeroing, like the two `namecmp` refusals — and in exchange
-   the clause HANDS BACK `2 <= dir_nrec (di_size ip)`, so
-   `dir_links_dotdot_out` takes no record-count premise and the
-   `isdirempty` loop does not have to establish one.  **Finding 1's
-   home-live premise now has its supplier too**: `dir_orphan_clean` says
-   an orphaned directory holds only dot records, so a live NON-dot record
-   — which is exactly what the two `namecmp` refusals hand the walk —
-   forces `di_nlink dp <> 0`, i.e. `DirLinks.dir_links_unlink`'s premise,
-   without any guard sys_unlink does not have.  Nothing in the campaign
-   gates the walk any more; see
-   [`fs-fragments-campaign.md`](fs-fragments-campaign.md), "PASS 2".
+* `DirView.dir_dots_ix` (PASS 1) is the `nlink <> 0` half, guarded by
+  `T_DIR` **and** `di_nlink <> 0`.  S7 supplies the liveness from the
+  kernel's own `blez` at +0x7c, walked before the zeroing like the two
+  `namecmp` refusals; in exchange the clause HANDS BACK
+  `2 <= dir_nrec (di_size ip)`, so `dir_links_dotdot_out` takes no
+  record-count premise and the isdirempty loop does not have to establish
+  one.
+* `DirView.dir_orphan_clean` (PASS 2) is the `nlink = 0` half: an orphaned
+  directory holds only dot records, so the live NON-dot record the two
+  `namecmp` refusals hand the walk forces `di_nlink dp <> 0`, which is
+  `DirLinks.dir_links_unlink`'s home-live premise — without any guard
+  sys_unlink does not have.
 
-The contract was deliberately not written first: fixing a postcondition
-around an arm nobody can reach is what the D₀ stops exist to prevent.
+See [`fs-fragments-campaign.md`](fs-fragments-campaign.md), PASS 1 + PASS 2.
+
+**The contract was deliberately not written until both were landed**:
+fixing a postcondition around an arm nobody can reach is what the D₀ stops
+exist to prevent.  It is written now because every arm is reachable.
 
 ## S7-open — **DONE.  sys_open is proven, sealed and linked.**
 
@@ -8841,7 +8937,7 @@ around an arm nobody can reach is what the D₀ stops exist to prevent.
 `rv64d.cancel_reservation`, `functional_extensionality_dep`) plus
 `LinkCreateFreshTy.CreateFreshTy.create_fresh_ty`, which comes in through
 create's ialloc and through nothing else.  Coverage: **185/190 proven**,
-sysfile.c **15/16** — only sys_unlink is left, and it is STOPPED above.
+sysfile.c **15/16** — only sys_unlink is left, and it is IN FLIGHT above.
 
 Six files: `SysOpenBudget.v` (the op-wide log ledger), `SpecSysOpen.v`,
 `ProofSysOpenParts.v`, `ProofSysOpenTails.v`, `ProofSysOpen.v` and

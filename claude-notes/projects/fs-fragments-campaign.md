@@ -721,11 +721,14 @@ file will take out the wrong one.
 
 ## F1.5b's FIRST-CONSUMER VERDICT (S7-unlink's road test)
 
-**The constructor's SHAPE fits; its PREMISE SET does not.**  `sys_unlink`
-is F1.5b's designated first consumer and it stopped before writing a
-contract, on two facts the algebra cannot supply.  The full record is in
-[`fs-sysfile.md`](fs-sysfile.md), "S7-unlink — STOPPED"; what belongs here
-is what it asks of the campaign.
+**The constructor's SHAPE fits, and its PREMISE SET now has suppliers.**
+`sys_unlink` is F1.5b's designated first consumer; the road test found two
+facts the algebra could not supply, and both are closed below — one by the
+kernel fix, one by the payload passes.  The walk that SPENDS the ticket is
+still being written, so `dir_links_unlink` has no compiled consumer yet:
+that verdict is owed when `ProofSysUnlink.v` lands.  The full record is in
+[`fs-sysfile.md`](fs-sysfile.md), "S7-unlink"; what belongs here is what it
+asks of the campaign.
 
 ### What fitted, verbatim
 
@@ -762,18 +765,17 @@ bought only `sys_unlink`'s own zeroing and left §20.6's itrunc row open,
 whereas the strong invariant discharges both.  fs-icache.md §20.17.4
 sharpening (b)'s name-blindness therefore STANDS.
 
-### AMENDMENT ASKED FOR (2): the `".."`-location fact needs a SUPPLIER,
-### not just a reading
+### AMENDMENT (2) IS CLOSED TOO — the `".."`-location fact has its SUPPLIER
 
 The T_DIR arm's `dp->nlink--` needs an `ilink dp`, whose only home is
-`ip`'s `".."` record — fs-icache.md §20.17.4's "S7's blocker", still open.
-`FsRep.fnode_dotdot` is the right READING but not a supplier: `fnode` is a
-derived predicate over client-held fragments (R3) and no payload hands one
-out, so nothing bridges "`ents ip !! ".."` is `dp`" to "record `k` of
-`ip`'s data names `dp`".  §20.17.4's own prescription — a payload conjunct
-beside `dir_links`, established at create's `dirlink(ip, "..", dp->inum)`
-— is what is missing, and it is the same conjunct amendment (1) wants for
-the grey clause.  **Both blockers close in one place.**
+`ip`'s `".."` record.  `FsRep.fnode_dotdot` was the right READING and not a
+supplier; what supplies it is the PAYLOAD conjunct `DirView.dir_dots_ix`
+(PASS 1) joined to the tree half by `FsLookup.fdir_dots_index`, whose
+answer feeds `DirLinks.dir_links_dotdot_out`.  Both blockers closed in one
+place, as predicted, and the guard the join carries (`T_DIR` **and**
+`di_nlink <> 0`) is discharged at the walk from the kernel's own
+`if (ip->nlink < 1) panic` — see the `".."` INDEX BRIDGE and F2 sections
+above, and `fs-sysfile.md`'s S7-unlink entry.
 
 ### THE isdirempty INVARIANT, stated — F1.5d's PLANK, and true of the
 ### FIXED binary
