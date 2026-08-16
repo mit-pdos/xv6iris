@@ -129,6 +129,14 @@ Qed.
 
 Section stack_own.
   Context `{!riscvGS Σ}.
+  (* The ambient TIER.  [stack_own] is a plain NAME (no notation) used
+     textually at ~330 sites, so the tier rides in as an instance-implicit
+     argument rather than as a positional one: [stack_own sp n] is
+     unchanged everywhere, and a file that pins [CurKtier] gets its stack
+     at that tier.  Every lemma in this section is thereby tier-generic --
+     the boot stack (KT0, the identity-mapped [stack0]) and a KSTACK frame
+     (KT1) share one algebra, which is the whole point of the project. *)
+  Context `{KTR : !CurKtier}.
 
   (* Ownership of the [n] eight-byte stack slots just below [sp], region
      [sp-8n, sp), with existential (scratch) contents.  Slot [i] (0-based,
