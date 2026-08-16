@@ -8664,12 +8664,11 @@ one of the ~20 `Wp*` leaf STATEMENTS a whole-function walk applies moved.
 When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
-## S7-unlink — **IN FLIGHT, AND STOPPED ON THE T_DIR ARM.**  The budget
-## audit, the REAL contract, the pure+frame+register layer, EVERY EXIT
-## BLOCK and the WALK's first two blocks `su_w1` and `su_w2` are landed
-## and gated.  W3–W5 are unwritten and the walk cannot be finished as
-## designed: **FINDING 3 below is a missing MODEL fact, not a proof
-## obligation.**  sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
+## S7-unlink — **IN FLIGHT, W5 IS THE LAST BLOCK.**  The budget audit, the
+## REAL contract, the pure+frame+register layer, EVERY EXIT BLOCK and the
+## walk's blocks `su_w1`..`su_w4` (W1, W2, W3, W4) are landed and gated;
+## V2's landing LIFTED the T_DIR stop, so both halves of W5 are writable.
+## sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
 
 Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
 every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
@@ -9024,6 +9023,52 @@ compile, in-functor): see the increment's commit message; `su_w4` names
 `EndOp` module parameters at most, and **no `dir_*` fragment lemma** —
 verdicts #1/#3 are exactly as open as before, W5's to record.  Coverage
 **186/190, sysfile.c 15/16 — unmoved**.
+
+### W3 IS LANDED — `su_w3`, AND THE +0x8a SEAM IS THE ISDIR-INDEXED ONE
+
+`ProofSysUnlink.su_w3` covers +0x72..+0x88 exactly as recorded: the
+`c.sdsp s3` (slot 5 fills with the CALLER's s3), `ilock(ip)` at a
+generation named by `inode_ref_gen_intro` + `su_shed_gen` off dirlookup's
+`inode_ref`, the `blez` at +0x7c (`Tails.su_panic_nlink` on the taken arm;
+the fall-through's `su_signed_pos_nz` is the seam's unconditional
+`di_nlink ip <> 0`), and the T_DIR `beq` at +0x86.  It sits AFTER `su_w4`
+in the file because the T_DIR arm applies it.
+
+* **The T_DIR arm instantiates `su_w4`'s `X` by `iCombine` of the whole
+  residue** — dp's bundle, ip's non-loop pieces, the ledger, the frame,
+  the proc-closer wand, AND both continuations (the +0x8a seam and the
+  caller's exit) — with the `X` argument passed as `_` and pinned by the
+  spec pattern.  `su_w4_exitE` destructs it, repacks BOTH `ic_loaded`s and
+  closes by `Tails.su_tail_e` (its `2 * iput_units <= u` is `su_u1_ge9`
+  against `iput_units`, `lia`); `su_w4_exitD` and the non-dir fall-through
+  both land on the +0x8a seam.
+* **The +0x8a seam** ∀-binds `M3 s3x bex isdir gili gisli gyi si qsi dni
+  bmi dati`: `su_regs` with s3 existential, `di_nlink dni <> 0`, ip's
+  `inode_ok`/`dir_ok`/`dir_dots_ix`/`dir_orphan_clean`, and ONE
+  isdir-indexed payload (`true`: `T_DIR_z` ∧ `dir_dots_only` ∧ the raw
+  dead-scan; `false`: the type disequality).  dp's bundle and pure facts
+  do NOT re-cross — they are su_w3's own premises, still in the composer's
+  scope.  Slot 5 crosses FILLED with `m !!! Rs3`; slot 27 stays split.
+* **A wand parked in `X` is shifted at its use site with
+  `proc_addr_nonzero`, never `wp_next_chain`** — the exit harts are
+  ∀-bound with NO chain facts in scope, and every parked `wp_next` is at
+  the literal `true` with a nonzero process address, so the shift's
+  premise is refuted (`ProofSleep`:792's pattern).  This is the one new
+  mechanism W3 adds and W5's composer inherits it.
+* One trap: the `blez` case split must be `Z.le_gt_cases` shaped so each
+  branch's side condition is `exact`-closed (`su_nlink_pos_taken` /
+  `_fall`); a `lia` inside the branch-condition `ltac:()` dies with
+  *"Cannot find witness"* even with the ordering fact in scope.
+
+`Print Assumptions su_w3` (gate compile, in-functor): the standing six +
+`Ilock.wp_ilock_sconf`, `Readi.wp_readi_sconf` (through `su_w4`),
+`Iunlockput.wp_iunlockput_sconf` + `EndOp.wp_end_op_sconf` (through
+`Tails.su_tail_e` / `su_panic_readi`) — and **no `dir_*` fragment lemma**:
+verdicts #1/#3 are still W5's to record.  Gated on lane
+`/shared/xv6iris-u7` at `178e6c61`, then RE-GATED on V2's `91679929` (the
+five in-chain V2 files re-synced, 26-file chain remake, `MAKEEXIT=0`, zero
+`Error`) — `su_w3` needed **no adaptation**: it names `dir_links` only
+opaquely.  Coverage **186/190, sysfile.c 15/16 — unmoved**.
 
 ### WHAT THE WALK STILL OWES — the exact next action
 

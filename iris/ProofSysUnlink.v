@@ -3243,6 +3243,717 @@ Section ProofSysUnlinkBody.
                       HcE HcD HX").
   Qed.
 
+  (* ================================================================== *)
+  (*  W3: +0x72 .. +0x88 -- [c.sdsp s3], [ilock(ip)], the [blez] panic    *)
+  (*  guard and the T_DIR test at +0x86.                                  *)
+  (*                                                                     *)
+  (*    +0x72 c.sdsp s3,200(sp)       (the THIRD shrink-wrapped save)    *)
+  (*    +0x74 jal ilock               (a0 = ip, dirlookup's return)       *)
+  (*    +0x78 lh a5,74(s2)            (ip->nlink)                        *)
+  (*    +0x7c blez a5 -> +0xec        [panic "unlink: nlink < 1"]        *)
+  (*    +0x80 lh a4,68(s2) ; +0x84 c.li a5,1                              *)
+  (*    +0x86 beq a4,a5 -> +0xf8      (the T_DIR arm: [su_w4])           *)
+  (*                                                                     *)
+  (*  THE [blez] FALL-THROUGH IS THE ONLY SOURCE OF [di_nlink ip <> 0],   *)
+  (*  and it crosses the +0x8a seam unconditionally: every route to       *)
+  (*  +0x8a is below it.                                                 *)
+  (*                                                                     *)
+  (*  THE T_DIR ARM APPLIES [su_w4], instantiating its opaque [X] with    *)
+  (*  dp's bundle, the ledger, the frame and BOTH continuations (the      *)
+  (*  +0x8a seam and the caller's exit).  [su_w4_exitE] destructs [X],    *)
+  (*  repacks BOTH [ic_loaded]s and closes through [Tails.su_tail_e]      *)
+  (*  (its [2 * iput_units <= u] is [su_u1_ge9] against [iput_units]);    *)
+  (*  [su_w4_exitD] and the non-dir fall-through both land on the         *)
+  (*  isdir-indexed +0x8a seam below, with [ip]'s bundle ∀-bound.         *)
+  (*                                                                     *)
+  (*  THE EXIT CONTINUATIONS SHIFT THE CALLER'S [wp_next] WITH NO CHAIN   *)
+  (*  FACTS IN SCOPE: the exit harts are ∀-bound, so the shift's premise  *)
+  (*  is discharged by [proc_addr_nonzero] (the index is the literal      *)
+  (*  [true] and the process address is not zero), never by               *)
+  (*  [wp_next_chain].                                                   *)
+  (* ================================================================== *)
+  Lemma su_w3 `{GEN : GenId} `{CID0 : CpuId}
+      (gf ga : gname)
+      (gs : list gname) (jx : nat) (gl : gname)
+      (gu : uart_names) (gd : disk_names) (gk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (g : log_names) (gfs : fs_names) (gi : gname)
+      (cn : ic_names) (gtl : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z) (dev : mword 32) (used1 : gset Z)
+      (dqb dqs dqbs : dfrac)
+      (pid : mword 32) (V : pprivate) (P1 : uptd)
+      (n1 : nat) (Sb1 : gset Z) (w1 : bool)
+      (kd ks kk : nat) (gild gisld gyd : gname) (qdi sd qs : Qp)
+      (dinum : mword 32) (dnd : dinode) (bmd : blkmap)
+      (datd : nat -> list (bv 8)) (lo : bv 32)
+      (nf bnm0 bp bd be : nat -> bv 8)
+      (w5 w6 w30 : mword 64)
+      (m M2 : regfile) (sp0 : mword 64) (K : nat) (eb b : bool)
+      (lks : gset string) :
+    (K_sys_unlink <= K)%nat ->
+    dev = icfg_dev ->
+    nib = icfg_nib ->
+    inodestart = icfg_ist ->
+    (0 < nib)%nat ->
+    log_geom_ok cov logstart ->
+    0 < size <= BPB ->
+    0 <= bmapstart ->
+    bmapstart ∈ cov ->
+    ~ (bmapstart ∈ log_region_set logstart) ->
+    0 <= inodestart ->
+    cov_below cov size ->
+    ireg_blocks_ok inodestart nib cov logstart ->
+    (jx < NPROC)%nat ->
+    gs !! jx = Some gl ->
+    eb = true ->
+    sp0 = (m !!! Regidx csp_rs1 : mword 64) ->
+    su_al sp0 ->
+    (su_u1 w1 <= n1)%nat ->
+    uptd_ext (pv_upt V) P1 ->
+    (* ---- the +0x72 seam's pure facts, verbatim ---- *)
+    su_regs m sp0 (ientry kd) (ientry ks)
+            (m !!! Regidx Rs3 : mword 64) M2 ->
+    (kd < NINODE)%nat ->
+    (ks < NINODE)%nat ->
+    bv_unsigned dinum < 16 * Z.of_nat nib ->
+    di_type dnd = SpecDirlookup.T_DIR ->
+    inode_ok cov logstart dnd bmd datd ->
+    dir_ok icfg_nib dnd datd ->
+    dir_dots_ix (bv_unsigned dinum) dnd datd ->
+    dir_orphan_clean dnd datd ->
+    bname 14 nf <> dot_name ->
+    bname 14 nf <> dotdot_name ->
+    dir_first datd (dir_nrec (bv_unsigned (di_size dnd)))
+              (bname 14 nf) = Some kk ->
+    (M2 !!! Regidx Ra0 : mword 64) = ientry ks ->
+    is_aligned_paddr (Physaddr (pa_stk sp0 27)) 8 = true ->
+    sie_cap_gpr M2 (K - 30) b (proc_addr jx) -∗
+    cpu_own 0 eb (proc_addr jx) b lks -∗
+    kernel_text -∗
+    pc_is (mword_of_int (SU + 0x72)) -∗
+    panic_wp_any -∗
+    bio_ctx bn (fs_view gfs gd dev cov) -∗
+    log_ctx g bn gfs cov logstart dev -∗
+    fs_crash_seam cov logstart -∗
+    gen_cert -∗
+    dev_inv gu gd -∗
+    disk_geom gd pd pav pu -∗
+    is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
+    bslots bn 3 -∗
+    is_itable2 gtl cn gfs gi cov logstart nib dev -∗
+    itable_inv -∗
+    ic_escrows cn gfs gi cov logstart -∗
+    ic_sleeplocks cn -∗
+    ireg_inv gi gfs inodestart nib -∗
+    sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+    sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+    sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+    bitmap_res gfs bmapstart cov logstart size used1 -∗
+    kalloc_env ga None -∗
+    procs_inv gs -∗
+    proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
+    (* ---- [dp], LOCKED and OPEN (the +0x72 seam's bundle) ---- *)
+    is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
+                     (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+    sleeplocked_q gisld sd -∗
+    sl_pid (i_lock (ientry kd)) ↦₄ pid -∗
+    ic_deposit cn kd (DepShr sd dev dinum gyd) -∗
+    i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
+    i_valid (ientry kd) ↦₄ valid_word true -∗
+    dir_links (bv_unsigned dinum) dnd datd -∗
+    dinode_at gi dinum dnd -∗
+    inode_meta (ientry kd) dnd -∗
+    inode_addrs (ientry kd) (bm_cells bmd) -∗
+    ind_res gfs bmd -∗
+    inode_blocks gfs bmd datd -∗
+    ity_shot gyd (di_type dnd) -∗
+    inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+    (* ---- [ip], REFERENCED (dirlookup's iget) ---- *)
+    inode_ref ks qs dev
+      (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+    log_opS g n1 Sb1 -∗
+    (* ---- the frame, as the +0x72 seam hands it ---- *)
+    (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+    (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+    (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+    (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+    (pa_stk sp0 5) ↦₈ w5 -∗
+    (pa_stk sp0 6) ↦₈ w6 -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ bd jj) -∗
+    ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
+    ([∗ list] jj ∈ seq 0 2,
+       pa_add (pa_add (pa_stk sp0 10) 14) jj ↦ₘ bnm0 (14 + jj)%nat) -∗
+    ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ bp jj) -∗
+    (pa_stk sp0 27) ↦₄ lo -∗
+    (pa_add (pa_stk sp0 27) 4) ↦₄
+      (mword_of_int (Z.of_nat (16 * kk)) : mword 32) -∗
+    ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ be jj) -∗
+    (pa_stk sp0 30) ↦₈ w30 -∗
+    (* ---- THE SEAM at +0x8a, indexed by [isdir], [ip]'s bundle ∀-bound.
+       [s3x] and the [be] buffer are existential because the isdirempty
+       loop moves both; slot 5 is FILLED (this block's own save).  The
+       payload at [true] is T_DIR + [dir_dots_only] + the raw dead-scan
+       (verbatim [su_dir_links_orphan]'s third premise); at [false] it is
+       the type disequality W5-FILE's [dir_links_not_dir] route reads. ---- *)
+    (∀ (CIDs : CpuId) (M3 : regfile) (s3x : mword 64) (bex : nat -> bv 8)
+       (isdir : bool) (gili gisli gyi : gname) (si qsi : Qp)
+       (dni : dinode) (bmi : blkmap) (dati : nat -> list (bv 8)),
+       ⌜su_regs m sp0 (ientry kd) (ientry ks) s3x M3⌝ -∗
+       ⌜bv_unsigned (di_nlink dni) <> 0⌝ -∗
+       ⌜inode_ok cov logstart dni bmi dati⌝ -∗
+       ⌜dir_ok icfg_nib dni dati⌝ -∗
+       ⌜dir_dots_ix (bv_unsigned (zero_extend' 32
+            (dir_inum datd kk : mword 16) : mword 32)) dni dati⌝ -∗
+       ⌜dir_orphan_clean dni dati⌝ -∗
+       ⌜if isdir
+        then bv_unsigned (di_type dni) = T_DIR_z
+             /\ dir_dots_only dni dati
+             /\ (forall k : nat, (2 <= k)%nat ->
+                   (k < dir_nrec (bv_unsigned (di_size dni)))%nat ->
+                   dir_inum dati k = bv_0 16)
+        else bv_unsigned (di_type dni) <> T_DIR_z⌝ -∗
+       sie_cap_gpr M3 (K - 30) b (proc_addr jx) -∗
+       cpu_own 0 eb (proc_addr jx) b lks -∗
+       pc_is (mword_of_int (SU + 0x8a)) -∗
+       fs_crash_seam cov logstart -∗
+       gen_cert -∗
+       bslots bn 3 -∗
+       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+       bitmap_res gfs bmapstart cov logstart size used1 -∗
+       proc_priv gf (proc_addr jx) pid (upd_upt V P1) -∗
+       (* ---- [dp], unchanged ---- *)
+       is_sleeplock_gen gild gisld (i_lock (ientry kd)) "inode"%string
+                        (ic_tok cn kd) (slh_tok (icfg_isl kd)) -∗
+       sleeplocked_q gisld sd -∗
+       sl_pid (i_lock (ientry kd)) ↦₄ pid -∗
+       ic_deposit cn kd (DepShr sd dev dinum gyd) -∗
+       i_dev (ientry kd) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry kd) ↦₄{DfracOwn (1/2)} dinum -∗
+       i_valid (ientry kd) ↦₄ valid_word true -∗
+       dir_links (bv_unsigned dinum) dnd datd -∗
+       dinode_at gi dinum dnd -∗
+       inode_meta (ientry kd) dnd -∗
+       inode_addrs (ientry kd) (bm_cells bmd) -∗
+       ind_res gfs bmd -∗
+       inode_blocks gfs bmd datd -∗
+       ity_shot gyd (di_type dnd) -∗
+       inode_ref_short kd (qdi + sd)%Qp qdi dev dinum -∗
+       (* ---- [ip], LOCKED and OPEN ---- *)
+       is_sleeplock_gen gili gisli (i_lock (ientry ks)) "inode"%string
+                        (ic_tok cn ks) (slh_tok (icfg_isl ks)) -∗
+       sleeplocked_q gisli si -∗
+       sl_pid (i_lock (ientry ks)) ↦₄ pid -∗
+       ic_deposit cn ks (DepShr si dev
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) gyi) -∗
+       i_dev (ientry ks) ↦₄{DfracOwn (1/2)} dev -∗
+       i_inum (ientry ks) ↦₄{DfracOwn (1/2)}
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       i_valid (ientry ks) ↦₄ valid_word true -∗
+       dir_links (bv_unsigned (zero_extend' 32
+           (dir_inum datd kk : mword 16) : mword 32)) dni dati -∗
+       dinode_at gi
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) dni -∗
+       inode_meta (ientry ks) dni -∗
+       inode_addrs (ientry ks) (bm_cells bmi) -∗
+       ind_res gfs bmi -∗
+       inode_blocks gfs bmi dati -∗
+       ity_shot gyi (di_type dni) -∗
+       inode_ref_short ks (qsi + si)%Qp qsi dev
+         (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32) -∗
+       log_opS g n1 Sb1 -∗
+       (* ---- the frame, slot 5 FILLED ---- *)
+       (pa_stk sp0 1) ↦₈ (m !!! Regidx Rra : mword 64) -∗
+       (pa_stk sp0 2) ↦₈ (m !!! Regidx Rs0 : mword 64) -∗
+       (pa_stk sp0 3) ↦₈ (m !!! Regidx Rs1 : mword 64) -∗
+       (pa_stk sp0 4) ↦₈ (m !!! Regidx Rs2 : mword 64) -∗
+       (pa_stk sp0 5) ↦₈ (m !!! Regidx Rs3 : mword 64) -∗
+       (pa_stk sp0 6) ↦₈ w6 -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 8) jj ↦ₘ bd jj) -∗
+       ([∗ list] jj ∈ seq 0 14, pa_add (pa_stk sp0 10) jj ↦ₘ nf jj) -∗
+       ([∗ list] jj ∈ seq 0 2,
+          pa_add (pa_add (pa_stk sp0 10) 14) jj ↦ₘ bnm0 (14 + jj)%nat) -∗
+       ([∗ list] jj ∈ seq 0 128, pa_add (pa_stk sp0 26) jj ↦ₘ bp jj) -∗
+       (pa_stk sp0 27) ↦₄ lo -∗
+       (pa_add (pa_stk sp0 27) 4) ↦₄
+         (mword_of_int (Z.of_nat (16 * kk)) : mword 32) -∗
+       ([∗ list] jj ∈ seq 0 16, pa_add (pa_stk sp0 29) jj ↦ₘ bex jj) -∗
+       (pa_stk sp0 30) ↦₈ w30 -∗
+       (* the caller's own exit, handed BACK *)
+       wp_next (CID0 := CIDs) true (proc_addr jx) (fun (CIDx : CpuId) =>
+         ∀ (mf : regfile) (used' : gset Z) (P' : uptd),
+             ⌜callee_saved m mf⌝ -∗
+             ⌜uptd_ext (pv_upt V) P'⌝ -∗
+             sie_cap_gpr mf K b (proc_addr jx) -∗
+             cpu_own 0 eb (proc_addr jx) b lks -∗
+             trap_csrs_ext eb -∗
+             cpu_claim_ext eb (proc_addr jx) -∗
+             pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
+             bslots bn 3 -∗
+             sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+             sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+             sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+             bitmap_res gfs bmapstart cov logstart size used' -∗
+             iref_slots SpecSysUnlink.sys_unlink_slots -∗
+             proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
+             ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
+             WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    wp_next true (proc_addr jx) (fun (CIDx : CpuId) =>
+      ∀ (mf : regfile) (used' : gset Z) (P' : uptd),
+          ⌜callee_saved m mf⌝ -∗
+          ⌜uptd_ext (pv_upt V) P'⌝ -∗
+          sie_cap_gpr mf K b (proc_addr jx) -∗
+          cpu_own 0 eb (proc_addr jx) b lks -∗
+          trap_csrs_ext eb -∗
+          cpu_claim_ext eb (proc_addr jx) -∗
+          pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
+          bslots bn 3 -∗
+          sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+          sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+          bitmap_res gfs bmapstart cov logstart size used' -∗
+          iref_slots SpecSysUnlink.sys_unlink_slots -∗
+          proc_priv gf (proc_addr jx) pid (upd_upt V P') -∗
+          ⌜sys_unlink_ret (mf !!! Regidx Ra0 : mword 64)⌝ -∗
+          WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
+           Hcovb Hiregb Hj Hgl Heb Hsp0 Hal Hn1 Hupt1 Hregs Hkd Hks Hdinb
+           Htydir Hiok Hdok Hddix Hdoc Hnotdot Hnotdd Hfst Hma0 Hal27.
+    destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
+                              & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
+    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hdev #Hgeo
+             #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg Hsbb Hsbi Hsbs
+             Hbmres #Hkenv #Hprocs Hpriv #Hslkd Hslkdq Hslpidd Hdepd Hidevd
+             Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd
+             #Hshotd Hkeepd Hchild HopS
+             Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
+             Hseamk Hcont".
+    iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
+    assert (Hlb : forall r : string, locks_below lks r).
+    { intro r. rewrite Hlkempty. apply locks_below_empty. }
+    assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
+    assert (Hcsa4 : is_cs_idx Ra4 = false) by (vm_compute; reflexivity).
+    assert (Hcsa5 : is_cs_idx Ra5 = false) by (vm_compute; reflexivity).
+    assert (Hiu2 : (2 * iput_units <= n1)%nat).
+    { pose proof (su_u1_ge9 w1) as H9. unfold iput_units. lia. }
+    (* dp's region-block facts *)
+    destruct (Hiregb dinum Hdinb) as [Hdiblk Hdiblog].
+    (* ip's inum bound: dirlookup's hit is a LIVE record below [nrec], and
+       [dir_ok] at the parent's T_DIR bounds every live inum *)
+    assert (Htydz : bv_unsigned (di_type dnd) = T_DIR_z)
+      by exact (su_tdir_zof _ Htydir).
+    assert (Hinums : dir_inums_ok datd
+                       (dir_nrec (bv_unsigned (di_size dnd))) nib)
+      by (rewrite Hcnib; exact (Hdok Htydz)).
+    assert (Hkklt : (kk < dir_nrec (bv_unsigned (di_size dnd)))%nat)
+      by exact (dir_first_lt _ _ _ _ Hfst).
+    assert (Hkklive : dir_live datd kk)
+      by exact (dir_first_live _ _ _ _ Hfst).
+    assert (Hinb : bv_unsigned (zero_extend' 32
+                     (dir_inum datd kk : mword 16) : mword 32)
+                   < 16 * Z.of_nat nib).
+    { rewrite su_zext32_unsigned. exact (Hinums kk Hkklt Hkklive). }
+    destruct (Hiregb _ Hinb) as [Hiblki Hiblogi].
+    (* the process block, opened for the callees' pid fraction, and THE
+       CLOSER, built once (W2's shape) *)
+    iDestruct (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1)
+                 with "Hpriv") as "[Hpnc Href]".
+    iDestruct (proc_priv_nocwd_cwd_pid gf (proc_addr jx) pid (upd_upt V P1)
+                 with "Hpnc") as "(Hcwd & Hpidq & Hpback)".
+    iAssert (p_pid (proc_addr jx) ↦₄{DfracOwn (1/4)} pid -∗
+             proc_priv gf (proc_addr jx) pid (upd_upt V P1))%I
+      with "[Hcwd Hpback Href]" as "Hpre".
+    { iIntros "Hpidq".
+      iDestruct ("Hpback" $! (pv_cwd V) with "Hcwd Hpidq") as "Hpnc".
+      iEval (rewrite su_upd_cwd_upt) in "Hpnc".
+      iApply (proc_priv_split_cwd gf (proc_addr jx) pid (upd_upt V P1)).
+      iSplitL "Hpnc"; [iExact "Hpnc" | iExact "Href"]. }
+    (* ip's reference: generation NAMED (the share ilock consumes and the
+       one-shot it returns must agree), then shed *)
+    iEval (rewrite inode_ref_gen_intro) in "Hchild".
+    iDestruct "Hchild" as (gyi) "Hchild".
+    iEval (rewrite su_shed_gen) in "Hchild".
+    iDestruct "Hchild" as "[Hkeepi Hshri]".
+    iDestruct (inode_ref_short_gen_forget with "Hkeepi") as "Hkeepi".
+    iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
+      as "#Hescd".
+    iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
+      as "#Hesci".
+    iDestruct (su_slk_acc cn ks Hks with "Hslks") as (gili gisli) "#Hslki".
+    iDestruct (su_bs3 bn with "Hbsl") as "[Hbs1 Hbs2]".
+    iPoseProof (suli_072 with "Htext") as "Hi72".
+    iPoseProof (suli_074 with "Htext") as "Hi74".
+    iPoseProof (suli_078 with "Htext") as "Hi78".
+    iPoseProof (suli_07c with "Htext") as "Hi7c".
+    iPoseProof (suli_080 with "Htext") as "Hi80".
+    iPoseProof (suli_084 with "Htext") as "Hi84".
+    iPoseProof (suli_086 with "Htext") as "Hi86".
+    (* ===== +0x72 c.sdsp s3,200(sp) -- slot 5, saved LATER STILL ===== *)
+    assert (Hd5 : add_vec (M2 !!! Regidx csp_rs1 : mword 64)
+                    (zero_extend' 64
+                       (concat_vec (mword_of_int 25 : mword 6) ('b"000")))
+                  = pa_stk sp0 5)
+      by (rewrite (su_regs_sp _ _ _ _ _ _ Hregs); apply su_frm5).
+    iEval (rewrite -Hd5) in "Hf5".
+    iApply (wp_csdsp_s_sconf (CID := CID0) (mword_of_int (SU + 0x72))
+              (mword_of_int 25 : mword 6) Rs3 M2 (K - 30)%nat w5 b
+              with "Hcg Hpc Hi72 Hf5").
+    iIntros (CID1 Hq1) "Hcg Hpc Hf5".
+    iEval (rgne; rewrite Hd5 (su_regs_s3 _ _ _ _ _ _ Hregs)) in "Hf5".
+    assert (Hpp74 : add_vec_int (mword_of_int (SU + 0x72) : mword 64) 2
+                    = mword_of_int (SU + 0x74)) by pcw.
+    iEval (rewrite Hpp74) in "Hpc".
+    (* ===== +0x74 jal ra,ilock ===== *)
+    iApply (wp_jal_s_sconf (CID := CID1) (mword_of_int (SU + 0x74)) Rra
+              (mword_of_int 2089550 : mword 21) M2 (K - 30)%nat b
+              ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi74").
+    iIntros (CID2 Hq2) "Hcg Hpc".
+    set (R0 := <[Regidx Rra := regval_into_reg
+                  (add_vec_int (mword_of_int (SU + 0x74) : mword 64) 4)]> M2).
+    assert (Hjil : add_vec (mword_of_int (SU + 0x74) : mword 64)
+                     (sign_extend' 64 (mword_of_int 2089550 : mword 21))
+                   = mword_of_int KernelSyms.ilock) by pcw.
+    iEval (rewrite Hjil) in "Hpc".
+    assert (HR0ra : (R0 !!! Regidx Rra : mword 64)
+                    = add_vec_int (mword_of_int (SU + 0x74) : mword 64) 4)
+      by (rewrite /R0; apply upd_eq).
+    assert (HR0a0 : (R0 !!! Regidx Ra0 : mword 64) = ientry ks)
+      by (rewrite /R0 upd_ne; [exact Hma0 | nz]).
+    assert (HR0regs : su_regs m sp0 (ientry kd) (ientry ks)
+                        (m !!! Regidx Rs3 : mword 64) R0)
+      by (rewrite /R0; apply su_regs_caller; [exact Hcsra | exact Hregs]).
+    iDestruct (cpu_own_transport CID0 CID2 0 eb (proc_addr jx) b
+                 ltac:(wp_next_chain) with "Hown") as "Hown".
+    iApply (Ilock.wp_ilock_sconf (CID := CID2) gs jx gl gu gd gk pd pav pu bn
+              gfs gi cn gili gisli cov logstart inodestart nib ks (qs/2)%Qp
+              gyi dev
+              (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+              pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
+              ltac:(exact Kil) Hks Hgeom Hist0 Hiblki Hinb Hj Hgl HR0a0
+              (Hlb "bcache"%string)
+              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hesci Hireg
+                    Hslki Hshri Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
+    { rewrite Heb /trap_csrs_ext. done. }
+    { rewrite Heb /cpu_claim_ext. done. }
+    iIntros (CID3 Hq3 mil dni bmi fldi)
+      "%Hcsil Hcg Hown _ _ Hpc Hpidq Hsbi Hbs1 Hslkiq Hslpidi Hdepi
+       Hidevi Hiinumi Hivalidi Hloadi #Hshoti %Hfldi".
+    assert (Hpc78 : ret_pc (R0 !!! Regidx Rra : mword 64)
+                    = mword_of_int (SU + 0x78)) by (rewrite HR0ra; pcw).
+    iEval (rewrite Hpc78) in "Hpc".
+    assert (Hilregs : su_regs m sp0 (ientry kd) (ientry ks)
+                        (m !!! Regidx Rs3 : mword 64) mil)
+      by exact (su_regs_cs m sp0 _ _ _ R0 mil Hcsil HR0regs).
+    (* [ip]'s loaded bundle, opened: the +0x8a seam wants it in pieces and
+       the [lh]s below read two of its meta cells *)
+    iDestruct "Hloadi" as (dati)
+      "(%Hioki & %Hdoki & %Hddixi & %Hdoci & Hdlnki & Hdiati & Hmetai &
+        Haddrsi & Hindi & Hblocksi)".
+    (* ===== +0x78 lh a5,74(s2) -- ip->nlink ===== *)
+    iEval (rewrite /inode_meta) in "Hmetai".
+    iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
+    iEval (rewrite /i_nlink) in "Hinli".
+    iApply (wp_lh_s_sconf (CID := CID3) (mword_of_int (SU + 0x78)) Ra5 Rs2
+              (mword_of_int 74 : mword 12) mil (K - 30)%nat
+              (di_nlink dni : mword 16) b ltac:(nz) ltac:(rdok)
+              with "Hcg Hpc Hi78 [Hinli]").
+    { iEval (rgne; rewrite (su_regs_s2 _ _ _ _ _ _ Hilregs)).
+      iExact "Hinli". }
+    iIntros (CID4 Hq4) "Hcg Hpc Hinli".
+    iEval (rgne; rewrite (su_regs_s2 _ _ _ _ _ _ Hilregs)) in "Hinli".
+    iAssert (inode_meta (ientry ks) dni)
+      with "[Hityi Himai Himii Hinli Hiszi]" as "Hmetai".
+    { rewrite /inode_meta /i_nlink. iFrame. }
+    set (M3 := <[Regidx Ra5 := regval_into_reg
+                  (sign_extend' 64 (di_nlink dni : mword 16))]> mil).
+    assert (HM3a5 : (M3 !!! Regidx Ra5 : mword 64)
+                    = (sign_extend' 64 (di_nlink dni : mword 16) : mword 64))
+      by (rewrite /M3; apply upd_eq).
+    assert (HM3regs : su_regs m sp0 (ientry kd) (ientry ks)
+                        (m !!! Regidx Rs3 : mword 64) M3)
+      by (rewrite /M3; apply su_regs_caller; [exact Hcsa5 | exact Hilregs]).
+    assert (Hpp7c : add_vec_int (mword_of_int (SU + 0x78) : mword 64) 4
+                    = mword_of_int (SU + 0x7c)) by pcw.
+    iEval (rewrite Hpp7c) in "Hpc".
+    (* ===== +0x7c blez a5 -> +0xec -- the panic guard ===== *)
+    destruct (Z.le_gt_cases (bv_signed (di_nlink dni)) 0) as [Hnpos | Hpos].
+    { (* TAKEN: "unlink: nlink < 1", and panic never returns *)
+      iApply (wp_bge_x0_taken_s_sconf (CID := CID4) (mword_of_int (SU + 0x7c))
+                (mword_of_int 112 : mword 13) Ra5 M3 (K - 30)%nat b
+                ltac:(nz)
+                ltac:(rgne; rewrite HM3a5; exact (su_nlink_pos_taken _ Hnpos))
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi7c").
+      iNext. iIntros (CID5 Hq5) "Hcg Hpc".
+      assert (Htgec : add_vec (mword_of_int (SU + 0x7c) : mword 64)
+                        (sign_extend' 64 (mword_of_int 112 : mword 13))
+                      = mword_of_int (SU + 0xec)) by pcw.
+      iEval (rewrite Htgec) in "Hpc".
+      iApply (Tails.su_panic_nlink (CID0 := CID5) M3 (K - 30)%nat b
+                (proc_addr jx) with "Hcg Htext Hpanic Hpc"). }
+    (* FALL-THROUGH: the count is signed-positive, so it is NONZERO -- the
+       one fact every route below +0x7c carries *)
+    iApply (wp_bge_x0_fall_s_sconf (CID := CID4) (mword_of_int (SU + 0x7c))
+              (mword_of_int 112 : mword 13) Ra5 M3 (K - 30)%nat b
+              ltac:(nz)
+              ltac:(rgne; rewrite HM3a5; exact (su_nlink_pos_fall _ Hpos))
+              with "Hcg Hpc Hi7c").
+    iIntros (CID5 Hq5) "Hcg Hpc".
+    assert (Hnlzi : bv_unsigned (di_nlink dni) <> 0)
+      by exact (su_signed_pos_nz _ Hpos).
+    assert (Hpp80 : add_vec_int (mword_of_int (SU + 0x7c) : mword 64) 4
+                    = mword_of_int (SU + 0x80)) by pcw.
+    iEval (rewrite Hpp80) in "Hpc".
+    (* ===== +0x80 lh a4,68(s2) -- ip->type ===== *)
+    iEval (rewrite /inode_meta) in "Hmetai".
+    iDestruct "Hmetai" as "(Hityi & Himai & Himii & Hinli & Hiszi)".
+    iEval (rewrite /i_type) in "Hityi".
+    iApply (wp_lh_s_sconf (CID := CID5) (mword_of_int (SU + 0x80)) Ra4 Rs2
+              (mword_of_int 68 : mword 12) M3 (K - 30)%nat
+              (di_type dni : mword 16) b ltac:(nz) ltac:(rdok)
+              with "Hcg Hpc Hi80 [Hityi]").
+    { iEval (rgne; rewrite (su_regs_s2 _ _ _ _ _ _ HM3regs)).
+      iExact "Hityi". }
+    iIntros (CID6 Hq6) "Hcg Hpc Hityi".
+    iEval (rgne; rewrite (su_regs_s2 _ _ _ _ _ _ HM3regs)) in "Hityi".
+    iAssert (inode_meta (ientry ks) dni)
+      with "[Hityi Himai Himii Hinli Hiszi]" as "Hmetai".
+    { rewrite /inode_meta /i_type. iFrame. }
+    set (M4 := <[Regidx Ra4 := regval_into_reg
+                  (sign_extend' 64 (di_type dni : mword 16))]> M3).
+    assert (HM4a4 : (M4 !!! Regidx Ra4 : mword 64)
+                    = (sign_extend' 64 (di_type dni : mword 16) : mword 64))
+      by (rewrite /M4; apply upd_eq).
+    assert (HM4regs : su_regs m sp0 (ientry kd) (ientry ks)
+                        (m !!! Regidx Rs3 : mword 64) M4)
+      by (rewrite /M4; apply su_regs_caller; [exact Hcsa4 | exact HM3regs]).
+    assert (Hpp84 : add_vec_int (mword_of_int (SU + 0x80) : mword 64) 4
+                    = mword_of_int (SU + 0x84)) by pcw.
+    iEval (rewrite Hpp84) in "Hpc".
+    (* ===== +0x84 c.li a5,1 ===== *)
+    iApply (wp_cli_s_sconf (CID := CID6) (mword_of_int (SU + 0x84)) Ra5
+              (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64)
+              M4 (K - 30)%nat b ltac:(nz) ltac:(rdok) ltac:(pcw)
+              with "Hcg Hpc Hi84").
+    iIntros (CID7 Hq7) "Hcg Hpc".
+    set (M5 := <[Regidx Ra5 := regval_into_reg (mword_of_int 1 : mword 64)]> M4).
+    assert (HM5a4 : (M5 !!! Regidx Ra4 : mword 64)
+                    = (sign_extend' 64 (di_type dni : mword 16) : mword 64))
+      by (rewrite /M5 upd_ne; [exact HM4a4 | nz]).
+    assert (HM5a5 : (M5 !!! Regidx Ra5 : mword 64) = (mword_of_int 1 : mword 64))
+      by (rewrite /M5; apply upd_eq).
+    assert (HM5regs : su_regs m sp0 (ientry kd) (ientry ks)
+                        (m !!! Regidx Rs3 : mword 64) M5)
+      by (rewrite /M5; apply su_regs_caller; [exact Hcsa5 | exact HM4regs]).
+    assert (Hpp86 : add_vec_int (mword_of_int (SU + 0x84) : mword 64) 2
+                    = mword_of_int (SU + 0x86)) by pcw.
+    iEval (rewrite Hpp86) in "Hpc".
+    (* ===== +0x86 beq a4,a5 -> +0xf8 -- the T_DIR test ===== *)
+    assert (Htgf8 : add_vec (mword_of_int (SU + 0x86) : mword 64)
+                      (sign_extend' 64 (mword_of_int 114 : mword 13))
+                    = mword_of_int (SU + 0xf8)) by pcw.
+    destruct (decide (bv_unsigned (di_type dni) = T_DIR_z))
+      as [Htyzi | Htynzi].
+    - (* ---------------- T_DIR: the inlined isdirempty ---------------- *)
+      iApply (wp_beq_taken_s_sconf (CID := CID7) (mword_of_int (SU + 0x86))
+                (mword_of_int 114 : mword 13) Ra5 Ra4 M5 (K - 30)%nat b
+                ltac:(nz) ltac:(nz)
+                ltac:(rgne; rgne; rewrite HM5a4 HM5a5;
+                      exact (su_tdir_eq _ (su_tdir_z _ Htyzi)))
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi86").
+      iIntros (CID8 Hq8). iNext. iIntros "Hcg Hpc".
+      iEval (rewrite Htgf8) in "Hpc".
+      iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      (* the loop's opaque [X]: dp's bundle, the ledger, the frame and BOTH
+         continuations, combined so [su_w4]'s exits can hand them back *)
+      iCombine "Hseam Hgen Hbs2 Hsbb Hsbi Hsbs Hbmres Hpre Hslkdq Hslpidd
+                Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd Hmetad Haddrsd
+                Hindd Hblocksd Hkeepd Hslkiq Hslpidi Hdepi Hiinumi Hivalidi
+                Hdlnki Hdiati Hkeepi HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14
+                Hnm2 HbP H27lo H27hi H30 Hseamk Hcont" as "HX".
+      iApply (su_w4 (CID0 := CID8) gs jx gl gu gd gk pd pav pu bn gfs ga gf
+                cov logstart dev ks
+                (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                dni bmi dati pid (DfracOwn (1/4)) be
+                (ientry kd) (ientry ks) (m !!! Regidx Rs3 : mword 64)
+                m M5 sp0 K eb b lks _
+                Kre Hgeom Hj Hgl Heb Hlkempty Hsp0 Hal eq_refl Hioki Htyzi
+                Hnlzi Hddixi HM5regs
+                with "Hcg Hown Htext Hpc Hpanic Hbio Hkenv Hprocs Hdev Hgeo
+                      Hdlk Hidevi Hmetai [Haddrsi Hindi] Hblocksi HbE Hpidq
+                      Hbs1 [] [] HX").
+      { rewrite /inode_map. iFrame "Haddrsi Hindi". }
+      { (* ---- ARM E: a live non-dot record -- [Tails.su_tail_e] ---- *)
+        iIntros (CIDx Mx s3x bex) "%Hxregs Hcg Hown Hpc Hidevi Hmetai Hmapi
+                                    Hblocksi Hbuf Hpidq Hbslot HX".
+        iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs & Hbmres
+                            & Hpre & Hslkdq & Hslpidd & Hdepd & Hidevd &
+                            Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
+                            Haddrsd & Hindd & Hblocksd & Hkeepd & Hslkiq &
+                            Hslpidi & Hdepi & Hiinumi & Hivalidi & Hdlnki &
+                            Hdiati & Hkeepi & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
+                            H27hi & H30 & Hseamk & Hcont)".
+        iDestruct "Hmapi" as "[Haddrsi Hindi]".
+        (* both bundles repacked: neither release below opens them *)
+        iAssert (ic_loaded gfs gi cov logstart kd dinum dnd bmd)
+          with "[Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd]" as "Hloadd".
+        { rewrite /ic_loaded. iExists datd.
+          iFrame "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd".
+          iPureIntro. split_and!;
+            [exact Hiok | exact Hdok | exact Hddix | exact Hdoc]. }
+        iAssert (ic_loaded gfs gi cov logstart ks
+                   (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                   dni bmi)
+          with "[Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi]" as "Hloadi".
+        { rewrite /ic_loaded. iExists dati.
+          iFrame "Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi".
+          iPureIntro. split_and!;
+            [exact Hioki | exact Hdoki | exact Hddixi | exact Hdoci]. }
+        (* the buffers and slot 27, put back for the tail *)
+        iDestruct (su_nm_join (pa_stk sp0 10) bnm0 nf with "Hnm14 Hnm2")
+          as "HbNj".
+        iDestruct (su_bytes_name (pa_stk sp0 10) 16 with "HbNj") as (bnf) "HbNj".
+        iDestruct (su_off_join sp0 lo
+                     (mword_of_int (Z.of_nat (16 * kk)) : mword 32) Hal27
+                     with "H27lo H27hi") as "H27".
+        assert (HMxsp : su_sp sp0 Mx) by exact (su_regs_sp _ _ _ _ _ _ Hxregs).
+        assert (HMxthr : su_thr m Mx)
+          by exact (su_regs_thr _ _ _ _ _ _ Hxregs).
+        assert (HMxs1 : (Mx !!! Regidx Rs1 : mword 64) = ientry kd)
+          by exact (su_regs_s1 _ _ _ _ _ _ Hxregs).
+        assert (HMxs2 : (Mx !!! Regidx Rs2 : mword 64) = ientry ks)
+          by exact (su_regs_s2 _ _ _ _ _ _ Hxregs).
+        iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDx)
+                     ltac:(intros [Hf | Hz];
+                           [ discriminate
+                           | exfalso; exact (proc_addr_nonzero jx Hj Hz) ])
+                     with "Hcont") as "Hcont".
+        iApply (Tails.su_tail_e (CID0 := CIDx) gs jx gl gu gd gk pd pav pu bn
+                  g gfs gi cn gtl gild gisld gili gisli cov logstart bmapstart
+                  inodestart nib size dev used1 kd qdi sd gyd dinum dnd bmd
+                  ks (qs/2)%Qp (qs/2)%Qp gyi
+                  (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                  dni bmi n1 pid (DfracOwn (1/4)) dqb dqs m Mx sp0 K eb b lks
+                  w6
+                  (word_of_words lo (mword_of_int (Z.of_nat (16 * kk))
+                                     : mword 32))
+                  w30 bd bnf bp bex
+                  Kiup Keo K30 Kpop Hkd Hks Hgeom Hsize Hbm0 Hbmcov Hbmlog
+                  Hist0 Hdiblk Hdiblog Hdinb Hiblki Hiblogi Hinb Hcovb Hiu2
+                  Hj Hgl Hlkempty Hsp0 HMxsp HMxthr HMxs1 HMxs2 Hal
+                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                        Hitab Hitinv Hescd Hesci Hireg Hslkd Hslkdq Hslpidd
+                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd Hkeepd
+                        Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi
+                        Hloadi Hshoti Hkeepi Hsbb Hsbi Hbmres Hpidq Hprocs
+                        Hdev Hgeo Hdlk [Hbslot Hbs2] [HopS] Hf1 Hf2 Hf3 Hf4
+                        Hf5 Hf6 HbD HbNj HbP H27 Hbuf H30
+                        [Hcont Hpre Hsbs]").
+        { rewrite Heb /trap_csrs_ext. done. }
+        { rewrite Heb /cpu_claim_ext. done. }
+        { iApply su_bs3. iFrame "Hbslot Hbs2". }
+        { rewrite /log_op. iExists Sb1. iExact "HopS". }
+        iEval (rewrite /wp_next).
+        iIntros (CIDy) "%Hqy". iIntros (mf used') "%Hcsf %Ha0f Hcg Hown Htce
+                                        Hcce Hpc Hpidq Hsbb Hsbi Hbmres Hbsl
+                                        Hislots".
+        iDestruct ("Hpre" with "Hpidq") as "Hpriv".
+        iSpecialize ("Hcont" $! CIDy with "[%]"); [wp_next_chain |].
+        iApply ("Hcont" $! mf used' P1 with "[%] [%] Hcg Hown Htce Hcce Hpc
+                  Hbsl Hsbb Hsbi Hsbs Hbmres [Hislots] Hpriv [%]").
+        { exact Hcsf. }
+        { exact Hupt1. }
+        { rewrite su_slots2. iExact "Hislots". }
+        { left. rewrite Ha0f. reflexivity. } }
+      { (* ---- the EMPTY exit: the +0x8a seam at [isdir = true] ---- *)
+        iIntros (CIDx Mx s3x bex) "%Hxregs %Hdots %Hdead Hcg Hown Hpc Hidevi
+                                    Hmetai Hmapi Hblocksi Hbuf Hpidq Hbslot
+                                    HX".
+        iDestruct "HX" as "(Hseam & Hgen & Hbs2 & Hsbb & Hsbi & Hsbs & Hbmres
+                            & Hpre & Hslkdq & Hslpidd & Hdepd & Hidevd &
+                            Hiinumd & Hivalidd & Hdlnkd & Hdiatd & Hmetad &
+                            Haddrsd & Hindd & Hblocksd & Hkeepd & Hslkiq &
+                            Hslpidi & Hdepi & Hiinumi & Hivalidi & Hdlnki &
+                            Hdiati & Hkeepi & HopS & Hf1 & Hf2 & Hf3 & Hf4 &
+                            Hf5 & Hf6 & HbD & Hnm14 & Hnm2 & HbP & H27lo &
+                            H27hi & H30 & Hseamk & Hcont)".
+        iDestruct "Hmapi" as "[Haddrsi Hindi]".
+        iDestruct ("Hpre" with "Hpidq") as "Hpriv".
+        iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDx)
+                     ltac:(intros [Hf | Hz];
+                           [ discriminate
+                           | exfalso; exact (proc_addr_nonzero jx Hj Hz) ])
+                     with "Hcont") as "Hcont".
+        iApply ("Hseamk" $! CIDx Mx s3x bex true gili gisli gyi (qs/2)%Qp
+                  (qs/2)%Qp dni bmi dati
+                  with "[%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
+                        [Hbslot Hbs2] Hsbb Hsbi Hsbs Hbmres Hpriv Hslkd
+                        Hslkdq Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd
+                        Hdiatd Hmetad Haddrsd Hindd Hblocksd Hshotd Hkeepd
+                        Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi
+                        Hdlnki Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti
+                        Hkeepi HopS Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2
+                        HbP H27lo H27hi Hbuf H30 [Hcont]").
+        { exact Hxregs. }
+        { exact Hnlzi. }
+        { exact Hioki. }
+        { exact Hdoki. }
+        { exact Hddixi. }
+        { exact Hdoci. }
+        { split_and!; [exact Htyzi | exact Hdots | exact Hdead]. }
+        { iApply su_bs3. iFrame "Hbslot Hbs2". }
+        { iExact "Hcont". } }
+    - (* ---------------- NOT a directory: fall to +0x8a ---------------- *)
+      iApply (wp_beq_fall_s_sconf (CID := CID7) (mword_of_int (SU + 0x86))
+                (mword_of_int 114 : mword 13) Ra5 Ra4 M5 (K - 30)%nat b
+                ltac:(nz) ltac:(nz)
+                ltac:(rgne; rgne; rewrite HM5a4 HM5a5;
+                      exact (su_tdir_ne _ (su_tdir_z_ne _ Htynzi)))
+                with "Hcg Hpc Hi86").
+      iIntros (CID8 Hq8) "Hcg Hpc".
+      assert (Hpp8a : add_vec_int (mword_of_int (SU + 0x86) : mword 64) 4
+                      = mword_of_int (SU + 0x8a)) by pcw.
+      iEval (rewrite Hpp8a) in "Hpc".
+      iDestruct ("Hpre" with "Hpidq") as "Hpriv".
+      iDestruct (cpu_own_transport CID3 CID8 0 eb (proc_addr jx) b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID8)
+                   ltac:(intros [Hf | Hz];
+                         [ discriminate
+                         | exfalso; exact (proc_addr_nonzero jx Hj Hz) ])
+                   with "Hcont") as "Hcont".
+      iApply ("Hseamk" $! CID8 M5 (m !!! Regidx Rs3 : mword 64) be false
+                gili gisli gyi (qs/2)%Qp (qs/2)%Qp dni bmi dati
+                with "[%] [%] [%] [%] [%] [%] [%] Hcg Hown Hpc Hseam Hgen
+                      [Hbs1 Hbs2] Hsbb Hsbi Hsbs Hbmres Hpriv Hslkd Hslkdq
+                      Hslpidd Hdepd Hidevd Hiinumd Hivalidd Hdlnkd Hdiatd
+                      Hmetad Haddrsd Hindd Hblocksd Hshotd Hkeepd Hslki
+                      Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi Hdlnki
+                      Hdiati Hmetai Haddrsi Hindi Hblocksi Hshoti Hkeepi HopS
+                      Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi
+                      HbE H30 [Hcont]").
+      { exact HM5regs. }
+      { exact Hnlzi. }
+      { exact Hioki. }
+      { exact Hdoki. }
+      { exact Hddixi. }
+      { exact Hdoci. }
+      { exact Htynzi. }
+      { iApply su_bs3. iFrame "Hbs1 Hbs2". }
+      { iExact "Hcont". }
+  Qed.
+
 End ProofSysUnlinkBody.
 
 End SysUnlinkProof.
