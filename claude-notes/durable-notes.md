@@ -200,6 +200,21 @@ position, where `K` is still an evar.
 
 ## CHAINING TWO HALVES OF A FUNCTION: THE EXIT MUST BE HANDED BACK
 
+**A SEAM MUST EXPORT EVERY *CALLER-SAVED* REGISTER THE NEXT BLOCK READS.**
+A whole-function walk split into blocks threads a register BUNDLE across
+each seam (`su_regs`, `cr_regs3`, `sl_regs`), and those bundles pin the
+CALLEE-SAVED registers — by construction they say nothing about `a0`–`a7`.
+So a seam placed one or two instructions after a call, where the callee's
+return value is still live in `a0` and the next block's first act reads it,
+is silently short one fact: the block's premise `⌜M !!! Ra0 = dpv⌝` cannot
+be produced from the bundle, from the seam's pure list, or from anything
+downstream. It is invisible until the SEAL composes the two blocks, which
+is typically the last thing written. When you cut a seam, list what the
+next block reads out of the register file and check each name against the
+bundle. (`ProofSysUnlink.su_w1`'s +0x30 seam, found by the seal; the fix
+is one conjunct and one `eq_trans` at the site.)
+
+
 A single `wp_next` exit continuation is LINEAR, so if both halves of a split
 function own a failure tail, the second half's premise list cannot be
 satisfied by the caller's one copy — the two continuation premises of the
@@ -1074,6 +1089,8 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   error rather than silently counted — fix those when they appear.
 
 ## Proofmode & bitvector gotchas (recur across files)
+
+- **AN `=`-EQUATION BETWEEN TWO `iProp`s DOES NOT RELIABLY `rewrite` INSIDE THE PROOFMODE, AND THE ERROR NAMES A TERM THAT PRINTS AS THE GOAL.** A mover stated as `f x = (if b then P else Q)` (both sides `iProp Σ`) fails with *"Found no subterm matching …"* against a goal whose printed form IS that RHS — because the goal's copy was elaborated through an `iExists`-instantiated `∃`/`∗` skeleton and is not syntactically the same term. No stronger rewrite fixes it. **State the mover as a WAND in each direction and `iApply` it**; keep the equation only as the reading. (`DirLinks.dlc_tick_dot_out`/`_in`, `_name_out`/`_in` are written that way after the equations `dlc_tick_dot`/`_name` failed at exactly one of their four use sites.)
 
 - **AN `own`-GHOST-STEP WHOSE FRAGMENT IS AN OP-TERM MUST BE STATED AS A GOAL AND `iApply`ed, NEVER `iMod`ed WITH EXPLICIT ARGUMENTS — the failure is a silent divergence, not an error.** Minting two fragments in one step (`link_update_alloc z a a' (b1 ⋅ b2)`) via `iMod` with every argument explicit spins forever at the `iMod` sentence (>14 min at 100 % CPU, stable RSS, no message); the IDENTICAL proof stated as `iAssert (|==> auth' ∗ frag (b1 ⋅ b2))%I … as ">[Hauth Hfr]"` with `iApply (link_update_alloc with "Ha")` inside — unification against the stated goal instead of elaborated arguments — completes in seconds. `iCombine "H1 H2" as "H"` on two `own`s of singleton auth-maps over a wide product CMRA diverges the same way (its `IsOp`/`CombineSepAs` search); combine with `iDestruct (own_op with "[$H1 $H2]") as "H"` + `iEval (rewrite singleton_op -auth_frag_op) in "H"` (all `=`-rewrites, no setoid search). And a `≡`-split of a fragment (`full ≡ half ⋅ half`) must NOT be setoid-rewritten under `own` inside `iEval` (fails fast with *"setoid rewrite failed: UNDEFINED EVARS"*) — do the `rewrite -Hsp` in the PURE local-update subgoal, where `local_update_proper` carries it. (All three found landing V5''s fractional parent register in `IcacheRef.link_mint_linkdp`/`link_spend_linkdp`.)
 - **A `prod_local_update'` CHAIN OVER A WIDE NESTED `prodUR` COSTS SECONDS PER `apply` — ~8 s each at a 7-component element, and in a long Section EVERY apply pays it** (in a small scratch file only the first does). A file with a dozen movers over such an element takes minutes for the algebra section alone. When widening a ledger element, budget for it — or fold the per-component chain into ONE composed helper lemma so each mover pays the elaboration once. (`IcacheRef.v` after the V4+V5' widening.)
