@@ -140,15 +140,18 @@ Evidence:
      the base store the compressed form expands to, which is the whole of
      the write side → try_step's tail → `tick_clock` at the tick.
 
-   **THE STORE SIDE, mapped** (it mirrors the read side, so the read
-   chain in `HartMFetch` is the template, not just an analogy):
+   **THE STORE SIDE** (`HartMStore.v`, in progress) mirrors the read side,
+   so `HartMFetch`'s chain is the template, not just an analogy:
    `execute_STORE imm rs2 rs1 4` = `assert_exp'` (pure) → `rX_bits rs2`
    (a GPR read) → `vmem_write rs1 offset 4 data (Store Data) …` →
-   `get_transformed_data_addr` → `vmem_write_addr`, a `cer` region:
-   the alignment check, `split_on_page_boundary`, the mstatus /
-   cur_privilege reads, `translationMode` (all hfrun — pinned reads, no
-   memory event), then `translateAddr` (**HartMFetch's fact already**),
-   then the write itself.  Only the last step is new work.
+   `get_transformed_data_addr` → `vmem_write_addr`, a `cer` region (the
+   alignment check, `split_on_page_boundary`, the mstatus/cur_privilege
+   reads, `translationMode` — all hfrun; then `translateAddr`, which is
+   **HartMFetch's fact already**) → `mem_write_ea` (**DONE**:
+   `swp_mem_write_ea`, 2.6 s) → `mem_write_value` →
+   `mem_write_value_meta` (a plain-`M` spine) →
+   `mem_write_value_priv_meta`, which is where the MemWrite event is.
+   **HERE.**
 
    **THE PEEL DEPTH IS NOT GUESSABLE FROM THE `.sail` SOURCE.**  Read it
    off the goal.  `dispatchInterrupt` and `fetch` inside
