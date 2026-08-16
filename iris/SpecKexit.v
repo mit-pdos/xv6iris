@@ -190,17 +190,6 @@ Definition wp_kexit_sconf_body
      [locks_below_union_singleton] at each call site. *)
   locks_below lks "log" ->
   sie_cap_gpr m av b pj -∗
-  (* THE STACK DEPOSIT, threaded down the diverging chain.  kexit is where
-     the whole of this thread's kernel stack finally becomes dead, and the
-     slot it is about to leave at ZOMBIE has to own that page again or no
-     later process can run on it ([ProcDefs.kstack_free]).  What kexit can
-     assemble by itself is only the region from ITS sp down; the frames
-     above it belong to usertrap, syscall and sys_exit, each of which is
-     equally never returning.  So each of them hands its callee a closer
-     that has captured its own frame, and this is the one that reaches the
-     bottom ([ProcDefs.kstack_closer]).  Nothing comes back on the arms that
-     RETURN: the wand is affine and those paths drop it. *)
-  kstack_closer pj (m !!! Regidx csp_rs1) (trap_res b + av)%nat -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj b lks -∗
   (* THE TRAP-CSR COMPLEMENT, WHERE [eb = true ->] USED TO BE -- the whole
@@ -284,18 +273,12 @@ Section KexitSeals.
     pv_cwd V = (zero_reg : mword 64) ->
     proc_priv_nocwd γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
     iref_slots (1 + IREFSPARE) -∗
-    (* AND THE KERNEL STACK, WHOLE.  A dormant slot owns its page
-       ([ProcDefs.kstack_free]) -- that is what lets the next allocproc give
-       it to a new process -- and the ZOMBIE park is where a dying thread
-       gives it back.  It can, because its swtch never returns: no record is
-       parked, so nothing of the page is captured in a continuation. *)
-    kstack_free (proc_addr j) -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hsp Hir Hkst".
+    iIntros "Hpriv Hsp Hir".
     iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid V Hof Hcwd
-              with "Hpriv Hsp Hir Hkst").
+              with "Hpriv Hsp Hir").
   Qed.
 
 End KexitSeals.

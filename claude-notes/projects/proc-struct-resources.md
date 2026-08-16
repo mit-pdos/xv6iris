@@ -1662,30 +1662,62 @@ Everything else follows:
 - **`SchedCtx.proc_slots_park_gen`** at ZOMBIE stops forgetting a record
   (`proc_ctx_own_ctx`) and takes the cells straight off the crossing.
 
+### THE TRAP THAT STOPPED THE STACK HALF: an unsatisfiable premise is worse than a red build
+
+Putting `kstack_free` into `proc_dormant` compiles, threads cleanly through
+procinit / allocproc / freeproc / kfork, and lands at `SpecMain` as a boot
+premise — and it is **WRONG**, in the way this tree's notes warn about most:
+it is a failure mode that COMPILES.
+
+`stack_own` is `word_pointsto` is `mem_pointsto`, and `mem_pointsto` carries
+`⌜pa_of ppn va = va⌝`. A KSTACK va is not identity-mapped, so
+`stack_own (kstack_va i + PGSIZE) n` is **UNSATISFIABLE**. Every producer's
+premise then becomes unpayable — which for a hypothesis is honest, but for
+`main`'s boot premise means `wp_main_boot_sconf` is VACUOUSLY TRUE. A proven
+top-level theorem would quietly stop saying anything, and nothing would go
+red to tell you.
+
+**RULE: before parking a resource in an invariant that boot must fill, check
+that boot CAN fill it.** For anything at a kernel va, that means checking the
+identity conjunct first. The physical page is available (`page_own` from
+`proc_mapstacks`); the va-tier claim is not, and converting between them IS
+sp-migration.
+
+So the slot does not own its kernel stack yet. `ProcDefs` keeps the
+vocabulary (`KSTACK_AV`, `kstack_free`, `kstack_closer`,
+`kstack_closer_frame`) because the park and the exit path are already written
+against it, and `SpecForkretParkPaid.forkret_park_pkg` takes `stack_own` as a
+PREMISE — an unpayable hypothesis is not a vacuous theorem, which is exactly
+the difference that matters here.
+
 ### What is landed, and what is left
 
-Landed and compiling: the protocol change itself (`SwtchCtx` + `SpecSwtch` +
-`ProofSwtch` + `SchedCtx` + `SpecSched` + `ProofSched`), and the forward half
-of the stack (`ProcDefs.kstack_free` / `KSTACK_AV` / `kstack_closer`,
-`proc_dormant` on both arms, `ProcInv.proc_dormant_prestk` and the moved
-seal, `SpecProcinit`/`ProofProcinit`, `SpecMain`'s boot premise,
-`SpecAllocproc`'s hand-out).
+Landed: the protocol change (`SwtchCtx` + `SpecSwtch` + `ProofSwtch` +
+`SchedCtx` + `SpecSched` + `ProofSched` + `ProofScheduler` + yield + sleep),
+kexit's park losing its post-resume arm, and the park theorem itself. The
+stack half is BACKED OUT for the reason above; `ProcDefs` keeps its
+vocabulary.
 
 Left, in order:
 
-1. **kexit's park.** `SpecKexit` takes the closer and `kexit_park_pay` takes
-   `kstack_free`; `ProofKexit` must assemble — its own frame plus what
-   sched's closer returns — and its post-resume arm (+0x9a..+0xa2, the
-   `panic("zombie exit")`) DELETES: the contract's `else emp` leaves nothing
-   to prove there.
-2. **The closer up the diverging chain**: `SpecSysExit`, `SpecSyscall`,
+1. **sp-migration** — the gate on everything below. A KPT-regime leaf family
+   (`sr_adm = True` there) over a kstack-flavoured points-to built from the
+   mapping claim plus the identity page's `↦ₚ`
+   ([`../design/tlb-translation.md`](../design/tlb-translation.md)). Until it
+   lands no process stack can be OWNED at the address the process runs on,
+   and `SpecUserinit`'s Axiom is what hides that.
+2. **Then** the stack goes into `proc_dormant` (both arms), boot deposits the
+   64 pages, allocproc hands one out, and the exit path gives it back — the
+   design is written up above and the swtch protocol it needs is already in
+   place. `ProcInv.proc_dormant_prestk` and the moved seal, reverted here,
+   are the shape to restore: the deposit needs the persisted `p->kstack`, so
+   it happens at `procs_inv_alloc`'s pass 3 and not before.
+3. **The closer up the diverging chain**: `SpecSysExit`, `SpecSyscall`,
    `SpecUsertrap` each take a `kstack_closer` and pass a wrapped one at their
    single diverging call site (`kstack_closer_frame`). usertrap BUILDS the
    top one out of `is_kstack` + its own `ut_stack ksp av`, so the chain
    terminates there and nothing new is assumed — but `ut_res_bare`'s bound
    must strengthen from `K_usertrap ≤ av` to `KSTACK_AV ≤ av`.
-3. **The forward leftovers**: `ProofAllocproc`'s second failure tail,
-   `ProofKforkMain`, `ProofMain`'s call site.
 4. Then the park package (`SpecForkretParkPaid.forkret_park_pkg`) can take
    the stack from allocproc, and `LinkForkretPark`'s Axiom is reachable.
 

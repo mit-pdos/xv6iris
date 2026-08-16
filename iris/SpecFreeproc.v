@@ -126,11 +126,6 @@ Section SpecFreeproc.
         [ProcInv.proc_dormant] -- this predicate IS that block minus its
         address-space disjunct, so it parks what the block parks. *)
      iref_slots (1 + IREFSPARE) ∗
-     (* the slot's KERNEL STACK, likewise: freeproc zeroes cells, it does not
-        move the stack, so the block's ZOMBIE -> UNUSED step carries it
-        through untouched -- which is what makes a reclaimed slot usable by
-        the next allocproc. *)
-     kstack_free pa ∗
      own_ctx (p_context pa))%I.
 
   (* ------------------------------------------------------------------ *)
@@ -151,9 +146,9 @@ Section SpecFreeproc.
         fp_rest pa V pid ∗ fp_pt pa (pv_sz V) None ∗ fp_tf pa None.
   Proof.
     rewrite /proc_dormant fp_unused_not_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hkst & Hctx & Hpg & Htf)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hctx & Hpg & Htf)".
     iExists V, pid. rewrite /fp_rest /fp_pt /fp_tf.
-    iFrame "Hpid Hf Hof Hu Hsp Hir Hkst Hctx Hpg Htf". iPureIntro. exact Hpure.
+    iFrame "Hpid Hf Hof Hu Hsp Hir Hctx Hpg Htf". iPureIntro. exact Hpure.
   Qed.
 
   Lemma fp_to_dormant_unused (pa : mword 64) (V : pprivate) (pid : mword 32)
@@ -161,9 +156,9 @@ Section SpecFreeproc.
     fp_rest pa V pid -∗ fp_pt pa szv None -∗ fp_tf pa None -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hkst & Hctx) Hpg Htf".
+    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hctx) Hpg Htf".
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
-    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hkst Hctx Hpg Htf".
+    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hctx Hpg Htf".
     iPureIntro. exact Hpure.
   Qed.
 
@@ -193,7 +188,7 @@ Section SpecFreeproc.
         fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     rewrite /proc_dormant fp_zombie_is_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hkst & Hctx & %Hbel & Hpt & Htfp)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hctx & %Hbel & Hpt & Htfp)".
     iExists V, pid.
     (* both [page_valid]s come out of the table: the trapframe's from
        [proc_pt_wf], the root's from the tree's node claim. *)
@@ -202,8 +197,8 @@ Section SpecFreeproc.
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
     rewrite /fp_rest /fp_pt /fp_tf.
-    iSplitL "Hpid Hf Hof Hu Hsp Hir Hkst Hctx".
-    { iFrame "Hpid Hf Hof Hu Hsp Hir Hkst Hctx". iPureIntro. exact Hpure. }
+    iSplitL "Hpid Hf Hof Hu Hsp Hir Hctx".
+    { iFrame "Hpid Hf Hof Hu Hsp Hir Hctx". iPureIntro. exact Hpure. }
     iSplitL "Hpg Hpt".
     { iFrame "Hpg Hpt". iPureIntro.
       split; [exact Hbel | exact (proj2 (proj2 Hpure))]. }

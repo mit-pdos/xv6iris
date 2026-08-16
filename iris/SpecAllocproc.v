@@ -91,8 +91,6 @@ Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import StackOwn.
-Require Import ProcDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
@@ -199,12 +197,6 @@ Definition allocproc_post
           [procs_inv], so it is where the unit has to come from. *)
        iref_slots (1 + IREFSPARE) ∗
        is_kstack (proc_addr j) ks ∗
-       (* THE SLOT'S KERNEL STACK, out of the dormant block with everything
-          else the slot owned.  It is what the caller parks in the fresh
-          process's context record: [context.sp] is [ks + PGSIZE] and the
-          record's stack claim has to be anchored exactly there
-          ([SpecForkretParkPaid.forkret_park_pkg]). *)
-       stack_own (add_vec ks (mword_of_int 4096)) KSTACK_AV ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
        (* [trap_res b + K], NOT [K]: allocproc RETURNS HOLDING p->lock, so

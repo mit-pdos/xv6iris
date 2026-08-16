@@ -60,6 +60,22 @@ Section ProcDefs.
   Proof. rewrite /is_kstack /word_pointsto /mem_pointsto. apply _. Qed.
 
   (* ------------------------------------------------------------------ *)
+  (* THE SLOT'S KERNEL STACK, FREE -- VOCABULARY ONLY, NOT YET IN THE      *)
+  (* BLOCK, and the reason is a trap worth stating.                        *)
+  (*                                                                       *)
+  (* [stack_own] is [word_pointsto] is [mem_pointsto], which carries the    *)
+  (* IDENTITY conjunct [pa_of ppn va = va] -- so a byte at a KSTACK va,     *)
+  (* which is NOT identity-mapped, is not expressible as one at all         *)
+  (* (RiscvPtsto.v's own header; design/tlb-translation.md).  Putting       *)
+  (* [kstack_free] into [proc_dormant] therefore makes every producer's     *)
+  (* premise UNSATISFIABLE at the real [ks] procinit stores -- main's boot  *)
+  (* theorem included, which would go quietly VACUOUS rather than red.      *)
+  (* So the slot does not own its stack until sp-migration lands; what      *)
+  (* lives here is the vocabulary the park and the exit path are already    *)
+  (* written against ([SpecForkretParkPaid.forkret_park_pkg] takes          *)
+  (* [stack_own] as a PREMISE, which is honest -- an unpayable hypothesis   *)
+  (* is not a vacuous theorem).                                            *)
+  (* ------------------------------------------------------------------ *)
   (* THE SLOT'S KERNEL STACK, FREE.                                       *)
   (*                                                                      *)
   (* A kernel thread's stack is not free-floating memory: it belongs to    *)
@@ -151,11 +167,6 @@ Section ProcDefs.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
        iref_slots (1 + IREFSPARE) ∗
-       (* THE SLOT'S KERNEL STACK -- see [kstack_free] below.  On BOTH arms:
-          a zombie owns its stack exactly as an unused slot does, which is
-          what makes freeproc's ZOMBIE -> UNUSED step a pass-through and
-          what puts the bill on the exit path, where the page actually is. *)
-       kstack_free pa ∗
        own_ctx (p_context pa) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
@@ -174,7 +185,6 @@ Section ProcDefs.
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
        iref_slots (1 + IREFSPARE) ∗
-       kstack_free pa ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
              proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
@@ -185,11 +195,11 @@ Section ProcDefs.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hkst & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hkst Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 
