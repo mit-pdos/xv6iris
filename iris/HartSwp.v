@@ -381,6 +381,14 @@ Section swp.
 
   (* the elimination form for a PLAIN-[M] bind spine, the counterpart of
      [swp_use_cer] outside an early-return region ([mem_read] is one). *)
+  Lemma swp_bind0_use {Y : Type} (m : M unit) (n : M Y)
+      (Φ : unit -> iProp Σ) (Ψ : Y -> iProp Σ) :
+    swp m Φ -∗ (∀ v : unit, Φ v -∗ swp n Ψ) -∗ swp (Defs.bind0 m n) Ψ.
+  Proof.
+    iIntros "H1 H2". iApply swp_bind0.
+    iApply (swp_mono with "[H2] H1"). iIntros (v) "HΦ". by iApply "H2".
+  Qed.
+
   Lemma swp_bind_use {X Y : Type} (m : M X) (f : X -> M Y)
       (Φ : X -> iProp Σ) (Ψ : Y -> iProp Σ) :
     swp m Φ -∗ (∀ v : X, Φ v -∗ swp (f v) Ψ) -∗ swp (Defs.bind m f) Ψ.

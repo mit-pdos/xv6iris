@@ -114,15 +114,35 @@ Evidence:
 ## Left, in order
 
 1. **`HartMLeaf.v`, rebuilt on `swp`.**  The last RED file: it names the
-   deleted segment apparatus.  It becomes the composition of the
-   per-function facts along `try_step`'s own spine —
-   `should_inc_minstret` (HartMCycle) → the `minstret_increment` write
-   (`HartRegNode`'s single-node rule, opening `MinstretInv`) →
-   `run_hart_active`'s `cer` region: `dispatchInterrupt` (HartMDispatch) →
-   `fetch` (HartMFetch's `swp_fetch_ram`, whose memory obligation the leaf
-   discharges from its text bytes via `HartLift2.text_read_bytes`) →
-   `ext_decode` (hfrun at the concrete word) → `execute` → the store event
-   → the tail, including `tick_clock` at the tick.
+   deleted segment apparatus.  It is the composition of the per-function
+   facts along `try_step`'s own spine.  **Walked to the decode already, in
+   a scratch probe, with every step one of the four standard moves** — so
+   what follows is a transcript, not a design:
+
+     `read_reg cur_privilege` → `should_inc_minstret` (HartMCycle) →
+     `write_reg minstret_increment` (`swp_write_reg_owned`; the cell is
+     OWNED, raw-cell form, since `MinstretInv` is above the red line) →
+     `read_reg hart_state` → `run_hart_active 0`, a `cer` region:
+     `read_reg cur_privilege` → `dispatchInterrupt` (HartMDispatch) →
+     `fetch` (HartMFetch's `swp_fetch_ram`, whose memory obligation the
+     leaf discharges from its text bytes via `HartLift2.text_read_bytes`)
+     → **HERE**: the `isRVC` branch, then `ext_decode_compressed` (hfrun
+     at the concrete half-word — mind the vm-opacity note in the traps
+     list) → `execute` → the store event → try_step's tail → `tick_clock`
+     at the tick.
+
+   **THE PEEL DEPTH IS NOT GUESSABLE FROM THE `.sail` SOURCE.**  Read it
+   off the goal.  `dispatchInterrupt` and `fetch` inside
+   `run_hart_active`, and `translateAddr` inside `fetch_bytes`, are all
+   DEPTH 1 — their `match`es sit inside the continuation, not in a
+   separate bind.  Depth 3 and 4 come from `or_boolM`/`and_boolM` nests
+   and from the `untilMT` body.
+   **THE FILE TOWER is the one piece of bookkeeping `swp` does not
+   remove** (it is inherent: writes change the file).  Each write adds a
+   `register_set` layer, and each later lookup costs one
+   `rewrite (irrelevant_register_set r r' rs _ eq_refl)` — the value
+   argument is inferred, the disequality is `eq_refl`.
+
    **THE QED DEBT IS SETTLED** and needs no further experiment: the
    stretch that cost 665 s as one monolithic goal-side chain is 6.0 s
    decomposed per model function, and the decomposition exposes four
