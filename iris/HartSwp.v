@@ -101,6 +101,40 @@ Lemma mctx_comp {X Y : Type} (F : M X -> M Y) (C : M Y -> M unit) :
   mctx (fun m : M X => C (F m)).
 Proof. intros HC HF T oc k Hx. rewrite (HF _ oc k Hx). by apply HC. Qed.
 
+(* THE ERROR-FAMILY-PRESERVING FORMERS.  Inside an early-return region the
+   model nests binds several deep -- [or_boolM (bind (liftR read) K0) …]
+   under [bind0] under [bind] is depth THREE before the first call is
+   exposed -- so a fixed-depth context lemma does not scale.  [mctxE] is
+   the same commutation condition for a former that stays INSIDE one error
+   family, which every MR-level combinator does; [mctx_cer_F] then wraps
+   any such former once. *)
+Definition is_extraE {E : Type} {T : Type}
+    (oc : Interface.outcome (fun _ => E) T) : bool :=
+  match oc with
+  | Interface.ExtraOutcome _ => true
+  | _ => false
+  end.
+
+Definition mctxE {E X Y : Type}
+    (F : Defs.monad E X -> Defs.monad E Y) : Prop :=
+  forall (T : Type) (oc : Interface.outcome (fun _ => E) T)
+         (k : T -> Defs.monad E X),
+    is_extraE oc = false ->
+    F (Interface.Next oc k) = Interface.Next oc (fun v => F (k v)).
+
+Lemma mctxE_id {E X : Type} : mctxE (fun m : Defs.monad E X => m).
+Proof. intros T oc k _. reflexivity. Qed.
+
+Lemma mctxE_bind {E X Y Z : Type} (f : X -> Defs.monad E Y)
+    (F : Defs.monad E Y -> Defs.monad E Z) :
+  mctxE F -> mctxE (fun m : Defs.monad E X => F (Defs.bind m f)).
+Proof. intros HF T oc k Hx. rewrite /Defs.bind /=. by apply HF. Qed.
+
+Lemma mctxE_bind0 {E Y Z : Type} (n : Defs.monad E Y)
+    (F : Defs.monad E Y -> Defs.monad E Z) :
+  mctxE F -> mctxE (fun m : Defs.monad E unit => F (Defs.bind0 m n)).
+Proof. intros HF T oc k Hx. rewrite /Defs.bind0 /Defs.bind /=. by apply HF. Qed.
+
 (* THE EARLY-RETURN CONTEXT: a plain-[M] sub-monad lifted into an
    early-return region and bound to a continuation there -- which is how
    [run_hart_active] presents the fetch, the decode and the execute.
@@ -127,6 +161,34 @@ Proof.
   { destruct oc; try discriminate Hx; reflexivity. }
   rewrite Heq. by apply HC.
 Qed.
+
+
+(* the general form: ANY family-preserving former between the [liftR] and
+   the [catch_early_return].  [mctx_cer_liftR] is the instance at
+   [F := bind _ K]. *)
+Lemma mctx_cer_F {X R : Type} (F : MR R X -> MR R R) (C : M R -> M unit) :
+  mctx C -> mctxE F ->
+  mctx (fun m : M X => C (Defs.catch_early_return (F (Defs.liftR (R := R) m)))).
+Proof.
+  intros HC HF T oc k Hx.
+  destruct oc; try discriminate Hx;
+    (cbn [Defs.liftR Defs.try_catch];
+     erewrite (HF _ _ _); [by apply HC | reflexivity]).
+Qed.
+
+
+(* GLUE REDUCTIONS, as rewrite equations rather than as cbn: the model's
+   early-return regions are full of [bind0 (returnR tt) x] and similar
+   no-ops, and clearing them with a cbn wide enough to do the iota step
+   also unfolds [Defs.bind] everywhere else, re-spelling the goal as
+   [Interface.iMon_bind] and breaking every first-order match downstream. *)
+Lemma mbind0_ret {E A : Type} (x : Defs.monad E A) :
+  Defs.bind0 (Interface.Ret tt) x = x.
+Proof. reflexivity. Qed.
+
+Lemma mbind_ret {E A B : Type} (v : A) (f : A -> Defs.monad E B) :
+  Defs.bind (Interface.Ret v) f = f v.
+Proof. reflexivity. Qed.
 
 (* ====================================================================== *)
 (* 2. [swp].                                                               *)
@@ -236,6 +298,78 @@ Section swp.
 
   (* [swp] IS PERSISTENTLY USABLE UNDER A CONTEXT: the definition is a ∀ of
      wands, so the usual [iApply] discipline applies with no extra lemma. *)
+
+  (* PEELING A PLAIN-[M] CALL OUT OF AN EARLY-RETURN REGION.  This is the
+     shape [run_hart_active], [fetch], [fetch_bytes] and [checked_mem_read]
+     all present: a [catch_early_return] whose body binds [liftR sub] to a
+     continuation.  After the call returns, [bind (liftR (Ret v)) K] IS
+     [K v], so the goal lands on the region's own next position with no
+     rewriting at all -- the glue between two calls is then reduced by
+     conversion (a whitelisted cbn), never by a lemma. *)
+  Lemma swp_use_cer {X R : Type} (m : M X) (Φ : X -> iProp Σ)
+      (K : X -> MR R R) (C : M R -> M unit) :
+    mctx C ->
+    swp m Φ -∗
+    (∀ v : X, Φ v -∗
+       WP (HartE gen_id cpu_id (C (Defs.catch_early_return (K v)))
+           : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id
+          (C (Defs.catch_early_return (Defs.bind (Defs.liftR (R := R) m) K)))
+        : expr riscv_lang).
+  Proof.
+    iIntros (HC) "Hswp H".
+    iApply (swp_use m Φ _ (mctx_cer_liftR K C HC) with "Hswp H").
+  Qed.
+
+  (* DEPTH INSTANCES of [swp_use_cer], so a call site matches FIRST-ORDER
+     (only the continuations are inferred, never the former).  The model's
+     early-return regions nest binds up to three deep before the first
+     plain-[M] call is exposed -- [or_boolM (bind (liftR read) K0) …] under
+     [bind0] under [bind] -- and guessing the former by higher-order
+     unification is exactly the kind of thing §5 item 1 (d) is about. *)
+  Lemma swp_use_cer2 {X A R : Type} (m : M X) (Φ : X -> iProp Σ)
+      (K0 : X -> MR R A) (K1 : A -> MR R R) (C : M R -> M unit) :
+    mctx C ->
+    swp m Φ -∗
+    (∀ v : X, Φ v -∗
+       WP (HartE gen_id cpu_id
+             (C (Defs.catch_early_return (Defs.bind (K0 v) K1)))
+           : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id
+          (C (Defs.catch_early_return
+                (Defs.bind (Defs.bind (Defs.liftR (R := R) m) K0) K1)))
+        : expr riscv_lang).
+  Proof.
+    iIntros (HC) "Hswp H".
+    iApply (swp_use m Φ _
+              (mctx_cer_F (fun h => Defs.bind (Defs.bind h K0) K1) C HC
+                 (mctxE_bind K0 _ (mctxE_bind K1 _ mctxE_id)))
+              with "Hswp H").
+  Qed.
+
+  Lemma swp_use_cer3 {X A B R : Type} (m : M X) (Φ : X -> iProp Σ)
+      (K0 : X -> MR R A) (K1 : A -> MR R B) (K2 : B -> MR R R)
+      (C : M R -> M unit) :
+    mctx C ->
+    swp m Φ -∗
+    (∀ v : X, Φ v -∗
+       WP (HartE gen_id cpu_id
+             (C (Defs.catch_early_return
+                   (Defs.bind (Defs.bind (K0 v) K1) K2)))
+           : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id
+          (C (Defs.catch_early_return
+                (Defs.bind (Defs.bind (Defs.bind (Defs.liftR (R := R) m) K0)
+                              K1) K2)))
+        : expr riscv_lang).
+  Proof.
+    iIntros (HC) "Hswp H".
+    iApply (swp_use m Φ _
+              (mctx_cer_F
+                 (fun h => Defs.bind (Defs.bind (Defs.bind h K0) K1) K2) C HC
+                 (mctxE_bind K0 _ (mctxE_bind K1 _ (mctxE_bind K2 _ mctxE_id))))
+              with "Hswp H").
+  Qed.
 
 End swp.
 
