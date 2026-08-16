@@ -61,6 +61,8 @@ Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import IcacheRef.
+Require Import DirLinks.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -110,6 +112,167 @@ Qed.
 
 Definition su_sp (sp0 : mword 64) (M : regfile) : Prop :=
   M !!! Regidx csp_rs1 = pa_stk sp0 30.
+
+(* ===================================================================== *)
+(*  THE REGISTER BUNDLE -- [ProofSysLink.sl_regs]' shape at FIVE pinned    *)
+(*  registers, with [su_thr] as the fifth conjunct                         *)
+(*                                                                        *)
+(*  A whole-function walk that carries its pinned registers as a per-      *)
+(*  register [assert] chain pays the same proof once per register per      *)
+(*  instruction; sys_link showed the shape at four and sys_unlink needs    *)
+(*  FIVE (sp, s0, s1 = dp, s2 = ip, s3 = the dual-use counter/address), so *)
+(*  the chain is 25 % longer again.  The bundle plus its three movers --   *)
+(*  a CALLER-saved write, a callee's [callee_saved] report, and a write to *)
+(*  one of the three pinned callee-saved registers -- is what the walk     *)
+(*  threads instead.                                                       *)
+(*                                                                        *)
+(*  s0 IS [sp0], NOT a slot: [c.addi4spn s0,sp,240] at +0x06 puts the      *)
+(*  frame pointer back at the ENTRY sp ([su_fp]), which is why every       *)
+(*  buffer base below is off [sp0] and not off the pushed sp.              *)
+(* ===================================================================== *)
+
+Local Ltac su_rne1 Hf :=
+  first [ apply is_cs_idx_true_neq; [exact Hf | vm_compute; reflexivity]
+        | apply not_eq_sym; apply is_cs_idx_true_neq;
+          [exact Hf | vm_compute; reflexivity] ].
+
+Local Ltac su_rne2 Hf Ht :=
+  first [ apply is_cs_idx_true_neq; [exact Hf | exact Ht]
+        | apply not_eq_sym; apply is_cs_idx_true_neq; [exact Hf | exact Ht] ].
+
+Local Ltac su_xne N :=
+  let Hq := fresh "Hq" in
+  intro Hq; apply N;
+  first [ exact (regidx_inj _ _ Hq) | symmetry; exact (regidx_inj _ _ Hq) ].
+
+Local Ltac sunz := vm_compute; discriminate.
+
+Definition su_regs (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile)
+  : Prop :=
+  Mx !!! Regidx csp_rs1 = pa_stk sp0 30
+  /\ Mx !!! Regidx (mword_of_int 8 : mword 5) = sp0
+  /\ Mx !!! Regidx (mword_of_int 9 : mword 5) = dpv
+  /\ Mx !!! Regidx (mword_of_int 18 : mword 5) = ipv
+  /\ Mx !!! Regidx (mword_of_int 19 : mword 5) = s3v
+  /\ su_thr m Mx.
+
+Lemma su_regs_sp (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile) :
+  su_regs m sp0 dpv ipv s3v Mx -> su_sp sp0 Mx.
+Proof. intros (H & _). exact H. Qed.
+
+Lemma su_regs_s0 (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile) :
+  su_regs m sp0 dpv ipv s3v Mx ->
+  (Mx !!! Regidx (mword_of_int 8 : mword 5) : mword 64) = sp0.
+Proof. intros (_ & H & _). exact H. Qed.
+
+Lemma su_regs_s1 (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile) :
+  su_regs m sp0 dpv ipv s3v Mx ->
+  (Mx !!! Regidx (mword_of_int 9 : mword 5) : mword 64) = dpv.
+Proof. intros (_ & _ & H & _). exact H. Qed.
+
+Lemma su_regs_s2 (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile) :
+  su_regs m sp0 dpv ipv s3v Mx ->
+  (Mx !!! Regidx (mword_of_int 18 : mword 5) : mword 64) = ipv.
+Proof. intros (_ & _ & _ & H & _). exact H. Qed.
+
+Lemma su_regs_s3 (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile) :
+  su_regs m sp0 dpv ipv s3v Mx ->
+  (Mx !!! Regidx (mword_of_int 19 : mword 5) : mword 64) = s3v.
+Proof. intros (_ & _ & _ & _ & H & _). exact H. Qed.
+
+Lemma su_regs_thr (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile) :
+  su_regs m sp0 dpv ipv s3v Mx -> su_thr m Mx.
+Proof. intros (_ & _ & _ & _ & _ & H). exact H. Qed.
+
+(* a CALLER-saved write leaves every pinned register alone *)
+Lemma su_regs_caller (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx : regfile)
+    (r : mword 5) (v : mword 64) :
+  is_cs_idx r = false -> su_regs m sp0 dpv ipv s3v Mx ->
+  su_regs m sp0 dpv ipv s3v (<[Regidx r := v]> Mx).
+Proof.
+  intros Hr (H2 & H8 & H9 & H18 & H19 & Hthr). unfold su_regs. split_and!.
+  - rewrite upd_ne; [exact H2 | su_rne1 Hr].
+  - rewrite upd_ne; [exact H8 | su_rne1 Hr].
+  - rewrite upd_ne; [exact H9 | su_rne1 Hr].
+  - rewrite upd_ne; [exact H18 | su_rne1 Hr].
+  - rewrite upd_ne; [exact H19 | su_rne1 Hr].
+  - intros c Hc N2 N8 N9 N18' N19'.
+    rewrite upd_ne; [exact (Hthr c Hc N2 N8 N9 N18' N19') | su_rne2 Hr Hc].
+Qed.
+
+(* ...and so does a callee's [callee_saved] report *)
+Lemma su_regs_cs (m : regfile) (sp0 dpv ipv s3v : mword 64) (Mx My : regfile) :
+  callee_saved Mx My ->
+  su_regs m sp0 dpv ipv s3v Mx -> su_regs m sp0 dpv ipv s3v My.
+Proof.
+  intros Hcs (H2 & H8 & H9 & H18 & H19 & Hthr). unfold su_regs. split_and!.
+  - rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)).
+    exact H2.
+  - rewrite (callee_saved_lookup Hcs (mword_of_int 8 : mword 5)
+               ltac:(vm_compute; reflexivity)).
+    exact H8.
+  - rewrite (callee_saved_lookup Hcs (mword_of_int 9 : mword 5)
+               ltac:(vm_compute; reflexivity)).
+    exact H9.
+  - rewrite (callee_saved_lookup Hcs (mword_of_int 18 : mword 5)
+               ltac:(vm_compute; reflexivity)).
+    exact H18.
+  - rewrite (callee_saved_lookup Hcs (mword_of_int 19 : mword 5)
+               ltac:(vm_compute; reflexivity)).
+    exact H19.
+  - intros c Hc N2 N8 N9 N18' N19'. rewrite (callee_saved_lookup Hcs c Hc).
+    exact (Hthr c Hc N2 N8 N9 N18' N19').
+Qed.
+
+(* the [c.mv s1,a0] at +0x2c -- dp *)
+Lemma su_regs_wr_s1 (m : regfile) (sp0 dpv dpv' ipv s3v : mword 64)
+    (Mx : regfile) (v : mword 64) :
+  v = dpv' -> su_regs m sp0 dpv ipv s3v Mx ->
+  su_regs m sp0 dpv' ipv s3v (<[Regidx (mword_of_int 9 : mword 5) := v]> Mx).
+Proof.
+  intros Hv (H2 & H8 & H9 & H18 & H19 & Hthr). unfold su_regs. split_and!.
+  - rewrite upd_ne; [exact H2 | sunz].
+  - rewrite upd_ne; [exact H8 | sunz].
+  - rewrite upd_eq. exact Hv.
+  - rewrite upd_ne; [exact H18 | sunz].
+  - rewrite upd_ne; [exact H19 | sunz].
+  - intros c Hc N2 N8 N9 N18' N19'.
+    rewrite upd_ne; [exact (Hthr c Hc N2 N8 N9 N18' N19') | su_xne N9].
+Qed.
+
+(* the [c.mv s2,a0] at +0x6c -- ip *)
+Lemma su_regs_wr_s2 (m : regfile) (sp0 dpv ipv ipv' s3v : mword 64)
+    (Mx : regfile) (v : mword 64) :
+  v = ipv' -> su_regs m sp0 dpv ipv s3v Mx ->
+  su_regs m sp0 dpv ipv' s3v (<[Regidx (mword_of_int 18 : mword 5) := v]> Mx).
+Proof.
+  intros Hv (H2 & H8 & H9 & H18 & H19 & Hthr). unfold su_regs. split_and!.
+  - rewrite upd_ne; [exact H2 | sunz].
+  - rewrite upd_ne; [exact H8 | sunz].
+  - rewrite upd_ne; [exact H9 | sunz].
+  - rewrite upd_eq. exact Hv.
+  - rewrite upd_ne; [exact H19 | sunz].
+  - intros c Hc N2 N8 N9 N18' N19'.
+    rewrite upd_ne; [exact (Hthr c Hc N2 N8 N9 N18' N19') | su_xne N18'].
+Qed.
+
+(* [s3] is DUAL-USE, so it is written twice: [c.mv s3,a5] at +0x104 (the
+   isdirempty counter) and [addi s3,s0,-64] at +0x8a (writei's [&de]), plus
+   the [c.addiw s3,s3,16] bump at +0x122. *)
+Lemma su_regs_wr_s3 (m : regfile) (sp0 dpv ipv s3v s3v' : mword 64)
+    (Mx : regfile) (v : mword 64) :
+  v = s3v' -> su_regs m sp0 dpv ipv s3v Mx ->
+  su_regs m sp0 dpv ipv s3v' (<[Regidx (mword_of_int 19 : mword 5) := v]> Mx).
+Proof.
+  intros Hv (H2 & H8 & H9 & H18 & H19 & Hthr). unfold su_regs. split_and!.
+  - rewrite upd_ne; [exact H2 | sunz].
+  - rewrite upd_ne; [exact H8 | sunz].
+  - rewrite upd_ne; [exact H9 | sunz].
+  - rewrite upd_ne; [exact H18 | sunz].
+  - rewrite upd_eq. exact Hv.
+  - intros c Hc N2 N8 N9 N18' N19'.
+    rewrite upd_ne; [exact (Hthr c Hc N2 N8 N9 N18' N19') | su_xne N19'].
+Qed.
 
 (* ===================================================================== *)
 (*  THE FRAME ARITHMETIC -- 240 bytes, THIRTY slots                       *)
@@ -1088,3 +1251,101 @@ Section ProofSysUnlinkEpilogue.
   Qed.
 
 End ProofSysUnlinkEpilogue.
+
+(* ===================================================================== *)
+(*  THE T_DIR ARM'S RE-PARK OF [ip], and the ONE premise it cannot supply  *)
+(*                                                                        *)
+(*  On the T_DIR arm the walk spends [ip]'s [".."] ticket at              *)
+(*  [dp->nlink--] ([DirLinks.dir_links_dotdot_out] hands out the           *)
+(*  [ilink dp], [SpecIupdate.wp_iupdate_unlink] consumes it) and must then *)
+(*  hand [ip]'s payload back at [iunlockput(ip)] -- so record 1 of [ip]    *)
+(*  needs a ticket it no longer has.  [DirLinks.dir_link_at] offers        *)
+(*  exactly three ways to have one:                                       *)
+(*                                                                        *)
+(*    * the record is FREE     -- false: [dir_dots_ix] says record 1 is a  *)
+(*                                live [".."];                            *)
+(*    * the record is the SELF record -- false, same clause;               *)
+(*    * [ilink]                -- SPENT at [dp->nlink--];                  *)
+(*    * [igrey] AND the HOME's count is ZERO -- the grey half is free      *)
+(*      ([InodeRegion.ireg_link_grey], no premise at all), the HOME half   *)
+(*      is [bv_unsigned (di_nlink dn') = 0] and IS NOT DERIVABLE.          *)
+(*                                                                        *)
+(*  This lemma is the constructor for the fourth route, stated with that   *)
+(*  one fact as a PREMISE rather than assumed: everything else the re-park *)
+(*  needs is already in hand -- record 0 is the self record and records    *)
+(*  2.. are dead, both out of the isdirempty loop and [dir_dots_ix].       *)
+(*                                                                        *)
+(*  WHAT THE PREMISE MEANS, AND WHY IT HAS NO SUPPLIER.  [ip->nlink--]     *)
+(*  lands at zero exactly when [ip]'s count was ONE going in, i.e. when an *)
+(*  empty directory's link count is 1 -- true of xv6 (a directory's count  *)
+(*  is 1 + its subdirectory count, and [isdirempty] says there are none)   *)
+(*  but stated NOWHERE in the model: [InodeRegion.ireg_link_ok] bounds the *)
+(*  ledger BELOW the count ((L1), [w <= nlink]) and nothing bounds it      *)
+(*  above.  design/fs-icache.md 20.17.4 sharpening (a) asserts the fact    *)
+(*  ("the home still has nlink = 1") without a carrier.  See               *)
+(*  projects/fs-sysfile.md, S7-unlink, FINDING 3.                          *)
+(* ===================================================================== *)
+
+Section ProofSysUnlinkOrphan.
+  Context `{!icacheG Σ} `{ICFG : icfg}.
+
+  (* record 0 is the SELF record, so its ticket is [emp] *)
+  Lemma su_link_self (self : Z) (dn' : dinode) (data : nat -> list (bv 8)) :
+    bv_unsigned (dir_inum data 0) = self ->
+    ⊢ dir_link_at self dn' data 0.
+  Proof.
+    intro Hs. rewrite /dir_link_at.
+    rewrite (bool_decide_eq_true_2 (bv_unsigned (dir_inum data 0) = self) Hs).
+    rewrite andb_false_r. done.
+  Qed.
+
+  (* ...and a record the isdirempty loop found FREE carries nothing *)
+  Lemma su_link_dead (self : Z) (dn' : dinode) (data : nat -> list (bv 8))
+      (k : nat) :
+    dir_inum data k = bv_0 16 -> ⊢ dir_link_at self dn' data k.
+  Proof. intro Hz. exact (dir_link_at_zeroed self dn' data k Hz). Qed.
+
+  (* THE CONSTRUCTOR.  [igrey] in, [ip]'s whole [dir_links] out. *)
+  Lemma su_dir_links_orphan (self : Z) (dn' : dinode)
+      (data : nat -> list (bv 8)) :
+    bv_unsigned (di_nlink dn') = 0 ->
+    bv_unsigned (dir_inum data 0) = self ->
+    (forall k : nat, (2 <= k)%nat ->
+       (k < dir_nrec (bv_unsigned (di_size dn')))%nat ->
+       dir_inum data k = bv_0 16) ->
+    igrey (bv_unsigned (dir_inum data 1)) -∗ dir_links self dn' data.
+  Proof.
+    intros Hnl Hself Hdead. iIntros "Hg".
+    (* every index but 1 is [emp], whatever the record at 1 turns out to be *)
+    assert (Hemp : forall k : nat, k <> 1%nat ->
+              (k < dir_nrec (bv_unsigned (di_size dn')))%nat ->
+              ⊢ (dir_link_at self dn' data k : iProp Σ)).
+    { intros k Hk1 Hk.
+      destruct k as [| k']; [ exact (su_link_self self dn' data Hself) |].
+      destruct k' as [| k'']; [ congruence |].
+      apply su_link_dead. apply Hdead; lia. }
+    rewrite /dir_links.
+    destruct (decide (bv_unsigned (di_type dn') = T_DIR_z)) as [_ | _];
+      [| iClear "Hg"; done].
+    destruct (decide (1 < dir_nrec (bv_unsigned (di_size dn')))%nat)
+      as [Hlt | Hge].
+    - rewrite (big_sepL_delete (fun _ k => dir_link_at self dn' data k)
+                 (seq 0 (dir_nrec (bv_unsigned (di_size dn')))) 1%nat 1%nat).
+      2:{ apply lookup_seq. lia. }
+      iSplitL "Hg".
+      + rewrite /dir_link_at.
+        destruct (dir_liveb data 1
+                  && negb (bool_decide (bv_unsigned (dir_inum data 1) = self)));
+          [| iClear "Hg"; done].
+        iRight. iSplitL "Hg"; [iExact "Hg" | iPureIntro; exact Hnl].
+      + iApply big_sepL_intro. iIntros "!>" (i k Hik).
+        destruct (decide (i = 1%nat)) as [-> | Hne]; [done |].
+        apply lookup_seq in Hik. destruct Hik as [Hke Hi]. subst k.
+        rewrite Nat.add_0_l. iApply (Hemp i Hne Hi).
+    - iClear "Hg". iApply big_sepL_intro. iIntros "!>" (i k Hik).
+      apply lookup_seq in Hik. destruct Hik as [Hke Hi]. subst k.
+      rewrite Nat.add_0_l.
+      iApply (Hemp i ltac:(lia) Hi).
+  Qed.
+
+End ProofSysUnlinkOrphan.
