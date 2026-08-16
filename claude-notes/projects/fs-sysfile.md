@@ -9493,6 +9493,71 @@ flavoured mint at create's `dp->nlink++` and states the `DirLinks`/`DirView`
 clause that turns it into an upper bound; V3 is this walk's consumption.
 **Do not start the T_DIR arm before V2 lands.**
 
+### FINDING 3's CARRIER — **V2 IS LANDED AND GATED.  THE WALL IS DOWN: the
+### payload now bounds a directory's count from ABOVE, and the T_DIR arm's
+### one unsupplied premise is derivable**
+
+The full record is [`fs-fragments-campaign.md`](fs-fragments-campaign.md)'s
+V2 section.  What S7-unlink needs to know, in the order the walk meets it:
+
+* **`DirLinks.dir_links` carries `∃ F : nat -> bool, ⌜DirView.dlc_bound F
+  dn data⌝`** beside its big-op, where `dlc_bound` is
+  `di_nlink dn <= 1 + #{k < nrec | k ∉ {0,1}, live, F k}` and `F k` says
+  record `k`'s ticket is the d-flavoured `ilinkd`.  Both DOT indices are
+  refused by index — `".."` names a directory and pays for the PARENT's
+  count, so admitting it would leave the clause at `nlink <= 2` and this
+  arm still blocked.
+* **`di_nlink ip = 1` IS NOW DERIVABLE, and it is the whole point.**
+  `DirLinks.dir_links_empty_nlink` is the one-line reading:
+
+  ```coq
+    (forall k, (2 <= k)%nat -> (k < dir_nrec (di_size dn))%nat ->
+       dir_inum data k = bv_0 16) ->
+    dir_links self dn data -∗
+      ⌜di_type dn = T_DIR_z -> bv_unsigned (di_nlink dn) <= 1⌝
+  ```
+
+  Its premise is exactly what the isdirempty loop concludes; its
+  conclusion is PURE, so `iDestruct … as %H` leaves the payload in place
+  for the re-park two instructions later.  With the walk's `blez`
+  fall-through (`1 <= di_nlink ip`) that is the equation
+  `su_dir_links_orphan` takes as its premise.
+* **`su_dir_links_orphan`'s statement did not move**, and its proof is now
+  one line (`exact (DirLinks.dir_links_orphan self dn' data)`) — the
+  content lives in `DirLinks` now, because building `dir_links` record by
+  record is the payload's business once the flavour map is inside it.
+  `su_link_self` / `su_link_dead` are untouched.
+* **`dir_links_unlink` HAS A NEW SHAPE and it is the file arm's job to
+  read it.**  It hands out `∃ b : bool, ilink_fl (dlc_fl b) …` — the
+  removed record's ticket AT ITS OWN FLAVOUR — and re-parks through a WAND
+  whose premise is
+  `di_nlink dn' + (if b then 1 else 0) <= di_nlink dn`:
+    * the **FILE arm** refutes `b = true` outright: at `b = true` it holds
+      `ilinkd ip`, and `IregDirBit.ireg_dirbit_ty` reads `di_type ip =
+      T_DIR` off it against the `beq a4,1` at +0xb4 that this arm fell
+      THROUGH.  Then the premise is `nlink' <= nlink`, which the arm has
+      (it does not touch `dp->nlink`).
+    * the **T_DIR arm** pays the unit with the `dp->nlink--` it executes
+      anyway, and needs no refutation at all — at `b = false` the premise
+      is weaker still.
+    * either way the released `ilink_fl (dlc_fl b)` is exactly what
+      `SpecIupdate.wp_iupdate_unlink` at `fl := dlc_fl b` spends, so no
+      conversion happens at the seam.
+  The old `di_nlink dn' = di_nlink dn` premise is GONE.
+* **`dir_links_dotdot_out` likewise** hands out `∃ b, ilink_fl (dlc_fl b)`
+  and takes the same ticket back; its return leg needs no premise, because
+  index 1 is refused by the count.
+* `IregLinkNz.dir_links_nlink_drop` gains `di_nlink dn' <= di_nlink dn`
+  (the name made honest), and `DirLinks.dir_links_size_zero` gains
+  `di_nlink dn <= 1`.  Both are free at every landed caller.
+
+**SpecSysUnlink.v WAS NOT TOUCHED** (it is this lane's file): its header's
+description of `dir_links_unlink`'s premises is stale as of V2 and should
+be refreshed when V3 lands.
+
+**THE STOP IS LIFTED.**  V3 — this walk's T_DIR arm — is unblocked and is
+the walk lane's to write.
+
 ### THE TWO CLAUSES THE WALK SPENDS, and what each hands back
 
 Both ride in `IcacheEscrow.ipool_alloc` and `ic_loaded` since the payload

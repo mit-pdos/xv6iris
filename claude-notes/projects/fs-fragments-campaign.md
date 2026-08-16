@@ -16,7 +16,7 @@ diverged from the design's sketches, and what is left.
 | **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause AND the isdirempty plank are landed** — see below) | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
 | **V1** | the COUNT-FACT CARRIER: `w` widened to `(wl, wd)`, `ilinkd`, (T1), the flavour-indexed movers and `wp_iupdate_link`/`_unlink` | IcacheRef, InodeRegion, IregLinkNz, `IregDirBit.v` (new), IcacheBoot, SpecIupdate, ProofIupdate + 3 callers | full cone | **LANDED** |
-| **V2** | the `DirLinks`/`DirView` clause + the d-flavoured mint ESTABLISHED at create's `dp->nlink++` (+0xc4) and sys_link's | DirLinks, DirView, ProofCreate, ProofSysLink | V1 | NOT STARTED |
+| **V2** | the `DirLinks`/`DirView` COUNT CLAUSE + the d-flavoured mint ESTABLISHED at create's mkdir arm | DirView, DirLinks, InodeRegion, IregLinkNz, FsRep, IcacheBoot, ProofIlock, ProofCreate, ProofSysLinkTails, ProofSysUnlinkParts | full cone | **LANDED** |
 | **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | NOT STARTED |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
@@ -976,3 +976,207 @@ green first, then the edit.
   changes nothing about FINDING 3's arithmetic — `di_nlink ip = 1` at an
   empty directory is still stated nowhere, and `ilinkd` does not state it.
   V2's `DirLinks`/`DirView` clause is where that has to come from.
+
+## V2 — THE COUNT CLAUSE, LANDED.  `dir_links` carries `∃ F, dlc_bound F`,
+## and create's mkdir arm is its one producer
+
+V1 landed the carrier with no producer and no consumer; V2 states the
+clause the carrier was for and establishes it.  The design of record is
+`fs-sysfile.md`'s S7-unlink FINDING 3; V3 is the walk's consumption.
+
+### What the clause IS
+
+`DirView.dlc_bound F dn data` is
+
+```
+bv_unsigned (di_nlink dn)
+  <= 1 + Z.of_nat (dlc_count F data (dir_nrec (bv_unsigned (di_size dn))))
+```
+
+where `dlc_count` counts the indices `k < nrec` with
+`dlc_ctb F data k = dlc_dotb k && dir_liveb data k && F k`, i.e. the LIVE,
+NON-DOT records whose ticket is d-flavoured.  It is xv6's own accounting
+read as an inequality: a directory's count is one (its entry in its parent)
+plus one per subdirectory, and its subdirectories are exactly its non-dot
+records that name a directory.
+
+**BOTH DOTS ARE REFUSED BY INDEX, and record 1 is the load-bearing one.**
+`".."` names the PARENT — a directory, hence indistinguishable from a
+subdirectory by any type test — but it pays for the parent's count, not for
+this one.  If index 1 were admitted, the clause at an empty directory would
+read `nlink <= 2` and V3 would still be blocked; the flavour map is
+existential, so "the `".."` ticket happens to be plain" is not a fact a
+consumer can use.  Record 0 is the self record and is refused for the same
+reason one index over.
+
+**IT IS AN INEQUALITY, AND THAT IS WHAT MAKES THE `++` FREE.**  Crossing
+create's `dp->nlink++` needs only `DirLinks.dlc_bv_add1_le` —
+`bv_unsigned (add_vec h 1) <= bv_unsigned h + 1`, unconditional, because
+the wrap lands at zero.  An EQUALITY would have needed (L4) at a record the
+walk cannot name (fs-sysfile.md's twelfth stop).  This is what buying the
+weaker clause bought, and it is the single best decision in the increment.
+
+### Where it rides, and why not beside
+
+`dir_links` gains `∃ F : nat -> bool, ⌜dlc_bound F dn data⌝ ∗ <the big-op
+at F>`, INSIDE the existing `if decide (type = T_DIR)`.  Arity does not
+move; a non-directory's payload is still literally `emp`, so every landed
+discharge that opens the definition on a refuted type is unchanged.
+
+**A FREE-FLOATING `⌜∃ F, dlc_bound F dn data⌝` BESIDE THE BIG-OP WOULD BE
+UNSOUND TO PRESERVE, and that is the whole argument for the shape.**  At
+sys_unlink's zeroing the count falls, and the only evidence that it did not
+fall below the home's count is the RELEASED TICKET's flavour — read off by
+`IregDirBit.ireg_dirbit_ty`, which needs the fragment.  A bound not tied to
+the tickets could not be re-established there by anybody.
+
+### The ticket, and the one duplication
+
+`dir_link_at_f F self dn data k` is the flavoured ticket
+(`ilink_fl (dlc_fl (F k))` in the live disjunct, grey disjunct verbatim).
+`dir_link_at` KEEPS ITS OWN EXPANDED BODY as the plain instance
+(`dir_link_at_f_plain` is the convertibility, one `reflexivity`) — because
+five landed consumers (`IregLinkNz.dir_link_at_nlink_drop`,
+`FsRep.fedges_acc`, `ProofCreate.cr_grey_links`, `ProofSysUnlinkParts`'s
+two record lemmas) open it with `rewrite /dir_link_at` and then `destruct`
+the guard, which only fires on the literal `if`.  Five lines of duplicated
+guard against a five-file sweep of a live lane's files: worth it, and the
+header says so at the point of use.
+
+### The mover table
+
+| lemma | what moved |
+|---|---|
+| `dir_links_dirlink` | **statement UNCHANGED.**  The deposit is plain, so `F' = F[k0 := false]`, the slot was dead (`dir_slot_free` below the count, out of range at it) and the count cannot fall — `dlc_count_slot_ge` |
+| `dir_links_dirlink_nop` | statement unchanged; `F' = F`, count equal |
+| `dir_links_dirlink_d` | **NEW.**  create's mkdir deposit AND the `++`, in ONE lemma (see below) |
+| `dir_links_unlink` | `di_nlink dn' = di_nlink dn` OUT; the released ticket comes back at `∃ b, ilink_fl (dlc_fl b)` and the re-park is a WAND whose premise is `nlink' + (if b then 1 else 0) <= nlink` |
+| `dir_links_dotdot_out` | same shape: `∃ b, ilink_fl (dlc_fl b)` out, the same ticket back in.  Index 1 is refused by the count, so the return leg takes NO premise |
+| `dir_links_live` / `_of_ilink` | thread `F`: `live` hands out `∃ F, ⌜type = T_DIR -> dlc_bound F dn data⌝ ∗ dir_ilinks F …`, and `of_ilink`'s return leg takes the clause at its own record |
+| `dir_links_size_zero` | one new premise, `nlink <= 1`, free at its one caller (ilock's claim box is `fresh_shape`, `nlink = 0`) |
+| `IregLinkNz.dir_links_nlink_drop` | one new premise, `nlink' <= nlink` — the lemma's own name made honest; free at its one caller (sys_link's `bad:` tail already holds `nlink = nlink' + 1`) |
+| `FsRep.fedges_acc` | hands `∃ F` out with the borrowed ticket; no consumers |
+| `dir_links_orphan` | **MOVED DOWN** out of `ProofSysUnlinkParts.su_dir_links_orphan`, which is now a one-line `exact` (see the coordination note) |
+
+### `dir_links_dirlink_d` — why the deposit and the `++` are ONE lemma
+
+create's mkdir arm appends the child's record to the parent (+0x12c) and
+raises the parent's count four instructions later (+0x134).  Between them
+the clause's slack is exactly one, held by the record just written — and
+**sealing the payload in between existentially quantifies the flavour map
+away and loses it**: what comes back out of `dir_links` is "SOME `F` with
+the bound", which is strictly weaker than "THIS `F`, and the record at `k0`
+is set".  So the walk holds the `ilinkd` across the `++` and applies one
+lemma at the end.  That replaced the landed
+`dir_link_at_dirlink` + `dir_links_dirlink` + `dir_links_live` +
+`dir_links_of_ilink` chain at ARM C-OK-DIR with a single `iDestruct`.
+
+That leaves `dir_links_live` / `dir_links_of_ilink` CONSUMER-LESS for now.
+They are kept, threaded, because they are the general open/seal pair and
+`DirView.dir_dots_ix`'s own header cites the round trip as the reason its
+clause names the fields it does; the fused lemma is the instance create
+happens to need, not a replacement for the pair.
+
+Two premises it takes that its plain sibling does not:
+
+* **`tot = 16`, not `2 <= tot <= 16`.**  At a SHORT write the appended
+  record falls outside the new `dir_nrec` and is not counted, while
+  `dp->nlink` rises anyway — the clause is genuinely false there.  ARM
+  C-OK-DIR is the `tot = 16` arm by construction.
+* **the child is not the parent** (`bv_unsigned inum <> self`), else the
+  new record is a SELF record, its ticket is `emp` and the count does not
+  move.  Supplied by `InodeRegion.dinode_at_ne` (new, 8 lines beside
+  `dinode_at_excl`): two records held at once are two records.  create
+  holds both `dinode_at`s at that instruction, and the conclusion is pure,
+  so `iDestruct … as %H` consumes neither.
+
+`2 <= k0` is NOT a premise: `dir_dots_ix` says records 0 and 1 are live and
+`dir_slot` never returns a live record below the count, so the slot is at 2
+or past the end.  The argument is made inside the lemma, where both facts
+are already in the hypothesis list.
+
+### The mint's flavour — `ProofCreate.cr_flav`
+
+The `ip->nlink = 1; iupdate(ip)` at +0xc4 mints the unit the parent's new
+record will hold, and it runs BEFORE the `beq` at +0xca that decides the
+type — so the flavour index it passes is `cr_flav ty := if decide (ty =
+T_DIR) then Some tt else None`, and each arm reduces it with its own
+decision (`cr_flav_file` at ARM C-OK, `cr_flav_dir` at ARM C-OK-DIR).  The
+three bodies that carry the undeposited ticket state it at
+`ilink_fl (cr_flav ty)`, and the two fail-arm `wp_iupdate_unlink`s spend it
+at the same index — V1's flavoured unlink contract, first consumer.
+
+**NO NEW GATE.**  The contract's premise at `Some tt` is the flushed
+record's type, and create has `di_type dnc = ty` from the fresh-type fact
+it already carries (`Htyc`, `SpecCreateFreshTy`'s licence).  `Print
+Assumptions Create.wp_create_sconf` is unchanged: six + `create_fresh_ty`.
+
+### Boot — one computational image fact, no signature move
+
+`IcacheBoot.ipool_shape_alloc`/`ipool_alloc` take `dir_links` as a resource
+the client supplies, so the clause lands INSIDE a premise that already
+existed and no arity moves.  What it costs the client is one fact about the
+image — every image directory has `nlink <= 1` — because the region's boot
+authorities are all-plain (V1), so the stock is built at `F = fun _ =>
+false` where the right-hand side is `1 + 0`.  True of mkfs (it writes
+`nlink = 1` into the root and creates no subdirectory).
+`DirLinks.dir_links_of_plain` is the constructor and
+`DirView.dlc_bound_le1` discharges the clause from the fact.  Recorded at
+the premise; **not** added to `ireg_alloc`'s ∀-slot, which is about REGION
+records and would have carried a premise nothing consumes.
+
+### Coordination — the one frozen-file edit
+
+`ProofSysUnlinkParts.su_dir_links_orphan` built `dir_links` record by
+record, so it could not survive the definition change.  Its STATEMENT is
+untouched and its proof is now `exact (dir_links_orphan self dn' data)` —
+the content moved down to `DirLinks`, where the flavour map lives.
+`su_link_self` / `su_link_dead` are untouched (they are about
+`dir_link_at`, which did not move).  Nothing else in `ProofSysUnlink*.v`
+changed, and `SpecSysUnlink.v` was not touched — its header's description
+of `dir_links_unlink`'s shape is now stale and is the walk lane's to
+refresh when V3 lands.
+
+**RE-BASE POINT: `62b65002`** (the walk lane's `su_w2` increment plus its
+durable-notes entry).  V2 was written against `cf313932`, gated on a lane
+tree re-pointed at `62b65002`, and the two change sets are disjoint by
+inspection: the walk's new `ProofSysUnlink.v` mentions `dir_links` exactly
+once, opaquely, in a block lemma's premise list — no unfolding, no lemma of
+this file used.
+
+### The payoff lemma, and it is what V3 calls
+
+`DirLinks.dir_links_empty_nlink` is the clause read back as the fact it was
+built for:
+
+```coq
+  (forall k, (2 <= k)%nat -> (k < dir_nrec (di_size dn))%nat ->
+     dir_inum data k = bv_0 16) ->
+  dir_links self dn data -∗
+    ⌜di_type dn = T_DIR_z -> bv_unsigned (di_nlink dn) <= 1⌝
+```
+
+The premise is exactly what the isdirempty loop concludes; the conclusion
+is pure, so `iDestruct … as %H` reads it off the `ic_loaded` payload and
+LEAVES THE PAYLOAD IN PLACE — which the arm needs, since it re-parks that
+very payload two instructions later.  With the walk's `blez` fall-through
+(`1 <= nlink`) it is `di_nlink ip = 1`, and FINDING 3 is closed.
+
+### What V3 inherits
+
+* `dir_links_unlink` at its new shape — the FILE arm refutes `b = true`
+  with `IregDirBit.ireg_dirbit_ty` against the `beq` at +0xb4 and owes
+  nothing; the T_DIR arm pays the one unit with the `dp->nlink--` it was
+  going to execute.  Either way the released `ilink_fl (dlc_fl b)` is
+  exactly what `wp_iupdate_unlink` at `fl := dlc_fl b` spends.
+* `dir_links_dotdot_out` at its new shape, and `dir_links_orphan` for the
+  re-park.
+* **FINDING 3's missing equation, at last**: `dir_links_empty_nlink` off
+  `ic_loaded ip`'s payload, plus the walk's `blez` fall-through, is
+  `di_nlink ip = 1` — `su_dir_links_orphan`'s one unsupplied premise.
+* **Not inherited, and the next thing V3 will notice**: nothing yet makes
+  `dir_links_unlink`'s FILE arm free of the `ilinkd` refutation — it is a
+  real `iMod` against `ireg_inv`, at an arm that otherwise touches no ghost
+  state.  It is three lines (`IregDirBit.ireg_dirbit_ty`, the type test,
+  `discriminate`), but it does put the region's invariant in the file arm's
+  hand, so budget the mask (`solve_ndisj`) there.
