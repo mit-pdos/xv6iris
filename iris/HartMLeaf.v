@@ -70,6 +70,19 @@ Definition hp_post (rs : regstate) (mi : SailStdpp.Values.mword 64)
                 (register_lookup (R_bitvector_32 mcountinhibit) rs)
                 (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))).
 
+(* [hp_post] IS the generic wrapper's post-file at this word: the
+   instruction leaves [nextPC] at pc+2 over the prelude's file, and the
+   tail commits it into PC and bumps minstret.  One [register_lookup_set]
+   away from syntactic identity -- which is what makes [swp_try_step_hp]
+   a corollary of [swp_try_step_gen] rather than a re-proof. *)
+Lemma wrap_post_hp (rs : regstate) (mi : SailStdpp.Values.mword 64) :
+  wrap_post (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+               (wrap_pre rs)) mi
+  = hp_post rs mi.
+Proof.
+  unfold wrap_post, hp_post, wrap_pre. by rewrite register_lookup_set.
+Qed.
+
 (* what one cycle body does to a single cell: four named writes, and
    nothing else -- so a caller reads the post-file off cell by cell *)
 Lemma hp_post_PC (rs : regstate) (mi : SailStdpp.Values.mword 64) :
@@ -871,9 +884,9 @@ Section leaf.
                 (register_set (R_bitvector_64 nextPC)
                    (add_vec_int hp_pc 2) rs) _ _ _ d pa pmar0 pcfg R Hdisj
                 HDmst HDpriv HDpma HDcfg HDhtif
-                ltac:(t_peel; exact Hpriv) ltac:(t_peel; exact Hpma)
-                ltac:(t_peel; exact Hpcfg) ltac:(t_peel; exact Hhtif)
-                ltac:(t_peel; exact Hmprv) Hunlock Hpallow Hsram Hsva Hspa
+                ltac:(rewrite /wrap_pre; t_peel; exact Hpriv) ltac:(rewrite /wrap_pre; t_peel; exact Hpma)
+                ltac:(rewrite /wrap_pre; t_peel; exact Hpcfg) ltac:(rewrite /wrap_pre; t_peel; exact Hhtif)
+                ltac:(rewrite /wrap_pre; t_peel; exact Hmprv) Hunlock Hpallow Hsram Hsva Hspa
                 Hsplit Hrx Hgta with "Hcert Hrw Hro Hwmem"). }
     iIntros (v) "(-> & Hrw & Hro & HR)". l_glue.
     rewrite mcer_ret.
@@ -1011,125 +1024,29 @@ Section leaf.
       Hpriv Hhart Hpc Hpma Hpcfg Hhtif HmisaS HmisaC HmIE Hmprv Hlpad
       Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa Hsram Hsva Hspa Hsplit Hrx Hgta.
     iIntros "#Hcert Hrw Hro Hmem Hwmem".
-    unfold try_step. cbn beta iota zeta delta [ext_pre_step_hook].
-    iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_bind_use (should_inc_minstret Machine) _ _ _
-              with "[Hrw Hro] [-]").
-    { iApply (swp_should_inc_minstret Drw Dro Df rs Hdisj HDmc HDcfg
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)".
-    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
-    { iApply (swp_bind0_use
-                (Defs.write_reg (R_bool minstret_increment)
-                   (minstret_inc_flag
-                      (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                      (register_lookup (R_bitvector_64 minstretcfg) rs)))
-                _ _ _ with "[Hrw Hro] [-]").
-      { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDmi
-                  with "Hcert Hrw Hro"). }
-      iIntros (u) "[Hrw Hro]".
-      iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)".
-    t_peel. rewrite Hhart.
-    (* THE INSTRUCTION *)
-    iApply (swp_bind_use (run_hart_active 0) _ _ _
-              with "[Hrw Hro Hmem Hwmem] [-]").
-    { iApply (swp_run_hart_active_hp Drw Dro Df
-                (register_set (R_bool minstret_increment)
-                   (minstret_inc_flag
-                      (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                      (register_lookup (R_bitvector_64 minstretcfg) rs)) rs)
-                pmar0 pcfg pa d R Hdisj
-                HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg2 HDhtif
-                ltac:(t_peel; exact Hpriv) ltac:(t_peel; exact Hpc)
-                ltac:(t_peel; exact Hpma) ltac:(t_peel; exact Hpcfg)
-                ltac:(t_peel; exact Hhtif)
-                ltac:(t_peel; exact HmisaS) ltac:(t_peel; exact HmIE)
-                ltac:(t_peel; exact HmisaC) Hlpad
-                Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
-                ltac:(t_peel; exact Hmprv) Hsram Hsva Hspa Hsplit Hrx Hgta
-                with "Hcert Hrw Hro Hmem Hwmem"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". l_glue.
-    (* the tail: the hart_state assert, tick_pc, the minstret bump *)
-    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
-    { iApply (swp_bind0_use _ _
-                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
-                with "[Hrw Hro] [-]").
-      { iApply (swp_bind_use (Defs.read_reg hart_state) _ _ _
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
-                    with "Hcert Hrw Hro"). }
-        iIntros (v) "(-> & Hrw & Hro)". t_peel. rewrite Hhart.
-        cbn beta iota zeta delta [hart_is_active Defs.assert_exp].
-        iApply swp_ret. iFrame. }
-      iIntros (u) "[Hrw Hro]".
-      iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". t_peel. rewrite Hhart. l_glue.
-    iApply (swp_bind0_use (tick_pc tt) _
-              (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I)
-              _ with "[Hrw Hro] [-]").
-    { iApply (swp_tick_pc Drw Dro Df _ Hdisj HDnpc' HWpc HDpc
-                with "Hcert Hrw Hro"). }
-    iIntros (u) "[Hrw Hro]".
-    unfold Defs.and_boolM. rewrite /returnM mbind_ret. l_glue.
-    iApply (swp_bind_use (Defs.read_reg (R_bool minstret_increment))
-              _ _ _ with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDmi'
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". t_peel. l_glue.
-    (* THE MINSTRET BUMP.  The branch is left OPEN: both arms reach the
-       same post-state shape, differing only in what minstret holds, and
-       the postcondition quantifies that value.  A caller that does not
-       care what the counter reads therefore needs no premise about the
-       config bit at all -- which is the raw-cell shadow of minstret
-       living in an invariant that pins no value. *)
-    destruct (minstret_inc_flag
-                (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                (register_lookup (R_bitvector_64 minstretcfg) rs)) eqn:Hmi.
-    - iApply (swp_bind0_use _ _
-                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
-                with "[Hrw Hro] [-]").
-      { iApply (swp_bind0_use _ _
-                  (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
-                  with "[Hrw Hro] [-]").
-        { iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 minstret))
-                    _ _ _ with "[Hrw Hro] [-]").
-          { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDms'
-                      with "Hcert Hrw Hro"). }
-          iIntros (v0) "(-> & Hrw & Hro)".
-          iApply (swp_write_reg_owned Drw Dro Df _ _ _ Hdisj HDms
-                    with "Hcert Hrw Hro"). }
-        iIntros (u0) "[Hrw Hro]". l_glue. iApply swp_ret. iFrame. }
-      iIntros (u1) "[Hrw Hro]".
-      iEval (t_peel) in "Hrw". iEval (t_peel) in "Hro".
-      iApply swp_ret. iExists _. unfold hp_post. rewrite Hmi. iFrame.
-    - iApply (swp_bind0_use _ _
-                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
-                with "[Hrw Hro] [-]").
-      { iApply (swp_bind0_use _ _
-                  (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
-                  with "[Hrw Hro] [-]").
-        { iApply swp_ret. iFrame. }
-        iIntros (u2) "[Hrw Hro]". l_glue. iApply swp_ret. iFrame. }
-      iIntros (u3) "[Hrw Hro]".
-      iEval (t_peel) in "Hrw". iEval (t_peel) in "Hro".
-      iApply swp_ret.
-      iExists (register_lookup (R_bitvector_64 minstret)
-                 (register_set (R_bitvector_64 PC) (add_vec_int hp_pc 2)
-                    (register_set (R_bitvector_64 nextPC)
-                       (add_vec_int hp_pc 2)
-                       (register_set (R_bool minstret_increment)
-                          false rs)))).
-      unfold hp_post. rewrite Hmi.
-      rewrite (hreg_frame_ext _ _ Drw (reg_set_id_agree Drw _ _)).
-      rewrite (hreg_frame_ro_ext' Df _ _ Dro (reg_set_id_agree Dro _ _)).
-      iFrame.
+    iApply (swp_mono _ _ _ with "[] [-]").
+    2:{ iApply (swp_try_step_gen Drw Dro Df rs
+                  (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+                     (wrap_pre rs)) _ R Hdisj HDpriv HDhart HDmc HDcfg
+                  HDmi HDmi' HDms HDms' HWpc HDpc HDnpc'
+                  Hpriv Hhart
+                  ltac:(t_peel; rewrite /wrap_pre; t_peel; exact Hhart)
+                  ltac:(t_peel; rewrite /wrap_pre; apply register_lookup_set)
+                  with "Hcert Hrw Hro [Hmem Hwmem]").
+        iIntros "Hrw Hro".
+        iApply (swp_run_hart_active_hp Drw Dro Df (wrap_pre rs)
+                  pmar0 pcfg pa d R Hdisj
+                  HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg2 HDhtif
+                  ltac:(rewrite /wrap_pre; t_peel; exact Hpriv) ltac:(rewrite /wrap_pre; t_peel; exact Hpc)
+                  ltac:(rewrite /wrap_pre; t_peel; exact Hpma) ltac:(rewrite /wrap_pre; t_peel; exact Hpcfg)
+                  ltac:(rewrite /wrap_pre; t_peel; exact Hhtif)
+                  ltac:(rewrite /wrap_pre; t_peel; exact HmisaS) ltac:(rewrite /wrap_pre; t_peel; exact HmIE)
+                  ltac:(rewrite /wrap_pre; t_peel; exact HmisaC) Hlpad
+                  Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
+                  ltac:(rewrite /wrap_pre; t_peel; exact Hmprv) Hsram Hsva Hspa Hsplit Hrx Hgta
+                  with "Hcert Hrw Hro Hmem Hwmem"). }
+    iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HR)".
+    iExists mi. rewrite wrap_post_hp. iFrame.
   Qed.
 
   (* ==================================================================== *)
