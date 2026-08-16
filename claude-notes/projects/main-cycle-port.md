@@ -106,6 +106,15 @@ segment):
   (Ext_Zca is never read — with bit 1 clear the `and_boolM` short-circuits
   before it — and Ext_Ziccif is a constant true from the config).
 
+- `iris/HartMDecode.v` — the DECODE, and the compressed store's EXECUTE.
+  `swp_decode_hp` is the pilot's word; `swp_execute_C_SW` is per-SHAPE
+  (generic in the operands), since `execute (C_SW …)` is one `Ret` node
+  handing back the `ExecuteAs (STORE …)` the compressed form expands to.
+  2.9 s.  **Read its header**: it also carries `d_tests`, the tactic that
+  collapses a decode cascade's closed bit tests by conversion, which is
+  what makes the decode an ordinary `hfrun` walk instead of the special
+  bridge design §5 item 7 used to call for.
+
 Evidence:
 
 - `iris/HartPilot.v` — the Phase B pilot at parity: one instruction at a
@@ -126,10 +135,20 @@ Evidence:
      `read_reg cur_privilege` → `dispatchInterrupt` (HartMDispatch) →
      `fetch` (HartMFetch's `swp_fetch_ram`, whose memory obligation the
      leaf discharges from its text bytes via `HartLift2.text_read_bytes`)
-     → **HERE**: the `isRVC` branch, then `ext_decode_compressed` (hfrun
-     at the concrete half-word — mind the vm-opacity note in the traps
-     list) → `execute` → the store event → try_step's tail → `tick_clock`
-     at the tick.
+     → the `isRVC` branch → `ext_decode_compressed` and `execute (C_SW …)`
+     (**both done — `HartMDecode.v`**) → **HERE**: `execute (STORE …)`,
+     the base store the compressed form expands to, which is the whole of
+     the write side → try_step's tail → `tick_clock` at the tick.
+
+   **THE STORE SIDE, mapped** (it mirrors the read side, so the read
+   chain in `HartMFetch` is the template, not just an analogy):
+   `execute_STORE imm rs2 rs1 4` = `assert_exp'` (pure) → `rX_bits rs2`
+   (a GPR read) → `vmem_write rs1 offset 4 data (Store Data) …` →
+   `get_transformed_data_addr` → `vmem_write_addr`, a `cer` region:
+   the alignment check, `split_on_page_boundary`, the mstatus /
+   cur_privilege reads, `translationMode` (all hfrun — pinned reads, no
+   memory event), then `translateAddr` (**HartMFetch's fact already**),
+   then the write itself.  Only the last step is new work.
 
    **THE PEEL DEPTH IS NOT GUESSABLE FROM THE `.sail` SOURCE.**  Read it
    off the goal.  `dispatchInterrupt` and `fetch` inside

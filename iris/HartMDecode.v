@@ -114,7 +114,28 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(* 4. The [swp] fact.                                                      *)
+(* 4. The compressed store's EXECUTE, which is per-SHAPE, not per-word:    *)
+(*    [execute (C_SW …)] is one [Ret] node, and it hands back an           *)
+(*    [ExecuteAs] -- the compressed form expands to a base STORE, which is *)
+(*    what [run_hart_active] then executes.  Generic in the operands, so   *)
+(*    this lemma serves every [c.sw] in the image.                          *)
+(* ====================================================================== *)
+
+Lemma hfrun_execute_C_SW (D Drw : gset register) (rs : regstate)
+    (uimm : SailStdpp.Values.mword 5) (r1 r2 : cregidx) :
+  hfrun 4 D Drw rs (execute (C_SW (uimm, r1, r2)))
+  = Some (ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm
+             (MachineWord.MachineWord.N_to_word
+                (MachineWord.MachineWord.Z_idx 2)
+                (BinaryString.Raw.to_N "00" 0))),
+           creg2reg_idx r2, creg2reg_idx r1, 4)), rs).
+Proof.
+  cbn beta iota zeta delta [execute execute_C_SW]. d_cbn.
+  apply hfrun_ret.
+Qed.
+
+(* ====================================================================== *)
+(* 5. The [swp] facts.                                                     *)
 (* ====================================================================== *)
 
 Section decode.
@@ -144,6 +165,25 @@ Section decode.
     intros Hdisj HDmisa HmisaC.
     apply (swp_hfrun 100 Drw Dro Df rs rs _ _ Hdisj).
     exact (hfrun_decode_hp (Drw ∪ Dro) Drw rs HDmisa HmisaC).
+  Qed.
+
+  Lemma swp_execute_C_SW (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (uimm : SailStdpp.Values.mword 5) (r1 r2 : cregidx) :
+    Drw ## Dro ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (execute (C_SW (uimm, r1, r2)))
+      (fun e => ⌜e = ExecuteAs (STORE (zero_extend' 12 (concat_vec uimm
+                        (MachineWord.MachineWord.N_to_word
+                           (MachineWord.MachineWord.Z_idx 2)
+                           (BinaryString.Raw.to_N "00" 0))),
+                      creg2reg_idx r2, creg2reg_idx r1, 4))⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj.
+    apply (swp_hfrun 4 Drw Dro Df rs rs _ _ Hdisj).
+    exact (hfrun_execute_C_SW (Drw ∪ Dro) Drw rs uimm r1 r2).
   Qed.
 
 End decode.
