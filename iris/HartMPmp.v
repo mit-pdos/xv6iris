@@ -18,7 +18,7 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec
+Require Import RiscvLang RiscvPtsto RiscvExec HartSwp RiscvTryStep RiscvFetchExec
         HartLift HartRegNode HartSpan HartSpanChar.
 Local Open Scope Z_scope.
 
@@ -139,26 +139,20 @@ Local Ltac mpmp_peel_D reg H Hstop HD rsN HagN :=
    [mpmp_matchaddr_pure_local] dichotomy -- NoMatch recurses via the IH at
    i + 1, Match short-circuits through [or_boolM] (X-bit set, or Machine ∧
    unlocked) to [early_return None], whose [ExtraOutcome] node the
-   [catch_early_return] handler collapses to the [K None] residual.  The
-   fuel-exhausted / index-past-15 residuals are the M-mode default allow,
-   also [K None]. *)
-Lemma mpmp_span_char_ifetch4 (D Drw : gset register)
+   [catch_early_return] handler collapses to the sub-monad's own
+   [Ret None].  The fuel-exhausted / index-past-15 residuals are the
+   M-mode default allow, also [Ret None]. *)
+Lemma mpmp_hval_ifetch4 (D Drw : gset register)
     (pcfg : type_of_register pmpcfg_n)
-    (addr : SailStdpp.Values.mword 64)
-    (K : option ExceptionType -> M unit)
-    (rs rs0 : regstate) (l : M unit * regstate) :
+    (addr : SailStdpp.Values.mword 64) (rs : regstate) :
   (pmpcfg_n : register) ∈ D ->
   (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   register_lookup pmpcfg_n rs = pcfg ->
-  reg_agree_on D rs0 rs ->
-  hspan D Drw
-    (Interface.iMon_bind
-       (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine) K, rs0) l ->
-  hspan_stops Drw l.1 = true ->
-  exists rs1, reg_agree_on D rs1 rs /\ hspan D Drw (K None, rs1) l.
+  hval D Drw rs
+    (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine) None rs.
 Proof.
-  intros HD Hunlock Halign Hpcfg Hag0 Hchain Hstop.
+  intros HD Hunlock Halign Hpcfg rs0 l Hag0 Hchain Hstop.
   (* the one-grain fit, exactly as the exec ifetch4 corollary derived it *)
   assert (Hfit : uint addr mod 4 + uint (to_bits 64 4) <= 4).
   { unfold is_aligned_paddr in Halign. apply Z.eqb_eq in Halign.
@@ -182,15 +176,15 @@ Proof.
   match type of Hchain with
   | context [ Defs.bind0 (Defs.foreach_ZM_up' _ _ _ _ _ ?B) ?AF ] =>
     assert (HLOOP : forall (n : nat) (from : Z) (rs0' : regstate)
-                           (l' : M unit * regstate),
+                           (l' : M (option ExceptionType) * regstate),
       reg_agree_on D rs0' rs ->
       hspan D Drw
-        (Interface.iMon_bind
-           (Defs.catch_early_return
-              (Defs.bind0 (Defs.foreach_ZM_up' from 15 1 n tt B) AF)) K,
+        (Defs.catch_early_return
+           (Defs.bind0 (Defs.foreach_ZM_up' from 15 1 n tt B) AF),
          rs0') l' ->
       hspan_stops Drw l'.1 = true ->
-      exists rs1, reg_agree_on D rs1 rs /\ hspan D Drw (K None, rs1) l')
+      exists rs1, reg_agree_on D rs1 rs /\
+           hspan D Drw (Interface.Ret None, rs1) l')
   end.
   { intro n; induction n as [|n IH]; intros from rs0' l' Hag' Hch Hstop'.
     - (* fuel exhausted: the residual is the M-mode default allow *)
@@ -259,5 +253,40 @@ Proof.
           end; (mpmp_red Hch;
             exists rs5; split; [exact Hag''|exact Hch]).
   }
-  exact (HLOOP 16%nat 0 rs0 l Hag0 Hchain Hstop).
+  destruct (HLOOP 16%nat 0 rs0 l Hag0 Hchain Hstop) as (rs1 & Hag1 & Hch1).
+  assert (Hl : l = (Interface.Ret None, rs1))
+    by (apply (hspan_stop_refl D Drw _ rs1 l); [reflexivity|exact Hch1]).
+  rewrite Hl. cbn. split; [reflexivity|exact Hag1].
 Qed.
+
+(* ====================================================================== *)
+(* 4. The [swp] fact.                                                      *)
+(* ====================================================================== *)
+
+Section swp_pmp.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma swp_pmpCheck_ifetch4 (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pcfg : type_of_register pmpcfg_n)
+      (addr : SailStdpp.Values.mword 64) :
+    Drw ## Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    is_aligned_paddr (Physaddr addr) 4 = true ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine)
+      (fun r => ⌜r = None⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hunlock Halign Hpcfg.
+    exact (swp_span Drw Dro Df rs rs _ None Hdisj
+             (mpmp_hval_ifetch4 (Drw ∪ Dro) Drw pcfg addr rs
+                HD Hunlock Halign Hpcfg)).
+  Qed.
+
+End swp_pmp.
