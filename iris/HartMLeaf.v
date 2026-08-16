@@ -28,7 +28,7 @@ Local Notation zerobit :=
 Local Ltac l_glue :=
   cbn beta iota zeta delta
     [Defs.returnm returnM returnR Defs.returnR andb orb negb not
-     Instances.generic_eq Instances.generic_neq].
+     Instances.generic_eq Instances.generic_neq get_config_rvfi].
 
 Local Lemma hfrun_cE_Zca (D Drw : gset register) (rs : regstate) :
   (misa : register) ∈ D ->
@@ -210,25 +210,132 @@ Section leaf.
     by iFrame.
   Qed.
 
-  (* the walk down to the dispatch: read cur_privilege, should_inc_minstret,
-     write minstret_increment, read hart_state, then run_hart_active *)
-  Lemma probe_prelude (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) :
+  (* ==================================================================== *)
+  (* THE LEAF.  [WP Loop] from [WP Loop], through the honest wrapper at     *)
+  (* BOTH ticks, for one real instruction.                                  *)
+  (* ==================================================================== *)
+
+  Lemma swp_try_step_hp (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pmar0 : list PMA_Region)
+      (pcfg : type_of_register pmpcfg_n)
+      (pa : SailStdpp.Values.mword 64) (d : SailStdpp.Values.mword 64) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (hart_state : register) ∈ Drw ∪ Dro ->
     (R_bitvector_32 mcountinhibit : register) ∈ Drw ∪ Dro ->
     (R_bitvector_64 minstretcfg : register) ∈ Drw ∪ Dro ->
     (R_bool minstret_increment : register) ∈ Drw ->
-    (hart_state : register) ∈ Drw ∪ Dro ->
+    (R_bool minstret_increment : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 minstret : register) ∈ Drw ->
+    (R_bitvector_64 minstret : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
     register_lookup cur_privilege rs = Machine ->
     register_lookup hart_state rs = HART_ACTIVE tt ->
+    register_lookup (R_bitvector_64 PC) rs = hp_pc ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Misa_S (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    eq_vec (_get_Mstatus_MIE (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    hfrun 8 (Drw ∪ Dro) Drw
+      (register_set (R_bool minstret_increment)
+         (minstret_inc_flag
+            (register_lookup (R_bitvector_32 mcountinhibit) rs)
+            (register_lookup (R_bitvector_64 minstretcfg) rs)) rs)
+      (is_landing_pad_expected tt)
+      = Some (false, register_set (R_bool minstret_increment)
+                       (minstret_inc_flag
+                          (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                          (register_lookup (R_bitvector_64 minstretcfg) rs))
+                       rs) ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram hp_pc ->
+    neq_vec (access_vec_dec hp_pc 0) zerobit = false ->
+    neq_vec (access_vec_dec hp_pc 1) zerobit = false ->
+    is_aligned_vaddr (Virtaddr hp_pc) 4 = true ->
+    is_aligned_paddr (Physaddr hp_pc) 4 = true ->
+    addr_is_ram pa ->
+    is_aligned_vaddr (Virtaddr pa) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
+      = returnM (4, 0) ->
+    hfrun 4 (Drw ∪ Dro) Drw
+      (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+         (register_set (R_bool minstret_increment)
+            (minstret_inc_flag
+               (register_lookup (R_bitvector_32 mcountinhibit) rs)
+               (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))
+      (rX_bits (creg2reg_idx
+                  (encdec_creg_backwards (subrange_vec_dec hp_half 4 2))))
+      = Some (d, register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+                   (register_set (R_bool minstret_increment)
+                      (minstret_inc_flag
+                         (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                         (register_lookup (R_bitvector_64 minstretcfg) rs))
+                      rs)) ->
+    hfrun 8 (Drw ∪ Dro) Drw
+      (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+         (register_set (R_bool minstret_increment)
+            (minstret_inc_flag
+               (register_lookup (R_bitvector_32 mcountinhibit) rs)
+               (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))
+      (get_transformed_data_addr
+         (creg2reg_idx (encdec_creg_backwards (subrange_vec_dec hp_half 9 7)))
+         (sign_extend' 64
+            (zero_extend' 12
+               (concat_vec
+                  (concat_vec
+                     (concat_vec (subrange_vec_dec hp_half 5 5)
+                        (subrange_vec_dec hp_half 12 10))
+                     (subrange_vec_dec hp_half 6 6))
+                  (MachineWord.MachineWord.N_to_word
+                     (MachineWord.MachineWord.Z_idx 2)
+                     (BinaryString.Raw.to_N "00" 0))))) (Store Data) 4)
+      = Some (Ext_DataAddr_OK (Virtaddr pa),
+              register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
+                (register_set (R_bool minstret_increment)
+                   (minstret_inc_flag
+                      (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                      (register_lookup (R_bitvector_64 minstretcfg) rs))
+                   rs)) ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    swp (try_step 0 false) (fun _ => True%I).
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ⌜read_bytes σ.(mem) hp_pc 4 = Some hp_wf⌝ ∗
+        ▷ (|={∅,⊤}=> mstate_interp σ)) -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 4
+                   (Interface.WriteReq.value
+                      (mwrite_req pa
+                         (TypeCasts.autocast (subrange_vec_dec d 31 0)))))
+                σ.(mdev)))) -∗
+    swp (try_step 0 false)
+      (fun _ => ∃ rs' : regstate,
+                  hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro)%I.
   Proof.
-    intros Hdisj HDpriv HDmc HDcfg HDmi HDhart Hpriv Hhart.
-    iIntros "#Hcert Hrw Hro".
+    intros Hdisj HDpriv HDmisa HDmst HDhart HDmc HDcfg HDmi HDmi' HDms HDms'
+      HWpc HDpc HDnpc HDnpc' HDpma HDcfg2 HDhtif
+      Hpriv Hhart Hpc Hpma Hpcfg Hhtif HmisaS HmisaC HmIE Hmprv Hlpad
+      Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa Hsram Hsva Hspa Hsplit Hrx Hgta.
+    iIntros "#Hcert Hrw Hro Hmem Hwmem".
     unfold try_step. cbn beta iota zeta delta [ext_pre_step_hook].
     iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
               with "[Hrw Hro] [-]").
@@ -254,7 +361,83 @@ Section leaf.
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)".
     t_peel. rewrite Hhart.
-    Show.
-  Admitted.
+    (* THE INSTRUCTION *)
+    iApply (swp_bind_use (run_hart_active 0) _ _ _
+              with "[Hrw Hro Hmem Hwmem] [-]").
+    { iApply (swp_run_hart_active_hp Drw Dro Df
+                (register_set (R_bool minstret_increment)
+                   (minstret_inc_flag
+                      (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                      (register_lookup (R_bitvector_64 minstretcfg) rs)) rs)
+                pmar0 pcfg pa d Hdisj
+                HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg2 HDhtif
+                ltac:(t_peel; exact Hpriv) ltac:(t_peel; exact Hpc)
+                ltac:(t_peel; exact Hpma) ltac:(t_peel; exact Hpcfg)
+                ltac:(t_peel; exact Hhtif)
+                ltac:(t_peel; exact HmisaS) ltac:(t_peel; exact HmIE)
+                ltac:(t_peel; exact HmisaC) Hlpad
+                Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
+                ltac:(t_peel; exact Hmprv) Hsram Hsva Hspa Hsplit Hrx Hgta
+                with "Hcert Hrw Hro Hmem Hwmem"). }
+    iIntros (v) "(-> & Hrw & Hro)". l_glue.
+    (* the tail: the hart_state assert, tick_pc, the minstret bump *)
+    iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_bind0_use _ _
+                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_bind_use (Defs.read_reg hart_state) _ _ _
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
+                    with "Hcert Hrw Hro"). }
+        iIntros (v) "(-> & Hrw & Hro)". t_peel. rewrite Hhart.
+        cbn beta iota zeta delta [hart_is_active Defs.assert_exp].
+        iApply swp_ret. iFrame. }
+      iIntros (u) "[Hrw Hro]".
+      iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDhart
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". t_peel. rewrite Hhart. l_glue.
+    iApply (swp_bind0_use (tick_pc tt) _
+              (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I)
+              _ with "[Hrw Hro] [-]").
+    { iApply (swp_tick_pc Drw Dro Df _ Hdisj HDnpc' HWpc HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (u) "[Hrw Hro]".
+    unfold Defs.and_boolM. rewrite /returnM mbind_ret. l_glue.
+    iApply (swp_bind_use (Defs.read_reg (R_bool minstret_increment))
+              _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDmi'
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". t_peel. l_glue.
+    (* the minstret bump.  The two branches leave DIFFERENT files, so the
+       case split has to come before the binds -- an intermediate
+       postcondition cannot be shared across it. *)
+    destruct (minstret_inc_flag
+                (register_lookup (R_bitvector_32 mcountinhibit) rs)
+                (register_lookup (R_bitvector_64 minstretcfg) rs)).
+    - iApply (swp_bind0_use _ _
+                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_bind0_use _ _
+                  (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                  with "[Hrw Hro] [-]").
+        { iApply (swp_bind_use (Defs.read_reg (R_bitvector_64 minstret))
+                    _ _ _ with "[Hrw Hro] [-]").
+          { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDms'
+                      with "Hcert Hrw Hro"). }
+          iIntros (v) "(-> & Hrw & Hro)".
+          iApply (swp_write_reg_owned Drw Dro Df _ _ _ Hdisj HDms
+                    with "Hcert Hrw Hro"). }
+        iIntros (u0) "[Hrw Hro]". l_glue. iApply swp_ret. iFrame. }
+      iIntros (u1) "[Hrw Hro]". iApply swp_ret. iExists _. iFrame.
+    - iApply (swp_bind0_use _ _
+                (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                with "[Hrw Hro] [-]").
+      { iApply (swp_bind0_use _ _
+                  (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
+                  with "[Hrw Hro] [-]").
+        { iApply swp_ret. iFrame. }
+        iIntros (u2) "[Hrw Hro]". l_glue. iApply swp_ret. iFrame. }
+      iIntros (u3) "[Hrw Hro]". iApply swp_ret. iExists _. iFrame.
+  Qed.
 
 End leaf.

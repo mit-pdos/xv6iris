@@ -127,80 +127,34 @@ Evidence:
 
 ## Left, in order
 
-1. **`HartMLeaf.v`, rebuilt on `swp`.**  The last RED file: it names the
-   deleted segment apparatus.  It is the composition of the per-function
-   facts along `try_step`'s own spine.  **Walked to the decode already, in
-   a scratch probe, with every step one of the four standard moves** — so
-   what follows is a transcript, not a design:
+1. **The boundary, and then the leaf's statement.**  `swp_try_step_hp` is
+   the whole cycle body -- prelude, dispatch, fetch, decode, execute,
+   store, tail -- as one `swp` fact.  What is left is wrapping it:
 
-     `read_reg cur_privilege` → `should_inc_minstret` (HartMCycle) →
-     `write_reg minstret_increment` (`swp_write_reg_owned`; the cell is
-     OWNED, raw-cell form, since `MinstretInv` is above the red line) →
-     `read_reg hart_state` → `run_hart_active 0`, a `cer` region:
-     `read_reg cur_privilege` → `dispatchInterrupt` (HartMDispatch) →
-     `fetch` (HartMFetch's `swp_fetch_ram`, whose memory obligation the
-     leaf discharges from its text bytes via `HartLift2.text_read_bytes`)
-     → the `isRVC` branch → `ext_decode_compressed` and `execute (C_SW …)`
-     (**both done — `HartMDecode.v`**) → `execute (STORE …)`, the base
-     store the compressed form expands to (**done — `HartMStore.v`**) →
-     try_step's tail → `tick_clock` at the tick.
+     `wp_hart_restart` (∀ tick) → `swp_wp_loop` → `swp_bind_use` on
+     `riscv_step tick = bind (try_step 0 false) (λ _, if tick then
+     tick_clock tt else Ret tt)` → `swp_tick_clock` on the tick arm.
 
-   **THE TAIL is the last piece, and it is all hfrun**: every register it
-   touches is one the leaf OWNS or pins, so the walker runs it outright.
-   `tick_pc` is **done** (`hfrun_tick_pc`/`swp_tick_pc` in `HartMCycle`) —
-   read nextPC, write PC, read PC.  What is left is the minstret bump
-   (`read minstret_increment`, then `read`+`write minstret`, both owned)
-   and, at the tick, `tick_clock`: `should_inc_mcycle` (the same
-   two-config-bit case split as `should_inc_minstret`, so define
-   `mcycle_inc_flag` beside it), the mcycle and mtime bumps, and
-   `clint_dispatch false` — which reads mip / mtimecmp / mtime, writes
-   mip, and then gates a second mip write on `Ext_Sstc` and `menvcfg`.
-   All of those registers are in the leaf's footprint, so it is one more
-   walk of the kind already done a dozen times.
-
-   **THE STORE SIDE IS COMPLETE** (`HartMStore.v`, 698 lines, 5.9 s, 5
-   platform axioms): `swp_execute_STORE` from `execute_STORE` down to the
-   `MemWrite` event.  It mirrors the read side,
-   so `HartMFetch`'s chain is the template, not just an analogy:
-   `execute_STORE imm rs2 rs1 4` = `assert_exp'` (pure) → `rX_bits rs2`
-   (a GPR read) → `vmem_write rs1 offset 4 data (Store Data) …` →
-   `get_transformed_data_addr` → `vmem_write_addr`, a `cer` region (the
-   alignment check, `split_on_page_boundary`, the mstatus/cur_privilege
-   reads, `translationMode` — all hfrun; then `translateAddr`, which is
-   **HartMFetch's fact already**) → `mem_write_ea` (**DONE**:
-   `swp_mem_write_ea`, 2.6 s) → `mem_write_value` →
-   `mem_write_value_meta` (a plain-`M` spine) →
-   `mem_write_value_priv_meta`, which is where the MemWrite event is.
-   `mem_write_value_priv_meta` → `checked_mem_write` (**DONE**:
-   `swp_checked_mem_write` — the MemWrite event lands).  **HERE**: the
-   glue above it (`mem_write_value_meta`, a plain-`M` spine;
-   `vmem_write_addr`; `vmem_write`; `execute_STORE`), all of which is
-   walking with facts that already exist.
-
-   **THE PEEL DEPTH IS NOT GUESSABLE FROM THE `.sail` SOURCE.**  Read it
-   off the goal.  `dispatchInterrupt` and `fetch` inside
-   `run_hart_active`, and `translateAddr` inside `fetch_bytes`, are all
-   DEPTH 1 — their `match`es sit inside the continuation, not in a
-   separate bind.  Depth 3 and 4 come from `or_boolM`/`and_boolM` nests
-   and from the `untilMT` body.
-   **THE FILE TOWER is the one piece of bookkeeping `swp` does not
-   remove** (it is inherent: writes change the file).  Each write adds a
-   `register_set` layer, and each later lookup costs one
-   `rewrite (irrelevant_register_set r r' rs _ eq_refl)` — the value
-   argument is inferred, the disequality is `eq_refl`.
-
-   **THE QED DEBT IS SETTLED** and needs no further experiment: the
-   stretch that cost 665 s as one monolithic goal-side chain is 6.0 s
-   decomposed per model function, and the decomposition exposes four
-   reusable intermediate facts the monolith did not.
-2. **The verbatim-statement question.**  `wp_word_main_b0` is per-word and
-   raw-cell; the old tree's statement is the shape-generic, bundle-taking
-   leaf.  (a) the bundles (`mmode_config`/`pc_is`/`gpr_file`/`instr`/
-   `minstret_inv`) are defined at or above the red line, so they cannot be
-   named until item 3; (b) ∀-operand shapes need a once-per-INSTRUCTION-
-   SHAPE decode characterization over the ENCODING FUNCTION — the seam is
-   that `instr` pins `decode w = i`, not `w = encode i`; (c) the two
-   remaining fetch shapes (2-aligned base, RVC).
+   **The one thing that needs deciding first** is how the final register
+   file is named.  `swp_try_step_hp` currently returns
+   `∃ rs', hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro`, which is enough
+   to close a loop whose continuation needs nothing of the file, but NOT
+   enough to instantiate `swp_tick_clock` on the tick arm (its premises are
+   about a concrete file).  Two honest options: pin the minstret branch
+   with a premise (`minstret_inc_flag … = true`) so there is ONE final file
+   and write it out, or state the tick's premises at the final file the way
+   the store's GPR premises are already stated.  Either is mechanical; the
+   choice is about what the leaf's statement should look like, which is
+   worth a moment's thought rather than a default.
+2. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
+   raw-cell; the old tree's statement for this instruction is the
+   shape-generic, bundle-taking leaf.  (a) the bundles (`mmode_config`/
+   `pc_is`/`gpr_file`/`instr`/`minstret_inv`) are defined at or above the
+   red line, so they cannot be named until item 3; (b) ∀-operand shapes
+   need a once-per-INSTRUCTION-SHAPE decode characterization over the
+   ENCODING FUNCTION — the seam is that `instr` pins `decode w = i`, not
+   `w = encode i`; (c) `swp_execute_C_SW` is already per-shape, which is
+   the pattern (b) wants.
    **The design doc's Phase B/C gate — leaf specs preserved verbatim — is
    still open.  Do not report it as met before a statement diff is empty.**
 3. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
@@ -230,7 +184,10 @@ Evidence:
    page-walker's read-then-A/D-update (`CommonWalk`) and the
    interrupt-absorbing step engines (`sr_absorb`); (b) mid-cycle interrupt
    delivery — the model's check reads `sig_seip`/mip at its own node, and
-   `WpIntrCore`/`WpIntrInv` already ∀-quantify those off σ.
+   `WpIntrCore`/`WpIntrInv` already ∀-quantify those off σ.  **Note that
+   (b) has already bitten once, benignly: `swp_tick_clock` needs a premise
+   that the CLINT does not change mip, precisely because the other branch
+   reads `sig_seip`.**
 
 Optional, decide with evidence, never speculatively: **native Sail values as
 `mval`** (design §5 item 8).  The restart marker is the cheap,
