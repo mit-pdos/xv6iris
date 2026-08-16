@@ -55,9 +55,14 @@ Local Ltac zt :=
 (* needs only the three clock CELLS owned.                                 *)
 (*                                                                        *)
 (* [mm_Dro] is what the wrapper, the fetch and the dispatch actually pin.  *)
-(* Six of the twelve are [hw_config]'s persistent cells; the other six are *)
-(* fractional, which is what lets [mmode_config] keep its [split]/[combine] *)
-(* (47 sites depend on it) -- the EXCLUSIVE cells go in [pc_is] instead.   *)
+(* EIGHT of the twelve are persistent: six are [hw_config]'s frozen cells,  *)
+(* and mcountinhibit / minstretcfg are frozen too but arrive from           *)
+(* [MinstretInv.minstret_res] -- they are read only by                      *)
+(* [should_inc_minstret], so they live with the rest of the minstret facts  *)
+(* rather than in the shared config bundle.  The four fractional ones are   *)
+(* the genuinely M-mode-specific config, which is what lets [mmode_config]  *)
+(* keep its [split]/[combine] (47 sites depend on it) -- the EXCLUSIVE      *)
+(* cells go in [pc_is] instead.                                            *)
 (* ====================================================================== *)
 
 Definition mm_Drw : gset register :=
@@ -239,6 +244,10 @@ Section gpr.
     else if decide (r = (htif_tohost_base : register)) then DfracDiscarded
     else if decide (r = (elp : register)) then DfracDiscarded
     else if decide (r = (senvcfg : register)) then DfracDiscarded
+    else if decide (r = (R_bitvector_32 mcountinhibit : register))
+    then DfracDiscarded
+    else if decide (r = (R_bitvector_64 minstretcfg : register))
+    then DfracDiscarded
     else DfracOwn q.
 
   Local Ltac dfq :=
@@ -258,6 +267,10 @@ Section gpr.
   Lemma mm_Df_elp q : mm_Df q elp = DfracDiscarded.
   Proof. dfq. Qed.
   Lemma mm_Df_senv q : mm_Df q senvcfg = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_mc q : mm_Df q (R_bitvector_32 mcountinhibit) = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_micfg q : mm_Df q (R_bitvector_64 minstretcfg) = DfracDiscarded.
   Proof. dfq. Qed.
 
   (* THE FRAME <-> POINTS-TO BRIDGE, at the size it should have been all
@@ -287,9 +300,9 @@ Section gpr.
      reg_pointsto mstatus (DfracOwn q) (register_lookup mstatus rs) ∗
      reg_pointsto hart_state (DfracOwn q) (register_lookup hart_state rs) ∗
      reg_pointsto pmpcfg_n (DfracOwn q) (register_lookup pmpcfg_n rs) ∗
-     reg_pointsto (R_bitvector_32 mcountinhibit) (DfracOwn q)
+     reg_pointsto (R_bitvector_32 mcountinhibit) DfracDiscarded
        (register_lookup (R_bitvector_32 mcountinhibit) rs) ∗
-     reg_pointsto (R_bitvector_64 minstretcfg) (DfracOwn q)
+     reg_pointsto (R_bitvector_64 minstretcfg) DfracDiscarded
        (register_lookup (R_bitvector_64 minstretcfg) rs) ∗
      reg_pointsto misa DfracDiscarded (register_lookup misa rs) ∗
      reg_pointsto mseccfg DfracDiscarded (register_lookup mseccfg rs) ∗
@@ -304,7 +317,7 @@ Section gpr.
     repeat (rewrite big_sepS_union; last set_solver).
     rewrite !big_sepS_singleton.
     rewrite !(mm_Df_misa q) !(mm_Df_sec q) !(mm_Df_pma q) !(mm_Df_htif q)
-      !(mm_Df_elp q) !(mm_Df_senv q).
+      !(mm_Df_elp q) !(mm_Df_senv q) !(mm_Df_mc q) !(mm_Df_micfg q).
     unfold mm_Df.
     repeat (rewrite decide_False; [|discriminate]).
     by rewrite !bi.sep_assoc.

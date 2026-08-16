@@ -735,18 +735,15 @@ Section InstrBytes.
      are persistent.  A client owning [mmode_config (DfracOwn 1)] can split off a
      fraction to hand to [wp_instr] while retaining the rest to keep reasoning
      about the config during the instruction. *)
-  (* [minstret_inv] is gone; [gen_cert] now rides in [hw_config] (persistent,
-     and shared with the S-mode bundles), so the slot it used to occupy is
-     simply dropped.  The two counter-CONFIG cells are new: the wrapper's
-     [should_inc_minstret] reads them, and they are READ-ONLY, hence
-     fractional and safe under [mmode_config_split]. *)
+  (* [minstret_inv] is gone; [gen_cert] and the two counter-CONFIG cells the
+     wrapper reads now ride in [hw_config] -- all three are frozen,
+     persistent and mode-independent, so they belong in the bundle both
+     modes already carry.  What is left here is exactly the M-mode-specific,
+     MUTABLE-in-principle config, which is why it is fraction-parameterised. *)
   Definition mmode_config (dq : dfrac) : iProp Σ :=
     (hw_config ∗
      hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
      cur_privilege ↦ᵣ{ dq } Machine ∗
-     (∃ (mc : mword 32) (micfg : mword 64),
-        (R_bitvector_32 mcountinhibit) ↦ᵣ{ dq } mc ∗
-        (R_bitvector_64 minstretcfg) ↦ᵣ{ dq } micfg) ∗
      ∃ mstatus0 : mword 64,
        mstatus ↦ᵣ{ dq } mstatus0 ∗
        ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
@@ -785,9 +782,6 @@ Section InstrBytes.
     hw_config ∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt ∗
     cur_privilege ↦ᵣ{ dq } Machine ∗
-    (∃ (mc : mword 32) (micfg : mword 64),
-       (R_bitvector_32 mcountinhibit) ↦ᵣ{ dq } mc ∗
-       (R_bitvector_64 minstretcfg) ↦ᵣ{ dq } micfg) ∗
     ∃ mstatus0 : mword 64,
       mstatus ↦ᵣ{ dq } mstatus0 ∗
       ⌜ eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ⌝ ∗
@@ -801,8 +795,7 @@ Section InstrBytes.
      Inverse of [mmode_config_unbundle]; the workhorse for chains that pass
      through a config-WRITING instruction (csrw mstatus / mret) and then want
      the opaque bundle back for the following instructions. *)
-  Lemma mmode_config_rebuild (dq : dfrac) (mstatus0 : mword 64)
-      (mc : mword 32) (micfg : mword 64) :
+  Lemma mmode_config_rebuild (dq : dfrac) (mstatus0 : mword 64) :
     eq_vec (_get_Mstatus_MIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -810,14 +803,11 @@ Section InstrBytes.
     hw_config -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ{ dq } Machine -∗
-    (R_bitvector_32 mcountinhibit) ↦ᵣ{ dq } mc -∗
-    (R_bitvector_64 minstretcfg) ↦ᵣ{ dq } micfg -∗
     mstatus ↦ᵣ{ dq } mstatus0 -∗
     mmode_config dq.
   Proof.
-    iIntros (HmIE HMPRV HSXL HKF) "#Hhw Hhs Hpriv Hmc Hmicfg Hms".
-    iFrame "Hhw Hhs Hpriv". iSplitL "Hmc Hmicfg".
-    { iExists mc, micfg. iFrame. }
+    iIntros (HmIE HMPRV HSXL HKF) "#Hhw Hhs Hpriv Hms".
+    iFrame "Hhw Hhs Hpriv".
     iExists mstatus0. iFrame "Hms".
     iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))).
   Qed.
@@ -829,43 +819,28 @@ Section InstrBytes.
     mmode_config (DfracOwn q) ⊢
       mmode_config (DfracOwn (q/2)) ∗ mmode_config (DfracOwn (q/2)).
   Proof.
-    iIntros "(#Hhw & Hhs & Hpriv & Hcfg & Hmst)".
+    iIntros "(#Hhw & Hhs & Hpriv & Hmst)".
     iDestruct "Hmst" as (ms0) "(Hms & %HmIE & %HMPRV & %HSXL & %HKF)".
-    iDestruct "Hcfg" as (mc micfg) "[Hmc Hmicfg]".
     iDestruct "Hhs" as "[Hhs1 Hhs2]".
     iDestruct "Hpriv" as "[Hpriv1 Hpriv2]".
     iDestruct "Hms" as "[Hms1 Hms2]".
-    iDestruct "Hmc" as "[Hmc1 Hmc2]".
-    iDestruct "Hmicfg" as "[Hmicfg1 Hmicfg2]".
-    iSplitL "Hhs1 Hpriv1 Hms1 Hmc1 Hmicfg1".
-    - iFrame "Hhw Hhs1 Hpriv1". iSplitL "Hmc1 Hmicfg1".
-      { iExists mc, micfg. iFrame. }
-      iExists ms0. iFrame "Hms1 %".
-    - iFrame "Hhw Hhs2 Hpriv2". iSplitL "Hmc2 Hmicfg2".
-      { iExists mc, micfg. iFrame. }
-      iExists ms0. iFrame "Hms2 %".
+    iSplitL "Hhs1 Hpriv1 Hms1".
+    - iFrame "Hhw Hhs1 Hpriv1". iExists ms0. iFrame "Hms1 %".
+    - iFrame "Hhw Hhs2 Hpriv2". iExists ms0. iFrame "Hms2 %".
   Qed.
 
   Lemma mmode_config_combine (q : Qp) :
     mmode_config (DfracOwn (q/2)) -∗ mmode_config (DfracOwn (q/2)) -∗
     mmode_config (DfracOwn q).
   Proof.
-    iIntros "(#Hhw & Hhs1 & Hpriv1 & Hcfg1 & Hmst1) (_ & Hhs2 & Hpriv2 & Hcfg2 & Hmst2)".
+    iIntros "(#Hhw & Hhs1 & Hpriv1 & Hmst1) (_ & Hhs2 & Hpriv2 & Hmst2)".
     iDestruct "Hmst1" as (ms0) "(Hms1 & %HmIE & %HMPRV & %HSXL & %HKF)".
     iDestruct "Hmst2" as (ms0') "(Hms2 & _ & _ & _)".
-    iDestruct "Hcfg1" as (mc micfg) "[Hmc1 Hmicfg1]".
-    iDestruct "Hcfg2" as (mc' micfg') "[Hmc2 Hmicfg2]".
     iDestruct (reg_pointsto_agree with "Hms1 Hms2") as %<-.
-    iDestruct (reg_pointsto_agree with "Hmc1 Hmc2") as %<-.
-    iDestruct (reg_pointsto_agree with "Hmicfg1 Hmicfg2") as %<-.
     iCombine "Hhs1 Hhs2" as "Hhs".
     iCombine "Hpriv1 Hpriv2" as "Hpriv".
     iCombine "Hms1 Hms2" as "Hms".
-    iCombine "Hmc1 Hmc2" as "Hmc".
-    iCombine "Hmicfg1 Hmicfg2" as "Hmicfg".
-    iFrame "Hhw Hhs Hpriv". iSplitL "Hmc Hmicfg".
-    { iExists mc, micfg. iFrame. }
-    iExists ms0. iFrame "Hms %".
+    iFrame "Hhw Hhs Hpriv". iExists ms0. iFrame "Hms %".
   Qed.
 
   (* wp_instr -- the [instr]-driven variant of wp_exec_step_decode_execute_inv.

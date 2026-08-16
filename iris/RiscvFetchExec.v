@@ -254,8 +254,13 @@ Section HwConfig.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  (* mcountinhibit / minstretcfg are no longer bundled here (the minstret step
-     no longer needs their values -- [should_inc] is total).  [elp] IS bundled,
+  (* mcountinhibit / minstretcfg are bundled here AGAIN.  They were removed
+     when the exec-shaped [should_inc] turned out to be total and not to need
+     their values; the [swp] wrapper's [swp_should_inc_minstret] DOES read
+     them, and it reads them in S-mode as much as in M-mode -- so they belong
+     in the bundle both modes already carry, not in [mmode_config].  Nothing
+     in the tree or in the kernel ever writes either, so [↦ᵣ□] is sound and
+     they cost no threading at all.  [elp] IS bundled,
      persistently and existentially, pinned to NOT [LP_EXPECTED] so it discharges
      the landing-pad side condition [eq_vec elp (landing_pad_bits_backwards
      LP_EXPECTED) = false] that the run_hart_active / fetch WPs require.

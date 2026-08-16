@@ -326,9 +326,18 @@ Section MinstretInv.
   Definition clock_res : iProp Σ :=
     (∃ (c t p : mword 64), mcycle ↦ᵣ c ∗ mtime ↦ᵣ t ∗ mip ↦ᵣ p)%I.
 
+  (* The counter cells AND the two config cells that decide whether the
+     counter moves.  [mcountinhibit]/[minstretcfg] are here rather than in
+     [hw_config] because nothing else in the system reads them: they exist
+     only to dismiss the minstret counting, so everything needed to reason
+     about minstret sits in one place.  They are frozen (nothing in the tree
+     or the kernel writes either), hence [↦ᵣ□] -- so re-establishing this
+     resource after a cycle asks nothing of them. *)
   Definition minstret_res : iProp Σ :=
-    (∃ (mst : mword 64) (mi : bool),
-       minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi)%I.
+    (∃ (mst : mword 64) (mi : bool) (mc : mword 32) (micfg : mword 64),
+       minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi ∗
+       (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc ∗
+       (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg)%I.
 
   Global Instance clock_res_timeless : Timeless clock_res.
   Proof. rewrite /clock_res. apply _. Qed.
@@ -350,13 +359,22 @@ Section MinstretInv.
       mcycle ↦ᵣ cy ∗ mtime ↦ᵣ ti ∗ mip ↦ᵣ ip.
   Proof. iIntros "H". iExact "H". Qed.
 
-  Lemma minstret_res_intro (mst : mword 64) (mi : bool) :
-    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi -∗ minstret_res.
-  Proof. iIntros "Hmst Hmi". iExists mst, mi. iFrame. Qed.
+  Lemma minstret_res_intro (mst : mword 64) (mi : bool)
+      (mc : mword 32) (micfg : mword 64) :
+    minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ mi -∗
+    (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc -∗
+    (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg -∗ minstret_res.
+  Proof.
+    iIntros "Hmst Hmi #Hmc #Hmicfg". iExists mst, mi, mc, micfg. iFrame.
+    by iFrame "Hmc Hmicfg".
+  Qed.
 
   Lemma minstret_res_acc :
-    minstret_res -∗ ∃ (mst : mword 64) (mi : bool),
-      minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi.
+    minstret_res -∗ ∃ (mst : mword 64) (mi : bool)
+                      (mc : mword 32) (micfg : mword 64),
+      minstret ↦ᵣ mst ∗ (R_bool minstret_increment) ↦ᵣ mi ∗
+      (R_bitvector_32 mcountinhibit) ↦ᵣ□ mc ∗
+      (R_bitvector_64 minstretcfg) ↦ᵣ□ micfg.
   Proof. iIntros "H". iExact "H". Qed.
 
 End MinstretInv.
