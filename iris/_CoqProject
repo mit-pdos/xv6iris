@@ -19,6 +19,7 @@ DiskImg.v
 DevModel.v
 RiscvLang.v
 HartBlock.v
+HartSwp.v
 HartLift.v
 HartEvents.v
 HartAmo.v
