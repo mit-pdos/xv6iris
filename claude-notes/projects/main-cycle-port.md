@@ -251,26 +251,46 @@ Evidence:
    obligation deletes outright.  `gpr_file m` IS already a frame: the leaves
    already declare their footprint and merely convert it into σ-reasoning.
 
-   **THE ONE OPEN DECISION, and it is the next thing to settle.**
-   `swp_run_hart_active_base`/`_rvc` take the decode as a FOOTPRINTED fact,
-   `hfrun nd (Drw ∪ Dro) Drw rs (ext_decode w) = Some (i, rs)`.  The `instr`
-   bundle currently supplies it in `exec` form, σ-shaped:
-   `exec (decode_fetch r) σ = Some (i, σ)`.  Three ways to close the gap:
+   **THE DECODE'S CURRENCY: DECIDED, and the generated corpus is untouched.**
+   `swp_run_hart_active_base`/`_rvc` want the decode as a FOOTPRINTED fact;
+   the `instr` bundle supplies it as `exec (decode_fetch r) σ = Some (i, σ)`.
+   The fix is NOT to re-prove the decode catalogue (3752 `kd_` lemmas across
+   33 `KernelDecode*.v`) -- it is one bridge lemma, because the missing
+   ingredient already exists:
 
-   (a) a general `exec` → `hfrun` bridge -- needs a "reads only `D`, touches
-       no memory" hypothesis, which is exactly what `hfrun` exists to decide,
-       so this is circular in the general case;
-   (b) **restate `instr`'s decode component in `hfrun` form.**  `instr pc
-       is_rvc i` is OPAQUE in all 135 leaf statements, so its definition can
-       change without touching one of them -- the same move as every other
-       currency change this port has made.  Cost lands on `instr`'s
-       CONSTRUCTION sites (the `kd_` decode catalogue / `WpDecodeBridge`),
-       which the worklist previously assumed would be "consumed unchanged";
-   (c) an extra `hfrun` premise on `wp_instr`, pushed to all 135 leaves --
-       rejected, it is the churn the whole design is avoiding.
+   `WpDecodeBridge.goodb D m s` is a COMPUTABLE certificate that `m` run from
+   `s` reads only `D`-registers and hits nothing else (memory, Choose,
+   failures all give `false`), and every generated proof already establishes
+   it by `vm_compute` -- that is what `decode_state_bridge` consumes.  The
+   decoder's read set is pinned and tiny: `D_m = {cur_privilege, mseccfg,
+   misa}`, `D_s = {cur_privilege, menvcfg, misa}`.
 
-   (b) is the one to take unless the construction sites turn out to make it
-   expensive; that is what to measure first.
+   `goodb` is exactly the "reads only `D`, touches no memory" hypothesis that
+   made a general `exec` → footprint bridge look circular.  With it:
+
+     hval_of_goodb :
+       (forall r, Db r = true -> r ∈ D) ->
+       reg_agree_on <Db> rs dst.(sregs) ->
+       goodb Db m dst = true ->
+       exec m dst = Some (x, dst) ->
+       hval D Drw rs m x rs
+
+   Target `hval`, NOT `hfrun`: `hval` is fuel-free, so no fuel enters the
+   interface.  `swp_span` takes `hval` directly, and existing `hfrun` callers
+   (the pilot) still reach it through `hfrun_hval`.
+
+   THE PLAN, in order:
+     1. prove `hval_of_goodb` (induction on the monad; `goodb` and `hfrun`
+        are near-identical structural walkers, so the arms line up);
+     2. change `swp_run_hart_active_*`'s decode premise from `hfrun nd …` to
+        `hval …`;
+     3. change `instr`'s decode component to the `hval` form;
+     4. re-prove `instr_intro_base`/`instr_intro_rvc` via `hval_of_goodb`,
+        from the SAME `goodb` + `exec` evidence they already take.
+
+   `mk_rvc` / `mk_base`, all 3752 `kd_` lemmas and every `Code*.v` are
+   UNCHANGED -- the two Ltacs are the only interface the generated corpus
+   has, and their arguments do not move.
 
    **DO NOT GRIND.**  Rebuild the 2 decode+execute rules and the 6 wrappers,
    then convert ONE leaf of each family by hand -- an ALU one, a JALR, a load,
