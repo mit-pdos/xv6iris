@@ -142,17 +142,19 @@ Local Ltac mpmp_peel_D reg H Hstop HD rsN HagN :=
    [catch_early_return] handler collapses to the sub-monad's own
    [Ret None].  The fuel-exhausted / index-past-15 residuals are the
    M-mode default allow, also [Ret None]. *)
-Lemma mpmp_hval_ifetch4 (D Drw : gset register)
+Lemma mpmp_hval4 (D Drw : gset register)
     (pcfg : type_of_register pmpcfg_n)
-    (addr : SailStdpp.Values.mword 64) (rs : regstate) :
+    (addr : SailStdpp.Values.mword 64) (rs : regstate)
+    (acc : MemoryAccessType mem_payload) :
+  (forall ent : SailStdpp.Values.mword 8,
+     exists b : bool, pmpCheckRWX ent acc = returnM b) ->
   (pmpcfg_n : register) ∈ D ->
   (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   register_lookup pmpcfg_n rs = pcfg ->
-  hval D Drw rs
-    (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine) None rs.
+  hval D Drw rs (pmpCheck (Physaddr addr) 4 acc Machine) None rs.
 Proof.
-  intros HD Hunlock Halign Hpcfg rs0 l Hag0 Hchain Hstop.
+  intros Hrwx HD Hunlock Halign Hpcfg rs0 l Hag0 Hchain Hstop.
   (* the one-grain fit, exactly as the exec ifetch4 corollary derived it *)
   assert (Hfit : uint addr mod 4 + uint (to_bits 64 4) <= 4).
   { unfold is_aligned_paddr in Halign. apply Z.eqb_eq in Halign.
@@ -225,9 +227,9 @@ Proof.
           replace (Instances.generic_eq Machine Machine) with true in Hch
             by (vm_compute; reflexivity).
           match type of Hch with
-          | context [ eq_vec (_get_Pmpcfg_ent_X ?E) ?ONE ] =>
-              destruct (eq_vec (_get_Pmpcfg_ent_X E) ONE) eqn:HX
-          end; (mpmp_red Hch;
+          | context [ pmpCheckRWX ?E acc ] =>
+              destruct (Hrwx E) as (bx & Hbx); rewrite Hbx in Hch
+          end; destruct bx; (mpmp_red Hch;
             exists rs5; split; [exact Hag''|exact Hch]).
       + (* i = 0: no previous entry; cfg, then entry pmpcfg + pmpaddr *)
         mpmp_peel_D pmpcfg_n Hch Hstop' HD rs3 Hag3.
@@ -248,9 +250,9 @@ Proof.
           replace (Instances.generic_eq Machine Machine) with true in Hch
             by (vm_compute; reflexivity).
           match type of Hch with
-          | context [ eq_vec (_get_Pmpcfg_ent_X ?E) ?ONE ] =>
-              destruct (eq_vec (_get_Pmpcfg_ent_X E) ONE) eqn:HX
-          end; (mpmp_red Hch;
+          | context [ pmpCheckRWX ?E acc ] =>
+              destruct (Hrwx E) as (bx & Hbx); rewrite Hbx in Hch
+          end; destruct bx; (mpmp_red Hch;
             exists rs5; split; [exact Hag''|exact Hch]).
   }
   destruct (HLOOP 16%nat 0 rs0 l Hag0 Hchain Hstop) as (rs1 & Hag1 & Hch1).
@@ -259,8 +261,37 @@ Proof.
   rewrite Hl. cbn. split; [reflexivity|exact Hag1].
 Qed.
 
+(* the two accesses this port needs.  The RWX premise is the ONLY thing the
+   walk needs from the access -- everything else (the entry loop, the
+   address match, the Machine + unlocked allow) is access-agnostic -- and it
+   is one line per access. *)
+Lemma mpmp_hval_ifetch4 (D Drw : gset register)
+    (pcfg : type_of_register pmpcfg_n)
+    (addr : SailStdpp.Values.mword 64) (rs : regstate) :
+  (pmpcfg_n : register) ∈ D ->
+  (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  register_lookup pmpcfg_n rs = pcfg ->
+  hval D Drw rs
+    (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine) None rs.
+Proof.
+  apply mpmp_hval4. intros ent. eexists. reflexivity.
+Qed.
+
+Lemma mpmp_hval_store4 (D Drw : gset register)
+    (pcfg : type_of_register pmpcfg_n)
+    (addr : SailStdpp.Values.mword 64) (rs : regstate) :
+  (pmpcfg_n : register) ∈ D ->
+  (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  register_lookup pmpcfg_n rs = pcfg ->
+  hval D Drw rs (pmpCheck (Physaddr addr) 4 (Store Data) Machine) None rs.
+Proof.
+  apply mpmp_hval4. intros ent. eexists. reflexivity.
+Qed.
+
 (* ====================================================================== *)
-(* 4. The [swp] fact.                                                      *)
+(* 4. The [swp] facts.                                                     *)
 (* ====================================================================== *)
 
 Section swp_pmp.
@@ -286,6 +317,28 @@ Section swp_pmp.
     intros Hdisj HD Hunlock Halign Hpcfg.
     exact (swp_span Drw Dro Df rs rs _ None Hdisj
              (mpmp_hval_ifetch4 (Drw ∪ Dro) Drw pcfg addr rs
+                HD Hunlock Halign Hpcfg)).
+  Qed.
+
+  Lemma swp_pmpCheck_store4 (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pcfg : type_of_register pmpcfg_n)
+      (addr : SailStdpp.Values.mword 64) :
+    Drw ## Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    is_aligned_paddr (Physaddr addr) 4 = true ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (pmpCheck (Physaddr addr) 4 (Store Data) Machine)
+      (fun r => ⌜r = None⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HD Hunlock Halign Hpcfg.
+    exact (swp_span Drw Dro Df rs rs _ None Hdisj
+             (mpmp_hval_store4 (Drw ∪ Dro) Drw pcfg addr rs
                 HD Hunlock Halign Hpcfg)).
   Qed.
 
