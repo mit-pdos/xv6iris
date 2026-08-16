@@ -106,6 +106,11 @@ segment):
   (Ext_Zca is never read — with bit 1 clear the `and_boolM` short-circuits
   before it — and Ext_Ziccif is a constant true from the config).
 
+- `iris/HartMStore.v` — **the store path, complete**: `swp_execute_STORE`
+  down to the `MemWrite` event, and under it one fact per model function
+  (`check_pma` at the store's writable grant, `translateAddr` at `Store`,
+  `mem_write_ea`, `checked_mem_write`, `mem_write_value`,
+  `vmem_write_addr`, `vmem_write`).  698 lines, 5.9 s, 5 platform axioms.
 - `iris/HartMDecode.v` — the DECODE, and the compressed store's EXECUTE.
   `swp_decode_hp` is the pilot's word; `swp_execute_C_SW` is per-SHAPE
   (generic in the operands), since `execute (C_SW …)` is one `Ret` node
@@ -140,7 +145,9 @@ Evidence:
      the base store the compressed form expands to, which is the whole of
      the write side → try_step's tail → `tick_clock` at the tick.
 
-   **THE STORE SIDE** (`HartMStore.v`, in progress) mirrors the read side,
+   **THE STORE SIDE IS COMPLETE** (`HartMStore.v`, 698 lines, 5.9 s, 5
+   platform axioms): `swp_execute_STORE` from `execute_STORE` down to the
+   `MemWrite` event.  It mirrors the read side,
    so `HartMFetch`'s chain is the template, not just an analogy:
    `execute_STORE imm rs2 rs1 4` = `assert_exp'` (pure) → `rX_bits rs2`
    (a GPR read) → `vmem_write rs1 offset 4 data (Store Data) …` →

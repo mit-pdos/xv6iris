@@ -460,4 +460,239 @@ Section store.
     iApply swp_ret. by iFrame.
   Qed.
 
+  Lemma swp_vmem_write_addr (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate)
+      (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    is_aligned_vaddr (Virtaddr pa) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    (* the access does not cross a page.  Stated as the model's OWN test so
+       a concrete address discharges it by computation; a general bv proof
+       (4-aligned => the low 12 bits cannot carry) would replace it. *)
+    split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
+      = returnM (4, 0) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 4
+                   (Interface.WriteReq.value (mwrite_req pa v)))
+                σ.(mdev)))) -∗
+    swp (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false false)
+      (fun r => ⌜r = Values.Ok true⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
+      Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit.
+    iIntros "#Hcert Hrw Hro Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold vmem_write_addr.
+    rewrite Hva. s_glue.
+    rewrite mbind0_ret.
+    rewrite Hsplit /returnM mliftR_ret mbind_ret. s_glue.
+    iApply (swp_use_cer (Defs.read_reg mstatus) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmst
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)".
+    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". rewrite Hpriv.
+    unfold effectivePrivilege.
+    change (Instances.generic_neq (Store Data) (InstructionFetch tt))
+      with true.
+    s_glue. rewrite Hmprv. s_glue.
+    rewrite mliftR_ret mbind_ret. s_glue.
+    unfold translationMode.
+    change (Instances.generic_eq Machine Machine) with true.
+    s_glue.
+    unfold Defs.and_boolM.
+    rewrite /returnM mliftR_ret mbind_ret. s_glue.
+    change (Instances.generic_neq Bare Bare) with false. s_glue.
+    rewrite mbind_ret. s_glue.
+    change (sys_misaligned_order_decreasing && false) with false. s_glue.
+    rewrite mbind_ret. s_glue.
+    iApply (swp_use_cer (translateAddr (Virtaddr pa) (Store Data)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj
+                (hfrun_translateAddr_M_store (Drw ∪ Dro) Drw rs pa
+                   HDmst HDpriv Hpriv Hmprv) with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    change (eqb false (is_store_conditional (Store Data))) with true.
+    cbn beta iota zeta delta [Defs.assert_exp].
+    rewrite /returnM mliftR_ret mbind0_ret. s_glue.
+    iApply (swp_use_cer2
+              (mem_write_ea (Physaddr pa) 4 (Store Data) PBMT_PMA
+                 false false false) _ _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_mem_write_ea Drw Dro Df rs pa pmar0 pcfg Hdisj HDmst
+                HDpriv HDpma HDcfg Hpriv Hpma Hpcfg Hmprv Hunlock Hpallow
+                Hram Hpa with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    change (8 * 4 - 1) with 31. rewrite subrange_full_32 autocast_id.
+    iApply (swp_use_cer2
+              (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
+                 false false false) _ _ _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_mem_write_value Drw Dro Df rs pa v pmar0 pcfg Hdisj HDmst
+                HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
+                Hunlock Hpallow Hram Hpa with "Hcert Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    rewrite mbind_ret. s_glue.
+    change (not sys_misaligned_order_decreasing && false) with false. s_glue.
+    rewrite mbind_ret. s_glue.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (Values.Ok true)). by iFrame.
+  Qed.
+
+  (* [vmem_write] and [execute_STORE]: the two outer wrappers.  Each takes
+     its GPR-dependent computation as an [hfrun] equation -- the base
+     address and the stored data are the leaf's business, and stating them
+     this way keeps every register value out of this file while leaving the
+     walk complete. *)
+  Lemma swp_vmem_write (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
+      (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    is_aligned_vaddr (Virtaddr pa) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
+      = returnM (4, 0) ->
+    hfrun 8 (Drw ∪ Dro) Drw rs
+      (get_transformed_data_addr base offset (Store Data) 4)
+      = Some (Ext_DataAddr_OK (Virtaddr pa), rs) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 4
+                   (Interface.WriteReq.value (mwrite_req pa v)))
+                σ.(mdev)))) -∗
+    swp (vmem_write base offset 4 v (Store Data) false false false)
+      (fun r => ⌜r = Values.Ok true⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
+      Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta.
+    iIntros "#Hcert Hrw Hro Hmem".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold vmem_write.
+    iApply (swp_use_cer
+              (get_transformed_data_addr base offset (Store Data) 4)
+              _ _ C HC with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj Hgta
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    rewrite mbind_ret. s_glue.
+    iApply (swp_use_cer0
+              (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false
+                 false) _ C HC with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg Hdisj HDmst
+                HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
+                Hunlock Hpallow Hram Hva Hpa Hsplit
+                with "Hcert Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro)".
+    iApply ("Hcont" $! (Values.Ok true)). by iFrame.
+  Qed.
+
+  Lemma swp_execute_STORE (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (imm : SailStdpp.Values.mword 12)
+      (rs2 rs1 : regidx) (d : SailStdpp.Values.mword 64)
+      (pa : SailStdpp.Values.mword 64)
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (pma_regions : register) ∈ Drw ∪ Dro ->
+    (pmpcfg_n : register) ∈ Drw ∪ Dro ->
+    (htif_tohost_base : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup htif_tohost_base rs = None ->
+    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = false ->
+    (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
+    pma_allows_ram pmar0 ->
+    addr_is_ram pa ->
+    is_aligned_vaddr (Virtaddr pa) 4 = true ->
+    is_aligned_paddr (Physaddr pa) 4 = true ->
+    split_on_page_boundary (bits_of_virtaddr (Virtaddr pa)) 4
+      = returnM (4, 0) ->
+    hfrun 4 (Drw ∪ Dro) Drw rs (rX_bits rs2) = Some (d, rs) ->
+    hfrun 8 (Drw ∪ Dro) Drw rs
+      (get_transformed_data_addr rs1 (sign_extend' 64 imm) (Store Data) 4)
+      = Some (Ext_DataAddr_OK (Virtaddr pa), rs) ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (∀ σ, mstate_interp σ ={⊤,∅}=∗
+        ▷ (|={∅,⊤}=> mstate_interp
+             (MState σ.(sregs)
+                (write_bytes σ.(mem) pa 4
+                   (Interface.WriteReq.value
+                      (mwrite_req pa
+                         (TypeCasts.autocast (subrange_vec_dec d 31 0)))))
+                σ.(mdev)))) -∗
+    swp (execute_STORE imm rs2 rs1 4)
+      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
+      Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hrx Hgta.
+    iIntros "#Hcert Hrw Hro Hmem".
+    unfold execute_STORE.
+    cbn beta iota zeta delta [Defs.assert_exp'].
+    rewrite /returnM mbind_ret. s_glue.
+    iApply (swp_bind_use (rX_bits rs2) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_hfrun 4 Drw Dro Df rs rs _ _ Hdisj Hrx
+                with "Hcert Hrw Hro"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    change (4 * 8 - 1) with 31.
+    iApply (swp_bind_use _ _
+              (fun r => (⌜r = Values.Ok true⌝ ∗
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+              with "[Hrw Hro Hmem] [-]").
+    { iApply (swp_vmem_write Drw Dro Df rs rs1 (sign_extend' 64 imm) pa _
+                pmar0 pcfg Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma
+                Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta
+                with "Hcert Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    iApply swp_ret. by iFrame.
+  Qed.
+
 End store.

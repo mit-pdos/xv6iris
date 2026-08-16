@@ -329,6 +329,24 @@ Section swp.
     iApply (swp_use m Φ _ (mctx_cer_liftR K C HC) with "Hswp H").
   Qed.
 
+  (* depth ZERO: the call is the region's LAST statement, so there is no
+     bind around it at all.  [C (cer (liftR (Ret v)))] IS [C (Ret v)], so
+     the continuation is the caller's own. *)
+  Lemma swp_use_cer0 {R : Type} (m : M R) (Φ : R -> iProp Σ)
+      (C : M R -> M unit) :
+    mctx C ->
+    swp m Φ -∗
+    (∀ v : R, Φ v -∗
+       WP (HartE gen_id cpu_id (C (Interface.Ret v)) : expr riscv_lang)) -∗
+    WP (HartE gen_id cpu_id
+          (C (Defs.catch_early_return (Defs.liftR (R := R) m)))
+        : expr riscv_lang).
+  Proof.
+    iIntros (HC) "Hswp H".
+    iApply (swp_use m Φ _
+              (mctx_cer_F (fun h => h) C HC mctxE_id) with "Hswp H").
+  Qed.
+
   (* DEPTH INSTANCES of [swp_use_cer], so a call site matches FIRST-ORDER
      (only the continuations are inferred, never the former).  The model's
      early-return regions nest binds up to three deep before the first
