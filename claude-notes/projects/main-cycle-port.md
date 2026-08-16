@@ -335,6 +335,17 @@ it here.  What is left is the rest:
 - `set_solver` in a clean top-level goal is 7 ms; the SAME goal inside a
   leaf proof, with the towers in scope, is unbounded.  Precompute
   memberships as standalone lemmas (`ml_in_*`, `ml_ind_*`) and pass them.
+- **`vm_compute` does NOT normalise a `regidx`'s WIDTH INDEX, so computed
+  register keys never syntactically match hand-written `k%bv` literals.**
+  Measured with `Set Printing All`: the literal is
+  `@BV 5 5 I`, while a key read out of `map_to_list (rf_to_gmap m)` is
+  `@BV (MachineWord.Z_idx (match false return Z with true => 4 | false => 5
+  end)) …` -- the width stays a stuck `match` on the xlen config bool.  The
+  two are CONVERTIBLE but not syntactically equal, so `reflexivity` succeeds
+  while `exact`, `iFrame` and every intro-pattern match FAIL, with an error
+  that prints the two types identically ("has type X while it is expected to
+  have type X").  Consequence for register-file bridges: build them with
+  `big_sepM_delete` at keys you WRITE, never by computing the key list.
 - Background builds must `cd` into `iris/` themselves: `make -f CoqMakefile`
   from the repo root fails with "No rule to make target 'CoqMakefile'", and
   a shell whose cwd drifted between commands is the usual cause.
