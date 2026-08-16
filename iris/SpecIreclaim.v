@@ -267,6 +267,14 @@ Definition wp_ireclaim_sconf_body
      a dinode, so [DinodeSlot.diblk_slot_acc] is all its scan needs and
      [InodeRegion.ireg_claim_au] never appears. *)
   ireg_inv γi γfs inodestart nib -∗
+  (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12 / §7.1.7).  ireclaim's [iget]
+     fires at a claim-SHAPED record (type ≠ 0, nlink 0); the licence alone does
+     not exclude a mid-window claim box, and the exclusion is the boot-order
+     fact that ireclaim runs before [kexec("/init")] and before any second
+     process.  This EXCLUSIVE token is that fact, made statable: while it is
+     held no slot is claimed ([IregLinkNz.ireg_boot_no_claim]).  fsinit, the
+     only caller, hands it in and takes it back. *)
+  ireg_boot -∗
   (* ---- THE ICACHE, as iget / ilock / iput take it ---- *)
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
@@ -318,6 +326,9 @@ Definition wp_ireclaim_sconf_body
          caller needs them named.  fsinit, the only caller, threads it on. *)
       ⌜used' ⊆ used⌝ -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
+      (* the boot-shelter token, returned unspent (fs-fragments.md §7.12): the
+         scan refutes claims AGAINST it, never consuming it *)
+      ireg_boot -∗
       (* ...and nothing else.  ireclaim returns void, no log reservation
          crosses the boundary (begin_op mints and end_op retires inside),
          and no inode reference survives (iget's is spent by iput). *)

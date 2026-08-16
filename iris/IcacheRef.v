@@ -485,6 +485,17 @@ Class icfg := MkIcfg {
      given) -- the ordinary constructor allocates the gname itself, which is
      too late for anything that has to mention it. *)
   icfg_isl : nat -> gname;
+  (* THE BOOT ONE-SHOT (boot-shelter plank, fs-fragments.md §7.12).  A single
+     [ityR] one-shot, ambient for [icfg_iref]'s reason: [ireg_open] (the
+     sealed regime) is parked in [InodeRegion.ireg_slot]'s disjunctive clause,
+     so a threaded name would enter [ireg_inv]'s arity.  The exclusive pending
+     regime [ireg_boot] is minted at boot by [icfg_alloc] (it reuses the pool's
+     boot generation one-shot, previously dropped) and carried on the exclusive
+     boot thread through fsinit into ireclaim; the seal to [ireg_open] fires
+     once, after fsinit returns and before [kexec("/init")] -- and is OWED to
+     whoever proves forkret's first branch (see SpecForkret's [first_addr]
+     IOU). *)
+  icfg_boot : gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -598,6 +609,11 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) ∗
       own icfg_live (live_boot_map g0) ∗
       own icfg_link LM ∗
+      (* the boot one-shot, PENDING -- this is [ireg_boot], the exclusive
+         boot-shelter token (fs-fragments.md §7.12).  It reuses the pool's
+         boot generation gname [g0] (they are independent [own]s: the pool
+         holds [g0] only as a [to_agree] VALUE inside [live_boot_map]). *)
+      own icfg_boot (Cinl (Excl ()) : ityR) ∗
       ([∗ list] k ∈ seq 0 (16 * nib),
          mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
@@ -612,12 +628,12 @@ Proof.
      PENDING one-shot is the cheapest way to get a fresh one.  It is dropped
      here: at boot every slot is FREE, and a free slot's generation carries
      no one-shot obligation at all (design §17.2 piece 2). *)
-  iMod (own_alloc (Cinl (Excl ()) : ityR)) as (g0) "_"; [done|].
+  iMod (own_alloc (Cinl (Excl ()) : ityR)) as (g0) "Hboot"; [done|].
   iMod (own_alloc (live_boot_map g0)) as (γl) "Hl".
   { apply live_boot_map_valid. }
   iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
-  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl), g0.
-  cbn [icfg_iep icfg_isl]. by iFrame "Ha Hl Hlk Hep Hisl".
+  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0), g0.
+  cbn [icfg_iep icfg_isl icfg_boot]. by iFrame "Ha Hl Hlk Hep Hisl Hboot".
 Qed.
 
 (* ===================================================================== *)
@@ -678,6 +694,37 @@ End IcacheIty.
 
 Section IcacheLink.
   Context `{!icacheG Σ} `{ICFG : icfg}.
+
+  (* ===================================================================== *)
+  (*  THE BOOT-SHELTER REGIMES (fs-fragments.md §7.12)                      *)
+  (* ===================================================================== *)
+
+  (* [ireg_boot] is the EXCLUSIVE pre-userspace token: while it is held no
+     [ireg_open] can exist ([ity_pending_shot_excl]).  It is minted by
+     [icfg_alloc] and carried on the boot thread through fsinit into ireclaim.
+     [ireg_open] is the PERSISTENT sealed regime, parked in every
+     [InodeRegion.ireg_slot] beside the slot's claim component: a claimed slot
+     (c = Some) must exhibit it, so a holder of [ireg_boot] proves every slot
+     is unclaimed ([IregLinkNz.ireg_boot_no_claim]).  The seal
+     [ireg_boot ==∗ ireg_open] ([ity_shoot]) fires once after fsinit returns;
+     that firing is OWED to forkret's first branch. *)
+  Definition ireg_boot : iProp Σ := ity_pending icfg_boot.
+  Definition ireg_open : iProp Σ := ∃ ty : bv 16, ity_shot icfg_boot ty.
+
+  Global Instance ireg_open_persistent : Persistent ireg_open.
+  Proof. rewrite /ireg_open. apply _. Qed.
+  Global Instance ireg_open_timeless : Timeless ireg_open.
+  Proof. rewrite /ireg_open. apply _. Qed.
+  Global Instance ireg_boot_timeless : Timeless ireg_boot.
+  Proof. rewrite /ireg_boot. apply _. Qed.
+
+  (* the whole point: the boot token refutes the sealed regime, hence a
+     claimed slot, hence a mid-window claim box on ireclaim's trace. *)
+  Lemma ireg_boot_open_excl : ireg_boot -∗ ireg_open -∗ False.
+  Proof.
+    rewrite /ireg_boot /ireg_open. iIntros "Hp (%ty & Hs)".
+    iApply (ity_pending_shot_excl with "Hp Hs").
+  Qed.
 
   Definition link_auth_e (z : Z) (a : linkElemUR) : iProp Σ :=
     own icfg_link ({[ z := ● a ]} : linkUR).

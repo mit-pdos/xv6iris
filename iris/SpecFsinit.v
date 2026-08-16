@@ -335,6 +335,13 @@ Definition wp_fsinit_sconf_body
   (* ---- the icache's four persistent things, straight from
          [IcacheBoot.icache_boot] ---- *)
   ireg_inv γi γfs inodestart nib -∗
+  (* THE BOOT-SHELTER TOKEN (fs-fragments.md §7.12), from [icfg_alloc] through
+     the boot chain: fsinit frames it across bread/memmove/initlog and hands it
+     to ireclaim, which is the only reason it is safe there (§7.1.7).  Returned
+     in the post, so the boot caller can seal it to [ireg_open] after fsinit
+     returns and before [kexec("/init")] -- that seal is OWED to forkret's
+     first branch. *)
+  ireg_boot -∗
   is_itable2 gtl cn γfs γi cov logstart nib dev -∗
   itable_inv -∗
   ic_escrows cn γfs γi cov logstart -∗
@@ -414,6 +421,9 @@ Definition wp_fsinit_sconf_body
       (* the bitmap, with every orphan's blocks freed *)
       ⌜used' ⊆ used⌝ -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
+      (* the boot-shelter token, handed back for the seal (fs-fragments.md
+         §7.12) *)
+      ireg_boot -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -566,18 +566,22 @@ Section IcacheBootRegion.
        hand them over ([IcacheRef.icfg_alloc]). *)
     ([∗ set] z ∈ region_inums nib, mono_nat_auth_own (icfg_iep z) 1 0) -∗
     ([∗ list] bi ∈ seq 0 nib,
-       fsblock γfs (inodestart + Z.of_nat bi) (bss bi))
+       fsblock γfs (inodestart + Z.of_nat bi) (bss bi)) -∗
+    (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
+       (fs-fragments.md §7.12) -- carried, never consumed here *)
+    ireg_boot
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
       ⌜length dss = nib⌝ ∗ ⌜Forall diblk_wf dss⌝ ∗
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
       ireg_inv γi γfs inodestart nib ∗
+      ireg_boot ∗
       ([∗ set] z ∈ region_inums nib,
          ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0).
-    iIntros "Hlk Hepa Hblks".
+    iIntros "Hlk Hepa Hblks Hboot".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -612,12 +616,18 @@ Section IcacheBootRegion.
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
                   ireg_par_ok_none
                   with "Hla Hep").
+        (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
+           disjunct is free (fs-fragments.md §7.12) *)
+        { iLeft; iPureIntro; reflexivity. }
         iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
         iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 0 None 0 None
                   Hok Hrt (ireg_dir_ok_zero _) (ireg_dir_wl0_zero _)
                   ireg_par_ok_none
                   with "Hla Hep").
+        (* boot's ledger is all-[None], so the boot-shelter clause's LEFT
+           disjunct is free (fs-fragments.md §7.12) *)
+        { iLeft; iPureIntro; reflexivity. }
         iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.
     iDestruct "Hall" as "[Hslots Hout]".
@@ -645,7 +655,7 @@ Section IcacheBootRegion.
       as "#Hinv"; [by iNext |].
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
-    iFrame "Hinv". iExact "Hout".
+    iFrame "Hinv Hboot". iExact "Hout".
   Qed.
 
 End IcacheBootRegion.

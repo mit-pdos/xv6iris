@@ -94,7 +94,7 @@ Section IregLinkNz.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -117,8 +117,61 @@ Section IregLinkNz.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE BOOT SHELTER, AS A THEOREM (fs-fragments.md §7.12 / §7.1.7)     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* Holding the exclusive pre-userspace token [ireg_boot], NO in-region slot
+     can be CLAIMED.  §7.1.7's threat is that ireclaim's [iget] fires exactly
+     at a claim-shaped record (type ≠ 0, nlink 0) -- indistinguishable from a
+     mid-window claim box -- and the licence alone cannot exclude it; the model
+     stated the exclusion only as the boot-order comment "ireclaim runs before
+     kexec, before any second process".  Here it is a ghost consequence:
+
+       an [iclaim z] pins the slot's claim component to [Some]
+       ([IcacheRef.link_claim_agree]) -> the slot's boot-shelter clause is
+       forced onto its SEALED arm [ireg_open] -> [ireg_boot_open_excl] refutes
+       it, because the exclusive boot token and the sealed one-shot cannot
+       coexist ([ity_pending_shot_excl]).
+
+     ireclaim carries [ireg_boot] on the boot thread ([SpecIreclaim] premise),
+     so this discharges the boot-order fact §7.1.7 left to a comment.  Stated
+     as an ACCESSOR over [ireg_inv] (the §7.1.4 constraint: name the record by
+     opening the region, never a free-standing entailment over a free [dn]);
+     the token is refuted-against, not consumed, so it survives for the caller
+     -- when [iclaim] is actually mintable (F1.5c's (M1)), this is what lets
+     ireclaim's free supply the [c = None] that §7.1.5 shows it needs. *)
+  Lemma ireg_boot_no_claim (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    ireg_inv γi γfs inodestart nib -∗
+    ireg_boot -∗
+    iclaim (bv_unsigned inum) ={E}=∗ False.
+  Proof.
+    iIntros (HE Hin) "#Hinv Hboot Hcl".
+    pose proof (islot_lt inum) as Hsl.
+    assert (Hkey : (16 * Z.of_nat (ireg_bi inum) + Z.of_nat (islot inum))%Z
+                   = bv_unsigned inum) by (symmetry; apply ireg_key_split).
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    pose proof (ireg_bi_lt inum nib Hin) as Hbi.
+    iDestruct (ireg_blks_acc_upd γi γfs inodestart m nib (ireg_bi inum) Hbi
+                with "Hblks") as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb & >Hsls)".
+    assert (Hlen16 : length ds = 16%nat) by (destruct Hwf as [Hl _]; exact Hl).
+    iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
+                with "Hsls") as "[Hslot Hslback]".
+    iEval (rewrite Hkey) in "Hslot".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
+    iDestruct (link_claim_agree with "Hla Hcl") as %Hc.
+    iDestruct "Hdisj" as "[%Hnone | Hopen]".
+    { exfalso. rewrite Hnone in Hc. discriminate. }
+    iDestruct (ireg_boot_open_excl with "Hboot Hopen") as %[].
   Qed.
 
   (* ...AND ITS FLAVOURED FORM.  After V4's flip create's [dp->nlink++]
@@ -151,7 +204,7 @@ Section IregLinkNz.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_wsum_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -173,7 +226,7 @@ Section IregLinkNz.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hnz.
   Qed.
 
@@ -207,7 +260,7 @@ Section IregLinkNz.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_wsum_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -232,7 +285,7 @@ Section IregLinkNz.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin2.
   Qed.
 
@@ -268,7 +321,7 @@ Section IregLinkNz.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_wdt_ge with "Hla Hfrag") as %[Hw1 _].
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -293,7 +346,7 @@ Section IregLinkNz.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hmin2.
   Qed.
 

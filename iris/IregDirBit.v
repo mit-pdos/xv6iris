@@ -104,7 +104,7 @@ Section IregDirBit.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_wd_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -129,7 +129,7 @@ Section IregDirBit.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 
@@ -165,7 +165,7 @@ Section IregDirBit.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_wdt_ge with "Hla Hfrag") as %[Hw1 _].
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -190,7 +190,7 @@ Section IregDirBit.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 
@@ -229,7 +229,7 @@ Section IregDirBit.
     iDestruct (ireg_slots_acc_upd γi (ireg_bi inum) ds (islot inum) Hsl Hlen16
                 with "Hsls") as "[Hslot Hslback]".
     iEval (rewrite Hkey) in "Hslot".
-    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar) [Hep Harm]]".
+    iDestruct "Hslot" as "[(%wl & %wdu & %wdt & %gl & %rl & %cl & %pl & Hla & %Hlok & %Hrt & %Hdir & %Hwl0 & %Hpar & #Hdisj) [Hep Harm]]".
     iDestruct (link_w_ge with "Hla Hfrag") as %Hw1.
     rewrite /dinode_at.
     iDestruct (ghost_map_lookup with "Ha Hdn") as %Hm.
@@ -255,7 +255,7 @@ Section IregDirBit.
       rewrite Hkey.
       iApply (ireg_slot_intro γi (bv_unsigned inum) (ds !!! islot inum)
                 wl wdu wdt gl cl rl pl Hlok Hrt Hdir Hwl0 Hpar
-                with "Hla Hep"). iExact "Harm". }
+                with "Hla Hep Hdisj"). iExact "Harm". }
     iModIntro. iFrame "Hdn Hfrag". iPureIntro. exact Hty.
   Qed.
 

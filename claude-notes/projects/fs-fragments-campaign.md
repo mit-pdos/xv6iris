@@ -13,7 +13,7 @@ diverged from the design's sketches, and what is left.
 | **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | **LANDED** |
 | **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | **LANDED** |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
-| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause AND the isdirempty plank are landed** — see below) | NOT STARTED |
+| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput — **AND `SpecIput` (under-counted here): ireclaim's iput must carry the boot token through to `ireg_free_au`, so `SpecIput` is `option unit`-indexed exactly as `SpecAllocproc` indexes `procs_avail op`; see the boot-shelter plank below** | §20.17.5's residue + C′ (**the root clause, the isdirempty plank AND the boot-shelter plank are landed** — see below) | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
 | **V1** | the COUNT-FACT CARRIER: `w` widened to `(wl, wd)`, `ilinkd`, (T1), the flavour-indexed movers and `wp_iupdate_link`/`_unlink` | IcacheRef, InodeRegion, IregLinkNz, `IregDirBit.v` (new), IcacheBoot, SpecIupdate, ProofIupdate + 3 callers | full cone | **LANDED** |
 | **V2** | the `DirLinks`/`DirView` COUNT CLAUSE + the d-flavoured mint ESTABLISHED at create's mkdir arm | DirView, DirLinks, InodeRegion, IregLinkNz, FsRep, IcacheBoot, ProofIlock, ProofCreate, ProofSysLinkTails, ProofSysUnlinkParts | full cone | **LANDED** |
@@ -630,6 +630,45 @@ flight, so the same lane was re-pointed at the merged commit and rebuilt:
 working tree clean. The two change sets are disjoint by inspection:
 `ProofSyscall.v` / `SpecSysUptime.v` / `ProofSysUptime.v` mention
 `ic_loaded` / `ipool_alloc` / `ic_payload` **zero** times.
+
+## THE BOOT-SHELTER PLANK — LANDED (design: fs-fragments.md §7.12)
+
+Plank 3 of §7.9's licence-completion program.  §7.1.7's boot-order shelter is
+now a theorem: while the exclusive pre-userspace token `ireg_boot` is held, no
+in-region slot is claimed, so `ireclaim`'s `iget` cannot be racing a claim
+box.  **Zero new assumptions** — the sealed syscalls' `Print Assumptions` and
+the adequacy print are unchanged; `create_fresh_ty` does NOT fall (this closes
+ireclaim, not the general free — the axiom's residue is Case 2, ialloc-side).
+
+- **The algebra was already landed.**  One new ambient field `icfg_boot :
+  gname` on `MkIcfg`, and the two regimes reuse `IcacheRef.ityR`:
+  `ireg_boot := ity_pending icfg_boot` (exclusive), `ireg_open := ∃ ty,
+  ity_shot icfg_boot ty` (persistent, timeless).  `icfg_alloc` mints
+  `ireg_boot` by KEEPING the pool's boot-generation one-shot it previously
+  dropped — no new `own_alloc`.  The refutation is the landed
+  `ity_pending_shot_excl` (→ `ireg_boot_open_excl`).
+- **The clause.**  `InodeRegion.ireg_slot` gains `(⌜c = None⌝ ∨ ireg_open)`
+  beside `link_auth` — DISJUNCTIVE (keeps `ireg_slot` timeless; both arms are
+  timeless AND persistent).  Threaded through `ireg_slot_intro` (one new
+  premise) at all ~21 intro sites and ~13 destructurings as `#Hdisj`: every
+  region mover carries it unchanged (none moves `c`), boot sites supply the
+  left arm for free.  No new camera, class, gname, or functor argument; the
+  124 `iregG` files see no binder change (the gname rides on `icfg`).
+- **The theorem.**  `IregLinkNz.ireg_boot_no_claim` — an ACCESSOR over
+  `ireg_inv` (the §7.1.4 shape): `ireg_inv -∗ ireg_boot -∗ iclaim z ={E}=∗
+  False`, via `link_claim_agree` + the clause + `ireg_boot_open_excl`.
+- **Threaded on two contracts only.**  `SpecFsinit`/`SpecIreclaim` each gain
+  one `ireg_boot` premise, returned in the post (`ProofFsinit` frames it across
+  bread/memmove/initlog/ireclaim; `ProofIreclaim` across the scan's block
+  lemmas — `irc_cont`/`irc_loop`/`irc_epilogue`/`irc_step`/`irc_orphan`/
+  `irc_release`).  `SpecForkret` does NOT move and the six fs contracts do NOT
+  move (`iclaim` is inert; the `ireg_open` premise on `ireg_claim_au` is a
+  written constraint on (M1)/F1.5c, not owed here).
+- **Two IOUs, recorded not fixed.**  (1) The seal `ireg_boot ==∗ ireg_open`
+  fires after fsinit returns and before `kexec` — OWED to `forkret`'s first
+  branch (UNPROVEN upstream, GR-37), beside `SpecForkret`'s `first_addr` IOU;
+  `ireg_open` being reachable post-boot is owed with it.  (2) F1.5d's row
+  under-counts `SpecIput` (see the corrected row above).
 
 ## `iunlock` STOPS ERASING THE GENERATION — the carrier PASS 2 needed
 

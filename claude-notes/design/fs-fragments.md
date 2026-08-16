@@ -3178,3 +3178,107 @@ status over ghost-only Iris; this probe fixes its scope and shows the
 uncovered case does not pay either.  **A ninth probe on either mechanism
 is a re-run** — the sentence in `SpecCreateFreshTy.v`'s header §(D) is
 there to say so.
+
+### 7.12 THE BOOT-SHELTER PLANK — §7.1.7's comment becomes a theorem (LANDED)
+
+Plank 3 of §7.9's licence-completion program (C′-lite / box-exclusion /
+**boot-shelter** / guard-fed grey deletion).  It upgrades §7.1.7's boot-order
+shelter from a comment to a machine-checked ghost consequence.  **It does NOT
+retire the axiom** — the axiom's residue is Case 2, a fresh `iget` in
+`ialloc`'s window (ialloc-side); this plank closes ireclaim ONLY.  It adds
+**zero assumptions** to any sealed syscall.
+
+#### The threat (§7.1.7 restated)
+
+`ireclaim` `iget`s exactly when `dip->type != 0 && dip->nlink == 0` — which is
+byte-identical to a mid-window claim box (`ialloc_fresh ty`).  Under (L5) the
+region invariant is *unpreservable* on ireclaim's trace (iget → ilock =
+withdraw at the box → iput = `ireg_free_au` whose `c = None` is FALSE there),
+excluded only by reachability: `fsinit` is called only from `forkret`'s first
+branch, before `kexec("/init")` and before any second process.  That is a
+boot-order fact — a STATE fact over modeled state, hence statable, unlike the
+axiom's future-trace residue.
+
+#### The statable form: reuse `IcacheRef`'s one-shot
+
+The algebra is already landed.  `ityR = csumR (exclR unitO) (agreeR …)`
+(`IcacheRef.v`) supplies the two regimes on ONE ambient gname `icfg_boot`
+(a new field on `MkIcfg`, ambient for `icfg_iref`'s reason — a threaded name
+would enter `ireg_inv`'s arity, i.e. every fs contract):
+
+- `ireg_boot := ity_pending icfg_boot` — **EXCLUSIVE**, the pre-userspace
+  token.  Minted by `icfg_alloc` (it reuses the pool's boot-generation
+  one-shot, previously allocated-and-dropped), carried on the boot thread.
+- `ireg_open := ∃ ty, ity_shot icfg_boot ty` — **PERSISTENT** and **timeless**,
+  the sealed regime.
+
+The refutation lemma is landed and is the whole engine:
+`ity_pending_shot_excl : ity_pending g -∗ ity_shot g ty -∗ False`
+(→ `IcacheRef.ireg_boot_open_excl`).
+
+**The clause.**  `InodeRegion.ireg_slot`'s ∃-block gains, beside `link_auth`,
+the DISJUNCTIVE `(⌜c = None⌝ ∨ ireg_open)` — a claimed slot (`c = Some`) must
+exhibit the sealed regime.  Disjunctive, not an implication, so `ireg_slot`
+stays timeless (both arms are timeless AND persistent); persistence makes it
+thread through the ~21 `ireg_slot_intro` sites and ~13 destructurings as a
+`#Hdisj` that every mover carries unchanged (no mover moves `c`), with the
+boot sites (`IcacheBoot`, all `c = None`) supplying the left arm for free.
+
+**The theorem** (`IregLinkNz.ireg_boot_no_claim`, in `ireg_link_nz`'s ACCESSOR
+shape per §7.1.4 — over `ireg_inv`, never free-standing over a free `dn`):
+
+> `ireg_inv … -∗ ireg_boot -∗ iclaim z ={E}=∗ False`
+>
+> *Proof.* `link_claim_agree` pins the slot's `c` to `Some`; the clause is
+> forced onto `ireg_open`; `ireg_boot_open_excl` refutes it. ∎
+
+While the boot token is held, NO in-region slot is claimed — §7.1.7's
+exclusion, as ghost, not prose.  `ireclaim` carries `ireg_boot` (a
+`SpecIreclaim` premise, returned unspent), so its `iget` cannot be racing a
+claim box.
+
+#### The moving set (and what does NOT move)
+
+`IcacheRef.v` (field + `icfg_alloc` + the two regimes),
+`InodeRegion.v` (the clause, `ireg_slot_intro`, the movers),
+`IcacheBoot.v` (left disjunct at each boot slot; `ireg_alloc` threads
+`ireg_boot` out beside `ireg_inv`), `IregLinkNz.v`/`IregDirBit.v`/`IregBox.v`/
+`IgetLic.v` (pattern-only), `SpecFsinit.v`+`ProofFsinit.v` and
+`SpecIreclaim.v`+`ProofIreclaim.v` (one premise, returned; framed across the
+scan / bread·memmove·initlog·ireclaim).  **`SpecForkret` does NOT move; the
+six fs contracts (`SpecIalloc`/`SpecCreate`/`SpecIlock`/`SpecIput`/
+`SpecIupdate`/`SpecIget`) do NOT move** — `ireg_claim_au` does not touch `c`
+today (the whole `iclaim` machinery is inert), so the clause is preserved by
+carrying `c` through unchanged, and the `ireg_open` premise on
+`ireg_claim_au` is a WRITTEN CONSTRAINT on (M1)/F1.5c, not an owed edit here.
+
+#### Two IOUs (recorded, not fixed)
+
+1. **The seal** `ireg_boot ==∗ ireg_open` (`ity_shoot`) fires once, after
+   `fsinit` returns and before `kexec("/init")`.  It is OWED to whoever proves
+   `forkret`'s first branch — UNPROVEN upstream (GR-37: their
+   `wp_forkret_nf_ax` and this seal both wait on it), beside `SpecForkret`'s
+   existing `first_addr` IOU.  `ireg_open` being reachable post-boot is thus
+   also owed with the seal — expected and correct for a plank.  (`procs_avail_seal`
+   owes an identical boot seal with zero call sites; pay them together.)
+2. **F1.5d under-counts `SpecIput`.**  The campaign-ledger F1.5d row lists
+   `SpecIget + 4 sites, SpecIupdate, ProofIput` but NOT `SpecIput` — yet
+   ireclaim's `iput` cannot discharge `c = None` from the licence enumeration
+   (§7.1.7's whole point), so under (M1) the token has to reach `ireg_free_au`
+   THROUGH `SpecIput`.  Recommended shape (the tree's own): index `SpecIput` by
+   `option unit` exactly as `SpecAllocproc` indexes `procs_avail op` — `Some tt`
+   = boot regime (exclusive `ireg_boot`), `None` = steady (persistent
+   `ireg_open`, free from `syscall_env`).  That is F1.5d's price, not this
+   plank's.
+
+#### What it buys, honestly
+
+It makes the ireclaim trace PRESERVABLE under a future (L5), and it is a
+prerequisite for (L5)'s free.  It touches none of the axiom's three missing
+pieces (converse of the freeze, affinity leak, currency gap): the token is
+gone before any user thread runs, so **`create_fresh_ty` does not fall** — the
+planks retire §20.17.5's *paragraph*, not §20.7's *wall*.  After C′-lite +
+box-exclusion + boot-shelter, §20.17.5's enumeration is discharged premises
+except the one named informal shelter: `ProofIalloc`'s own `iget` under the
+`SpanL` transitional licence, sheltered by `create_fresh_ty` itself and
+deleting exactly when the axiom does.

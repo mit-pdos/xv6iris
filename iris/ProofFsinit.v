@@ -224,6 +224,7 @@ Section FsinitDefs.
         iref_slot -∗
         ⌜used' ⊆ used⌝ -∗
         bitmap_res γfs bmapstart cov logstart size used' -∗
+        ireg_boot -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------ *)
@@ -308,6 +309,7 @@ Section FsinitEpilogue.
     bslots bn 3 -∗
     iref_slot -∗
     bitmap_res γfs bmapstart cov logstart size used' -∗
+    ireg_boot -∗
     fsi_cont (CID0 := CID0) γfs bn cov logstart bmapstart inodestart ninodes
              size used dev v_magic v_size v_nblocks v_nlog bs_sb pidv dq j
              m K b lks -∗
@@ -316,7 +318,7 @@ Section FsinitEpilogue.
     intros HK Hsub Hsp Hthr.
     pose proof HK as HK'. 
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls Hist
-              Hbms Hfsb Hlctx Hsl Hiref Hbm Hcont".
+              Hbms Hfsb Hlctx Hsl Hiref Hbm Hboot Hcont".
     iPoseProof (fsi_58 with "Htext") as "Hi58".
     iPoseProof (fsi_5a with "Htext") as "Hi5a".
     iPoseProof (fsi_5c with "Htext") as "Hi5c".
@@ -507,7 +509,7 @@ Section FsinitEpilogue.
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P5 used' with "[%] Hcg Hcnt Hpc Hppid Hmg Hsz Hnb Hni
                                        Hnl Hls Hist Hbms Hfsb Hlctx Hsl Hiref
-                                       [%] Hbm");
+                                       [%] Hbm Hboot");
       [exact Hcs | exact Hsub].
   Qed.
 
@@ -574,7 +576,7 @@ Section FsinitMain.
     assert (Hbnocov : uint bno ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Hbnou; exact H1cov).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hseam #Hgen
-              Hmirror Hfsb Hsbold #Hireg #Hitb2 #Hitbl #Hesc #Hslks Hbm
+              Hmirror Hfsb Hsbold #Hireg Hboot #Hitb2 #Hitbl #Hesc #Hslks Hbm
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
@@ -1467,11 +1469,11 @@ Section FsinitMain.
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0 eq_refl
               Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hpenv Hbio Hlctx Hseam
-                    Hgen Hni Hist Hbms Hireg Hitb2 Hitbl Hesc Hslks Hbm Hppid
+                    Hgen Hni Hist Hbms Hireg Hboot Hitb2 Hitbl Hesc Hslks Hbm Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl3 Hiref").
     all: try lkbelow.
     iIntros (CID33 Hq33 mf used') "%Hcsir Hcg Hcnt Hpc Hni Hist Hbms Hppid
-                                   Hsl3 Hiref %Hsub Hbm".
+                                   Hsl3 Hiref %Hsub Hbm Hboot".
     assert (Hpc58 : ret_pc (R1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.fsinit + 0x58))
       by (rewrite HR1ra; pcw).
@@ -1489,7 +1491,7 @@ Section FsinitMain.
               inodestart ninodes size used used' dev v_magic v_size v_nblocks
               v_nlog bs_sb pidv dq m mf K b lks HK Hsub Hmfsp Hmfthr
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls
-                    Hist Hbms Hfsb [Hlctx] Hsl3 Hiref Hbm [Hcont]").
+                    Hist Hbms Hfsb [Hlctx] Hsl3 Hiref Hbm Hboot [Hcont]").
     { iExists γlog. iExact "Hlctx". }
     { iApply (wp_next_shift (b := true) (CIDa := CID32) (CIDb := CID33)
                 ltac:(wp_next_chain) with "Hcont"). }
