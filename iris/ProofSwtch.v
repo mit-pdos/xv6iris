@@ -85,11 +85,11 @@ Section ProofSwtch.
 
   Lemma wp_swtch_sconf
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
-           mword 64 -d> mword 64 -d> iPropO Σ)
+           mword 64 -d> mword 64 -d> bool -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
-      (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
+      (av : nat) (eb : bool) (p : mword 64) (back : bool) :
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p back.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -205,9 +205,21 @@ Section ProofSwtch.
        wand.  Pack p := the spec's [p] param; the caller continuation [Hwold]
        is already [∀ m eb', … cpu_own γ 1 eb' p emp …], matching the record's
        [∀ m eb'] wand at that same p. ---- *)
-    iAssert (valid_context P Ao oldc p)
+    (* WHAT THE OLD SIDE LEAVES BEHIND, and it is one of two things.  At
+       [back = true] it is the caller's record, built from its continuation,
+       its cells and its parked stack, exactly as a coroutine crossing
+       demands.  At [back = false] the caller is not coming back: there is no
+       continuation to park (the spec asked for none) and the stack is the
+       caller's own business, so what crosses is just the CELLS the block
+       above wrote -- which is all a slot that will never be resumed can use
+       ([SchedCtx.proc_slots] at ZOMBIE wants [own_ctx] and nothing more). *)
+    iAssert (if back then valid_context P Ao oldc p else own_ctx oldc)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
+    { destruct back; last first.
+      { iExists (callee_img m0). iSplitR.
+        { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
+        iExact "Holdpart". }
+      rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
       iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
@@ -295,8 +307,8 @@ Section ProofSwtch.
               with "[] [] Hcg_t Hcpuown Hpc Hnewpart [Hvoldc HP]").
     { iPureIntro. exact Hadm. }
     { iPureIntro. exact Hcallee_new. }
-    iExists Ao, oldc. iSplitL "Hvoldc".
-    { iApply bi.later_intro. iExact "Hvoldc". }
+    iExists Ao, oldc, back. iSplitL "Hvoldc".
+    { destruct back; [iApply bi.later_intro |]; iExact "Hvoldc". }
     { rewrite Hm4. iExact "HP". }
   Qed.
 

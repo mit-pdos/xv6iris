@@ -54,6 +54,8 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
+Require Import WpMmodeLeafBase.
+Require Import StackOwn.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -111,8 +113,19 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      [emp] at a resumable park -- the private block stays in the parking
      thread's own closure -- and, at the ZOMBIE park, the dormant block minus
      its context cells, because nothing will ever resume the closure and
-     wait()/freeproc must find that block in the lock. *)
-  park_pay pj st -∗
+     wait()/freeproc must find that block in the lock.
+
+     AND IT IS A CLOSER, NOT A RESOURCE, taking back the whole stack region
+     sched was called with.  At a park that never returns ([needs_ctx st]
+     false) sched's own frame and its unused tail are dead the moment the
+     swtch happens, and the slot needs them: they are part of the page the
+     dying thread has to leave behind ([ProcDefs.kstack_free]).  So sched
+     hands them to the payload instead of carrying them into a continuation
+     that will never run.  At a RESUMABLE park the argument is unusable --
+     sched needs its frame after the swtch -- but so is the closer:
+     [park_pay] is [emp] there, so the caller passes [fun _ => emp] and
+     nothing is promised. *)
+  (stack_own (m !!! Regidx csp_rs1) av -∗ park_pay pj st) -∗
   (* handed over at the crossing, taken back from the dispatch payload. *)
   trap_csrs -∗
   (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:
@@ -131,20 +144,29 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      [cpu_claim] out of one resource. *)
   hart_full j cpu_id -∗
   ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
-  wp_next true pj (fun (CID : CpuId) =>
-    ∀ (mf : regfile) (ch' : mword 64),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf av false pj -∗
-      pc_is ret_tgt -∗
-      proc_held cpu_id j γl RUNNING ch' -∗
-      (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
-         rides inside it, which is what the caller's own retune needs. *)
-      trap_csrs -∗
-      cpu_own 1 eb pj false {["proc"]} -∗
-      own_ctx (p_context pj) -∗
-      hart_full j cpu_id -∗
-      ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang)) -∗
+  (* THE POST-RESUME HALF EXISTS ONLY AT A RESUMABLE PARK.  [needs_ctx st] is
+     the proc lock's own predicate for "this slot owns a saved context", and
+     it is exactly the [back] flag sched hands the crossing
+     ([SchedCtx.p_sched]): where no record is left, no resumption can occur,
+     and there is nothing for the caller to prove.  That is what makes
+     kexit's [panic("zombie exit")] tail dead code rather than an arm to
+     discharge. *)
+  (if needs_ctx st then
+     wp_next true pj (fun (CID : CpuId) =>
+       ∀ (mf : regfile) (ch' : mword 64),
+         ⌜callee_saved m mf⌝ -∗
+         sie_cap_gpr mf av false pj -∗
+         pc_is ret_tgt -∗
+         proc_held cpu_id j γl RUNNING ch' -∗
+         (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
+            rides inside it, which is what the caller's own retune needs. *)
+         trap_csrs -∗
+         cpu_own 1 eb pj false {["proc"]} -∗
+         own_ctx (p_context pj) -∗
+         hart_full j cpu_id -∗
+         ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
+         WP (Loop : expr riscv_lang))
+   else emp) -∗
   WP (Loop : expr riscv_lang).
 
 (* ===================================================================== *)

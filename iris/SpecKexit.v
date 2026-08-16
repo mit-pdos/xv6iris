@@ -116,6 +116,9 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv.
+Require Import StackOwn.
+Require Import WpMmodeLeafBase.
+Require Import ProcDefs.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.

@@ -1311,52 +1311,24 @@ Section KexitPark.
     { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
       iFrame "Hkilled Hxstate Hpidh". }
-    { iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp Hir"). }
-    (* THE POST-RESUME ARM.  A dispatched zombie returns here and panics --
-       which is why forgetting its record costs nothing. *)
-    iIntros (CIDz Hsz mf ch') "%Hcsz Hcg Hpc Hheld Htc Hcpuemp Hoc Htag' Hvc".
-    assert (Hpc9a : ret_pc (PD !!! Regidx (mword_of_int 1 : mword 5))
-                    = mword_of_int (KX + 0x9a))
-      by (rewrite HPDra; apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpc9a) in "Hpc".
-    iPoseProof (kxi_9a with "Htext") as "Hi9a".
-    iPoseProof (kxi_9e with "Htext") as "Hi9e".
-    iPoseProof (kxi_a2 with "Htext") as "Hia2".
-    (* +0x9a auipc a0,5 ; +0x9e addi a0,a0,328 ; +0xa2 jal panic *)
-    iApply (wp_auipc_s_sconf (CID := CIDz) (mword_of_int (KX + 0x9a))
-              (mword_of_int 10 : mword 5) (mword_of_int 5 : mword 20)
-              mf (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9a").
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
-    set (PZ := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (mword_of_int (KX + 0x9a) : mword 64) (auipc_off (mword_of_int 5 : mword 20)))]> mf).
-    assert (Hpp9e : add_vec_int (mword_of_int (KX + 0x9a) : mword 64) 4 = mword_of_int (KX + 0x9e))
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpp9e) in "Hpc".
-    iApply (wp_addi4_s_sconf (CID := CIDz) (mword_of_int (KX + 0x9e))
-              (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 362 : mword 12)
-              PZ (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi9e").
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
-    set (PZ2 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg
-         (add_vec (rget (CID := CIDz) PZ (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 362 : mword 12)))]> PZ).
-    assert (Hppa2 : add_vec_int (mword_of_int (KX + 0x9e) : mword 64) 4 = mword_of_int (KX + 0xa2))
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hppa2) in "Hpc".
-    iApply (wp_jal_s_sconf (CID := CIDz) (mword_of_int (KX + 0xa2))
-              (mword_of_int 1 : mword 5) (mword_of_int 2090854 : mword 21) PZ2 (trap_res b + av)%nat false
-              ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
-              with "Hcg Hpc Hia2").
-    iApply wp_next_off_intro. iIntros "Hcg Hpc".
-    assert (Hjpn : add_vec (mword_of_int (KX + 0xa2) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2090854 : mword 21)) = mword_of_int KernelSyms.panic)
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hjpn) in "Hpc".
-    iPoseProof (panic_wp_any_at CIDz with "Hpanic") as "Hpw".
-    iApply ("Hpw" with "Htext Hpc Hcg").
+    { (* sched's [park_pay] is a CLOSER now: at a park that never returns it
+         hands back the whole stack region it was called with, because its
+         own frame and tail are dead the instant the swtch happens.  kexit
+         has nowhere to put them until the slot owns its kernel stack
+         (ProcDefs.kstack_free -- blocked on sp-migration), so for now they
+         are dropped, exactly as they were before. *)
+      iIntros "_".
+      iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp Hir"). }
+    (* NO POST-RESUME ARM.  [needs_ctx ZOMBIE] is false, so sched's contract
+       owes the caller nothing after the crossing: the swtch a dying thread
+       makes does not come back, and THAT is the proof that the
+       [panic("zombie exit")] tail at +0x9a..+0xa2 is unreachable.  It used
+       to be discharged (by panicking); now there is no arm at all. *)
+    done.
   Qed.
 
 End KexitPark.
+
 
 (* ===================================================================== *)
 (* +0x4c .. +0x5c: [begin_op(); iput(p->cwd); end_op(); p->cwd = 0;].      *)

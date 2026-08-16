@@ -145,7 +145,7 @@ Theorem wp_forkret
     wp_forkret_body (fun h : CpuId => usertrap_res_bare (CID := h))
       pt j γl γf s Rlk pid V ks m av av2 eb.
 Proof.
-  cbv beta delta [wp_forkret_body].
+  cbv beta delta [wp_forkret_body wp_forkret_gen_body].
   intros pcE p ksp Hjlt Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw.
   (* the budget in numbers [lia] can see *)
   pose proof Hut as Hut'.

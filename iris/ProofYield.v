@@ -751,7 +751,7 @@ Section ProofYield.
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
     (* a RUNNABLE park owes the slot nothing beyond its record. *)
-    { iApply (park_pay_needs_ctx (proc_addr j) RUNNABLE needs_ctx_RUNNABLE). }
+    { iIntros "_". iApply (park_pay_needs_ctx (proc_addr j) RUNNABLE needs_ctx_RUNNABLE). }
     (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
        [yield_post_sched] at [(CID0 := CIDs)]. *)
     iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".

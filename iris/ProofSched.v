@@ -1282,50 +1282,10 @@ Section ProofSched.
     iAssert (cpu_own 1 eb pj false {["proc"]}) with "[Hnoff Hint Hlks Hcnt Hcur]" as "Hcpu".
     { rewrite cpu_own_off /cpu_hart /cpu_priv /cpu_cells.
       iFrame "Hnoff Hint Hcnt Hcur Hlks". iPureIntro; vm_compute; reflexivity. }
-    (* build the parking-proc payload (proc-held facts only; the cpu bundle
-       now crosses at the swtch's [cpu_own] interface, not in the payload). *)
-    iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
-                  with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpay") as "HP".
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
-    (* apply swtch.  The TARGET record is PINNED at this hart
-       (cpus[cid].context is only ever resumed from hart cid's own tp); the
-       record sched deposits for ITSELF is a PROC context, hence MIGRATABLE
-       ([Ao = None]) -- which is what makes the whole post-resume half below
-       ∀-hart, and what lets [procs_inv] be hart-free. *)
-    iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
-              (p_context (proc_addr j)) (a_cpu_ctx cid_word)
-              Mc ctxvs (av - 6)%nat eb pj
-              Hctxlen Holdc Hnewc (adm_pin cpu_id)
-              with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP]").
-    { iEval (rewrite (rget_tp Mc)). iExact "HP". }
-    (* THE SEAM IS CLOSED BY THE CONTRACT, not by a ghost fact: [SpecSwtch]
-       pins the held set at [{["proc"]}] on BOTH sides, because
-       swtch is reachable only while holding exactly this proc's lock (sched's
-       own [noff != 1] check is the C-level statement of it).  The resumption
-       therefore arrives at the same singleton rather than at a freshly
-       quantified set nothing could tie back. *)
-    iIntros (h m' eb') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
-    (* [Ao = None] -- the resumption's hart is NOT pinned; [Hadm'] is vacuous
-       and everything from here on is at an arbitrary [h]. *)
-    clear Hadm'.
-    (* resume: elim the SECOND disjunct (dispatched proc).  It delivers the
-       lock at hart [h] and hart [h]'s trap CSRs ([intr_res] among them). *)
-    iDestruct "Hresume" as (A' cret) "[Hvc' Hpay]".
-    iDestruct (p_sched_at_proc γs h A' j cret (rget (CID := h) m' (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
-      as "(%Htpv & %Hcret & %Hpidx & %HA' & Htc' & Hpay2)".
-    subst A'.
-    iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Htag')".
-    assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
-    iEval (rewrite Hcret) in "Hvc'".
-    (* callee-image component equalities. *)
-    unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
-    injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
     (* ------------------------------------------------------------------ *)
-    (* Everything the post-resume half needs about the returned file [m'], *)
-    (* read off this tower ONCE.  From here the proof is hart-generic and   *)
-    (* runs inside [sched_post_swtch] at [(CID := h)].                      *)
+    (* THE CROSSING'S [back] IS THE PARKED STATE'S OWN [needs_ctx], and the *)
+    (* two parks are genuinely different from here on.                      *)
     (* ------------------------------------------------------------------ *)
-    (* sp threads unchanged from the prologue push all the way through. *)
     assert (Hcsp_Mc : Mc !!! Regidx csp_rs1 = spd).
     { rewrite /Mc upd_ne; [| vm_compute; discriminate].
       rewrite /D14 upd_ne; [| vm_compute; discriminate]. rewrite /D13 upd_ne; [| vm_compute; discriminate].
@@ -1347,6 +1307,103 @@ Section ProofSched.
       rewrite (callee_saved_lookup Hcs_mp csp_rs1 ltac:(vm_compute; reflexivity)).
       rewrite /A2 upd_ne; [| vm_compute; discriminate]. rewrite /A1 upd_ne; [| vm_compute; discriminate].
       exact HcspA0. }
+    destruct (needs_ctx st) eqn:Hnc; last first.
+    { (* ---- THE PARK THAT NEVER RETURNS (kexit's).  No record is left, so
+           no continuation is owed -- and sched's own frame and unused tail
+           are dead the instant the swtch happens.  Both go to the payload,
+           which is what lets the dying thread leave its slot a WHOLE free
+           kernel stack (ProcDefs.kstack_free) instead of a page with a hole
+           where this frame used to be. ---- *)
+      iAssert (stack_own sp0 6) with "[Hr1 Hr2 Hr3 Hr4 Hr5 Hgap]" as "Hframe6".
+      { rewrite stack_own_slots. cbn [seq].
+        iSplitL "Hr1". { iExists _. iEval (rewrite Hb1 -HcspA0). iExact "Hr1". }
+        iSplitL "Hr2". { iExists _. iEval (rewrite Hb2 -HcspA0). iExact "Hr2". }
+        iSplitL "Hr3". { iExists _. iEval (rewrite Hb3 -HcspA0). iExact "Hr3". }
+        iSplitL "Hr4". { iExists _. iEval (rewrite Hb4 -HcspA0). iExact "Hr4". }
+        iSplitL "Hr5". { iExists _. iEval (rewrite Hb5 -HcspA0). iExact "Hr5". }
+        iSplitL "Hgap". { iExists _. iExact "Hgap". }
+        done. }
+      (* take the free tail out of the bundle: swtch touches no stack, so it
+         runs at avail 0 and the tail crosses in the payload instead. *)
+      iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
+      iEval (rewrite /sie_cap) in "Hcap".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+      iEval (rewrite Hcsp_Mc) in "Hstk".
+      iAssert (sie_cap Mc 0%nat false pj) with "[Htr Harm]" as "Hcap0".
+      { rewrite /sie_cap. iSplitR "Htr Harm".
+        { rewrite Hcsp_Mc. by iApply stack_own_0. }
+        iFrame "Htr Harm". }
+      iDestruct (sie_cap_gpr_join Mc 0%nat false pj with "Hhs Hsc Hcap0 Hfile") as "Hcg0".
+      (* frame ++ tail = the whole region sched was called with *)
+      assert (Hgeom6 : pa_stk sp0 6 = spd).
+      { rewrite /spd -Hpush. reflexivity. }
+      assert (Havsplit : av = (6 + (av - 6))%nat) by lia.
+      iAssert (stack_own sp0 av) with "[Hframe6 Hstk]" as "Hfull".
+      { iEval (rewrite {1}Havsplit (stack_own_app sp0 6 (av - 6))).
+        iSplitL "Hframe6"; [iExact "Hframe6" |].
+        iEval (rewrite Hgeom6). iExact "Hstk". }
+      iPoseProof ("Hpay" with "Hfull") as "Hpp".
+      iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
+                    with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpp") as "HP".
+      { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
+      iEval (rewrite Hnc) in "HP".
+      iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
+                (p_context (proc_addr j)) (a_cpu_ctx cid_word)
+                Mc ctxvs 0%nat eb pj false
+                Hctxlen Holdc Hnewc (adm_pin cpu_id)
+                with "Htext Hcg0 Hcpu Hpc Hctxcells Hvc [HP] []").
+      { iEval (rewrite (rget_tp Mc)). iExact "HP". }
+      done. }
+    (* ---- A RESUMABLE PARK: the caller comes back, so its continuation is
+           its record.  [park_pay] is [emp] here, so the closer's argument is
+           not needed and the payload is free. ---- *)
+    iAssert (park_pay (proc_addr j) st) as "Hpp".
+    { iApply (park_pay_needs_ctx (proc_addr j) st Hnc). }
+    (* build the parking-proc payload (proc-held facts only; the cpu bundle
+       now crosses at the swtch's [cpu_own] interface, not in the payload). *)
+    iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
+                  with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpp") as "HP".
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
+    iEval (rewrite Hnc) in "HP".
+    (* apply swtch.  The TARGET record is PINNED at this hart
+       (cpus[cid].context is only ever resumed from hart cid's own tp); the
+       record sched deposits for ITSELF is a PROC context, hence MIGRATABLE
+       ([Ao = None]) -- which is what makes the whole post-resume half below
+       ∀-hart, and what lets [procs_inv] be hart-free. *)
+    iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
+              (p_context (proc_addr j)) (a_cpu_ctx cid_word)
+              Mc ctxvs (av - 6)%nat eb pj true
+              Hctxlen Holdc Hnewc (adm_pin cpu_id)
+              with "Htext Hcg Hcpu Hpc Hctxcells Hvc [HP]").
+    { iEval (rewrite (rget_tp Mc)). iExact "HP". }
+    (* THE SEAM IS CLOSED BY THE CONTRACT, not by a ghost fact: [SpecSwtch]
+       pins the held set at [{["proc"]}] on BOTH sides, because
+       swtch is reachable only while holding exactly this proc's lock (sched's
+       own [noff != 1] check is the C-level statement of it).  The resumption
+       therefore arrives at the same singleton rather than at a freshly
+       quantified set nothing could tie back. *)
+    iIntros (h m' eb') "%Hadm' %Hcallee Hcg Hcpu Hpc Hctxback Hresume".
+    (* [Ao = None] -- the resumption's hart is NOT pinned; [Hadm'] is vacuous
+       and everything from here on is at an arbitrary [h]. *)
+    clear Hadm'.
+    (* resume: elim the SECOND disjunct (dispatched proc).  It delivers the
+       lock at hart [h] and hart [h]'s trap CSRs ([intr_res] among them). *)
+    iDestruct "Hresume" as (A' cret backr) "[Hvc' Hpayr]".
+    iDestruct (p_sched_at_proc γs h A' j cret (rget (CID := h) m' (mword_of_int 4 : mword 5)) pj backr Hj with "Hpayr")
+      as "(%Htpv & %Hcret & %Hpidx & %HA' & %Hbackr & Htc' & Hpay2)".
+    subst A'. subst backr.
+    iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Htag')".
+    assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
+    iEval (rewrite Hcret) in "Hvc'".
+    (* callee-image component equalities. *)
+    unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
+    injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
+    (* ------------------------------------------------------------------ *)
+    (* Everything the post-resume half needs about the returned file [m'], *)
+    (* read off this tower ONCE.  From here the proof is hart-generic and   *)
+    (* runs inside [sched_post_swtch] at [(CID := h)].                      *)
+    (* ------------------------------------------------------------------ *)
+    (* sp threads unchanged from the prologue push all the way through. *)
     assert (Hsp_m' : m' !!! Regidx csp_rs1 = spd).
     { change (Regidx csp_rs1) with (Regidx (mword_of_int 2 : mword 5)).
       rewrite Hm2. change (Regidx (mword_of_int 2 : mword 5)) with (Regidx csp_rs1). exact Hcsp_Mc. }
