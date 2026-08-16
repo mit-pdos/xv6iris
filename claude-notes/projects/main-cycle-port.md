@@ -251,6 +251,27 @@ Evidence:
    obligation deletes outright.  `gpr_file m` IS already a frame: the leaves
    already declare their footprint and merely convert it into σ-reasoning.
 
+   **THE ONE OPEN DECISION, and it is the next thing to settle.**
+   `swp_run_hart_active_base`/`_rvc` take the decode as a FOOTPRINTED fact,
+   `hfrun nd (Drw ∪ Dro) Drw rs (ext_decode w) = Some (i, rs)`.  The `instr`
+   bundle currently supplies it in `exec` form, σ-shaped:
+   `exec (decode_fetch r) σ = Some (i, σ)`.  Three ways to close the gap:
+
+   (a) a general `exec` → `hfrun` bridge -- needs a "reads only `D`, touches
+       no memory" hypothesis, which is exactly what `hfrun` exists to decide,
+       so this is circular in the general case;
+   (b) **restate `instr`'s decode component in `hfrun` form.**  `instr pc
+       is_rvc i` is OPAQUE in all 135 leaf statements, so its definition can
+       change without touching one of them -- the same move as every other
+       currency change this port has made.  Cost lands on `instr`'s
+       CONSTRUCTION sites (the `kd_` decode catalogue / `WpDecodeBridge`),
+       which the worklist previously assumed would be "consumed unchanged";
+   (c) an extra `hfrun` premise on `wp_instr`, pushed to all 135 leaves --
+       rejected, it is the churn the whole design is avoiding.
+
+   (b) is the one to take unless the construction sites turn out to make it
+   expensive; that is what to measure first.
+
    **DO NOT GRIND.**  Rebuild the 2 decode+execute rules and the 6 wrappers,
    then convert ONE leaf of each family by hand -- an ALU one, a JALR, a load,
    a store -- before touching the other 131.  If those four diffs are not
