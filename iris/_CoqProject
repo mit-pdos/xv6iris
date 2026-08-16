@@ -29,6 +29,7 @@ HartSpanChar.v
 HartMCycle.v
 HartMPmp.v
 HartMFetch.v
+HartMDecode.v
 HartLift2.v
 HartMLeaf.v
 HartMDispatch.v
