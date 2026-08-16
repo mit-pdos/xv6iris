@@ -546,7 +546,14 @@ Section IcacheBootRegion.
        (forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)) ->
        image_free_nlink dss nib /\ image_nlink_short dss nib /\
        image_root_alive dss nib) ->
-    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 None 0) -∗
+    (* THE LEDGER AT BOOT, AT THE WIDENED [w] (V1's count-fact carrier): the
+       image's authorities are ALL-PLAIN, [wd = 0] at every inum, so (T1) is
+       vacuous at every slot and the image owes NOTHING new.  A d-flavoured
+       fragment is only ever minted by [InodeRegion.ireg_write_link_d], i.e.
+       by a running kernel at a [dp->nlink++]; mkfs's records are handed to
+       the region unflavoured, and the root's own [nlink = 1] is still
+       [image_root_alive]'s business and nobody else's. *)
+    ([∗ set] z ∈ region_inums nib, link_auth z 0 0 0 None 0) -∗
     (* THE OBSERVATION COUNTERS (fs-log.md §G.17), one per inum and all at
        zero: nobody has ever observed a nonzero nlink, which is exactly the
        [⌜v = 0⌝] disjunct that carries the receipt over the mkfs image's
@@ -597,11 +604,11 @@ Section IcacheBootRegion.
       rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
       case_decide as Hty.
       - iSplitR "Hmk"; [| iExact "Hmk"].
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok Hrt
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 None 0 Hok Hrt (ireg_dir_ok_zero _)
                   with "Hla Hep").
         iLeft. iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
       - iSplitR "Hfrag"; [| iExact "Hfrag"].
-        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 None 0 Hok Hrt
+        iApply (ireg_slot_intro γi z (image_dinode dss z) 0 0 0 None 0 Hok Hrt (ireg_dir_ok_zero _)
                   with "Hla Hep").
         iRight. iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
     rewrite big_sepS_sep.

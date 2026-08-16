@@ -930,6 +930,7 @@ InodeLock.v
 InodeRegion.v
 FsRep.v
 IregLinkNz.v
+IregDirBit.v
 IcacheEscrow.v
 IcacheBoot.v
 CodeIget.v

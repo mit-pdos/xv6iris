@@ -4734,7 +4734,7 @@ Section ProofCreateMain.
       iApply (IU.wp_iupdate_link γs j γl γu γd γk pd pav pu bn γ γfs γi
                 cov logstart inodestart nib dev (ientry kslot) cinum
                 (cr_setf dnc major minor (mword_of_int 1 : mword 16)) dnc bmc
-                q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true pidv
+                q2 (Sb1 ∪ {[IBLOCK cinum inodestart]}) true None pidv
                 (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                 W3 (K - 10)%nat eb b lks
                 ltac:(exact HKiu)
@@ -4743,6 +4743,7 @@ Section ProofCreateMain.
                 ltac:(exact (di_type_stable_eq _ _
                         (cr_setf_type dnc major minor _)))
                 ltac:(exact (cr_setf_type_nz dnc major minor _ Htyz))
+                ltac:(discriminate)
                 Hbump Hgrd Hcadd Hcdirlen Hj Hgs HW3a0 Heb
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hcidev Hciinum
                       Hcmeta Hcmap Hsbi Hiregi Hcdiat Hppid Hprocs Hdevi
@@ -5938,7 +5939,7 @@ Section ProofCreateMain.
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dnc major minor (mword_of_int 0 : mword 16))
               (cr_setf dnc major minor (mword_of_int 1 : mword 16)) bmc
-              u0 Sb4 true pidv
+              u0 Sb4 true None pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
@@ -6718,7 +6719,7 @@ Section ProofCreateMain.
     iApply (IU.wp_iupdate_unlink γs j γl γu γd γk pd pav pu bn γ γfs γi
               cov logstart inodestart nib dev (ientry kslot) cinum
               (cr_setf dc major minor (mword_of_int 0 : mword 16)) dc bmc
-              u0 Sb4 true pidv
+              u0 Sb4 true None pidv
               (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
               G2 (K - 10)%nat eb b lks
               ltac:(exact HKiu) ltac:(intros _; exact Hmem4)
@@ -8375,12 +8376,13 @@ Section ProofCreateMain.
                     cov logstart inodestart nib dev (ientry kd) dind
                     (cr_setf dp3 (di_major dp3) (di_minor dp3)
                        (add_vec (di_nlink dp3 : mword 16) (mword_of_int 1 : mword 16)))
-                    dp3 bm3 u6 Sb6 true pidv
+                    dp3 bm3 u6 Sb6 true None pidv
                     (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                     V4 (K - 10)%nat eb b lks
                     HKiu Hmtcru
                     Hlg Hist0 Hdblk Hdblog Hdib
-                    Hmtstab Hmttynz Hmtbump Hmtgrd Hmtaddr Hmtdirlen
+                    Hmtstab Hmttynz ltac:(discriminate) Hmtbump Hmtgrd
+                    Hmtaddr Hmtdirlen
                     Hj Hgs HV4a0 Heb
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hidev Hiinum
                           Hmeta Hmap Hsbi Hiregi Hdiat Hppid Hprocs Hdevi

@@ -1773,13 +1773,14 @@ Section ProofSysLinkBody.
                              ltac:(wp_next_chain) with "Hown") as "Hown".
                 iApply (Iupdate.wp_iupdate_link (CID := CID40) gs j gl gu gd gk
                           pd pav pu bn g gfs gi cov logstart inodestart nib dev
-                          (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false pid
+                          (ientry kk) inum (sl_incnl dn) dn bm c1 Sb1 false None pid
                           (DfracOwn (1/4)) (DfracOwn (1/2)) (DfracOwn (1/2)) dqs
                           S2 (K - 38)%nat eb b lks
                           ltac:(exact Kiupd) ltac:(discriminate) Hgeom Hist0
                           Hiblk Hiblog Hinb
                           ltac:(exact (sl_setnl_type_stable dn _))
                           ltac:(rewrite /sl_incnl sl_setnl_type; exact Htynz)
+                          ltac:(discriminate)
                           ltac:(rewrite /sl_incnl; apply sl_setnl_nlink)
                           Hnl
                           ltac:(rewrite /sl_incnl sl_setnl_addrs; exact Haddreq)
