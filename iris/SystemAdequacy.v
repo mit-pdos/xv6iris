@@ -295,6 +295,8 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     reducible (Λ := riscv_lang) e2 g2.
 Proof. apply (xv6_power_adequacy xv6Σ g Hgen0 Hpow). Qed.
 
+Print Assumptions xv6_power_adequacy_xv6Σ.
+
 (* ...and the FS form at the same concrete functor list. *)
 Corollary xv6_fs_adequacy_xv6Σ (g : gstate) (cov : gset Z) (logstart : Z)
     (D0 : gmap Z (list (bv 8)))
