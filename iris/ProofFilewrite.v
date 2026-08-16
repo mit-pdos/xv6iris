@@ -1894,7 +1894,8 @@ Section ProofFilewrite.
            content (SpecIlock v2) and it IS [FileOff.off_mark]. ---- *)
     rewrite /ic_loaded.
     iDestruct "Hlk" as (datal)
-      "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdnat & Hmeta & Haddrs & Hindres
+       & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map (fwn_fs fn) (ientry ik) bml)
       with "[Haddrs Hindres]" as "Hmap".
@@ -2229,6 +2230,8 @@ Section ProofFilewrite.
       iSplitR; [iPureIntro; exact Hdok2 |].
       iSplitR; [iPureIntro;
                 exact (dir_dots_ix_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
+      iSplitR; [iPureIntro;
+                exact (dir_orphan_clean_not_dir dn' data' Hnodir') |].
       iSplitR; [iApply (dir_links_not_dir (bv_unsigned inum) dn' data' Hnodir') |].
       iDestruct "Hmap" as "[Haddrs Hindres]".
       rewrite Hdn0q. iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }

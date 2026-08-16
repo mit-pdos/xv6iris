@@ -1584,7 +1584,8 @@ Section ProofSysChdirBody.
         { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
           exact (HP0thr c Hc N2' N8 N9 N18). }
         iDestruct "Hload" as (dat)
-          "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind & Hblocks)".
+          "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
+            & Hblocks)".
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
         (* ============ +0x38 lh a4,68(s1) -- ip->type ============ *)
@@ -1714,6 +1715,7 @@ Section ProofSysChdirBody.
             iSplitR; [iPureIntro; exact Hiok |].
             iSplitR; [iPureIntro; exact Hdok |].
             iSplitR; [iPureIntro; exact Hddix |].
+            iSplitR; [iPureIntro; exact Hdoc |].
             iSplitL "Hdlnk"; [iExact "Hdlnk" |].
             iFrame "Hdiat".
             iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -2057,6 +2059,7 @@ Section ProofSysChdirBody.
             iSplitR; [iPureIntro; exact Hiok |].
             iSplitR; [iPureIntro; exact Hdok |].
             iSplitR; [iPureIntro; exact Hddix |].
+            iSplitR; [iPureIntro; exact Hdoc |].
             iSplitL "Hdlnk"; [iExact "Hdlnk" |].
             iFrame "Hdiat".
             iSplitL "Hity Himaj Himin Hinl Hisz".

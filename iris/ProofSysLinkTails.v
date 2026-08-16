@@ -67,6 +67,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
+Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.
@@ -1010,6 +1011,7 @@ Section ProofSysLinkTails.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used : gset Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (ty : mword 16)
       (u : nat) (Sb : gset Z)
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m M : regfile) (sp0 : mword 64) (K : nat) (eb : bool)
@@ -1040,6 +1042,13 @@ Section ProofSysLinkTails.
     sl_sp sp0 M -> sl_thr m M ->
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     sl_al sp0 ->
+    (* THE TYPE THE CALLER SHOT, and the ONLY thing that gets the
+       complement dot clause across this tail's own re-[ilock]: the record
+       [ilock] hands back is an EXISTENTIAL, so nothing in the walk below
+       can say it is not a directory.  [ity_shot_agree] against the shot the
+       CALLER minted before its [iunlock] pins the type, and the generation
+       is carriable because [SpecIunlock] returns the share gen-named. *)
+    bv_unsigned ty <> T_DIR_z ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xf4)) -∗
@@ -1057,6 +1066,7 @@ Section ProofSysLinkTails.
        the generation-named share is what this arm's own [ilock] consumes. *)
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     inode_shr_gen kk s dev inum gy -∗
+    ity_shot gy ty -∗
     (* THE FRAGMENT THE [--] SPENDS *)
     ilink (bv_unsigned inum) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1097,9 +1107,9 @@ Section ProofSysLinkTails.
   Proof.
     intros HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem Hiu Hj Hgl
-           Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal.
+           Hlkempty Heb Hsp0 HMsp HMthr HMs1 Hal Hncd.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hireg #Hslkk Hkeep Hshr Hilink Hsbb Hsbi Hbmres Hpid
+              #Hesck #Hireg #Hslkk Hkeep Hshr #Hshotc Hilink Hsbb Hsbi Hbmres Hpid
               #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
               Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hb. cbn in Hb.
@@ -1187,10 +1197,20 @@ Section ProofSysLinkTails.
     { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
       exact (HM2thr c Hc N2 N8 N9 N18). }
     iDestruct "Hload" as (dat)
-      "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
-        Hblocks)".
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
+        & Hblocks)".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_nlink) in "Hinl".
+    (* THE TYPE, ACROSS THE CALLER'S OWN [iunlock].  [ilock] hands back a
+       record this walk never chose, so the complement dot clause could not
+       be discharged here at all until the share stopped being
+       generation-erased: with the caller's [ity_shot] at the SAME [gy],
+       [ity_shot_agree] pins [di_type dn] to the type the caller refused at
+       its [+0x4a], and [dir_orphan_clean_not_dir] closes the re-park. *)
+    iDestruct (ity_shot_agree gy ty (di_type dn) with "Hshotc Hshot")
+      as %Htyshot.
+    assert (Hnotdir : bv_unsigned (di_type dn) <> T_DIR_z)
+      by (rewrite <- Htyshot; exact Hncd).
     (* THE LEDGER'S OWN FACT: the fragment forces (L1)'s lower bound at the
        record this arm is about to lower.  Nothing in the WALK can say it. *)
     iApply fupd_wp.
@@ -1371,6 +1391,8 @@ Section ProofSysLinkTails.
       iSplitR; [iPureIntro; exact (sl_setnl_inode_ok cov logstart dn bm dat _ Hiok) |].
       iSplitR; [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
       iSplitR; [iPureIntro; exact (sl_setnl_ddix _ dn dat _ Hnz Hddix) |].
+      iSplitR; [iPureIntro; apply dir_orphan_clean_not_dir;
+                rewrite /dn' sl_setnl_type; exact Hnotdir |].
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.
       iDestruct "Hmap" as "[Ha Hi]". iFrame "Ha Hi Hblocks". }
@@ -1598,6 +1620,7 @@ Section ProofSysLinkTails.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used : gset Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (ty : mword 16)
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
       (dnd : dinode) (bmd : blkmap)
       (n : nat) (Sb : gset Z) (crb cru : bool) (e0 : nat)
@@ -1642,6 +1665,13 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = ientry kd ->
     sl_al sp0 ->
+    (* THE TYPE THE CALLER SHOT, and the ONLY thing that gets the
+       complement dot clause across this tail's own re-[ilock]: the record
+       [ilock] hands back is an EXISTENTIAL, so nothing in the walk below
+       can say it is not a directory.  [ity_shot_agree] against the shot the
+       CALLER minted before its [iunlock] pins the type, and the generation
+       is carriable because [SpecIunlock] returns the share gen-named. *)
+    bv_unsigned ty <> T_DIR_z ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xee)) -∗
@@ -1660,6 +1690,7 @@ Section ProofSysLinkTails.
     (* ---- the CHILD, unlocked, its reference already shed ---- *)
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     inode_shr_gen kk s dev inum gy -∗
+    ity_shot gy ty -∗
     ilink (bv_unsigned inum) -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd -∗
@@ -1710,9 +1741,9 @@ Section ProofSysLinkTails.
     intros HKil HKiup HKup HKeo HK38 Kpop Hkk Hkd Hglog Hcist Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hdblk Hdblog Hdnb Hcovb
            Hcrb Hcru Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
-           HMs1 HMs2 Hal.
+           HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hshr Hilink Hslkd
+              #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hshr #Hshotc Hilink Hslkd
               Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hkeepd Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -1803,13 +1834,13 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID3) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used1 kk qi s gy inum u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
+              used1 kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
-              Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal
+              Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hslkk Hkeep Hshr Hilink Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hslkk Hkeep Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).
@@ -1858,6 +1889,7 @@ Section ProofSysLinkTails.
       (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
       (size : Z) (dev : mword 32) (used : gset Z)
       (kk : nat) (qi s : Qp) (gy : gname) (inum : mword 32)
+      (ty : mword 16)
       (kd : nat) (qd sd : Qp) (gyd : gname) (dinum : mword 32)
       (dnd : dinode) (bmd : blkmap)
       (n : nat) (Sb : gset Z) (e0 : nat)
@@ -1901,6 +1933,13 @@ Section ProofSysLinkTails.
     (M !!! Regidx Rs1 : mword 64) = ientry kk ->
     (M !!! Regidx Rs2 : mword 64) = ientry kd ->
     sl_al sp0 ->
+    (* THE TYPE THE CALLER SHOT, and the ONLY thing that gets the
+       complement dot clause across this tail's own re-[ilock]: the record
+       [ilock] hands back is an EXISTENTIAL, so nothing in the walk below
+       can say it is not a directory.  [ity_shot_agree] against the shot the
+       CALLER minted before its [iunlock] pins the type, and the generation
+       is carriable because [SpecIunlock] returns the share gen-named. *)
+    bv_unsigned ty <> T_DIR_z ->
     sie_cap_gpr M (K - 38) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
     kernel_text -∗ pc_is (mword_of_int (SL + 0xe6)) -∗
@@ -1919,6 +1958,7 @@ Section ProofSysLinkTails.
     (* ---- the CHILD, unlocked, its reference already shed ---- *)
     inode_ref_short kk (qi + s)%Qp qi dev inum -∗
     inode_shr_gen kk s dev inum gy -∗
+    ity_shot gy ty -∗
     ilink (bv_unsigned inum) -∗
     (* ---- the PARENT, still locked ---- *)
     sleeplocked_q gisld sd -∗
@@ -1969,9 +2009,9 @@ Section ProofSysLinkTails.
     intros HKil HKiup HKup HKeo HK38 Kpop Hkk Hkd Hglog Hcist Hgeom Hsize Hbm0
            Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hdblk Hdblog Hdnb Hcovb
            Hmem Hiu Hclose Hj Hgl Hlkempty Heb Hsp0 HMsp HMthr
-           HMs1 HMs2 Hal.
+           HMs1 HMs2 Hal Hncd.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
-              #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hshr Hilink Hslkd
+              #Hesck #Hescd #Hireg #Hslkk #Hslkd0 Hkeep Hshr #Hshotc Hilink Hslkd
               Hslpid Hdep Hidev Hiinum Hivalid Hload #Hshotd Hkeepd Hsbb Hsbi
               Hbmres Hpid #Hprocs #Hdev #Hgeo #Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4
               HbN HbW HbO Hcont".
@@ -2082,13 +2122,13 @@ Section ProofSysLinkTails.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (sl_tail_bad (CID0 := CID4) gs jx gl gu gd gk pd pav pu bn g gfs gi
               cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
-              used1 kk qi s gy inum u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
+              used1 kk qi s gy inum ty u1 Sb1 pidv dq dqb dqs m mup sp0 K eb b
               lks bnm bw bo
               HKil HKiup HKup HKeo HK38 Kpop Hkk Hglog Hcist Hgeom Hsize Hbm0
               Hbmcov Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hmem1 Hiu1 Hj Hgl
-              Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal
+              Hlkempty Heb Hsp0 Hupsp Hupthr Hups1 Hal Hncd
               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hitab Hitinv
-                    Hesck Hireg Hslkk Hkeep Hshr Hilink Hsbb Hsbi Hbmres Hpid
+                    Hesck Hireg Hslkk Hkeep Hshr Hshotc Hilink Hsbb Hsbi Hbmres Hpid
                     Hprocs Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                     [Hislot Hcont]").
     iEval (rewrite /wp_next).

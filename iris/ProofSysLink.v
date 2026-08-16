@@ -1358,7 +1358,7 @@ Section ProofSysLinkBody.
           assert (Hils1 : (mil !!! Regidx Rs1 : mword 64) = ientry kk)
             by exact (sl_regs_s1 _ _ _ _ _ Hilregs).
           iDestruct "Hload" as (dat)
-            "(%Hiok & %Hdok & %Hddix & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
+            "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
               Hblocks)".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_type) in "Hity".
@@ -1425,6 +1425,7 @@ Section ProofSysLinkBody.
                iSplitR; [iPureIntro; exact Hiok |].
                iSplitR; [iPureIntro; exact Hdok |].
                iSplitR; [iPureIntro; exact Hddix |].
+               iSplitR; [iPureIntro; exact Hdoc |].
                iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                iFrame "Hdiat".
                iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -1573,6 +1574,7 @@ Section ProofSysLinkBody.
                   iSplitR; [iPureIntro; exact Hiok |].
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
+                  iSplitR; [iPureIntro; exact Hdoc |].
                   iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                   iFrame "Hdiat".
                   iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -1805,6 +1807,14 @@ Section ProofSysLinkBody.
                   rewrite /sl_incnl sl_setnl_type. exact (sl_tdir_zne _ Hty). }
                 iAssert (ity_shot gsh (di_type (sl_incnl dn))) as "#Hshot2".
                 { rewrite /sl_incnl sl_setnl_type. iExact "Hshot". }
+                (* HOISTED, not spelled inline at the four tail applications:
+                   an [ltac:] in argument position at this depth is the
+                   recorded budget trap, and all four tails want the same
+                   fact -- the [+0x4a] refusal, carried to the [bad:] tails
+                   through [Hshot2]'s generation. *)
+                assert (Hncd : bv_unsigned (di_type (sl_incnl dn)) <> T_DIR_z)
+                  by (rewrite /sl_incnl sl_setnl_type;
+                      exact (sl_tdir_zne _ Hty)).
                 iAssert (ic_loaded gfs gi cov logstart kk inum (sl_incnl dn) bm)
                   with "[Hdlnk2 Hdiat Hmeta Hmap Hblocks]" as "Hload".
                 { rewrite /ic_loaded. iExists dat.
@@ -1814,6 +1824,10 @@ Section ProofSysLinkBody.
                     [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
                   iSplitR;
                     [iPureIntro; apply (dir_dots_ix_not_dir (bv_unsigned inum));
+                     rewrite /sl_incnl sl_setnl_type;
+                     exact (sl_tdir_zne _ Hty) |].
+                  iSplitR;
+                    [iPureIntro; apply dir_orphan_clean_not_dir;
                      rewrite /sl_incnl sl_setnl_type;
                      exact (sl_tdir_zne _ Hty) |].
                   iSplitL "Hdlnk2"; [iExact "Hdlnk2" |].
@@ -2138,8 +2152,8 @@ Section ProofSysLinkBody.
                    assert (Htyd : di_type dnd = SpecDirlookup.T_DIR)
                      by (symmetry; exact Htyd0).
                    iDestruct "Hloadd" as (datd)
-                     "(%Hdiok & %Hddok & %Hddixd & Hdlnkd & Hdiatd & Hmetad &
-                       Haddrsd & Hindd & Hblocksd)".
+                     "(%Hdiok & %Hddok & %Hddixd & %Hdocd & Hdlnkd & Hdiatd &
+                       Hmetad & Haddrsd & Hindd & Hblocksd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
                    (*                                                              *)
@@ -2210,7 +2224,7 @@ Section ProofSysLinkBody.
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)
                      iDestruct (ic_mk_loaded gfs gi cov logstart kd dinum dnd bmd
-                                  datd Hdiok Hddok Hddixd
+                                  datd Hdiok Hddok Hddixd Hdocd
                                   with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd")
                        as "Hloadd".
                      iDestruct (sl_bs3 bn with "[Hbs1d Hbs2d]") as "Hbsl";
@@ -2241,6 +2255,7 @@ Section ProofSysLinkBody.
                                pav pu bn g gfs gi cn gtl gil gisl gild gisld cov
                                logstart bmapstart inodestart nib size dev used2
                                kk (qq/2)%Qp (qq/2)%Qp gsh inum
+                               (di_type (sl_incnl dn))
                                kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                n2 Sb2 e0 pid (DfracOwn (1/4)) dqb dqs
                                m Ug sp0 K eb b lks bn1 bw2 bo2
@@ -2256,9 +2271,11 @@ Section ProofSysLinkBody.
                                Hj Hgl Hlkempty Heb ltac:(reflexivity)
                                (sl_regs_sp _ _ _ _ _ HUgregs)
                                (sl_regs_thr _ _ _ _ _ HUgregs) HUgs1 HUgs2 Hal
+                               Hncd
                                with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
-                                     Hslkd0 Hkeep Hshr Hilink Hslkdd Hslpidd
+                                     Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
+                                     Hslpidd
                                      Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                      Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                      Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -2565,6 +2582,7 @@ Section ProofSysLinkBody.
                          iSplitR; [iPureIntro; exact Hdiok |].
                          iSplitR; [iPureIntro; exact Hddok |].
                          iSplitR; [iPureIntro; exact Hddixd |].
+                         iSplitR; [iPureIntro; exact Hdocd |].
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
                          iDestruct "Hmapd" as "[Ha Hi]". iFrame "Ha Hi Hblocksd". }
@@ -2593,6 +2611,7 @@ Section ProofSysLinkBody.
                                  pav pu bn g gfs gi cn gtl gil gisl gild gisld cov
                                  logstart bmapstart inodestart nib size dev used3
                                  kk (qq/2)%Qp (qq/2)%Qp gsh inum
+                                 (di_type (sl_incnl dn))
                                  kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd bmd
                                  n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
                                  pid (DfracOwn (1/4)) dqb dqs
@@ -2611,9 +2630,11 @@ Section ProofSysLinkBody.
                                  Hj Hgl Hlkempty Heb ltac:(reflexivity)
                                  (sl_regs_sp _ _ _ _ _ Hdlregs)
                                  (sl_regs_thr _ _ _ _ _ Hdlregs) Hdls1 Hdls2 Hal
+                                 Hncd
                                  with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
-                                       Hslkd0 Hkeep Hshr Hilink Hslkdd Hslpidd
+                                       Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
+                                       Hslpidd
                                        Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd2
                                        Hkeepd Hsbb Hsbi Hbmres Hpidq Hprocs Hdev
                                        Hgeo Hdlk Hbsl HopE Hf1 Hf2 Hf3 Hf4
@@ -2680,6 +2701,17 @@ Section ProofSysLinkBody.
                                  (dir_slot datd (dir_nrec (bv_unsigned (di_size dnd))))
                                  tot eq_refl eq_refl Htotle Htyeq Hnleq
                                  ltac:(rewrite Hszmax; lia) Hrng Hddixd). }
+                       (* ...and the COMPLEMENT clause, which the KERNEL FIX
+                          is what makes free: xv6 f60ff58's orphan guard at
+                          +0x84 has already refused an orphaned parent, so
+                          the record this dirlink appends to is LIVE and the
+                          clause says nothing about it.  Without ARM E2 this
+                          is exactly the site where the strong isdirempty
+                          invariant was FALSE of the binary. *)
+                       assert (Hdoc' : dir_orphan_clean dnd' datd').
+                       { apply dir_orphan_clean_live. rewrite Hnleq.
+                         intro Hc. apply Hdnl0. apply bv_eq. rewrite Hc.
+                         vm_compute. reflexivity. }
                        assert (Hdtynz : bv_unsigned (di_type dnd') <> 0)
                          by (rewrite Htyeq;
                              exact (proj1 (proj2 (proj2 (proj2 Hdiok))))).
@@ -2735,6 +2767,7 @@ Section ProofSysLinkBody.
                               iSplitR; [iPureIntro; exact Hdiok' |].
                               iSplitR; [iPureIntro; exact Hddok' |].
                               iSplitR; [iPureIntro; exact Hddix' |].
+                              iSplitR; [iPureIntro; exact Hdoc' |].
                               iSplitL "Hdlnkd'"; [iExact "Hdlnkd'" |].
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
@@ -3124,6 +3157,7 @@ Section ProofSysLinkBody.
                               iSplitR; [iPureIntro; exact Hdiok' |].
                               iSplitR; [iPureIntro; exact Hddok' |].
                               iSplitR; [iPureIntro; exact Hddix' |].
+                              iSplitR; [iPureIntro; exact Hdoc' |].
                               iSplitL "Hdlnkd'"; [iExact "Hdlnkd'" |].
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
@@ -3159,7 +3193,8 @@ Section ProofSysLinkBody.
                                       pd pav pu bn g gfs gi cn gtl gil gisl gild
                                       gisld cov logstart bmapstart inodestart nib
                                       size dev used3 kk (qq/2)%Qp (qq/2)%Qp gsh
-                                      inum kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd' bmd'
+                                      inum (di_type (sl_incnl dn))
+                                      kd (qd/2)%Qp (qd/2)%Qp gyd dinum dnd' bmd'
                                       n3 Sb3 (bool_decide (bmapstart ∈ Sb3)) false e0
                                       pid (DfracOwn (1/4)) dqb dqs
                                       m mdl sp0 K eb b lks bn1 bw2 bo2
@@ -3178,9 +3213,11 @@ Section ProofSysLinkBody.
                                       Hj Hgl Hlkempty Heb ltac:(reflexivity)
                                       (sl_regs_sp _ _ _ _ _ Hdlregs)
                                       (sl_regs_thr _ _ _ _ _ Hdlregs) Hdls1 Hdls2 Hal
+                                      Hncd
                                       with "Hcg Hown Htext Hpc Hpanic Hbio Hlog
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
-                                            Hireg Hslkk Hslkd0 Hkeep Hshr Hilink
+                                            Hireg Hslkk Hslkd0 Hkeep Hshr Hshot2
+                                            Hilink
                                             Hslkdd Hslpidd Hdepd Hidevd Hiinumd
                                             Hivalidd Hloadd Hshotd3 Hkeepd Hsbb
                                             Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
@@ -3249,7 +3286,8 @@ Section ProofSysLinkBody.
                    iApply (Tails.sl_tail_bad (CID0 := CID50) gs j gl gu gd gk pd
                              pav pu bn g gfs gi cn gtl gil gisl cov logstart
                              bmapstart inodestart nib size dev used2 kk
-                             (qq/2)%Qp (qq/2)%Qp gsh inum c2 Sb2
+                             (qq/2)%Qp (qq/2)%Qp gsh inum
+                             (di_type (sl_incnl dn)) c2 Sb2
                              pid (DfracOwn (1/4)) dqb dqs
                              m T3 sp0 K eb b lks bn1 bw2 bo2
                              ltac:(exact Kil) ltac:(exact Kiupd) ltac:(exact Kiup)
@@ -3260,10 +3298,11 @@ Section ProofSysLinkBody.
                              Hj Hgl Hlkempty Heb ltac:(reflexivity)
                              (sl_regs_sp _ _ _ _ _ HT3regs)
                              (sl_regs_thr _ _ _ _ _ HT3regs)
-                             (sl_regs_s1 _ _ _ _ _ HT3regs) Hal
+                             (sl_regs_s1 _ _ _ _ _ HT3regs) Hal Hncd
                              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen
                                    Hitab Hitinv Hesck Hireg Hslkk Hkeep Hshr
-                                   Hilink Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
+                                   Hshot2 Hilink Hsbb Hsbi Hbmres Hpidq Hprocs
+                                   Hdev Hgeo
                                    Hdlk Hbsl HopS Hf1 Hf2 Hf3 Hf4 HbN HbW HbO
                                    [Hsbs Hir2d Hcwd Hcwdref Hpback Hcont]").
                    iEval (rewrite /wp_next).

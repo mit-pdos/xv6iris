@@ -328,6 +328,7 @@ Section KexecB2Res.
       ⌜inode_ok cov logstart dnf bmf datl⌝ ∗
       ⌜dir_ok icfg_nib dnf datl⌝ ∗
       ⌜dir_dots_ix (bv_unsigned inumf) dnf datl⌝ ∗
+      ⌜dir_orphan_clean dnf datl⌝ ∗
       dir_links (bv_unsigned inumf) dnf datl ∗
       dinode_at gi inumf dnf ∗
       inode_meta (ientry kf) dnf ∗
@@ -335,12 +336,13 @@ Section KexecB2Res.
       inode_blocks gfs bmf datl.
   Proof.
     rewrite /ic_loaded /inode_map.
-    iIntros "(%datl & %Hok & %Hdok & %Hddix & Hdlk & Hdiat & Hmeta & Haddrs &
-              Hind & Hbl)".
+    iIntros "(%datl & %Hok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdiat & Hmeta &
+              Haddrs & Hind & Hbl)".
     iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
+    iSplitR; [iPureIntro; exact Hdoc |].
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitR "Hbl"; [| iExact "Hbl"].
@@ -353,6 +355,7 @@ Section KexecB2Res.
     inode_ok cov logstart dnf bmf datl ->
     dir_ok icfg_nib dnf datl ->
     dir_dots_ix (bv_unsigned inumf) dnf datl ->
+    dir_orphan_clean dnf datl ->
     dir_links (bv_unsigned inumf) dnf datl -∗
     dinode_at gi inumf dnf -∗
     inode_meta (ientry kf) dnf -∗
@@ -360,11 +363,12 @@ Section KexecB2Res.
     inode_blocks gfs bmf datl -∗
     ic_loaded gfs gi cov logstart kf inumf dnf bmf.
   Proof.
-    intros Hok Hdok Hddix. rewrite /ic_loaded /inode_map.
+    intros Hok Hdok Hddix Hdoc. rewrite /ic_loaded /inode_map.
     iIntros "Hdlk Hdiat Hmeta [Haddrs Hind] Hbl". iExists datl.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
+    iSplitR; [iPureIntro; exact Hdoc |].
     iSplitL "Hdlk"; [iExact "Hdlk" |]. iSplitL "Hdiat"; [iExact "Hdiat" |].
     iSplitL "Hmeta"; [iExact "Hmeta" |].
     iSplitL "Haddrs"; [iExact "Haddrs" |].

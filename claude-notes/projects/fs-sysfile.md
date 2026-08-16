@@ -8564,6 +8564,20 @@ Iunlock Iupdate Dirlink Iput Iunlockput EndOp`), plus `IregLinkNz.v`.
 sys_link allocates no inode and never reaches create.  Coverage: sysfile.c
 12/16 -> 13/16, tree 181 -> 182 of 190.
 
+**THE `bad:` TAILS CARRY A TYPE WITNESS ACROSS THE WALK'S OWN `iunlock`,
+and that is what let the fragment campaign's complement dot clause into the
+escrow payloads.**  `sl_tail_bad` — and `sl_tail_f` / `sl_tail_e2`, which
+route into it — each take a `ty : mword 16`, a pure
+`bv_unsigned ty <> T_DIR_z`, and a persistent `ity_shot gy ty`.  The record
+the tail's own `ilock` hands back is an EXISTENTIAL, so nothing in the tail
+can say it is not a directory; the walk mints `ity_shot gsh (di_type
+(sl_incnl dn))` before its `iunlock` at +0x6c, `SpecIunlock`'s gen-indexed
+post keeps the share at `gsh` across the window, and `ity_shot_agree` fires
+at the re-`ilock` at +0xe8.  The pure fact is HOISTED once beside the shot
+(`Hncd`) — at four applications nested this deep an `ltac:` in argument
+position is the recorded budget trap.  Full record:
+[`fs-fragments-campaign.md`](fs-fragments-campaign.md), "PASS 2".
+
 The arm graph, the frame map and the two ledgers are in `SpecSysLink.v`'s
 own header.  Four facts worth knowing outside those files:
 
@@ -8768,7 +8782,8 @@ would have established it is absent from the C, and three of its four
 siblings already have one.
 
 ### FINDING 2 — **THE T_DIR ARM'S `dp->nlink--` IS §20.17.4's RECORDED
-### "S7's BLOCKER", AND IT IS STILL OPEN**
+### "S7's BLOCKER".  CLOSED by the payload passes; kept for the reading of
+### WHY a name-blind ledger needed a payload conjunct**
 
 `dp->nlink--; iupdate(dp)` needs an `ilink dp`.  The only one in the
 system is inside `ip`'s `dir_links`, at the index of `ip`'s `".."`, and
@@ -8796,23 +8811,24 @@ two things, in this order:
 
 1. **the pin bump** carrying `f60ff58`, after which finding 1's premise is
    derivable and the T_FILE success arm is unblocked;
-2. **finding 2's payload conjunct** — no longer a design item.  The FACT
-   and its extraction are landed (`DirView.dir_dots_ix`,
-   `DirLinks.dir_links_dotdot_out`); what is left is the mechanical pass
-   that puts the conjunct into `IcacheEscrow.ipool_alloc` / `ic_loaded`,
-   and that is SEQUENCED behind the FileOff/sys_open lane — see
-   [`fs-fragments-campaign.md`](fs-fragments-campaign.md), "THE
-   PAYLOAD-CONJUNCT PASS".  **Two things S7 must read before spending the
-   `ilink`:** the clause is guarded by `T_DIR` **and** `di_nlink <> 0`, so
-   S7 supplies the liveness from the kernel's own
-   `if(ip->nlink < 1) panic("unlink: nlink < 1")` — walked before the
-   zeroing, like the two `namecmp` refusals — and in exchange the clause
-   HANDS BACK `2 <= dir_nrec (di_size ip)`, so `dir_links_dotdot_out` takes
-   no record-count premise and the `isdirempty` loop does not have to
-   establish one.  The `di_nlink` guard is also what makes the conjunct
-   true of create's three `fail:` re-parks, which a type-only guard was
-   not; the complement (`nlink = 0` ⇒ only dot records) is the strong
-   `isdirempty` clause riding beside it.
+2. **finding 2's payload conjunct — LANDED.**  Both halves now ride in
+   `IcacheEscrow.ipool_alloc` and `ic_loaded`:
+   `DirView.dir_dots_ix` (PASS 1) and `DirView.dir_orphan_clean` (PASS 2),
+   which between them partition the directory case.  **Two things S7 must
+   read before spending the `ilink`:** the index clause is guarded by
+   `T_DIR` **and** `di_nlink <> 0`, so S7 supplies the liveness from the
+   kernel's own `if(ip->nlink < 1) panic("unlink: nlink < 1")` — walked
+   before the zeroing, like the two `namecmp` refusals — and in exchange
+   the clause HANDS BACK `2 <= dir_nrec (di_size ip)`, so
+   `dir_links_dotdot_out` takes no record-count premise and the
+   `isdirempty` loop does not have to establish one.  **Finding 1's
+   home-live premise now has its supplier too**: `dir_orphan_clean` says
+   an orphaned directory holds only dot records, so a live NON-dot record
+   — which is exactly what the two `namecmp` refusals hand the walk —
+   forces `di_nlink dp <> 0`, i.e. `DirLinks.dir_links_unlink`'s premise,
+   without any guard sys_unlink does not have.  Nothing in the campaign
+   gates the walk any more; see
+   [`fs-fragments-campaign.md`](fs-fragments-campaign.md), "PASS 2".
 
 The contract was deliberately not written first: fixing a postcondition
 around an arm nobody can reach is what the D₀ stops exist to prevent.

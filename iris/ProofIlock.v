@@ -1021,13 +1021,14 @@ Section IlockLoad.
                     ⌜inode_ok cov logstart dn bm data⌝ ∗
                     ⌜dir_ok icfg_nib dn data⌝ ∗
                     ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
+                    ⌜dir_orphan_clean dn data⌝ ∗
                     dir_links (bv_unsigned inum) dn data ∗
                     ind_res gfs bm ∗ inode_blocks gfs bm data))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL]" as ">[HL Hrest]".
     { rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hmk]".
       - iDestruct "Hal" as (dn0 bm0 data0)
-          "(%Hok0 & %Hdok0 & %Hddix0 & Hdlk0 & Hdn & Hind & Hblk)".
+          "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & Hdlk0 & Hdn & Hind & Hblk)".
         iMod (ireg_read ⊤ gi gfs inodestart nib inum dn0
                 (IBLOCK inum inodestart) (diblk_bytes ds)
                 ltac:(solve_ndisj) Hinlt eq_refl with "Hireg Hdn HL")
@@ -1045,6 +1046,7 @@ Section IlockLoad.
         iSplitR; [iPureIntro; exact Hok0 |].
         iSplitR; [iPureIntro; exact Hdok0 |].
         iSplitR; [iPureIntro; exact Hddix0 |].
+        iSplitR; [iPureIntro; exact Hdoc0 |].
         iSplitL "Hdlk0"; [iExact "Hdlk0" |]. iFrame.
       - destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
         + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
@@ -1080,6 +1082,13 @@ Section IlockLoad.
           iSplitR; [iPureIntro;
                     exact (dir_dots_ix_orphan (bv_unsigned inum) dn _
                              (fresh_shape_nlink dn Hfr0)) |].
+          (* ...and the COMPLEMENT clause is free at the same box, from the
+             other half of [fresh_shape]: a claim box has size 0, so it has
+             no records at all and [dir_dots_only] is vacuous.  The two dot
+             clauses partition the directory case and the claim box happens
+             to land in both halves' easy corner. *)
+          iSplitR; [iPureIntro;
+                    exact (dir_orphan_clean_size_zero dn _ Hfsz) |].
           (* §16.4's CLAIM BOX has [fresh_shape], i.e. size 0, so the twin
              collapses to [emp] exactly where [dir_ok_size_zero] makes the
              pure conjunct vacuous -- the resource half of §19.4's
@@ -1857,7 +1866,7 @@ Section IlockLoad.
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
     iDestruct "Hal" as (fl bm data)
-      "(%Hfr & %Hok & %Hdok & %Hddix & Hdlk & Hindres & Hblocks)".
+      "(%Hfr & %Hok & %Hdok & %Hddix & %Hdoc & Hdlk & Hindres & Hblocks)".
     destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
@@ -1934,6 +1943,7 @@ Section IlockLoad.
          same record, same data, so the conjunct transfers verbatim *)
       iSplitR; [iPureIntro; exact Hdok |].
       iSplitR; [iPureIntro; exact Hddix |].
+      iSplitR; [iPureIntro; exact Hdoc |].
       iSplitL "Hdlk"; [iExact "Hdlk" |].
       iSplitL "Hdn"; [iExact "Hdn" |].
       iSplitL "Hmty Hmmaj Hmmin Hmnl Hmsz".

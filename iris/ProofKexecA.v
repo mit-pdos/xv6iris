@@ -1114,7 +1114,8 @@ Section KexecABody.
       rewrite /Q2 upd_ne; [| regne]. exact (HQ1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- peel the loaded content for readi ---- *)
     iDestruct "Hload" as (datl)
-      "(%Hiok & %Hdok & %Hddix & Hdlk & Hdiat & Hmeta & Haddrs & Hindres & Hblocks)".
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdiat & Hmeta & Haddrs & Hindres
+       & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map gfs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
     { rewrite /inode_map. iSplitL "Haddrs"; [iExact "Haddrs" | iExact "Hindres"]. }
@@ -1444,6 +1445,7 @@ Section KexecABody.
             | exact Hszb | exact Hholes | exact Hsized] |].
           iSplitR; [iPureIntro; exact Hdok |].
           iSplitR; [iPureIntro; exact Hddix |].
+          iSplitR; [iPureIntro; exact Hdoc |].
           iSplitL "Hdlk"; [iExact "Hdlk" |].
           iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
@@ -1503,6 +1505,7 @@ Section KexecABody.
             | exact Hszb | exact Hholes | exact Hsized] |].
           iSplitR; [iPureIntro; exact Hdok |].
           iSplitR; [iPureIntro; exact Hddix |].
+          iSplitR; [iPureIntro; exact Hdoc |].
           iSplitL "Hdlk"; [iExact "Hdlk" |].
           iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
@@ -1575,6 +1578,7 @@ Section KexecABody.
           | exact Hszb | exact Hholes | exact Hsized] |].
         iSplitR; [iPureIntro; exact Hdok |].
         iSplitR; [iPureIntro; exact Hddix |].
+        iSplitR; [iPureIntro; exact Hdoc |].
         iSplitL "Hdlk"; [iExact "Hdlk" |].
         iDestruct "Hmap" as "[Haddrs Hindres]".
         iSplitL "Hdiat"; [iExact "Hdiat" |].

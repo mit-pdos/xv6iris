@@ -13,7 +13,7 @@ diverged from the design's sketches, and what is left.
 | **F1b** | `fnode`/`fedges`/`fslice`/`fs_rep` as a reading over `dinode_at` + `inode_blocks` + `dir_links`; the frame law; the `".."` fact | `FsRep.v` (new) | F1a | **LANDED** |
 | **F1.5b** | the edge-DELETE constructor | `DirLinks.v` (additive) | none | **LANDED** |
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
-| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause is landed** — see below) | NOT STARTED |
+| **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause AND the isdirempty plank are landed** — see below) | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
@@ -448,6 +448,19 @@ Compiles are mirror-only. Two things about that are worth keeping:
   **in the copy only**, confirm `git status --porcelain` lists exactly your
   own files, then `rm` the cone and build there. Copying the `.vo` tree along
   is what keeps it to one cone instead of a from-scratch build.
+- **A SIBLING LANE CAN `git reset --hard` THE SHARED MIRROR *UNDER A RUNNING
+  BUILD*, AND THE TELL IS AN mtime THAT MOVES BACKWARD.** PASS 2 lost a
+  whole run that way: the mirror was stamped from `3e8d4c3e` back to
+  `1f1112ba` mid-`make`, every edited `.v` was reverted, and every `.vo`
+  was bulk-touched to one second — so the log showed ONE honest error and
+  then a green tail built from code nobody wrote. Two independent tells,
+  both cheap: `.vo` timestamps identical to the SECOND across unrelated
+  files (no compile produces that), and a source `.v` whose mtime is
+  EARLIER than the `scp` that put it there. `git log --oneline -1` on the
+  mirror before AND after a run is the one-command check. The fix is the
+  lane tree, not a smaller gate: `cp -a /shared/xv6iris /shared/xv6iris-p2`
+  (the `.vo` ride along, so it is one cone and not a from-scratch build),
+  `git reset --hard <your base>` in the COPY, and build there.
 - **`DirLinks.v`'s cone is 142 files**, and the only two that consume the
   ticket lemmas at all are `ProofCreate.v` and `ProofSysLink.v`
   (`SpecDirlink.v` and `SpecSysLink.v` name them in prose only). Both are in
@@ -459,9 +472,10 @@ Compiles are mirror-only. Two things about that are worth keeping:
 
 Carried forward from R9; none of it is F1a/F1b/F1.5b's to discharge.
 
-- `isdirempty`'s invariant — S7's brief, as a PREREQUISITE of
-  `create_fresh_ty`'s retirement, not a local convenience.
 - `SpecIget`'s licence enumeration (C′), or fs-icache §20.17.7's kernel fix.
+
+`isdirempty`'s invariant is no longer owed: it is `DirView.dir_orphan_clean`,
+riding in both escrow payloads since PASS 2 below.
 
 ## THE PAYLOAD-CONJUNCT PASS — LANDED, and what the road test changed
 
@@ -507,28 +521,99 @@ premise and no caller has to measure a directory it never read.
 | **create's `dirlink(ip,"..")`** | **the establishment** — `cr_dotdot_record` + `cr_dot_record` + `dir_dots_ix_self` at the parent |
 | boot | threaded, zero obligation (`IcacheBoot`) |
 
-### THE ATTEMPTED FOLD OF THE COMPLEMENT CLAUSE — REVERTED, and where it stops
+## PASS 2 — THE COMPLEMENT CLAUSE IS IN THE PAYLOADS, and F1.5d's
+## isdirempty PLANK IS CLOSED
 
-The strong-isdirempty clause (`dir_orphan_clean`: a `T_DIR` record at
-`nlink = 0` has every live record's name in `{".", ".."}`) was folded into
-this sweep to pay the arity once. **It does not close, and the obstruction is
-one site: `sys_link`'s `bad:` tail.** The clause is trivial everywhere else —
-vacuous at every live directory, `not_dir` at every file, `size_zero` at the
-claim box and the truncated corpse, a transfer at every peel — but
-`ProofSysLinkTails`' `ip->nlink--` re-parks a record that its OWN `ilock`
-produced, so the record is an existential and the walk cannot say it is not a
-directory. The natural fix (pass the caller's `ity_shot` and agree the types)
-**fails at the generation**: the call sites re-introduce the generation
-existentially (`inode_shr_gen_intro`), so no shot at the tail's `gy` exists to
-agree with. `dir_dots_ix` is no help — it speaks only above `nlink <> 0`, and
-the site is exactly the drop to zero.
+`DirView.dir_orphan_clean` rides beside `dir_dots_ix` in
+`IcacheEscrow.ipool_alloc` and `ic_loaded`, verbatim:
 
-So the complement clause needs its own design step before it can ride in the
-payload, and it is about `sys_link`'s tail alone. Its **definition and five
-discharges are landed in `DirView.v`** (`dir_dots_only`, `dir_orphan_clean`,
-`_not_dir`, `_free`, `_live`, `_size_zero`, `_of_only`, `dir_dots_only_of`,
-`dir_dots_only_dirlink`), so the design step has its vocabulary and the
-arity sweep is the only part that must be paid twice.
+```coq
+Definition dir_dots_only (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  forall k : nat, (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+    dir_live data k ->
+    bname 14 (dir_name data k) = dot_name
+    \/ bname 14 (dir_name data k) = dotdot_name.
+
+Definition dir_orphan_clean (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  bv_unsigned (di_nlink dn) = 0 ->
+    dir_dots_only dn data.
+```
+
+— an ORPHANED directory's live records are exactly `"."` and `".."`. With
+`dir_dots_ix` (the `nlink <> 0` half) it partitions the directory case with
+no overlap and no gap. **It takes no `self` parameter**, so unlike its
+sibling it costs nothing at the boot and eviction sites where the inum has
+to be spelled.
+
+**THE OBSTRUCTION THAT REVERTED THE FOLD IS GONE, AND THE FIX WAS NOT IN
+`sys_link` AT ALL.** The blocker was `ProofSysLinkTails`' `ip->nlink--`:
+the tail re-`ilock`s a record its own `ilock` produced, so the record is an
+existential and the walk cannot say it is not a directory; passing the
+caller's `ity_shot` failed at the GENERATION, because the share arrived
+generation-erased. `SpecIunlock`'s gen-indexed return (930fdd94) is what
+closed it. The three tails (`sl_tail_bad`, and `sl_tail_f`/`sl_tail_e2`
+which route into it) each gained **one type parameter, one pure premise
+`bv_unsigned ty <> T_DIR_z`, and one persistent `ity_shot gy ty`**; the
+walk mints the shot before its own `iunlock` (`ProofSysLink.v`'s `#Hshot2`
+at the `ip->nlink++`), `ity_shot_agree` pins `di_type dn` at the re-`ilock`,
+and `dir_orphan_clean_not_dir` closes the re-park. The pure fact is
+**hoisted once** beside the shot (`Hncd`) rather than spelled as an
+`ltac:` at the four tail applications — the recorded budget trap.
+
+### What it cost, per site
+
+| site | discharge |
+|---|---|
+| every peel/re-park that moves nothing (`ProofNamex` ×4, `ProofSysChdir` ×2, `ProofKexecA` ×3, `ProofKexecB2`/`B3`, `ProofFileread` ×2, `ProofFilestat`, `ProofIput` ×2, `ProofSysOpen`, `ProofSysLink` ×3, `ProofCreate` ×4) | transfer — one name in the destruct, one `iSplitR` in the rebuild |
+| `ProofIlock`'s fill | transfer out of `ipool_alloc`'s allocated arm |
+| `ProofIlock`'s CLAIM BOX | `dir_orphan_clean_size_zero` off `fresh_shape`'s size |
+| `ProofFilewrite`, `ProofSysOpenParts`' O_TRUNC, `ProofSysLink`'s `ip->nlink++`, create's two `cr_setf` children | `dir_orphan_clean_not_dir` |
+| **`ProofSysLinkTails`' `ip->nlink--`** | **`ity_shot_agree` across the walk's own `iunlock`, then `_not_dir`** |
+| every create parent — the peel, the two dirlinks, the NOP dirlink, the fail bodies | `cr_doc_of_live`, one line: create's guard at +0x2a says the parent is live and the clause speaks only at `nlink = 0` |
+| create's `dp->nlink++` | **`IregLinkNz.ireg_link_nz`** — see below |
+| `cr_fail_mkdir_body`'s child | the new `⌜dir_dots_only dc datc⌝` premise, spent through `dir_dots_only_of` at the `sh zero,74(s3)` |
+| the three `fail:` entries | `Hc1dots` (nrec 0), `Hc2dots` (one arm `"."` only, the other both dots) |
+| iput's free path | nothing: the exit is `ipool_shape`'s MARKER arm, which carries no payload — the post-itrunc vacuity is never demanded |
+| boot | threaded, zero obligation (`IcacheBoot`), and vacuous of any mkfs image, which writes no orphan |
+
+**THE CONTENT FORM IS A SEPARATE DEFINITION BECAUSE OF ONE CALLER.**
+`cr_fail_mkdir_body` takes the child at `nlink = 1` and parks it at
+`nlink = 0`: a guarded premise would be VACUOUS on the way in and DEMANDED
+on the way out. So the premise is `dir_dots_only` (the content) and the
+re-park is `dir_orphan_clean_of_only ∘ dir_dots_only_of`. The three entries
+supply it from what their own interior links wrote, and the bound being
+`dir_nrec` — not a size equation — is what makes them cheap: at
+`tot1 < 16` the child has NO records (`Z.div_small`), at `tot2 < 16` it has
+one and it is the `"."`, at `tot2 = 16` it has two and they are the dots.
+`dir_bname_agree` off the second write's range clause carries record 0
+across; no parent fact enters, so unlike `dir_dots_ix`'s establishment this
+one needs no `dp->inum <> 0`.
+
+**THE ONE SITE WHERE THE CLAUSE IS NOT FREE IS create's `dp->nlink++`, AND
+THE REASON IS A WRAP.** The re-park is at `nlink + 1`, so the clause's
+antecedent is `nlink + 1 = 0` — and **the NLINK_MAX guard is a SIGNED test
+(`== 32767`) that does not exclude `nlink = 65535`**; (L4) lives in the
+region and no pure fact in the walk bounds a count from above. What closes
+it is (L1) read off the `ilink` the flush has JUST minted, through
+`IregLinkNz.ireg_link_nz` (mask-preserving, hands everything back) —
+**taken immediately after `wp_iupdate_link` returns, because three lines
+later that ticket is spent into the child's `".."`**. Five lines, one
+`Require Import IregLinkNz` in `ProofCreate.v`. The rule: *when a payload
+conjunct is guarded on a count and a walk moves that count, the guard's
+antecedent is a claim about MACHINE arithmetic — look for the ledger
+fragment that pays for the move, not for a pure bound.*
+
+### Gate
+
+Lane tree `/shared/xv6iris-p2` on the mirror (see the trap below), at
+`3e8d4c3e` + the eighteen edited files, every one md5-verified against the
+working tree as a block. The reverse transitive closure of
+`IcacheEscrow.vo` out of `.CoqMakefile.d` — **165 files** — was `rm`'d
+first; what actually ran was a whole-tree build: **1152 compiles, 1152
+`.vo` for 1152 `.v`, `EXIT=0`, zero `Error` lines, staleness 0, and
+`make -n` afterwards emits 0 compile lines.** `lemma_diff` over all
+eighteen: CLEAN. Coverage 186/190 (98%), unmoved.
 
 ## `iunlock` STOPS ERASING THE GENERATION — the carrier PASS 2 needed
 
@@ -595,6 +680,16 @@ Two ways that count comes out wrong:
   intro pattern and drops it; its caller's pattern must NOT gain a name.
   Getting this backwards produces `iExistDestruct: cannot destruct` at the
   CALLER, which reads like a payload error and is a lemma-statement one.
+
+**A SECOND `∗`-conjunct is CHEAPER than the first, and the figure is 18
+files against PASS 1's 21.** The three that dropped out
+(`ProofSysOpenTails`, `SpecIunlock`, `IcacheRef`) were never payload sites;
+what stayed is exactly the destruct/rebuild set. The scripted sweep has one
+trap of its own: **a tactic line at eight spaces of indent is a SUBSTRING of
+the same line at ten**, so a `replace(old, new)` keyed on
+`"        iSplitR; [iPureIntro; exact Hddix |]."` silently matches the
+deeper site too and the count assertion fires on the wrong file. Anchor
+every such pattern on a leading `\n`.
 
 **Folding a SECOND clause into the same sweep is worth it when it closes**
 (the arity is paid once), and the fold is cheap to attempt and cheap to

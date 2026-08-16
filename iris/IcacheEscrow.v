@@ -443,13 +443,26 @@ Section IcacheEscrow.
      WHICH ticket in a child's [dir_links] is the parent's.  It rides HERE,
      beside [dir_ok], for [dir_ok]'s own reason: it is a fact about this
      payload's bytes that no contract in the tree wants to carry, and the
-     [Timeless] instances below are unaffected because it is pure. *)
+     [Timeless] instances below are unaffected because it is pure.
+
+     ...AND ITS COMPLEMENT, [DirView.dir_orphan_clean] (the STRONG isdirempty
+     invariant, fs-fragments F1.5d's plank).  [dir_dots_ix] speaks only above
+     [nlink <> 0]; this one speaks only at [nlink = 0], and between them the
+     directory case is partitioned with no overlap and no gap: an ORPHANED
+     directory's live records are exactly ["."] and [".."].  It is true of
+     THIS binary because sys_link's orphan guard (xv6 f60ff58, ARM E2)
+     refuses to [dirlink] into a directory whose count has already fallen to
+     zero, and it carries three loads at once -- fs-icache §20.6's itrunc
+     row, §20.17.5's residue, and [sys_unlink]'s own input premise, since a
+     live NON-dot record under it forces the home's count nonzero, which is
+     [DirLinks.dir_links_unlink]'s home-live premise. *)
   Definition ipool_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
     (∃ (dn0 : dinode) (bm0 : blkmap) (data0 : nat -> list (bv 8)),
        ⌜inode_ok cov logstart dn0 bm0 data0⌝ ∗
        ⌜dir_ok icfg_nib dn0 data0⌝ ∗
        ⌜dir_dots_ix (bv_unsigned inum) dn0 data0⌝ ∗
+       ⌜dir_orphan_clean dn0 data0⌝ ∗
        dir_links (bv_unsigned inum) dn0 data0 ∗
        dinode_at γi inum dn0 ∗
        ind_res γfs bm0 ∗
@@ -501,7 +514,15 @@ Section IcacheEscrow.
      other re-park in the tree transfers it, and the ones that move the
      record discharge it from [DirView]'s five ways -- most often
      [dir_dots_ix_orphan], since a walk that zeroes [nlink] before parking
-     is parking a directory the clause says nothing about. *)
+     is parking a directory the clause says nothing about.
+
+     ...AND ITS COMPLEMENT [DirView.dir_orphan_clean], the twin of
+     [ipool_alloc]'s: see there.  Where [dir_dots_ix] is transferred by the
+     peels and discharged by [_orphan] at the walks that zero a count, this
+     one is exactly the other way round -- [_live] at every live directory,
+     [_not_dir] at every file, [_size_zero] at a claim box and a truncated
+     corpse -- and its one PRODUCING site is create's [fail:] twin, which
+     parks a child it has just orphaned. *)
   Definition ic_loaded (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32)
       (dn : dinode) (bm : blkmap) : iProp Σ :=
@@ -509,6 +530,7 @@ Section IcacheEscrow.
        ⌜inode_ok cov logstart dn bm data⌝ ∗
        ⌜dir_ok icfg_nib dn data⌝ ∗
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
+       ⌜dir_orphan_clean dn data⌝ ∗
        dir_links (bv_unsigned inum) dn data ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
@@ -1020,6 +1042,7 @@ Section IcacheEscrow.
     inode_ok cov logstart dn bm data ->
     dir_ok icfg_nib dn data ->
     dir_dots_ix (bv_unsigned inum) dn data ->
+    dir_orphan_clean dn data ->
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗
     inode_meta (ientry k) dn -∗
@@ -1028,8 +1051,10 @@ Section IcacheEscrow.
     inode_blocks γfs bm data -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
-    intros Hok Hdok Hddix. iIntros "Hl Hd Hm Ha Hr Hb". rewrite /ic_loaded.
+    intros Hok Hdok Hddix Hdoc. iIntros "Hl Hd Hm Ha Hr Hb".
+    rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+    iSplitR; [done |].
     iSplitL "Hl"; [iExact "Hl" |]. iSplitL "Hd"; [iExact "Hd" |].
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" | iExact "Hb"].
@@ -1445,7 +1470,7 @@ Section IcacheEscrow.
     { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & %Hddix & Hdlk & Hdat & Hmeta & Haddrs & Hind &
+        "(%Hok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdat & Hmeta & Haddrs & Hind &
           Hblks)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
@@ -1461,6 +1486,7 @@ Section IcacheEscrow.
       (* the eviction moves no byte and no field: the clause goes back to the
          pool exactly as the loaded arm held it *)
       iSplitR; [iPureIntro; exact Hddix |].
+      iSplitR; [iPureIntro; exact Hdoc |].
       iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
@@ -1657,7 +1683,7 @@ Section IcacheEscrow.
     rewrite /ic_payload. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").

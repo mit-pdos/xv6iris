@@ -1792,7 +1792,8 @@ Section ProofFileread.
                     [ip] its own [f->ip] cell holds. ---- *)
              rewrite /ic_loaded.
              iDestruct "Hlk" as (data)
-               "(%Hiok & %Hdok & %Hddix & Hdlk & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
+               "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
+                 & Hblocks)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
@@ -2089,6 +2090,7 @@ Section ProofFileread.
                      conjunct goes back exactly as it came out *)
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
+                  iSplitR; [iPureIntro; exact Hdoc |].
                   iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
@@ -2366,6 +2368,7 @@ Section ProofFileread.
                      conjunct goes back exactly as it came out *)
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
+                  iSplitR; [iPureIntro; exact Hdoc |].
                   iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
