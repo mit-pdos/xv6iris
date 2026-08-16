@@ -1,16 +1,25 @@
-# Project: panic()
+# COMPLETED: panic()
 
-`panic()` is PROVEN — `SpecPanic.v` / `CodePanic.v` / `ProofPanic.v` /
-`LinkPanic.v`, sealed as `PanicProof Printk : PANIC`, `Print Assumptions` = the
-5 Sail platform externs + funext and nothing else.
+`panic()` is proven (`SpecPanic.v` / `CodePanic.v` / `ProofPanic.v` /
+`LinkPanic.v`, sealed as `PanicProof Printk : PANIC`), every live panic arm in
+the kernel links against it, and the placeholder `PanicStub.v` /
+`LinkPanicStub.v` are deleted — which took
+`LinkPanicStub.PanicAssumed.panic_wp_holds` out of the adequacy print and left
+`LinkUserinit.Userinit.wp_userinit_sconf` as the only assumed Link in the tree.
 
-**THE PROJECT IS DONE.** Every live panic arm links against `SpecPanic`, and
-the placeholder `PanicStub.v` / `LinkPanicStub.v` are deleted — which took
-`LinkPanicStub.PanicAssumed.panic_wp_holds` out of the adequacy print, leaving
-`LinkUserinit` as the only assumed Link in the tree. This file is kept as a
-REFERENCE: the arm recipe and its traps, what threading two ambient
-credentials through a whole cone costs, and how to retire a resource that 200
-files name.
+**The broadly-applicable rules have been lifted into
+[`../durable-notes.md`](../durable-notes.md)** — the post-`jal` regfile, the
+credential-not-in-scope-at-the-arm trap, the `+3` push-off premise for an arm
+inside its own critical section, the four shapes of retiring a resource 200
+files name, the budget `Notation` rules, and the encode-a-constant-as-a-literal
+defect class. Read those, not this. What is kept here is the narrative and the
+per-site detail.
+
+**THE ONE PLACE THIS FILE IS STILL WANTED.** `forkret`'s `if (first)` arm is
+excluded by a premise rather than proven (`first_addr ↦₄{DfracDiscarded} 0`),
+and that arm contains `panic("exec")`. Whoever closes it — the open item at the
+foot of [`../projects/uservec.md`](../projects/uservec.md) — needs "THE RECIPE
+FOR A PANIC ARM" below and the address-derivation rule beside it.
 
 ## The contract
 
@@ -237,37 +246,12 @@ current spec values, fed by both the constraints the proofs state outright
 the prologues are reliable; baseline DEPTHS are not, because of indirect
 dispatch.
 
-## BUDGET CONSTANTS ARE `Notation`, NOT `Definition`
+## Budget constants, and the literal-that-encodes-a-constant defect class
 
-102 of them, as `Notation X := (e) (only parsing).`  There is nothing to
-unfold, so `lia` sees the literals and no proof has to know which callee
-dominates a derived budget.  Three traps, all of which recur if more are added:
-
-- **A `Notation` inside a `Section` does NOT survive its `End`.**
-  `kv_frame_slots` (IntrDefs) and `K_kvmmake` (KvmSpec) sit above their
-  `Section` line for this reason.
-- **The `: nat` ascription is gone, so a bare numeral parses in the ambient
-  scope.**  Every body needs `%nat`.
-- **`rewrite /X` is ssreflect's unfold** and fails with the baffling
-  "The term S is not unfoldable" once `X` is a numeral.
-
-Cost accepted: `only parsing` means goals display `58`, not `K_bread`.
-
-## THE DEFECT CLASS TO WATCH: literals that encode another constant's value
-
-**A numeral written into a proof that silently encodes some other constant's
-then-current value.**  None is findable by grepping for the constant's name,
-because the name never appears.  Instances found and fixed: `ProofMain.mn_bounds`
-+ 4 `mn_grp_*` (`50 <= n` = `K_userinit`); `ProofKexit.kx_rest` (`60 <= av` =
-`K_iput`); `SpecPipealloc` (`74 <= K` = `6 + fileclose_stack`);
-`ProofSysPipe.sp_bounds`; `ProofKernelvec` ×3 (`46 + av` = `kv_frame_slots - 32`);
-`ProofConsoleread` ×4 and `ProofPiperead` (`trap_res true = 78` = `kv_frame_slots`);
-`ProofCreateParts.cr_K_value`; `BootBridge.boot_stack_slots_main`.
-
-Where the referenced constant is in scope it is now NAMED.  Where it is not —
-`SpecPipealloc` reaches `SpecFileclose` only in prose — the literal stays with
-the derivation in the comment.  **The `Notation` change does not fix this class.
-A bare literal is still a bare literal.**
+Both lifted to [`../durable-notes.md`](../durable-notes.md) §"Spec-design
+preferences" — the `Notation … (only parsing)` rule with its three traps, and
+the ungreppable numeral class that dominated the budget change (eight sites,
+listed there).
 
 ## HOW TO PROFILE ONE OF THESE — do this BEFORE changing anything
 

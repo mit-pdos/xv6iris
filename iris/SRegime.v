@@ -618,3 +618,113 @@ Section SRegimeShared.
   Proof. reflexivity. Qed.
 
 End SRegimeShared.
+
+(* ===================================================================== *)
+(* §4 THE TIER-INDEXED ACCESS WITNESS (claude-notes/projects/             *)
+(*    sp-migration.md, design §4 -- phase D).                             *)
+(*                                                                        *)
+(* A memory datum carries a TIER ([Ktier.ktier], via [RiscvPtsto.         *)
+(* ktier_pin]) that is a lower bound on the translation generation of any *)
+(* hart that may drive an access with it, and a leaf reconciles the       *)
+(* datum's claim with the hardware in one of two ways:                    *)
+(*                                                                        *)
+(*   - at KT0 the datum's own PIN is the identity, so admissibility comes *)
+(*     out of the datum ([sr_adm_id]) and the leaf needs NOTHING from its *)
+(*     caller -- which is why the whole tree compiles at KT0 today;       *)
+(*   - at KT1 there is no pin at all, so admissibility has to come from   *)
+(*     the REGIME's all-claims witness [sr_kwit] ([sr_absorb_wit]), which *)
+(*     the accessing hart must actually hold ([kpt_on cpu_id] for         *)
+(*     [strans_regime]; unsatisfiable [False] for [bare_regime], which is *)
+(*     exactly the soundness gate).                                       *)
+(*                                                                        *)
+(* [sr_ktier_wit R kt] is that "what a hart at tier [kt] must show" as a  *)
+(* single tier-indexed proposition -- [emp] at KT0, [sr_kwit R] at KT1 -- *)
+(* so ONE generic leaf rule takes it as a (persistent) hypothesis and     *)
+(* both tiers are one lemma.  At the KT0 default the hypothesis is [emp], *)
+(* so today's leaf statements are that rule's KT0/KT0 corollaries and no  *)
+(* function proof sees the generalization.                               *)
+(* ===================================================================== *)
+
+Section SRegimeKtier.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* THE TIER-INDEXED ACCESS WITNESS the generic leaves take.  At KT0
+     access rides the DATUM's own pin (the identity, discharged through
+     [sr_adm_id]) and costs the caller nothing; at KT1 it rides the
+     REGIME's all-claims witness [sr_kwit].  Persistent in both arms
+     ([emp] trivially, KT1 by [sr_kwit_pers]), so a leaf may take it,
+     keep it, and hand it on without threading a linear resource. *)
+  Definition sr_ktier_wit (R : s_regime) (kt : ktier) : iProp Σ :=
+    match kt with
+    | KT0 => emp
+    | KT1 => sr_kwit R
+    end.
+
+  Global Instance sr_ktier_wit_persistent R kt : Persistent (sr_ktier_wit R kt).
+  Proof. destruct kt; [apply _ | exact (sr_kwit_pers R)]. Qed.
+
+  (* the KT0 arm is free -- this is what makes every old leaf statement a
+     literal corollary of its generic form (no premise appears). *)
+  Lemma sr_ktier_wit_KT0 (R : s_regime) : ⊢ sr_ktier_wit R KT0.
+  Proof. done. Qed.
+
+  (* THE ONE ABSORPTION A TIER-INDEXED LEAF CALLS.  Its premise list is
+     [sr_absorb]'s with the [sr_adm va ppn] conjunct replaced by the
+     DATUM's pin [ktier_pin kt' ppn va] and the witness [sr_ktier_wit R
+     kt] prepended to the resource chain -- i.e. exactly the two things a
+     [↦ₘ[kt']] datum and a tier-[kt] hart respectively supply.  Both arms
+     land on an existing field, so no leaf proof grows a case split:
+       kt' = KT0 -- the pin IS [kadm_ident], fed to [sr_adm]/[sr_absorb];
+       kt' = KT1 -- [KtierLe KT1 kt] forces kt = KT1, so the witness IS
+                    [sr_kwit R] and [sr_absorb_wit] applies one-for-one. *)
+  Lemma sr_absorb_ktier (R : s_regime) (kt kt' : ktier) `{Hle : !KtierLe kt' kt} :
+    forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
+        (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
+      s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ktier_pin kt' ppn va ->
+      ↑kptN ⊆ E ->
+      ⊢ sr_ktier_wit R kt -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv R ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv R.
+  Proof.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp
+           HSXL Heff Hss Hall Hpin HE.
+    destruct kt' as [|].
+    - (* KT0: the pin IS [kadm_ident va ppn]; the witness is [emp]. *)
+      iIntros "_ Hk Hri Hgh Hinv".
+      iApply (sr_absorb R acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa
+                Hmenv Hhtif Hcp HSXL Heff Hss Hall (sr_adm_id R va ppn Hpin) HE
+                with "Hk Hri Hgh Hinv").
+    - (* KT1: [KtierLe KT1 kt] leaves only kt = KT1, so the witness IS
+         [sr_kwit R] and there is nothing to reconcile per-address. *)
+      destruct (ktier_le_cases _ _ Hle) as [Heq | [Hbad _]]; [| discriminate Hbad].
+      rewrite -Heq.
+      iIntros "Hw Hk Hri Hgh Hinv".
+      iApply (sr_absorb_wit R acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa
+                Hmenv Hhtif Hcp HSXL Heff Hss Hall HE
+                with "Hw Hk Hri Hgh Hinv").
+  Qed.
+
+End SRegimeKtier.

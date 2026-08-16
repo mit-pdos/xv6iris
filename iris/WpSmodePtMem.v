@@ -974,7 +974,19 @@ Section WpSmodePtMemLeaves.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Lemma wp_clw_s_r (R : s_regime)
+  (* ==================================================================== *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4).  [kt'] is the *)
+  (* DATUM's tier, [kt] the accessing hart's; [KtierLe kt' kt] is the whole *)
+  (* access condition and [sr_ktier_wit R kt] (persistent, [emp] at KT0) is *)
+  (* what the hart shows for it -- at KT0 the datum's own pin discharges    *)
+  (* admissibility ([sr_adm_id]); at KT1 the regime's all-claims witness    *)
+  (* does ([sr_absorb_wit]).  Both go through [SRegime.sr_absorb_ktier], so *)
+  (* the body below is the pre-phase-D proof with ONE call respelled.       *)
+  (* TIER-PRESERVING: the datum comes back at [kt'].  The [KT0/KT0]         *)
+  (* corollary after [Qed] is the pre-phase-D statement, character for      *)
+  (* character, so no consumer sees the generalization.                     *)
+  (* ==================================================================== *)
+  Lemma wp_clw_s_r_t (R : s_regime) (kt kt' : ktier) `{!KtierLe kt' kt}
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (v : mword 32)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -991,6 +1003,7 @@ Section WpSmodePtMemLeaves.
     pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     menvcfg0 = MENVCFG_S ->
+    sr_ktier_wit R kt -∗
     hw_config -∗
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
@@ -1003,7 +1016,7 @@ Section WpSmodePtMemLeaves.
     pc_is pc -∗
     gpr_file m -∗
     instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    pa ↦₄{ dqm } v -∗
+    pa ↦₄[kt']{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1013,12 +1026,12 @@ Section WpSmodePtMemLeaves.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
-      pa ↦₄{ dqm } v -∗
+      pa ↦₄[kt']{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+    iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] Hfmap Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true) by exact Hpalign4.
@@ -1043,7 +1056,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1087,14 +1100,14 @@ Section WpSmodePtMemLeaves.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
     iDestruct (sr_tmode R s_pc LSXL_pc with "Hreg Htlbinv") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb R (Load Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier R kt kt' (Load Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
             (or_intror (or_introl eq_refl)) I
             (lo_canonical a8 Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' Hid _ with "Hwit Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1106,7 +1119,7 @@ Section WpSmodePtMemLeaves.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (s_mem_chunk s_tr pa a8 0 4 4 (nth_byte v) ppn dqm
+    iDestruct (s_mem_chunk (KTR := kt') s_tr pa a8 0 4 4 (nth_byte v) ppn dqm
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(Hbytesf_tr & Hram0 & Hram3 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn a8) 4
@@ -1172,17 +1185,17 @@ Section WpSmodePtMemLeaves.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (pa ↦₄{ dqm } v)%I with "[Hbytes]" as "Hbw".
+    iAssert (pa ↦₄[kt']{ dqm } v)%I with "[Hbytes]" as "Hbw".
     { rewrite /word4_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           [$Hpc' $Hnpc] Hfmap Hbw").
   Qed.
 
-
-
-  Lemma wp_ld_s_r (R : s_regime)
+  (* THE KT0/KT0 COROLLARY: the pre-phase-D statement verbatim (the ambient
+     tier IS the KT0 default), with the [emp] witness discharged here. *)
+  Lemma wp_clw_s_r (R : s_regime)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (v : mword 64)
+      (m : regfile) (v : mword 32)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
@@ -1208,8 +1221,73 @@ Section WpSmodePtMemLeaves.
     sr_inv R -∗
     pc_is pc -∗
     gpr_file m -∗
+    instr pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
+    pa ↦₄{ dqm } v -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      sr_inv R -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
+      pa ↦₄{ dqm } v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit".
+    iApply (wp_clw_s_r_t R KT0 KT0 pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0
+              (dq := dq) (dqm := dqm)
+              Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 with "Hwit").
+  Qed.
+
+
+
+  (* ==================================================================== *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4).  [kt'] is the *)
+  (* DATUM's tier, [kt] the accessing hart's; [KtierLe kt' kt] is the whole *)
+  (* access condition and [sr_ktier_wit R kt] (persistent, [emp] at KT0) is *)
+  (* what the hart shows for it -- at KT0 the datum's own pin discharges    *)
+  (* admissibility ([sr_adm_id]); at KT1 the regime's all-claims witness    *)
+  (* does ([sr_absorb_wit]).  Both go through [SRegime.sr_absorb_ktier], so *)
+  (* the body below is the pre-phase-D proof with ONE call respelled.       *)
+  (* TIER-PRESERVING: the datum comes back at [kt'].  The [KT0/KT0]         *)
+  (* corollary after [Qed] is the pre-phase-D statement, character for      *)
+  (* character, so no consumer sees the generalization.                     *)
+  (* ==================================================================== *)
+  Lemma wp_ld_s_r_t (R : s_regime) (kt kt' : ktier) `{!KtierLe kt' kt}
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (v : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq dqm : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    let a8 := ea in
+    let pa := a8 in
+    uint rd <> 0 ->
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    sr_ktier_wit R kt -∗
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    gpr_file m -∗
     instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    pa ↦₈{ dqm } v -∗
+    pa ↦₈[kt']{ dqm } v -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1219,12 +1297,12 @@ Section WpSmodePtMemLeaves.
       sr_inv R -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
-      pa ↦₈{ dqm } v -∗
+      pa ↦₈[kt']{ dqm } v -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+    iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] Hfmap Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 8 = true) by exact Hpalign4.
@@ -1249,7 +1327,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1293,14 +1371,14 @@ Section WpSmodePtMemLeaves.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
     iDestruct (sr_tmode R s_pc LSXL_pc with "Hreg Htlbinv") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb R (Load Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier R kt kt' (Load Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
             (or_intror (or_introl eq_refl)) I
             (lo_canonical a8 Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_load_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_load s_pc)
-            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' Hid _ with "Hwit Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1312,7 +1390,7 @@ Section WpSmodePtMemLeaves.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (s_mem_chunk s_tr pa a8 0 8 8 (nth_byte v) ppn dqm
+    iDestruct (s_mem_chunk (KTR := kt') s_tr pa a8 0 8 8 (nth_byte v) ppn dqm
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(Hbytesf_tr & Hram0 & Hram7 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn a8) 8
@@ -1378,22 +1456,23 @@ Section WpSmodePtMemLeaves.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (pa ↦₈{ dqm } v)%I with "[Hbytes]" as "Hbw".
+    iAssert (pa ↦₈[kt']{ dqm } v)%I with "[Hbytes]" as "Hbw".
     { rewrite /word_pointsto. iFrame "Hbytes". iPureIntro. exact Hpalign4. }
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           [$Hpc' $Hnpc] Hfmap Hbw").
   Qed.
 
-
-  Lemma wp_csw_s_r (R : s_regime)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (vold : bv 32)
+  (* THE KT0/KT0 COROLLARY: the pre-phase-D statement verbatim (the ambient
+     tier IS the KT0 default), with the [emp] witness discharged here. *)
+  Lemma wp_ld_s_r (R : s_regime)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (v : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
-      {dq : dfrac} :
+      {dq dqm : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
-    let storeval := trunc32 (m !!! Regidx rs2) in
+    uint rd <> 0 ->
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1413,8 +1492,72 @@ Section WpSmodePtMemLeaves.
     sr_inv R -∗
     pc_is pc -∗
     gpr_file m -∗
+    instr pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
+    pa ↦₈{ dqm } v -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      sr_inv R -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
+      pa ↦₈{ dqm } v -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit".
+    iApply (wp_ld_s_r_t R KT0 KT0 pc rd rs1 imm m v mstatus0 mie_v mdv0 menvcfg0
+              (dq := dq) (dqm := dqm)
+              Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 with "Hwit").
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4).  [kt'] is the *)
+  (* DATUM's tier, [kt] the accessing hart's; [KtierLe kt' kt] is the whole *)
+  (* access condition and [sr_ktier_wit R kt] (persistent, [emp] at KT0) is *)
+  (* what the hart shows for it -- at KT0 the datum's own pin discharges    *)
+  (* admissibility ([sr_adm_id]); at KT1 the regime's all-claims witness    *)
+  (* does ([sr_absorb_wit]).  Both go through [SRegime.sr_absorb_ktier], so *)
+  (* the body below is the pre-phase-D proof with ONE call respelled.       *)
+  (* TIER-PRESERVING: the datum comes back at [kt'].  The [KT0/KT0]         *)
+  (* corollary after [Qed] is the pre-phase-D statement, character for      *)
+  (* character, so no consumer sees the generalization.                     *)
+  (* ==================================================================== *)
+  Lemma wp_csw_s_r_t (R : s_regime) (kt kt' : ktier) `{!KtierLe kt' kt}
+      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (vold : bv 32)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    let a8 := ea in
+    let pa := a8 in
+    let storeval := trunc32 (m !!! Regidx rs2) in
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    sr_ktier_wit R kt -∗
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    gpr_file m -∗
     instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    pa ↦₄ vold -∗
+    pa ↦₄[kt'] vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1424,12 +1567,12 @@ Section WpSmodePtMemLeaves.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
-      pa ↦₄ storeval -∗
+      pa ↦₄[kt'] storeval -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa storeval HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+    iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] Hfmap Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true) by exact Hpalign4.
@@ -1454,7 +1597,7 @@ Section WpSmodePtMemLeaves.
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hbytes") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hbytes".
@@ -1499,14 +1642,14 @@ Section WpSmodePtMemLeaves.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
     iDestruct (sr_tmode R s_pc LSXL_pc with "Hreg Htlbinv") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb R (Store Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier R kt kt' (Store Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical a8 Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' Hid _ with "Hwit Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1518,7 +1661,7 @@ Section WpSmodePtMemLeaves.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (s_mem_chunk s_tr pa a8 0 4 4 (nth_byte vold) ppn (DfracOwn 1)
+    iDestruct (s_mem_chunk (KTR := kt') s_tr pa a8 0 4 4 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hbytes") as %(_ & Hram0 & Hram3 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn a8) 4
@@ -1560,8 +1703,8 @@ Section WpSmodePtMemLeaves.
                (addr_is_ram_not_dev _ Hram0)) as H0.
       rewrite Lv2 in H0.
       exact H0. }
-    iDestruct (word4_pointsto_intro pa (DfracOwn 1) vold Hpalign4 with "Hbytes") as "Hbytes".
-    iMod (word4_pointsto_write_c s_tr.(mem) pa ppn vold storeval Hcan Hoff with "Hk Hmem Hbytes")
+    iDestruct (word4_pointsto_intro (KTR := kt') pa (DfracOwn 1) vold Hpalign4 with "Hbytes") as "Hbytes".
+    iMod (word4_pointsto_write_c (KTR := kt') s_tr.(mem) pa ppn vold storeval Hcan Hoff with "Hk Hmem Hbytes")
       as "[Hmem Hbytes]".
     iModIntro.
     iExists (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn a8) 4 storeval) s_tr.(mdev)).
@@ -1584,17 +1727,17 @@ Section WpSmodePtMemLeaves.
                           [$Hpc' $Hnpc] Hfmap Hbytes").
   Qed.
 
-
-
-
-  Lemma wp_sd_s_r (R : s_regime)
+  (* THE KT0/KT0 COROLLARY: the pre-phase-D statement verbatim (the ambient
+     tier IS the KT0 default), with the [emp] witness discharged here. *)
+  Lemma wp_csw_s_r (R : s_regime)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (vold : mword 64)
+      (m : regfile) (vold : bv 32)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
     let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
     let a8 := ea in
     let pa := a8 in
+    let storeval := trunc32 (m !!! Regidx rs2) in
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1614,8 +1757,73 @@ Section WpSmodePtMemLeaves.
     sr_inv R -∗
     pc_is pc -∗
     gpr_file m -∗
+    instr pc true (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
+    pa ↦₄ vold -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      sr_inv R -∗
+      pc_is (add_vec_int pc 2) -∗
+      gpr_file m -∗
+      pa ↦₄ storeval -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea a8 pa storeval HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit".
+    iApply (wp_csw_s_r_t R KT0 KT0 pc rs2 rs1 imm m vold mstatus0 mie_v mdv0 menvcfg0
+              (dq := dq)
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 with "Hwit").
+  Qed.
+
+
+
+
+  (* ==================================================================== *)
+  (* THE TIER-INDEXED FORM (sp-migration phase D, design §4).  [kt'] is the *)
+  (* DATUM's tier, [kt] the accessing hart's; [KtierLe kt' kt] is the whole *)
+  (* access condition and [sr_ktier_wit R kt] (persistent, [emp] at KT0) is *)
+  (* what the hart shows for it -- at KT0 the datum's own pin discharges    *)
+  (* admissibility ([sr_adm_id]); at KT1 the regime's all-claims witness    *)
+  (* does ([sr_absorb_wit]).  Both go through [SRegime.sr_absorb_ktier], so *)
+  (* the body below is the pre-phase-D proof with ONE call respelled.       *)
+  (* TIER-PRESERVING: the datum comes back at [kt'].  The [KT0/KT0]         *)
+  (* corollary after [Qed] is the pre-phase-D statement, character for      *)
+  (* character, so no consumer sees the generalization.                     *)
+  (* ==================================================================== *)
+  Lemma wp_sd_s_r_t (R : s_regime) (kt kt' : ktier) `{!KtierLe kt' kt}
+      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (vold : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    let a8 := ea in
+    let pa := a8 in
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    sr_ktier_wit R kt -∗
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    gpr_file m -∗
     instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
-    pa ↦₈ vold -∗
+    pa ↦₈[kt'] vold -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -1625,14 +1833,14 @@ Section WpSmodePtMemLeaves.
       sr_inv R -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      pa ↦₈ (m !!! Regidx rs2) -∗
+      pa ↦₈[kt'] (m !!! Regidx rs2) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
-    iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
+    iIntros "#Hwit #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
              [Hpc Hnpc] Hfmap Hinstr Hbytes Hcont".
-    iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
+    iDestruct (word_pointsto_aligned_p (KTR := kt') with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 8 = true) by exact Hpalign4.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
@@ -1652,11 +1860,11 @@ Section WpSmodePtMemLeaves.
     iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
     (* the word's OWN base claim + canonicality (peek byte 0 of its bytes) *)
-    iDestruct (word_pointsto_bytes with "Hbytes") as "Hb".
+    iDestruct (word_pointsto_bytes (KTR := kt') with "Hbytes") as "Hb".
     iDestruct (big_sepL_lookup_acc _ _ 0%nat 0%nat with "Hb") as "[Hb0 Hbclose]".
     { rewrite lookup_seq_lt; [reflexivity | lia]. }
     iEval (rewrite pa_add_0) in "Hb0".
-    iDestruct (mem_pointsto_acc with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
+    iDestruct (mem_pointsto_acc (KTR := kt') with "Hb0") as (ppn) "(#Hk & %Hcan & %Hkd0 & %Hid & Hp0 & Href0)".
     iDestruct ("Href0" with "Hp0") as "Hb0".
     iEval (rewrite -(pa_add_0 pa)) in "Hb0".
     iDestruct ("Hbclose" with "Hb0") as "Hb".
@@ -1701,14 +1909,14 @@ Section WpSmodePtMemLeaves.
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htlbinv") as %Htea.
     iDestruct (sr_tmode R s_pc LSXL_pc with "Hreg Htlbinv") as %(md0 & Htm_pc).
-    unshelve iMod (sr_absorb R (Store Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb_ktier R kt kt' (Store Data) a8 (pa_of ppn a8) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical a8 Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
             (exec_effectivePrivilege_store_S (register_lookup mstatus s_pc.(sregs)) s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
             (exec_is_shadow_stack_store s_pc)
-            Lpma_pc' (sr_adm_id R a8 ppn Hid) _ with "Hk Hreg Hmem Htlbinv")
+            Lpma_pc' Hid _ with "Hwit Hk Hreg Hmem Htlbinv")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htlbinv)"; [solve_ndisj |].
     destruct Hgr as (HA1 & Hord1 & HX1 & HW1 & HR1 & Hcov1).
     pose proof (pt_regs_preserved _ _ Hshtr) as Hprestr.
@@ -1720,7 +1928,7 @@ Section WpSmodePtMemLeaves.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (s_mem_chunk s_tr pa a8 0 8 8 (nth_byte vold) ppn (DfracOwn 1)
+    iDestruct (s_mem_chunk (KTR := kt') s_tr pa a8 0 8 8 (nth_byte vold) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
                  with "Hmem Hk Hb") as %(_ & Hram0 & Hram7 & Hkd).
     destruct (pma_all_ram Hpma_all (pa_of ppn a8) 8
@@ -1762,8 +1970,8 @@ Section WpSmodePtMemLeaves.
                (addr_is_ram_not_dev _ Hram0)) as H0.
       rewrite Lv2 in H0.
       exact H0. }
-    iDestruct (word_pointsto_intro pa (DfracOwn 1) vold Hpalign4 with "Hb") as "Hbytes".
-    iMod (word_pointsto_write_c s_tr.(mem) pa ppn vold (m !!! Regidx rs2) Hcan Hoff with "Hk Hmem Hbytes")
+    iDestruct (word_pointsto_intro (KTR := kt') pa (DfracOwn 1) vold Hpalign4 with "Hb") as "Hbytes".
+    iMod (word_pointsto_write_c (KTR := kt') s_tr.(mem) pa ppn vold (m !!! Regidx rs2) Hcan Hoff with "Hk Hmem Hbytes")
       as "[Hmem Hbytes]".
     iModIntro.
     iExists (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn a8) 8 (m !!! Regidx rs2)) s_tr.(mdev)).
@@ -1784,6 +1992,57 @@ Section WpSmodePtMemLeaves.
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs' Hpriv Hms Hmie Hmdl Hmenv Htlbinv
                           [$Hpc' $Hnpc] Hfmap Hbytes").
+  Qed.
+
+  (* THE KT0/KT0 COROLLARY: the pre-phase-D statement verbatim (the ambient
+     tier IS the KT0 default), with the [emp] witness discharged here. *)
+  Lemma wp_sd_s_r (R : s_regime)
+      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (vold : mword 64)
+      (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
+      {dq : dfrac} :
+    let ea := add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) in
+    let a8 := ea in
+    let pa := a8 in
+    eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
+    eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
+    _get_Mstatus_SXL mstatus0 = 'b"10" ->
+    and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    eq_vec (_get_Mstatus_MXR mstatus0) ('b"0") = true ->
+    pmm_mode_backwards (_get_MEnvcfg_PMM menvcfg0) = PMM_Disabled ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    menvcfg0 = MENVCFG_S ->
+    hw_config -∗
+    minstret_inv -∗
+    hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ{ dq } Supervisor -∗
+    mstatus ↦ᵣ{ dq } mstatus0 -∗
+    mie ↦ᵣ{ dq } mie_v -∗
+    mideleg ↦ᵣ{ dq } mdv0 -∗
+    menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+    sr_inv R -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8)) -∗
+    pa ↦₈ vold -∗
+    ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
+      cur_privilege ↦ᵣ{ dq } Supervisor -∗
+      mstatus ↦ᵣ{ dq } mstatus0 -∗
+      mie ↦ᵣ{ dq } mie_v -∗
+      mideleg ↦ᵣ{ dq } mdv0 -∗
+      menvcfg ↦ᵣ{ dq } menvcfg0 -∗
+      sr_inv R -∗
+      pc_is (add_vec_int pc 4) -∗
+      gpr_file m -∗
+      pa ↦₈ (m !!! Regidx rs2) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
+    iPoseProof (sr_ktier_wit_KT0 R) as "#Hwit".
+    iApply (wp_sd_s_r_t R KT0 KT0 pc rs2 rs1 imm m vold mstatus0 mie_v mdv0 menvcfg0
+              (dq := dq)
+              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 with "Hwit").
   Qed.
 
 

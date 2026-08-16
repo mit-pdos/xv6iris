@@ -826,6 +826,16 @@ Two mitigations worth reaching for before budgeting the full sweep:
   proc) collapse the obligation outright, so the interrupts-off-only leaves — the
   ones threading per-hart registers, which would have been the hard cases — are
   free.  Look for the collapse lemma first and count what it covers.
+- **IF THE CONE ALREADY THREADS A PERSISTENT BUNDLE, PUT THE NEW AMBIENT
+  CREDENTIAL IN THE BUNDLE.** Threading `kernel_data` + `panic_env` down to
+  kexec's panic arm would have meant two more premises on each of that cone's
+  dozen block lemmas — ~40 edits — against one conjunct added to
+  `SpecKexec.fs_fabric`, which every one of them already carries as a single
+  hypothesis, plus one extra name in each `iDestruct "Hfab"` pattern. Nothing
+  is hidden by it as long as the new conjunct is NAMED in the bundle and the
+  obligation it feeds is still discharged explicitly at the arm. The test for
+  whether this is bundling or burying: does a reader of the arm still see
+  which resource paid for it?
 - **Widen an EXISTING premise slot instead of adding one.**  A new premise changes
   arity and therefore every call site; widening what an existing slot MEANS costs
   nothing wherever the slot is discharged by an opaque `ltac:(…)`.  Measured on
@@ -950,6 +960,35 @@ and it is cheap enough to run on every touched file:
   `iIntros`/`iApply` name in place, so strip the token from multi-line
   proofmode strings AND from `&`-separated destructuring patterns — a
   per-line, space-separated regex misses both and quietly leaves `(A & & B)`.
+
+- **RETIRING A RESOURCE THAT 200 FILES NAME HAS FOUR SHAPES, AND ONLY THE
+  FIRST IS A ONE-LINER.** Deleting `PanicStub.panic_wp_any` (207 files, 264
+  changed) took five build rounds, and every failure after the first was one
+  of the last three:
+  (a) **the premise has three spellings** — alone on a line, mid-line after
+  another premise, and at end-of-line with the continuation below. A
+  line-anchored regex sees one of them; miss the others and the next full
+  build reports them one file at a time.
+  (b) **the hypothesis name is not uniform** — `Hpanic` in almost every file,
+  but `Hpany` in `ProofMain`/`ProofMainSecondary` and `Hpanicany` in
+  `ProofBwrite`. Enumerate the names before writing the regex
+  (`grep -ho '#H<stem>[a-z0-9]*' *.v | sort | uniq -c` prints the roster).
+  (c) **dropping a conjunct from a BUNDLE renumbers every POSITIONAL
+  projection downstream of it.** Seven bundles carried this one, and
+  `UsertrapRes.ut_caps`' consumers project by position
+  (`iDestruct "Hcaps" as "(_ & _ & $ & _)"`), so five of those had to lose
+  exactly one `_`. **The error is `iAndDestruct: cannot destruct` and it
+  names the SURVIVING conjunct, not the missing one** — it reads like the
+  bundle is the wrong shape rather than one short.
+  (d) **a CONSTRUCTION site loses a tactic, not a name.**
+  `iFrame "… Hx"` merely shortens, but `iSplitR; [iExact "Ha" | iExact "Hx"]`
+  has to lose the whole `iSplit`: the bundle is one conjunct shorter, not one
+  name shorter.
+  **And do not normalise whitespace while doing any of it.** Collapsing runs
+  of spaces on every touched line reflowed alignment inside `iIntros` patterns
+  across 190 files and made the diff unreadable — back out with
+  `git checkout -- <dir>` (never `reset --hard` in a shared tree) and redo it
+  removing the token plus exactly one adjacent space.
 - **`tools/lemma_diff.py [--ref REF]`** — reports top-level declarations that
   VANISHED relative to a git ref, plus `Admitted`/`admit`/`Abort` and any new
   `Axiom`/`Parameter`/`Hypothesis`. **Until 2026-08-10 its regex was anchored
@@ -1225,11 +1264,13 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - A `stack_own` (or any) resource bound must be the function's own max depth as a CONSTANT, stated `∀ n, (K ≤ n) → … stack_own sp n` — never a value coupled to the function's arguments.
 - **A WRONG WP APPLICATION DOES NOT FAIL, IT HANGS — SO PROFILE BEFORE YOU CHANGE ANYTHING.** Applying a spec whose regfile/parameter you guessed wrong sets the unifier an unsatisfiable problem (`m =?= <[r := v]> m`) and `iSpecialize` never returns; an unbounded `coqc` then teaches you nothing for twenty minutes. The tools that work, together: a hard `timeout 260` on `coqc`, `coqc -time` for per-statement costs, and Rocq's **`Timeout n <tactic>`** combinator to bound ONE step — bisect an `iApply` into `iPoseProof` plus per-hypothesis `iSpecialize` and each run finishes in ~2 minutes naming the exact offender. Get the true baseline by timing the unmodified HEAD version of the same file: the checked-in `.v.timing` files go stale (ProofDirlink's said 130s; the real figure was 48s). Measured instance: three changes made before profiling, two of them real defects that were NOT the cause, and the third became the new bottleneck (100s in a `rewrite upd_ne`, 110s more at its `Qed`). See claude-notes/projects/panic.md, "HOW TO PROFILE ONE OF THESE".
 - **A CREDENTIAL THAT APPEARS IN A SPEC FILE IS NOT NECESSARILY IN SCOPE ON THE ARM YOU NEED IT ON.** Picking the cheap call sites for a splice by `grep`ping their specs for the credential is unsound when the spec bundles it behind a CONDITIONAL: `SpecFilewrite` contains both `kernel_data` and `printk_env`, but inside `filewrite_fs_env`, which is the FD_INODE branch — and filewrite's panic arm is the "neither pipe, nor device, nor inode" branch, where the bundle reduces to `emp`. The test is whether the credential is in scope AT THE ARM, which means reading the branch, not counting grep hits. Cost of getting it wrong: a full conversion written and then reverted.
+  The same trap with a different shape: **a bundle indexed by an OPTION is `emp` in one mode**, so a credential inside it is unavailable exactly where that mode is taken. `ProofBmap.bm_prk ak γu γd` is `kernel_data ∗ printk_env …` at `ak = Some a` and `emp` at `None` — the NOALLOC mode — so bmap could not source `kernel_data` from the bundle it already carried, and `SpecBmap`'s noalloc body had to gain the premise outright while its two siblings gained only the other half.
 - **THE REGFILE A CALLEE'S SPEC WANTS IS THE POST-`jal` ONE.** `wp_jal_s_sconf` hands back `sie_cap_gpr (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) n b p`, so the register file to pass is the one posed before the jump WITH `rd` written — not the posed one. Passing the latter is the hang above. A spec that INFERS its regfile from the capability hypothesis hides this (`PanicStub.panic_wp` did); one that takes it as a parameter exposes it at every call site. Carry any register fact across the write by re-proving it on the post-jal file with `pcw`, stated in the goal's `!!!` form — `rget f r` is a definition and `rewrite` will not match it against `f !!! Regidx (mword_of_int 10)` however convertible, and deriving it with `rewrite upd_ne` instead costs two orders of magnitude more.
 - **A STACK-BUDGET CONSTANT IS A `Notation … (only parsing)`, NEVER A `Definition`.** All ~102 of them (`K_*`, `*_stack`, `kv_frame_slots`, `boot_stack_depth`) expand at parse time, so `lia` sees the literal and NO proof has to know which callee dominates a derived budget. Adding one as a `Definition` re-introduces the churn this replaced: raising a constant then breaks every `unfold`/`rewrite /` list that names it, and moving a derived budget's dominating callee (e.g. `fileclose_stack` going `8 + K_iput` → `8 + K_end_op`) breaks them all again. Three traps when adding one: (1) **a `Notation` inside a `Section` does NOT survive its `End`** — declare it above the `Section`; (2) the `: nat` ascription is gone, so **the body needs an explicit `%nat`** or a bare numeral parses in the ambient scope (`Z_scope` in most of these files) and you get a `Z`; (3) `rewrite /X` is ssreflect's unfold and fails as "**The term S is not unfoldable**" once `X` is a numeral — the message names neither the constant nor the file's real problem.
 - **A NUMERAL IN A PROOF THAT SILENTLY ENCODES ANOTHER CONSTANT'S VALUE IS THE DOMINANT FAILURE MODE OF ANY BUDGET CHANGE — and it is ungreppable, because the constant's NAME never appears.** Raising the stack budgets to cover `panic()` took six build rounds, and after the first every failure was this: `(50 <= n)` was `K_userinit`, `(60 <= av)` was `K_iput`, `(74 <= K)` was `6 + fileclose_stack`, `(46 + av)` was `kv_frame_slots - 32`, `trap_res true = 78` was `kv_frame_slots`, and two `Lemma … = <literal>` pins (`cr_K_value`, `boot_stack_slots_main`) restated a budget outright. The `Notation` rule above does NOT fix this class. **When you write a numeral into a budget goal, write the constant instead if it is in scope; if pulling in the `Require` is the worse trade, say so in the comment and name what the number is derived from.** Only the build finds these, so expect to iterate rather than to predict.
 - **THE PROOFS ARE A BETTER ORACLE FOR BUDGETS THAN THE DISASSEMBLY.** Frames read off the prologue (`addi sp,sp,-N`) are reliable — they match the `K - n` the proofs name. Whole-function DEPTHS are not: `syscall()` dispatches indirectly through `syscalls[]`, so no static `jal` edge exists for any of the 22 `sys_*`, and a call-graph model silently under-reads `K_syscall`/`K_usertrap` by ~250 slots. Compute a ripple as an ABSOLUTE monotone fixpoint seeded at the current spec values, fed by both the constraints the proofs state outright (`(K_f <= K)%nat -> (K_g <= K - n)%nat`) and the static edges — never as a DELTA between two fixpoints of the model added onto the spec values, which does not compose wherever the model's baseline already disagreed.
 - **A spec whose function ACQUIRES a lock and then calls a callee that itself acquires must state `Z.of_nat n + 2 < 2^31`, not `+ 1`.** The callee runs at level `S n`, its own premise becomes `n + 2`, and the `+1` form is unobtainable at the call site — `cpu_cells`' own `⌜n < 2^31⌝` at level `S n` gives back only `+1`, and nothing else carries a nesting bound. The gap compiles and surfaces only at the callee application, far from the spec. Precedents: SpecPipeclose, SpecConsoleintr, SpecDevintr, SpecUartintr, SpecVirtioDiskIntr, SpecLogWrite.
+  **And `+3` when the callee is reached from INSIDE the function's own critical section.** A panic (or any nested-acquire) arm that fires while the function still holds the lock it took itself runs at `S n` with the held set `{[<that lock>]} ∪ lks`, so it wants `S n + 2`, i.e. the CALLER must state `n + 3`. `SpecIget` is the worked instance (iget panics holding `itable.lock`), and `SpecNamex`/`SpecNamei`'s `namex_root` had to follow because they hand their `n` to iget. Two things move together here and only one is arithmetic: the held set also grows, so the `locks_below` obligation is discharged by `LockRank.locks_below_union_singleton` over `rank(<that lock>) < rank(<the callee's own top lock>)` — which is why `LockRank.v` ranks `itable`(14) and `bcache`(2) below `pr`(16) and says so at the table. **Before adding an arm under a lock, check that edge exists; if it does not, the arm is not dischargeable at all and the ranking, not the proof, is what has to change.**
 - **Model undefined behaviour as "anything", never as "nothing".** A transition
   that is merely ABSENT from a model silently excuses the software that caused
   it: a WP over that model is then provable for code that in reality corrupts
@@ -1270,6 +1311,15 @@ but as an unhelpful failure in whatever consumer compiled first (a bare `lia`
 "Cannot find witness" inside `BootCarve.v`; `Unable to unify "2147558352" with
 "2147558212"` inside `ProcGeom.v`). The diagnosis is nowhere near the defect,
 which is what made them expensive.
+
+**The same rule covers a `.rodata` STRING address used in a proof, and there
+the transcription is even easier to get wrong because nothing checks it until
+a `vm_compute` fails.** Derive it: `site + (auipc_imm << 12) + addi_imm`, then
+read the bytes out of `kernel-rocq/KernelData.v` to confirm the string and its
+length (the `*_msg_bytes` lemma's `do N (destruct j …)` wants length + 1 for the
+NUL). A hand-kept table of panic-message addresses in `claude-notes` had one
+entry pointing into the MIDDLE of a different string, and the only symptom was
+`congruence failed` inside the bytes lemma.
 
 They are all generated now. **`iris/KernelConsts.v` is produced by
 `tools/gen_consts.py` (hooked into `make gen-code`)** from the same dump the

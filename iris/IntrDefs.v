@@ -2063,6 +2063,79 @@ Section IntrDefs.
     iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm".
   Qed.
 
+  (* =================================================================== *)
+  (* §6d THE TIER WITNESS, AND WHERE CODE ALREADY HAS IT                  *)
+  (*     (claude-notes/projects/sp-migration.md, design §5 -- phase D).   *)
+  (*                                                                      *)
+  (* What a KT1 memory access asks of the accessing hart is               *)
+  (* [SRegime.sr_ktier_wit strans_regime kt]: [emp] at KT0, and at KT1    *)
+  (* the regime's all-claims witness, which for [strans_regime] IS        *)
+  (* [kpt_on cpu_id].  There is deliberately NO separate [ktier_wit]      *)
+  (* definition here -- [sr_ktier_wit strans_regime] already unfolds to   *)
+  (* exactly that, and a second name would be a second thing to keep in   *)
+  (* step with the record.                                                *)
+  (*                                                                      *)
+  (* THE WITNESS IS NOT A CONJUNCT OF [sie_cap], and that is a measured   *)
+  (* decision, not an omission.  [sie_cap]'s three-way [∗] is             *)
+  (* destructured POSITIONALLY in ~20 files, and roughly half of those    *)
+  (* take it apart with explicit [iSplitL]/[iDestruct] patterns rather    *)
+  (* than [iFrame] (ProofUsertrap, ProofKernelvec, ProofSched, ProofSwtch,*)
+  (* WpSmodeIntr, WpSconfCsr, ...), so a fourth conjunct -- even one that *)
+  (* is [emp] at the KT0 default -- edits FUNCTION proofs far outside     *)
+  (* this file's cone.  It is also unnecessary, because the two bundles   *)
+  (* post-boot code already threads CARRY the receipt (§6b): the ENABLED  *)
+  (* ARM and [trap_csrs].  The three lemmas below read the witness off    *)
+  (* them with no new plumbing; the remaining case -- interrupts-OFF code *)
+  (* holding neither -- takes it as an explicit PERSISTENT premise, which *)
+  (* is the shape phase D's generic leaves have.                          *)
+  (* =================================================================== *)
+
+  (* MINTING: the flip's [kpt_on] IS the KT1 access right, for this hart, *)
+  (* for the rest of the era ([strans_flip], §6b).                        *)
+  Lemma strans_ktier_wit_intro (kt : ktier) :
+    kpt_on cpu_id -∗ sr_ktier_wit strans_regime kt.
+  Proof. iIntros "#Hkpt". destruct kt; [ done | iExact "Hkpt" ]. Qed.
+
+  (* THE ENABLED ARM IS ALREADY A KT1 WITNESS (§6b: interrupts on implies
+     the kernel table is installed).  So a hart holding an ENABLED
+     capability may drive a KT1 datum at no cost and with no premise --
+     this is the "exploited rather than duplicated" half of design §5. *)
+  Lemma sie_cap_ktier_wit (kt : ktier) (m : regfile) (avail : nat) (p : mword 64) :
+    sie_cap m avail true p -∗
+    sie_cap m avail true p ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "(Hstk & Htr & Harm)".
+    iDestruct "Harm" as "(Hbit & Hres & #Hkpt & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)".
+    iSplitL "Hstk Htr Hbit Hres Hsep Hsca Hstv Hspp Hclm Hcpu".
+    - iFrame "Hstk Htr Hbit Hres Hkpt Hsep Hsca Hstv Hspp Hclm Hcpu".
+    - iApply (strans_ktier_wit_intro with "Hkpt").
+  Qed.
+
+  (* ... and so is [trap_csrs], the bundle an interrupts-OFF handler body
+     threads: the receipt is one of its members for the same reason. *)
+  Lemma trap_csrs_ktier_wit (kt : ktier) :
+    trap_csrs -∗ trap_csrs ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "(Ha & Hb & Hc & Hd & Hres & #Hkpt)".
+    iSplitL "Ha Hb Hc Hd Hres".
+    - iFrame "Ha Hb Hc Hd Hres Hkpt".
+    - iApply (strans_ktier_wit_intro with "Hkpt").
+  Qed.
+
+  (* THE UPGRADE AT THE kvminithart FLIP.  The capability itself does not
+     move (it carries no tier index -- see the note above), so "upgrading"
+     it is exactly: keep it, and take the witness the flip just minted.
+     This is the lemma the KSTACK campaign wants at kvminithart's exit;
+     no function spec, [SpecKvminithart]'s included, changes for it. *)
+  Lemma sie_cap_ktier_up (kt : ktier) (m : regfile) (avail : nat) (b : bool)
+      (p : mword 64) :
+    sie_cap m avail b p -∗ kpt_on cpu_id -∗
+    sie_cap m avail b p ∗ sr_ktier_wit strans_regime kt.
+  Proof.
+    iIntros "Hcap #Hkpt". iFrame "Hcap".
+    iApply (strans_ktier_wit_intro with "Hkpt").
+  Qed.
+
   Definition rd_ok (rd : mword 5) : Prop :=
     rd <> csp_rs1 /\ Regidx rd <> Regidx Rtp.
 

@@ -183,7 +183,11 @@ Section SmodeCorePt.
   (* (each byte used once) into a [∀]-fact, then read off at 0 and [len-1]  *)
   (* for the region endpoints.                                             *)
   (* =================================================================== *)
-  Lemma s_mem_chunk (σ' : mstate) (pc b : mword 64)
+  (* TIER-GENERIC (sp-migration phase D): the collapse is about the CLAIM
+     each byte carries, never about its tier pin, so the [CurKtier] binder
+     makes one lemma serve a KT0 and a KT1 window with the statement
+     unchanged.  Ambient callers keep resolving it at the KT0 default. *)
+  Lemma s_mem_chunk `{KTR : !CurKtier} (σ' : mstate) (pc b : mword 64)
       (lo len N : nat) (g : nat -> bv 8) (ppn : mword 44) (dq : dfrac) :
     (lo + len <= N)%nat ->
     (0 < len)%nat ->
@@ -236,7 +240,11 @@ Section SmodeCorePt.
   (* pas -- in step with the heap update, refolding the window at the new   *)
   (* values.  Width-agnostic (over the index list + old/new byte fns).     *)
   (* =================================================================== *)
-  Lemma s_win_write (va : mword 64) (ppn : mword 44) (gold gnew : nat -> bv 8) :
+  (* TIER-PRESERVING and TIER-GENERIC (sp-migration phase D): the window
+     goes back in at the tier it came in at -- the re-mint below re-uses
+     the pin it destructured ([Hid]) rather than re-establishing one -- so
+     the [CurKtier] binder costs the statement nothing. *)
+  Lemma s_win_write `{KTR : !CurKtier} (va : mword 64) (ppn : mword 44) (gold gnew : nat -> bv 8) :
     (uint va < 274877906944)%Z ->
     forall (l : list nat),
     Forall (fun j => (bv_unsigned (subrange_vec_dec va 11 0) + Z.of_nat j < 4096)%Z) l ->
@@ -266,7 +274,7 @@ Section SmodeCorePt.
 
   (* 8-byte claim-keyed write: the VA replacement for the (now physical)
      [word_pointsto_write], writing at [pa_of ppn va]. *)
-  Lemma word_pointsto_write_c (mm : _) (va : mword 64)
+  Lemma word_pointsto_write_c `{KTR : !CurKtier} (mm : _) (va : mword 64)
       (ppn : mword 44) (vold vnew : bv 64) :
     (uint va < 274877906944)%Z ->
     (bv_unsigned (subrange_vec_dec va 11 0) + 8 <= 4096)%Z ->
@@ -287,7 +295,7 @@ Section SmodeCorePt.
   Qed.
 
   (* 4-byte claim-keyed write (the width-4 analogue). *)
-  Lemma word4_pointsto_write_c (mm : _) (va : mword 64)
+  Lemma word4_pointsto_write_c `{KTR : !CurKtier} (mm : _) (va : mword 64)
       (ppn : mword 44) (vold vnew : bv 32) :
     (uint va < 274877906944)%Z ->
     (bv_unsigned (subrange_vec_dec va 11 0) + 4 <= 4096)%Z ->
