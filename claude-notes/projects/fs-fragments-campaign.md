@@ -1144,6 +1144,22 @@ inspection: the walk's new `ProofSysUnlink.v` mentions `dir_links` exactly
 once, opaquely, in a block lemma's premise list — no unfolding, no lemma of
 this file used.
 
+### Gate
+
+Private lane tree `/home/ubuntu/v1` on the build box, re-pointed at the
+walk lane's `62b65002` and carrying these ten files md5-verified as a block
+against the working tree.  Baseline green there first; then the edit:
+**172 compiles, MAKE_EXIT=0, zero `Error` lines, 1157/1157 `.vo`, and
+`make -n` afterwards emits 0 compile lines** — a real build, so the
+staleness-0 reading means what it says.  `lemma_diff` over all ten: CLEAN
+(nothing dropped, nothing admitted, no new assumption).  Coverage 186/190
+(98%), unmoved.
+
+**And the walk lane's newest file compiles against it**: `ProofSysUnlink.v`
+at `178e6c61` (su_w2 + su_w4, ~2200 lines) was checked out into the gated
+lane and built green — it carries `dir_links` opaquely, in one block
+lemma's premise list, and uses no lemma of this file.
+
 ### The payoff lemma, and it is what V3 calls
 
 `DirLinks.dir_links_empty_nlink` is the clause read back as the fact it was
