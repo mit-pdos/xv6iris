@@ -151,7 +151,11 @@ Evidence:
    `swp_mem_write_ea`, 2.6 s) → `mem_write_value` →
    `mem_write_value_meta` (a plain-`M` spine) →
    `mem_write_value_priv_meta`, which is where the MemWrite event is.
-   **HERE.**
+   `mem_write_value_priv_meta` → `checked_mem_write` (**DONE**:
+   `swp_checked_mem_write` — the MemWrite event lands).  **HERE**: the
+   glue above it (`mem_write_value_meta`, a plain-`M` spine;
+   `vmem_write_addr`; `vmem_write`; `execute_STORE`), all of which is
+   walking with facts that already exist.
 
    **THE PEEL DEPTH IS NOT GUESSABLE FROM THE `.sail` SOURCE.**  Read it
    off the goal.  `dispatchInterrupt` and `fetch` inside
