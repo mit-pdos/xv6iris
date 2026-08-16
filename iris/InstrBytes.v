@@ -11,6 +11,8 @@ From iris.base_logic.lib Require Import ghost_map.
 From iris.program_logic Require Import language.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords.
+Require Import HartSwp HartLift HartSpan HartSpanChar HartRegNode
+        HartMCycle HartMRun HartMFrame.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
@@ -841,6 +843,54 @@ Section InstrBytes.
     iCombine "Hpriv1 Hpriv2" as "Hpriv".
     iCombine "Hms1 Hms2" as "Hms".
     iFrame "Hhw Hhs Hpriv". iExists ms0. iFrame "Hms %".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE BUNDLE <-> FRAME BRIDGE.  A leaf holds [mmode_config] /          *)
+  (* [pmpcfg_n ↦ᵣ] / [pc_is]; the [swp] layer wants two frames over        *)
+  (* [mm_rs].  Doing the conversion here is what keeps every leaf          *)
+  (* statement free of footprints.  Note the read-only frame is assembled  *)
+  (* from BOTH incoming bundles: mcountinhibit/minstretcfg arrive inside   *)
+  (* [pc_is]'s [minstret_res], not from [mmode_config].                    *)
+  (* ------------------------------------------------------------------ *)
+  Lemma mm_frames_intro (dq : dfrac) (pc : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) :
+    mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗ pc_is pc -∗
+    hw_config ∗
+    ∃ (ms : mword 64) (bmi : bool) (cy ti ip mst0 : mword 64)
+      (mc : mword 32) (micfg misa0 mseccfg0 senv0 : mword 64)
+      (pmar0 : list PMA_Region) (elp0 : type_of_register elp),
+      ⌜ eq_vec (_get_Mstatus_MIE mst0) ('b"1") = false ⌝ ∗
+      ⌜ eq_vec (_get_Mstatus_MPRV mst0) ('b"1") = false ⌝ ∗
+      hreg_frame (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0
+                    mseccfg0 pmar0 elp0 senv0) mm_Drw ∗
+      hreg_frame_ro (mm_Df dq)
+        (mm_rs pc pc ms bmi cy ti ip mst0 pmpcfg0 mc micfg misa0
+           mseccfg0 pmar0 elp0 senv0) mm_Dro.
+  Proof.
+    iIntros "Hmm Hpmpc Hpc".
+    iDestruct "Hmm" as "(#Hhw & Hhs & Hpriv & Hmst)".
+    iDestruct "Hmst" as (mst0) "(Hmstatus & %HmIE & %HMPRV & %HSXL & %HKF)".
+    iDestruct "Hpc" as "(HPC & HnPC & Hmr & Hcr)".
+    iDestruct "Hmr" as (ms bmi mc micfg) "(Hms & Hmi & #Hmc & #Hmicfg)".
+    iDestruct "Hcr" as (cy ti ip) "(Hcy & Hti & Hip)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & _)".
+    iFrame "Hhw".
+    iExists ms, bmi, cy, ti, ip, mst0, mc, micfg, misa0, mseccfg0,
+            (mword_of_int 0 : mword 64), pmar0, elp0.
+    iSplitR; [done|]. iSplitR; [done|].
+    iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
+    - rewrite mm_rw_split.
+      rewrite mm_rs_PC mm_rs_nPC mm_rs_ms mm_rs_mi mm_rs_cy mm_rs_ti
+        mm_rs_ip. iFrame.
+    - rewrite mm_ro_split.
+      rewrite mm_rs_priv mm_rs_mst mm_rs_hart mm_rs_pcfg mm_rs_mc
+        mm_rs_micfg mm_rs_misa mm_rs_sec mm_rs_pma mm_rs_htif mm_rs_elp
+        mm_rs_senv.
+      iFrame "Hpriv Hmstatus Hhs Hpmpc".
+      by iFrame "Hmc Hmicfg Hmisa Hmseccfg Hpma Hhtif Help Hsenv".
   Qed.
 
   (* wp_instr -- the [instr]-driven variant of wp_exec_step_decode_execute_inv.
