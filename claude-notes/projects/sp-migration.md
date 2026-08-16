@@ -1066,13 +1066,29 @@ the paid park FEEDABLE means flipping that cone to KT1.
     breaks at KT1). Widen the triple to carry the witness (persistent, so
     the callback side is free), retire the re-conjures.
   - K2b-2: the funnel + leaves go TIER-GENERIC in the capability
-    (`sie_cap_gpr (KTR := kt)` premise/give-back at the same kt), with
-    the CORRELATION PREMISE `⌜b = true → kt = KT1⌝` (the user's
-    "interrupts on ⟹ KT1" made spec-local); the fixpoint chain
-    (`ihs_*_of` + `ihs_of`/`ihs_pre`/`ihs`) is PINNED at KT1 (the binder
-    on all three at once, per its own comment). The resumed capability is
-    then KT1, consistent with the premise. Boot (kt=KT0) has b=false;
-    post-boot (kt=KT1) discharges trivially.
+    (`sie_cap_gpr (KTR := kt)` premise/give-back at the same kt); the
+    fixpoint chain (`ihs_*_of` + `ihs_of`/`ihs_pre`/`ihs`) is PINNED at
+    KT1 (the binder on all three at once, per its own comment). The
+    (KT0, true) corner is killed by a RESOURCE FACT, NOT A SPEC PREMISE
+    (user correction, 2026-08-16: a `⌜b = true → kt = KT1⌝` premise is
+    NOT enough — post-boot code runs at b = false constantly, and b is
+    DATA-DEPENDENT through the saved intena bit, so the premise would
+    morph into eb-shaped variants threading every dual-regime spec):
+    - THE ENABLED ARM PINS THE TIER: the SIE='1' arm gains
+      `⌜cur_ktier = KT1⌝` — "interrupts on ⟹ KT1" stated as a conjunct
+      of the thing whose existence means interrupts are on. (KT0, true)
+      becomes UNSATISFIABLE; the funnel's b = true arm EXTRACTS kt = KT1
+      from the arm, so the fixpoint's resumed KT1 capability is the
+      caller's own tier by equality.
+    - THE INTENA CHAIN CARRIES IT ACROSS DISABLED WINDOWS: the only
+      builders of an enabled arm are the re-enable paths (pop_off/
+      release's csrsi, sret, usertrapret, the boot→scheduler seam), and
+      their knowledge of eb comes from the interrupt-level ghost
+      (`intr_count`/`trap_csrs_pay`) minted when interrupts were last on
+      — under an arm that carried the fact. Its eb = true arm gains the
+      matching tier fact: minted at push_off, consumed at the re-enable.
+      Zero spec premises anywhere; b = false at KT1 is unconstrained
+      (the K2a fourth conjunct is the access right there).
   - K2b-3, THE SWEEP (measure first): flip the capability spelling to KT1
     in the post-boot Spec files + their proofs' fallout. Caller/callee
     agreement makes this atomic along call edges (no KT1→KT0
