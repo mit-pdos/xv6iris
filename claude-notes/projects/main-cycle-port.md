@@ -14,7 +14,7 @@ hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
 **The tree is RED from `MinstretInv.v` up — 971 files — and stays red until
-item 3 lands.** This is by design (design doc §6): `wp_exec_step`'s
+item 4 lands.** This is by design (design doc §6): `wp_exec_step`'s
 whole-instruction, one-σ witness is unsound under per-node interleaving and
 cannot be re-derived as stated. Iterate with single-file `coqc` or
 `make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a milestone.
@@ -22,7 +22,7 @@ cannot be re-derived as stated. Iterate with single-file `coqc` or
 Everything listed under "What exists" is proven with **no admits** and at
 **exactly the 5 rv64d platform axioms** (several files are fully closed).
 What is NOT yet done: any leaf with its **old statement byte-identical** —
-see item 2 and the honest scope note there.  `iris/HartMFetch.v` and
+see item 3 and the honest scope note there.  `iris/HartMFetch.v` and
 `iris/HartMLeaf.v` are additionally red on their own account: they still
 name apparatus the `swp` decomposition deleted (item 1).
 
@@ -93,6 +93,13 @@ segment):
   ifetch PMP check allows at Machine with entries unlocked; **fuel
   induction** over `foreach_ZM_up'` with the loop body captured by ltac
   `context` match (never transcribed).  4.9 s, zero axioms.
+- `iris/HartMFetch.v` — `swp_fetch`: the WHOLE fetch, 2.7 s, ~40 lines of
+  script, **taking the `fetch_bytes` fact as a premise**.  It is also the
+  worked example of the early-return walk; read its header for the recipe.
+  What the 4-aligned M-mode path touches is now visible in the statement:
+  seven PC reads and nothing else (Ext_Zca is never read — with bit 1
+  clear the `and_boolM` short-circuits before it — and Ext_Ziccif is a
+  constant true from the config).
 
 Evidence:
 
@@ -101,18 +108,30 @@ Evidence:
 
 ## Left, in order
 
-1. **`HartMFetch.v` and `HartMLeaf.v`, rebuilt on `swp`.**  Both are RED:
-   they still name the deleted segment apparatus.  The shape to build:
-   one `swp` fact per model function along `fetch`'s own bind spine —
-   `fetch` → `fetch_bytes` → `translateAddr` / `mem_read` →
-   `checked_mem_read` (which is where `pmpCheck` and the memory event
-   live, under an `untilMT` misalignment loop).  Each stretch between
-   calls is an `hval`; each call is a `swp_bind`.
-   **This is also the Qed-debt experiment.**  The 665 s / 671 s `Qed`s
-   were the kernel re-checking ONE monolithic goal-side walk chain; the
-   per-function decomposition should make each chain function-sized.  If
-   it does not, that is a finding that changes the plan for item 3.
-2. **The verbatim-statement question.**  `wp_word_main_b0` is per-word and
+1. **`swp_fetch_bytes`, the premise `swp_fetch` is stated against.**
+   `fetch_bytes` is `translateAddr` then `mem_read`; `mem_read` is a
+   PLAIN-`M` bind spine (`swp_bind` applies directly, no context needed)
+   down to `mem_read_priv` → `checked_mem_read`, which is a `cer` region
+   containing `check_pma_with_pmp_priority`, an `untilMT` misalignment
+   loop, `pmpCheck` (HartMPmp's fact) and the memory event.
+   **Which tool where** — this is the one judgement the walk needs:
+   `hfrun` for any maximal stretch whose reads are all pinned and which
+   contains NO memory event (`translateAddr` at Bare, `effectivePrivilege`,
+   `check_pma_with_pmp_priority`); `swp_bind` at plain-`M` spines;
+   `swp_use_cer{,2,3}` inside `cer` regions; the ∀-peel only where reads
+   leave `D` (`pmpCheck`, already done).
+   **This is also the Qed-debt experiment.**  The old 665 s / 671 s `Qed`s
+   covered exactly this stretch — the walk from the minstret chop down to
+   the fetch's `MemRead` — as ONE monolithic goal-side chain.  The fetch
+   layer above it already went from 912 lines / 665 s to 136 lines /
+   2.7 s; whether the rest follows is the real test.  If it does not, that
+   is a finding that changes the plan for item 3.
+2. **`HartMLeaf.v`, rebuilt on `swp`.**  Still RED: it names the deleted
+   segment apparatus.  It becomes the composition of the per-function
+   facts along `try_step`'s own spine, with the invariant-cell writes
+   (`minstret_increment`, the clock) taking `HartRegNode`'s single-node
+   rules.
+3. **The verbatim-statement question.**  `wp_word_main_b0` is per-word and
    raw-cell; the old tree's statement is the shape-generic, bundle-taking
    leaf.  (a) the bundles (`mmode_config`/`pc_is`/`gpr_file`/`instr`/
    `minstret_inv`) are defined at or above the red line, so they cannot be
@@ -122,7 +141,7 @@ Evidence:
    remaining fetch shapes (2-aligned base, RVC).
    **The design doc's Phase B/C gate — leaf specs preserved verbatim — is
    still open.  Do not report it as met before a statement diff is empty.**
-3. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
+4. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
    the plan, surveyed against the real statements:
    - Leaf SPECS are resource-shaped (cells in, cells out — no σ, no
      `exec`, no fupd), so "verbatim" is achievable; the σ-callback
@@ -137,14 +156,14 @@ Evidence:
    - Memory-class leaves route their data events through `HartEvents`;
      MMIO leaves keep σ-shaped device reasoning through the MMIO rules.
    - The clock/minstret absorption rebuilds on `HartRegNode`'s single-node
-     rules; `sr_absorb`/interrupt engines are item 6.
-4. **Phase C — the leaf sweep**, spec-identical; whole-function proofs
+     rules; `sr_absorb`/interrupt engines are item 7.
+5. **Phase C — the leaf sweep**, spec-identical; whole-function proofs
    must re-check unedited (a failure is a finding, not a patch).
-5. **Phase D — adequacy + capstones.**  `RiscvAdequacy`/`SystemAdequacy`
+6. **Phase D — adequacy + capstones.**  `RiscvAdequacy`/`SystemAdequacy`
    mention `LoopE` by name, so statements keep elaborating; proofs that
    invert `prim_step` need the new inversion lemmas.
    `tools/proof_coverage.py` parity; `Print Assumptions` unchanged.
-6. **The §4 audit items**, resolved and recorded: (a) invariants opened
+7. **The §4 audit items**, resolved and recorded: (a) invariants opened
    across a whole instruction to LINK two accesses — candidates: the
    page-walker's read-then-A/D-update (`CommonWalk`) and the
    interrupt-absorbing step engines (`sr_absorb`); (b) mid-cycle interrupt
