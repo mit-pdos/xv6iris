@@ -1054,7 +1054,15 @@ the paid park FEEDABLE means flipping that cone to KT1.
     flipped proof moves to the `_t` rule + an explicit witness — the
     same edit at thousands of sites.
   The phase-D valve was RIGHT for phase D (nothing consumed the
-  witness); at flip time the amortization reverses. RECOMMENDATION: (A).
+  witness); at flip time the amortization reverses. **RESOLVED: (A)**
+  (user decision, 2026-08-16). The conjunct is
+  `sr_ktier_wit strans_regime cur_ktier` reading the bundle's OWN
+  ambient instance — no explicit args anywhere: post-boot files pin
+  `Local Instance : CurKtier := KT1`, dual-regime files use a section
+  Context, explicit `(KTR := …)` only at seams. Its real content is the
+  SIE=0 KT1 windows (post-boot push_off), where today only `trap_csrs`
+  carries the receipt; the SIE='1' arm already implies it (phase A). The
+  ~20-file cost is positional-destructure pattern slots, one per site.
 - [ ] **K3 — the lifecycle** (restores the RED-era kexit shape, now
   payable): `proc_dormant` gains the stack in BOTH arms; allocproc hands
   it out (beside `fd_slots FDSPARE`, via `proc_dormant_unused`); kexit
