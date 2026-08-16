@@ -16,8 +16,8 @@
    universally quantified in the continuation -- with an invariant that says
    nothing about ticks, nothing more can be said, and a caller must accept any
    reading.  Interrupt/noff bookkeeping is acquire's: the count returns to [n]
-   and no [arm_pay] escapes.  Calls no per-process state, but acquire
-   pins tp = [cid_word]. *)
+   and no [arm_pay] escapes.  Calls no per-process state, and takes NO tp
+   premise -- see the note on that at the contract itself. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -43,8 +43,18 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (av : nat) (b : bool) (lks : gset string) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_uptime in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* the hart id is the ambient CpuId (acquire/release's cid convention) *)
-  m !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
+  (* NO tp PREMISE.  The hart id is the ambient [CpuId], and [tp]'s true
+     value at this hart is that id BY CONSTRUCTION -- every register-file
+     resource reads through [HartTp.rget], whose [tp] case is
+     [rget_tp : rget m Rtp = cid_word_of cpu_id], proved by [upd_eq] with no
+     hypothesis at all.  Stating it as [m !!! Regidx Rtp = cid_word] instead
+     made it a claim about the CALLER's map, which is (a) not what any leaf
+     reads and (b) unsatisfiable by a caller that does not control [m] at tp
+     -- syscall()'s dispatch reaches this niladic function with whatever the
+     table walk left in the register file, and could never supply it.  The
+     premise was dead in the proof as well ([ProofSysUptime.v] introduced it
+     and never used it), which is what let it survive.  [SpecYield.v] deleted
+     its own copy for the same reason. *)
   (* acquire's transient noff increment stays in int range *)
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (14 <= av)%nat ->
