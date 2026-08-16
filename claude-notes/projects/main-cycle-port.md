@@ -14,7 +14,7 @@ hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
 **The tree is RED from `MinstretInv.v` up — 971 files — and stays red until
-item 4 lands.** This is by design (design doc §6): `wp_exec_step`'s
+item 3 lands.** This is by design (design doc §6): `wp_exec_step`'s
 whole-instruction, one-σ witness is unsound under per-node interleaving and
 cannot be re-derived as stated. Iterate with single-file `coqc` or
 `make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a milestone.
@@ -22,7 +22,7 @@ cannot be re-derived as stated. Iterate with single-file `coqc` or
 Everything listed under "What exists" is proven with **no admits** and at
 **exactly the 5 rv64d platform axioms** (several files are fully closed).
 What is NOT yet done: any leaf with its **old statement byte-identical** —
-see item 3 and the honest scope note there.  `iris/HartMFetch.v` and
+see item 2 and the honest scope note there.  `iris/HartMFetch.v` and
 `iris/HartMLeaf.v` are additionally red on their own account: they still
 name apparatus the `swp` decomposition deleted (item 1).
 
@@ -93,13 +93,16 @@ segment):
   ifetch PMP check allows at Machine with entries unlocked; **fuel
   induction** over `foreach_ZM_up'` with the loop body captured by ltac
   `context` match (never transcribed).  4.9 s, zero axioms.
-- `iris/HartMFetch.v` — the fetch chain down to the memory-access layer,
-  4.2 s for the file: `hfrun_translateAddr_M` / `swp_translateAddr_M`,
-  `swp_mem_read_M`, `swp_fetch_bytes_M`, `swp_fetch`, and `swp_fetch_M`
-  composing them.  **The one obligation left is `checked_mem_read`.**
-  Read its header for the early-return recipe and for the which-tool
-  judgement.  What the 4-aligned M-mode path touches is now visible in the
-  statements: seven PC reads, mstatus, cur_privilege, and nothing else
+- `iris/HartMFetch.v` — **the fetch, complete**: `swp_fetch_ram` is
+  WP-level fetch from the boundary to `F_Base w` with no obligation but
+  the memory one (the leaf owns the text bytes).  Under it, one fact per
+  model function: `translateAddr`, `mem_read`, `fetch_bytes`,
+  `check_pma_with_pmp_priority`, `within_mmio_readable`,
+  `checked_mem_read`.  634 lines, 6.0 s, 5 platform axioms.
+  **Read its header for the early-return recipe, the which-tool
+  judgement, and the `untilMT` note.**  What the 4-aligned M-mode path
+  touches is visible in the statements: seven PC reads, mstatus,
+  cur_privilege, pma_regions, pmpcfg_n, htif_tohost_base, and nothing else
   (Ext_Zca is never read — with bit 1 clear the `and_boolM` short-circuits
   before it — and Ext_Ziccif is a constant true from the config).
 
@@ -110,36 +113,21 @@ Evidence:
 
 ## Left, in order
 
-1. **`swp_checked_mem_read`, the one premise the fetch chain is stated
-   against.**  A `cer` region: `check_pma_with_pmp_priority` (hfrun — it
-   reads `pma_regions`, and the PMA region premise is the old file's
-   `Hpallow`), `split_misaligned` and `read_kind_of_flags` (pure), then an
-   `untilMT` loop that runs ONCE for an aligned 4-byte fetch, whose body is
-   `pmpCheck` (HartMPmp's fact) → `within_mmio_readable` (hfrun, reads
-   `htif_tohost_base`) → `read_ram` (THE MEMORY EVENT, `swp_hart_ram_read`
-   with `hread_req_at` computed).
-   **The one unknown is unrolling `untilMT`**: it recurses on an
-   `Acc (Zwf 0) limit` built by `Zwf_guarded`, so a step is a conversion
-   rather than an iota — the `foreach_ZM_up'` fuel trick HartMPmp uses does
-   NOT apply.  Establish a reduction equation for it at an abstract
-   body/cond before walking anything.
-   **Which tool where** — the judgement the whole walk turns on: `hfrun`
-   for any maximal stretch whose reads are all pinned and which contains
-   NO memory event (it does not care about `cer` wrappers); `swp_bind_use`
-   at plain-`M` spines; `swp_use_cer{,2,3}` inside `cer` regions; the
-   ∀-peel only where reads leave `D`.
-   **This is also the Qed-debt experiment.**  The old 665 s / 671 s `Qed`s
-   covered exactly this stretch — the walk from the minstret chop down to
-   the fetch's `MemRead` — as ONE monolithic goal-side chain.  Everything
-   above `checked_mem_read` has now been rebuilt at 4.2 s for the whole
-   file; whether the last layer follows is the remaining test.  If it does
-   not, that is a finding that changes the plan for item 4.
-2. **`HartMLeaf.v`, rebuilt on `swp`.**  Still RED: it names the deleted
-   segment apparatus.  It becomes the composition of the per-function
-   facts along `try_step`'s own spine, with the invariant-cell writes
-   (`minstret_increment`, the clock) taking `HartRegNode`'s single-node
-   rules.
-3. **The verbatim-statement question.**  `wp_word_main_b0` is per-word and
+1. **`HartMLeaf.v`, rebuilt on `swp`.**  The last RED file: it names the
+   deleted segment apparatus.  It becomes the composition of the
+   per-function facts along `try_step`'s own spine —
+   `should_inc_minstret` (HartMCycle) → the `minstret_increment` write
+   (`HartRegNode`'s single-node rule, opening `MinstretInv`) →
+   `run_hart_active`'s `cer` region: `dispatchInterrupt` (HartMDispatch) →
+   `fetch` (HartMFetch's `swp_fetch_ram`, whose memory obligation the leaf
+   discharges from its text bytes via `HartLift2.text_read_bytes`) →
+   `ext_decode` (hfrun at the concrete word) → `execute` → the store event
+   → the tail, including `tick_clock` at the tick.
+   **THE QED DEBT IS SETTLED** and needs no further experiment: the
+   stretch that cost 665 s as one monolithic goal-side chain is 6.0 s
+   decomposed per model function, and the decomposition exposes four
+   reusable intermediate facts the monolith did not.
+2. **The verbatim-statement question.**  `wp_word_main_b0` is per-word and
    raw-cell; the old tree's statement is the shape-generic, bundle-taking
    leaf.  (a) the bundles (`mmode_config`/`pc_is`/`gpr_file`/`instr`/
    `minstret_inv`) are defined at or above the red line, so they cannot be
@@ -149,7 +137,7 @@ Evidence:
    remaining fetch shapes (2-aligned base, RVC).
    **The design doc's Phase B/C gate — leaf specs preserved verbatim — is
    still open.  Do not report it as met before a statement diff is empty.**
-4. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
+3. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
    the plan, surveyed against the real statements:
    - Leaf SPECS are resource-shaped (cells in, cells out — no σ, no
      `exec`, no fupd), so "verbatim" is achievable; the σ-callback
@@ -164,14 +152,14 @@ Evidence:
    - Memory-class leaves route their data events through `HartEvents`;
      MMIO leaves keep σ-shaped device reasoning through the MMIO rules.
    - The clock/minstret absorption rebuilds on `HartRegNode`'s single-node
-     rules; `sr_absorb`/interrupt engines are item 7.
-5. **Phase C — the leaf sweep**, spec-identical; whole-function proofs
+     rules; `sr_absorb`/interrupt engines are item 6.
+4. **Phase C — the leaf sweep**, spec-identical; whole-function proofs
    must re-check unedited (a failure is a finding, not a patch).
-6. **Phase D — adequacy + capstones.**  `RiscvAdequacy`/`SystemAdequacy`
+5. **Phase D — adequacy + capstones.**  `RiscvAdequacy`/`SystemAdequacy`
    mention `LoopE` by name, so statements keep elaborating; proofs that
    invert `prim_step` need the new inversion lemmas.
    `tools/proof_coverage.py` parity; `Print Assumptions` unchanged.
-7. **The §4 audit items**, resolved and recorded: (a) invariants opened
+6. **The §4 audit items**, resolved and recorded: (a) invariants opened
    across a whole instruction to LINK two accesses — candidates: the
    page-walker's read-then-A/D-update (`CommonWalk`) and the
    interrupt-absorbing step engines (`sr_absorb`); (b) mid-cycle interrupt
