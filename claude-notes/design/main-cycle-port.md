@@ -400,6 +400,40 @@ proof interface is:
    `swp_read_reg_pinned` (`r ∈ Drw ∪ Dro`) and `swp_write_reg_owned`
    (`r ∈ Drw`).
 
+7b. **NOT EVERY STRETCH SHOULD NAME ITS POST-STATE (`hvalE`/`swp_spanE`).**
+   `hval` pins both the returned value and the whole post-file, and for
+   most model functions that is exactly right.  `tick_clock` is the
+   counter-example, and it is the one that matters: what its three clock
+   cells end up holding depends on reads no caller can own (`mtimecmp`,
+   `menvcfg`, `stimecmp`, and — on the branch where mip changes — the
+   plic's `sig_seip` wire), and `riscv_step` takes the tick at the
+   MACHINE's choice, so a whole-cycle leaf must survive every path.
+   Naming the post-file is therefore not merely inconvenient, it is
+   impossible without premises the leaf cannot pay.
+
+   `hvalE D Drw rs m Q` says instead: from any file agreeing with `rs` on
+   `D`, every maximal chain LANDS, and the value/file it lands on satisfy
+   `Q` — with `Q` free to constrain only what matters, typically
+   `reg_agree_on (D ∖ touched) rs' rs`.  `swp_spanE` is the bridge; `hval`
+   and `swp_span` are the instance `Q x rs' := x = x0 ∧ rs' = rs0`, so
+   there is still ONE induction and callers do not choose a layer.
+
+   This is the raw-cell rehearsal of the invariant story: a cell held by
+   an invariant rather than a frame is exactly a cell whose value the
+   caller must not name.  `swp_tick_clock_any` is what a leaf uses; the
+   premise-taking `swp_tick_clock` stays as the convenience form.
+
+7c. **THE TICK AXIS IS ONE LEMMA, NOT A PER-LEAF CASE SPLIT
+   (`swp_tick_wrap`).**  A leaf proves `swp (try_step 0 false) (λ _, ∃ rs1,
+   ⌜P rs1⌝ ∗ frames ∗ Ψ)` for its own `P` and its own carried resources
+   `Ψ`, and gets back `swp (riscv_step tick) (λ _, ∃ rs2, ⌜∃ rs1, P rs1 ∧
+   reg_agree_on (D ∖ clock3) rs2 rs1⌝ ∗ frames ∗ Ψ)` — for BOTH ticks, with
+   no premise duplication and its characterization intact, weakened only
+   off the clock cells.  Composed with `swp_loop`
+   (`▷ (∀ tick, swp (riscv_step tick) (λ _, WP Loop)) ⊢ WP Loop`, which is
+   just `wp_hart_restart` after `swp_wp_loop`), that is the entire
+   boundary story: a leaf never mentions `tick`.
+
 8. **WHY `mval` STAYS `Empty_set` (asked and answered; re-open only with
    the evidence named below).**  Making the language's values the Sail
    values fails on TWO independent blockers:
@@ -442,6 +476,19 @@ proof interface is:
    scope, if the fupd-style event rules prove painful there.  Decide then,
    not before; the restart marker is the cheap, independently-landable
    half that keeps the door open.
+
+9. **A MEMORY OBLIGATION MUST HAND BACK WHAT IT UPDATED.**  The store
+   chain's obligation was originally
+   `∀ σ, mstate_interp σ ={⊤,∅}=∗ ▷ (|={∅,⊤}=> mstate_interp (… write_bytes
+   …))` — which strands the caller's updated points-to inside the
+   interpretation, so a leaf can prove the store happened but cannot tell
+   its continuation what the cell now holds.  Thread a caller-chosen
+   `R : iProp Σ` through every layer of the chain (`swp_checked_mem_write`
+   → `swp_mem_write_value` → `swp_vmem_write_addr` → `swp_vmem_write` →
+   `swp_execute_STORE` → the leaf), returning `mstate_interp … ∗ R`.  The
+   fetch's obligation needs no `R` because the text bytes are `↦ₓ□` and the
+   obligation is therefore re-provable every cycle — which is precisely
+   what makes a LOOP out of a leaf.
 
 5. **Proof-term discipline** per durable-notes: `vm_cast_no_check` for
    reflective equations; compute-once-into-a-`Definition` for VALUES

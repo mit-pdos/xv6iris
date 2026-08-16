@@ -311,7 +311,8 @@ Section store.
   Lemma swp_checked_mem_write (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (R : iProp Σ) :
     Drw ## Dro ->
     (pma_regions : register) ∈ Drw ∪ Dro ->
     (pmpcfg_n : register) ∈ Drw ∪ Dro ->
@@ -331,11 +332,11 @@ Section store.
              (MState σ.(sregs)
                 (write_bytes σ.(mem) pa 4
                    (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)))) -∗
+                σ.(mdev)) ∗ R)) -∗
     swp (checked_mem_write (Physaddr pa) 4 v (Store Data) PBMT_PMA Machine
            tt false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDpma HDcfg HDhtif Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hpa.
     iIntros "#Hcert Hrw Hro Hmem".
@@ -379,13 +380,15 @@ Section store.
               _ _ _ _ _ C HC with "[Hrw Hro Hmem] [-]").
     { iApply (swp_hart_ram_write 4 (mwrite_req pa v) _
                 (fun r => (⌜r = true⌝ ∗
-                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)
+                           hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗
+                           R)%I)
                 (hwrite_req_at_write_ram pa v)
                 (addr_is_ram_not_dev pa Hram) with "Hcert [Hrw Hro Hmem]").
       iIntros (σ) "Hσ". iMod ("Hmem" $! σ with "Hσ") as "Hclose".
-      iModIntro. iNext. iMod "Hclose" as "Hσ". iModIntro. iFrame "Hσ".
+      iModIntro. iNext. iMod "Hclose" as "[Hσ HR]". iModIntro.
+      iFrame "Hσ".
       rewrite hwrite_resume_write_ram. iApply swp_ret. by iFrame. }
-    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
     change (0 =? 1 - 1) with true. s_glue.
     rewrite mbind_ret. s_glue.
     rewrite mcer_ret.
@@ -398,7 +401,8 @@ Section store.
   Lemma swp_mem_write_value (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (R : iProp Σ) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -423,11 +427,11 @@ Section store.
              (MState σ.(sregs)
                 (write_bytes σ.(mem) pa 4
                    (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)))) -∗
+                σ.(mdev)) ∗ R)) -∗
     swp (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
            false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hpa.
@@ -451,19 +455,20 @@ Section store.
     unfold mem_write_value_priv_meta.
     iApply (swp_bind_use _ _
               (fun r => (⌜r = Values.Ok true⌝ ∗
-                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I) _
               with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_checked_mem_write Drw Dro Df rs pa v pmar0 pcfg Hdisj
+    { iApply (swp_checked_mem_write Drw Dro Df rs pa v pmar0 pcfg R Hdisj
                 HDpma HDcfg HDhtif Hpma Hpcfg Hhtif Hunlock Hpallow Hram Hpa
                 with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
     iApply swp_ret. by iFrame.
   Qed.
 
   Lemma swp_vmem_write_addr (Drw Dro : gset register)
       (Df : register -> dfrac) (rs : regstate)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (R : iProp Σ) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -494,10 +499,10 @@ Section store.
              (MState σ.(sregs)
                 (write_bytes σ.(mem) pa 4
                    (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)))) -∗
+                σ.(mdev)) ∗ R)) -∗
     swp (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit.
@@ -551,10 +556,10 @@ Section store.
     iApply (swp_use_cer2
               (mem_write_value (Physaddr pa) 4 v (Store Data) PBMT_PMA
                  false false false) _ _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_mem_write_value Drw Dro Df rs pa v pmar0 pcfg Hdisj HDmst
-                HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
+    { iApply (swp_mem_write_value Drw Dro Df rs pa v pmar0 pcfg R Hdisj
+                HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
                 Hunlock Hpallow Hram Hpa with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
     rewrite mbind_ret. s_glue.
     change (not sys_misaligned_order_decreasing && false) with false. s_glue.
     rewrite mbind_ret. s_glue.
@@ -570,7 +575,8 @@ Section store.
   Lemma swp_vmem_write (Drw Dro : gset register) (Df : register -> dfrac)
       (rs : regstate) (base : regidx) (offset : SailStdpp.Values.mword 64)
       (pa : SailStdpp.Values.mword 64) (v : SailStdpp.Values.mword 32)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (R : iProp Σ) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -601,10 +607,10 @@ Section store.
              (MState σ.(sregs)
                 (write_bytes σ.(mem) pa 4
                    (Interface.WriteReq.value (mwrite_req pa v)))
-                σ.(mdev)))) -∗
+                σ.(mdev)) ∗ R)) -∗
     swp (vmem_write base offset 4 v (Store Data) false false false)
       (fun r => ⌜r = Values.Ok true⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta.
@@ -621,11 +627,11 @@ Section store.
     iApply (swp_use_cer0
               (vmem_write_addr (Virtaddr pa) 4 v (Store Data) false false
                  false) _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg Hdisj HDmst
-                HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
+    { iApply (swp_vmem_write_addr Drw Dro Df rs pa v pmar0 pcfg R Hdisj
+                HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif Hmprv
                 Hunlock Hpallow Hram Hva Hpa Hsplit
                 with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro)".
+    iIntros (v0) "(-> & Hrw & Hro & HR)".
     iApply ("Hcont" $! (Values.Ok true)). by iFrame.
   Qed.
 
@@ -633,7 +639,8 @@ Section store.
       (rs : regstate) (imm : SailStdpp.Values.mword 12)
       (rs2 rs1 : regidx) (d : SailStdpp.Values.mword 64)
       (pa : SailStdpp.Values.mword 64)
-      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n) :
+      (pmar0 : list PMA_Region) (pcfg : type_of_register pmpcfg_n)
+      (R : iProp Σ) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
@@ -667,10 +674,10 @@ Section store.
                    (Interface.WriteReq.value
                       (mwrite_req pa
                          (TypeCasts.autocast (subrange_vec_dec d 31 0)))))
-                σ.(mdev)))) -∗
+                σ.(mdev)) ∗ R)) -∗
     swp (execute_STORE imm rs2 rs1 4)
       (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R).
   Proof.
     intros Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma Hpcfg Hhtif
       Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hrx Hgta.
@@ -685,13 +692,13 @@ Section store.
     change (4 * 8 - 1) with 31.
     iApply (swp_bind_use _ _
               (fun r => (⌜r = Values.Ok true⌝ ∗
-                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I) _
+                         hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro ∗ R)%I) _
               with "[Hrw Hro Hmem] [-]").
     { iApply (swp_vmem_write Drw Dro Df rs rs1 (sign_extend' 64 imm) pa _
-                pmar0 pcfg Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv Hpma
-                Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit Hgta
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v0) "(-> & Hrw & Hro)". s_glue.
+                pmar0 pcfg R Hdisj HDmst HDpriv HDpma HDcfg HDhtif Hpriv
+                Hpma Hpcfg Hhtif Hmprv Hunlock Hpallow Hram Hva Hpa Hsplit
+                Hgta with "Hcert Hrw Hro Hmem"). }
+    iIntros (v0) "(-> & Hrw & Hro & HR)". s_glue.
     iApply swp_ret. by iFrame.
   Qed.
 

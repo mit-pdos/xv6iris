@@ -241,6 +241,271 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(* 3b. THE TICK WITHOUT PREMISES, as an [hvalE].                            *)
+(*                                                                          *)
+(* [hfrun_tick_clock] above buys a NAMED post-file at the price of four     *)
+(* premises about the machine -- one of which ([Hsame]) is not a fact about *)
+(* this instruction at all but a demand that the CLINT dispatch not         *)
+(* re-read [mip], because that path reaches [sig_seip], the plic's wire at  *)
+(* [DfracOwn 1] inside [WireInv.wire_inv], which no caller can frame.       *)
+(*                                                                          *)
+(* A whole-cycle leaf cannot pay that: [riscv_step] takes the tick at the   *)
+(* MACHINE's choice, so the leaf must survive every path.  It does not need *)
+(* the post-file, though -- only that the tick touches nothing outside the  *)
+(* three clock cells.  So walk all eighteen paths with every unowned read   *)
+(* ∀-peeled (exactly as [dispatchInterrupt]'s five are) and export the      *)
+(* WEAK conclusion: lands at [Ret tt], file unchanged off [tk_clock3].      *)
+(* That is [hvalE], and it holds unconditionally.                           *)
+(* ====================================================================== *)
+
+Local Lemma tk_cE_Sstc_eq : currentlyEnabled Ext_Sstc = returnM true.
+Proof. reflexivity. Qed.
+
+Local Lemma tk_cE_S_eq :
+  currentlyEnabled Ext_S
+  = Defs.bind (Defs.read_reg misa)
+      (fun w : SailStdpp.Values.mword 64 =>
+         if eq_vec (_get_Misa_S w) (MachineWord.MachineWord.N_to_word 1 1%N)
+         then returnM true else returnM false).
+Proof. reflexivity. Qed.
+
+Local Lemma tk_csrcb_mip (v : SailStdpp.Values.mword 64) :
+  csr_name_write_callback "mip" v = returnM tt.
+Proof. reflexivity. Qed.
+
+Local Lemma tk_hregwrite_val_at_red (r : register) (ak : option unit)
+    (v : type_of_register r) (K : unit -> M unit) :
+  hregwrite_val_at r (Interface.Next (Interface.RegWrite r ak v) K) = Some v.
+Proof.
+  simpl. destruct (decide _) as [Heq|Hne]; [|congruence].
+  assert (Heq = eq_refl) as -> by apply proof_irrel.
+  reflexivity.
+Qed.
+
+Definition tk_clock3 : gset register :=
+  {[ (R_bitvector_64 mcycle : register); (R_bitvector_64 mtime : register);
+     (R_bitvector_64 mip : register) ]}.
+
+Local Lemma tk_nin3 (r a b c : register) :
+  r ∉ ({[a; b; c]} : gset register) -> r <> a /\ r <> b /\ r <> c.
+Proof. intros H. split_and!; intros ->; apply H; set_solver. Qed.
+
+(* the spine reducer, tick edition: the monad's combinators plus the tick's
+   own model functions, and nothing else *)
+Local Ltac tk_red_in H :=
+  cbn beta iota zeta delta
+    [Defs.bind Defs.bind0 Interface.iMon_bind Defs.liftR Defs.try_catch
+     Defs.catch_early_return Defs.returnm returnM returnR Defs.returnR
+     Defs.read_reg Defs.write_reg Defs.early_return Defs.throw
+     Defs.assert_exp Defs.assert_exp' Defs.and_boolM Defs.or_boolM
+     andb orb negb not
+     tick_clock should_inc_mcycle clint_dispatch read_mip
+     external_interrupts_pending csr_name_write_callback
+     csr_full_write_callback get_config_print_clint __id] in H.
+
+(* split on the leftmost if-scrutinee of the chain head *)
+Local Ltac tk_destruct_if Hchain :=
+  let HB := fresh "HB" in
+  match type of Hchain with
+  | hspan _ _ (?m, _) _ =>
+      match m with
+      | context [ if ?b then _ else _ ] => destruct b eqn:HB
+      end
+  end.
+
+(* peel ONE exposed read node, ∀-quantifying the value read: the walk never
+   needs it, so the register need not be owned OR pinned *)
+Local Ltac tk_peel_any reg H Hstop v rsN HagN :=
+  apply hspan_peel in H; [ | reflexivity | exact Hstop ];
+  let c := fresh "c" in
+  let Hstep := fresh "Hstep" in
+  destruct H as (c & Hstep & H);
+  let Hat := fresh "Hat" in
+  match type of Hstep with
+  | hspani _ _ (?m, _) _ =>
+      assert (Hat : hregread_at reg m = true)
+        by (cbn [hregread_at]; apply bool_decide_eq_true_2; reflexivity)
+  end;
+  destruct (hspani_read_any_inv _ _ reg _ _ _ Hat Hstep)
+    as (v & rsN & HagN & ->);
+  clear Hat Hstep;
+  rewrite hregread_resume_red in H.
+
+Local Ltac tk_step_any reg v Hag H Hstop :=
+  let rsN := fresh "rsc" in
+  let HagN := fresh "Hagc" in
+  tk_peel_any reg H Hstop v rsN HagN;
+  let Hag' := fresh "Hagt" in
+  match type of Hag with
+  | reg_agree_on ?D0 _ ?rsP =>
+      assert (Hag' : reg_agree_on D0 rsN rsP)
+        by (let r := fresh "r" in let Hr := fresh "Hr" in
+            intros r Hr; rewrite (HagN r Hr); exact (Hag r Hr))
+  end;
+  clear Hag HagN; rename Hag' into Hag.
+
+(* peel ONE exposed WRITE node of a [Drw] register; the running pin file
+   takes the same write *)
+Local Ltac tk_step_W Hmem Hag H Hstop :=
+  apply hspan_peel in H;
+    [ | cbn [hspan_stops]; apply bool_decide_eq_false_2;
+        exact (fun HX => HX Hmem)
+      | exact Hstop ];
+  let c := fresh "c" in
+  let Hstep := fresh "Hstep" in
+  destruct H as (c & Hstep & H);
+  lazymatch type of Hstep with
+  | hspani _ _ (Interface.Next (Interface.RegWrite ?rg ?ak ?vv) ?K, _) _ =>
+      let Hat := fresh "Hat" in
+      assert (Hat : hregwrite_val_at rg
+                      (Interface.Next (Interface.RegWrite rg ak vv) K)
+                    = Some vv)
+        by apply tk_hregwrite_val_at_red;
+      let Hin := fresh "Hin" in
+      let rsN := fresh "rsc" in
+      let HagN := fresh "Hagc" in
+      destruct (hspani_write_inv _ _ rg vv _ _ _ Hat Hstep)
+        as (Hin & rsN & HagN & ->);
+      clear Hat Hstep Hin;
+      rewrite hregwrite_resume_red in H;
+      let Hag' := fresh "Hagt" in
+      lazymatch type of Hag with
+      | reg_agree_on ?D0 _ ?rsP =>
+          assert (Hag' : reg_agree_on D0 (register_set rg vv rsN)
+                           (register_set rg vv rsP))
+            by (apply reg_agree_set;
+                let r := fresh "r" in let Hr := fresh "Hr" in
+                intros r Hr; rewrite (HagN r Hr); exact (Hag r Hr))
+      end;
+      clear Hag HagN; rename Hag' into Hag
+  end.
+
+(* the shared FINISH: the landing is a [Ret]; export it together with the
+   [D ∖ tk_clock3] agreement, peeling the running file's clock writes off *)
+Local Ltac tk_finish Hag Hchain Hstop :=
+  apply hspan_stop_refl in Hchain; [ | reflexivity ];
+  rewrite Hchain; cbn [fst snd];
+  eexists; eexists;
+  (split; [ | split; [ reflexivity | apply reg_agree_refl ] ]);
+  (split; [ reflexivity | ]);
+  let r := fresh "r" in let Hr := fresh "Hr" in
+  let HrD := fresh "HrD" in let Hr3 := fresh "Hr3" in
+  intros r Hr; apply elem_of_difference in Hr; destruct Hr as [HrD Hr3];
+  let Hne1 := fresh "Hne1" in let Hne2 := fresh "Hne2" in
+  let Hne3 := fresh "Hne3" in
+  destruct (tk_nin3 r _ _ _ Hr3) as (Hne1 & Hne2 & Hne3);
+  rewrite (Hag r HrD);
+  repeat first
+    [ rewrite (irrelevant_register_set r (R_bitvector_64 mcycle) _ _
+                 (register_beq_false _ _ Hne1))
+    | rewrite (irrelevant_register_set r (R_bitvector_64 mtime) _ _
+                 (register_beq_false _ _ Hne2))
+    | rewrite (irrelevant_register_set r (R_bitvector_64 mip) _ _
+                 (register_beq_false _ _ Hne3)) ];
+  reflexivity.
+
+Local Ltac tk_or_tac Hag Hchain Hstop :=
+  let o4 := fresh "vip" in tk_step_any (R_bitvector_64 mip) o4 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  tk_destruct_if Hchain;
+  tk_red_in Hchain;
+  [> (* mip changed: read_mip re-runs, through the plic's wires *)
+    let o5 := fresh "vip" in
+    tk_step_any (R_bitvector_64 mip) o5 Hag Hchain Hstop;
+    tk_red_in Hchain;
+    let me1 := fresh "vme" in tk_step_any sig_meip me1 Hag Hchain Hstop;
+    tk_red_in Hchain;
+    rewrite tk_cE_S_eq in Hchain;
+    tk_red_in Hchain;
+    let mi1 := fresh "vmisa" in tk_step_any misa mi1 Hag Hchain Hstop;
+    tk_red_in Hchain;
+    tk_destruct_if Hchain;
+    tk_red_in Hchain;
+    [> let se1 := fresh "vse" in tk_step_any sig_seip se1 Hag Hchain Hstop;
+      tk_red_in Hchain;
+      rewrite tk_csrcb_mip in Hchain;
+      tk_red_in Hchain;
+      tk_finish Hag Hchain Hstop
+    | rewrite tk_csrcb_mip in Hchain;
+      tk_red_in Hchain;
+      tk_finish Hag Hchain Hstop ]
+  | tk_finish Hag Hchain Hstop ].
+
+Local Ltac tk_tail_tac HWti HWip Hag Hchain Hstop :=
+  let t1 := fresh "vt" in
+  tk_step_any (R_bitvector_64 mtime) t1 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  tk_step_W HWti Hag Hchain Hstop;
+  tk_red_in Hchain;
+  let o1 := fresh "vip" in tk_step_any (R_bitvector_64 mip) o1 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  let o2 := fresh "vip" in tk_step_any (R_bitvector_64 mip) o2 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  let c1 := fresh "vtc" in
+  tk_step_any (R_bitvector_64 mtimecmp) c1 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  let t2 := fresh "vt" in tk_step_any (R_bitvector_64 mtime) t2 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  tk_step_W HWip Hag Hchain Hstop;
+  tk_red_in Hchain;
+  rewrite tk_cE_Sstc_eq in Hchain;
+  tk_red_in Hchain;
+  let e1 := fresh "vec" in
+  tk_step_any (R_bitvector_64 menvcfg) e1 Hag Hchain Hstop;
+  tk_red_in Hchain;
+  tk_destruct_if Hchain;
+  tk_red_in Hchain;
+  [> (* STCE: mip, stimecmp, mtime reads; a second mip write *)
+    let o3 := fresh "vip" in
+    tk_step_any (R_bitvector_64 mip) o3 Hag Hchain Hstop;
+    tk_red_in Hchain;
+    let s1 := fresh "vsc" in
+    tk_step_any (R_bitvector_64 stimecmp) s1 Hag Hchain Hstop;
+    tk_red_in Hchain;
+    let t3 := fresh "vt" in
+    tk_step_any (R_bitvector_64 mtime) t3 Hag Hchain Hstop;
+    tk_red_in Hchain;
+    tk_step_W HWip Hag Hchain Hstop;
+    tk_red_in Hchain;
+    tk_or_tac Hag Hchain Hstop
+  | tk_or_tac Hag Hchain Hstop ].
+
+Lemma tick_clock_hvalE (D Drw : gset register) (rs : regstate) :
+  (R_bitvector_64 mcycle : register) ∈ Drw ->
+  (R_bitvector_64 mtime : register) ∈ Drw ->
+  (R_bitvector_64 mip : register) ∈ Drw ->
+  hvalE D Drw rs (tick_clock tt)
+    (fun (u : unit) (rs' : regstate) =>
+       u = tt /\ reg_agree_on (D ∖ tk_clock3) rs' rs).
+Proof.
+  intros HWcy HWti HWip rs0 l Hag Hchain Hstop.
+  unfold tick_clock in Hchain.
+  tk_red_in Hchain.
+  let v := fresh "vpriv" in tk_step_any cur_privilege v Hag Hchain Hstop.
+  tk_red_in Hchain.
+  let v := fresh "vmc" in
+  tk_step_any (R_bitvector_32 mcountinhibit) v Hag Hchain Hstop.
+  tk_red_in Hchain.
+  tk_destruct_if Hchain;
+  tk_red_in Hchain.
+  - (* CY counting: mcyclecfg read, filter branch *)
+    let v := fresh "vccfg" in
+    tk_step_any (R_bitvector_64 mcyclecfg) v Hag Hchain Hstop.
+    tk_red_in Hchain.
+    tk_destruct_if Hchain;
+    tk_red_in Hchain.
+    + (* bump mcycle *)
+      let v := fresh "vcy" in
+      tk_step_any (R_bitvector_64 mcycle) v Hag Hchain Hstop.
+      tk_red_in Hchain.
+      tk_step_W HWcy Hag Hchain Hstop.
+      tk_red_in Hchain.
+      tk_tail_tac HWti HWip Hag Hchain Hstop.
+    + tk_tail_tac HWti HWip Hag Hchain Hstop.
+  - tk_tail_tac HWti HWip Hag Hchain Hstop.
+Qed.
+
+(* ====================================================================== *)
 (* 4. The [swp] facts.                                                     *)
 (* ====================================================================== *)
 
@@ -334,6 +599,72 @@ Section mcycle.
                      HWcy HDti HWti HDip HWip HDtc HDenv Hpriv Hstce Hsame
                      Hflag) with "Hcert Hrw Hro")].
     iIntros (u) "(_ & Hrw & Hro)". iFrame.
+  Qed.
+
+  (* THE TICK A WHOLE-CYCLE LEAF USES.  No premise about the machine at
+     all -- only that the three clock cells are owned.  In exchange the
+     post-file is not named: it is SOME file that agrees with [rs]
+     everywhere the caller pinned except the clock cells.  That is all a
+     leaf needs, because [riscv_step] takes the tick at the machine's
+     choice and the next cycle re-derives whatever it reads. *)
+  Lemma swp_tick_clock_any (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (tick_clock tt)
+      (fun _ => ∃ rs' : regstate,
+                  ⌜reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs' rs⌝ ∗
+                  hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj HWcy HWti HWip. iIntros "#Hcert Hrw Hro".
+    iApply (swp_mono with "[] [-]");
+      [|iApply (swp_spanE Drw Dro Df rs (tick_clock tt) _ Hdisj
+                  (tick_clock_hvalE (Drw ∪ Dro) Drw rs HWcy HWti HWip)
+                  with "Hcert Hrw Hro")].
+    iIntros (u). iDestruct 1 as (rs') "([_ %Hag] & Hrw & Hro)".
+    iExists rs'. by iFrame.
+  Qed.
+
+  (* THE TICK AXIS, ONCE AND GENERICALLY.  [riscv_step tick] is [try_step]
+     followed by the tick, so a leaf's obligation at the boundary is its
+     body's [swp] plus this wrapper -- no per-leaf case split on [tick], no
+     premise duplication, and the leaf's own characterization [P] survives
+     verbatim (weakened only off the clock cells, which is exactly what the
+     tick can touch).  [Ψ] carries whatever else the body produced (memory
+     resources, say) straight through. *)
+  Lemma swp_tick_wrap (Drw Dro : gset register) (Df : register -> dfrac)
+      (P : regstate -> Prop) (Ψ : iProp Σ) (tick : bool) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    gen_cert -∗
+    swp (try_step 0 false)
+      (fun _ => ∃ rs1 : regstate, ⌜P rs1⌝ ∗
+                  hreg_frame rs1 Drw ∗ hreg_frame_ro Df rs1 Dro ∗ Ψ) -∗
+    swp (riscv_step tick)
+      (fun _ => ∃ rs2 : regstate,
+                  ⌜∃ rs1 : regstate, P rs1 /\
+                     reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs2 rs1⌝ ∗
+                  hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ Ψ).
+  Proof.
+    intros Hdisj HWcy HWti HWip. iIntros "#Hcert Hbody".
+    rewrite /riscv_step.
+    iApply (swp_bind_use (try_step 0 false) _ _ _ with "Hbody [-]").
+    iIntros (b). iDestruct 1 as (rs1) "(%HP & Hrw & Hro & HΨ)".
+    destruct tick.
+    - iApply (swp_mono with "[HΨ] [-]");
+        [|iApply (swp_tick_clock_any Drw Dro Df rs1 Hdisj HWcy HWti HWip
+                    with "Hcert Hrw Hro")].
+      iIntros (u). iDestruct 1 as (rs2) "(%Hag & Hrw & Hro)".
+      iExists rs2. iFrame. iPureIntro. by exists rs1.
+    - iApply swp_ret. iExists rs1. iFrame. iPureIntro.
+      exists rs1. split; [exact HP|apply reg_agree_refl].
   Qed.
 
 End mcycle.

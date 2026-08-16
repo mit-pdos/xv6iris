@@ -14,17 +14,21 @@ hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
 access of one instruction can interleave with other harts.
 
 **The tree is RED from `MinstretInv.v` up — 971 files — and stays red until
-item 3 lands.** This is by design (design doc §6): `wp_exec_step`'s
+item 2 lands.** This is by design (design doc §6): `wp_exec_step`'s
 whole-instruction, one-σ witness is unsound under per-node interleaving and
 cannot be re-derived as stated. Iterate with single-file `coqc` or
 `make -f CoqMakefile <one>.vo` chains; a full `-j` build only at a milestone.
 
-Everything listed under "What exists" is proven with **no admits** and at
-**exactly the 5 rv64d platform axioms** (several files are fully closed).
-What is NOT yet done: any leaf with its **old statement byte-identical** —
-see item 2 and the honest scope note there.  `iris/HartMFetch.v` and
-`iris/HartMLeaf.v` are additionally red on their own account: they still
-name apparatus the `swp` decomposition deleted (item 1).
+**The whole-cycle leaf is back.**  `HartMLeaf.wp_word_main_b0` is
+`WP Loop ⊢ WP Loop` for one real kernel instruction (`c.sw a4,0(a5)` at
+`main+0xb0`), at BOTH ticks, with **no admits** and at **exactly the 5 rv64d
+platform axioms** — the same statement altitude the pre-port tree had, now
+discharged through the per-node language.  17 s for the file.
+
+Everything listed under "What exists" is proven with no admits and at the
+same 5 axioms (several files are fully closed).  What is NOT yet done: any
+leaf with its **old statement byte-identical** — see item 1 and the honest
+scope note there.
 
 Where a fresh agent should start reading: design doc §§2–5 — §5 items 6 and
 7 are the interface and the two ways into it, and §5 item 1 is the list of
@@ -54,7 +58,9 @@ The proof interface (design §5 items 1, 1c, 6, 7):
 - `iris/HartSwp.v` — **`swp`, in CONTEXT-GENERIC form**, and `mctx` with
   its four context formers (identity, bind, composition, and
   `mctx_cer_liftR` for the early-return region).  Laws: ret, bind, bind0,
-  mono, frame, fupd both sides, `swp_use`, `swp_wp`/`swp_wp_loop`.
+  mono, frame, fupd both sides, `swp_use`, `swp_wp`/`swp_wp_loop`, and
+  **`swp_loop`** — the boundary rule a leaf actually ends on:
+  `▷ (∀ tick, swp (riscv_step tick) (λ _, WP Loop)) ⊢ WP Loop`.
   Read design §5 item 6 before touching it — the obvious CPS form is not
   merely less convenient, it CANNOT be applied inside
   `catch_early_return`.
@@ -62,7 +68,11 @@ The proof interface (design §5 items 1, 1c, 6, 7):
   UNGATED, `Dro` read-only frame), the pure `hval` predicate, **the
   `swp_span` bridge** that consumes the landing quantifier once, and
   `hfrun` + its reduction equations.  The pure layer is polymorphic in the
-  sub-monad's result type.
+  sub-monad's result type.  **`hvalE`/`swp_spanE`** are the weakened form
+  for stretches whose result is not worth naming: the walk LANDS and what
+  it lands on satisfies a caller-chosen `Q`, typically
+  `reg_agree_on (D ∖ touched) rs' rs`.  `hval`/`swp_span` are the
+  instance `Q x rs' := x = x0 ∧ rs' = rs0`, so both go through one bridge.
 - `iris/HartSpanChar.v` — the six peel inversions, **`hfrun_hval`** (the
   computed route, no side conditions), `swp_hfrun`, and the two rules that
   fire constantly: `swp_read_reg_pinned`, `swp_write_reg_owned`.
@@ -88,7 +98,18 @@ segment):
   its five unownable reads ∀-peeled once.  2.4 s, zero axioms.
 - `iris/HartMCycle.v` — `hfrun_should_inc_minstret` /
   `swp_should_inc_minstret`: everything it reads is pinnable, so the
-  whole proof is the walker plus a case split on two config bits.  2.7 s.
+  whole proof is the walker plus a case split on two config bits.  Also
+  `tick_pc`, and the TICK in two forms: `swp_tick_clock` (named post-file,
+  four premises about the machine) and **`swp_tick_clock_any`** (no premise
+  at all beyond owning the three clock cells; the post-file is SOME file
+  agreeing with the old one off `tk_clock3`).  A whole-cycle leaf needs the
+  second, because `riscv_step` takes the tick at the MACHINE's choice and so
+  the leaf must survive all eighteen paths — including the one that reaches
+  the plic's unownable `sig_seip` wire, which the ∀-peel handles and the
+  named form cannot.  **`swp_tick_wrap`** then puts the whole tick axis in
+  one generic lemma: a leaf proves its body's `swp (try_step 0 false) …`
+  and gets `swp (riscv_step tick) …` with its own characterization intact,
+  weakened only off the clock cells.  5 s.
 - `iris/HartMPmp.v` — `mpmp_hval_ifetch4` / `swp_pmpCheck_ifetch4`: the
   ifetch PMP check allows at Machine with entries unlocked; **fuel
   induction** over `foreach_ZM_up'` with the loop body captured by ltac
@@ -120,6 +141,25 @@ segment):
   what makes the decode an ordinary `hfrun` walk instead of the special
   bridge design §5 item 7 used to call for.
 
+- `iris/HartMLeaf.v` — **the leaf**.  `swp_run_hart_active_hp` (the whole
+  instruction), `swp_try_step_hp` (the whole cycle body, with the named
+  post-state `hp_post` and minstret's VALUE quantified), and
+  **`wp_word_main_b0`**: `WP Loop ⊢ WP Loop`, both ticks.  Under them the
+  anchor tower `ml_rs` and its 23 lookup lemmas, the footprint split
+  (`ml_Drw`/`ml_Dro`/`ml_Df` + `ml_rw_split`/`ml_ro_split`, the frame ↔
+  points-to bridge), the three leaf-local `hfrun` equations (landing pad,
+  `rX_bits`, `get_transformed_data_addr`), the concrete address facts, and
+  the two memory obligations discharged from persistent text bytes
+  (`ml_fetch_obl`) and owned data bytes (`ml_store_obl`).  1400 lines,
+  17 s, 5 platform axioms.
+
+  What the statement SAYS: the machine ends one instruction on — PC/nextPC
+  at `pc+2`, the flag cell holding 1, every pin returned at the value it
+  came in with — and the four cells the wrapper and the tick own (minstret
+  and the three clock cells) hold SOME value.  That value-agnosticism is
+  the raw-cell shadow of `MinstretInv`/`clock_inv`, which is where those
+  cells go in B′.
+
 Evidence:
 
 - `iris/HartPilot.v` — the Phase B pilot at parity: one instruction at a
@@ -127,37 +167,18 @@ Evidence:
 
 ## Left, in order
 
-1. **The boundary, and then the leaf's statement.**  `swp_try_step_hp` is
-   the whole cycle body -- prelude, dispatch, fetch, decode, execute,
-   store, tail -- as one `swp` fact.  What is left is wrapping it:
-
-     `wp_hart_restart` (∀ tick) → `swp_wp_loop` → `swp_bind_use` on
-     `riscv_step tick = bind (try_step 0 false) (λ _, if tick then
-     tick_clock tt else Ret tt)` → `swp_tick_clock` on the tick arm.
-
-   **The one thing that needs deciding first** is how the final register
-   file is named.  `swp_try_step_hp` currently returns
-   `∃ rs', hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro`, which is enough
-   to close a loop whose continuation needs nothing of the file, but NOT
-   enough to instantiate `swp_tick_clock` on the tick arm (its premises are
-   about a concrete file).  Two honest options: pin the minstret branch
-   with a premise (`minstret_inc_flag … = true`) so there is ONE final file
-   and write it out, or state the tick's premises at the final file the way
-   the store's GPR premises are already stated.  Either is mechanical; the
-   choice is about what the leaf's statement should look like, which is
-   worth a moment's thought rather than a default.
-2. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
+1. **The verbatim-statement question.**  `swp_try_step_hp` is per-word and
    raw-cell; the old tree's statement for this instruction is the
    shape-generic, bundle-taking leaf.  (a) the bundles (`mmode_config`/
    `pc_is`/`gpr_file`/`instr`/`minstret_inv`) are defined at or above the
-   red line, so they cannot be named until item 3; (b) ∀-operand shapes
+   red line, so they cannot be named until item 2; (b) ∀-operand shapes
    need a once-per-INSTRUCTION-SHAPE decode characterization over the
    ENCODING FUNCTION — the seam is that `instr` pins `decode w = i`, not
    `w = encode i`; (c) `swp_execute_C_SW` is already per-shape, which is
    the pattern (b) wants.
    **The design doc's Phase B/C gate — leaf specs preserved verbatim — is
    still open.  Do not report it as met before a statement diff is empty.**
-3. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
+2. **Phase B′ — reconnect the tree** (the 971 files).  Findings that set
    the plan, surveyed against the real statements:
    - Leaf SPECS are resource-shaped (cells in, cells out — no σ, no
      `exec`, no fupd), so "verbatim" is achievable; the σ-callback
@@ -173,21 +194,23 @@ Evidence:
      MMIO leaves keep σ-shaped device reasoning through the MMIO rules.
    - The clock/minstret absorption rebuilds on `HartRegNode`'s single-node
      rules; `sr_absorb`/interrupt engines are item 6.
-4. **Phase C — the leaf sweep**, spec-identical; whole-function proofs
+3. **Phase C — the leaf sweep**, spec-identical; whole-function proofs
    must re-check unedited (a failure is a finding, not a patch).
-5. **Phase D — adequacy + capstones.**  `RiscvAdequacy`/`SystemAdequacy`
+4. **Phase D — adequacy + capstones.**  `RiscvAdequacy`/`SystemAdequacy`
    mention `LoopE` by name, so statements keep elaborating; proofs that
    invert `prim_step` need the new inversion lemmas.
    `tools/proof_coverage.py` parity; `Print Assumptions` unchanged.
-6. **The §4 audit items**, resolved and recorded: (a) invariants opened
+5. **The §4 audit items**, resolved and recorded: (a) invariants opened
    across a whole instruction to LINK two accesses — candidates: the
    page-walker's read-then-A/D-update (`CommonWalk`) and the
    interrupt-absorbing step engines (`sr_absorb`); (b) mid-cycle interrupt
    delivery — the model's check reads `sig_seip`/mip at its own node, and
-   `WpIntrCore`/`WpIntrInv` already ∀-quantify those off σ.  **Note that
-   (b) has already bitten once, benignly: `swp_tick_clock` needs a premise
-   that the CLINT does not change mip, precisely because the other branch
-   reads `sig_seip`.**
+   `WpIntrCore`/`WpIntrInv` already ∀-quantify those off σ.  **(b) has
+   already bitten twice, benignly: `swp_tick_clock` needs a premise that the
+   CLINT does not change mip, precisely because the other branch reads
+   `sig_seip` — and that premise is exactly what a whole-cycle leaf cannot
+   pay, which is why `swp_tick_clock_any` exists.  The ∀-peel is the general
+   answer; the named form is the convenience.**
 
 Optional, decide with evidence, never speculatively: **native Sail values as
 `mval`** (design §5 item 8).  The restart marker is the cheap,
@@ -218,6 +241,23 @@ it here.  What is left is the rest:
   lags execution by ~4 KB; to localize a stall, `kill -INT` the
   `rocqworker` (`timeout` reaps only its direct child, and `pgrep -x coqc`
   does not find it).
+- **A `Definition` for an intermediate register file is a conversion bomb.**
+  A premise stated at `Definition mlb_rs2 := register_set … mlb_rs1` is one
+  delta step from the caller's expected type; the conversion checker answers
+  that by unfolding `register_set` instead, and never comes back (>2 min,
+  killed).  Use `Local Notation` so the premise's type is SYNTACTICALLY what
+  the consumer spells.  The anchor file itself may stay a `Definition` — it
+  is what gets PASSED, not what gets matched under.
+- **Never `rewrite` between two register-file towers.**  In a goal
+  `register_lookup r towerA = register_lookup r towerB`, a conditional
+  `rewrite` whose keyed match fails on one side unfolds `register_set` and
+  compares two record-update towers (the 3^N bomb).  `etransitivity` +
+  `apply` only ever unifies against ONE side, so each cell is constant-time.
+  One tower is fine: `rewrite /the_definition` there reduces the lookup all
+  the way by iota, which is both cheap and complete.
+- `set_solver` in a clean top-level goal is 7 ms; the SAME goal inside a
+  leaf proof, with the towers in scope, is unbounded.  Precompute
+  memberships as standalone lemmas (`ml_in_*`, `ml_ind_*`) and pass them.
 - Background builds must `cd` into `iris/` themselves: `make -f CoqMakefile`
   from the repo root fails with "No rule to make target 'CoqMakefile'", and
   a shell whose cwd drifted between commands is the usual cause.

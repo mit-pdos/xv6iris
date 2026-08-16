@@ -132,6 +132,39 @@ Definition hval {X : Type} (D Drw : gset register) (rs : regstate)
     hspan_stops Drw l.1 = true ->
     l.1 = Interface.Ret x /\ reg_agree_on D l.2 rs'.
 
+(* ---------------------------------------------------------------------- *)
+(* THE WEAKENED FORM, for stretches whose result is not worth naming.       *)
+(*                                                                          *)
+(* [hval] pins BOTH the returned value and the whole post-file.  A stretch  *)
+(* like [tick_clock] cannot afford either: what the clock cells end up      *)
+(* holding depends on unowned reads (mtimecmp, menvcfg, stimecmp, the plic  *)
+(* wires), and the caller does not care.  [hvalE] says instead: the walk    *)
+(* LANDS, and whatever it lands on satisfies [Q] -- with [Q] free to talk   *)
+(* about only the part of the file that matters (typically                  *)
+(* [reg_agree_on (D ∖ touched) rs' rs]).                                    *)
+(*                                                                          *)
+(* [hval] is the instance [Q x rs' := x = x0 /\ rs' = rs0]; both go through *)
+(* the SAME bridge ([swp_spanE]), so nothing downstream has to choose.      *)
+(* ---------------------------------------------------------------------- *)
+Definition hvalE {X : Type} (D Drw : gset register) (rs : regstate)
+    (m : M X) (Q : X -> regstate -> Prop) : Prop :=
+  forall (rs0 : regstate) (l : M X * regstate),
+    reg_agree_on D rs0 rs ->
+    hspan D Drw (m, rs0) l ->
+    hspan_stops Drw l.1 = true ->
+    exists (x : X) (rs' : regstate),
+      Q x rs' /\ l.1 = Interface.Ret x /\ reg_agree_on D l.2 rs'.
+
+Lemma hval_hvalE {X : Type} (D Drw : gset register) (rs : regstate)
+    (m : M X) (x : X) (rs' : regstate) :
+  hval D Drw rs m x rs' ->
+  hvalE D Drw rs m (fun v rs'' => v = x /\ rs'' = rs').
+Proof.
+  intros Hval rs0 l Hag Hchain Hstop.
+  destruct (Hval rs0 l Hag Hchain Hstop) as [Hm Hag'].
+  exists x, rs'. split; [split; reflexivity|]. split; [exact Hm|exact Hag'].
+Qed.
+
 Lemma reg_agree_refl (D : gset register) (rs : regstate) :
   reg_agree_on D rs rs.
 Proof. intros r _. reflexivity. Qed.
@@ -635,22 +668,23 @@ Section span.
       (Df : register -> dfrac) :
     Drw ## Dro ->
     forall (m : M X), Acc mchild m ->
-    forall (rs rs' : regstate) (x : X),
-    hval (Drw ∪ Dro) Drw rs m x rs' ->
+    forall (rs : regstate) (Q : X -> regstate -> Prop),
+    hvalE (Drw ∪ Dro) Drw rs m Q ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    swp m (fun v => ⌜v = x⌝ ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+    swp m (fun v => ∃ rs', ⌜Q v rs'⌝ ∗
+                    hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
   Proof.
-    intros Hdisj m HAcc. induction HAcc as [m _ IH]. intros rs rs' x Hval.
+    intros Hdisj m HAcc. induction HAcc as [m _ IH]. intros rs Q Hval.
     iIntros "#Hcert Hrf Hro". rewrite /swp. iIntros (C) "%HC Hcont".
     destruct (hspan_stops Drw m) eqn:Hs.
-    - (* THE STRETCH IS ALREADY OVER.  [hval] at the empty chain forces the
+    - (* THE STRETCH IS ALREADY OVER.  [hvalE] at the empty chain forces the
          head to be [Ret x] and the file to agree with [rs'] already. *)
       destruct (Hval rs (m, rs) (reg_agree_refl_local _ _)
-                  (rtc_refl _ _) Hs) as [Hm Hag].
+                  (rtc_refl _ _) Hs) as (x & rs' & HQ & Hm & Hag).
       simpl in Hm, Hag. rewrite Hm.
-      iApply ("Hcont" $! x). iSplitR; [done|].
+      iApply ("Hcont" $! x). iExists rs'. iSplitR; [done|].
       iSplitL "Hrf".
       + iApply (hreg_frame_ext rs rs' Drw
                   (reg_agree_mono_local _ Drw _ _ (union_subseteq_l _ _) Hag)
@@ -669,7 +703,7 @@ Section span.
          is shifted ([hspani] constrains its start file only on [D]); with
          no first step, the one-step chain to [(m2, rs2)] is the witness
          and the files compose. *)
-      assert (Hval2 : hval (Drw ∪ Dro) Drw rs2 m2 x rs').
+      assert (Hval2 : hvalE (Drw ∪ Dro) Drw rs2 m2 Q).
       { intros rs0' l Hag0' Hchain Hstop.
         assert (Hstep1 : hspani (Drw ∪ Dro) Drw (m, rs) (m2, rs2)).
         { exists rsM. split;
@@ -677,8 +711,10 @@ Section span.
         apply rtc_inv in Hchain as [Heq|(cmid & Hfirst & Hrest)].
         - rewrite <- Heq. rewrite <- Heq in Hstop. simpl in Hstop |- *.
           destruct (Hval rs (m2, rs2) (reg_agree_refl_local _ _)
-                      (rtc_once _ _ Hstep1) Hstop) as [Hm2 Hag2].
-          simpl in Hm2, Hag2. split; [exact Hm2|].
+                      (rtc_once _ _ Hstep1) Hstop)
+            as (x & rs' & HQ & Hm2 & Hag2).
+          simpl in Hm2, Hag2. exists x, rs'.
+          split_and!; [exact HQ|exact Hm2|].
           intros r Hr. etrans; [exact (Hag0' r Hr)|exact (Hag2 r Hr)].
         - assert (Hchain' : hspan (Drw ∪ Dro) Drw (m, rs) l).
           { eapply rtc_l; [exact Hstep1|].
@@ -688,13 +724,28 @@ Section span.
           exact (Hval rs l (reg_agree_refl_local _ _) Hchain' Hstop). }
       iApply (swp_use m2 _ C HC with "[Hrf Hro] Hcont").
       iApply (IH m2 (hspan_node_mchild Drw (m, rsM) (m2, rs2) Hnode)
-                rs2 rs' x Hval2 with "Hcert Hrf Hro").
+                rs2 Q Hval2 with "Hcert Hrf Hro").
   Qed.
 
   (* THE BRIDGE.  [Drw] is the caller's exclusive footprint (the stretch may
      write it), [Dro] the dfrac-generic read-only frame (the config bundle);
      every OTHER register the stretch reads is answered by the machine and
      its value is irrelevant -- that is what [hval] proves once per class. *)
+  Lemma swp_spanE {X : Type} (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (m : M X)
+      (Q : X -> regstate -> Prop) :
+    Drw ## Dro ->
+    hvalE (Drw ∪ Dro) Drw rs m Q ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp m (fun v => ∃ rs', ⌜Q v rs'⌝ ∗
+                    hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
+  Proof.
+    intros Hdisj Hval.
+    exact (swp_span_acc_local Drw Dro Df Hdisj m (macc m) rs Q Hval).
+  Qed.
+
   Lemma swp_span {X : Type} (Drw Dro : gset register)
       (Df : register -> dfrac) (rs rs' : regstate) (m : M X) (x : X) :
     Drw ## Dro ->
@@ -704,8 +755,11 @@ Section span.
     hreg_frame_ro Df rs Dro -∗
     swp m (fun v => ⌜v = x⌝ ∗ hreg_frame rs' Drw ∗ hreg_frame_ro Df rs' Dro).
   Proof.
-    intros Hdisj Hval.
-    exact (swp_span_acc_local Drw Dro Df Hdisj m (macc m) rs rs' x Hval).
+    intros Hdisj Hval. iIntros "#Hcert Hrf Hro".
+    iApply (swp_mono with "[] [-]");
+      [|iApply (swp_spanE Drw Dro Df rs m _ Hdisj (hval_hvalE _ _ _ _ _ _ Hval)
+                  with "Hcert Hrf Hro")].
+    iIntros (v). iDestruct 1 as (rs'') "([-> ->] & Hrf & Hro)". by iFrame.
   Qed.
 
 End span.

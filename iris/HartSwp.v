@@ -288,6 +288,22 @@ Section swp.
     WP (HartE gen_id cpu_id m : expr riscv_lang).
   Proof. iIntros "Hswp". iApply (swp_wp with "Hswp"). by iIntros (v) "H". Qed.
 
+  (* THE BOUNDARY, as the leaves see it: [wp_hart_restart] composed with
+     [swp_wp_loop].  A leaf that proves [swp (riscv_step tick) (fun _ =>
+     WP Loop)] for BOTH ticks has proved [WP Loop -* WP Loop] -- so this is
+     the whole-cycle rule of the pre-port semantics, restated over the
+     per-node language.  The ∀-over-[tick] is the machine's choice, which
+     is why it is here and not inside a leaf. *)
+  Lemma swp_loop :
+    gen_cert -∗
+    ▷ (∀ tick : bool,
+         swp (riscv_step tick) (fun _ => WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros "#Hcert H". iApply (wp_hart_restart with "Hcert").
+    iNext. iIntros (tick). iApply swp_wp_loop. iApply "H".
+  Qed.
+
   (* ---- modalities: [swp] is closed under everything WP is ---- *)
 
   Lemma swp_fupd {X} (m : M X) (Φ : X -> iProp Σ) :
