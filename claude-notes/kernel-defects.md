@@ -232,3 +232,30 @@ SOURCE".
   `off, n < 2^31`, which the callers' `uint` arguments guarantee.
 - **`initlog`'s "too big logheader" panic** is compile-time dead and absent from
   the image entirely.
+
+## Benign-but-load-bearing (2026-08-16): the no-crash orphan, and why ireclaim is not just crash recovery
+
+Not a defect — a design consequence worth having on the record (user-derived,
+from iput's tail).  Between `releasesleep(&ip->lock)` (fs.c:357) and the
+re-`acquire`/`ref--` (:359-362), the freeing thread F holds a counted
+reference to an entry whose inode it has already freed on disk.  `iget`
+adopts any entry with `ref > 0` at the same `(dev, inum)` (:258), so a
+concurrent `ialloc`+`iget` for the recycled inum bumps ref 1→2 and the slot
+now serves TWO incarnations at once — safe (all ref moves under
+`itable.lock`; `valid = 0` forces the newcomer's `ilock` to reload its own
+claim), but the incarnation boundary exists only in the trace, never in
+machine state.  This is the model's BORN-BEFORE-THE-ENTRY wall and
+§17.6.1's mid-free referrer, read directly off the C.
+
+The corner: F is preemptible in that gap (no spinlock held).  If the new
+incarnation lives a WHOLE LIFE meanwhile (create → unlink → last close),
+its final `iput` sees `ref == 2` — F's ghost — and SKIPS the free (:343);
+F then decrements to 0.  Result: `type != 0, nlink == 0`, zero refs, zero
+dirents — a fully-formed on-disk orphan with NO crash anywhere.  Bounded
+in THIS kernel because `ireclaim`'s scan (:381) matches exactly that shape
+at next boot; stock xv6 (no ireclaim) leaks it until fsck.  Consequences:
+(1) ireclaim is load-bearing for steady-state semantics, not only crash
+recovery — do not model it as crash-only; (2) any future strong invariant
+of the form "nlink == 0 ∧ ref == 0 ⇒ type == 0 on disk" is FALSE of the
+running kernel between F's ref-- and the next boot; state orphan-set
+membership instead.
