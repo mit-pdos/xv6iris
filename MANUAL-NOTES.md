@@ -74,6 +74,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - xv6 bug: scheduler did not reset intena, could miss process wakeup between loop and wfi
 - weak memory: expose internal steps of architecture model, expr gets Cycle which executes Sail monad, so every memory op is explicit and separate in trace
 - resources tracking possible sleeplock holders, to reason about iput's acquiresleep while holding itable.lock
+- Sail model concrete evaluator [hfrun] that takes partial knowledge of HART registers
+- kernel proc exit requires owning entire stack, so callers must pass THEIR stack frame ownership down into functions that never return (usertrap -> syscall -> sys_exit -> kexit)
 
 Big things that still need to be done/explored:
 
