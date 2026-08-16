@@ -22,6 +22,6 @@
    So this cone's assumption count stays at the five platform axioms plus
    funext. *)
 Require Import LinkDirlookup LinkReadi LinkIput LinkStrncpy LinkWritei
-        ProofDirlink.
+        LinkPanic ProofDirlink.
 
-Module Dirlink := DirlinkProof Dirlookup Readi Iput Strncpy Writei.
+Module Dirlink := DirlinkProof Dirlookup Readi Iput Strncpy Writei Panic.

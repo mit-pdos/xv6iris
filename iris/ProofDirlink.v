@@ -114,12 +114,66 @@ Require Import SpecDirlink.
 Require Import ProofDirlookupParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
+Require Import KernelDataInv.
+Require Import SpecPanic.
+Require Import SpecPrintk.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
 
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  dirlink's one live arm is [panic("dirlink read")] *)
+(*  at +0x68; the literal sits at 0x800074e8 in .rodata.  Hoisted as      *)
+(*  NAMED pure lemmas rather than inline [ltac:] -- see optimization.md.  *)
+(* ===================================================================== *)
+Definition dl_msg_a : Z := 0x800074e8.
+Definition dl_msg : string := "dirlink read".
+
+Lemma dl_panic_K (K : nat) : (K_dirlink <= K)%nat -> (panic_stack <= K - 10)%nat.
+Proof. lia. Qed.
+
+Lemma dl_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+(* "log" (rank 7) is below "pr" (16).  As a CLOSED lemma over the plain gset,
+   not an inline [ltac:(lkbelow)]: [lkbelow] backtracks across four rules and
+   each arm ends in [vm_compute; lia], which is the documented search-forever
+   case once a bitvector is in the context -- and worse still if the lock set
+   is an unresolved evar. *)
+Lemma dl_panic_below (lks : gset string) :
+  locks_below lks "log" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
+
+Lemma dl_msg_nz : eq_vec (mword_of_int dl_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma dl_msg_nonul : PrintkFmt.nonul dl_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma dl_msg_bytes :
+  forall j b, cstring_bytes dl_msg !! j = Some b ->
+    KernelData.kernel_data !! (dl_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 13 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section DirlinkMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma dl_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int dl_msg_a : mword 64) ↦ₛ□ dl_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string dl_msg_a dl_msg _ eq_refl
+              ltac:(unfold text_end, dl_msg_a; lia) dl_msg_bytes with "Hd").
+  Qed.
+End DirlinkMsg.
+
 Module DirlinkProof (DL : DIRLOOKUP) (RD : READI) (IP : IPUT)
-                    (SNC : STRNCPY) (WI : WRITEI) : DIRLINK.
+                    (SNC : STRNCPY) (WI : WRITEI) (PN : PANIC) : DIRLINK.
 
 Notation DK := KernelSyms.dirlink (only parsing).
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -3019,8 +3073,32 @@ Section ProofDirlinkMain.
                                (sign_extend' 64 (mword_of_int 2084380 : mword 21))
                              = mword_of_int KernelSyms.panic) by pcw.
             iEval (rewrite Htgtpn) in "Hpc".
-            iPoseProof (panic_wp_any_at CIDpa4 with "Hpanic") as "Hpan".
-            iApply ("Hpan" with "Htext Hpc Hcg"). }
+            (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+               a0 now holds &"dirlink read"; [kernel_data] mints the string,
+               [printk_env] supplies panic's console bundle, and [cpu_own]
+               has to arrive AT THE PANIC HART (CIDpa4), not at the one the
+               arm was entered on. *)
+
+            iPoseProof (dl_msg_str with "Hkd") as "#Hstr".
+            iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
+            iDestruct (cpu_own_transport CIDrd CIDpa4 0%nat eb (proc_addr j) b
+                         ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+            (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE.  [wp_jal_s_sconf]
+               hands back [sie_cap_gpr (<[rd := pc+4]> m) ...], so passing [PB2]
+               here makes the unifier try [PB2 =?= <[Rra := _]> PB2] and grind
+               forever inside [iSpecialize].  a0 survives the [ra] write. *)
+            pose (PB3 := <[Regidx Rra := regval_into_reg
+                            (add_vec_int (mword_of_int (DK + 0x68) : mword 64) 4)]> PB2).
+            assert (Ha0msg3 : PB3 !!! Regidx Ra0 = (mword_of_int dl_msg_a : mword 64))
+              by pcw.
+            iApply (PN.wp_panic_sconf (CID := CIDpa4) PB3 (K - 10)%nat
+                      0%nat eb b (proc_addr j) (PkAStr DfracDiscarded dl_msg) lks
+                      (dl_panic_K K HK) eq_refl dl_panic_noff
+                      (dl_panic_below lks Hbelow)
+                      with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+            { rewrite /pk_desc_res Ha0msg3.
+              iSplit; [iPureIntro; exact dl_msg_nonul|].
+              iSplit; [iPureIntro; exact dl_msg_nz|]. iExact "Hstr". } }
           (* -------------- THE FULL READ: exactly as before ----------- *)
           assert (Hclamp : rd_clamp (di_size dn) (16 * i) 16 = 16%nat)
             by exact (dlk_rd_clamp_full' (di_size dn) i Hfull).
