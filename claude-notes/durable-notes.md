@@ -596,6 +596,22 @@ Annotate for one or two steps; split for anything longer.
 (+0xb2 to the exit, applied at `(CID := CIDp)`) is the worked instance, and
 splitting is what made a fifteen-instruction stretch annotation-free.
 
+**A FUNCTION BUILT OUT OF SHARED TAILS NEEDS *N* SECTIONS, ORDERED BY WHO
+APPLIES WHOM ACROSS A CROSSING — and the stack is easy to under-count.** A
+dispatcher factors naturally into layers that each end in the next one
+(`ProofSyscall.v`: epilogue ← return tail ← per-syscall arm ← capstone), and
+every layer applies the one below it *after* its own `wp_next` — the store's
+crossing, the callee's crossing, the `c.jalr`'s. A sibling in the SAME
+section is rigid at that section's hart, so each layer has to sit in its own
+section, in that order; `End` is what turns the hart into an ordinary
+`(CID := …)` argument. Two corollaries: **hoist the `Notation`s and `Ltac`s
+above all the sections** (an in-section abbreviation does not survive `End`),
+and note that a **`Definition` with its own `` `{CIDh : CpuId} `` binder is
+already hart-generic** — the binder wins over the ambient section variable —
+so the shared *vocabulary* (`_pre`/`_hcont_ty`/`_goal` predicates) stays in
+one place while only the *lemmas* stratify. Getting the count wrong shows up
+as `iApply: cannot apply (WP Loop)`, which names neither hart.
+
 ## Changing the kernel SOURCE
 
 Editing `xv6-riscv/` moves symbol addresses and takes every proof that names one
