@@ -156,6 +156,17 @@
    instruction order -- [ialloc] does [brelse] BEFORE [iget], so between
    them the claimant holds nothing revocable at all.
 
+   AND THE EXTENSION DOES NOT PAY EITHER, which is the one carrier the
+   four assignments above do not reach: pin the episode on the TRACE
+   (prophecy / language observations, i.e. (F3) below, now RUN as probe 8
+   -- fs-fragments.md §7.11) and every station closes and the
+   prophesied-MINE branch PAYS [di_type dn = ty] past all five named
+   walls; the payout gap merely moves to the prophecy's FOREIGN branch,
+   whose refutation is the same absence ("no foreign fill between my claim
+   and my fill"), so the debt is conserved through the logic extension too
+   (probe 8's wall: THE ADVERSARY RESOLVES CONSISTENTLY -- resolution
+   refutes mis-ordered observations, never a foreign resolver).
+
    CONSEQUENCE.  Do not open another ghost-side route: protocol ghosts,
    Owicki-Gries registries, birth certificates, escorts, epochs, marker
    batons and ownership-transferring claims are all instances of the four

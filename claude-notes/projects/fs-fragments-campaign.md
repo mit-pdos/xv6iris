@@ -2310,3 +2310,71 @@ was not touched.
   the load-bearing one if K-F2 ever lands: it turns "`ialloc`'s `iget`
   finds either the pool's marker or an unloaded entry's marker, and
   never a loaded record" from a paragraph into a theorem.
+
+---
+
+## PROBE 8 — **PROPHECY-ASSISTED LATE LINEARIZATION: DEAD at a SIXTH
+## named wall, THE ADVERSARY RESOLVES CONSISTENTLY.  The last recorded
+## unaudited route is closed; report-only, nothing built**
+
+Transcribed into `claude-notes/design/fs-fragments.md` §7.11 (with §7.0
+gaining the sixth-wall note and §5.3/§7.4.6 reconciled to the new door
+map); one sentence added to `SpecCreateFreshTy.v`'s header §(D).
+
+- **VERDICT.**  DEAD as a retirement of `create_fresh_ty` — but one wall
+  further out than all eight predecessors.  The language extension is
+  *not* the obstacle: `mobs := Empty_set` today, and adding deterministic
+  step observations is a sound, conservative, ~8-file-deep change with
+  **zero contract movement above the lifting layer**.  The
+  prophesied-MINE branch (region-resident `proph_z` in `ireg_slot`, H1's
+  phase carrying `sp₀`, γe on the **proc** bundle) genuinely delivers
+  `di_type dn = ty`, past **all five named walls** — the currency gap
+  included — and past all three of §7.9's missing pieces.
+- **WALL (new, sixth): THE ADVERSARY RESOLVES CONSISTENTLY.**  Prophecy
+  resolution refutes *mis-ordered observations relative to a hypothesized
+  future*; it cannot refute a *foreign resolver*.  The prophesied-FOREIGN
+  branch grants the adversary the first move, and every future in which
+  it acts is realized by resolutions each consistent at its own step, so
+  the branch survives every resolution create can reach except in the
+  no-interference sub-world — and "no interference" is §19.6's
+  allocatedness / §7.2.7's honest residue.  **The debt is conserved
+  through the logic extension too.**  Certificate verbatim at §7.11.5;
+  all five escape rungs (pocketing, richer prophecies, resolution
+  counters, trace snapshots, plain logical atomicity) audited and dead.
+- **SCOPE FINDING on §7.10.6.**  Station exhaustion is **LAW over
+  ghost-only Iris** and nothing more: its carrier enumeration {bytes,
+  arm, client token, nowhere} misses a fifth carrier — **the trace** —
+  which lives in `state_interp`, outside the frame quantification, so
+  clause (i) does not reach it.  Branch A is the constructive witness.
+  §7.10 is scoped, not weakened.
+- **THE ONE-BIT FACTORIZATION.**  Under the design, `create_fresh_ty` is
+  *exactly equivalent* to one trace-level sentence — **"the first fill of
+  a just-claimed inum is the claimant's"** — statable in the operational
+  semantics' own vocabulary, no Iris, no ghost state, consumed at one
+  point.  That is a real redraw of the modular boundary (the WP tree goes
+  axiom-clean), but it is a **FACTORIZATION, NOT A RETIREMENT**: the
+  trace lemma is provable only by a whole-machine interleaving argument
+  ((F2)), or assumed — one axiom traded for another plus the extension.
+  **Not worth building for this axiom alone; REPRICE if a second
+  commit-early/resolve-late window ever appears** (the machinery
+  amortizes, the axiom does not).
+- **ROUTE MAP CLOSED (§7.11.7).**  **K-F2 = the unique CODE door**
+  (rejected by policy); **the licence-completion program** (C′ +
+  box-exclusion + boot-shelter + guard-fed grey deletion, §7.9) **= the
+  unique MODULAR-GHOST door**, with its three named missing pieces; **the
+  trace lemma = the unique LANGUAGE-LEVEL door**, non-modular by nature.
+  **Prophecy is a BRIDGE between the last two, not a fourth door.**  A
+  ninth probe on either mechanism is a re-run, and §(D)'s new sentence in
+  `SpecCreateFreshTy.v` says so.  Stale count corrected along the way:
+  §20.17.7's "those are the two doors" was already down to **one**
+  (§7.4.6); §5.3's restatement of it now points at the three-door map.
+
+### Gate
+
+MIRROR (`ec2-18-206-159-30`), never local.  `SpecCreateFreshTy.v` is a
+comment-only edit; scp + md5 verified both sides, then `SpecCreateFreshTy.vo`
+and `LinkCreateFreshTy.vo` (the Module Type instantiation — the one
+consumer that would catch a statement move) rebuilt: **EXIT=0**, so no
+statement moved.  Committed by explicit path; the live `DirLinks.v` /
+`ProofCreate.v` / `IregDirBit.v` lanes' edits were present in the tree
+throughout and were not touched.
