@@ -86,7 +86,7 @@ Section run.
       (Df : register -> dfrac) (rs rs2 : regstate)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (i : instruction) (pmar0 : list PMA_Region)
-      (pcfg : type_of_register pmpcfg_n) (nd nl : nat) (R : iProp Σ) :
+      (pcfg : type_of_register pmpcfg_n) (nl : nat) (R : iProp Σ) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
     (misa : register) ∈ Drw ∪ Dro ->
@@ -114,9 +114,12 @@ Section run.
     is_aligned_paddr (Physaddr pc) 4 = true ->
     (* THE WIDTH: this is the 4-byte path *)
     isRVC (subrange_vec_dec w 15 0) = false ->
-    (* THE DECODE, as a pure footprinted walk -- the caller's own premise,
-       exactly as [⌜exec (decode_fetch r) σf = Some (i, σf)⌝] was *)
-    hfrun nd (Drw ∪ Dro) Drw rs (ext_decode w) = Some (i, rs) ->
+    (* THE DECODE, as a pure footprinted characterization -- the caller's own
+       premise, exactly where [⌜exec (decode_fetch r) σf = Some (i, σf)⌝] sat.
+       [hval] rather than [hfrun] so NO FUEL reaches this interface;
+       [HartGoodb.hval_of_goodb] is what the [instr] bundle supplies it
+       with, off the decode catalogue's own [goodb] certificate. *)
+    hval (Drw ∪ Dro) Drw rs (ext_decode w) i rs ->
     (* the landing-pad gate, likewise *)
     hfrun nl (Drw ∪ Dro) Drw rs (is_landing_pad_expected tt) = Some (false, rs) ->
     gen_cert -∗
@@ -161,7 +164,7 @@ Section run.
     cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
       fetch_callback get_config_print_instr].
     iApply (swp_use_cer (ext_decode w) _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun nd Drw Dro Df rs rs _ _ Hdisj Hdec
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". r_glue.
     rewrite mbind0_ret.
@@ -204,7 +207,7 @@ Section run.
       (Df : register -> dfrac) (rs rs2 : regstate)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (i other : instruction) (pmar0 : list PMA_Region)
-      (pcfg : type_of_register pmpcfg_n) (nd nl : nat) (R : iProp Σ) :
+      (pcfg : type_of_register pmpcfg_n) (nl : nat) (R : iProp Σ) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
     (misa : register) ∈ Drw ∪ Dro ->
@@ -233,8 +236,8 @@ Section run.
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     is_aligned_paddr (Physaddr pc) 4 = true ->
     isRVC (subrange_vec_dec w 15 0) = true ->
-    hfrun nd (Drw ∪ Dro) Drw rs
-      (ext_decode_compressed (subrange_vec_dec w 15 0)) = Some (i, rs) ->
+    hval (Drw ∪ Dro) Drw rs
+      (ext_decode_compressed (subrange_vec_dec w 15 0)) i rs ->
     hfrun nl (Drw ∪ Dro) Drw rs (is_landing_pad_expected tt) = Some (false, rs) ->
     gen_cert -∗
     hreg_frame rs Drw -∗
@@ -288,7 +291,7 @@ Section run.
       fetch_callback get_config_print_instr].
     iApply (swp_use_cer (ext_decode_compressed (subrange_vec_dec w 15 0))
               _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun nd Drw Dro Df rs rs _ _ Hdisj Hdec
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj Hdec
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". r_glue.
     rewrite mbind0_ret.

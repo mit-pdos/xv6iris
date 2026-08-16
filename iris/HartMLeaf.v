@@ -825,11 +825,13 @@ Section leaf.
     iIntros "#Hcert Hrw Hro Hmem Hwmem".
     iApply (swp_run_hart_active_rvc Drw Dro Df rs
               (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2) rs)
-              hp_pc hp_wf _ _ pmar0 pcfg 100 8 R Hdisj
+              hp_pc hp_wf _ _ pmar0 pcfg 8 R Hdisj
               HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
               Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC
               Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
-              hp_isRVC (hfrun_decode_hp (Drw ∪ Dro) Drw rs HDmisa HmisaC)
+              hp_isRVC
+              (hfrun_hval 100 (Drw ∪ Dro) Drw rs _ _ rs
+                 (hfrun_decode_hp (Drw ∪ Dro) Drw rs HDmisa HmisaC))
               Hlpad with "Hcert Hrw Hro Hmem [] [Hwmem]").
     - iIntros "Hrw Hro".
       iApply (swp_execute_C_SW Drw Dro Df _ _ _ _ Hdisj with "Hcert Hrw Hro").
