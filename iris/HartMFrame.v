@@ -45,6 +45,89 @@ Local Ltac zt :=
                      | false => change b with false end
   end.
 
+(* ====================================================================== *)
+(* THE M-MODE WRAPPER'S FOOTPRINT.                                         *)
+(*                                                                        *)
+(* [mm_Drw] is SEVEN cells, not thirty-eight: the GPRs are not here (see   *)
+(* the header -- they ride in the caller's [R] and are reached by          *)
+(* [swp_rX_bits]/[swp_wX_bits]), and neither is the clock CONFIG, because  *)
+(* [HartMCycle.tick_clock_hvalE] ∀-peels every read the tick makes and     *)
+(* needs only the three clock CELLS owned.                                 *)
+(*                                                                        *)
+(* [mm_Dro] is what the wrapper, the fetch and the dispatch actually pin.  *)
+(* Six of the twelve are [hw_config]'s persistent cells; the other six are *)
+(* fractional, which is what lets [mmode_config] keep its [split]/[combine] *)
+(* (47 sites depend on it) -- the EXCLUSIVE cells go in [pc_is] instead.   *)
+(* ====================================================================== *)
+
+Definition mm_Drw : gset register :=
+  {[ (R_bitvector_64 PC : register); (R_bitvector_64 nextPC : register);
+     (R_bitvector_64 minstret : register);
+     (R_bool minstret_increment : register);
+     (R_bitvector_64 mcycle : register);
+     (R_bitvector_64 mtime : register);
+     (R_bitvector_64 mip : register) ]}.
+
+Definition mm_Dro : gset register :=
+  {[ (cur_privilege : register); (mstatus : register);
+     (hart_state : register); (pmpcfg_n : register);
+     (R_bitvector_32 mcountinhibit : register);
+     (R_bitvector_64 minstretcfg : register);
+     (misa : register); (mseccfg : register); (pma_regions : register);
+     (htif_tohost_base : register); (elp : register);
+     (senvcfg : register) ]}.
+
+Lemma mm_disj : mm_Drw ## mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+
+(* the wrapper's own memberships, precomputed (set_solver in an empty
+   context is 7 ms; inside a leaf proof with towers in scope it is not) *)
+Lemma mm_w_PC : (R_bitvector_64 PC : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+Lemma mm_w_nPC : (R_bitvector_64 nextPC : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+Lemma mm_w_ms : (R_bitvector_64 minstret : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+Lemma mm_w_mi : (R_bool minstret_increment : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+Lemma mm_w_cy : (R_bitvector_64 mcycle : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+Lemma mm_w_ti : (R_bitvector_64 mtime : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+Lemma mm_w_ip : (R_bitvector_64 mip : register) ∈ mm_Drw.
+Proof. rewrite /mm_Drw. set_solver. Qed.
+
+Lemma mm_in_PC : (R_bitvector_64 PC : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_nPC : (R_bitvector_64 nextPC : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_ms : (R_bitvector_64 minstret : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_mi : (R_bool minstret_increment : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_priv : (cur_privilege : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_mst : (mstatus : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_hart : (hart_state : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_pcfg : (pmpcfg_n : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_mc : (R_bitvector_32 mcountinhibit : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_micfg : (R_bitvector_64 minstretcfg : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_misa : (misa : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_sec : (mseccfg : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_pma : (pma_regions : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_htif : (htif_tohost_base : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+Lemma mm_in_elp : (elp : register) ∈ mm_Drw ∪ mm_Dro.
+Proof. rewrite /mm_Drw /mm_Dro. set_solver. Qed.
+
 Section gpr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -145,6 +228,86 @@ Section gpr.
              rewrite hregwrite_resume_red;
              iApply swp_ret; iExact "Hpt"
          end.
+  Qed.
+
+  (* THE DFRAC ASSIGNMENT for the read-only frame: [hw_config]'s six cells
+     are persistent, the rest fractional at the caller's [q]. *)
+  Definition mm_Df (q : Qp) : register -> dfrac := fun r =>
+    if decide (r = (misa : register)) then DfracDiscarded
+    else if decide (r = (mseccfg : register)) then DfracDiscarded
+    else if decide (r = (pma_regions : register)) then DfracDiscarded
+    else if decide (r = (htif_tohost_base : register)) then DfracDiscarded
+    else if decide (r = (elp : register)) then DfracDiscarded
+    else if decide (r = (senvcfg : register)) then DfracDiscarded
+    else DfracOwn q.
+
+  Local Ltac dfq :=
+    unfold mm_Df;
+    repeat first [ rewrite decide_True; [reflexivity|reflexivity]
+                 | rewrite decide_False; [|discriminate] ];
+    reflexivity.
+
+  Lemma mm_Df_misa q : mm_Df q misa = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_sec q : mm_Df q mseccfg = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_pma q : mm_Df q pma_regions = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_htif q : mm_Df q htif_tohost_base = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_elp q : mm_Df q elp = DfracDiscarded.
+  Proof. dfq. Qed.
+  Lemma mm_Df_senv q : mm_Df q senvcfg = DfracDiscarded.
+  Proof. dfq. Qed.
+
+  (* THE FRAME <-> POINTS-TO BRIDGE, at the size it should have been all
+     along: seven cells and twelve, not thirty-eight.  Instant. *)
+  Lemma mm_rw_split (rs : regstate) :
+    (hreg_frame rs mm_Drw : iProp Σ) ⊣⊢
+    ((R_bitvector_64 PC) ↦ᵣ register_lookup (R_bitvector_64 PC) rs ∗
+     (R_bitvector_64 nextPC) ↦ᵣ register_lookup (R_bitvector_64 nextPC) rs ∗
+     (R_bitvector_64 minstret) ↦ᵣ
+       register_lookup (R_bitvector_64 minstret) rs ∗
+     (R_bool minstret_increment) ↦ᵣ
+       register_lookup (R_bool minstret_increment) rs ∗
+     (R_bitvector_64 mcycle) ↦ᵣ register_lookup (R_bitvector_64 mcycle) rs ∗
+     (R_bitvector_64 mtime) ↦ᵣ register_lookup (R_bitvector_64 mtime) rs ∗
+     (R_bitvector_64 mip) ↦ᵣ register_lookup (R_bitvector_64 mip) rs)%I.
+  Proof.
+    rewrite /hreg_frame /mm_Drw.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    by rewrite !bi.sep_assoc.
+  Qed.
+
+  Lemma mm_ro_split (q : Qp) (rs : regstate) :
+    (hreg_frame_ro (mm_Df q) rs mm_Dro : iProp Σ) ⊣⊢
+    (reg_pointsto cur_privilege (DfracOwn q)
+       (register_lookup cur_privilege rs) ∗
+     reg_pointsto mstatus (DfracOwn q) (register_lookup mstatus rs) ∗
+     reg_pointsto hart_state (DfracOwn q) (register_lookup hart_state rs) ∗
+     reg_pointsto pmpcfg_n (DfracOwn q) (register_lookup pmpcfg_n rs) ∗
+     reg_pointsto (R_bitvector_32 mcountinhibit) (DfracOwn q)
+       (register_lookup (R_bitvector_32 mcountinhibit) rs) ∗
+     reg_pointsto (R_bitvector_64 minstretcfg) (DfracOwn q)
+       (register_lookup (R_bitvector_64 minstretcfg) rs) ∗
+     reg_pointsto misa DfracDiscarded (register_lookup misa rs) ∗
+     reg_pointsto mseccfg DfracDiscarded (register_lookup mseccfg rs) ∗
+     reg_pointsto pma_regions DfracDiscarded
+       (register_lookup pma_regions rs) ∗
+     reg_pointsto htif_tohost_base DfracDiscarded
+       (register_lookup htif_tohost_base rs) ∗
+     reg_pointsto elp DfracDiscarded (register_lookup elp rs) ∗
+     reg_pointsto senvcfg DfracDiscarded (register_lookup senvcfg rs))%I.
+  Proof.
+    rewrite /hreg_frame_ro /mm_Dro.
+    repeat (rewrite big_sepS_union; last set_solver).
+    rewrite !big_sepS_singleton.
+    rewrite !(mm_Df_misa q) !(mm_Df_sec q) !(mm_Df_pma q) !(mm_Df_htif q)
+      !(mm_Df_elp q) !(mm_Df_senv q).
+    unfold mm_Df.
+    repeat (rewrite decide_False; [|discriminate]).
+    by rewrite !bi.sep_assoc.
   Qed.
 
 End gpr.
