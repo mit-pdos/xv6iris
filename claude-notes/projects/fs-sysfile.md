@@ -8665,17 +8665,19 @@ When a sweep lands under an in-flight walk, diff the statements before
 budgeting a repair.
 
 ## S7-unlink — **IN FLIGHT, AND STOPPED ON THE T_DIR ARM.**  The budget
-## audit, the REAL contract, the pure+frame+register layer and EVERY EXIT
-## BLOCK are landed and gated.  The WALK is not written, and it cannot be
-## finished as designed: **FINDING 3 below is a missing MODEL fact, not a
-## proof obligation.**  sysfile.c stays 15/16 until `LinkSysUnlink.v` flips
+## audit, the REAL contract, the pure+frame+register layer, EVERY EXIT
+## BLOCK and the WALK's first block `su_w1` are landed and gated.  W2–W5
+## are unwritten and the walk cannot be finished as designed: **FINDING 3
+## below is a missing MODEL fact, not a proof obligation.**  sysfile.c
+## stays 15/16 until `LinkSysUnlink.v` flips
 
 Landed and green: `SysUnlinkBudget.v` (the op-wide log ledger, every arm at
 every corner), `SpecSysUnlink.v` (**the real contract** — it replaced the
 syscall-shaped placeholder whose body was `wp_syscall_sconf_body` with the
 entry pc changed), `ProofSysUnlinkParts.v` (the pure layer **plus the frame
 carve and the epilogue**), `ProofSysUnlinkTails.v` (**every exit block**),
-and the `_CoqProject` rows.  `LinkSysUnlink.v` still supplies `SYSUNLINK`
+`ProofSysUnlink.v` (**the module functor and `su_w1`**), and the
+`_CoqProject` rows.  `LinkSysUnlink.v` still supplies `SYSUNLINK`
 with an `Axiom`, now at the REAL shape.  `Print Assumptions` on every
 headline theorem in the budget file and in the parts file's PURE half:
 **closed under the global context**.
@@ -8812,14 +8814,60 @@ Beside it, `su_dir_links_orphan`, the T_DIR arm's re-park constructor (see
 FINDING 3).  `Print Assumptions` on all six headline lemmas: **closed under
 the global context.**
 
+### THE WALK FILE EXISTS, AND `su_w1` IS LANDED
+
+`ProofSysUnlink.v` holds `Module SysUnlinkProof` over all twelve callees
+(`Argstr BeginOp Nameiparent Ilock Namecmp Dirlookup Memset Readi Writei
+Iupdate Iunlockput EndOp`), **not ascribed to `SYSUNLINK`** — the seal
+happens only when the T_DIR arm closes — with `Module Tails :=
+SysUnlinkTails Iunlockput EndOp` beside it.  `su_w1` (+0x00..+0x2e,
+including ARM A and ARM B) is proven.
+
+**THE SEAM IS THE INTERFACE W2 IS WRITTEN AGAINST, and it is what a block
+lemma in this walk costs.**  `su_w1` takes TWO continuations: the
+fall-through seam and the caller's own `wp_next`, and the seam takes the
+caller's `wp_next` BACK (durable-notes' "the exit must be handed back",
+which is forced because ARM A and ARM B each consume the one copy).  Its
+`(CID0 := CIDs)` annotation is mandatory.  What crosses at +0x30, in
+order: `su_al`, `su_regs m sp0 dpv (m!!!s2) (m!!!s3) Ms`, `uptd_ext`,
+`used1 ⊆ used`, `su_u1 w1 <= n1`, `w1 = true -> bmapstart ∈ Sb1`,
+`dpv <> zero_reg`; then `sie_cap_gpr` at `K-30`, `cpu_own`, `pc_is`,
+`fs_crash_seam`, `gen_cert`, `bslots 3`, the three superblock cells,
+`bitmap_res used1`, **`proc_priv` REBUILT WHOLE** (W2 re-splits it — the
+alternative, carrying `p_cwd`/`p_pid`/`Hpback`/`inode_held` across, makes
+the seam three items longer for nothing), `iref_slots 1`,
+`inode_held_ty dpv T_DIR` **undestructured** (W2 does the unpack and the
+generation-named shed), `log_opS g n1 Sb1`, and the frame — slots 1/2/3 at
+their pinned values, 4/5/6/27/30 existential, the four byte windows with
+the NAME window already split 14 + 2.
+
+Three shape decisions inside `su_w1` a later block should copy:
+
+* **`trap_csrs_ext` / `cpu_claim_ext` ARE NOT ARGUMENTS.**  `eb = true` is
+  a premise, so both are `emp`; supplying them with `[]` and
+  `rewrite Heb /trap_csrs_ext; done` at each of the four sites that want
+  them is shorter than threading and transporting them.
+* **`sys_unlink_slots` IS DEFINED TWICE** (`SpecSysUnlink` and
+  `SysUnlinkBudget`), and this file imports both, so every mention is
+  spelled `SpecSysUnlink.sys_unlink_slots` and `su_slots2` is the bridge to
+  the literal `2` the callees want.  Get this wrong and the mismatch is
+  invisible until an `iApply` two hundred lines away.
+* **`Print Assumptions` INSIDE AN UNINSTANTIATED FUNCTOR IS THE HONEST
+  CHECK** — it reports exactly the module `Parameter`s the lemma applies.
+  `su_w1`: `Argstr.wp_argstr_sconf`, `BeginOp.wp_begin_op_sconf`,
+  `Nameiparent.wp_nameiparent_gen`, `EndOp.wp_end_op_sconf` (through
+  `Tails.su_tail_b`) and the standing six + `functional_extensionality_dep`.
+  Nothing else; no `Ilock`, no `Iunlockput`, which is the arm graph's word
+  that W1 really is the first block.
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
-`ProofSysUnlink.v` — the WALK and the seal.  **W1–W4 and the FILE half of
-W5 are unobstructed; the T_DIR half of W5 is not** (FINDING 3), so the walk
-as decomposed below cannot reach the seal until that ruling lands.  The
-decomposition, with every exit already in hand:
+`ProofSysUnlink.v` — **W2, W3, W4, the FILE half of W5, and the seal.**
+W2–W4 and the FILE half of W5 are unobstructed; **the T_DIR half of W5 is
+not** (FINDING 3), so the walk cannot reach the seal until that ruling
+lands.  The decomposition, with every exit already in hand:
 
-* **W1, +0x00..+0x2e** — the prologue and the push, `su_frame_carve`,
+* **W1, +0x00..+0x2e — DONE.**  The prologue and the push, `su_frame_carve`,
   `li a2,128` / `addi a1,s0,-208` / `c.li a0,0` / `jal argstr`, the `bltz`
   at +0x16 (**`su_tail_a`**), the shrink-wrapped `c.sdsp s1` at +0x1a,
   `jal begin_op`, `addi a1,s0,-80` / `addi a0,s0,-208` / `jal nameiparent`
@@ -8858,7 +8906,12 @@ and the `dir_dots_ix` / `fdir_dots_index` / `dir_links_dotdot_out` trio have
 NO compiled consumer until `ProofSysUnlink.v` lands.  Nothing in the exit
 blocks touches any of them — every branch into an exit is above the zeroing
 — so the tails file is not evidence either way, and its green is not a road
-test of the fragment campaign.
+test of the fragment campaign.  **`su_w1` is not evidence either**: it ends
+at +0x30, above `ilock(dp)`, so it names no `dir_*` fragment at all and all
+three verdicts are exactly as open as they were before it landed.  The one
+thing W1 does settle is negative and worth having: `Print Assumptions su_w1`
+lists FOUR module parameters and no fragment lemma, which is the mechanical
+confirmation that the campaign's delete half is untouched above the lock.
 
 Then `LinkSysUnlink.v` becomes
 `Module SysUnlink := SysUnlinkProof Argstr BeginOp Nameiparent Ilock
@@ -8901,6 +8954,51 @@ this walk's, and it should be made BEFORE the first deep arm is written
 rather than discovered inside one.
 
 ### Gate
+
+**The `su_w1` increment's gate.**  Lane `/shared/xv6iris-u7`, whose seven
+sys_unlink `.v` were md5-identical to the working tree's at `e50a6508`
+before any edit.  `ProofSysUnlink.v`'s chain is **208 files**; after the
+one-line `_CoqProject` row, `make -f CoqMakefile -j3 ProofSysUnlink.vo`
+ends `MAKEEXIT=0` with zero `Error` lines, `make -n` on the target emits 0
+compile lines afterwards, and `make -n ProofSysUnlinkTails.vo` still emits
+0 (the shared files the new chain forced a rebuild of did not disturb the
+old one).  `tools/proof_coverage.py --check` exits 0: coverage
+**186/190, sysfile.c 15/16 — unmoved**, which is what it must be until the
+`Link` flips.  `Print Assumptions`: the six file-level pure lemmas are
+**closed under the global context**; `su_w1` is the standing six +
+`functional_extensionality_dep` + the four module parameters it applies.
+
+**TWO TRAPS THIS INCREMENT FOUND, both of which read as something else.**
+
+* **A LANE THAT IS "STALENESS 0" FOR ONE TARGET IS NOT CONSISTENT FOR A
+  NEW ONE, and the first file outside the old chain says so in a sentence
+  that reads like a corrupt checkout.**  The lane was verified green at
+  `make -n ProofSysUnlinkTails.vo` = 0 compile lines; `ProofSysUnlink.v`
+  Requires `WpSconfBtype`, which the tails file does not, and the compile
+  died with *"Compiled library xv6iris.WpSconfBtype makes inconsistent
+  assumptions over library xv6iris.RiscvLang"*.  A partially-built lane
+  holds TWO GENERATIONS of `.vo` and `make` will not notice, because every
+  stale one is newer than its own `.v`.  **The mtime test that finds them
+  is not "older than `RiscvLang.vo`"** — that flags every base file
+  `RiscvLang` itself sits on top of, 27 false positives out of 208 here —
+  **it is "older than a `.vo` it DEPENDS on", iterated to a fixpoint** over
+  `iris/.CoqMakefile.d`.  That names 7 of the 208 (2 stale, 5 absent);
+  deleting the 2 and re-making is the whole fix.  Corollary: after adding a
+  `_CoqProject` row, regenerate `CoqMakefile` with
+  `coq_makefile -f _CoqProject -o CoqMakefile` **in the same command as the
+  `eval $(opam env ...)`**, and check its banner says 9.0.1.
+* **A SEAM NEEDS ITS OWN `cpu_own_transport`, and the plain instructions
+  that make it necessary are easy to miss** because they are not calls.
+  Between `nameiparent`'s return hart and the seam at +0x30 sit `c.mv
+  s1,a0` and `c.beqz`, so `cpu_own` arrives two harts behind what the seam
+  binder demands; the failure is `iSpecialize: cannot instantiate (cpu_own
+  0 eb … -∗ …)`.  The usual tell — the two propositions printing
+  identically — is ABSENT here if the walk also abbreviated the process
+  address, so **do not `set (pj := proc_addr jx)` in a block lemma**: a
+  callee's postcondition is stated over its own `let pj := proc_addr j` and
+  hands resources back spelled `proc_addr j`, and folding the goal makes
+  the two sides print differently for a reason that has nothing to do with
+  the actual bug.  `su_w1` spells `proc_addr jx` out everywhere.
 
 **The register-bundle increment's gate.**  The GCP build VM is not reachable
 from every container (`gcp-rocq/run-on-gcp` needs `gcloud`, which is not
