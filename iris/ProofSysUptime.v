@@ -120,7 +120,7 @@ Section ProofSysUptime.
     : wp_sys_uptime_sconf_body γl m n eb p av b lks.
   Proof.
     cbv beta delta [wp_sys_uptime_sconf_body].
-    intros pcE ret_tgt Htp Hn Hav Hfresh.
+    intros pcE ret_tgt Hn Hav Hfresh.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
