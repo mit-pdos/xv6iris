@@ -32,6 +32,7 @@ HartMFetch.v
 HartMDecode.v
 HartMStore.v
 HartLift2.v
+HartMRun.v
 HartMLeaf.v
 HartMDispatch.v
 HartPilot.v

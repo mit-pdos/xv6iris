@@ -17,7 +17,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMCycle HartMDispatch HartMPmp
-        HartMFetch HartMDecode HartMStore HartPilot.
+        HartMFetch HartMDecode HartMStore HartMRun HartPilot.
 Require Import RiscvTryStep RiscvExtras RiscvFetchExec HartLift2.
 Require Import SailStdpp.Base.
 Local Open Scope Z_scope.
@@ -823,76 +823,25 @@ Section leaf.
       Hram
       Hb0 Hb1 Hva Hpa Hmprv Hsram Hsva Hspa Hsplit Hrx Hgta.
     iIntros "#Hcert Hrw Hro Hmem Hwmem".
-    unfold run_hart_active.
-    rewrite /swp. iIntros (C) "%HC Hcont".
-    iApply (swp_use_cer (Defs.read_reg cur_privilege) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df _ _ Hdisj HDpriv
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_use_cer (dispatchInterrupt Machine) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_dispatchInterrupt_M Drw Dro Df rs _ _ Hdisj HDmisa HDmst
-                HmisaS HmIE eq_refl eq_refl with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer (fetch tt) _ _ C HC with "[Hrw Hro Hmem] [-]").
-    { iApply (swp_fetch_ram Drw Dro Df rs hp_pc pmar0 pcfg hp_wf Hdisj HDpc
-                HDmst HDpriv HDpma HDcfg HDhtif Hpc Hpriv Hpma Hpcfg
-                Hhtif Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
-                with "Hcert Hrw Hro Hmem"). }
-    iIntros (v) "(-> & Hrw & Hro)".
-    rewrite hp_isRVC. cbn beta iota.
-    cbn beta iota zeta delta [ext_fetch_hook sail_instr_announce
-      fetch_callback get_config_print_instr].
-    iApply (swp_use_cer (ext_decode_compressed hp_half) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_decode_hp Drw Dro Df rs Hdisj HDmisa HmisaC
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". l_glue.
-    rewrite mbind0_ret.
-    iApply (swp_use_cer2 (is_landing_pad_expected tt) _ _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 8 Drw Dro Df rs rs _ _ Hdisj Hlpad
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". l_glue.
-    rewrite mbind_ret. l_glue.
-    iApply (swp_use_cer (currentlyEnabled Ext_Zca) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_hfrun 4 Drw Dro Df rs rs _ _ Hdisj
-                (hfrun_cE_Zca (Drw ∪ Dro) Drw rs HDmisa HmisaC)
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". l_glue.
-    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
-              with "[Hrw Hro] [-]").
-    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
-    iApply (swp_use_cer2
-              (Defs.write_reg (R_bitvector_64 nextPC)
-                 (add_vec_int hp_pc 2)) _ _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HDnpc
-                with "Hcert Hrw Hro"). }
-    iIntros (u) "[Hrw Hro]".
-    iApply (swp_use_cer _ _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_execute_C_SW Drw Dro Df _ _ _ _ Hdisj
-                with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". l_glue.
-    cbn beta iota zeta delta [execute].
-    iApply (swp_use_cer _ _ _ C HC with "[Hrw Hro Hwmem] [-]").
-    { iApply (swp_execute_STORE Drw Dro Df
+    iApply (swp_run_hart_active_rvc Drw Dro Df rs
+              (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2) rs)
+              hp_pc hp_wf _ _ pmar0 pcfg 100 8 R Hdisj
+              HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg HDhtif
+              Hpriv Hpc Hpma Hpcfg Hhtif HmisaS HmIE HmisaC
+              Hunlock Hpallow Hram Hb0 Hb1 Hva Hpa
+              hp_isRVC (hfrun_decode_hp (Drw ∪ Dro) Drw rs HDmisa HmisaC)
+              Hlpad with "Hcert Hrw Hro Hmem [] [Hwmem]").
+    - iIntros "Hrw Hro".
+      iApply (swp_execute_C_SW Drw Dro Df _ _ _ _ Hdisj with "Hcert Hrw Hro").
+    - iIntros "Hrw Hro".
+      iApply (swp_execute_STORE Drw Dro Df
                 (register_set (R_bitvector_64 nextPC)
                    (add_vec_int hp_pc 2) rs) _ _ _ d pa pmar0 pcfg R Hdisj
                 HDmst HDpriv HDpma HDcfg HDhtif
-                ltac:(rewrite /wrap_pre; t_peel; exact Hpriv) ltac:(rewrite /wrap_pre; t_peel; exact Hpma)
-                ltac:(rewrite /wrap_pre; t_peel; exact Hpcfg) ltac:(rewrite /wrap_pre; t_peel; exact Hhtif)
-                ltac:(rewrite /wrap_pre; t_peel; exact Hmprv) Hunlock Hpallow Hsram Hsva Hspa
-                Hsplit Hrx Hgta with "Hcert Hrw Hro Hwmem"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". l_glue.
-    rewrite mcer_ret.
-    iApply ("Hcont" $! (Step_Execute (RETIRE_SUCCESS,
-                                      zero_extend' 32 hp_half))).
-    by iFrame.
+                ltac:(t_peel; exact Hpriv) ltac:(t_peel; exact Hpma)
+                ltac:(t_peel; exact Hpcfg) ltac:(t_peel; exact Hhtif)
+                ltac:(t_peel; exact Hmprv) Hunlock Hpallow Hsram Hsva Hspa
+                Hsplit Hrx Hgta with "Hcert Hrw Hro Hwmem").
   Qed.
 
   (* ==================================================================== *)
