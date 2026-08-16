@@ -76,6 +76,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - resources tracking possible sleeplock holders, to reason about iput's acquiresleep while holding itable.lock
 - Sail model concrete evaluator [hfrun] that takes partial knowledge of HART registers
 - kernel proc exit requires owning entire stack, so callers must pass THEIR stack frame ownership down into functions that never return (usertrap -> syscall -> sys_exit -> kexit)
+- kernel memory points-to is generation-indexed (bare or KPT), monotonic fact about current CPU's mapping regime (still bare, or installed KPT), needed because one HART could have already constructed KSTACK pointers, but another HART is still before kvminithart.
 
 Big things that still need to be done/explored:
 
