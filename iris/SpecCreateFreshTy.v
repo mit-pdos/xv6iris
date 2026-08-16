@@ -27,6 +27,68 @@
    exactly [SpecForkretPark]'s situation and exactly why this file has the
    same shape.
 
+   ==== (C) THE MARKER ROUTE, KILLED IN ONE SENTENCE =====================
+
+   The shortest known statement of the whole problem is that if
+   [ireg_claim_au] could pay out [imark gi inum], this axiom would fall in
+   two lines -- [imark] in hand means nobody can fill and nobody can free
+   the inum ([ireg_withdraw]'s sole gate is the marker, [ireg_free_au]
+   needs [dinode_at], and [imark_excl] settles it), with no (L5), no
+   ledger clause and no free-side obligation.  ITS DEATH CERTIFICATE IS
+   ONE SENTENCE: at a free inum the marker is OUTSIDE the region -- in
+   [IcacheEscrow]'s [ipool], behind the itable spinlock that [ialloc] does
+   not hold, and it cannot be minted either, because [IcacheBoot] allocates
+   the record map and the marker map in ONE [ghost_map_alloc] and no marker
+   entry is ever created afterwards, only moved.  Three separate probes
+   re-derived this; it is written here so a fourth does not.
+
+   ==== (D) STATION EXHAUSTION -- WHY NO GHOST-SIDE ROUTE CAN EXIST ======
+
+   Seven report-only probes have attacked this axiom (all seven are
+   transcribed as claude-notes/design/fs-fragments.md section 7, with the
+   five named walls indexed at section 7.0).  The seventh closes the
+   question with an exhaustion argument rather than a seventh dead
+   candidate, and THIS IS THE PARAGRAPH THAT SHOULD STOP AN EIGHTH PROBE:
+
+     A claim-to-fill protocol has exactly three stations -- the MINT
+     ([ireg_claim_au]), the HAND-OFF ([ireg_withdraw]) and the RESET
+     ([ireg_free_au]) -- plus the PAYOUT at create's [ilock].  Every
+     possible carrier of the "this box is MY episode's" pin kills exactly
+     one station, and the assignment space is EXHAUSTED: pin it on the
+     BYTES (option (k)'s [c = Excl ty -> di_type = ty]) and the RESET
+     cannot clear it; pin it on the ARM ((L6)'s [c <> None -> inreg]) and
+     the HAND-OFF cannot clear it (that is R5's standing ban, and (B)
+     above); pin it on a CLIENT TOKEN and the MINT is blocked, or the
+     token is stale, or it is unreissuable -- and since the token is
+     affine, even the good case LEAKS (a create that drops it pins
+     [c = Some] forever and wedges the free on plain "create; unlink");
+     pin it NOWHERE, in an authority-side protocol phase, and every
+     station closes at the price of an EXISTENTIALLY-TYPED payout,
+     because the mint must stay universally firable and frame-preserving,
+     so every episode reset is invisible to every client frame.  That
+     last payout is [exists ty', di_type dn = ty' /\ fresh_shape dn] --
+     byte-for-byte the weakening this tree ALREADY HAS via [SpecIlock]'s
+     [filled] indicator and [ireg_withdraw]'s [fresh_shape].
+
+   The dichotomy is LAW, not cost: frame preservation is a property of the
+   logic (a frame-preserving update is valid against ALL frames, so no
+   client resource can obstruct it); each station's mover must stay
+   provable because it fires on machine-reachable instantiations
+   elsewhere; and the mint's emptiness of hand is the machine's own
+   instruction order -- [ialloc] does [brelse] BEFORE [iget], so between
+   them the claimant holds nothing revocable at all.
+
+   CONSEQUENCE.  Do not open another ghost-side route: protocol ghosts,
+   Owicki-Gries registries, birth certificates, escorts, epochs, marker
+   batons and ownership-transferring claims are all instances of the four
+   assignments above, and all are dead BY LAW.  The two remaining imports
+   are a KERNEL change (move [ialloc]'s [brelse] after its [iget], which
+   is the unique change that puts currency -- the buffer's [fs_L] half --
+   into the empty window; rejected by the user, so this axiom is the
+   price of that policy) or WEAKENING what depends on this file
+   ([SpecCreate]'s made-arm conjunct, which breaks ARM C-OK-DIR's
+   [dirlink(ip, ".")]).
+
    ==== WHY THE SPAN IS THE TWO CALLS, AND NOT A NARROW FACT ============
 
    §19.9.2 and §20.17.9 both anticipated a one-line gate -- a pure fact, or

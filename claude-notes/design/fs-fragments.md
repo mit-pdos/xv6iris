@@ -2553,3 +2553,274 @@ are unchanged: **K-F2** (rejected by R13(iii); priced at three kernel
 lines plus `ProofIalloc`'s re-walk) or **weakening `SpecCreate`'s made
 arm** (§7.2.6's third door; unaudited, and it breaks ARM C-OK-DIR's
 `dirlink(ip, ".")`).
+
+**AMENDED, and this closes the record (§7.10, the seventh and FINAL
+ghost-side route).**  The protocol-ghost probe upgrades the ruling from
+an enumeration of dead candidates to an exhaustion argument: a
+claim→fill protocol has exactly three stations (MINT, HAND-OFF, RESET)
+plus a PAYOUT, every carrier of the episode pin kills exactly one of
+them, and **the assignment space is exhausted** — bytes kill the RESET,
+the arm kills the HAND-OFF, a client token kills the MINT (or leaks by
+affinity), and pinning NOWHERE closes every station at the price of an
+∃-typed payout that is byte-for-byte §19.9.2's already-landed ∃ty′.
+The dichotomy is **LAW, not cost**.  So the standing conclusion is no
+longer "no candidate has worked" but **"every ghost-only route is
+excluded by law, and K-F2 is the unique door precisely because it is
+the unique change that puts currency — the buffer half — into phase
+2."**  Do not open an eighth ghost-side probe; the station-exhaustion
+sentence and §7.3.1's marker sentence are now in
+`SpecCreateFreshTy.v`'s header so the file itself says so.
+
+---
+
+### 7.10 THE PROTOCOL-GHOST ROUTE (probe 7) — station exhaustion, a LAW wall
+
+Owicki–Gries in Iris: put the claim→fill handshake in an authority-side
+*phase* rather than in a client-held token.  Read against the tree at
+`90789dec` **plus the live uncommitted S7-unlink churn** — at the time of
+the probe `ireg_slot` had become `link_auth z wl wd g c r` with
+`ireg_dir_ok` as a third pure conjunct; **the arm structure, the `c` slot
+and all six movers are unchanged in shape, so every argument below
+survives the churn.**
+
+> **VERDICT.  The protocol-ghost route is DEAD, and the certificate names
+> a LAW wall — but it dies one wall LATER than all six predecessors, and
+> the route's corpse is the most informative one yet: H1 is the first
+> design in seven probes whose invariant is fully maintainable,
+> §19.7-clean at every mover, and it dodges four of the five named walls
+> outright.  It dies at the PAYOUT.**
+
+#### 7.10.1 H1 worked out exactly, and it is BUILDABLE
+
+The phase is a component of the slot's existential — authority-side
+state, no client fragment:
+
+```coq
+Inductive iph := PhNone | PhClaimed (ty : mword 16) | PhFilled.
+
+Definition ireg_slot (γi : gname) (z : Z) (d : dinode) : iProp Σ :=
+  ((∃ (wl wd g r : nat) (c : option (excl unit)) (p : iph),
+      link_auth z wl wd g c r
+      ∗ ⌜ireg_link_ok d (wl + wd)⌝ ∗ ⌜ireg_root_ok z d (wl + wd)⌝ ∗ ⌜ireg_dir_ok d wd⌝
+      ∗ ⌜iph_ok p d inreg⌝)                    (* THE PROTOCOL CLAUSE *)
+   ∗ ireg_ep z d
+   ∗ ((⌜ireg_in d⌝ ∗ z ↪[γi] d)                (* inreg = true  *)
+      ∨ (⌜di_type d <> 0⌝ ∗ imark γi z)))%I.   (* inreg = false *)
+
+Definition iph_ok (p : iph) (d : dinode) (inreg : bool) : Prop :=
+  ∀ ty, p = PhClaimed ty ->
+    inreg = true ∧ fresh_shape d ∧ di_type d = ty.     (* (P1) *)
+```
+
+(Mechanically, `inreg` is threaded by restating the arm disjunction with
+the pure bit, or by putting `⌜∀ ty, p ≠ PhClaimed ty⌝` on the OUT arm —
+same content.  `p` can even stay a bare existential rather than a CMRA:
+since no fragment of it exists, "setting" it is choosing a different
+witness at the close, which is the purest possible frame preservation.)
+
+**Every mover's disposition, audited (§19.7 at each step):**
+
+| mover | disposition | verdict |
+|---|---|---|
+| `ireg_claim_au` | sets `p := PhClaimed ty` at the type-0 slot.  Old phase: `PhClaimed` refuted purely ((P1) gives `fresh_shape` ⟹ type ≠ 0 against the buffer's 0, through `ireg_couple` — the same `exact (Ht2 Ht0)` pattern already landed); `PhNone`/`PhFilled` overwritten freely.  (P1) re-established from its own `fresh_shape dn'` premise and `di_type (ialloc_fresh ty) = ty`.  **Takes no caller resource, stays universally firable, frame-preserving against every frame** — §7.4.4's constraint is satisfied *by construction*, because there is no client copy to collide with | ✓ |
+| `ireg_write_au` / `_link` / `_unlink` (all flavours) | each takes `dinode_at γi z dn` — so at `PhClaimed`, (P1)'s `inreg = true` puts the fragment in the region and `dinode_at_excl` refutes the phase before the write is even considered.  (P1) preserved **vacuously**; no premise travels to `SpecIupdate`/`SpecWritei`/`SpecItrunc`/`SpecDirlink`.  **This is T1's freeze doing the work, and it is the first design in which the freeze is load-bearing rather than decorative** | ✓ |
+| `ireg_withdraw` | the hand-off.  Flips the arm, so it owes `p ≠ PhClaimed` after — **and it can pay, itself, region-internally: `p := PhFilled`.**  No `iclaim` consumed, no licence demanded, no option index, and the foreign marker-holder's fill (the §16.4 killing trace, §17.6.1's mid-free referrer) closes identically.  **R5's wall — §20.16.3/§20.16.5(e) — is DODGED**, because the obligation was only unpayable when the phase was a client fragment.  A fill at a *non*-claimed box cannot "hit Claimed wrongly": post-boot a box arises only via the claim (free exits to type-0/IN; ordinary writes run at the OUT arm; itrunc's fresh-shape-shaped corpse is OUT in the holder's hand and is absorbed by the free as type-0), and boot stamps any image box `PhClaimed (di_type d)` | ✓ |
+| `ireg_free_au` | **the crux, answered:** the free holds `dinode_at γi inum dn` (its own signature).  (P1) says `PhClaimed → inreg = true`; the freer's fragment says the arm is OUT (`dinode_at_excl` — the *exact* two lines §20.16.3 wrote for `c ≠ None → inreg`, pattern already landed at the free's own arm-refutation).  **So `PhClaimed` at any free is REFUTED IN THE MODEL, unconditionally** — no reachability argument, no gamble, no block.  The free then sets `p := PhNone` ((P1) vacuous at the type-0 record).  And separately: free-at-mid-claim is machine-UNREACHABLE on `f60ff58` (a free needs a checked-out fragment; mid-claim it is in-region; extracting it needs a foreign withdraw, which needs a foreign namer of the just-claimed inum, which §7.2.7's honest residue excludes) — **but the proof never needs that fact** | ✓ |
+| boot (`IcacheBoot.ireg_alloc`) | choose witnesses: `p := PhClaimed (di_type d)` at any in-region `fresh_shape` record, `PhNone` elsewhere.  **Zero image obligation** — (P1) holds definitionally | ✓ |
+| eviction / re-park / `ireg_read` / obs lemmas | phase is per-inum, region-side: entry death (`ic_close_to_empty`) never touches it.  **BORN BEFORE THE ENTRY is dodged** — the phase exists before, during and after any entry, which no entry/generation-keyed candidate ever managed.  Openers re-close with the same witness | ✓ |
+
+**And the conservation law is dodged too**: the claim deposits nothing
+and the free withdraws nothing — the phase is not a token moved but
+authority state rewritten; the {fragment, marker} conservation from
+`IcacheBoot`'s single `ghost_map_alloc` is untouched.
+
+So: consistent, frame-preserving, boot-cheap, no contract moves, no
+§19.7 violation anywhere, and it steps past **four walls by name** — the
+conservation law (§7.7), born-before-entry (§7.4), the converse of the
+freeze (§7.6.2: H1 needs only `Claimed → box`, never `box → Claimed`),
+and R5-at-the-withdraw (§20.16.3).  The affinity leak (§7.6.3) is dodged
+trivially: nothing client-held exists to drop.  The claim's horizon
+(§7.6.4) is dodged at the *mint*: this claim verifies no absence — it
+overwrites.
+
+#### 7.10.2 THE DEATH: the payout is ∃-typed — the episode-blindness theorem
+
+What does create receive?  `SpecIalloc`'s post is pure and
+claim-time-indexed (`dn' = ialloc_fresh ty` — "says nothing about the
+region at RETURN time", its own header).  Under H1 it stays that way:
+**the claim pays no resource, because there is none to pay.**  At
+create's `ilock`, the withdraw reads the phase at its own fupd and can
+pay at most:
+
+```coq
+∃ ty', ⌜p_pre = PhClaimed ty'⌝ ∗ ⌜di_type dn = ty'⌝ ∗ ⌜fresh_shape dn⌝ ∗ dinode_at γi inum dn
+```
+
+`ty'` is existentially bound.  **Create cannot pin `ty' = ty`, and this
+is a theorem, not a gap:**
+
+> **THEOREM (episode blindness).**  Let R be create's entire
+> spatial+pure context at its `ilock`.  The interference sequence
+> I = ⟨foreign `iget` of z (admissible: `SpecIget` takes only
+> `iref_slot` today; under C′, licence (b)/(e) is honestly *satisfiable*
+> at a claim box — TRACE G, §7.5.4); foreign `ilock` → `ireg_withdraw`
+> (closes under H1 by design: `PhClaimed ty → PhFilled`); foreign `iput`
+> at REF-1/nlink-0 → `ireg_free_au` at `PhFilled` (proceeds —
+> `PhClaimed` is not there to refute it); third `ialloc` re-claims at
+> ty₂ → `PhClaimed ty₂`⟩ consists entirely of frame-preserving updates
+> fired by movers that are landed, green, and universally provable.
+> Hence R is preserved verbatim across I.  After I the withdrawn record
+> is `ialloc_fresh ty₂` with the phase a perfectly well-formed
+> `PhClaimed ty₂`.  So R ∧ (everything derivable from R at the withdraw)
+> is consistent with `di_type dn = ty₂ ≠ ty`, and `di_type dn = ty` is
+> underivable.  ∎
+
+This is §7.4.4's general impossibility, extended from client
+certificates to authority-side registries: **the claim's universal
+firability makes every episode reset invisible to every client frame.**
+The phase can hold facts about the *box* (it does — (P1) is true and
+maintained); "this box is MY episode's" is not a fact about the box, and
+the claimant has no identity in the region's algebra.
+
+Note the exact yield: `∃ty', di_type dn = ty' ∧ fresh_shape dn` — which
+is **byte-for-byte §19.9.2's ∃ty′ weakening, already landed** via
+`SpecIlock`'s `filled` indicator plus `ireg_withdraw`'s `fresh_shape`
+payout.  **H1's marginal content over the landed tree is zero.  A
+protocol nobody can be paid by is a diary, not an escrow.**
+
+#### 7.10.3 The repair escalation — every rung lands on a named wall
+
+- **(r1) per-inum exclusive receipt** (claim pays an `iclaim`-like token;
+  phase clause mentions it): the re-claim must reset a slot whose token
+  is in an absent (or *departed* — affinity) claimant's hand → wedges
+  `ireg_claim_au` at a machine-reachable step (§19.7) — §19.5(f) case 1
+  + the affinity leak §7.6.3, verbatim.
+- **(r2) per-episode fresh gname** (claim allocates γ_e, pays a half;
+  phase = `PhClaimed ty γ_e`): fresh allocation keeps the claim
+  frame-preserving ✓ — and the abandoned half in create's hand after a
+  reset is **stale-indistinguishable** (two distinct gnames coexist
+  without contradiction; create cannot pin the phase's γ to its own).
+  §19.5(f) case 2.
+- **(r3) epochs/counters** (`PhClaimed ty e`, create remembers `e`
+  purely): "my `e` is current" = "no free since my claim" — needs a
+  revocable, reference-tied resource across the window, and in phase 2
+  (brelse→iget) the claimant holds nothing revocable.  **THE CURRENCY
+  GAP, §7.2.4, verbatim** — and it is a fact about the instruction order
+  in `ialloc`, not about ghost state.
+- **(r4) persistent receipt**: §20.9(b), dead on free-and-reclaim,
+  unchanged.
+
+**The debt is conserved: H1 escaped the horizon wall at the mint by
+verifying nothing there — and the unverified absence reappears,
+undiminished, at the payout.**
+
+#### 7.10.4 H2 — the dedicated protocol invariant: collapses into H1
+
+The §20.9(e) arity question, answered precisely: the registry's content
+*must* couple to the region's arm ((P1)'s `inreg` conjunct is what
+closes the free).  A separate invariant cannot state a clause about
+another invariant's interior; it needs a shared coupling ghost whose
+authority sits in `ireg_slot` — at which point the phase *is* in the
+region and the second invariant is vestigial.  If built anyway: the
+gname **can** ride ambient `icfg` (the `icfg_link` dodge, §20.2 — so no,
+it need *not* enter `ic_escrow`'s arity; §20.9(e)'s catastrophe is
+avoidable), and the persistent inv assertion would still tour
+`SpecIalloc` (+5 consumers), `SpecIlock` (+11), `SpecIupdate`'s cred
+form (+`ProofIput` chain), `SpecCreate` — additive but wide — **plus** a
+two-invariant mask discipline at three movers that today open once.
+Strictly dominated by H1 in every dimension (COST), and it dies at H1's
+wall regardless (LAW).  **H2 is not a distinct route; it is H1 with
+packaging debt.**
+
+#### 7.10.5 H3 — the thread/hart registry, full Owicki–Gries
+
+Registry `gmap hart_id (option (Z * mword 16))`; clause
+`∀ h z ty, reg h = Some (z,ty) → z's slot: inreg ∧ fresh_shape ∧ di_type = ty`.
+The hart-keyed pin genuinely **fixes delivery** (create holds hart h's
+exclusive registry fragment; agreement pins its own entry —
+twice-instantiate passes, the `ty` is resource-related to `dn`).  Two
+claims at one z cannot coexist (second claim refuted purely by the box's
+nonzero type through the coupling — the freeze again).  The free closes
+(same two-line arm refutation).
+
+**It dies at the hand-off:** a *foreign* `ireg_withdraw` at hart h's box
+flips the arm and must clear `reg h` — which needs hart h's fragment,
+which the foreign filler does not hold and `SpecIlock`'s 11 callers
+cannot supply (option-indexed input, `fr = None`: the None branch at a
+mid-claim box has **no source** — not expensive, *sourceless*).  That is
+§20.16.5(e)/R5 landing on the registry exactly where it landed on `c` —
+and moving the clause off the arm onto the bytes
+(`reg h = Some (z,ty) → di_type = ty`, no `inreg`) frees the withdraw
+and re-kills it at the free, which writes type 0 and cannot clear a
+foreign hart's entry — §20.17.6's option (k) death, verbatim.  The
+hart-token's affinity is a third, independent kill: a dropped hart
+fragment wedges that hart's *next* `ialloc` forever (§19.7), and the
+only cure is welding the fragment into the hart's permanent machine
+bundle — a change to the execution-model resources, the maximal blast
+radius in the tree — which still leaves the withdraw wall standing.
+**Dead by law; the cost is merely astronomical on top.**
+
+#### 7.10.6 THE CERTIFICATE — station exhaustion (a LAW wall)
+
+> **DEATH CERTIFICATE (protocol ghost / Owicki–Gries, all homes).**  A
+> claim→fill protocol has three stations — the MINT (`ireg_claim_au`),
+> the HAND-OFF (`ireg_withdraw`), the RESET (`ireg_free_au`) — plus the
+> PAYOUT (create's ilock).  Every possible carrier of the episode pin
+> kills exactly one station, and the assignment space is exhausted:
+>
+> - pin on the **bytes** (`c = Excl ty → di_type = ty`; option (k)) →
+>   the RESET cannot clear it (§20.17.6(k));
+> - pin on the **arm** (`Claimed → inreg`; (L6)/H3's clause with a
+>   client-held reflection) → the HAND-OFF cannot clear it (§20.16.3,
+>   §20.16.5(e), R5);
+> - pin on a **client token** → the MINT is blocked or the token is
+>   stale or unreissuable (§19.5(f)'s trichotomy), and affinity makes
+>   even the good case leak (§7.6.3);
+> - pin **nowhere** (H1, authority-side phase) → every station closes
+>   and the PAYOUT is ∃-typed: by frame preservation of frame-preserving
+>   updates plus the mint's universal firability, episode resets are
+>   invisible to every client frame, so the strongest payable fact is
+>   §19.9.2's ∃ty′ — already landed.
+>
+> The dichotomy is LAW, not cost: (i) frame preservation is a property
+> of the logic (a frame-preserving update is valid against *all* frames
+> — no client resource can obstruct it); (ii) the stations' movers must
+> remain provable because each fires on machine-reachable instantiations
+> elsewhere (§19.7, and `ProofIlock`/`ProofIput`/`ProofIalloc` are one
+> generic proof each); (iii) the mint's emptiness of hand is the
+> machine's own instruction order (`brelse` before `iget` in `ialloc`).
+> The six prior certificates each explored one assignment; the
+> protocol-ghost frame shows **the assignments are the whole space**.
+> **Owicki–Gries does not create currency; it relocates the debt around
+> the protocol, and the only payer is a revocable resource in the
+> claimant's hand across the window — which phase 2 of the window
+> denies.  THE COST-RULE EXCLUSION IS HEREBY UPGRADED: the route the
+> cost rule excluded (K-F2) is the unique door because it is the unique
+> change that puts currency (the buffer half) into phase 2; EVERY
+> GHOST-ONLY ROUTE, PROTOCOL GHOSTS INCLUDED, IS EXCLUDED BY LAW.**
+
+Cost-rule waivers audited along the way: `SpecIlock`'s option-indexed
+registry input — waivable at ~12 files, then sourceless at `None` (law);
+H2's arity — waivable free via ambient `icfg` (collapses to H1); H3's
+hart-bundle threading — waivable at execution-model blast radius, then
+dead at the withdraw (law).  **Nowhere does a cost rule stand between
+this route and life.**
+
+#### 7.10.7 What the probe yields
+
+- **Positive findings worth keeping:** (1) H1 is the first *consistent*
+  protocol — it dodges the conservation law, born-before-entry, the
+  freeze-converse, R5, and the affinity leak, and its free-side
+  refutation (`PhClaimed → inreg` + `dinode_at_excl`, two lines)
+  rehabilitates §20.16.3's "the free half closes" in a form where the
+  withdraw closes too; (2) free-at-mid-claim is machine-unreachable on
+  `f60ff58` **and** model-refutable — the model is stronger than
+  reachability here, a rarity worth recording; (3) the
+  station-exhaustion sentence belongs in `SpecCreateFreshTy.v`'s header
+  beside §7.3.1's marker sentence, **so an eighth probe does not re-open
+  OG** (both are now transcribed there).
+- **Nothing new to build.**  H1's machinery (~100–150 lines,
+  `InodeRegion.v` only, zero contract moves) is **buildable and
+  worthless** — its entire payout is already landed as `filled` +
+  `fresh_shape` + ∃ty′.  The one still-unwritten lemma worth landing
+  remains §7.6.9's `ireg_box_excl` (confirmed still absent at HEAD).
