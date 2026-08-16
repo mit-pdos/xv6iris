@@ -50,7 +50,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec HartSwp HartLift HartRegNode
         HartSpan HartSpanChar HartEvents HartMPmp.
-Require Import RiscvTryStep RiscvExtras RiscvFetchExec.
+Require Import RiscvTryStep RiscvExtras RiscvFetchExec HartAlign.
 Local Open Scope Z_scope.
 
 Local Notation zerobit :=
@@ -61,6 +61,20 @@ Local Notation zerobit :=
    answers from the config) -- a pure conversion *)
 Local Lemma mf_cE_Ziccif_eq_local : currentlyEnabled Ext_Ziccif = returnM true.
 Proof. reflexivity. Qed.
+
+(* THE 2-mod-4 PATH'S EXTRA READ.  The 4-aligned fetch never evaluates
+   [Ext_Zca] -- with PC bit 1 clear the misalignment [and_boolM]
+   short-circuits before it -- but with bit 1 SET the model does reach the
+   probe, so that path needs the read equation and a pinned misa.C. *)
+Lemma mf_cE_Zca_eq_local :
+  currentlyEnabled Ext_Zca
+  = Defs.bind (Defs.read_reg misa)
+      (fun v : SailStdpp.Values.mword 64 =>
+         if eq_vec (_get_Misa_C v) (MachineWord.MachineWord.N_to_word 1 1%N)
+         then returnM true else returnM false).
+Proof. reflexivity. Qed.
+
+
 
 Local Ltac mf_glue :=
   cbn beta iota zeta delta [get_config_rvfi ext_fetch_check_pc].
@@ -870,6 +884,107 @@ Section fetch.
     iApply ("Hcont" $! (if isRVC (subrange_vec_dec w 15 0)
                         then F_RVC (subrange_vec_dec w 15 0)
                         else F_Base w)). by iFrame.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE 2-mod-4 COMPRESSED FETCH.  With PC bit 1 SET the model takes the *)
+  (* halfword path: [fetch_bytes pc pc 2], and if that halfword is        *)
+  (* compressed the fetch is done in ONE access.                          *)
+  (*                                                                     *)
+  (* WHAT DIFFERS FROM THE 4-ALIGNED RULE, and it is not just the width:  *)
+  (* with bit 1 set the misalignment test does NOT short-circuit, so the  *)
+  (* model reads [misa] to evaluate [Ext_Zca].  Hence the two extra       *)
+  (* premises.  (This file's header says "Ext_Zca is never read" -- true  *)
+  (* of the 4-aligned path, and exactly why this one needs its own rule.) *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_fetch_rvc2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (h : SailStdpp.Values.mword 16) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    isRVC h = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch_bytes pc pc 2)
+         (fun r => ⌜r = @FetchBytes_Success 2 h⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = F_RVC h⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 HmisaC Hrvc.
+    iIntros "#Hcert Hrw Hro Hfb".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch. mf_glue.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". mf_glue.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". mf_glue.
+    rewrite mbind0_ret. unfold Defs.or_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb0.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb1.
+    (* bit 1 SET: the Zca probe IS reached *)
+    rewrite mf_cE_Zca_eq_local.
+    iApply (swp_use_cer3 (Defs.read_reg misa) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmisa
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite HmisaC. cbn beta iota.
+    rewrite mbind_ret. cbn beta.
+    (* the 4-alignment test is FALSE, so the and_boolM short-circuits *)
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta.
+    rewrite (mf_align4_false pc Hb1). cbn beta iota.
+    rewrite mbind_ret. cbn beta.
+    (* the two PC reads feeding the halfword fetch_bytes *)
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (fetch_bytes pc pc 2) _ _ C HC
+              with "[Hrw Hro Hfb] [-]").
+    { iApply ("Hfb" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite Hrvc. cbn beta iota.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (F_RVC h)). by iFrame.
   Qed.
 
   (* THE COMPOSITION: [fetch] with [fetch_bytes] filled in, leaving only
