@@ -193,15 +193,21 @@ Section FsRep.
     bv_unsigned (di_type dn) = T_DIR_z ->
     (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
     fedges self dn data -∗
-      dir_link_at self dn data k ∗
-      (dir_link_at self dn data k -∗ fedges self dn data).
+      ∃ F : nat -> bool,
+        dir_link_at_f F self dn data k ∗
+        (dir_link_at_f F self dn data k -∗ fedges self dn data).
   Proof.
     intros Hty Hk. rewrite /fedges /dir_links decide_True; [| exact Hty].
-    iIntros "H".
+    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
     iDestruct (big_sepL_lookup_acc _ (seq 0 (dir_nrec (bv_unsigned (di_size dn))))
                  k k with "H") as "[Hk Hback]".
     { apply lookup_seq. lia. }
-    iFrame.
+    (* THE FLAVOUR MAP COMES OUT WITH THE TICKET (V2).  The borrow returns
+       the SAME record at the SAME flavour, so the count clause is handed
+       back untouched -- which is why it does not appear in the statement. *)
+    iExists F. iSplitL "Hk"; [iExact "Hk" |].
+    iIntros "Hk". iExists F. iSplitR; [iPureIntro; exact Hbnd |].
+    iApply ("Hback" with "Hk").
   Qed.
 
   (* ------------------------------------------------------------------ *)

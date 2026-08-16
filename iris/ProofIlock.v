@@ -1093,7 +1093,11 @@ Section IlockLoad.
              collapses to [emp] exactly where [dir_ok_size_zero] makes the
              pure conjunct vacuous -- the resource half of §19.4's
              "[ireg_withdraw] already pays [fresh_shape]". *)
-          iSplitR; [iApply (dir_links_size_zero (bv_unsigned inum) dn _ Hfsz) |].
+          (* ...and V2's count clause is the SAME conjunct of [fresh_shape]
+             the ".." discharge above reads: a claim box is an orphan, and
+             [0 <= 1]. *)
+          iSplitR; [iApply (dir_links_size_zero (bv_unsigned inum) dn _ Hfsz
+                              ltac:(rewrite (fresh_shape_nlink dn Hfr0); lia)) |].
           iSplitL; [iApply il_ind_res_empty | iApply il_blocks_empty]. }
     (* THE FILL SPENDS THE GENERATION'S ONE-SHOT (design §17.6 (3)), at the
        only instruction in this kernel that knows [di_type]: the record has

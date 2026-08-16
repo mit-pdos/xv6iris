@@ -780,6 +780,26 @@ Section InodeRegion.
     exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
   Qed.
 
+  (* ...AND THE DISEQUALITY THAT READS OFF IT.  Two records held at once are
+     two records: exclusivity at one key is the whole content of
+     [dinode_at_excl], so a holder of both never has to argue that the
+     inums differ from anything about the inodes.  create's mkdir arm is
+     the first consumer -- the record it appends to the parent names the
+     CHILD, and the count clause (V2) needs that record not to be the
+     parent's own self record.  Pure conclusion, so [iDestruct .. as %H]
+     leaves both fragments in place. *)
+  Lemma dinode_at_ne γi (i1 i2 : bv 32) (dn1 dn2 : dinode) :
+    dinode_at γi i1 dn1 -∗ dinode_at γi i2 dn2 -∗
+      ⌜bv_unsigned i1 <> bv_unsigned i2⌝.
+  Proof.
+    rewrite /dinode_at. iIntros "H1 H2".
+    destruct (decide (bv_unsigned i1 = bv_unsigned i2)) as [Heq | Hne].
+    - rewrite Heq.
+      iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+      exfalso. exact (exclusive_l (DfracOwn 1) (DfracOwn 1) Hv).
+    - iPureIntro. exact Hne.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  THE MARKER (§16.4's claim box, realised inside the region)          *)
   (* ------------------------------------------------------------------ *)

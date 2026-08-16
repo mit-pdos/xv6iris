@@ -1315,37 +1315,14 @@ Section ProofSysUnlinkOrphan.
        dir_inum data k = bv_0 16) ->
     igrey (bv_unsigned (dir_inum data 1)) -∗ dir_links self dn' data.
   Proof.
-    intros Hnl Hself Hdead. iIntros "Hg".
-    (* every index but 1 is [emp], whatever the record at 1 turns out to be *)
-    assert (Hemp : forall k : nat, k <> 1%nat ->
-              (k < dir_nrec (bv_unsigned (di_size dn')))%nat ->
-              ⊢ (dir_link_at self dn' data k : iProp Σ)).
-    { intros k Hk1 Hk.
-      destruct k as [| k']; [ exact (su_link_self self dn' data Hself) |].
-      destruct k' as [| k'']; [ congruence |].
-      apply su_link_dead. apply Hdead; lia. }
-    rewrite /dir_links.
-    destruct (decide (bv_unsigned (di_type dn') = T_DIR_z)) as [_ | _];
-      [| iClear "Hg"; done].
-    destruct (decide (1 < dir_nrec (bv_unsigned (di_size dn')))%nat)
-      as [Hlt | Hge].
-    - rewrite (big_sepL_delete (fun _ k => dir_link_at self dn' data k)
-                 (seq 0 (dir_nrec (bv_unsigned (di_size dn')))) 1%nat 1%nat).
-      2:{ apply lookup_seq. lia. }
-      iSplitL "Hg".
-      + rewrite /dir_link_at.
-        destruct (dir_liveb data 1
-                  && negb (bool_decide (bv_unsigned (dir_inum data 1) = self)));
-          [| iClear "Hg"; done].
-        iRight. iSplitL "Hg"; [iExact "Hg" | iPureIntro; exact Hnl].
-      + iApply big_sepL_intro. iIntros "!>" (i k Hik).
-        destruct (decide (i = 1%nat)) as [-> | Hne]; [done |].
-        apply lookup_seq in Hik. destruct Hik as [Hke Hi]. subst k.
-        rewrite Nat.add_0_l. iApply (Hemp i Hne Hi).
-    - iClear "Hg". iApply big_sepL_intro. iIntros "!>" (i k Hik).
-      apply lookup_seq in Hik. destruct Hik as [Hke Hi]. subst k.
-      rewrite Nat.add_0_l.
-      iApply (Hemp i ltac:(lia) Hi).
+    (* THE CONTENT MOVED DOWN TO [DirLinks.dir_links_orphan] (V2, the count
+       clause).  [dir_links] now carries [DirView.dlc_bound] over an
+       existential flavour map, so building it record by record is the
+       payload's own business rather than this file's -- and the clause is
+       free at the premise this lemma already takes ([nlink = 0] gives
+       [0 <= 1 + _]).  The STATEMENT is unchanged, and so is what the walk
+       owes: the one pure premise below. *)
+    exact (dir_links_orphan self dn' data).
   Qed.
 
 End ProofSysUnlinkOrphan.

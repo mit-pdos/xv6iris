@@ -1380,6 +1380,7 @@ Section ProofSysLinkTails.
        [IregLinkNz.dir_links_nlink_drop], whose whole content is that at a
        nonzero count no ticket in it can be grey. *)
     iDestruct (dir_links_nlink_drop (bv_unsigned inum) dn dn' dat Hnz
+                 ltac:(clear -Hdec; lia)
                  ltac:(exact (sl_setnl_type dn (sl_ndec (di_nlink dn))))
                  ltac:(exact (sl_setnl_size dn (sl_ndec (di_nlink dn))))
                  with "Hdlnk") as "Hdlnk".

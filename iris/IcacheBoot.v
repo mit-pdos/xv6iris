@@ -661,6 +661,23 @@ Section IcacheBootPool.
      image-wf family for exactly the reason [inode_ok] did: it is a fact
      about the IMAGE ON DISK, so the boot client owes it and this lemma
      cannot manufacture it.  mkfs images satisfy it. *)
+
+  (* WHAT V2's COUNT CLAUSE ADDS HERE, AND WHY IT IS NOT A NEW PREMISE.
+     [DirLinks.dir_links] now carries [DirView.dlc_bound] over an
+     existential flavour map, so the client's [dir_links] bundle below is
+     one conjunct stronger than it was.  It costs the client ONE
+     COMPUTATIONAL FACT about the image and nothing else -- every image
+     directory has [nlink <= 1] -- because the region's boot authorities
+     are ALL-PLAIN ([ireg_alloc] takes [link_auth z 0 0 0 None 0], V1), so
+     the stock is built at [F = fun _ => false], where the clause's
+     right-hand side is [1 + 0].  That is true of mkfs: it writes
+     [nlink = 1] into the root and creates no subdirectory, so no image
+     directory is ever named by a [".."] it did not write itself.
+     [DirLinks.dir_links_of_plain] is the constructor
+     ([DirView.dlc_bound_le1] discharges the clause from the fact), and it
+     is why no signature here moves: the obligation lands inside a resource
+     the client was already producing, exactly as (L3)/(L4) landed inside
+     [ireg_alloc]'s ∀-over-decodings slot. *)
   Lemma ipool_shape_alloc (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) (dn : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) :

@@ -159,20 +159,32 @@ Section IregLinkNz.
     exfalso. exact (Hnz Hz).
   Qed.
 
+  (* THE COUNT PREMISE IS THE LEMMA'S OWN NAME MADE HONEST (V2).  The
+     payload now carries [DirView.dlc_bound], which is an UPPER bound on
+     the home's count -- so the big-op rides a count change only DOWNWARDS,
+     which is the only direction this lemma was ever applied in (sys_link's
+     [bad:] tail, sys_unlink's decrements).  The tickets themselves still
+     say nothing about the home. *)
   Lemma dir_links_nlink_drop (self : Z) (dn dn' : dinode)
       (data : nat -> list (bv 8)) :
     bv_unsigned (di_nlink dn) <> 0 ->
+    bv_unsigned (di_nlink dn') <= bv_unsigned (di_nlink dn) ->
     di_type dn' = di_type dn ->
     di_size dn' = di_size dn ->
     dir_links self dn data -∗ dir_links self dn' data.
   Proof.
-    intros Hnz Hty Hsz. rewrite /dir_links Hty Hsz.
+    intros Hnz Hle Hty Hsz. rewrite /dir_links Hty Hsz.
     destruct (decide (bv_unsigned (di_type dn) = T_DIR_z));
       [| iIntros "_"; done].
-    iIntros "H".
+    iIntros "H". iDestruct "H" as (F) "[%Hbnd H]".
+    iExists F. iSplitR.
+    { iPureIntro.
+      apply (dlc_bound_le F F dn dn' data data Hle); [| exact Hbnd].
+      rewrite Hsz. lia. }
     iApply (big_sepL_mono with "H").
     iIntros (kk k0 _) "Hk".
-    iApply (dir_link_at_nlink_drop self dn dn' data k0 Hnz with "Hk").
+    iApply (dir_link_at_f_live_agree F F self dn dn' data data k0 Hnz
+              eq_refl eq_refl with "Hk").
   Qed.
 
 End IregLinkNz.

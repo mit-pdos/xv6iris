@@ -1413,3 +1413,378 @@ Lemma dir_ok_dir (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) :
 Proof.
   intros Ht H. apply H. rewrite Ht. vm_compute. reflexivity.
 Qed.
+
+(* ====================================================================== *)
+(*  THE COUNT CLAUSE -- an UPPER bound on a directory's link count         *)
+(*  design: claude-notes/projects/fs-fragments-campaign.md, V2             *)
+(*                                                                        *)
+(*  FINDING 3's wall is that the model bounds the ledger only from BELOW   *)
+(*  ((L1), [w <= nlink]), so nothing says an EMPTY directory's count is    *)
+(*  one -- the fact [sys_unlink]'s T_DIR re-park needs.  The carrier is    *)
+(*  this clause, riding inside [DirLinks.dir_links] (V1 carries the        *)
+(*  flavour that makes it PRESERVABLE; see there):                         *)
+(*                                                                        *)
+(*    nlink <= 1 + #{ k < nrec | k is neither dot, k is LIVE, F k }        *)
+(*                                                                        *)
+(*  where [F] marks the records whose ledger ticket is d-FLAVOURED, i.e.   *)
+(*  whose target is known to be a directory.  It is xv6's accounting read  *)
+(*  as an inequality: a directory's count is ONE (its own entry in its     *)
+(*  parent) plus one per SUBDIRECTORY (each subdirectory's [".."] names    *)
+(*  it), and the subdirectories are exactly the non-dot records of this    *)
+(*  directory that name a directory.                                      *)
+(*                                                                        *)
+(*  BOTH DOTS ARE EXCLUDED, AND NEITHER EXCLUSION IS OPTIONAL.  Record 0   *)
+(*  is [ "." ], which names the directory ITSELF and which xv6             *)
+(*  deliberately does not count ("No ip->nlink++ for '.'"); record 1 is    *)
+(*  [ ".." ], which names the PARENT -- a directory, and hence a record    *)
+(*  a target-type test cannot tell from a subdirectory's, but one that     *)
+(*  pays for the PARENT's count and not for this one.  An empty directory  *)
+(*  has records 0 and 1 live and nothing else, so the count is ZERO and    *)
+(*  the clause reads [nlink <= 1] -- which with the walk's own             *)
+(*  [ip->nlink >= 1] is FINDING 3's missing equation.                      *)
+(*                                                                        *)
+(*  IT IS AN INEQUALITY, AND THAT IS WHAT MAKES THE [++] FREE.  Crossing   *)
+(*  create's [dp->nlink++] needs only [bv_unsigned (add_vec h 1) <=        *)
+(*  bv_unsigned h + 1] ([dlc_bv_add1_le] below), which is UNCONDITIONAL --  *)
+(*  the wrap lands at zero.  An equality would have needed (L4) at a       *)
+(*  record the walk cannot name (fs-sysfile.md's twelfth stop).            *)
+(* ====================================================================== *)
+
+(* ---- the generic counter over a boolean predicate --------------------- *)
+
+(* [dcnt p n] counts the indices below [n] that [p] accepts.  Stated over
+   a raw predicate rather than over [dlc_ctb] directly so the five movers
+   below are about COUNTING and say nothing about directories; the record
+   view enters only in [dlc_ctb]'s own three-line lemmas. *)
+Definition dcnt (p : nat -> bool) (n : nat) : nat :=
+  length (List.filter p (seq 0 n)).
+
+(* the append law the whole block is proved by induction with.  [seq 0]'s
+   recursion is at the FRONT, so [simpl] steps the wrong end; [seq_S] is
+   what puts the new index last. *)
+Lemma dcnt_len_app (p : nat -> bool) (l l' : list nat) :
+  length (List.filter p (l ++ l'))
+  = (length (List.filter p l) + length (List.filter p l'))%nat.
+Proof.
+  induction l as [| a l IH]; simpl; [reflexivity |].
+  destruct (p a); simpl; rewrite IH; reflexivity.
+Qed.
+
+Lemma dcnt_S (p : nat -> bool) (n : nat) :
+  dcnt p (S n) = (dcnt p n + (if p n then 1 else 0))%nat.
+Proof.
+  unfold dcnt. rewrite seq_S. rewrite dcnt_len_app. simpl.
+  destruct (p n); simpl; lia.
+Qed.
+
+Lemma dcnt_ext (p q : nat -> bool) (n : nat) :
+  (forall k : nat, (k < n)%nat -> q k = p k) -> dcnt q n = dcnt p n.
+Proof.
+  induction n as [| n IH]; intro H; [reflexivity |].
+  rewrite (dcnt_S q n). rewrite (dcnt_S p n).
+  rewrite (IH ltac:(intros k Hk; apply H; lia)).
+  rewrite (H n ltac:(lia)). reflexivity.
+Qed.
+
+Lemma dcnt_mono (p : nat -> bool) (n n' : nat) :
+  (n <= n')%nat -> (dcnt p n <= dcnt p n')%nat.
+Proof.
+  intro H. induction n' as [| n' IH].
+  - assert (Hz : n = 0%nat) by lia. rewrite Hz. lia.
+  - destruct (Nat.eq_dec n (S n')) as [Heq | Hne]; [rewrite Heq; lia |].
+    rewrite (dcnt_S p n'). pose proof (IH ltac:(lia)). lia.
+Qed.
+
+(* TWO PREDICATES THAT DIFFER AT ONE INDEX.  Everything the writers need
+   is an instance of this: a dirlink flips one record's slot, a zeroing
+   kills one, and nothing else in the kernel touches a directory's bytes. *)
+Lemma dcnt_diff1 (p q : nat -> bool) (n k0 : nat) :
+  (forall k : nat, (k < n)%nat -> k <> k0 -> q k = p k) ->
+  (dcnt p n <= dcnt q n + (if p k0 then 1 else 0))%nat.
+Proof.
+  induction n as [| n IH]; intro H; [unfold dcnt; simpl; lia |].
+  rewrite (dcnt_S p n). rewrite (dcnt_S q n).
+  destruct (Nat.eq_dec n k0) as [Heq | Hne].
+  - (* the differing index is the LAST one: everything below agrees *)
+    rewrite (dcnt_ext p q n ltac:(intros k Hk; apply H; lia)).
+    rewrite Heq. destruct (q k0); lia.
+  - rewrite (H n ltac:(lia) Hne).
+    pose proof (IH ltac:(intros k Hk Hk0; apply H; lia)).
+    destruct (p n); lia.
+Qed.
+
+Lemma dcnt_set (p q : nat -> bool) (n k0 : nat) :
+  (k0 < n)%nat ->
+  (forall k : nat, (k < n)%nat -> k <> k0 -> q k = p k) ->
+  p k0 = false -> q k0 = true ->
+  dcnt q n = S (dcnt p n).
+Proof.
+  induction n as [| n IH]; intros Hk0 H Hp Hq; [lia |].
+  rewrite (dcnt_S p n). rewrite (dcnt_S q n).
+  destruct (Nat.eq_dec k0 n) as [Heq | Hne].
+  - rewrite (dcnt_ext p q n ltac:(intros k Hk; apply H; lia)).
+    rewrite <- Heq. rewrite Hp. rewrite Hq. lia.
+  - rewrite (H n ltac:(lia) ltac:(lia)).
+    rewrite (IH ltac:(lia) ltac:(intros k Hk Hk0'; apply H; lia) Hp Hq).
+    destruct (p n); lia.
+Qed.
+
+(* ...and the two forms the writers actually apply, where the RANGE may
+   also have grown (a dirlink that appends raises [dir_nrec] by one).
+
+   THE "WAS IT SET" PREMISE IS GUARDED BY [k0 < n] AND THAT IS FORCED: a
+   dirlink's slot is free BELOW the record count ([dir_slot_free]) and
+   simply OUT OF RANGE at it, where the bytes past the size are nobody's
+   and no liveness can be claimed.  Both cases give the same conclusion by
+   different halves of the argument. *)
+Lemma dcnt_slot_ge (p q : nat -> bool) (n n' k0 : nat) :
+  (n <= n')%nat ->
+  (forall k : nat, (k < n')%nat -> k <> k0 -> q k = p k) ->
+  ((k0 < n)%nat -> p k0 = false) ->
+  (dcnt p n <= dcnt q n')%nat.
+Proof.
+  intros Hn H Hp. destruct (Nat.lt_ge_cases k0 n) as [Hlt | Hge].
+  - pose proof (dcnt_mono p n n' Hn).
+    pose proof (dcnt_diff1 p q n' k0 H) as Hd. rewrite (Hp Hlt) in Hd. lia.
+  - rewrite <- (dcnt_ext p q n ltac:(intros k Hk; apply H; lia)).
+    exact (dcnt_mono q n n' Hn).
+Qed.
+
+Lemma dcnt_set_ge (p q : nat -> bool) (n n' k0 : nat) :
+  (n <= n')%nat -> (k0 < n')%nat ->
+  (forall k : nat, (k < n')%nat -> k <> k0 -> q k = p k) ->
+  ((k0 < n)%nat -> p k0 = false) ->
+  q k0 = true ->
+  (S (dcnt p n) <= dcnt q n')%nat.
+Proof.
+  intros Hn Hk0 H Hp Hq. destruct (Nat.lt_ge_cases k0 n) as [Hlt | Hge].
+  - rewrite (dcnt_set p q n' k0 Hk0 H (Hp Hlt) Hq).
+    pose proof (dcnt_mono p n n' Hn). lia.
+  - rewrite <- (dcnt_ext p q n ltac:(intros k Hk; apply H; lia)).
+    pose proof (dcnt_mono q (S k0) n' ltac:(lia)) as H1.
+    rewrite (dcnt_S q k0) in H1. rewrite Hq in H1.
+    pose proof (dcnt_mono q n k0 Hge) as H2. lia.
+Qed.
+
+(* ---- the record-view predicate, and the clause ------------------------ *)
+
+(* the two DOT indices, refused.  [dir_dots_ix] is what says they are the
+   dot records; here they are refused by INDEX, which is what keeps the
+   clause readable at a directory whose dots the walk has not looked at. *)
+Definition dlc_dotb (k : nat) : bool :=
+  negb (bool_decide (k = 0%nat)) && negb (bool_decide (k = 1%nat)).
+
+Definition dlc_ctb (F : nat -> bool) (data : nat -> list (bv 8)) (k : nat)
+  : bool := dlc_dotb k && dir_liveb data k && F k.
+
+Definition dlc_count (F : nat -> bool) (data : nat -> list (bv 8)) (n : nat)
+  : nat := dcnt (dlc_ctb F data) n.
+
+Definition dlc_bound (F : nat -> bool) (dn : dinode)
+    (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_nlink dn)
+  <= 1 + Z.of_nat (dlc_count F data (dir_nrec (bv_unsigned (di_size dn)))).
+
+(* ---- [dlc_ctb]'s four readings --------------------------------------- *)
+
+Lemma dlc_ctb_dead (F : nat -> bool) (data : nat -> list (bv 8)) (k : nat) :
+  dir_liveb data k = false -> dlc_ctb F data k = false.
+Proof.
+  intro H. unfold dlc_ctb. rewrite H. rewrite andb_false_r.
+  rewrite andb_false_l. reflexivity.
+Qed.
+
+Lemma dlc_ctb_dot (F : nat -> bool) (data : nat -> list (bv 8)) (k : nat) :
+  (k < 2)%nat -> dlc_ctb F data k = false.
+Proof.
+  intro H. unfold dlc_ctb, dlc_dotb.
+  destruct k as [| k']; [rewrite bool_decide_eq_true_2; reflexivity |].
+  destruct k' as [| k'']; [| lia].
+  rewrite (bool_decide_eq_true_2 (1%nat = 1%nat) eq_refl).
+  rewrite andb_false_r. rewrite andb_false_l. reflexivity.
+Qed.
+
+Lemma dlc_ctb_flav (F : nat -> bool) (data : nat -> list (bv 8)) (k : nat) :
+  F k = false -> dlc_ctb F data k = false.
+Proof. intro H. unfold dlc_ctb. rewrite H. rewrite andb_false_r. reflexivity. Qed.
+
+Lemma dlc_ctb_true (F : nat -> bool) (data : nat -> list (bv 8)) (k : nat) :
+  (2 <= k)%nat -> dir_live data k -> F k = true -> dlc_ctb F data k = true.
+Proof.
+  intros Hk Hlv HF. unfold dlc_ctb, dlc_dotb.
+  rewrite (proj2 (dir_liveb_true data k) Hlv). rewrite HF.
+  rewrite (bool_decide_eq_false_2 (k = 0%nat) ltac:(lia)).
+  rewrite (bool_decide_eq_false_2 (k = 1%nat) ltac:(lia)).
+  reflexivity.
+Qed.
+
+(* the CONGRUENCE: the predicate reads the record's two inum bytes and the
+   flavour, and nothing else -- so a record whose halfword did not move
+   and whose flavour did not change counts the same. *)
+Lemma dlc_ctb_agree (F G : nat -> bool) (data data' : nat -> list (bv 8))
+    (k : nat) :
+  dir_inum data' k = dir_inum data k -> G k = F k ->
+  dlc_ctb G data' k = dlc_ctb F data k.
+Proof.
+  intros Hin HF. unfold dlc_ctb, dir_liveb, dir_freeb.
+  rewrite Hin. rewrite HF. reflexivity.
+Qed.
+
+(* the EMPTY count -- what an [isdirempty] walk's conclusion turns into *)
+Lemma dcnt_false (p : nat -> bool) (n : nat) :
+  (forall k : nat, (k < n)%nat -> p k = false) -> dcnt p n = 0%nat.
+Proof.
+  induction n as [| n IH]; intro H; [reflexivity |].
+  rewrite (dcnt_S p n). rewrite (H n ltac:(lia)).
+  rewrite (IH ltac:(intros k Hk; apply H; lia)). lia.
+Qed.
+
+(* the flavour map a writer installs: the written slot's flavour is
+   whatever the ticket it deposited was, and every other record keeps
+   its own.  Handed out as an EXISTENTIAL so no proof has to name a
+   [Nat.eq_dec] lambda or unfold a [set]-bound local. *)
+Lemma dlc_upd_map (F : nat -> bool) (k0 : nat) (b : bool) :
+  exists G : nat -> bool, G k0 = b /\ (forall k : nat, k <> k0 -> G k = F k).
+Proof.
+  exists (fun k => if Nat.eq_dec k k0 then b else F k). split.
+  - destruct (Nat.eq_dec k0 k0); [reflexivity | congruence].
+  - intros k Hk. destruct (Nat.eq_dec k k0); [congruence | reflexivity].
+Qed.
+
+(* ---- the two count comparisons a dirlink's write needs ---------------- *)
+
+(* the no-op: nothing moved, so nothing counts differently *)
+Lemma dlc_count_agree (F G : nat -> bool) (data data' : nat -> list (bv 8))
+    (n : nat) :
+  (forall k : nat, dir_inum data' k = dir_inum data k) ->
+  (forall k : nat, G k = F k) ->
+  dlc_count G data' n = dlc_count F data n.
+Proof.
+  intros Hin HF. unfold dlc_count. apply dcnt_ext. intros k _.
+  exact (dlc_ctb_agree F G data data' k (Hin k) (HF k)).
+Qed.
+
+(* THE APPEND, at a slot whose ticket is PLAIN: the count cannot fall.
+   Every record but [k0] keeps its halfword and its flavour, and [k0]
+   itself was not counted before -- free below the record count, out of
+   range at it. *)
+Lemma dlc_count_slot_ge (F G : nat -> bool) (data data' : nat -> list (bv 8))
+    (n n' k0 : nat) :
+  (n <= n')%nat ->
+  (forall k : nat, k <> k0 -> dir_inum data' k = dir_inum data k) ->
+  (forall k : nat, k <> k0 -> G k = F k) ->
+  ((k0 < n)%nat -> dir_inum data k0 = bv_0 16) ->
+  (dlc_count F data n <= dlc_count G data' n')%nat.
+Proof.
+  intros Hn Hin HF Hfree. unfold dlc_count.
+  apply (dcnt_slot_ge _ _ n n' k0 Hn).
+  - intros k Hk Hk0. exact (dlc_ctb_agree F G data data' k (Hin k Hk0) (HF k Hk0)).
+  - intro Hlt. apply dlc_ctb_dead.
+    apply (proj2 (dir_liveb_false data k0)). exact (Hfree Hlt).
+Qed.
+
+(* ...AND THE APPEND AT A D-FLAVOURED SLOT, which is create's [mkdir] and
+   the only writer that raises a directory's count.  The record that goes
+   in is live, is not a dot, and its ticket is [ilinkd] -- so the bound's
+   right-hand side rises by one, exactly as [dp->nlink++] raises its
+   left. *)
+Lemma dlc_count_set_ge (F G : nat -> bool) (data data' : nat -> list (bv 8))
+    (n n' k0 : nat) :
+  (n <= n')%nat -> (2 <= k0)%nat -> (k0 < n')%nat ->
+  (forall k : nat, k <> k0 -> dir_inum data' k = dir_inum data k) ->
+  (forall k : nat, k <> k0 -> G k = F k) ->
+  ((k0 < n)%nat -> dir_inum data k0 = bv_0 16) ->
+  dir_live data' k0 -> G k0 = true ->
+  (S (dlc_count F data n) <= dlc_count G data' n')%nat.
+Proof.
+  intros Hn Hk2 Hk0 Hin HF Hfree Hlv HG. unfold dlc_count.
+  apply (dcnt_set_ge _ _ n n' k0 Hn Hk0).
+  - intros k Hk Hk0'. exact (dlc_ctb_agree F G data data' k (Hin k Hk0') (HF k Hk0')).
+  - intro Hlt. apply dlc_ctb_dead.
+    apply (proj2 (dir_liveb_false data k0)). exact (Hfree Hlt).
+  - exact (dlc_ctb_true G data' k0 Hk2 Hlv HG).
+Qed.
+
+(* THE ZEROING, and it is the only place the count FALLS.  The record at
+   [k0] dies; every other one rides; so the count falls by at most one, and
+   by NOTHING unless [k0]'s ticket was d-flavoured.  That is what makes
+   sys_unlink's file arm free and its directory arm exact. *)
+Lemma dlc_count_kill (F : nat -> bool) (data data' : nat -> list (bv 8))
+    (n k0 : nat) :
+  (forall k : nat, k <> k0 -> dir_inum data' k = dir_inum data k) ->
+  (dlc_count F data n
+   <= dlc_count F data' n + (if F k0 then 1 else 0))%nat.
+Proof.
+  intro Hin. unfold dlc_count.
+  pose proof (dcnt_diff1 (dlc_ctb F data) (dlc_ctb F data') n k0
+                ltac:(intros k Hk Hk0;
+                      exact (dlc_ctb_agree F F data data' k (Hin k Hk0) eq_refl)))
+    as Hd.
+  destruct (dlc_ctb F data k0) eqn:EC.
+  - assert (HF : F k0 = true).
+    { destruct (F k0) eqn:EF; [reflexivity |].
+      rewrite (dlc_ctb_flav F data k0 EF) in EC. discriminate. }
+    rewrite HF. lia.
+  - destruct (F k0); lia.
+Qed.
+
+(* ---- the clause's own movers ----------------------------------------- *)
+
+(* THE FREE DISCHARGE, and it is what every fresh, orphaned and truncated
+   record takes: a count of at most one needs no records at all.  mkfs's
+   image is the same corner (its directories have [nlink = 1]). *)
+Lemma dlc_bound_le1 (F : nat -> bool) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn) <= 1 -> dlc_bound F dn data.
+Proof.
+  intro H. unfold dlc_bound. pose proof (Nat2Z.is_nonneg
+    (dlc_count F data (dir_nrec (bv_unsigned (di_size dn))))). lia.
+Qed.
+
+(* **THE CLAUSE'S PAYOFF, PURE HALF (S7-unlink FINDING 3).**  A directory
+   whose records past the two dots are all DEAD has no subdirectories, so
+   the count is zero and the bound reads [nlink <= 1].  The premise is
+   exactly what the isdirempty loop concludes, and the conclusion is the
+   fact the T_DIR re-park's grey ticket needs, one [blez] short. *)
+Lemma dlc_bound_empty (F : nat -> bool) (dn : dinode)
+    (data : nat -> list (bv 8)) :
+  (forall k : nat, (2 <= k)%nat ->
+     (k < dir_nrec (bv_unsigned (di_size dn)))%nat ->
+     dir_inum data k = bv_0 16) ->
+  dlc_bound F dn data ->
+  bv_unsigned (di_nlink dn) <= 1.
+Proof.
+  intros Hdead Hb. unfold dlc_bound, dlc_count in Hb.
+  rewrite (dcnt_false (dlc_ctb F data) _) in Hb; [lia |].
+  intros k Hk.
+  destruct (Nat.lt_ge_cases k 2) as [Hlt | Hge];
+    [exact (dlc_ctb_dot F data k Hlt) |].
+  apply dlc_ctb_dead. apply (proj2 (dir_liveb_false data k)).
+  exact (Hdead k Hge Hk).
+Qed.
+
+(* the general step: the count may not fall faster than the bound does *)
+Lemma dlc_bound_le (F G : nat -> bool) (dn dn' : dinode)
+    (data data' : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn') <= bv_unsigned (di_nlink dn) ->
+  (dlc_count F data (dir_nrec (bv_unsigned (di_size dn)))
+   <= dlc_count G data' (dir_nrec (bv_unsigned (di_size dn'))))%nat ->
+  dlc_bound F dn data -> dlc_bound G dn' data'.
+Proof. unfold dlc_bound. lia. Qed.
+
+(* ...and the one create's [dp->nlink++] takes, where the count rose by one
+   and the record count rose with it. *)
+Lemma dlc_bound_bump (F G : nat -> bool) (dn dn' : dinode)
+    (data data' : nat -> list (bv 8)) :
+  bv_unsigned (di_nlink dn') <= bv_unsigned (di_nlink dn) + 1 ->
+  (S (dlc_count F data (dir_nrec (bv_unsigned (di_size dn))))
+   <= dlc_count G data' (dir_nrec (bv_unsigned (di_size dn'))))%nat ->
+  dlc_bound F dn data -> dlc_bound G dn' data'.
+Proof. unfold dlc_bound. lia. Qed.
+
+(* THE [++] ITSELF IS CROSSED BY [DirLinks.dlc_bv_add1_le] AND IT TAKES NO
+   GUARD -- the store is a sixteen-bit increment and it wraps at 65535 to
+   ZERO, which is below any bound at all.  It lives one file up because
+   this one has no [add_vec] in scope (and importing SailStdpp's operators
+   here would put ssreflect's [rewrite] in scope, which every proof above
+   is written against the absence of). *)
