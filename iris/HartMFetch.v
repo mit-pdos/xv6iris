@@ -761,8 +761,12 @@ Section fetch.
   Qed.
 
   (* the 2-byte instance *)
+  (* the 2-byte instance, with the two addresses SEPARATE: the model
+     translates and reads at [granule_start], and the second halfword of a
+     base instruction at a 2-mod-4 pc is fetched at [pc+2] while
+     [fetch_start] stays [pc]. *)
   Lemma swp_fetch_bytes_M2 (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (rs : regstate) (fs gs : SailStdpp.Values.mword 64)
       (w : SailStdpp.Values.mword 16) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
@@ -773,10 +777,10 @@ Section fetch.
     hreg_frame_ro Df rs Dro -∗
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
        swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine
-              (Physaddr pc) 2 false false false false)
+              (Physaddr gs) 2 false false false false)
          (fun r => (⌜r = Values.Ok (w, tt)⌝ ∗
                     hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)%I)) -∗
-    swp (fetch_bytes pc pc 2)
+    swp (fetch_bytes fs gs 2)
       (fun r => ⌜r = @FetchBytes_Success 2 w⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
@@ -786,15 +790,15 @@ Section fetch.
     unfold fetch_bytes.
     cbn beta iota zeta delta [ext_fetch_check_pc].
     rewrite mbind0_ret.
-    iApply (swp_use_cer (translateAddr (Virtaddr pc) (InstructionFetch tt))
+    iApply (swp_use_cer (translateAddr (Virtaddr gs) (InstructionFetch tt))
               _ _ C HC with "[Hrw Hro] [-]").
-    { iApply (swp_translateAddr_M Drw Dro Df rs pc Hdisj HDmst HDpriv Hpriv
+    { iApply (swp_translateAddr_M Drw Dro Df rs gs Hdisj HDmst HDpriv Hpriv
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     iApply (swp_use_cer
-              (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pc) 2
+              (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr gs) 2
                  false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
-    { iApply (swp_mem_read_M2 Drw Dro Df rs (Physaddr pc) w Hdisj HDmst
+    { iApply (swp_mem_read_M2 Drw Dro Df rs (Physaddr gs) w Hdisj HDmst
                 HDpriv Hpriv with "Hcert Hrw Hro Hcmr"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite autocast_id mcer_ret.
@@ -987,6 +991,121 @@ Section fetch.
     iApply ("Hcont" $! (F_RVC h)). by iFrame.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* A BASE INSTRUCTION AT A 2-mod-4 pc: TWO halfword fetches, then     *)
+  (* [F_Base (concat_vec ihi ilo)].  This case is real -- strncpy+0xe   *)
+  (* is a BGE sitting after seven compressed instructions -- so it is   *)
+  (* not an exotic corner the kernel avoids.                             *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_fetch_base2 (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (ilo ihi : SailStdpp.Values.mword 16) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (misa : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = true ->
+    eq_vec (_get_Misa_C (register_lookup misa rs))
+      (MachineWord.MachineWord.N_to_word 1 1%N) = true ->
+    isRVC ilo = false ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch_bytes pc pc 2)
+         (fun r => ⌜r = @FetchBytes_Success 2 ilo⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (fetch_bytes pc (add_vec_int pc 2) 2)
+         (fun r => ⌜r = @FetchBytes_Success 2 ihi⌝ ∗
+                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = F_Base (concat_vec ihi ilo)⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDpc HDmisa Hpc Hb0 Hb1 HmisaC Hnrvc.
+    iIntros "#Hcert Hrw Hro Hlo Hhi".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch. mf_glue.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". mf_glue.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". mf_glue.
+    rewrite mbind0_ret. unfold Defs.or_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb0.
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta. rewrite Hb1.
+    (* bit 1 SET: the Zca probe IS reached *)
+    rewrite mf_cE_Zca_eq_local.
+    iApply (swp_use_cer3 (Defs.read_reg misa) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmisa
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite HmisaC. cbn beta iota.
+    rewrite mbind_ret. cbn beta.
+    (* the 4-alignment test is FALSE, so the and_boolM short-circuits *)
+    unfold Defs.and_boolM.
+    iApply (swp_use_cer3 (Defs.read_reg (R_bitvector_64 PC)) _ _ _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)".
+    rewrite Hpc mbind_ret. cbn beta.
+    rewrite (mf_align4_false pc Hb1). cbn beta iota.
+    rewrite mbind_ret. cbn beta.
+    (* the two PC reads feeding the FIRST halfword fetch *)
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (fetch_bytes pc pc 2) _ _ C HC
+              with "[Hrw Hro Hlo] [-]").
+    { iApply ("Hlo" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    (* NOT compressed, so the model goes back for the high halfword *)
+    rewrite Hnrvc. cbn beta iota.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (Defs.read_reg (R_bitvector_64 PC)) _ _ C HC
+              with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpc
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpc.
+    iApply (swp_use_cer (fetch_bytes pc (add_vec_int pc 2) 2) _ _ C HC
+              with "[Hrw Hro Hhi] [-]").
+    { iApply ("Hhi" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite mcer_ret.
+    iApply ("Hcont" $! (F_Base (concat_vec ihi ilo))). by iFrame.
+  Qed.
+
   (* THE COMPOSITION: [fetch] with [fetch_bytes] filled in, leaving only
      [checked_mem_read] -- where [pmpCheck] and the memory event live -- as
      the obligation. *)
@@ -1121,7 +1240,7 @@ Section fetch.
     iApply (swp_fetch_rvc2 Drw Dro Df rs pc h Hdisj HDpc HDmisa Hpc Hb0 Hb1
               HmisaC Hrvc with "Hcert Hrw Hro [Hmem]").
     iIntros "Hrw Hro".
-    iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc h Hdisj HDmst HDpriv Hpriv
+    iApply (swp_fetch_bytes_M2 Drw Dro Df rs pc pc h Hdisj HDmst HDpriv Hpriv
               with "Hcert Hrw Hro [Hmem]").
     iIntros "Hrw Hro".
     iApply (swp_checked_mem_read_ifetch2 Drw Dro Df rs pc pmar0 pcfg h
