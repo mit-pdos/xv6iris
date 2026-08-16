@@ -190,6 +190,14 @@ Lemma mbind_ret {E A B : Type} (v : A) (f : A -> Defs.monad E B) :
   Defs.bind (Interface.Ret v) f = f v.
 Proof. reflexivity. Qed.
 
+Lemma mliftR_ret {E R A : Type} (v : A) :
+  Defs.liftR (E := E) (R := R) (Interface.Ret v) = Interface.Ret v.
+Proof. reflexivity. Qed.
+
+Lemma mcer_ret {E A : Type} (v : A) :
+  Defs.catch_early_return (E := E) (Interface.Ret v) = Interface.Ret v.
+Proof. reflexivity. Qed.
+
 (* ====================================================================== *)
 (* 2. [swp].                                                               *)
 (* ====================================================================== *)
