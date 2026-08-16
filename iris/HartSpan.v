@@ -245,6 +245,60 @@ Lemma hfrun_write {X : Type} (n : nat) (D Drw : gset register)
     else None.
 Proof. reflexivity. Qed.
 
+(* THE WALKER COMPOSES.  Without these two, an [hfrun] fact about a model
+   function is useless inside the walk of its CALLER -- the walker would
+   simply re-walk the callee's body inline, and every per-function fact
+   would have to be re-proven at every call site.  [hfrun_bind] is the pure
+   analogue of [swp_bind], and [hfrun_mono] is what lets the two fuels be
+   chosen independently. *)
+Lemma hfrun_mono {X : Type} (n n' : nat) (D Drw : gset register)
+    (rs : regstate) (m : M X) (r : X * regstate) :
+  (n <= n')%nat -> hfrun n D Drw rs m = Some r -> hfrun n' D Drw rs m = Some r.
+Proof.
+  revert n' rs m. induction n as [|n IH]; intros n' rs m Hle H; [discriminate H|].
+  destruct n' as [|n']; [exfalso; lia|].
+  destruct m as [z|T oc k]; [exact H|].
+  destruct oc; cbn in H |- *; try discriminate H;
+    [ destruct (bool_decide (reg ∈ D)); [|discriminate H]
+    | destruct (bool_decide (reg ∈ Drw)); [|discriminate H]
+    | .. ];
+    apply (IH n' _ _ ltac:(lia) H).
+Qed.
+
+Lemma hfrun_bind {X Y : Type} (n k : nat) (D Drw : gset register)
+    (rs rs' rs'' : regstate) (m : M X) (f : X -> M Y) (x : X) (y : Y) :
+  hfrun n D Drw rs m = Some (x, rs') ->
+  hfrun k D Drw rs' (f x) = Some (y, rs'') ->
+  hfrun (n + k) D Drw rs (Defs.bind m f) = Some (y, rs'').
+Proof.
+  revert rs m. induction n as [|n IH]; intros rs m H1 H2; [discriminate H1|].
+  destruct m as [z|T oc kk].
+  - cbn in H1. injection H1 as <- <-.
+    exact (hfrun_mono k (S n + k) D Drw rs (f z) (y, rs'') ltac:(lia) H2).
+  - destruct oc; cbn in H1 |- *; try discriminate H1.
+    + destruct (bool_decide (reg ∈ D)); [|discriminate H1]. by apply IH.
+    + destruct (bool_decide (reg ∈ Drw)); [|discriminate H1]. by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+    + by apply IH.
+Qed.
+
+Lemma hfrun_bind0 {Y : Type} (n k : nat) (D Drw : gset register)
+    (rs rs' rs'' : regstate) (m : M unit) (n0 : M Y) (y : Y) :
+  hfrun n D Drw rs m = Some (tt, rs') ->
+  hfrun k D Drw rs' n0 = Some (y, rs'') ->
+  hfrun (n + k) D Drw rs (Defs.bind0 m n0) = Some (y, rs'').
+Proof. intros H1 H2. exact (hfrun_bind n k D Drw rs rs' rs'' m _ tt y H1 H2). Qed.
+
 (* ====================================================================== *)
 (* 2. Structural well-foundedness of the monad: each span step's           *)
 (*    continuation is an immediate subterm.  The [Acc] fixpoint is what    *)
