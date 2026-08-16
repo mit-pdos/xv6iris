@@ -1040,6 +1040,54 @@ the paid park FEEDABLE means flipping that cone to KT1.
   `Local Instance : CurKtier := KT1`. The witness-delivery fork is
   settled by K2a; what is LEFT is the engine funnels, which drop the
   witness on the way through (K2a findings, "What K2b must know").
+- [ ] **K2b — the flip itself** (design settled 2026-08-16 off two recons
+  + K2a's findings; MEASURE BEFORE CHOOSING THE LAST STEP'S SHAPE):
+  - THE FACTS. (1) The funnel is the choke point: every leaf funnels
+    through `WpSmodeIntr.wp_instr_s_sconf` → `WpIntrInv.wp_exec_step_intr`
+    → the Banach fixpoint, all stated bare (ambient KT0 at their own
+    definition sites); even the phase-D `_t` leaves index only the DATUM.
+    (2) No Module-Type sweep exists for the capability family: 0 Module
+    Types and 0 Link files name it (the 114-file matching-pairs trap is
+    the MEMORY family's). (3) Proofs thread the capability BY NAME off
+    callee postconditions — never reconstructed — so the textual surface
+    is the SPECS (193 Spec files mention `sie_cap_gpr`, 2-4 sites each)
+    plus the 34 positional-destructure proof files K2a already repaired.
+    (4) THE TWO-TIER-PER-FILE FACT: a post-boot proof needs its CAPABILITY
+    (and kstack facts) at KT1 but its DATA (fs buffers, proc fields — all
+    statically mapped) honestly at KT0, and one file's single ambient
+    instance cannot serve both. So the flip is NOT `Local Instance :=
+    KT1` per file — it is an explicit KT1 spelling of the CAPABILITY in
+    post-boot specs (data spellings stay at the KT0 ambient).
+  - K2b-1 (next, well-defined): WIDEN THE ENGINE TRIPLE. `WpSconfCsr`'s
+    engine funnels hand the capability to the σ-callback as
+    `stack_own ∗ ⌜SIE⌝ ∗ sie_arm` and take it back the same way — the
+    witness does not survive the crossing; six sites re-conjure it with
+    `sie_cap_wit_KT0` (grep for the name: those sites are exactly what
+    breaks at KT1). Widen the triple to carry the witness (persistent, so
+    the callback side is free), retire the re-conjures.
+  - K2b-2: the funnel + leaves go TIER-GENERIC in the capability
+    (`sie_cap_gpr (KTR := kt)` premise/give-back at the same kt), with
+    the CORRELATION PREMISE `⌜b = true → kt = KT1⌝` (the user's
+    "interrupts on ⟹ KT1" made spec-local); the fixpoint chain
+    (`ihs_*_of` + `ihs_of`/`ihs_pre`/`ihs`) is PINNED at KT1 (the binder
+    on all three at once, per its own comment). The resumed capability is
+    then KT1, consistent with the premise. Boot (kt=KT0) has b=false;
+    post-boot (kt=KT1) discharges trivially.
+  - K2b-3, THE SWEEP (measure first): flip the capability spelling to KT1
+    in the post-boot Spec files + their proofs' fallout. Caller/callee
+    agreement makes this atomic along call edges (no KT1→KT0
+    down-conversion exists) — but by-name threading should make per-proof
+    fallout small. BEFORE choosing between one mechanical mega-sweep and
+    kt-generic spec statements (binder + premise per spec), PROBE: flip
+    ONE cone end-to-end (sys_getpid + myproc) and measure the per-file
+    cost. The dual-regime cone (printk/console/uart, memset/memmove,
+    acquire/release, kalloc/kfree — the measured boot∩post-boot set)
+    stays kt-GENERIC regardless, with the correlation premise; boot-only
+    files pin KT0.
+  - `SpecForkretParkPaid.v:114`'s `stack_own` conjunct (the real
+    stack-sourcing axiom seam — SpecUserinit does NOT source kstacks; it
+    runs on hart 0's boot stack) gets its `(KTR := KT1)` spelling in this
+    sweep.
 - [ ] **K3 — the lifecycle** (restores the RED-era kexit shape, now
   payable): `proc_dormant` gains the stack in BOTH arms; allocproc hands
   it out (beside `fd_slots FDSPARE`, via `proc_dormant_unused`); kexit
