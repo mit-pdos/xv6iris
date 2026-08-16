@@ -9225,6 +9225,46 @@ mkdir arm (which moves both together), and it still leaves the walk needing
 needed is a DESIGN ruling on how an empty directory's count becomes
 readable, not a proof.**  Do not start the walk's T_DIR arm before it lands.
 
+### FINDING 3's CARRIER — **V1 IS LANDED AND GATED.  The ledger's `w` is a
+### PAIR, `ilinkd` is the count-fact fragment, and (T1) is the region
+### clause it buys.  THE WALL ITSELF IS UNMOVED**
+
+The design above asked for "a DESIGN ruling on how an empty directory's
+count becomes readable".  The ruling is the count-fact carrier, staged V1 /
+V2 / V3; **V1 — the carrier, with no producer and no consumer — is landed**
+and its full record is
+[`fs-fragments-campaign.md`](fs-fragments-campaign.md)'s V1 section.  What
+S7-unlink needs to know:
+
+* `IcacheRef.linkElemUR`'s `w` is now `(wl, wd)`, and **(L1) is the SUM**
+  `wl + wd <= nlink`.  `InodeRegion.ireg_link_ok` and `ireg_root_ok` are
+  UNCHANGED — applied at `wl + wd` — so nothing this walk reads off either
+  predicate moved.  `IregLinkNz.ireg_link_nz` and
+  `DirLinks.dir_links_nlink_drop` are untouched.
+* `IcacheRef.ilinkd z` is the d-flavoured fragment: the SAME one unit of
+  payment an `ilink` is, filed in the component that carries (T1),
+  `0 < wd -> di_type d = T_DIR`.  There is no `ilinkd z -∗ ilink z` and
+  there cannot be one.
+* `IregDirBit.ireg_dirbit_ty` reads the type off a record the caller NAMES,
+  mask-preserving, everything handed back — `ireg_link_nz`'s structural
+  copy one clause across.
+* `SpecIupdate.wp_iupdate_link` / `_unlink` are option-flavour indexed
+  (R6's `filled` precedent). **Every current caller, including every
+  `sys_link` and `create` site, is at `None`, where the contracts are
+  byte-equivalent to what landed.**  Nothing in `ProofSysUnlinkParts.v` or
+  `ProofSysUnlinkTails.v` moved, and neither did `SpecSysUnlink.v`.
+
+**THE STOP STILL STANDS FOR THE WALK.**  V1 gives the TYPE of a record a
+paid d-flavoured fragment names.  It does NOT give a count: `ilinkd` bounds
+`wd` from BELOW, and the model still bounds the ledger only from below,
+which is this finding's actual wall.  `su_dir_links_orphan`'s one pure
+premise — `di_nlink ip = 1` before the decrement — is **still unsupplied**,
+and the T_DIR half of W5 is still blocked.  What changes is that the
+carrier the repair needs now exists and is gated: V2 establishes the
+flavoured mint at create's `dp->nlink++` and states the `DirLinks`/`DirView`
+clause that turns it into an upper bound; V3 is this walk's consumption.
+**Do not start the T_DIR arm before V2 lands.**
+
 ### THE TWO CLAUSES THE WALK SPENDS, and what each hands back
 
 Both ride in `IcacheEscrow.ipool_alloc` and `ic_loaded` since the payload

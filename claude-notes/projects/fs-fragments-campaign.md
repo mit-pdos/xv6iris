@@ -15,6 +15,9 @@ diverged from the design's sketches, and what is left.
 | **F1.5c** | (L5), `fdetached`, the mint, the option-indexed read at ilock, the axiom deletes | IcacheRef, InodeRegion, IcacheBoot, SpecIalloc, SpecIlock + 9, ProofCreate | **F1.5d** | NOT STARTED — **do not start** (R7) |
 | **F1.5d** | `ireg_free_au`'s `c = None` | SpecIget + 4 sites, SpecIupdate, ProofIput | §20.17.5's residue + C′ (**the root clause AND the isdirempty plank are landed** — see below) | NOT STARTED |
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
+| **V1** | the COUNT-FACT CARRIER: `w` widened to `(wl, wd)`, `ilinkd`, (T1), the flavour-indexed movers and `wp_iupdate_link`/`_unlink` | IcacheRef, InodeRegion, IregLinkNz, `IregDirBit.v` (new), IcacheBoot, SpecIupdate, ProofIupdate + 3 callers | full cone | **LANDED** |
+| **V2** | the `DirLinks`/`DirView` clause + the d-flavoured mint ESTABLISHED at create's `dp->nlink++` (+0xc4) and sys_link's | DirLinks, DirView, ProofCreate, ProofSysLink | V1 | NOT STARTED |
+| **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | NOT STARTED |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
 landed contract and no landed proof moved.
@@ -838,3 +841,138 @@ the image that enforces it (`sys_link`'s ARM E2, `ProofSysLinkTails.sl_tail_e2`)
 What still gates F1.5d is finding 2 alone — §20.17.4's `".."`-location
 fact.  See [`../kernel-defects.md`](../kernel-defects.md) and
 [`../xv6-bump-playbook.md`](../xv6-bump-playbook.md).
+
+## V1 — THE COUNT-FACT CARRIER, LANDED.  `w` is a PAIR, (T1) is a
+## SEPARATE CONJUNCT, and every landed caller stands at the plain flavour
+
+The design of record is `fs-sysfile.md`'s S7-unlink **FINDING 3** (the
+T_DIR re-park's missing model fact) and the probe that answered it.  V1 is
+the CARRIER only: it is designed so that green = today's tree and the
+increment is independently correct with **no new consumer**.  V2
+establishes the flavoured fragment, V3 spends it.
+
+### What the widening actually is
+
+`IcacheRef.linkElemUR`'s `w` component becomes `prodUR natUR natUR`, i.e.
+`w = (wl, wd)`:
+
+* `wl` — a paid record whose holder knows nothing about the target's type.
+  The fragment is `ilink z`, **unchanged in name, in meaning, and in every
+  landed consumer**.
+* `wd` — a paid record whose holder ALSO knows the target is a directory.
+  The fragment is the new `ilinkd z`.
+
+**(L1) IS THE SUM.**  `ireg_link_ok` and `ireg_root_ok` are applied at
+`wl + wd` and are THEMSELVES UNCHANGED — same definitions, same projection
+lemmas, same three conjuncts.  That is the whole reason the ~350-file cone
+cost one arithmetic rewrite per mover instead of a sweep: the two
+predicates have consumers all over the tree reading them by projection, and
+none of them moved.  The only files that name `lelem`/`link_auth` at all
+are `IcacheRef.v`, `InodeRegion.v`, `IregLinkNz.v` and `IcacheBoot.v`
+(verified by grep before the edit, which is what made the widening a local
+change).
+
+**(T1) IS A SEPARATE CONJUNCT, NOT A FOURTH CLAUSE OF `ireg_link_ok`** —
+the root clause's recorded discipline, applied a second time.  It is
+`InodeRegion.ireg_dir_ok d wd := (0 < wd)%nat -> di_type d = ireg_dir_ty`,
+riding in `ireg_slot` beside `ireg_link_ok` and `ireg_root_ok`, with five
+projection lemmas (`_zero` / `_ty` / `_stable` / `_intro` / `_le`).
+
+**THE TYPE IS A LITERAL at the region's own key type**, exactly as
+`ireg_root` is: `ireg_dir_ty : Z := 1`, so `InodeRegion.v` acquires no
+`DirView` import for one constant.  `IregDirBit.ireg_dir_ty_T_DIR_z` is the
+bridge and it is one `reflexivity` — `IregLinkNz.ireg_root_ROOTINO`'s twin.
+
+### The mover table, and what each one cost
+
+| mover | (L1) at the sum | (T1) |
+|---|---|---|
+| `ireg_write_au` | the same `di_nlink_stable` rewrite, at `wl + wd` | RIDES: `di_type_stable`'s left disjunct is dead against the nonzero-type premise, so the type is literally the same halfword |
+| `ireg_write_link_fl` | `S wl + wd` and `wl + S wd` are both `S (wl + wd)` — one `Hsum` equation, and the arithmetic below it is the landed proof verbatim | plain: rides; d: **the mover's own new premise IS (T1)** at the written record |
+| `ireg_write_unlink_fl` | dual, `S (wl' + wd') = wl + wd` | **DISCHARGED, not taken**: lowering `wd` only weakens the antecedent (`ireg_dir_ok_le`) |
+| `ireg_claim_au` | `ireg_link_ok_free` now gives `wl + wd = 0`, split by `ireg_sum_zero` | VACUOUS at `wd = 0` |
+| `ireg_free_au` | `ireg_wle_zero` at the sum, same split | VACUOUS at `wd = 0` |
+| `ireg_withdraw` | record, counts and authority all unchanged | rides untouched |
+| `ireg_link_grey` | `g` moves and nothing else | rides untouched |
+| `ireg_link_alloc` | `1 <= wl` weakens to `1 <= wl + wd` in one `lia` | not read |
+
+**THE TWO nlink-MOVING MOVERS ARE FLAVOUR-INDEXED, AND THE PLAIN FORMS ARE
+INSTANCES.**  `ireg_write_link_fl` / `ireg_write_unlink_fl` carry the whole
+proof once; `ireg_write_link` / `ireg_write_unlink` are their `None`
+instances **stated verbatim as they landed**, so nothing downstream sees the
+index, and `ireg_write_link_d` / `ireg_write_unlink_d` are the `Some tt`
+ones.  This is `wp_bmap_gen`/`wp_balloc_gen`'s pattern one layer down, and
+it is what kept the diff to the region's six movers plus two thin wrappers.
+
+### The read half — `IregDirBit.v` (new leaf, ~140 lines)
+
+`ireg_dirbit_ty : ireg_inv ∗ dinode_at γi inum dn ∗ ilinkd (bv_unsigned inum)
+={E}=∗ ⌜di_type dn = T_DIR_z⌝ ∗ (both back)`.  It is
+`IregLinkNz.ireg_link_nz`'s structural copy with (L1) replaced by (T1) —
+same premises, same opening, same re-park, one different pure step — and it
+lives in a LEAF for that file's recorded reason (an additive lemma inside
+`InodeRegion.v` costs ~350 files on every iteration).  Fold both leaves back
+at a milestone.
+
+**IT DOES NOT GIVE A COUNT, AND SAYING SO IS THE POINT.**  `ilinkd` bounds
+`wd` BELOW; the model still bounds the ledger only below, which is FINDING
+3's actual wall and V1 does not move it.  What V1 delivers is the TYPE of
+the record a paid d-flavoured fragment names — the fact V2's `DirLinks` /
+`DirView` clause is keyed on.
+
+### The contracts — an option-flavour INPUT, R6's precedent exactly
+
+`SpecIupdate.wp_iupdate_link` / `_unlink` gain `(fl : option unit)`
+positionally beside `cru`.
+
+* `link`: the payout becomes `ilink_fl fl (bv_unsigned inum)` and ONE
+  premise is added, `fl = Some tt -> di_type dn = ireg_dir_ty` — vacuous at
+  `None`, discharged by `ltac:(discriminate)` at every landed caller.
+* `unlink`: the SPENT resource becomes `ilink_fl fl …` and **no premise is
+  added on either arm**.
+
+`ilink_fl None` IS `ilink` by iota, so every landed continuation
+(`iIntros "… Hilink …"`, every `with "… Hlink …"` spec pattern) is unchanged
+to the character.  R6 applies and §20.16.5(e)'s death certificate does not,
+for its own stated reason: this is an indexed INPUT, not an obligation the
+region owes back on every firing.
+
+**EVERY CURRENT CALLER IS AT PLAIN, DELIBERATELY.**  Six sites, all edited
+to pass `None`: `ProofCreate` +0xc4 (the child mint) and the mkdir
+`dp->nlink++`, `ProofSysLink`'s `ip->nlink++`, `ProofCreate`'s two fail-arm
+flushes and `ProofSysLinkTails`' `bad:` flush.  **The d-flavoured mint at
+create's `dp->nlink++` is V2's establishment and was NOT made here** — V1
+lands a carrier with no producer and no consumer on purpose, so that its
+gate is a pure regression test.
+
+### Boot — verified, not restructured
+
+`IcacheBoot.ireg_alloc` takes `link_auth z 0 0 0 None 0`: the image's
+authorities are **all-plain**, `wd = 0` at every inum, so (T1) is vacuous at
+every slot and the image obligation set does not grow.  A d-flavoured
+fragment can only ever come out of `ireg_write_link_d`, i.e. out of a
+running kernel at a `dp->nlink++`; mkfs's records are handed to the region
+unflavoured.  `image_root_alive` is untouched.
+
+### Gate
+
+Full cone on a private lane tree (`/home/ubuntu/v1` on the build box), NOT
+the shared mirror — a sibling lane was landing `ProofSysUnlink.v` W1–W4
+under my cone throughout, which is exactly the condition the "how the gates
+were run" section above says makes the shared mirror ungateable.  Baseline
+green first, then the edit.
+
+### What V2 inherits
+
+* `ireg_write_link_d` — the mover create's `dp->nlink++` at +0xc4 goes
+  through; its one premise is `di_type dn' = ireg_dir_ty` at the flushed
+  parent record, which create's walk has (it locked `dp` and read its type).
+* `wp_iupdate_link` at `fl := Some tt` — the contract that carries it, and
+  the `ltac:(discriminate)` at that call site becomes a real proof.
+* `IregDirBit.ireg_dirbit_ty` — the read, ready and with no consumer.
+* `ireg_write_unlink_d` / `wp_iupdate_unlink` at `Some tt` — the spend, so
+  the flavour is not one-way. V3's walk uses it.
+* **Not inherited, and still open: an UPPER bound on the ledger.**  V1
+  changes nothing about FINDING 3's arithmetic — `di_nlink ip = 1` at an
+  empty directory is still stated nowhere, and `ilinkd` does not state it.
+  V2's `DirLinks`/`DirView` clause is where that has to come from.
