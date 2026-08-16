@@ -9070,7 +9070,19 @@ lands.  The decomposition, with every exit already in hand:
   parameters, `X` the opaque frame both hand back.
 * **W5, +0x8a..+0x0d8** — `memset(&de,0,16)`, `writei(dp,0,&de,off,16)`
   (**`su_panic_writei`** on the short write), where `dir_links_unlink`
-  fires CALLER-side and releases the `ilink`; the second T_DIR test at
+  fires CALLER-side and releases the `ilink`.  THREE facts settled ahead
+  of the walk: (i) `ip->nlink--`'s `wp_iupdate_unlink` receipt must be the
+  **LEFT** disjunct (`γ = icfg_log ∧ inodestart = icfg_ist` — thread
+  `g = icfg_log` down to W5): a FILE's decrement can land at ZERO, where
+  the right disjunct (`di_nlink dn <> 0` of the NEW record) is unprovable;
+  the "RIGHT disjunct" reading fits only `dp`'s decrement, which lands
+  nonzero.  (ii) `dir_links_unlink`'s `dir_inum datd kk <> self` premise
+  comes from **`InodeRegion.dinode_at_excl`**: if the inums were equal,
+  dp's and ip's `dinode_at` at the one `γi` collide (`su_zext32_unsigned`
+  bridges the `zero_extend' 32`).  (iii) writei needs `printk_gen_contract`
+  + `printk_env` — the top-level contract has them (`γpr`), W1/W2 never
+  threaded them; W5 takes them directly (persistent), no seam re-thread.
+  Then the second T_DIR test at
   +0xb4 and the +0x146 tail's `dp->nlink--` (spending the `".."` ticket the
   `dir_dots_ix` + `fdir_dots_index` + `dir_links_dotdot_out` chain names);
   `iunlockput(dp)` CREDITED; `ip->nlink--` + `wp_iupdate_unlink`;
