@@ -445,6 +445,57 @@ declaration order.
   at kvminithart; the SIE='1' arm pins KT1.
 - **Phase E** (design §9 step 7, later): `text_pointsto`/TRAMPOLINE.
 
+### Phase A findings (LANDED)
+
+Landed as designed — 19 files, whole-tree build green. Deviations and
+facts phases B–D need:
+
+- **The one-shot's three faces are gname-explicit definitions in
+  `RiscvPtsto.v`** (`strans_pending_at` / `strans_kpt_at` / `kpt_on_at`,
+  beside `gen_auth`), and `IntrDefs`' `strans_pending` / `strans_kpt` /
+  `kpt_on c` are those at `strans_name cpu_id` / `strans_name c`. This is
+  NOT cosmetic: `DiskPtsto.diskGhostG` carries a second `mono_natG Σ`
+  (`disk_nc_inG`), and `BootShared`'s allocation section binds it beside
+  `riscvGS` — a raw `mono_nat_auth_own` written there resolves to the disk
+  instance and then will not unify with `IntrDefs`', both printing
+  identically. Anything phase B–D writes over the one-shot outside a
+  `riscvGS`-only context must go through these definitions.
+- **No Σ / functor / adequacy-statement change.** `mono_natG Σ` already
+  reaches every site as `riscvF_genGS` (a `::` substructure of
+  `riscvFixedGS`, itself one of `riscvGS`), and `mono_natΣ` is already in
+  `riscvΣ`. `ghost_varG (mword 1)` stays for `sie_gname`/`spp`/`spie`.
+- **`strans_inv_acc_kpt` no longer returns the receipt** (persistent), so
+  its conclusion is just `∃ root_ppn, tlb_res_pt ∗ (tlb_res_pt -∗
+  strans_inv)`. Its single consumer (`WpSconfCsr.wp_csrr_satp_*`) now
+  introduces the receipt as `#Hkptr`. `strans_bit_flip` → `strans_flip`
+  (`strans_pending -∗ strans_pending ==∗ strans_kpt ∗ kpt_on cpu_id`);
+  `strans_bit_agree` is gone, replaced by `kpt_on_pending_False` and
+  `strans_pending_kpt_False`. Everything else kept its name and shape.
+- **`SmodeCore.strans_bit_bare` / `strans_bit_kpt` DELETED** — nothing else
+  consumed them. `sie_bit_off` stays.
+- **`UsertrapRes.ut_trap_parked` keeps two conjuncts**, now `strans_kpt ∗
+  kpt_on cpu_id` (was two `strans_bit` halves). Nothing relied on the
+  CLIENT receipt being exclusive; the "nobody is using the slot" property
+  that file's comment leans on is now carried by the auth at fraction 1,
+  which is strictly stronger. No escalation was needed anywhere.
+- **Every other consumer was a pure textual substitution**
+  (`strans_bit strans_bit_bare` → `strans_pending`,
+  `strans_bit strans_bit_kpt` → `kpt_on cpu_id`) and needed NO proof
+  change — including the `wp_next` continuations, where `cpu_id` resolves
+  to the innermost `CpuId` exactly as the old implicit section argument
+  did, so `(CID := c)` re-anchoring still works unchanged.
+- **`Qp.half_half` REWRITE DIRECTION.** Combining the two pending halves
+  by rewriting the goal's `1` BACKWARDS into `1/2 + 1/2` also rewrites the
+  `1` inside every `1/2` in the proofmode CONTEXT — `envs_entails Δ Q` is
+  one term — leaving `mono_nat_auth_own … ((1/2 + 1/2)/2)` hypotheses and
+  an `iFrame: cannot frame` naming a fraction nobody wrote. Build the sum
+  with the `Fractional` instance first (`iAssert … (1/2 + 1/2)`), then
+  rewrite FORWARDS. `IntrDefs.strans_pending_combine` carries the note.
+- For phase B: `sr_kwit := kpt_on cpu_id` is ready to use as designed;
+  `kpt_on` has `Persistent` and `Timeless` instances declared, and the
+  Bare-arm refutation `strans_absorb_wit` needs is exactly
+  `kpt_on_pending_False`.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc

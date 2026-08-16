@@ -403,8 +403,8 @@ Section BootRun.
      mb_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
      stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
      (* --- the bridge's adequacy-minted and .bss inputs --- *)
-     strans_bit strans_bit_bare ∗
-     strans_bit strans_bit_bare ∗
+     strans_pending ∗
+     strans_pending ∗
      ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗

@@ -42,7 +42,8 @@
 From Stdlib Require Import ZArith Bool Lia.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap.
+From iris.base_logic.lib Require Import ghost_var ghost_map invariants gen_heap
+                                        mono_nat.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
@@ -803,7 +804,7 @@ Section IntrDefsBase.
      WHY IT CANNOT LIVE IN [sie_cap].  The capability is threaded from the
      very first S-mode instruction, long before kvminithart installs the
      kernel table -- [sie_cap_intro_bare] builds it over the Bare arm -- so
-     a capability that always carried [strans_bit_kpt] could not be
+     a capability that always carried [kpt_on] could not be
      constructed at boot at all.
 
      WHY IT BELONGS TO THIS BUNDLE.  Once interrupts are ENABLED the
@@ -816,9 +817,89 @@ Section IntrDefsBase.
      INVARIANT instead of a convention, and it is what lets kernel code READ
      satp ([strans_inv_acc_kpt]) -- which usertrapret's
      [p->trapframe->kernel_satp = r_satp()] needs and which nothing could do
-     before, the receipt having been dropped by [main]. *)
-  Definition strans_bit (b : mword 1) : iProp Σ :=
-    ghost_var (strans_name cpu_id) (1/2)%Qp b.
+     before, the receipt having been dropped by [main].
+
+     THE RECEIPT IS PERSISTENT, and that is what the whole shape is for.  The
+     per-hart translation regime is MONOTONE -- Bare -> KPT, once per era
+     (kexec starts a new era with a fresh [era_strans_name], so within-era
+     persistence is safe) -- so it is tracked by a ONE-SHOT [mono_nat] rather
+     than a two-valued [ghost_var]:
+
+       [strans_pending]  auth at 0, HALF.  Two halves exist: the Bare arm of
+                         [strans_inv] holds one, the boot receipt is the
+                         other.  Their conjunction is the full auth at 0,
+                         which is what the kvminithart flip shoots.
+       [strans_kpt]      the FULL auth at 1 -- the KPT arm's own conjunct,
+                         and exclusive, so a slot cannot be in two places.
+       [kpt_on c]        the lower bound 1: PERSISTENT and TIMELESS, the
+                         shot's certificate, i.e. "hart [c] has the kernel
+                         page table installed".  This is what every CLIENT
+                         holds; nothing needs it to be exclusive.
+
+     The three conflicts that replace the old bit AGREEMENT:
+       - [kpt_on] against a pending half     -> 1 <= 0            (pins KPT)
+       - a pending half against [strans_kpt] -> 1/2 + 1 <= 1      (pins Bare)
+       - two pending halves                  -> agree at 0, no work.
+
+     The three faces are [RiscvPtsto]'s gname-explicit [strans_pending_at] /
+     [strans_kpt_at] / [kpt_on_at] at this hart's [strans_name] -- see the
+     note there for why they are definitions and not raw [mono_nat] at each
+     site. *)
+  Definition strans_pending : iProp Σ :=
+    strans_pending_at (strans_name cpu_id).
+
+  Definition strans_kpt : iProp Σ :=
+    strans_kpt_at (strans_name cpu_id).
+
+  Definition kpt_on (c : CPU) : iProp Σ :=
+    kpt_on_at (strans_name c).
+
+  Global Instance kpt_on_persistent (c : CPU) : Persistent (kpt_on c).
+  Proof. rewrite /kpt_on /kpt_on_at. apply _. Qed.
+  Global Instance kpt_on_timeless (c : CPU) : Timeless (kpt_on c).
+  Proof. rewrite /kpt_on /kpt_on_at. apply _. Qed.
+  Global Instance strans_pending_timeless : Timeless strans_pending.
+  Proof. rewrite /strans_pending /strans_pending_at. apply _. Qed.
+  Global Instance strans_kpt_timeless : Timeless strans_kpt.
+  Proof. rewrite /strans_kpt /strans_kpt_at. apply _. Qed.
+
+  (* THE TWO CONFLICTS, stated here beside the definitions because
+     [strans_inv]'s accessors below are their only real consumers. *)
+  Lemma kpt_on_pending_False : kpt_on cpu_id -∗ strans_pending -∗ ⌜ False ⌝.
+  Proof.
+    rewrite /kpt_on /kpt_on_at /strans_pending /strans_pending_at.
+    iIntros "Hlb Hauth".
+    iDestruct (mono_nat_lb_own_valid with "Hauth Hlb") as %[_ Hle].
+    iPureIntro. lia.
+  Qed.
+
+  Lemma strans_pending_kpt_False : strans_pending -∗ strans_kpt -∗ ⌜ False ⌝.
+  Proof.
+    rewrite /strans_pending /strans_pending_at /strans_kpt /strans_kpt_at.
+    iIntros "H1 H2".
+    iDestruct (mono_nat_auth_own_agree with "H1 H2") as %[Hq _].
+    iPureIntro. by eapply Qp.not_add_le_r.
+  Qed.
+
+  (* the two pending halves are the full auth: what the flip consumes.
+     NOTE THE DIRECTION OF THE [Qp.half_half] REWRITE.  Going BACKWARDS (turn
+     the goal's [1] into [1/2 + 1/2]) also rewrites the [1] INSIDE every
+     [1/2] in the proofmode context -- the whole [envs_entails Δ Q] is one
+     term -- and leaves [((1/2 + 1/2)/2)] hypotheses that frame against
+     nothing.  Build the sum first, then rewrite FORWARDS. *)
+  Lemma strans_pending_combine :
+    strans_pending -∗ strans_pending -∗
+    mono_nat_auth_own (strans_name cpu_id) 1%Qp 0%nat.
+  Proof.
+    rewrite /strans_pending /strans_pending_at. iIntros "H1 H2".
+    iAssert (mono_nat_auth_own (strans_name cpu_id) (1/2 + 1/2)%Qp 0%nat)
+      with "[H1 H2]" as "H".
+    { iApply (bi.equiv_entails_1_2 _ _
+                (mono_nat_auth_own_fractional (strans_name cpu_id) 0%nat
+                   (1/2)%Qp (1/2)%Qp)).
+      iFrame "H1 H2". }
+    rewrite Qp.half_half. iExact "H".
+  Qed.
 
   (* [intr_count] IS NOW LEVEL + EIGHTH, WITH NO PAYLOAD.  It used to carry
      [intr_handler_avail] at [n ≥ 1 ∧ eb = true] -- the "the pop will re-enable,
@@ -1099,78 +1180,74 @@ Section IntrDefsBase.
      The Bare→KPT move happens once, at kvminithart: dissolve the left arm
      (it owns the satp cell the switch writes), build [tlb_inv_pt], hand the
      stvec cell out to the boot code.
-     GHOST-TRACKED ARM: each arm carries half of a [ghost_var strans_name]
-     bit ('b"0" = Bare, 'b"1" = kernel PT installed); the bit is the arm
-     INDICATOR.  A client that holds the matching half pins the arm
-     (agreement -- the "still-Bare receipt"), and the kvminithart switch
-     flips it with both halves.  In practice the flip is one-way: the boot
-     receipt is the only outside half ever minted, so the arm only ever
-     moves Bare→KPT. *)
-  (* [strans_bit] itself is DEFINED ABOVE [trap_csrs] (§6b), because the KPT
+     GHOST-TRACKED ARM: the arm is the value of a per-hart ONE-SHOT
+     ([strans_pending] / [strans_kpt] / [kpt_on], §6b).  The Bare arm holds
+     one PENDING half (the boot receipt is the other); the KPT arm holds the
+     shot's FULL auth.  A client pins an arm by CONFLICT rather than by
+     agreement -- [kpt_on] against a pending half is 1 <= 0, a pending half
+     against the shot auth is a fraction above 1 -- and the kvminithart
+     switch SHOOTS, with both pending halves.  The flip is one-way by
+     construction now, not merely in practice: [kpt_on] is persistent and
+     [mono_nat] cannot go back down. *)
+  (* the one-shot itself is DEFINED ABOVE [trap_csrs] (§6b), because the KPT
      receipt is one of that bundle's members.  Only the slot and its movers
      live here. *)
 
   Definition strans_inv : iProp Σ :=
-    ((strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
-     ∨ (strans_bit ('b"1") ∗ ∃ root_ppn : mword 44, tlb_res_pt root_ppn))%I.
+    ((strans_pending ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v))
+     ∨ (strans_kpt ∗ ∃ root_ppn : mword 44, tlb_res_pt root_ppn))%I.
 
   Lemma strans_inv_intro (root_ppn : mword 44) :
-    strans_bit ('b"1") -∗ tlb_res_pt root_ppn -∗ strans_inv.
+    strans_kpt -∗ tlb_res_pt root_ppn -∗ strans_inv.
   Proof. iIntros "Hbit H". iRight. iFrame "Hbit". iExists root_ppn. iExact "H". Qed.
 
   Lemma strans_inv_intro_bare (v : mword 64) :
-    strans_bit ('b"0") -∗ bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
+    strans_pending -∗ bare_inv -∗ stvec ↦ᵣ v -∗ strans_inv.
   Proof. iIntros "Hbit Hb Hstv". iLeft. iFrame "Hbit Hb". iExists v. iExact "Hstv". Qed.
 
-  Lemma strans_bit_agree b b' : strans_bit b -∗ strans_bit b' -∗ ⌜b = b'⌝.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (ghost_var_agree with "H1 H2") as %He. done.
-  Qed.
-
-  (* the receipt pins the arm at Bare and opens it, returning BOTH halves
-     (the client's + the arm's) so the switch can flip the bit. *)
+  (* the still-Bare receipt pins the arm at Bare and opens it, returning BOTH
+     pending halves so the switch can shoot. *)
   Lemma strans_inv_acc_bare :
-    strans_bit ('b"0") -∗ strans_inv -∗
-    strans_bit ('b"0") ∗ strans_bit ('b"0") ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v).
+    strans_pending -∗ strans_inv -∗
+    strans_pending ∗ strans_pending ∗ bare_inv ∗ (∃ v : mword 64, stvec ↦ᵣ v).
   Proof.
     iIntros "Hrcpt [(Hbit & Hb & Hstv) | (Hbit & _)]".
     - iFrame "Hrcpt Hbit Hb Hstv".
-    - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate.
+    - iDestruct (strans_pending_kpt_False with "Hrcpt Hbit") as %[].
   Qed.
 
   (* THE KPT MIRROR of [strans_inv_acc_bare], and the reason the receipt is
      worth carrying.  It BORROWS rather than dissolves: the Bare accessor
-     hands both halves out because kvminithart is about to flip the bit,
-     whereas a reader of the kernel table wants the slot back unchanged, so
-     this returns the client's receipt plus a wand that re-seals the arm from
-     the residue.  The root stays EXISTENTIAL -- the sconf tier is
-     deliberately root-free, and a caller that needs to identify the root
-     does so at the boundary where it is named, not here. *)
+     hands both halves out because kvminithart is about to shoot, whereas a
+     reader of the kernel table wants the slot back unchanged, so this
+     returns a wand that re-seals the arm from the residue.  The receipt
+     itself is NOT returned -- [kpt_on] is persistent, so the caller still
+     has it.  The root stays EXISTENTIAL -- the sconf tier is deliberately
+     root-free, and a caller that needs to identify the root does so at the
+     boundary where it is named, not here. *)
   Lemma strans_inv_acc_kpt :
-    strans_bit strans_bit_kpt -∗ strans_inv -∗
-    strans_bit strans_bit_kpt ∗
+    kpt_on cpu_id -∗ strans_inv -∗
     ∃ root_ppn : mword 44,
       tlb_res_pt root_ppn ∗ (tlb_res_pt root_ppn -∗ strans_inv).
   Proof.
     iIntros "Hrcpt [(Hbit & _ & _) | (Hbit & Hres)]".
-    - iDestruct (strans_bit_agree with "Hrcpt Hbit") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate.
-    - iFrame "Hrcpt". iDestruct "Hres" as (root_ppn) "Hres".
+    - iDestruct (kpt_on_pending_False with "Hrcpt Hbit") as %[].
+    - iDestruct "Hres" as (root_ppn) "Hres".
       iExists root_ppn. iFrame "Hres".
       iIntros "Hres". iApply (strans_inv_intro root_ppn with "Hbit Hres").
   Qed.
 
-  (* both halves -> flip to '1', split back into two halves. *)
-  Lemma strans_bit_flip :
-    strans_bit ('b"0") -∗ strans_bit ('b"0") ==∗ strans_bit ('b"1") ∗ strans_bit ('b"1").
+  (* THE SHOT: both pending halves -> the KPT arm's full auth, plus the
+     persistent certificate.  Only ONE thing comes back for the client, and
+     it never has to be handed anywhere again. *)
+  Lemma strans_flip :
+    strans_pending -∗ strans_pending ==∗ strans_kpt ∗ kpt_on cpu_id.
   Proof.
     iIntros "H1 H2".
-    iMod (ghost_var_update_halves ('b"1" : mword 1) with "H1 H2") as "[H1 H2]".
-    iModIntro. iFrame.
+    iDestruct (strans_pending_combine with "H1 H2") as "H".
+    rewrite /strans_kpt /strans_kpt_at /kpt_on /kpt_on_at.
+    iMod (mono_nat_own_update 1%nat with "H") as "[Ha Hlb]"; [lia|].
+    iModIntro. iFrame "Ha Hlb".
   Qed.
 
   (* two FULL cells of the same register cannot coexist -- the Bare∧SIE='1'
@@ -1324,7 +1401,7 @@ Section IntrDefsBase.
            R cpu_id ∗
            (* the KPT receipt: interrupts on implies the kernel table is
               installed, so it has exactly this arm's lifetime (§6b). *)
-           strans_bit strans_bit_kpt ∗
+           kpt_on cpu_id ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1373,7 +1450,7 @@ Section IntrDefsBase.
         members.  A trap cannot change which table is installed, so this is a
         pure hand-over -- and it is what [WpSconfSret.wp_sret_s_sconf] asks of
         whoever re-enables interrupts. *)
-     strans_bit strans_bit_kpt ∗
+     kpt_on cpu_id ∗
      (* ∅: the trap fired with interrupts ENABLED, and an enabled hart holds
         no spinlock -- so a handler always starts from the empty held set,
         which is what makes its own acquires (clockintr's tickslock,
@@ -1703,14 +1780,14 @@ Section IntrDefs.
      (∃ v : mword 64, stval ↦ᵣ v) ∗
      (∃ a b : mword 1, sret_bits a b) ∗
      intr_res ∗
-     strans_bit strans_bit_kpt)%I.
+     kpt_on cpu_id)%I.
 
   Lemma trap_csrs_of_raw :
-    trap_csrs_raw -∗ intr_res -∗ strans_bit strans_bit_kpt -∗ trap_csrs.
+    trap_csrs_raw -∗ intr_res -∗ kpt_on cpu_id -∗ trap_csrs.
   Proof. iIntros "(Ha & Hb & Hc & Hd) Hres Hkpt". iFrame. Qed.
 
   Lemma trap_csrs_to_raw :
-    trap_csrs -∗ trap_csrs_raw ∗ intr_res ∗ strans_bit strans_bit_kpt.
+    trap_csrs -∗ trap_csrs_raw ∗ intr_res ∗ kpt_on cpu_id.
   Proof. iIntros "(Ha & Hb & Hc & Hd & Hres & Hkpt)". iFrame. Qed.
 
   Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
@@ -1824,7 +1901,7 @@ Section IntrDefs.
   Qed.
 
   (* THE KPT RECEIPT IS AN ENABLED-ARM MEMBER, for the reason spelled out at
-     [strans_bit] (§6b): interrupts on implies the kernel table is installed,
+     the one-shot (§6b): interrupts on implies the kernel table is installed,
      so the receipt has exactly this arm's lifetime.  The DISABLED arm does
      not carry it -- which is what keeps boot constructible, since every
      instruction before kvminithart runs at [b = false] over the Bare slot. *)
@@ -1832,7 +1909,7 @@ Section IntrDefs.
     (if b
      then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
            intr_res ∗
-           strans_bit strans_bit_kpt ∗
+           kpt_on cpu_id ∗
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1862,7 +1939,7 @@ Section IntrDefs.
     (ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) ∨
      (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
       intr_res ∗
-      strans_bit strans_bit_kpt ∗
+      kpt_on cpu_id ∗
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
@@ -1926,17 +2003,16 @@ Section IntrDefs.
     sie_cap m avail true p -∗
     ∃ root_ppn : mword 44,
       stack_own (m !!! Regidx csp_rs1) (trap_res true + avail) ∗
-      strans_bit ('b"1") ∗ tlb_res_pt root_ppn ∗ sie_arm true p.
+      strans_kpt ∗ tlb_res_pt root_ppn ∗ sie_arm true p.
   Proof.
     iIntros "(Hstk & Htr & Harm)".
     iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-    { (* the arm's own KPT RECEIPT against the Bare arm's bit: agreement, no
-         cell conflict needed (the receipt landed in the arm upstream). *)
+    { (* the arm's own KPT RECEIPT against the Bare arm's pending half: the
+         one-shot conflict, no cell conflict needed (the receipt landed in
+         the arm upstream). *)
       iEval (rewrite /sie_arm) in "Harm".
       iDestruct "Harm" as "(_ & _ & Hrcpt & _)".
-      iDestruct (strans_bit_agree with "Hrcpt Hbit0") as %Hbad.
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
-      vm_compute in Hbad. discriminate. }
+      iDestruct (kpt_on_pending_False with "Hrcpt Hbit0") as %[]. }
     iDestruct "Hkpt" as (root_ppn) "Htlb".
     iExists root_ppn. iFrame "Hstk Hbit1 Htlb Harm".
   Qed.
@@ -2177,7 +2253,7 @@ Section IntrDefs.
   (* BOOT ENTRY: the capability at the Bare regime, from raw boot
      resources -- the free-stack carve, satp still Bare + PMP, the
      UNWRITTEN stvec cell (no trap handler installed), the translation
-     slot's Bare arm-bit half [strans_bit ('b"0")] (its twin is kept boot
+     slot's PENDING half [strans_pending] (its twin is kept boot
      side as the still-Bare receipt), and the SIE ghost's kernel-code
      eighth at '0' -- i.e. the capability comes out at the [b = false]
      arm, interrupts off.  Nothing here requires the
@@ -2195,7 +2271,7 @@ Section IntrDefs.
   Lemma sie_cap_intro_bare (m : regfile) (avail : nat)
       (v : mword 64) {p : mword 64} :
     stack_own (m !!! Regidx csp_rs1) avail -∗
-    strans_bit ('b"0") -∗
+    strans_pending -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
     ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1) -∗

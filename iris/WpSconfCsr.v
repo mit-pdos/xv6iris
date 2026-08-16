@@ -2419,8 +2419,8 @@ Section WpSconfCsr.
      is vacuous however carefully it is proved.  (It was: this lemma had
      that shape until prepare_return tried to call it.)
 
-     WHAT THE CALLER SUPPLIES INSTEAD IS THE KPT RECEIPT.  [strans_bit
-     strans_bit_kpt] pins the arm at KPT and opens it
+     WHAT THE CALLER SUPPLIES INSTEAD IS THE KPT RECEIPT.  [kpt_on cpu_id]
+     pins the arm at KPT and opens it
      ([IntrDefs.strans_inv_acc_kpt]); the cell comes out of the
      [tlb_res_pt] inside ([KptShare.tlb_res_pt_satp_acc]) and goes straight
      back, so the borrow never escapes this leaf and the bundle handed back
@@ -2439,7 +2439,7 @@ Section WpSconfCsr.
     uint rd <> 0 ->
     rd_ok rd ->
     sie_cap_gpr m n false p -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_satp, zreg, Regidx rd, CSRRS)) -∗
     wp_next false p (fun (CID : CpuId) =>
@@ -2450,12 +2450,12 @@ Section WpSconfCsr.
       ⌜ autocast (T := mword) (satp_to_ppn (autocast (T := mword) sp0 : mword 64))
           = root ⌝ -∗
       sie_cap_gpr (<[Regidx rd := regval_into_reg sp0]> m) n false p -∗
-      strans_bit strans_bit_kpt -∗
+      kpt_on cpu_id -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok) "Hcg Hkptr Hpc Hinstr Hcont".
+    iIntros (Hrd Hrdok) "Hcg #Hkptr Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iApply (wp_instr_s_sconf m n false pc false
@@ -2467,8 +2467,7 @@ Section WpSconfCsr.
        [tlb_res_pt] lends the cell, and both closures are held until the
        bundle is rebuilt below. *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-    iDestruct (strans_inv_acc_kpt with "Hkptr Htr") as "(Hkptr & Htrx)".
-    iDestruct "Htrx" as (root) "(Htlb & Htrback)".
+    iDestruct (strans_inv_acc_kpt with "Hkptr Htr") as (root) "(Htlb & Htrback)".
     iDestruct (tlb_res_pt_satp_acc with "Htlb")
       as (v) "(Hcell & %Hmode & %Hasid & %Hppn & Htlbback)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".

@@ -221,7 +221,7 @@ Definition wp_prepare_return_sconf_body
          the sret. *)
       ghost_var sie_gname (1/4) vb -∗
       (* the KPT receipt, likewise out of [trap_csrs] and not folded back *)
-      strans_bit strans_bit_kpt -∗
+      kpt_on cpu_id -∗
       (* the process block, with the four kernel words re-armed *)
       proc_priv γf p pid
         (upd_tf V (prepare_return_tf (pv_tf V) ksat

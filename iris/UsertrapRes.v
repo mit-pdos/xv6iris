@@ -146,7 +146,7 @@ Section UsertrapRes.
         of SpecUsertrap.v's restatement *)
      strans_inv ∗
      sie_arm false pj ∗
-     strans_bit strans_bit_kpt ∗
+     kpt_on cpu_id ∗
      (* NOT [IntrDefs.sconf_priv_closer]: [mie]/[mideleg]/[menvcfg] are
         [user_cfg]'s cells too (uservec/userret/user-mode hold them the
         whole time usertrap ISN'T running), so [ut_trap] cannot claim them
@@ -164,27 +164,27 @@ Section UsertrapRes.
   (* THE PARKED FORM: [ut_trap] WITHOUT THE TRANSLATION SLOT.             *)
   (*                                                                      *)
   (* [ut_trap] owns [satp] -- its [strans_inv] is pinned to the KPT arm by *)
-  (* the [strans_bit strans_bit_kpt] beside it, and that arm IS            *)
+  (* the [kpt_on cpu_id] beside it, and that arm IS                        *)
   (* [tlb_res_pt], whose [satp ↦ᵣ] is full.  That is correct for the state *)
   (* usertrap RUNS in, and WRONG for anything parked across user           *)
   (* execution: while the user runs, [UptTree.utlb_inv_pt] owns [satp] (at *)
   (* the USER root), so a residue also holding [strans_inv] makes the pair *)
-  (* contradictory -- [strans_inv ∗ strans_bit strans_bit_kpt ∗            *)
+  (* contradictory -- [strans_inv ∗ kpt_on cpu_id ∗                        *)
   (* utlb_inv_pt _ _ _ ⊢ False] is provable, which silently turns any      *)
   (* consumer holding both into a vacuous lemma.                          *)
   (*                                                                      *)
-  (* So the parked form drops [strans_inv] and keeps BOTH [strans_bit]     *)
-  (* halves loose (the slot's own and the client's -- [strans_bit] is a    *)
-  (* [ghost_var] at [1/2], so the two together are full ownership of the   *)
-  (* bit, which is exactly "nobody is using the translation slot right     *)
-  (* now").  uservec's exit switch produces the [tlb_res_pt] that          *)
+  (* So the parked form drops [strans_inv] and keeps the one-shot's own    *)
+  (* [strans_kpt] auth loose beside the client's persistent [kpt_on]: the  *)
+  (* auth is at fraction 1, so holding it IS "nobody is using the          *)
+  (* translation slot right now" (a second copy is unsatisfiable).         *)
+  (* uservec's exit switch produces the [tlb_res_pt] that                  *)
   (* completes it ([ut_trap_tlb_close]); userret's entry switch takes it   *)
   (* back out ([ut_trap_tlb_open]).                                       *)
   Definition ut_trap_parked (pj : mword 64) (ksp : mword 64) (av : nat)
       (lks : gset string) : iProp Σ :=
     (ut_stack ksp av ∗
      sie_arm false pj ∗
-     strans_bit strans_bit_kpt ∗ strans_bit strans_bit_kpt ∗
+     strans_kpt ∗ kpt_on cpu_id ∗
      ut_ghosts ∗
      cpu_own 0%nat false pj false lks ∗
      cpu_claim pj)%I.
@@ -193,9 +193,8 @@ Section UsertrapRes.
       (lks : gset string) (kroot : mword 44) :
     ut_trap_parked pj ksp av lks -∗ tlb_res_pt kroot -∗ ut_trap pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Harm & Hb1 & Hb2 & Hgh & Hcpu & Hclm) Hkres".
+    iIntros "(Hstk & Harm & Hb1 & #Hb2 & Hgh & Hcpu & Hclm) Hkres".
     rewrite /ut_trap. iFrame "Hstk Harm Hb2 Hgh Hcpu Hclm".
-    rewrite /strans_bit_kpt.
     iApply (strans_inv_intro kroot with "Hb1 Hkres").
   Qed.
 
@@ -204,14 +203,13 @@ Section UsertrapRes.
     ut_trap pj ksp av lks -∗
     ∃ kroot : mword 44, tlb_res_pt kroot ∗ ut_trap_parked pj ksp av lks.
   Proof.
-    iIntros "(Hstk & Hstr & Harm & Hbit & Hgh & Hcpu & Hclm)".
-    (* the bit BESIDE the slot pins the slot's arm: at Bare the two would
-       disagree, so only the KPT arm survives. *)
+    iIntros "(Hstk & Hstr & Harm & #Hbit & Hgh & Hcpu & Hclm)".
+    (* the receipt BESIDE the slot pins the slot's arm: at Bare the shot's
+       lower bound and the pending half conflict, so only KPT survives. *)
     iDestruct "Hstr" as "[(Hb0 & _ & _) | (Hb1 & Hkpt)]".
-    { iDestruct (strans_bit_agree with "Hb0 Hbit") as %He.
-      rewrite /strans_bit_kpt in He. discriminate He. }
+    { iDestruct (kpt_on_pending_False with "Hbit Hb0") as %[]. }
     iDestruct "Hkpt" as (kroot) "Hkres".
-    iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked /strans_bit_kpt.
+    iExists kroot. iFrame "Hkres". rewrite /ut_trap_parked.
     iFrame "Hstk Harm Hb1 Hbit Hgh Hcpu Hclm".
   Qed.
 
@@ -265,7 +263,7 @@ Section UsertrapRes.
       cpu_own 0%nat false pj false lks ∗
       cpu_claim pj ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
-      strans_bit strans_bit_kpt ∗
+      kpt_on cpu_id ∗
       sret_bits ('b"0" : mword 1) ('b"1" : mword 1).
   Proof.
     intros Hmsf Hsie Hspp Hspie Hsp Htp Hmiev Hmask Hmenvv.
@@ -369,7 +367,7 @@ Section UsertrapRes.
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     intr_handler_spec (mword_of_int KernelSyms.kernelvec : mword 64) -∗
     trap_csrs.
   Proof.
@@ -1149,7 +1147,7 @@ Section UsertrapRes.
      stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
      sret_bits ('b"0" : mword 1) ('b"1" : mword 1) ∗
-     strans_bit strans_bit_kpt)%I.
+     kpt_on cpu_id)%I.
 
   Lemma ut_csrs_raw_fold (ep sc st : mword 64) :
     ut_csrs_raw ep sc st -∗

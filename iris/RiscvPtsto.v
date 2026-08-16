@@ -188,18 +188,20 @@ Record riscvEraGS := RiscvEraGS {
      [kmap_name] does: the residue rides inside [sie_cap]/[intr_frame], so a
      class would have to be threaded through every sconf-tier file. *)
   era_kpt_name : gname;
-  (* the S-mode translation-slot arm bit ('b"0" = Bare, 'b"1" = kernel PT
-     installed): a global ghost name (like [kmap_name]) tracking which arm
-     of [strans_inv] the capability's translation slot is in.  A client
-     half held outside the slot is a "still-Bare receipt" pinning the arm;
-     the kvminithart switch flips it with both halves.  The [ghost_varG Σ
-     (mword 1)] functor instance comes from [sieG] at the use sites (NOT a
-     field here -- a second [ghost_varG Σ (mword 1)] instance would make
-     typeclass resolution ambiguous between two functor slots).
+  (* the S-mode translation ONE-SHOT (Bare -> kernel PT installed): a ghost
+     name tracking which arm of [strans_inv] the capability's translation
+     slot is in.  A pending half held outside the slot is the "still-Bare
+     receipt"; the kvminithart switch SHOOTS with both pending halves and
+     mints the PERSISTENT certificate [IntrDefs.kpt_on].  The three faces
+     are [strans_pending_at] / [strans_kpt_at] / [kpt_on_at] below; the
+     [mono_natG Σ] functor instance is [riscvF_genGS] (the power layer's --
+     there is only one in a [riscvFixedGS] context, which is exactly why
+     those three are definitions).  Monotone, hence safely persistent WITHIN
+     an era: kexec starts a new era with a fresh name.
      PER-HART, like [cpu_reg_name]: satp and tlb are per-hart registers, so
      which arm a hart's translation slot is in is a per-hart fact, and the
      shared-kernel-table sweep (claude-notes/completed/kpt-share.md) needs
-     every hart to flip its own bit at its own kvminithart. *)
+     every hart to shoot its own at its own kvminithart. *)
   era_strans_name : CPU -> gname;
   (* the SIE ghost, CANONICALLY per hart -- the same shape as [strans_name],
      and for the same reason: mstatus.SIE is a per-hart register, so which
@@ -501,6 +503,27 @@ Definition gen_born `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_gen_name gen.
 Definition gen_dead `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_gen_name (S gen).
+
+(* THE S-MODE TRANSLATION ONE-SHOT, at an explicit gname (the per-hart
+   [strans_name c] / era-explicit [era_strans_name HE c]).  [IntrDefs] names
+   the ambient-hart forms [strans_pending] / [strans_kpt] / [kpt_on c] on top
+   of these; the slot itself and everything it means live there.
+
+   SPELLED THROUGH A DEFINITION HERE, NOT RAW AT EACH SITE, FOR THE INSTANCE.
+   [DiskPtsto.diskGhostG] carries a SECOND [mono_natG Σ] ([disk_nc_inG]), and
+   [BootShared]'s allocation section binds both it and [riscvGS] -- so a raw
+   [mono_nat_auth_own] written there resolves to whichever instance search
+   reaches first and then fails to unify with the one [IntrDefs] used, with
+   both propositions printing identically (LogInv.v's duplicate-class trap).
+   Fixing the instance at the definition, in a context where [riscvFixedGS]'s
+   [riscv_gen_inG] is the only one, makes every site agree by construction --
+   exactly why [gen_auth] above is a definition too. *)
+Definition strans_pending_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
+  mono_nat_auth_own γ (1/2)%Qp 0%nat.
+Definition strans_kpt_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
+  mono_nat_auth_own γ 1%Qp 1%nat.
+Definition kpt_on_at `{!riscvFixedGS Σ} (γ : gname) : iProp Σ :=
+  mono_nat_lb_own γ 1%nat.
 
 (* the started-generations counter's faces.  [start_count] is the pure
    value [state_interp] pins; [gen_started gen] says generation [gen]'s

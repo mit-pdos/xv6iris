@@ -207,7 +207,7 @@ Section UtRet2.
     sret_bits ('b"0" : mword 1) ('b"1" : mword 1) -∗
     stvec ↦ᵣ uservec_tvec -∗
     ghost_var sie_gname (1/4) vb -∗
-    strans_bit strans_bit_kpt -∗
+    kpt_on cpu_id -∗
     ut_env Rsys N V -∗
     ut_frame ksp (m0 !!! Regidx Rra) (m0 !!! Regidx Rs0)
                  (m0 !!! Regidx Rs1) (m0 !!! Regidx Rs2) -∗

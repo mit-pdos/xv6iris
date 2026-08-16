@@ -289,7 +289,7 @@ Definition wp_kerneltrap_sconf_body
      returning trap can no more re-enable them without it than without the
      handler resource.  It crosses the yield park inside [trap_csrs] and comes
      back as the RESUMING hart's, which is why it is a post as well. *)
-  strans_bit strans_bit_kpt -∗
+  kpt_on cpu_id -∗
   cpu_own 0 false p false lks -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
@@ -313,7 +313,7 @@ Definition wp_kerneltrap_sconf_body
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       (* at the RESUMING hart -- see the premise *)
       intr_res -∗
-      strans_bit strans_bit_kpt -∗
+      kpt_on cpu_id -∗
       cpu_own 0 false p false lks -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)

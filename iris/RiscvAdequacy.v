@@ -61,7 +61,7 @@ Require Import KMap.    (* kmap_auth / kmap_wf_M0 *)
 Require Import BootCarve.  (* the boot-image carving library: the claims-bundle
                               persist and the rwx three-way split at [text_end],
                               lifted out of this proof so there is ONE copy *)
-Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans arm bit *)
+Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the SIE/SPP/SPIE ghosts *)
 Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
 Require Import PlicPlan DiskPtsto VirtioProto WpUart.
@@ -250,10 +250,36 @@ Section reg_alloc.
       rewrite decide_False; [done|].
       intros ->. apply Hc. by eapply elem_of_list_lookup_2.
   Qed.
+  (* THE PER-HART ONE-SHOT allocation, [ghost_var_alloc_halves_cpus]' mono_nat
+     twin: one fresh name per hart, the auth minted at 0 and split into the two
+     PENDING halves.  What [strans_name : CPU -> gname] needs -- the
+     translation-slot one-shot ([IntrDefs.strans_pending] / [strans_kpt] /
+     [kpt_on]) is per-hart, since satp/tlb are.  The lower bound
+     [mono_nat_own_alloc] also hands back is at 0 and is dropped: only the
+     bound at 1, minted by the kvminithart shot, ever means anything. *)
+  Lemma mono_nat_alloc_halves_cpus `{!mono_natG Σ} (n : nat) (cs : list CPU) :
+    NoDup cs ->
+    ⊢ |==> ∃ f : CPU -> gname,
+      [∗ list] c ∈ cs,
+        (mono_nat_auth_own (f c) (1/2)%Qp n ∗ mono_nat_auth_own (f c) (1/2)%Qp n).
+  Proof.
+    induction cs as [|c cs' IH]; intros Hnd.
+    - iModIntro. iExists (fun _ => 1%positive). done.
+    - apply NoDup_cons in Hnd as [Hc Hnd'].
+      iMod (IH Hnd') as (fr) "Hrest".
+      iMod (mono_nat_own_alloc n) as (γ) "[Hg _]".
+      iDestruct "Hg" as "[HgA HgB]".
+      iModIntro. iExists (fun c' => if decide (c' = c) then γ else fr c').
+      rewrite big_sepL_cons. iSplitL "HgA HgB".
+      { rewrite decide_True //. iFrame "HgA HgB". }
+      iApply (big_sepL_mono with "Hrest").
+      intros k c' Hk. simpl.
+      rewrite decide_False; [done|].
+      intros ->. apply Hc. by eapply elem_of_list_lookup_2.
+  Qed.
+
   (* the per-hart HALVES allocation, the [ghost_var] analogue of
-     [reg_alloc_cpus]: one fresh name per hart, both halves handed out.
-     What [strans_name : CPU -> gname] needs (the translation-slot arm bit
-     is per-hart, since satp/tlb are). *)
+     [reg_alloc_cpus]: one fresh name per hart, both halves handed out. *)
   Lemma ghost_var_alloc_halves_cpus {A : Type} `{!ghost_varG Σ A} (a : A)
       (cs : list CPU) :
     NoDup cs ->
@@ -435,14 +461,14 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        (* ... and the persisted static-claims bundle (uniform-claims):
           the client threads it into hw_config *)
        kmap_static_claims ∗
-       (* BOTH halves of EVERY hart's S-mode translation-slot arm bit, minted
-          at Bare ('b"0"): each hart's boot introduction folds one into its
+       (* BOTH PENDING halves of EVERY hart's S-mode translation one-shot,
+          minted at 0 (Bare): each hart's boot introduction folds one into its
           Bare translation slot via [sie_cap_intro_bare] and keeps the other
           as the still-Bare receipt (which that hart's kvminithart switch
-          spends to flip its arm). *)
+          spends to SHOOT the one-shot, minting the persistent [kpt_on]). *)
        ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
-          ghost_var (strans_name c) (1/2)%Qp strans_bit_bare ∗
-          ghost_var (strans_name c) (1/2)%Qp strans_bit_bare) ∗
+          strans_pending_at (strans_name c) ∗
+          strans_pending_at (strans_name c)) ∗
        (* EVERY hart's SIE ghost, minted at '0' -- interrupts are off at boot --
           in the three pieces the choreography (IntrDefs.v §2) splits it into:
           the 1/2 live-bit tie that rides in [sconf], the 1/4 kernel-code
@@ -511,9 +537,9 @@ Proof.
   iEval (rewrite -Qp.half_half) in "Hv".
   iDestruct (ghost_var_split with "Hv") as "[HvA HvF]".
   iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
-  (* EVERY hart's S-mode translation-slot arm bit, minted at Bare ('b"0");
+  (* EVERY hart's S-mode translation one-shot, minted PENDING (auth at 0);
      both halves of each are handed to the boot client below *)
-  iMod (ghost_var_alloc_halves_cpus strans_bit_bare (enum CPU) (NoDup_enum CPU))
+  iMod (mono_nat_alloc_halves_cpus 0%nat (enum CPU) (NoDup_enum CPU))
     as (γs) "Hs".
   (* EVERY hart's SIE ghost, minted at '0' (interrupts off at boot), in the
      three pieces of the choreography *)
@@ -820,8 +846,8 @@ Section power.
           (era_kmap_name HE) vpn (DfracOwn 1) pc) ∗
      own (era_kpt_name HE) (Cinl (Excl ()) : kptR) ∗
      ([∗ list] c ∈ enum CPU,
-        ghost_var (era_strans_name HE c) (1/2)%Qp strans_bit_bare ∗
-        ghost_var (era_strans_name HE c) (1/2)%Qp strans_bit_bare) ∗
+        strans_pending_at (era_strans_name HE c) ∗
+        strans_pending_at (era_strans_name HE c)) ∗
      ([∗ list] c ∈ enum CPU,
         ghost_var (era_sie_name HE c) (1/2)%Qp sie_bit_off ∗
         ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off ∗
@@ -970,7 +996,7 @@ Section power.
       iMod (ghost_map_alloc kmap_M0) as (γk) "[Hkauth Hkfrags]".
       iMod (own_alloc (Cinl (Excl ()) : kptR)) as (γkpt) "Hkpt";
         [done|].
-      iMod (ghost_var_alloc_halves_cpus strans_bit_bare (enum CPU)
+      iMod (mono_nat_alloc_halves_cpus 0%nat (enum CPU)
               (NoDup_enum CPU)) as (γs) "Hs".
       iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU)
               (NoDup_enum CPU)) as (γsie) "Hsie".
