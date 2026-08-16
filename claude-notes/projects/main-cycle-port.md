@@ -141,9 +141,22 @@ Evidence:
      `fetch` (HartMFetch's `swp_fetch_ram`, whose memory obligation the
      leaf discharges from its text bytes via `HartLift2.text_read_bytes`)
      → the `isRVC` branch → `ext_decode_compressed` and `execute (C_SW …)`
-     (**both done — `HartMDecode.v`**) → **HERE**: `execute (STORE …)`,
-     the base store the compressed form expands to, which is the whole of
-     the write side → try_step's tail → `tick_clock` at the tick.
+     (**both done — `HartMDecode.v`**) → `execute (STORE …)`, the base
+     store the compressed form expands to (**done — `HartMStore.v`**) →
+     try_step's tail → `tick_clock` at the tick.
+
+   **THE TAIL is the last piece, and it is all hfrun**: every register it
+   touches is one the leaf OWNS or pins, so the walker runs it outright.
+   `tick_pc` is **done** (`hfrun_tick_pc`/`swp_tick_pc` in `HartMCycle`) —
+   read nextPC, write PC, read PC.  What is left is the minstret bump
+   (`read minstret_increment`, then `read`+`write minstret`, both owned)
+   and, at the tick, `tick_clock`: `should_inc_mcycle` (the same
+   two-config-bit case split as `should_inc_minstret`, so define
+   `mcycle_inc_flag` beside it), the mcycle and mtime bumps, and
+   `clint_dispatch false` — which reads mip / mtimecmp / mtime, writes
+   mip, and then gates a second mip write on `Ext_Sstc` and `menvcfg`.
+   All of those registers are in the leaf's footprint, so it is one more
+   walk of the kind already done a dozen times.
 
    **THE STORE SIDE IS COMPLETE** (`HartMStore.v`, 698 lines, 5.9 s, 5
    platform axioms): `swp_execute_STORE` from `execute_STORE` down to the
