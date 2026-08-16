@@ -379,6 +379,16 @@ Section swp.
               with "Hswp H").
   Qed.
 
+  (* the elimination form for a PLAIN-[M] bind spine, the counterpart of
+     [swp_use_cer] outside an early-return region ([mem_read] is one). *)
+  Lemma swp_bind_use {X Y : Type} (m : M X) (f : X -> M Y)
+      (Φ : X -> iProp Σ) (Ψ : Y -> iProp Σ) :
+    swp m Φ -∗ (∀ v : X, Φ v -∗ swp (f v) Ψ) -∗ swp (Defs.bind m f) Ψ.
+  Proof.
+    iIntros "H1 H2". iApply swp_bind.
+    iApply (swp_mono with "[H2] H1"). iIntros (v) "HΦ". by iApply "H2".
+  Qed.
+
 End swp.
 
 Global Arguments swp {Σ _ _ _ X} m Φ.
