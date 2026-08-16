@@ -127,7 +127,6 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import CodeCopyin.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSconfVc.
 Require Import SpecWalkaddr SpecVmfault SpecMemmove.
 Require Import SpecCopyin.
 Require Import KernelRvcDecode.

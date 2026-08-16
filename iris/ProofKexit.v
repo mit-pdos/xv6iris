@@ -62,7 +62,6 @@ Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase.
-Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
 Require Import CpuOwn.

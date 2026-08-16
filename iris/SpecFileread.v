@@ -157,7 +157,6 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.
@@ -178,7 +177,7 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import PipeInvDefs.
-Require Import FileOff ProcInv.
+Require Import ProcInv.
 Require Import ConsoleInv.
 Require Import FileInvDefs.
 Require Import SpecReadi.

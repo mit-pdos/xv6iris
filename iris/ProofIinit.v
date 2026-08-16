@@ -33,7 +33,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import WpLock SleepLock.
 Require Import ArrCursor.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecInitlock SpecInitsleeplock.
 Require Import CodeIinit.
 From Kernel Require KernelSyms.

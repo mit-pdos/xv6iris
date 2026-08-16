@@ -66,7 +66,7 @@ Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeHalf.
 Require Import WpSconfSrliw.
 Require Import ByteBuf.

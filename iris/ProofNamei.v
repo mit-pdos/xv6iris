@@ -41,7 +41,7 @@ Require Import VcGen.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -52,7 +52,7 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import InodeRegion.
 Require Import IrefSlots.

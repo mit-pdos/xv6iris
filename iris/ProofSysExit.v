@@ -47,7 +47,7 @@ Require Import IrefSlots InodeRegion IcacheEscrow.
 Require Import SpecFileclose.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecArgint SpecKexit.

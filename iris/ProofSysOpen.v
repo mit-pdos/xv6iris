@@ -45,10 +45,10 @@ Require Import ByteBuf.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved KernelText KernelDataInv.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -77,13 +77,10 @@ Require Import IcacheBoot.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import DirView.
-Require Import DirLinks.
 Require Import FileInvDefs.
 Require Import FileInv.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import ProcInv.
-Require Import IregLinkNz.
 Require Import SpecArgint.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.

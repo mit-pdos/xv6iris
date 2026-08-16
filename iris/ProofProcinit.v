@@ -65,7 +65,7 @@ Require Import FileInvDefs.
 Require Import ProcInv.
 Require Import KvmMap.
 Require Import KstackArith.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecInitlock.
 Require Import CodeProcinit.
 From Kernel Require KernelSyms.

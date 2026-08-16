@@ -125,7 +125,7 @@ Require Import SpecFileclose. (* [fclose_names], [fileclose_bm] -- the five
    trap: the tell is [UNDEFINED EVARS]/"unresolved implicit arguments"
    naming exactly these). *)
 Require Import KallocInv.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.

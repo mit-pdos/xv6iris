@@ -103,7 +103,7 @@ Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.
 Require Import WpSmodeHalf WpSmodeIntr.
 Require Import WpSconfSrliw.
@@ -117,7 +117,6 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import BlockWords.
 Require Import DinodeEnc.
-Require Import FsCrash.
 Require Import InodeInv.
 Require Import DirView.
 Require Import DirLinks.

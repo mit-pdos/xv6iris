@@ -52,7 +52,7 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.

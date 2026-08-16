@@ -160,7 +160,7 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import PipeInvDefs.
-Require Import FileOff ProcInv.
+Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import BitmapInv.
 Require Import KernelDataInv.

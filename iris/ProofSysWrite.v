@@ -75,7 +75,7 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.          (* [fsCrashG] -- filewrite's extra class *)
 Require Import InodeRegion.

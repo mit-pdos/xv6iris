@@ -54,7 +54,6 @@ Require Import DiskPtsto.
 Require Import BufOwn.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import ProcInv.

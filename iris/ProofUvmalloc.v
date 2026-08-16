@@ -66,7 +66,6 @@ Require Import ProcPt ProcPtOwn.
 Require Import UmCovered.
 Require Import CodeUvmalloc.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSconfVc.
 Require Import SpecKalloc SpecMemsetPage SpecMappages SpecKfree SpecUvmdealloc.
 Require Import SpecUvmalloc.
 Require Import KernelRvcDecode.

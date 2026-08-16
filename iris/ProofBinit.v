@@ -58,7 +58,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock SleepLock.
 Require Import ArrCursor BcacheInv.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecInitlock SpecInitsleeplock.
 Require Import CodeBinit.
 From Kernel Require KernelSyms.

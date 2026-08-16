@@ -118,7 +118,7 @@ Require Import ProofKforkParts.
 Require Import PanicStub.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecIput.

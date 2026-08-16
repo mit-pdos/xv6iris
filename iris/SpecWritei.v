@@ -293,7 +293,6 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.

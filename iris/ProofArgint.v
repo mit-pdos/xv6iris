@@ -27,7 +27,6 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import StackOwn CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import FdSlots.

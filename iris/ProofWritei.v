@@ -57,7 +57,6 @@ Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeRegion.

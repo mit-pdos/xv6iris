@@ -24,7 +24,6 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import KernelRvcDecode.
 Require Import ProcGeom.
 Require Import CodeMyproc.
 Require Import CpuOwn.

@@ -66,7 +66,6 @@ Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
-Require Import WpSconfVc.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import ByteCursor.

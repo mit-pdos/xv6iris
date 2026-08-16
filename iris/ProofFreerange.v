@@ -53,7 +53,6 @@ Require Import WpLock.
 Require Import KallocInv.
 Require Import CpuOwn.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSconfVc.
 Require Import SpecKfree.
 Require Import CodeFreerange.
 From Kernel Require KernelSyms.

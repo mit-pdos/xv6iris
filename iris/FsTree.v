@@ -84,7 +84,7 @@ Require Import SailStdpp.Values.
 Require Import RiscvModelBytes.
 Require Import DinodeEnc.
 Require Import DirentEnc.
-Require Import InodeInv.
+Require Import InodeDefs.
 Require Import DirView.
 
 Local Open Scope Z_scope.

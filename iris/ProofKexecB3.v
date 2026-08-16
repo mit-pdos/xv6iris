@@ -87,7 +87,7 @@ Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
@@ -98,7 +98,8 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import FileInvDefs.
 Require Import DinodeEnc.
-Require Import SchedCtx.
+Require Import IrefSlots.
+Require Import ProcAvail.
 Require Import DiskInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.

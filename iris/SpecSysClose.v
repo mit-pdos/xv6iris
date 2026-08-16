@@ -64,7 +64,7 @@ Require Import SpecArgfd.
 Require Import KallocInv.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import IrefSlots InodeRegion.

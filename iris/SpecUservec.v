@@ -107,7 +107,7 @@ Require Import ProcInv ProcPtOwn.   (* [proc_pt] / [ud_pas] / [ud_norm] -- the a
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import DiskPtsto.
 Require Import WpUart.
 Require Import FsBlocks LogInv.

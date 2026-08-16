@@ -34,7 +34,10 @@ Require Import PtBuild.
 Require Import PtTreeAdue.
 Require Import KptPt.
 Require Import TrampPt.
-Require Import SmodeCore.
+Require Import KptPt.
+Require Import Pt4kWalk.
+Require Import RiscvExtras.
+Require Import SmodePte.
 Require Import UserTranslate.
 Require Import KptTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.

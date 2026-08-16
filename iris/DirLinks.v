@@ -60,7 +60,7 @@ Require Import SailStdpp.Values SailStdpp.Operators_mwords SailStdpp.MachineWord
 Require Import RiscvExtras.            (* [add_vec_unsigned], for the [++] *)
 Require Import DinodeEnc.
 Require Import DirentEnc.
-Require Import InodeInv.
+Require Import InodeDefs.
 Require Import DirView.
 Require Import IcacheRef.
 

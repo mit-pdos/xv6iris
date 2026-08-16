@@ -81,7 +81,8 @@ Require Import KallocInv.
 Require Import ProcPtOwn.
 Require Import PanicStub.
 Require Import ProcInv.
-Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
+Require Import WpUart DiskPtsto FsBlocks LogInv.
+Require Import BioDefs.
 Require Import ConsoleInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.

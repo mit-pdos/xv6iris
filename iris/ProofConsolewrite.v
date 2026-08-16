@@ -58,7 +58,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import W32Arith.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
-Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import UserPtTree KvmSpec ProcPtOwn.
 Require Import FdSlots ProcInv.

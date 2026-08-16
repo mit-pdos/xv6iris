@@ -61,7 +61,7 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.

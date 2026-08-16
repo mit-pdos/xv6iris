@@ -50,11 +50,9 @@ Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import KernelRvcDecode.
-Require Import BvShift.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
-Require Import WpSmodeHalf.
 Require Import IntrDefs.
 Require Import WpLock.                (* [lockG] -- bound in the publication's
                                          section, and a class that is not
@@ -69,15 +67,17 @@ Require Import FsCrash.               (* [BSIZE] *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
-Require Import IrefSlots.
 Require Import IcacheRef.             (* the reference algebra the publication
                                          re-pins its generation in *)
+(* KEPT against 43b8097e's sweep: it judged these dead in ITS tree, which
+   does not carry our fragment-campaign content.  A surplus import costs a
+   rebuild-cone edge; a missing one costs the build.  If the next nightly
+   sweep still calls them dead against THIS tree, they can go then. *)
 Require Import IcacheInv.
 Require Import FsTree.
 Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
 Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode
                                          bit cluster's target *)
-Require Import SpecArgint.
 Require Import SpecArgstr.
 Require Import SpecBeginOp.
 Require Import SpecEndOp.
@@ -88,7 +88,6 @@ Require Import SpecIunlockput.
 Require Import SpecItrunc.
 Require Import SpecNamei.
 Require Import SpecCreate.
-Require Import SpecFilealloc.
 Require Import SpecFdalloc.
 Require Import SpecFileclose.
 Require Import CodeSysOpen.

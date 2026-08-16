@@ -110,7 +110,6 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 (* [trunc16_sext64]: an [sh] of a register an [lh] filled is the identity on

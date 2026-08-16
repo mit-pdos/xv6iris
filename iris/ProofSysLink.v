@@ -82,12 +82,13 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
-Require Import SchedCtx.
+Require Import IrefSlots.
+Require Import ProcAvail.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.

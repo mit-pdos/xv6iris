@@ -61,14 +61,14 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
@@ -95,14 +95,12 @@ Require Import KallocInv.
 Require Import FileInvDefs.
 Require Import FileInv.
 Require Import ProcInv.
-Require Import IregLinkNz.
 Require Import SpecEndOp.
 Require Import SpecIput.
 Require Import SpecIunlock.
 Require Import SpecIunlockput.
 Require Import SpecFileclose.
 Require Import CodeSysOpen.
-Require Import SpecSysOpen.
 Require Import ProofSysOpenParts.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
