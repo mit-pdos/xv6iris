@@ -179,102 +179,99 @@ granularity.**  Measured on the weak branch: naive per-node proofmode
 stepping costs ~1 ms/node (~50× on a real 293-node instruction).  The
 proof interface is:
 
-1. **A reflective silent-stepper** in equation-free form (spike finding
-   F8, MANDATORY): a cursor `(regstate * M unit)` with TOTAL stepper
-   functions (`esil n D : cursor → cursor`, plus `ecur_read v`,
-   `ecur_write`, …), where a certification is a CHAIN OF APPLICATIONS —
-   the residual monad is NEVER named at a call site (VM readback of a
-   monad closure did not finish in 110 s; the same run projected to a
-   number takes 0.1 s).  Rules match the residual's head via
-   value-output projections (`enode_tag` a number, request-record
-   projections) with once-proven inversion lemmas.  The batched WP rule
-   takes NO equation:
-   `ereg_frame … D -∗ (ereg_frame … (esil n D x).1 D -∗ WP (HartE …
-   (esil n D x).2)) -∗ WP (HartE … x.2)`.
-   GOTCHA (measured, on the spike AND re-measured on main's pilot —
-   the trap has FOUR heads, all the same lazy evaluation of a stretch):
-   (a) discharge any cursor equation with `have H : … by reflexivity` and
+1. **THE REDUCTION DISCIPLINE (spike finding F8, MANDATORY) — the rule
+   every walker, projection and class lemma in this port obeys.**  NO CALL
+   SITE EVER WRITES A RESIDUAL MONAD DOWN, and NO TACTIC EVER FORCES ONE.
+   Rules match a residual's head through TOTAL PROJECTIONS with small
+   outputs (`hnode_tag` a number, `hregread_at` a bool, the request
+   records) plus once-proven inversion and REDUCTION equations
+   (`hregread_resume_red`, `hfrun_read`, …).  The measured heads of the
+   trap, all the same lazy evaluation of a stretch:
+   (a) discharge any residual equation with `have H : … by reflexivity` and
    pass `H`; a bare `eq_refl` inside an application hands the goal to the
    elaborator's unifier (5 s → unbounded).  (b) The equation's two sides
-   must be ONE δ-step from syntactic identity — `hp_x2 = hsil n D
-   (hcur_read v hp_x1)` in the definition's own spelling is milliseconds,
-   while the same fact against a pair-literal spelling re-enters lazy
-   evaluation (5.5 s at depth 2, 171 s at depth 3).  (c) Never leave a
-   cursor equation in the proof context across a hypothesis-scanning
-   tactic: `set_solver`'s `naive_solver` runs `simplify_eq` on every
-   hypothesis and whnf-evaluates both sides (57 s); clear it or avoid the
-   tactic (`apply empty_subseteq` for mask side conditions).  (d) Never
-   `iApply` a kit rule at a composition-spelled cursor argument from a
-   concrete call site — the unfold oracle can pick the resume-function
-   side and force the scrutinee (4.5 s at depth 2, minutes at depth 3).
-   A fifth head, measured at the segment template: **vm is unusable past
-   a resume application even at a CONCRETE value** — the resume's
-   register-`decide` carries the Qed-opaque `register_encode_inj`, the
-   `eq_rect` sticks, and vm readback then normalizes the entire dead
-   instruction executor (>200 s).  vm facts are safe only where the fed
-   value is never consumed (closed prefix projections).  The working
-   incantation for stepping a resume-composition at a symbolic value is
-   recorded at `HartMCycle.mseg1_read3_at_local`: whitelisted
-   `cbn beta iota zeta delta [bind/returnm spine]` rounds (the dead
-   executor stays folded), `rewrite !hregread_resume_red` (rewrite's
-   unification beta-reduces `K v`, stepping every exposed read level in
-   one shot), and `rewrite Hbit` to resolve symbolic-bit ifs.
-   THE SHAPE THAT MAKES ALL FOUR IMPOSSIBLE: prove a per-instruction-class
-   SEQUENCE RULE once at ABSTRACT cursors (variables are rigid, so every
-   unification is O(1)) taking the cursor equations as premises, and
-   instantiate it with `by reflexivity` equations in the definitions' own
-   spelling — `HartPilot.wp_hart_rw_seq` / `wp_pilot_started_store` is the
-   worked pair, mirroring the spike's `ewp_ev_started_set` / §5e split.
-   The adapter's per-class rules must be built this way from the start.
-   **BATCH BREAKS (main-specific; the mechanics are the two bullets at the
-   top of this section).**  A batch is sound only while the cursor's
-   `regstate` is provably this hart's file, i.e. while the caller owns the
-   touched cells.  So a batch breaks at: memory/device events, `sig_seip`
-   accesses (cross-thread-written; self-enforcing per above), and the
-   minstret/clock invariant cells (single-node rules per above).
-   `dispatchInterrupt` reads mip and `sig_seip` at the TOP of every
-   instruction, so every cycle has breaks early; the existing
-   `WpIntrCore`/`WpIntrInv` layer already ∀-quantifies those reads off σ,
-   so the adapter reuses it rather than inventing anything.
-5b. **The tick, settled by the spike's own pilot** (`WeakEvStarted` §4, the
-   two-instruction composition): the boundary rule quantifies the
-   continuation over `tick`, and the next instruction's certification is
-   supplied as a FAMILY of unevaluated cursor compositions uniform in the
-   tick (and in any value the previous instruction read) — `∀ w tick, y1 w
-   tick = hsil k1 D (hcur_loop tick (x3 w))` — with the per-site projection
-   facts ∀-quantified likewise.  No bind-commutation lemma; the measured
-   1.03–1.19× parity INCLUDES this cost.  A `hsil`-commutes-with-`bind`
-   equation remains available as an optimization if the adapter's
-   measurements show the per-tick duplication biting on main (main's tail
-   is bigger than the weak branch's: `tick_clock` is register-only, so its
-   nodes are batched silent stretches broken only at the clock_inv cells,
-   each taking a single-node rule that opens `clock_inv` around exactly
-   that node — the per-node heir of `wp_exec_step_clock`'s absorption).
+   must be ONE δ-step from syntactic identity — the definition's own
+   spelling is milliseconds, a pair-literal spelling re-enters lazy
+   evaluation (5.5 s at depth 2, 171 s at depth 3).  (c) Never leave such
+   an equation in the proof context across a hypothesis-scanning tactic:
+   `set_solver`'s `naive_solver` runs `simplify_eq` on every hypothesis and
+   whnf-evaluates both sides (57 s); clear it or avoid the tactic
+   (`apply empty_subseteq` for mask side conditions).  (d) Never `iApply` a
+   kit rule at a composition-spelled argument from a concrete call site —
+   the unfold oracle can pick the resume-function side and force the
+   scrutinee (4.5 s at depth 2, minutes at depth 3).
+   (e) **vm is unusable past a resume application even at a CONCRETE
+   value** — the resume's register-`decide` carries the Qed-opaque
+   `register_encode_inj`, the `eq_rect` sticks, and vm readback then
+   normalizes the entire dead instruction executor (>200 s).  vm facts are
+   safe only where the fed value is never consumed (closed prefix
+   projections).
+   (f) **NEVER `cbn` A WALKER FIXPOINT AGAINST A FOLDED MODEL TERM.**  To
+   expose its `match m` scrutinee, `cbn` reduces `m` itself — whitelist or
+   no whitelist: `cbn [hfrun]` on
+   `hfrun 6 D Drw rs (should_inc_minstret Machine)` does not finish in
+   60 s, while the same goal with the spine pre-reduced and the walker
+   stepped by `hfrun_ret`/`hfrun_read`/`hfrun_write` is milliseconds.
+   (g) **MIRROR THE MODEL'S LITERAL SPELLING.**  Sail's `'b"0"` elaborates
+   to `N_to_word (Z_idx 1) (to_N "0" 0)`; a hand-written `N_to_word 1 0%N`
+   is CONVERTIBLE but not syntactically equal, and `destruct … eqn:` /
+   `rewrite` match syntactically — so a case split silently misses the
+   occurrence inside the goal and the next rewrite fails with "does not
+   match any subterm".  Mirror the model's literal, via a `Notation` (a
+   `Definition` hides the term again).  The `'b"…"` notation itself does
+   not survive Iris's notation scope, so spell the elaborated term.
+   THE WORKING INCANTATION for stepping a spine at a symbolic value:
+   whitelisted `cbn beta iota zeta delta [Defs.bind Defs.bind0
+   Interface.iMon_bind Defs.read_reg returnM Defs.returnm …]` rounds (every
+   un-whitelisted constant, including the dead executor and the walker,
+   stays FOLDED), then `rewrite` the reduction equations, then the
+   bit-fact rewrites.  `HartMDispatch`'s `mdisp_cbn`/`mdisp_setup` and
+   `HartMCycle`'s `msi_cbn` are the worked pairs.
+   **WHERE A STRETCH BREAKS.**  A computed run is sound only while the
+   walker's `regstate` is provably this hart's file, i.e. while the caller
+   owns or pins the touched cells.  So it breaks at: memory/device events,
+   `sig_seip` accesses (cross-thread-written; self-enforcing per above),
+   and the minstret/clock invariant cells.  Every one of those breaks is a
+   BIND BOUNDARY in the model's own source — the model calls `write_reg`,
+   `mem_read`, `pmpCheck` as sub-monads — which is why item 7's `hval`
+   only ever has to reach `Ret`.
+5b. **THE TICK IS NOT AN AXIS.**  `riscv_step tick` is
+   `bind (try_step 0 false) (fun _ => if tick then tick_clock tt else
+   Ret tt)`, so under item 6 the tick tail is simply the second half of a
+   `swp_bind` and nothing before it needs to know the tick exists.  Do NOT
+   reintroduce tick-generic (`KT`-parameterized) statements, a wrapper
+   definition, or a "next segment's start" spelled as a resume
+   composition: that apparatus existed only to name "the rest of the
+   cycle" for characterizations that spanned function boundaries, and the
+   `swp` decomposition names nothing.  `tick_clock` is register-only, so
+   its own stretches are computed walks broken only at the `clock_inv`
+   cells, each a single-node rule opening the invariant — the per-node
+   heir of `wp_exec_step_clock`'s absorption.
 1c. **THE SPAN RULE (the B′ keystone; charted from the pilot's per-node
    register trace).**  A real M-mode cycle's prelude reads ~54 registers
    that are NOT ownable and whose values are irrelevant (pmpaddr_n ×~48
    with every PMP entry OFF, mie/mideleg/mip/sig_meip/sig_seip under
-   MIE=0): footprinted batching cannot cover them (no cell to put in a
-   frame) and per-node ∀-rules would cost ~54 applications per cycle.  The
-   rule that fits: a WHOLE-STRETCH rule whose writes are gated on the
-   caller's exclusive footprint `Drw` (frame + ghost updates, PC/nextPC/
-   GPRs) and whose READS ARE UNGATED — the machine answers them — with a
-   read-only dfrac-generic frame `Dro` (the config bundle: cur_privilege,
-   mstatus, misa, pmpcfg, mcountinhibit, …) exported as an agreement fact,
-   and the continuation quantified over the RELATIONAL landing set: rtc of
-   span steps where, between nodes, every register OUTSIDE `Drw ∪ Dro` may
-   be perturbed arbitrarily (the honest in-WP knowledge: ghost cells pin
-   exactly the framed registers; the semantic licence pins more but is not
-   derivable inside WP).  The quantifier is killed by a ONCE-PER-CLASS pure
-   characterization lemma: with the `Dro` values pinned, every chain is
-   forced to the same landing because each unowned read feeds a
-   value-insensitive continuation (cbn-checkable; the symbolic-stretch
-   probe validated the mechanism).  Spans are CHOPPED only at
-   invariant-cell WRITES (minstret_increment, minstret, the tick's
+   MIE=0): a computed walk cannot cover them (no cell to pin) and per-node
+   ∀-rules would cost ~54 applications per cycle.  The rule that fits: a
+   WHOLE-STRETCH rule whose writes are gated on the caller's exclusive
+   footprint `Drw` (frame + ghost updates, PC/nextPC/GPRs) and whose READS
+   ARE UNGATED — the machine answers them — with a read-only dfrac-generic
+   frame `Dro` (the config bundle: cur_privilege, mstatus, misa, pmpcfg,
+   mcountinhibit, …) exported as an agreement fact, and the continuation
+   quantified over the RELATIONAL landing set: rtc of span steps where,
+   between nodes, every register OUTSIDE `Drw ∪ Dro` may be perturbed
+   arbitrarily (the honest in-WP knowledge: ghost cells pin exactly the
+   framed registers; the semantic licence pins more but is not derivable
+   inside WP).  Its proof is by structural induction on the monad (each
+   step's continuation is a subterm), not Löb, and it runs under a context
+   (item 6), so ONE node proof serves every sub-monad type.
+   **NO CALLER EVER SEES THE LANDING SET.**  `swp_span` consumes it once,
+   inside the induction, against an `hval` premise (item 7) and returns a
+   `swp` fact mentioning neither chains nor files.  Spans are CHOPPED at
+   invariant-cell writes (minstret_increment, minstret, the tick's
    mcycle/mtime/mip — ~2-5 per cycle), each a single-node HartRegNode rule
-   opening the invariant.  The prelude characterization is ONE lemma for
-   ALL M-mode leaves.  The rule's proof is by structural induction on the
-   monad (each step's continuation is a subterm), not Löb.
+   opening the invariant — and each of those is a bind boundary in the
+   model's source, so the chop needs no special support.
 2. **Per-memory-event rules**: one WP rule each for RAM read, RAM write,
    the fused AMO, device read/write — these are where the real reasoning
    (points-to, invariants) happens, exactly as in today's leaves.
@@ -295,86 +292,113 @@ proof interface is:
    Decode is imported, not re-solved: all existing decode
    proof-engineering is consumed inside the reflective stepper's
    computation.
-6. **THE MONADIC WP LAYER (`swp`) — the interface leaves compose in, and
-   why it is DERIVED rather than the language's own.**  Sail code is
-   written with `bind`; the proof interface should decompose along that
-   structure and let the value a continuation receives appear in a
-   postcondition.  Define it in CPS over the existing WP — no language
-   change:
+6. **THE MONADIC WP LAYER (`swp`) — the interface leaves compose in.**
+   Sail code is written with `bind`; the proof interface decomposes along
+   that structure and lets the value a continuation receives appear in a
+   postcondition.  `swp` is DERIVED from the real WP — no language change —
+   so it inherits adequacy, laters and masks with no second soundness
+   argument.
+
+   **IT QUANTIFIES OVER A CONTEXT, NOT A CONTINUATION.**  A context is a
+   function `C : M X -> M unit` that commutes with the head node at every
+   node that is not `ExtraOutcome` (`mctx`):
 
    ```coq
-   Definition swp {X} (m : M X) (Φ : X → iProp Σ) : iProp Σ :=
-     ∀ K : X → M unit,
-       (∀ v, Φ v -∗ WP (HartE gen_id cpu_id (K v))) -∗
-       WP (HartE gen_id cpu_id (Defs.bind m K)).
+   Definition mctx {X} (C : M X -> M unit) : Prop :=
+     forall T (oc : outcome T) k, is_extra oc = false ->
+       C (Next oc k) = Next oc (fun v => C (k v)).
+
+   Definition swp {X} (m : M X) (Φ : X -> iProp Σ) : iProp Σ :=
+     ∀ C, ⌜mctx C⌝ -∗ (∀ v, Φ v -∗ WP (HartE gen cpu (C (Ret v)))) -∗
+          WP (HartE gen cpu (C m)).
    ```
 
-   Laws: `Φ x ⊢ swp (Ret x) Φ` (definitional, `bind (Ret x) K = K x`);
-   `swp m (λ v, swp (f v) Φ) ⊢ swp (bind m f) Φ` (monad associativity);
-   `swp m (λ _, WP LoopE) ⊢ WP (HartE _ _ m)` at `M unit` (right unit —
-   and `LoopE` IS `HartE _ _ (Ret tt)`, so that side is definitional);
-   mono/frame/fupd structurally.  Being DEFINED BY the real WP, it
-   inherits adequacy, laters and masks with no second soundness argument.
-   coq-sail-stdpp proves no monad laws for `iMon`, so associativity is
-   ours: induction + funext at the `Next` case, which pulls
-   `functional_extensionality_dep` (already in the tree's declared budget,
-   but the Hart* files are currently funext-free) into its cone.
+   The obvious CPS form (∀ `K : X -> M unit`, concluding at
+   `WP (HartE (bind m K))`) fails on THREE counts, and the first is fatal:
+
+   - **THE EARLY-RETURN REGION.**  `run_hart_active` — where the fetch,
+     the decode and the execute all live — is
+     `catch_early_return (… liftR sub >>= K …)` at `MR Step`.  Applying a
+     bind-shaped `swp` fact there needs
+     `catch_early_return (bind (liftR m) K) = bind m (fun v =>
+     catch_early_return (K v))`, and THAT EQUATION IS FALSE: at an
+     `ExtraOutcome` node `try_catch` DISCARDS the continuation while `bind`
+     re-attaches one.  No throw-freeness premise fixes it — the equation is
+     about syntax and the model's `throw`s sit in unreached branches of
+     `execute`.  As a context the same thing is admissible, `mctx` demands
+     nothing at `ExtraOutcome`, and `mctx_cer_liftR` is `destruct oc;
+     reflexivity` with no casts.  (Each half ALONE cannot even be stated:
+     `liftR` and `catch_early_return` change the outcome's error family, so
+     "mirrors the head node" does not typecheck; state the composite.)
+   - **ASSOCIATIVITY.**  `swp_bind` against the CPS form needs
+     `bind (bind m f) K = bind m (fun x => bind (f x) K)`, whose `Next`
+     case is provable only with `functional_extensionality_dep`.  With
+     contexts, re-associating is composing two functions and the return
+     point is `C (bind (Ret v) f)`, which IS `C (f v)`.  `swp_bind` is
+     five lines and the whole layer stays at the 5 platform axioms.
+   - **THE STUCK CLASSES.**  `GenericFail`/`Discard`/`Choose` need no
+     mirroring: the machine cannot step them, so no proof reaches one.
+
+   Laws (`HartSwp.v`): ret, bind, `bind0`, mono, frame, fupd on both
+   sides, `swp_use` (the elimination form every consumer goes through, so
+   nothing outside the file knows `swp` is CPS), and `swp_wp`/
+   `swp_wp_loop` closing into the real WP at the boundary (`LoopE` IS
+   `HartE _ _ (Ret tt)`, so that side is definitional).
 
    **`swp` IS AN INTERFACE, NOT AN IMPLEMENTATION.**  Unfolding it to
    per-node WP steps re-incurs the ~1 ms/node cost the batching exists to
-   avoid.  The layering is: `wp_hart_step` (per node) → span / batch
-   (multi-node, absorbing interference and unowned reads — where the
-   expensive proofs live, once per stretch) → **`swp`** (bridge lemmas
-   export each stretch as one `swp` fact) → leaves (compose by `swp_bind`
-   along the model's own structure).
+   avoid.  The layering is: `wp_hart_step` (per node) → the two `hval`
+   provers (below) → **`swp`** → leaves (compose by `swp_bind` along the
+   model's own structure).
 
-   THE HAND-ROLLED PRECURSOR, so nobody re-invents it a third time: the
-   existing characterizations' conclusions (`∃ rs1, reg_agree_on D rs1 rs
-   ∧ hspan D Drw (K None, rs1) l`) ARE `swp` written out by hand, with the
-   continuation baked in as a specific `K`, the landing threaded
-   explicitly, and the frame agreement carried as a side condition instead
-   of as resources.  The `swp` form —
-   `hreg_frame … -∗ swp (dispatchInterrupt Machine) (λ r, ⌜r = None⌝ ∗
-   hreg_frame …)` — drops all of that bookkeeping into the resources and,
-   because it is a fact about a SUB-MONAD rather than about a landing in
-   one particular chain, is reusable at every call site and privilege mode.
+   WHAT `swp` DOES NOT FIX: the fused AMO (read + window + paired write are
+   one atomic event by design, so there is no `swp` for the exclusive read
+   alone).
 
-   WHAT `swp` DOES NOT FIX: the decode gap (a monad branching on a
-   symbolic `w` is a headless term — no WP rule can step it; see 7), and
-   the fused AMO (read + window + paired write cross bind boundaries and
-   are one atomic event by design, so there is no `swp` for the exclusive
-   read alone).
-
-7. **THE PURE-EXEC BRIDGE (`swp_of_pure_exec`) — the `goodb` construction,
-   ported.**  `DecodeSetU`'s decode bridge is: `vm_compute` the decoder at
-   a concrete reference state, transport to the real state by read-frame
-   congruence (`exec_goodb_congr`) given `agree_on D`.  Its twin here:
+7. **THE TWO ROUTES INTO `swp`, AND THE ONE PURE PREDICATE THEY SHARE.**
+   Everything enters through `swp_span`, whose pure premise is
 
    ```coq
-   Lemma swp_of_pure_exec {X} (m : M X) (x : X) (D : gset register) (rs : regstate) :
-     (∀ s, reg_agree_on D s.(sregs) rs → exec m s = Some (x, s)) →
-     mem_free m →
-     hreg_frame_ro Df rs D -∗ (Φ x -∗ …) -∗ swp m Φ
+   Definition hval {X} (D Drw : gset register) (rs : regstate)
+       (m : M X) (x : X) (rs' : regstate) : Prop :=
+     ∀ rs0 l, reg_agree_on D rs0 rs -> hspan D Drw (m, rs0) l ->
+              hspan_stops Drw l.1 = true ->
+              l.1 = Ret x /\ reg_agree_on D l.2 rs'.
    ```
 
-   Two points that make it work where a naive "step the decode" does not:
-   - `m` is UNIVERSALLY QUANTIFIED in the lemma, so its proof may
-     `destruct m` and run the `mchild` induction.  The headless-term
-     obstruction is a USE-SITE problem (a specific stuck term in a goal),
-     never a statement problem — do not conflate the two.
-   - `exec m s = Some (x, s)` already encodes state-preservation (the
-     state returns syntactically identical), so no separate register
-     write-freeness premise is needed.  `mem_free` is the one genuine
-     extra, it is not computable (a `RegRead` node quantifies its
-     continuation over all values), and it goes in the declared,
-     decoder-checkable slot the weak branch used for `sail_live_st`:
-     PROVE IT ONCE for the decoder from its source structure (`read_reg` +
-     pure ops + `Ret`, no `sail_mem_read`), then it is free at every word.
+   — from any file agreeing with `rs` on `D`, every maximal interfered span
+   chain of `m` lands at `Ret x`.  NO continuation, NO landing, NO context,
+   so it is reusable at every call site and privilege mode; `swp_span`
+   consumes the landing quantifier ONCE, inside the span induction, and
+   hands back a `swp` fact mentioning neither chains nor files.  A
+   sub-monad ending at `Ret` is not a restriction but the payoff of
+   decomposing along the model's own binds: every chop (a memory event, an
+   invariant-held cell) is a bind boundary, because the model calls
+   `write_reg`/`mem_read` as sub-monads of their own.
 
-   Use site stays cheap: concrete word ⇒ vm the `exec` fact at the
-   reference state, `agree_on` from the `Dro` frame.  This subsumes the
-   decode cascade that a leaf otherwise peels by hand, which is where most
-   of the per-leaf `Qed` cost lives.
+   `hval` is proven two ways:
+
+   - **BY COMPUTATION (`hfrun`).**  A fuel-bounded functional walker that
+     REFUSES what it is not entitled to: it answers a register read only
+     from `D` (so interference cannot change the answer), takes a write
+     only inside `Drw`, passes the silent classes, stops at `Ret`, and is
+     `None` on memory, devices, `Choose`, failures, an unpinnable read or
+     an unownable write.  Because the refusals are built in, `hfrun_hval`
+     carries NO side condition.  This single lemma is the whole of the
+     footprinted BATCH story and the whole of the DECODE story: a concrete
+     word's decoder reads only config registers, all in the read-only
+     frame, so the walker just runs it.  There is therefore no `mem_free`
+     obligation, no `exec`-at-a-reference-state `goodb` congruence, and no
+     separate batch rule.
+   - **BY PEELING**, for stretches that read registers OUTSIDE `D` — the
+     M-mode prelude's ~54 unownable reads, the dispatch's five, the PMP
+     walk's ~48 pmpaddr reads.  There the landing is forced by VALUE
+     INSENSITIVITY, which is not computable; `HartSpanChar`'s six
+     inversions plus per-class `∀`-peels do it once per class.
+
+   Two rules fire constantly and are just `hfrun` at fuel 2:
+   `swp_read_reg_pinned` (`r ∈ Drw ∪ Dro`) and `swp_write_reg_owned`
+   (`r ∈ Drw`).
 
 8. **WHY `mval` STAYS `Empty_set` (asked and answered; re-open only with
    the evidence named below).**  Making the language's values the Sail
