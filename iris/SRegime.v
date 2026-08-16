@@ -34,7 +34,10 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import SmodePte KptPt.
 Require Import WpGpr WpMmodeLeafBase ExecCommon.
-Require Import SmodeCore KptTree.
+Require Import KptTree.
+Require Import KptPt.
+Require Import RiscvExtras.
+Require Import SmodePte.
 Require Import KptGhost.   (* kptN: the shared kernel table's namespace, named in [sr_absorb]'s mask premise *)
 Require Import KptShare.   (* the SHARED-table regime instance (§3) *)
 Require Import Riscv.rv64d_types Riscv.rv64d.

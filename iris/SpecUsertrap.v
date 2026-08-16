@@ -109,11 +109,12 @@ Require Import IntrDefs.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import ProcInv.
+Require Import IrefSlots.
+Require Import ProcDefs.
 Require Import ProcPtOwn.   (* [proc_pt] / [ud_norm] -- the bare residue's vocabulary *)
 (* the classes the module type's [usertrap_res] parameter needs -- see the
    note above [Module Type USERTRAP] at the foot of this file *)
-Require Import BioInv.
+Require Import BioDefs.
 Require Import DiskPtsto.
 Require Import WpUart.
 Require Import FsBlocks LogInv.

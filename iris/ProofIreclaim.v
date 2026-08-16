@@ -90,7 +90,7 @@ Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import PrintkFmt.

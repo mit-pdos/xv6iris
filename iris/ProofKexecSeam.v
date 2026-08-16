@@ -57,7 +57,7 @@ Require Import PageGeom.
 Require Import ProcGeom.
 Require Import ProcInv.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.

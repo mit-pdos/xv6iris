@@ -19,9 +19,10 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvPtsto.
 Require Import TrampPt.
-Require Import ProcGeom ProcInv.
+Require Import ProcGeom.
+Require Import ProcDefs.
 Local Open Scope Z_scope.
 Import Defs.
 

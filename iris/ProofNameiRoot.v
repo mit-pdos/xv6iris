@@ -32,7 +32,7 @@ Require Import VcGen.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.

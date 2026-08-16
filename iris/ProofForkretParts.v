@@ -17,12 +17,8 @@ From iris.proofmode Require Import proofmode.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvExtras.
-Require Import PageGeom.
 Require Import TrampPt.
 Require Import UserretDefs.
-Require Import WpMmodeLeafBase.
-Require Import KernelRvcDecode.
-Require Import IntrDefs.
 Require Import SpecPrepareReturn.
 Require Import SpecForkret.
 From Kernel Require KernelSyms.

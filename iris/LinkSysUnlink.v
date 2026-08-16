@@ -24,17 +24,16 @@ Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import WpLock FdSlots IrefSlots.
 Require Import FileInvDefs.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import KallocInv.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import InodeInv.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import ProcInv.
+Require Import IrefSlots.
+Require Import ProcDefs.
 Require Import SpecSysUnlink.
 Require Import ProcAvail.
 

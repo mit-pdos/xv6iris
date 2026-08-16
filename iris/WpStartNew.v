@@ -88,7 +88,6 @@ Require Import WpMmodeMret.
 Require Import InstrBytes KernelText WpTimerinit.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 
 Require Import CodeStartAux.

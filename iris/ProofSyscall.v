@@ -272,7 +272,7 @@ Require Import FileInvDefs FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import PanicStub.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import ProcAvail.
 Require Import SpecAllocpid.

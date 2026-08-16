@@ -117,7 +117,7 @@ Require Import SmodeCore.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
@@ -132,7 +132,6 @@ Require Import WpUart.
 Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import DirentEnc.

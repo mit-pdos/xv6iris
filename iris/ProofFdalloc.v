@@ -69,7 +69,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs.
-Require Import HartTp WpNext WpSconfVc.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.

@@ -184,7 +184,6 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintk.

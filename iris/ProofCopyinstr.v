@@ -116,7 +116,7 @@ Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
-Require Import HartTp WpNext WpSconfVc.
+Require Import HartTp WpNext.
 Require Import WpLock.
 Require Import ByteCursor ByteBuf.
 Require Import PtreeType.

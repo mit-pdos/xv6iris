@@ -83,7 +83,6 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import CodeFreewalk.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSconfVc.
 Require Import SpecKfree.
 Require Import SpecFreewalk.
 Require Import KernelRvcDecode.

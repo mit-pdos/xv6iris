@@ -51,7 +51,6 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import KernelRvcDecode.
 Require Import CodeYield.
 Require Import SpecMyproc SpecAcquire SpecSched SpecRelease SpecYield.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

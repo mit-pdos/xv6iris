@@ -88,7 +88,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.
 Require Import ByteBuf.
 Require Import FdSlots.
@@ -97,7 +97,6 @@ Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BlockWords.
 Require Import InodeInv.
 Require Import BitmapInv.

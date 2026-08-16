@@ -38,7 +38,7 @@ From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.Values.
 Require Import DinodeEnc.
 Require Import DirentEnc.
-Require Import InodeInv.
+Require Import InodeDefs.
 Require Import DirView.
 Require Import IcacheRef.
 

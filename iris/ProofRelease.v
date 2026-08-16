@@ -25,7 +25,7 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock KernelRvcDecode.
+Require Import WpLock.
 Require Import SpecHolding.
 Require Import SpecPushOff.
 Require Import CodeRelease.

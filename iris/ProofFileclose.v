@@ -65,7 +65,8 @@ Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import ProcGeom.
 Require Import IrefSlots.
-Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
+Require Import WpUart DiskPtsto FsBlocks LogInv FsCrash.
+Require Import BioDefs.
 Require Import WpLock.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.

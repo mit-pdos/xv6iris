@@ -127,7 +127,6 @@ Require Import ProcPtOwn.
 Require Import ByteCursor ByteBuf.
 Require Import CodeCopyout.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
-Require Import WpSconfVc.
 Require Import SpecWalkaddr SpecVmfault SpecWalk SpecMemmove.
 Require Import SpecCopyout.
 Require Import KernelRvcDecode.

@@ -51,7 +51,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpAu4.
 Require Import FdSlots.
 Require Import ProcGeom.

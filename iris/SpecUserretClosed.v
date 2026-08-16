@@ -45,7 +45,6 @@ From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvExtras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import RegFile.
@@ -57,8 +56,10 @@ Require Import PtTree.
 Require Import TrampPt UptTree KptShare UserretDefs.
 Require Import UserPtTree UserExec.
 Require Import IntrDefs.
-Require Import ProcGeom ProcInv ProcPtOwn.
-Require Import WpLock FdSlots FileInvDefs BioInv DiskPtsto WpUart.
+Require Import ProcGeom ProcPtOwn.
+Require Import IrefSlots.
+Require Import WpLock FdSlots FileInvDefs DiskPtsto WpUart.
+Require Import BioDefs.
 Require Import FsBlocks LogInv FsCrash KallocInv IrefSlots InodeRegion.
 Require Import ProcAvail.
 Require Import SpecUsertrap.

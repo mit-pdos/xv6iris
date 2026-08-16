@@ -52,7 +52,7 @@ Require Import CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc WpSmodeIntr.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
 Require Import StackOwn.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots ProcInv.

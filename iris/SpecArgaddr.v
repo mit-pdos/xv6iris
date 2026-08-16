@@ -44,7 +44,9 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import FdSlots ProcInv.
+Require Import FdSlots.
+Require Import IrefSlots.
+Require Import ProcDefs.
 Require Import FileInvDefs.
 Require Import PageGeom.
 From Kernel Require KernelSyms.

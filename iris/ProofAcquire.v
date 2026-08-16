@@ -20,7 +20,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock CpuOwn WpAmo KernelRvcDecode.
+Require Import WpLock CpuOwn WpAmo.
 Require Import SpecMycpu SpecHolding.
 Require Import SpecPushOff.
 Require Import CodeAcquire.

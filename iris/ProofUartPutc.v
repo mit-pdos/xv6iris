@@ -56,7 +56,7 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import VcGen WpSconfVc.
+Require Import VcGen.
 Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import CpuOwn.

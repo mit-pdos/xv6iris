@@ -42,7 +42,7 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import ByteBuf.
 Require Import DirentEnc.

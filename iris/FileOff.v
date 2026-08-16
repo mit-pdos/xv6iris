@@ -97,9 +97,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto.
 Require Import FdSlots.
 Require Import WpLock.
-Require Import FileInv.
-Require Import FsCrash.
-Require Import InodeInv.
+Require Import FileInvDefs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 

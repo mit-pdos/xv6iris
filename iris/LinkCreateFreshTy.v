@@ -42,7 +42,8 @@ Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import ProcAvail.
 Require Import WpUart.
-Require Import DiskPtsto BioInv.
+Require Import DiskPtsto.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import InodeRegion.
 Require Import IrefSlots IcacheRef IcacheEscrow.

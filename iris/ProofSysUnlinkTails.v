@@ -53,11 +53,11 @@ Require Import InstrBytes.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn StackBytes.
+Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
-Require Import WpSmodeIntr WpSmodeHalf.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots.
@@ -71,7 +71,6 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
-Require Import DirView.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import SleepLock.

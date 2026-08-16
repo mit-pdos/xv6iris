@@ -88,7 +88,7 @@ Require Import KernelRvcDecode.
 Require Import StackOwn StackBytes.
 Require Import CalleeSaved KernelText.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
 Require Import CpuOwn.

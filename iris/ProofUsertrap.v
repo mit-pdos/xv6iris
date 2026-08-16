@@ -80,7 +80,8 @@ Require Import UserPtTree ProcPtOwn.
 Require Import KptTree.
 Require Import TrampPt.
 Require Import KallocInv.
-Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash.
+Require Import BioDefs.
 Require Import SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import FdSlots ProcInv.

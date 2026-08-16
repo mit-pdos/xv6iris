@@ -62,7 +62,6 @@ Require Import CodeProcFreepagetable.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import SpecUvmunmap SpecUvmfree.
 Require Import SpecProcFreepagetable.
-Require Import KernelRvcDecode.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.

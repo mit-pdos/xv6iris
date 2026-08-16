@@ -57,7 +57,7 @@ Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import WpUart.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecFilealloc SpecKalloc SpecInitlock SpecIput SpecFileclose.

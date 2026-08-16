@@ -14,7 +14,9 @@ Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import WpLock.
-Require Import FdSlots ProcInv.
+Require Import FdSlots.
+Require Import IrefSlots.
+Require Import ProcDefs.
 Require Import FileInvDefs.
 Require Import SpecForkretPark.
 

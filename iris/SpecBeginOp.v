@@ -69,7 +69,7 @@ Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import DiskPtsto.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

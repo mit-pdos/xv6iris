@@ -86,10 +86,11 @@ Require Import PanicStub.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
-Require Import SchedCtx.
+Require Import IrefSlots.
+Require Import ProcAvail.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BitmapInv.

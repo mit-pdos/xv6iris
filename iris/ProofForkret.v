@@ -41,32 +41,32 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import PageGeom.
 Require Import RegFile HartTp WpNext CpuOwn CalleeSaved.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
-Require Import MinstretInv InstrBytes WireInv.
-Require Import KernelText KernelRvcDecode MstatusBits.
+Require Import KernelRvcDecode.
 Require Import WpGprCsrwA.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeIntr.   (* [wp_cli_s_sconf] *)
 Require Import WpKvminithart.      (* [kvi_satp_word] and its three facts *)
 Require Import IntrDefs.
 Require Import WpLock.
-Require Import TrampPt KptShare UserretDefs.
-Require Import UserPtTree UserExec.
+Require Import KptShare UserretDefs.
+Require Import UserPtTree.
 Require Import ProcGeom.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInvDefs.
 Require Import ProcInv.
-Require Import BioInv DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv.
+Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv.
+Require Import BioDefs.
 Require Import IrefSlots InodeRegion ProcAvail.
 Require Import CodeForkret.
 Require Import SpecMyproc SpecRelease SpecPrepareReturn.
 Require Import SpecSyscall SpecSysExit SpecKexit.
-Require Import SpecUsertrap SpecUserretClosed.
+Require Import SpecUserretClosed.
 Require Import UsertrapRes.
 Require Import SpecForkret ProofForkretParts ProofPrepareReturnParts.
 From Kernel Require KernelInstrs.

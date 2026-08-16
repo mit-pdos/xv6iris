@@ -41,7 +41,6 @@ Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import MinstretInv.
 Require Import WpSmodeHalf.

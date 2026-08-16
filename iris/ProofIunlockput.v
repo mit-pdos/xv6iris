@@ -33,12 +33,12 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import FdSlots.
 Require Import IcacheRef.
 Require Import IrefSlots.
 Require Import WpUart.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.

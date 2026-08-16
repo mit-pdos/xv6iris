@@ -30,7 +30,6 @@ Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock SleepLock.
 Require Import SpecInitlock.
-Require Import KernelRvcDecode.
 Require Import CodeSleeplock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

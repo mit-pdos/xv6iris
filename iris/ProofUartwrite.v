@@ -89,7 +89,7 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
-Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess.
 Require Import UartTxInv.

@@ -46,7 +46,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import FileInvDefs.
-Require Import BioInv.
+Require Import BioDefs.
 Require Import DiskPtsto.
 Require Import WpUart.
 Require Import FsBlocks LogInv.

@@ -40,7 +40,7 @@ Require Import StackOwn CalleeSaved KernelText KernelDataInv.
 Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import DiskPtsto WpUart.
-Require Import IntrDefs HartTp WpNext WpSconfVc.
+Require Import IntrDefs HartTp WpNext.
 Require Import PrintintArith StackBytes.
 Require Import CodePrintk.
 Require Import WpLock CpuOwn UartTxInv.

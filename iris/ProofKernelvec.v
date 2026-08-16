@@ -62,7 +62,6 @@ Require WpGprCsrwCommon WpGprCsrwC.
 Require Import SpecKerneltrap SpecKernelvec.
 From Kernel Require KernelSyms.
 Require Import KernelConsts.
-Require Import KernelRvcDecode.
 Require Import ProcAvail.
 Local Open Scope Z_scope.
 Import Defs.

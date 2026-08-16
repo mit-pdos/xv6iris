@@ -81,7 +81,7 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import W32Arith.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
-Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn.
 Require Import FdSlots.
 Require Import DiskPtsto WpUart UartTxInv.
 Require Import ConsoleInv.
