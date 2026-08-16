@@ -760,25 +760,13 @@ Lemma wp_load_s_… (kt kt' : ktier) `{!KtierLe kt' kt} … :
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
-  sketch. Phases A, B and C are LANDED; `main` is GREEN.
-- **Branch `sp-migration-red`** (local, one squashed commit off `4019ec33`)
-  holds the RED experiment as a QUARRY for step 3, not as a base: the
-  identity conjunct removed from `mem_pointsto`, with `RiscvPtsto.v`'s own
-  suite repaired (`mem_pointsto_acc`, `_pin`, `_persist`, `mem_canonical`,
-  `mem_ram`, `mem_valid`, `phys_to_mem_map` — which lost its
-  `pa_of ppn va = va` premise — `phys_to_mem_claim`, `mem_to_phys_claim`),
-  plus `KMap.v` and `SmodeCorePt.v` destructure arities. Those repaired
-  lemmas are essentially the KT1 tier's suite; step 3 adapts them under the
-  g index rather than rediscovering them.
-- On that branch the build stops at `WpSmodePtLeaves.v:427`, the first of
-  ~14 sites that destructure `%Hid` out of the datum and feed it to
-  `sr_adm_id` (`WpSconfMem` ×5, `WpSmodePtMem` ×4, `WpSmodePtLeaves` ×2,
-  `SmodeCorePt`, `WpSconfLock`, `ProofAcquiresleep`). Under the settled
-  design these become the KT0 arm of the tier-preserving leaf rules (step 3
-  of the implementation order). Implementation should START FRESH from
-  green `main` at step 1 (the oneshot refactor, which is independent and
-  lands green), not by resuming the branch.
+  sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) are LANDED
+  and pushed; `main` is GREEN. NEXT: phase D — the KT1 access path (see
+  the campaign section's Phase D bullet and "What phase D needs" at the
+  end of the phase C findings).
+- The `sp-migration-red` quarry branch is DELETED: the identity-pin
+  deviation (phase C findings) left nothing to mine from it.
 - `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch
   path is untouched. It must eventually lose it too (TRAMPOLINE is
   non-identity); the settled design covers it — same index, same witness —
-  as step 7 of the implementation order.
+  as phase E.
