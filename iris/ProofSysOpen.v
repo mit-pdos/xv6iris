@@ -71,6 +71,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
@@ -385,11 +386,11 @@ Section ProofSysOpenBody.
     inode_meta (ientry k) dn ∗
     (inode_meta (ientry k) dn -∗ ic_loaded gfs gi cov logstart k inum dn bm).
   Proof.
-    iIntros "(%data & %Hok & %Hdok & %Hddix & %Hdoc & Hl & Hd & Hm & Ha & Hr &
+    iIntros "(%data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hl & Hd & Hm & Ha & Hr &
              Hb)".
     iFrame "Hm". iIntros "Hm".
     iApply (ic_mk_loaded gfs gi cov logstart k inum dn bm data Hok Hdok Hddix
-              Hdoc with "Hl Hd Hm Ha Hr Hb").
+              Hdoc Hduq with "Hl Hd Hm Ha Hr Hb").
   Qed.
 
   Local Lemma so_type_acc (ip : mword 64) (dn : dinode) :

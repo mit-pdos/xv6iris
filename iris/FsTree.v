@@ -718,3 +718,303 @@ Proof.
   - apply Forall_singleton. split; assumption.
   - rewrite path_at_singleton. exact Hst.
 Qed.
+
+(* ====================================================================== *)
+(*  2.  THE RECORD DELTAS THE FRIENDLY LAYER READS ITS TREE DELTAS OFF     *)
+(* ====================================================================== *)
+
+(* WHAT dirlink LEAVES BEHIND, said at the record view -- the exact twin of
+   [FsTree.dir_zeroed_at], which says what sys_unlink's memset+writei
+   leaves behind.  Slot [k0] now holds the name [s] at inum [z]; every
+   other record's sixteen bytes are untouched, which is
+   [DirView.dir_win_agree], the vocabulary a byte-range postcondition
+   converts into with [DirView.dir_win_agree_below].
+
+   ONE CLAUSE COVERS BOTH OF dirlink's ARMS.  The APPEND arm has
+   [k0 = nrec] and grows the count; the REUSE arm has [k0 < nrec] at a
+   record that was FREE.  They differ only in where [k0] sits relative to
+   the OLD count, which is why the lemmas below quantify over [nrec] and
+   [nrec'] separately instead of being written twice. *)
+Definition dir_written_at (data data' : nat -> list (bv 8)) (k0 : nat)
+    (s : fname) (z : bv 16) : Prop :=
+  dir_inum data' k0 = z
+  /\ dir_bname data' k0 = s
+  /\ (forall q : nat, q <> k0 -> dir_win_agree data data' q).
+
+Lemma dir_written_inum (data data' : nat -> list (bv 8)) (k0 : nat)
+    (s : fname) (z : bv 16) (q : nat) :
+  dir_written_at data data' k0 s z -> q <> k0 ->
+  dir_inum data' q = dir_inum data q.
+Proof. intros (_ & _ & H) Hq. exact (dir_inum_agree data data' q (H q Hq)). Qed.
+
+Lemma dir_written_bname (data data' : nat -> list (bv 8)) (k0 : nat)
+    (s : fname) (z : bv 16) (q : nat) :
+  dir_written_at data data' k0 s z -> q <> k0 ->
+  dir_bname data' q = dir_bname data q.
+Proof.
+  intros (_ & _ & H) Hq. exact (dir_bname_agree data data' q (H q Hq)).
+Qed.
+
+Lemma dir_written_live (data data' : nat -> list (bv 8)) (k0 : nat)
+    (s : fname) (z : bv 16) (q : nat) :
+  dir_written_at data data' k0 s z -> q <> k0 ->
+  (dir_live data' q <-> dir_live data q).
+Proof.
+  intros Hw Hq. unfold dir_live.
+  rewrite (dir_written_inum data data' k0 s z q Hw Hq). reflexivity.
+Qed.
+
+(* the written record is LIVE: its inum halfword is the nonzero [z] *)
+Lemma dir_written_live0 (data data' : nat -> list (bv 8)) (k0 : nat)
+    (s : fname) (z : bv 16) :
+  dir_written_at data data' k0 s z -> z <> bv_0 16 -> dir_live data' k0.
+Proof. intros (Hz & _ & _) Hnz. unfold dir_live. rewrite Hz. exact Hnz. Qed.
+
+(* EVERY LIVE RECORD OF THE NEW STATE IS EITHER THE WRITTEN ONE OR AN OLD
+   ONE.  The workhorse of both lemmas below; the second premise is what the
+   APPEND arm supplies (the records the count grew over, other than the one
+   written, are free -- and there are none at all when the count grows by
+   exactly one, onto [k0]). *)
+Lemma dir_written_class (data data' : nat -> list (bv 8))
+    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) (q : nat) :
+  dir_written_at data data' k0 s z ->
+  (forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 -> ~ dir_live data' r) ->
+  (q < nrec')%nat -> dir_live data' q -> q <> k0 ->
+  (q < nrec)%nat /\ dir_live data q.
+Proof.
+  intros Hw Hdead Hq Hl Hqk.
+  destruct (decide (q < nrec)%nat) as [Hlt | Hge].
+  - split; [exact Hlt |].
+    exact (proj1 (dir_written_live data data' k0 s z q Hw Hqk) Hl).
+  - exfalso. assert (Hrng : (nrec <= q < nrec')%nat) by lia.
+    exact (Hdead q Hrng Hqk Hl).
+Qed.
+
+(* UNIQUENESS IS PRESERVED, and dirlink's guard is exactly what pays for it:
+   the kernel refuses to append a name the scan already found
+   ([SpecDirlink] exposes [dir_first data nrec s = None] on the append arm
+   and the found-arm negation on the other), so the written name collides
+   with no surviving live record. *)
+Lemma dir_names_unique_write (data data' : nat -> list (bv 8))
+    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) :
+  dir_names_unique data nrec ->
+  (nrec <= nrec')%nat -> (k0 < nrec')%nat ->
+  (forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 -> ~ dir_live data' r) ->
+  dir_first data nrec s = None ->
+  dir_written_at data data' k0 s z ->
+  dir_names_unique data' nrec'.
+Proof.
+  intros Hu Hle Hk0 Hdead Hnone Hw j k Hj Hk Hlj Hlk Heq.
+  (* the written name meets no surviving live record *)
+  assert (Hno : forall q : nat, (q < nrec')%nat -> dir_live data' q ->
+                  q <> k0 -> dir_bname data' q <> s).
+  { intros q Hq Hl Hqk Hnm.
+    destruct (dir_written_class data data' nrec nrec' k0 s z q Hw Hdead Hq Hl Hqk)
+      as [Hqlt Hlq].
+    apply (proj1 (dir_first_None data nrec s) Hnone q Hqlt).
+    split; [exact Hlq |].
+    rewrite <- Hnm. symmetry.
+    exact (dir_written_bname data data' k0 s z q Hw Hqk). }
+  destruct (decide (j = k0)) as [Hjk0 | Hjk0];
+    destruct (decide (k = k0)) as [Hkk0 | Hkk0].
+  - congruence.
+  - exfalso. apply (Hno k Hk Hlk Hkk0).
+    rewrite <- Heq. rewrite Hjk0. exact (proj1 (proj2 Hw)).
+  - exfalso. apply (Hno j Hj Hlj Hjk0).
+    rewrite Heq. rewrite Hkk0. exact (proj1 (proj2 Hw)).
+  - destruct (dir_written_class data data' nrec nrec' k0 s z j Hw Hdead Hj Hlj Hjk0)
+      as [Hjlt Hlj0].
+    destruct (dir_written_class data data' nrec nrec' k0 s z k Hw Hdead Hk Hlk Hkk0)
+      as [Hklt Hlk0].
+    apply (Hu j k Hjlt Hklt Hlj0 Hlk0).
+    rewrite <- (dir_written_bname data data' k0 s z j Hw Hjk0).
+    rewrite <- (dir_written_bname data data' k0 s z k Hw Hkk0).
+    exact Heq.
+Qed.
+
+(* ====================================================================== *)
+(*  9.  THE PAYLOAD CLAUSE [dir_uniq] (fs-fragments §7.5.8, item S2-0),     *)
+(*      AND dirlink's PRESERVATION MOVER, MOVED DOWN FROM [FsLookup.v].     *)
+(*                                                                          *)
+(*  R2 rules that name uniqueness is an INVARIANT.  Until this clause it     *)
+(*  had no CARRIER: [dir_names_unique] occurred in exactly two files         *)
+(*  ([FsTree.v] and [FsLookup.v]) and in no payload, no spec and no walk,    *)
+(*  so no landed proof could build an [FsRep.fnode] / [FsLookup.fdir] and    *)
+(*  the whole tree layer was unreachable from every WP in the tree.  This    *)
+(*  is that carrier: it rides in [IcacheEscrow.ipool_alloc] and              *)
+(*  [ic_loaded] beside [dir_ok] / [dir_dots_ix] / [dir_orphan_clean].        *)
+(*                                                                          *)
+(*  IT IS TYPE-GUARDED EXACTLY AS [dir_ok] IS, AND THE GUARD IS NOT          *)
+(*  DECORATION: unguarded the clause is FALSE of a FILE -- a large file's    *)
+(*  bytes read as records will collide -- which is the [dir_dots_ix]         *)
+(*  road-test lesson, one clause over.                                       *)
+(*                                                                          *)
+(*  LAYERING NOTE.  fs-fragments §7.5.8 charts the definition for            *)
+(*  [DirView.v]; it lands HERE because [dir_names_unique], [dir_bname] and   *)
+(*  [fname] are this file's vocabulary and DirView is BELOW it (DirView is   *)
+(*  a leaf; FsTree imports it, not the other way round).  Moving the three   *)
+(*  down into DirView would have restated [dir_bname] as [bname 14 (…)] in   *)
+(*  every proof of two files for no gain.  [IcacheEscrow.v] therefore        *)
+(*  gains one import of this file, which costs nothing: FsTree's own         *)
+(*  imports are a subset of the escrow's.                                    *)
+(* ====================================================================== *)
+
+Definition dir_uniq (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))).
+
+(* ---- the five ways a holder discharges it, [dir_ok]'s shape exactly --- *)
+
+(* (i) it is not a directory *)
+Lemma dir_uniq_not_dir (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) <> T_DIR_z -> dir_uniq dn data.
+Proof. intros H Hc. exfalso. exact (H Hc). Qed.
+
+(* (ii) it is FREE -- [ipool_shape]'s free arm, and iput's post-itrunc park *)
+Lemma dir_uniq_free (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = 0 -> dir_uniq dn data.
+Proof.
+  intros H. apply dir_uniq_not_dir. rewrite H. unfold T_DIR_z. lia.
+Qed.
+
+(* (iii) it holds no whole record -- a claim box and a truncated corpse *)
+Lemma dir_uniq_size_zero (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_size dn) = 0 -> dir_uniq dn data.
+Proof.
+  intros H _ j k Hj. exfalso. rewrite H in Hj.
+  change (dir_nrec 0) with 0%nat in Hj. lia.
+Qed.
+
+(* (iv) the record and the data are unchanged -- the "rides" case every
+   re-park in the cache is *)
+Lemma dir_uniq_eq (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
+  dn = dn' -> data = data' -> dir_uniq dn data -> dir_uniq dn' data'.
+Proof. intros -> ->. exact id. Qed.
+
+(* (v) ONLY THE COUNT MOVED.  [dir_uniq] reads the record through
+   [di_type] and [di_size] alone, so every [nlink]-moving walk
+   (sys_link's [bad:], create's [dp->nlink++] and its three [fail:]
+   flushes, sys_unlink's two decrements) crosses it in one line. *)
+Lemma dir_uniq_cong (dn dn' : dinode) (data : nat -> list (bv 8)) :
+  di_type dn' = di_type dn -> di_size dn' = di_size dn ->
+  dir_uniq dn data -> dir_uniq dn' data.
+Proof. intros Hty Hsz H Hd. rewrite Hsz. apply H. rewrite <- Hty. exact Hd. Qed.
+
+(* the raw form, for a producer that has the invariant outright (boot) *)
+Lemma dir_uniq_of (dn : dinode) (data : nat -> list (bv 8)) :
+  dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))) ->
+  dir_uniq dn data.
+Proof. intros H _. exact H. Qed.
+
+(* ...and the projection, which is what [FsRep.fnode_intro_of] consumes *)
+Lemma dir_uniq_names (dn : dinode) (data : nat -> list (bv 8)) :
+  bv_unsigned (di_type dn) = T_DIR_z -> dir_uniq dn data ->
+  dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))).
+Proof. intros Hty H. exact (H Hty). Qed.
+
+(* ---- MOVER 1: sys_unlink's ZEROING ----------------------------------- *)
+
+(* Free, and for the reason [dir_names_unique_zero] records: zeroing only
+   REMOVES a live name.  The size cannot rise (the record is inside the
+   directory), so the count cannot either. *)
+Lemma dir_uniq_zero (dn dn' : dinode) (data data' : nat -> list (bv 8))
+    (k0 : nat) :
+  di_type dn' = di_type dn ->
+  bv_unsigned (di_size dn') <= bv_unsigned (di_size dn) ->
+  dir_zeroed_at data data' k0 ->
+  dir_uniq dn data -> dir_uniq dn' data'.
+Proof.
+  intros Hty Hsz Hzer H Hd'.
+  assert (Hd : bv_unsigned (di_type dn) = T_DIR_z)
+    by (rewrite <- Hty; exact Hd').
+  apply (dir_names_unique_le data'
+           (dir_nrec (bv_unsigned (di_size dn')))
+           (dir_nrec (bv_unsigned (di_size dn)))).
+  - apply dir_nrec_mono. exact Hsz.
+  - exact (dir_names_unique_zero data data' _ k0 Hzer (H Hd)).
+Qed.
+
+(* ---- MOVER 2: dirlink's WRITE ---------------------------------------- *)
+
+(* **THE ATOMICITY PREMISE IS THE WHOLE ARGUMENT.**  At [0 < tot < 16] the
+   clause is genuinely FALSE: a partial record goes LIVE carrying the NAME
+   BYTES the last deletion left behind (xv6 zeroes only the inum
+   halfword), and those may well duplicate a live name.  [SpecDirlink]'s
+   [dl_post] already relays [SpecWritei.wi16_atomic] -- [tot = 0 \/
+   tot = 16] at this call's single-block window -- so the premise costs a
+   caller one [destruct], and the same clause is what [dir_link_at]'s
+   re-park needed before it.  At [tot = 0] nothing moved at all; at
+   [tot = 16] the guard dirlink itself applies ([dir_first data nrec s =
+   None]) is what pays. *)
+Lemma dir_uniq_dirlink (dn dn' : dinode)
+    (data data' : nat -> list (bv 8))
+    (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
+  nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+  k0 = dir_slot data nrec ->
+  (tot = 0%nat \/ tot = 16%nat) ->
+  (length s <= 14)%nat -> nonul s ->
+  di_type dn' = di_type dn ->
+  bv_unsigned (di_size dn')
+    = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+  (forall x : nat,
+     file_byte data' x
+     = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+       then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+       else file_byte data x) ->
+  dir_first data nrec s = None ->
+  dir_uniq dn data -> dir_uniq dn' data'.
+Proof.
+  intros Hnrec Hk0 Htot Hlen Hs Hty Hsz Hrng Hnone H Hd'.
+  assert (Hd : bv_unsigned (di_type dn) = T_DIR_z)
+    by (rewrite <- Hty; exact Hd').
+  specialize (H Hd). rewrite <- Hnrec in H.
+  (* the count arithmetic, [dir_ok_dirlink]'s verbatim *)
+  assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+    by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+  assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+    by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+  destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+  destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn') as [Hnr1' Hnr2'].
+  rewrite <- Hnrec in Hnr1, Hnr2.
+  assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+  set (nrec' := dir_nrec (bv_unsigned (di_size dn'))).
+  assert (Hcle : (nrec <= nrec')%nat) by (unfold nrec'; lia).
+  destruct Htot as [Htot | Htot].
+  - (* ======== tot = 0: nothing was written, and the size did not move === *)
+    subst tot.
+    assert (Hagr : forall q : nat, dir_win_agree data data' q).
+    { intros q j Hj. rewrite (Hrng (16 * q + j)%nat).
+      rewrite decide_False; [reflexivity |]. lia. }
+    assert (Hnre : (nrec' <= nrec)%nat) by (unfold nrec'; lia).
+    intros j k Hj Hk Hlj Hlk Heq.
+    apply H; try lia.
+    + unfold dir_live. rewrite <- (dir_inum_agree data data' j (Hagr j)).
+      exact Hlj.
+    + unfold dir_live. rewrite <- (dir_inum_agree data data' k (Hagr k)).
+      exact Hlk.
+    + unfold dir_bname.
+      rewrite <- (dir_bname_agree data data' j (Hagr j)).
+      rewrite <- (dir_bname_agree data data' k (Hagr k)).
+      exact Heq.
+  - (* ======== tot = 16: the record is WHOLLY new ======================= *)
+    subst tot.
+    assert (Hwin : forall j, (j < 16)%nat ->
+              file_byte data' (16 * k0 + j)%nat
+              = dirent_bytes (de_of_name inum s) !!! j).
+    { intros j Hj. rewrite (Hrng (16 * k0 + j)%nat).
+      rewrite decide_True; [| lia].
+      replace (16 * k0 + j - 16 * k0)%nat with j by lia. reflexivity. }
+    destruct (dir_record_of_name data' k0 inum s Hlen Hs Hwin) as [Hrin Hrnm].
+    assert (Hwrit : dir_written_at data data' k0 s inum).
+    { split; [exact Hrin | split].
+      - unfold dir_bname. exact Hrnm.
+      - intros q Hq j Hj. rewrite (Hrng (16 * q + j)%nat).
+        rewrite decide_False; [reflexivity |].
+        intros [Hlo Hhi]. apply Hq. lia. }
+    assert (Hk0lt : (k0 < nrec')%nat) by (unfold nrec'; lia).
+    assert (Hdead : forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 ->
+                      ~ dir_live data' r).
+    { intros r Hr Hrk. exfalso. unfold nrec' in Hr. lia. }
+    exact (dir_names_unique_write data data' nrec nrec' k0 s inum
+             H Hcle Hk0lt Hdead Hnone Hwrit).
+Qed.

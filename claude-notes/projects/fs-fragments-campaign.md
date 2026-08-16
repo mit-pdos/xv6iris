@@ -17,7 +17,10 @@ diverged from the design's sketches, and what is left.
 | **F2** | path resolution as a logically-atomic triple (R8 — NOT a re-derivation of namex's post) | `FsLookup.v` (new) | F1b | **LANDED** |
 | **V1** | the COUNT-FACT CARRIER: `w` widened to `(wl, wd)`, `ilinkd`, (T1), the flavour-indexed movers and `wp_iupdate_link`/`_unlink` | IcacheRef, InodeRegion, IregLinkNz, `IregDirBit.v` (new), IcacheBoot, SpecIupdate, ProofIupdate + 3 callers | full cone | **LANDED** |
 | **V2** | the `DirLinks`/`DirView` COUNT CLAUSE + the d-flavoured mint ESTABLISHED at create's mkdir arm | DirView, DirLinks, InodeRegion, IregLinkNz, FsRep, IcacheBoot, ProofIlock, ProofCreate, ProofSysLinkTails, ProofSysUnlinkParts | full cone | **LANDED** |
-| **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | NOT STARTED |
+| **V3** | sys_unlink's T_DIR arm CONSUMING it — FINDING 3's re-park | ProofSysUnlink | V2 | **LANDED with W5-DIR (increment 9), at two premises D1/D2** |
+| **S2-0** | the NAME-UNIQUENESS payload clause `dir_uniq`, and the payload → tree constructor it unlocks | FsTree, FsLookup, IcacheEscrow, IcacheBoot + 18 walk/spec files | full cone | **LANDED** |
+| **V4** | D2's carrier: the PLAIN-unit refusal at directories (T1′) + create's `dp->nlink++` flavour FLIP + `dlc_lower` | InodeRegion, IregDirBit, DirView, DirLinks, IcacheBoot, ProofCreate, ProofSysUnlink | full cone | DESIGNED, NOT STARTED — see below |
+| **V5** | D1's carrier: the PARENT-EDGE tag (`wd` becomes `option (agree Z)`) | IcacheRef, InodeRegion, DirView, DirLinks, IcacheBoot, ProofCreate, the payload sweep | full cone | DESIGNED, NOT STARTED — see below |
 
 `F1a`, `F1b` and `F1.5b` are the unconditional slate: purely additive, no
 landed contract and no landed proof moved.
@@ -1222,3 +1225,331 @@ very payload two instructions later.  With the walk's `blez` fall-through
   state.  It is three lines (`IregDirBit.ireg_dirbit_ty`, the type test,
   `discriminate`), but it does put the region's invariant in the file arm's
   hand, so budget the mask (`solve_ndisj`) there.
+
+## S2-0 — **THE NAME-UNIQUENESS CLAUSE IS LANDED.  `dir_uniq` rides in
+## both payloads, and `FsLookup.ic_loaded_fdir` makes the whole tree layer
+## reachable from a WP for the first time**
+
+fs-fragments §7.5.8's ranked item S2-0 recorded the gap exactly: *"No
+landed walk can construct an `fnode`, an `fdir`, an `fslice` or an
+`fs_rep`.  F1b and F2 are landed, green, `Print Assumptions`-clean — and
+unreachable from every proof in the tree."*  The cause was one pure
+conjunct: `node_rep`'s NDir case demands `dir_names_unique`, and that
+predicate occurred in exactly two files and in no payload.  This is the
+carrier, at the design's chartered shape, plus the constructor it buys.
+
+### What landed, and the ONE place the design's shape moved
+
+```coq
+Definition dir_uniq (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  dir_names_unique data (dir_nrec (bv_unsigned (di_size dn))).
+```
+
+type-guarded exactly as `dir_ok` is, and the guard is not decoration:
+unguarded the clause is FALSE of a FILE (a large file's bytes read as
+records will collide) — the `dir_dots_ix` road-test lesson one clause
+over, as §7.5.8 predicted.
+
+**IT LIVES IN `FsTree.v`, NOT `DirView.v`, AND THE REASON IS LAYERING.**
+§7.5.8 charts the definition for `DirView.v` "beside `dir_ok` /
+`dir_dots_ix` / `dir_orphan_clean`".  That home is not available:
+`dir_names_unique`, `dir_bname` and `fname` are `FsTree`'s vocabulary and
+**`DirView` is BELOW `FsTree`** (DirView is a leaf; FsTree imports it, not
+the other way round).  Moving the three down would have restated
+`dir_bname data k` as `bname 14 (dir_name data k)` through every proof of
+two files for no gain.  So the clause lands in `FsTree.v` and
+`IcacheEscrow.v` gains **one import**, which costs nothing — FsTree's own
+imports (DirView, InodeInv, DinodeEnc, DirentEnc, RiscvModelBytes) are a
+subset of the escrow's, and there is no cycle.
+
+`FsLookup.v`'s `dir_written_at` block (the definition, its four readings
+and **`dir_names_unique_write`**) **MOVED DOWN into `FsTree.v`** with it:
+it is stated in FsTree/DirView vocabulary alone, `FsLookup` is far above
+the payloads, and `dir_uniq_dirlink` needs it.  FsLookup keeps every use
+unqualified through its own `Require Import FsTree`; no statement changed
+and no proof of that file moved.
+
+### The mover table — five discharges, two real
+
+| site | discharge |
+|---|---|
+| every peel/re-park that moves nothing (`ProofNamex` ×4, `ProofSysChdir` ×2, `ProofKexecA` ×3, `ProofKexecB2`/`B3`, `ProofFileread` ×2, `ProofFilestat`, `ProofIput` ×2, `ProofSysOpen`, `ProofSysLink` ×3, `ProofCreate` ×4, `SpecKexecB2` ×2) | transfer — one name in the destruct, one `iSplitR` in the rebuild |
+| `ProofIlock`'s fill | transfer out of `ipool_alloc`'s allocated arm |
+| `ProofIlock`'s CLAIM BOX | `dir_uniq_size_zero` off `fresh_shape`'s size — `dir_nrec 0 = 0`, vacuous |
+| `ProofFilewrite`, `ProofSysOpenParts`' O_TRUNC, `ProofSysLink`'s `ip->nlink++`, create's two `cr_setf` children, sys_unlink's `ip->nlink--` (FILE arm) | `dir_uniq_not_dir` |
+| `ProofSysLinkTails`' `ip->nlink--` | `dir_uniq_not_dir` under the walk's `ity_shot` type, the sibling clause's line verbatim |
+| every `nlink`-only move (create's `dp->nlink++`, sys_unlink's two decrements, the `fail:` flushes) | **`dir_uniq_cong`** — the clause reads `di_type` and `di_size` and nothing else, so a count move crosses it in one line |
+| **`dirlink`'s write** (create ×3 + the `tot = 0` arm, sys_link ×1) | **`dir_uniq_dirlink`**, off `FsTree.dir_names_unique_write` |
+| **sys_unlink's zeroing** (both arms) | **`dir_uniq_zero`**, off `FsTree.dir_names_unique_zero` |
+| boot | threaded, zero obligation — it joins `IcacheBoot`'s premise family on the same terms as `dir_dots_ix` and `dir_orphan_clean` |
+
+### **THE ONE THING THE DESIGN DID NOT SEE: `dir_uniq` IS FALSE ACROSS A
+### PARTIAL `dirlink` WRITE, AND `SpecDirlink` ALREADY RELAYS THE FIX**
+
+§7.5.8 priced the dirlink discharge as "`FsLookup.dir_names_unique_write`,
+**LANDED**" — free.  It is not free, and the reason is worth keeping: at
+`0 < tot < 16` the appended record goes **LIVE carrying the NAME BYTES the
+last deletion left behind** (xv6 zeroes only the inum halfword), and those
+may well duplicate a live name.  Neither `dir_ok` nor `dir_dots_ix` cares
+— the first is a range bound the mod-256 argument covers, the second is
+kept away from the window by `dir_slot` — so no landed clause had ever met
+this arm.
+
+The fix costs nothing because it was already there: **`SpecDirlink`'s
+`dl_post` relays `SpecWritei.wi16_atomic` at this call's single-block
+window — `tot = 0 \/ tot = 16`** — and `dir_uniq_dirlink` takes it as a
+premise.  Every caller destructs it already (`Hatom`/`Hatom1`/`Hatom2`/
+`Hatom3`).  At `tot = 0` nothing moved and the count cannot have grown
+(`k0 <= nrec` and `16*nrec <= size`); at `tot = 16` the record is wholly
+new and dirlink's own guard (`dir_first data nrec s = None`) is what pays.
+
+**The rule**: *a payload clause about NAMES must take dirlink's atomicity;
+a clause about inums or indices need not.*  The contract's own header
+already argued the same thing for `dir_link_at`'s re-park ("at
+`0 < tot < 16` there is no re-park at all") — this is the second consumer
+of that observation and the first PURE one.
+
+### The constructor — `FsLookup.ic_loaded_fdir` / `ic_loaded_fnode`
+
+```coq
+  bv_unsigned (di_type dn) = T_DIR_z ->
+  ic_loaded gfs gi cov logstart k inum dn bm -∗
+    ∃ data, fdir gi gfs (bv_unsigned inum) (dir_view data (dnrec dn)) dn bm data
+            ∗ (fdir … -∗ ic_loaded …)
+```
+
+An ACCESSOR, not a conversion: `fdir` holds two of the payload's ten
+conjuncts (`dinode_at`, `inode_blocks`) and the wand puts them back, so a
+walk reads its tree and keeps its bundle.  The node is not guessed — it is
+`FsTree.dir_view` of the payload's own bytes, which is what makes the
+lemma unconditional in `ents`.  S2-0 is closed: **the F1b/F2 layer is
+reachable from a WP.**
+
+### **AND ITS LIMIT, WHICH IS S7-unlink's D1 AND IS NOT REMOVABLE HERE**
+
+The increment's brief expected D1 (the child's `".."` names the parent) to
+fall out of this constructor through `FsLookup.fdir_dots_index`.  **It does
+not, and the circularity the W5 record named is real.**  Building `ents`
+from the payload's own bytes gives `ents !! DOTDOT = Some (dir_inum data
+1)` and nothing else, so feeding it to `fdir_dots_index` — whose premise is
+`ents !! DOTDOT = Some dp` — instantiates `dp` AS `dir_inum data 1` and
+returns the premise it was given.  **The parent-edge IDENTITY is a relation
+between TWO inodes; no reading of ONE payload can supply it**, and the tree
+layer cannot supply it either without a whole-tree consistency invariant,
+which R3 forbids.  The header of `ic_loaded_fdir` says so at the point of
+use.  D1's honest carrier is V5 below.
+
+### `lemma_diff` READS THE MOVE AS SEVEN DELETIONS, and that is expected
+
+`tools/lemma_diff.py` reports `dir_written_at`, its four readings,
+`dir_written_class` and `dir_names_unique_write` as **GONE from
+`FsLookup.v`**.  They are not gone: all seven are in `FsTree.v`, verbatim,
+and `FsLookup` still uses them unqualified through its own import.  That
+is the one line of justification the tool asks for; nothing else in the
+21-file diff is flagged.
+
+### Owed
+
+* The `dir_uniq_*` discharge lemmas live in `FsTree.v` beside the tree
+  layer, not in `DirView.v` beside their four siblings.  Fold them
+  together at a milestone **only if `dir_names_unique`'s vocabulary moves
+  down with them** — the split is a layering fact, not an oversight.
+* `FsLookup.ic_loaded_fdir` has ONE consumer possibility today and no
+  consumer: it is the door, not the walk through it.  The first client
+  should be F3's friendly layer, not another byte-level walk.
+
+### Gate
+
+MAIN's own working tree at `1e33d07e` (no sibling lane was live —
+`git status --porcelain` accounted for every line before and after).  The
+baseline was a **whole-tree build from a 949/1156 `.vo` starting point**,
+so the increment's cone was validated inside a real full build rather than
+on top of a synced one.  Final pass: **`make -f CoqMakefile -j3 -k` exits
+`0`, zero `Error` lines, `make -n` afterwards emits 0 `ROCQ compile`
+lines, and the `.v`-vs-`.vo` staleness sweep over all 1156 `_CoqProject`
+rows reports nothing.**  `proof_coverage.py --check` exits 0; coverage
+**186/190 (98 %), sysfile.c 15/16 — UNMOVED** (the clause is additive and
+the seal did not flip).  `Print Assumptions` on `dir_uniq_dirlink`,
+`dir_uniq_zero`, `dir_names_unique_write`, `ic_loaded_fdir` and
+`ic_loaded_fnode`: **"Closed under the global context"** — the increment
+introduces no `Axiom`, no `Parameter` and no `admit` (verified over the
+whole diff).  `lemma_diff`: the seven moved declarations, justified above.
+
+**THE TWO TRAPS IT PAID FOR** (both already in the recorded set, both hit
+anyway):
+
+* **THE INDENT SUBSTRING TRAP, in its argument-position form.**  The
+  campaign's recorded version is about tactic lines; the same bug bites a
+  `replace()` keyed on an APPLICATION's argument line, because
+  `"\n" + 21*" " + "Hiok Hdok Hddix Hdoc\n"` is a substring of the same
+  line at 23 spaces.  Anchor on a leading `\n` **and** assert the count.
+* **A NEW PURE PREMISE MOVES THE `[%]` RUN OF EVERY `iApply … with`.**
+  Adding a `⌜…⌝ -∗` to a block lemma is invisible at the DESTRUCT sites
+  and fatal at the APPLICATION sites: the spec pattern's `[%]`
+  placeholders are positional, and one too few reports as *"iSpecialize:
+  cannot instantiate (⌜…⌝ -∗ …)"* naming a premise several lines PAST the
+  one you added.  Seven applications across `ProofCreate`/`ProofSysUnlink`
+  needed the bump, two of them by TWO (a lemma that gained the clause for
+  both the parent and the child).  Grep for the `{ exact … }` goal you
+  added and count the `[%]` run above it.
+
+## V4 — **D2's CARRIER, DESIGNED AND PRICED.  The winner is the PLAIN-UNIT
+## REFUSAL AT DIRECTORIES (T1′) + create's `dp->nlink++` FLAVOUR FLIP +
+## `dlc_lower`.  Nothing cheaper closes, and the certificates are below**
+
+S7-unlink's W5-DIR takes `(D2) 2 <= bv_unsigned (di_nlink dnd)` as a
+premise: `dp`'s post-decrement `dir_orphan_clean` re-park has only the
+`nlink <> 0` discharge, and the model bounds a directory's count **only
+from above** (V2's `dlc_bound`).  This is FINDING 3's wall one inode over,
+and V2's own method — audit every park — is what settles it.
+
+### The reachable truth, and the two units
+
+`dp` holds `ip`'s live subdirectory record (the one being zeroed) AND
+`ip`'s `".."` names `dp`.  Parent-record + child-`".."` = 2.  In the
+ledger's terms `nlink_dp = wl_dp + wd_dp` and both summands are ≥ 1.
+
+### (a) THE LOWER-BOUND COUNTERPART — `dlc_lower`, and it is TRUE
+
+```coq
+Definition dlc_lower (F : nat -> bool) (dn : dinode)
+    (data : nat -> list (bv 8)) : Prop :=
+  bv_unsigned (di_nlink dn) <> 0 ->
+  1 + Z.of_nat (dlc_count F data (dir_nrec (bv_unsigned (di_size dn))))
+    <= bv_unsigned (di_nlink dn).
+```
+
+riding in `dir_links`'s EXISTING `∃ F` beside `dlc_bound`, so **no arity
+moves anywhere and there is no payload sweep** — V2's shape argument
+applies verbatim (a bound not tied to the tickets could not be
+re-established at the zeroing).  At the same `F` the two clauses force `F`
+to be exactly the subdirectory marker, which is what it is.
+
+**The guard is not optional.**  An ORPHANED directory has only dot records
+(`dir_orphan_clean`), so `count = 0` and `1 + 0 <= 0` is false; `nlink <> 0`
+makes it vacuous exactly there, which is also where `ip->nlink--` parks.
+
+**The park audit, every site:**
+
+| mover | count | nlink | verdict |
+|---|---|---|---|
+| `dir_links_dirlink` / `_nop` (plain deposit into a live dir) | unchanged (slot was dead, `F' = F[k0 := false]`) | unchanged | free |
+| `dir_links_dirlink_d` (create's mkdir, FUSED deposit + `++`) | +1 | +1 | free — **but needs NO-WRAP**, i.e. `nlink+1 <> 0`, which is the SAME fact `IregLinkNz.ireg_link_nz` already supplies at that site for `dir_orphan_clean` |
+| `dir_links_unlink` (sys_unlink's zeroing) | −1 at `b = true`, unchanged at `b = false` | the caller's | the wand's premise must become the EQUALITY `nlink' + (if b then 1 else 0) = nlink`; both landed consumers already have it (the FILE arm re-parks the SAME record, the T_DIR arm decrements by exactly one) |
+| `dir_links_dotdot_out` | index 1 is refused by the count | unchanged | free |
+| `dir_links_orphan` (ip's re-park at `nlink = 0`) | — | 0 | guard vacuous |
+| `dir_links_size_zero` (ilock's claim box) | — | 0 | guard vacuous |
+| `dir_links_of_plain` (boot) | 0 | image's | **free**: the obligation is `nlink <> 0 -> 1 <= nlink`, true of any bitvector.  Unlike `dlc_bound`'s, this boot obligation is not even an image fact |
+| create's `fail:` flushes, sys_link's `bad:` | the directory is not one, or the count RISES | | free |
+
+### (b) THE MISSING HALF — `F kk = true`, and **`dlc_lower` ALONE DOES NOT
+### GIVE IT**
+
+To read `2 <= nlink_dp` off `dlc_lower` at `dp` the walk needs
+`count >= 1`, i.e. that `dp`'s record for `ip` is **d-flavoured**.  The
+walk knows `ip` IS a directory; it does **not** know the ticket's flavour,
+because `F` is existential and V1's (T1) runs the wrong way (`0 < wd ->
+T_DIR`, not the converse).  The FILE arm refutes `b = true` through
+`IregDirBit.ireg_dirbit_ty`; the T_DIR arm needs the MIRROR refutation of
+`b = false`, and nothing landed provides it.
+
+**The mirror, and it is the whole of V4's region half:**
+
+```coq
+(* InodeRegion.v, a second clause of [ireg_dir_ok] or its own conjunct *)
+Definition ireg_dir_wl0 (d : dinode) (wl : nat) : Prop :=
+  bv_unsigned (di_type d) = ireg_dir_ty -> wl = 0%nat.
+```
+
+— **no PLAIN unit is ever filed against a directory.**  Then the T_DIR arm
+reads `di_type ip = T_DIR` off its own payload, holds the released
+`ilink_fl (dlc_fl b)` at `ip`, and `b = false` gives `wl_ip >= 1`:
+contradiction, in three lines, at the same altitude as the file arm's.
+
+**It is FALSE of the tree as it stands, by exactly one mint.**  The units
+filed against a directory `z` are (i) `z`'s entry in its parent — minted at
+create's `ip->nlink = 1` at +0xc4 under `cr_flav ty`, hence **d-flavoured
+when `z` is a directory** — and (ii) one per subdirectory's `".."` — minted
+at create's `dp->nlink++` at +0x134, which passes **`None`** (verified:
+`ProofCreate.v`'s `IU.wp_iupdate_link … true None`).  **THE FLIP** is that
+one argument: pass `Some tt`, whose contract premise is `di_type dn =
+ireg_dir_ty` at the flushed parent record, which create holds
+(`Hdntdir`/`Hp3ty`).  Its only downstream effect is that `ip`'s `".."`
+ticket becomes `ilinkd dp` — and **`dlc_count` refuses index 1 by index**,
+so V2's clause does not move.  (The deposit lemma at that record must
+become a d-flavoured, count-neutral variant; the slot is index 1, which
+`Hc1k0` already names.)
+
+**Boot is free**: V1 stocks `link_auth z 0 0 0 None 0`, so `wl = 0` at
+every image inum and (T1′) holds vacuously.
+
+**The mover premise**: `ireg_write_link_fl` at `fl = None` gains
+`di_type dn <> ireg_dir_ty`.  Three callers, all discharge — create's
++0xc4 child mint through `cr_flav_file`, create's `dp->nlink++` (now
+`Some tt`, vacuous), sys_link's `ip->nlink++` through ARM E2's `T_DIR`
+refusal.
+
+### (c) WHAT WAS TRIED AND DIED — the certificates
+
+* **The ROOT clause alone.**  `ireg_root_ok z d w := z = ireg_root ->
+  w < nlink` gives `nlink_dp >= 2` from ONE held unit at `dp` — but the
+  only candidate unit is `ip`'s `".."` ticket, which is at inum
+  `dir_inum dati 1` and is `dp`'s **only given D1**.  Circular.  (It does
+  do one real job: `ip <> ireg_root` is FREE from it, since `nlink_ip = 1`
+  and the walk holds a unit at `ip`.)
+* **A region clause "a live non-root directory has `1 <= w`" (T3).**
+  Useless: it and the walk's own held fragment both say `w >= 1` and they
+  do not add.  The flavour split is what makes two units countable, which
+  is why (T1′) and not (T3).
+* **Deriving `dir_orphan_clean` at the decremented record directly** (i.e.
+  proving `nlink' = 0 -> dir_dots_only dp`).  Needs an UPPER bound on the
+  live non-dot record count from `nlink`, which is `dlc_lower`'s content
+  restricted to d-flavoured records — and even at `count = 0` it does not
+  give `dir_dots_only`, because plain (file) records are uncounted.  Dead.
+* **Counting ALL live non-dot records instead of the F-marked ones.**
+  False outright: a directory holding three files still has `nlink = 1`.
+
+### Price
+
+`InodeRegion.v` (six movers, the (T1′) conjunct and its projections) +
+`IregDirBit.v` (the `wl` reader, `ireg_dirbit_ty`'s structural twin) +
+`DirView.v`/`DirLinks.v` (`dlc_lower` and ~10 movers, no arity) +
+`IcacheBoot.v` (nothing but a threaded conjunct) + `ProofCreate.v` (the
+flip and the index-1 deposit) + `ProofSysUnlink.v` (the refutation and the
+read).  Comparable to V1 and V2 together; the InodeRegion cone is ~350
+files, so it is its own increment and must be gated on its own lane.
+
+## V5 — **D1's CARRIER, DESIGNED.  The parent edge must be an AGREED TAG
+## ON THE d-FLAVOURED UNIT; no payload and no tree reading can supply it**
+
+`(D1) bv_unsigned (dir_inum dati 1) = bv_unsigned dinum`.  What died:
+
+* **the payload** — §20.17.4 sharpening (b)'s constraint, restated: one
+  payload cannot state a two-inode relation, and `dir_dots_ix` is already
+  the index half;
+* **the tree layer, even now that S2-0 makes it reachable** — see S2-0's
+  "AND ITS LIMIT" above: `ic_loaded_fdir` builds `ents` from the payload's
+  own bytes, so `fdir_dots_index` returns its own premise.  Joining `dp`'s
+  side (`ents_dp !! name = Some ip`) to `ip`'s would need a whole-tree
+  parent/child agreement invariant, which R3 forecloses;
+* **the ledger as it stands** — the `".."` unit is filed at
+  `dir_inum dati 1`; a `nat` count carries no identity.
+
+**The one shape that works.**  A directory has EXACTLY ONE parent, so the
+d-component of `IcacheRef.linkElemUR`'s `w` can carry it: `wd` becomes
+`optionUR (agreeR ZO)` — "`z`'s parent is `p`" — with (L1) counting
+`wl + (if wd then 1 else 0)` and (T1) reading `wd = Some _ -> di_type d =
+T_DIR`.  The tag is established at create's mkdir (the walk names both
+inums at +0xc4), the persistent `agree` fragment is duplicable, and the
+CHILD's payload carries `∃ p, iparent self p ∗ ⌜dir_inum data 1 = p⌝`
+(guarded on `T_DIR` ∧ `nlink <> 0`) — a ONE-payload statement, because the
+relation is hidden behind the agreement.  The T_DIR arm then holds the
+released `ilinkd ip dp_inum` from `dp`'s record and the child's
+`iparent ip p` from `ip`'s payload; agreement gives `p = dp_inum`, and
+D1 falls.
+
+This is a payload conjunct carrying a RESOURCE (the first one beside
+`dir_links`), so it is a full ~45-site sweep on top of a CMRA widening.
+**Do not start it before V4 lands** — V4 is strictly smaller, closes the
+half of W5-DIR that has no alternative, and V5 reuses its flavour work.

@@ -102,6 +102,7 @@ Require Import WpUart DiskPtsto BioInv FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeRegion.
 Require Import IrefSlots.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
                                 payload's slot names, out of the family *)
@@ -735,7 +736,7 @@ Section ProofFilestat.
       (* ---- PEEL the checked-out bundle for stati's metadata cells ---- *)
       rewrite /ic_loaded.
       iDestruct "Hlk" as (data)
-        "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
+        "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
           & Hblocks)".
       iEval (rewrite -Hipk) in "Hmeta".
       iEval (rewrite -Hipk) in "Hidev".
@@ -909,6 +910,7 @@ Section ProofFilestat.
         iSplitR; [iPureIntro; exact Hdok |].
         iSplitR; [iPureIntro; exact Hddix |].
         iSplitR; [iPureIntro; exact Hdoc |].
+        iSplitR; [iPureIntro; exact Hduq |].
         iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
       (* +0x36 c.ld a0,24(s1) *)
       assert (Hpip3 : add_vec (rget mst Rs1)

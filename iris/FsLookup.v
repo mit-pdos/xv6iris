@@ -228,114 +228,12 @@ Qed.
 (*  2.  THE RECORD DELTAS THE FRIENDLY LAYER READS ITS TREE DELTAS OFF     *)
 (* ====================================================================== *)
 
-(* WHAT dirlink LEAVES BEHIND, said at the record view -- the exact twin of
-   [FsTree.dir_zeroed_at], which says what sys_unlink's memset+writei
-   leaves behind.  Slot [k0] now holds the name [s] at inum [z]; every
-   other record's sixteen bytes are untouched, which is
-   [DirView.dir_win_agree], the vocabulary a byte-range postcondition
-   converts into with [DirView.dir_win_agree_below].
-
-   ONE CLAUSE COVERS BOTH OF dirlink's ARMS.  The APPEND arm has
-   [k0 = nrec] and grows the count; the REUSE arm has [k0 < nrec] at a
-   record that was FREE.  They differ only in where [k0] sits relative to
-   the OLD count, which is why the lemmas below quantify over [nrec] and
-   [nrec'] separately instead of being written twice. *)
-Definition dir_written_at (data data' : nat -> list (bv 8)) (k0 : nat)
-    (s : fname) (z : bv 16) : Prop :=
-  dir_inum data' k0 = z
-  /\ dir_bname data' k0 = s
-  /\ (forall q : nat, q <> k0 -> dir_win_agree data data' q).
-
-Lemma dir_written_inum (data data' : nat -> list (bv 8)) (k0 : nat)
-    (s : fname) (z : bv 16) (q : nat) :
-  dir_written_at data data' k0 s z -> q <> k0 ->
-  dir_inum data' q = dir_inum data q.
-Proof. intros (_ & _ & H) Hq. exact (dir_inum_agree data data' q (H q Hq)). Qed.
-
-Lemma dir_written_bname (data data' : nat -> list (bv 8)) (k0 : nat)
-    (s : fname) (z : bv 16) (q : nat) :
-  dir_written_at data data' k0 s z -> q <> k0 ->
-  dir_bname data' q = dir_bname data q.
-Proof.
-  intros (_ & _ & H) Hq. exact (dir_bname_agree data data' q (H q Hq)).
-Qed.
-
-Lemma dir_written_live (data data' : nat -> list (bv 8)) (k0 : nat)
-    (s : fname) (z : bv 16) (q : nat) :
-  dir_written_at data data' k0 s z -> q <> k0 ->
-  (dir_live data' q <-> dir_live data q).
-Proof.
-  intros Hw Hq. unfold dir_live.
-  rewrite (dir_written_inum data data' k0 s z q Hw Hq). reflexivity.
-Qed.
-
-(* the written record is LIVE: its inum halfword is the nonzero [z] *)
-Lemma dir_written_live0 (data data' : nat -> list (bv 8)) (k0 : nat)
-    (s : fname) (z : bv 16) :
-  dir_written_at data data' k0 s z -> z <> bv_0 16 -> dir_live data' k0.
-Proof. intros (Hz & _ & _) Hnz. unfold dir_live. rewrite Hz. exact Hnz. Qed.
-
-(* EVERY LIVE RECORD OF THE NEW STATE IS EITHER THE WRITTEN ONE OR AN OLD
-   ONE.  The workhorse of both lemmas below; the second premise is what the
-   APPEND arm supplies (the records the count grew over, other than the one
-   written, are free -- and there are none at all when the count grows by
-   exactly one, onto [k0]). *)
-Lemma dir_written_class (data data' : nat -> list (bv 8))
-    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) (q : nat) :
-  dir_written_at data data' k0 s z ->
-  (forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 -> ~ dir_live data' r) ->
-  (q < nrec')%nat -> dir_live data' q -> q <> k0 ->
-  (q < nrec)%nat /\ dir_live data q.
-Proof.
-  intros Hw Hdead Hq Hl Hqk.
-  destruct (decide (q < nrec)%nat) as [Hlt | Hge].
-  - split; [exact Hlt |].
-    exact (proj1 (dir_written_live data data' k0 s z q Hw Hqk) Hl).
-  - exfalso. assert (Hrng : (nrec <= q < nrec')%nat) by lia.
-    exact (Hdead q Hrng Hqk Hl).
-Qed.
-
-(* UNIQUENESS IS PRESERVED, and dirlink's guard is exactly what pays for it:
-   the kernel refuses to append a name the scan already found
-   ([SpecDirlink] exposes [dir_first data nrec s = None] on the append arm
-   and the found-arm negation on the other), so the written name collides
-   with no surviving live record. *)
-Lemma dir_names_unique_write (data data' : nat -> list (bv 8))
-    (nrec nrec' k0 : nat) (s : fname) (z : bv 16) :
-  dir_names_unique data nrec ->
-  (nrec <= nrec')%nat -> (k0 < nrec')%nat ->
-  (forall r : nat, (nrec <= r < nrec')%nat -> r <> k0 -> ~ dir_live data' r) ->
-  dir_first data nrec s = None ->
-  dir_written_at data data' k0 s z ->
-  dir_names_unique data' nrec'.
-Proof.
-  intros Hu Hle Hk0 Hdead Hnone Hw j k Hj Hk Hlj Hlk Heq.
-  (* the written name meets no surviving live record *)
-  assert (Hno : forall q : nat, (q < nrec')%nat -> dir_live data' q ->
-                  q <> k0 -> dir_bname data' q <> s).
-  { intros q Hq Hl Hqk Hnm.
-    destruct (dir_written_class data data' nrec nrec' k0 s z q Hw Hdead Hq Hl Hqk)
-      as [Hqlt Hlq].
-    apply (proj1 (dir_first_None data nrec s) Hnone q Hqlt).
-    split; [exact Hlq |].
-    rewrite <- Hnm. symmetry.
-    exact (dir_written_bname data data' k0 s z q Hw Hqk). }
-  destruct (decide (j = k0)) as [Hjk0 | Hjk0];
-    destruct (decide (k = k0)) as [Hkk0 | Hkk0].
-  - congruence.
-  - exfalso. apply (Hno k Hk Hlk Hkk0).
-    rewrite <- Heq. rewrite Hjk0. exact (proj1 (proj2 Hw)).
-  - exfalso. apply (Hno j Hj Hlj Hjk0).
-    rewrite Heq. rewrite Hkk0. exact (proj1 (proj2 Hw)).
-  - destruct (dir_written_class data data' nrec nrec' k0 s z j Hw Hdead Hj Hlj Hjk0)
-      as [Hjlt Hlj0].
-    destruct (dir_written_class data data' nrec nrec' k0 s z k Hw Hdead Hk Hlk Hkk0)
-      as [Hklt Hlk0].
-    apply (Hu j k Hjlt Hklt Hlj0 Hlk0).
-    rewrite <- (dir_written_bname data data' k0 s z j Hw Hjk0).
-    rewrite <- (dir_written_bname data data' k0 s z k Hw Hkk0).
-    exact Heq.
-Qed.
+(* **MOVED DOWN TO [FsTree.v]** (the [dir_uniq] increment, fs-fragments
+   S2-0).  [dir_written_at] and [dir_names_unique_write] are stated in
+   [FsTree]/[DirView] vocabulary alone, and the payload clause [dir_uniq]
+   -- which rides in [IcacheEscrow]'s two payloads, far below this file --
+   is what needs them.  They are still in scope here, unqualified, through
+   this file's own [Require Import FsTree]; nothing else moved. *)
 
 (* **THE TREE DELTA OF A DIRLINK**, and the twin of [FsTree.dir_view_zero].
    Writing name [s] at inum [z] into a FREE slot inserts exactly that one
@@ -1042,6 +940,92 @@ Section FsLookupDots.
     split; [exact Hs0 |]. split; [exact Hnrec |].
     split; [exact (node_rep_dir ents dn data Hrep) |].
     rewrite <- Hz. exact Hne.
+  Qed.
+
+  (* ===================================================================== *)
+  (*  THE PAYLOAD -> TREE CONSTRUCTOR (fs-fragments §7.5.8, item S2-0).     *)
+  (*                                                                       *)
+  (*  S2-0's finding was that F1b and F2 were landed, green and             *)
+  (*  UNREACHABLE: [FsRep.fnode] demands [node_rep], whose NDir case        *)
+  (*  demands [dir_names_unique], and that predicate occurred in no         *)
+  (*  payload, no spec and no walk -- so no proof in the tree could build   *)
+  (*  an [fnode], an [fdir], an [fslice] or an [fs_rep].  With [dir_uniq]   *)
+  (*  riding in [IcacheEscrow.ic_loaded] the gap closes here, in one        *)
+  (*  lemma: every OTHER ingredient of [fdir] was already in the payload.   *)
+  (*                                                                       *)
+  (*  IT IS AN ACCESSOR, NOT A CONVERSION.  [fdir] holds two of the         *)
+  (*  payload's ten conjuncts ([dinode_at], [inode_blocks]); the wand puts  *)
+  (*  them back, so a walk can read its tree and keep its bundle.           *)
+  (*                                                                       *)
+  (*  THE NODE IS NOT GUESSED -- it is [FsTree.dir_view] of the payload's   *)
+  (*  OWN bytes, which is what makes the lemma unconditional in [ents].     *)
+  (*  **AND THAT IS ALSO ITS LIMIT** (S7-unlink's D1): a walk that builds   *)
+  (*  its [ents] this way learns [ents !! DOTDOT = Some (dir_inum data 1)]  *)
+  (*  and nothing more, so feeding it to [fdir_dots_index] instantiates     *)
+  (*  [dp] AS [dir_inum data 1] and returns the premise it was given.  The  *)
+  (*  parent-edge IDENTITY is a two-inode relation; no reading of ONE       *)
+  (*  payload can supply it.  See fs-sysfile.md, S7-unlink W5-DIR.          *)
+  (* ===================================================================== *)
+
+  Lemma inum_of_self (inum : mword 32) : inum_of (bv_unsigned inum) = inum.
+  Proof.
+    apply bv_eq. apply inum_of_unsigned.
+    pose proof (bv_unsigned_in_range 32 inum) as H.
+    unfold bv_modulus in H. cbn in H. lia.
+  Qed.
+
+  Lemma ic_loaded_fdir (gfs : fs_names) (gi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    ic_loaded gfs gi cov logstart k inum dn bm -∗
+      ∃ data : nat -> list (bv 8),
+        fdir gi gfs (bv_unsigned inum)
+             (dir_view data (dnrec dn)) dn bm data ∗
+        (fdir gi gfs (bv_unsigned inum)
+              (dir_view data (dnrec dn)) dn bm data -∗
+         ic_loaded gfs gi cov logstart k inum dn bm).
+  Proof.
+    intros Hty. rewrite /ic_loaded.
+    iIntros "H". iDestruct "H" as (data)
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta &
+        Haddrs & Hind & Hblocks)".
+    assert (Hrep : node_rep (NDir (dir_view data (dnrec dn))) dn data).
+    { unfold node_rep, dnrec. split_and!;
+        [exact Hty | exact (Hduq Hty) | reflexivity]. }
+    iExists data.
+    iSplitL "Hdiat Hblocks".
+    { rewrite /fdir inum_of_self.
+      iSplitL "Hdiat"; [iExact "Hdiat" |].
+      iSplitL "Hblocks"; [iExact "Hblocks" |].
+      iPureIntro. exact Hrep. }
+    iIntros "Hfd". rewrite /fdir inum_of_self.
+    iDestruct "Hfd" as "(Hdiat & Hblocks & _)".
+    iExists data.
+    iSplitR; [iPureIntro; exact Hiok |].
+    iSplitR; [iPureIntro; exact Hdok |].
+    iSplitR; [iPureIntro; exact Hddix |].
+    iSplitR; [iPureIntro; exact Hdoc |].
+    iSplitR; [iPureIntro; exact Hduq |].
+    iFrame "Hdlnk Hdiat Hmeta Haddrs Hind Hblocks".
+  Qed.
+
+  (* ...and the [fnode] form, which is what a client of F1b asks for. *)
+  Lemma ic_loaded_fnode (gfs : fs_names) (gi : gname) (cov : gset Z)
+      (logstart : Z) (k : nat) (inum : mword 32) (dn : dinode) (bm : blkmap) :
+    bv_unsigned (di_type dn) = T_DIR_z ->
+    ic_loaded gfs gi cov logstart k inum dn bm -∗
+      ∃ data : nat -> list (bv 8),
+        fnode gi gfs (bv_unsigned inum)
+              (NDir (dir_view data (dnrec dn))) ∗
+        (fdir gi gfs (bv_unsigned inum)
+              (dir_view data (dnrec dn)) dn bm data -∗
+         ic_loaded gfs gi cov logstart k inum dn bm).
+  Proof.
+    intros Hty. iIntros "H".
+    iDestruct (ic_loaded_fdir gfs gi cov logstart k inum dn bm Hty with "H")
+      as (data) "[Hfd Hback]".
+    iExists data. iSplitR "Hback"; [| iExact "Hback"].
+    iApply (fdir_fnode with "Hfd").
   Qed.
 
 End FsLookupDots.

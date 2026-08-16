@@ -108,6 +108,7 @@ Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import W32Arith.
 Require Import PageGeom.
@@ -1257,7 +1258,7 @@ Section KexecB2Loops.
       iDestruct "Hopen" as "(#Hslkk & Hslkd & Hslpid & Hdep & Hidev & Hiinum &
                              Hivalid & Hload & #Hity & Hkeep)".
       iDestruct (kxc_load_peel with "Hload") as
-        (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdiat & Hmeta & Hmap
+        (datl) "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Hmap
                & Hblocks)".
       pose proof Hiok as Hiok'.
       destruct Hiok' as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
@@ -1303,7 +1304,7 @@ Section KexecB2Loops.
                    with "Hdst Hrest") as "Hpage".
       iDestruct ("Hgive" with "Hpage") as "Hpt".
       iDestruct (kxc_load_seal gfs gi cov logstart kf inumf dnf bmf datl
-                   Hiok Hdok Hddix Hdoc
+                   Hiok Hdok Hddix Hdoc Hduq
                    with "Hdlk Hdiat Hmeta Hmap Hblocks") as "Hload".
       iDestruct (A.kxa_bs3_join bn with "Hbs1 Hbs2") as "Hbs".
       iDestruct (kxc_open_intro gfs gi cn cov logstart dev pidv kf qf sf gyf

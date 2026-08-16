@@ -75,6 +75,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
 Require Import IcacheInv.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
@@ -1197,7 +1198,7 @@ Section ProofSysLinkTails.
     { intros c Hc N2 N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
       exact (HM2thr c Hc N2 N8 N9 N18). }
     iDestruct "Hload" as (dat)
-      "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
         & Hblocks)".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iEval (rewrite /i_nlink) in "Hinl".
@@ -1393,6 +1394,8 @@ Section ProofSysLinkTails.
       iSplitR; [iPureIntro; exact (sl_setnl_dir_ok icfg_nib dn dat _ Hdok) |].
       iSplitR; [iPureIntro; exact (sl_setnl_ddix _ dn dat _ Hnz Hddix) |].
       iSplitR; [iPureIntro; apply dir_orphan_clean_not_dir;
+                rewrite /dn' sl_setnl_type; exact Hnotdir |].
+      iSplitR; [iPureIntro; apply dir_uniq_not_dir;
                 rewrite /dn' sl_setnl_type; exact Hnotdir |].
       iSplitL "Hdlnk"; [iExact "Hdlnk" |].
       iFrame "Hdiat Hmeta". rewrite /inode_map.

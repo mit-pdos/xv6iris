@@ -129,6 +129,7 @@ Require Import InodeRegion.
 Require Export FastSetSolver.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import FdSlots.
 Require Import CodeIput.
@@ -1647,7 +1648,7 @@ Section ProofIput.
        free path it dies with the generation [live_slot_regen] retires. *)
     iDestruct "Hpayl" as (dn bm) "[Hlk #Hshot]".
     iDestruct "Hlk" as (data)
-      "(%Hok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdat & Hmeta & Haddrs & Hind &
+      "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind &
         Hblks)".
     pose proof Hok as Hok'.
     destruct Hok' as (Hbmwf & Hcovers & Hdiaddrs & Htyne & Hszcap & Hholes & Hsized).
@@ -1705,6 +1706,7 @@ Section ProofIput.
         iSplitR; [iPureIntro; exact Hdok |].
         iSplitR; [iPureIntro; exact Hddix |].
         iSplitR; [iPureIntro; exact Hdoc |].
+        iSplitR; [iPureIntro; exact Hduq |].
         iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
       iDestruct "Hrtok" as "(Hrfrg & Hrlv & Hrslh)".
       iMod (ic_open_held cn gfs gi cov logstart k (⊤ ∖ ↑icEscN)
@@ -1967,6 +1969,7 @@ Section ProofIput.
       iSplitR; [iPureIntro; exact Hdok |].
       iSplitR; [iPureIntro; exact Hddix |].
       iSplitR; [iPureIntro; exact Hdoc |].
+      iSplitR; [iPureIntro; exact Hduq |].
       iSplitL "Hdlk"; [iExact "Hdlk" |]. rewrite /inode_meta. iFrame. }
     (* [live_slot_regen] hands back the slice GENERATION-NAMED; [ic_open_held]
        takes the ∃-form, and the destruct below re-opens it. *)
@@ -2146,7 +2149,7 @@ Section ProofIput.
        region free at +0x74, where (L3) needs it. *)
     iDestruct "Hpayl" as "[Hlk2 _]".
     iDestruct "Hlk2" as (data2)
-      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind &
+      "(%Hok2 & %Hdok2 & %Hddix2 & %Hdoc2 & %Hduq2 & Hdlk2 & Hdat & Hmeta & Haddrs & Hind &
        Hblks)".
     (* [Hdlk2] -- the link-ledger fragments this directory's own records held
        (design §20.3/§20.6's itrunc row) -- is SHED here and never re-parked:

@@ -73,6 +73,7 @@ Require Import IrefSlots.
 Require Import IcacheRef.             (* the reference algebra the publication
                                          re-pins its generation in *)
 Require Import IcacheInv.
+Require Import FsTree.
 Require Import IcacheEscrow.          (* [ic_loaded] -- the O_TRUNC bridge *)
 Require Import FileInvDefs.           (* [fcontent], [fc_wbool] -- the omode
                                          bit cluster's target *)
@@ -776,13 +777,14 @@ Section ProofSysOpenPublish.
       inode_map gfs (ientry k) bm ∗
       inode_blocks gfs bm data.
   Proof.
-    iIntros "(%data & %Hok & %Hdir & %Hddix & %Hdoc & Hlnk & Hat & Hmeta &
+    iIntros "(%data & %Hok & %Hdir & %Hddix & %Hdoc & %Hduq & Hlnk & Hat & Hmeta &
               Haddr & Hind & Hblk)".
     (* Keep this structural: even [iFrame "%"] searches the whole goal, whose
        [inode_blocks] tail is large (171 s at this site).  The arity sweep's
-       third and fourth pure conjuncts [Hddix]/[Hdoc] are bound but NOT
-       re-split: this lemma WEAKENS [ic_loaded], and the goal above carries
-       only [inode_ok] and [dir_ok], so both dot clauses are discarded here. *)
+       third, fourth and fifth pure conjuncts [Hddix]/[Hdoc]/[Hduq] are bound
+       but NOT re-split: this lemma WEAKENS [ic_loaded], and the goal above
+       carries only [inode_ok] and [dir_ok], so the two dot clauses and the
+       uniqueness clause are all discarded here. *)
     iExists data.
     iSplit; [iPureIntro; exact Hok |].
     iSplit; [iPureIntro; exact Hdir |].
@@ -815,6 +817,8 @@ Section ProofSysOpenPublish.
               (dir_dots_ix_not_dir (bv_unsigned inum) (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
               (dir_orphan_clean_not_dir (di_trunc dn) _
+                 ltac:(rewrite Hty; exact Hnd))
+              (dir_uniq_not_dir (di_trunc dn) _
                  ltac:(rewrite Hty; exact Hnd))
               with "[] Hat Hmeta Haddr Hind Hblk").
     iApply (dir_links_not_dir (bv_unsigned inum) (di_trunc dn)).

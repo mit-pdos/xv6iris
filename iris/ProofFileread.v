@@ -86,6 +86,7 @@ Require Import ConsoleInv.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.   (* [ic_sleeplocks_acc]: the entry sleeplock the
                                 carve's slot selects out of the family. *)
@@ -1792,7 +1793,7 @@ Section ProofFileread.
                     [ip] its own [f->ip] cell holds. ---- *)
              rewrite /ic_loaded.
              iDestruct "Hlk" as (data)
-               "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
+               "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdnat & Hmeta & Haddrs & Hindres
                  & Hblocks)".
              destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
                                & Hsized).
@@ -2091,6 +2092,7 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
                   iSplitR; [iPureIntro; exact Hdoc |].
+                  iSplitR; [iPureIntro; exact Hduq |].
                   iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
@@ -2369,6 +2371,7 @@ Section ProofFileread.
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
                   iSplitR; [iPureIntro; exact Hdoc |].
+                  iSplitR; [iPureIntro; exact Hduq |].
                   iSplitL "Hdlk"; [iExact "Hdlk" |].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }

@@ -107,6 +107,7 @@ Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import FsTree.
 Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -685,17 +686,19 @@ Section IcacheBootPool.
     dir_ok icfg_nib dn data ->
     dir_dots_ix (bv_unsigned inum) dn data ->
     dir_orphan_clean dn data ->
+    dir_uniq dn data ->
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗ ind_res γfs bm -∗ inode_blocks γfs bm data -∗
     ipool_shape γfs γi cov logstart inum.
   Proof.
-    iIntros (Hok Hdok Hddix Hdoc) "Hdlk Hdn Hind Hblk".
+    iIntros (Hok Hdok Hddix Hdoc Hduq) "Hdlk Hdn Hind Hblk".
     rewrite /ipool_shape. iLeft.
     iExists dn, bm, data.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].
     iSplitR; [iPureIntro; exact Hddix |].
     iSplitR; [iPureIntro; exact Hdoc |].
+    iSplitR; [iPureIntro; exact Hduq |].
     iSplitL "Hdlk"; [iExact "Hdlk" |].
     iFrame "Hdn Hind Hblk".
   Qed.
@@ -724,6 +727,7 @@ Section IcacheBootPool.
          ⌜dir_ok icfg_nib dn data⌝ ∗
          ⌜dir_dots_ix (bv_unsigned (mword_of_int z : mword 32)) dn data⌝ ∗
          ⌜dir_orphan_clean dn data⌝ ∗
+         ⌜dir_uniq dn data⌝ ∗
          dir_links (bv_unsigned (mword_of_int z : mword 32)) dn data ∗
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data) -∗
@@ -735,9 +739,9 @@ Section IcacheBootPool.
     iApply (ipool_split γfs γi cov logstart R A Hsub).
     iSplitL "Ha".
     - rewrite /ipool. iApply (big_sepS_mono with "Ha"). intros z _.
-      iIntros "(%dn & %bm & %data & %Hok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdn
+      iIntros "(%dn & %bm & %data & %Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdn
                 & Hind & Hblk)".
-      iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok Hddix Hdoc
+      iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok Hddix Hdoc Hduq
                 with "Hdlk Hdn Hind Hblk").
     - rewrite /ipool. iApply (big_sepS_mono with "Hf"). intros z _.
       iIntros "Hmk". iApply (ipool_shape_free with "Hmk").

@@ -9324,6 +9324,52 @@ fragment fact both halves spend is a PROVEN lemma.  `proof_coverage.py
   `bslots 3` is unpayable — the tell is an `iExact` mismatch two calls
   later.  Split in the MAIN context, pass the piece, rejoin explicitly.
 
+### V4-INCREMENT UPDATE (S2-0 / `dir_uniq`): **D1 IS REFUTED AS A
+### CONSEQUENCE OF THE TREE LAYER, AND D2 HAS A DESIGNED CARRIER.  The
+### seal is STILL STOPPED, and `su_w5_dir` keeps both premises**
+
+`DirView`/`FsTree`'s `dir_uniq` is LANDED (the full record is
+[`fs-fragments-campaign.md`](fs-fragments-campaign.md)'s S2-0 section):
+the name-uniqueness invariant now rides in `IcacheEscrow.ipool_alloc` and
+`ic_loaded` beside `dir_ok`/`dir_dots_ix`/`dir_orphan_clean`, and
+`FsLookup.ic_loaded_fdir` turns a locked directory's payload into an
+`FsRep.fnode`/`FsLookup.fdir`.  **The whole F1b/F2 tree layer is reachable
+from a WP for the first time.**  What this walk must know:
+
+* **`su_w5_file` / `su_w5_dir` gained one pure premise each** (`dir_uniq
+  dnd datd` and `dir_uniq dni dati`), threaded from the +0x8a seam exactly
+  as the two dot clauses are, and the zeroing crosses it by
+  `FsTree.dir_uniq_zero`.  Nothing else in the walk moved.
+* **(D1) IS NOT SUPPLIED BY THE TREE LAYER, AND THE CIRCULARITY THE W5
+  RECORD NAMED IS CONFIRMED, NOT DISSOLVED.**  `ic_loaded_fdir` builds
+  `ents` as `FsTree.dir_view` of the payload's OWN bytes, so all a walk
+  learns is `ents !! DOTDOT = Some (dir_inum dati 1)`; feeding it to
+  `fdir_dots_index` — whose premise is `ents !! DOTDOT = Some dp` —
+  instantiates `dp` AS `dir_inum dati 1` and hands the premise back.  The
+  parent-edge IDENTITY is a relation between TWO inodes and no reading of
+  ONE payload states it; joining `dp`'s side to `ip`'s would need a
+  whole-tree parent/child agreement invariant, which fs-fragments R3
+  forecloses.  **VERDICT #2 STAYS SPLIT.**  D1's honest carrier is the
+  campaign's **V5**: the d-flavoured ledger unit carries the parent inum as
+  an `agree`, and the child's payload carries the persistent fragment plus
+  `⌜dir_inum data 1 = p⌝` — a one-payload statement because the relation
+  hides behind the agreement.
+* **(D2) HAS A DESIGNED, AUDITED CARRIER — the campaign's V4** — and it is
+  three pieces, none of which is optional: `dlc_lower` (the lower-bound
+  counterpart, riding in `dir_links`'s existing `∃ F`, no arity move), the
+  region clause **(T1′) `di_type d = ireg_dir_ty -> wl = 0`** ("no PLAIN
+  unit is ever filed against a directory"), and **the FLIP** of create's
+  `dp->nlink++` mint from `None` to `Some tt`, which is the one mint that
+  makes (T1′) false today.  With them the T_DIR arm refutes `b = false`
+  through the mirror of the file arm's `ireg_dirbit_ty` step, reads
+  `count >= 1` off `dp`'s d-flavoured record for `ip`, and `dlc_lower` is
+  `2 <= di_nlink dnd`.  Four cheaper routes were tried and are dead; their
+  certificates are in the V4 section.
+* Coverage is **UNMOVED at 186/190, sysfile.c 15/16**.  `LinkSysUnlink.v`
+  still supplies `SYSUNLINK` with the `Axiom`.  **Do not attempt the seal
+  before V4 AND V5 land** — one of the two is not enough, because
+  `su_w5_dir` takes both premises and the seal must discharge both.
+
 ### WHAT THE WALK STILL OWES — the exact next action
 
 `ProofSysUnlink.v` — **THE SEAL ALONE, and it is STOPPED on W5-DIR's two

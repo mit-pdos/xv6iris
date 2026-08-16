@@ -109,6 +109,7 @@ Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
@@ -1584,7 +1585,7 @@ Section ProofSysChdirBody.
         { intros c Hc N2' N8 N9 N18. rewrite (callee_saved_lookup Hcsil c Hc).
           exact (HP0thr c Hc N2' N8 N9 N18). }
         iDestruct "Hload" as (dat)
-          "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
+          "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind
             & Hblocks)".
         iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
         iEval (rewrite /i_type) in "Hity".
@@ -1716,6 +1717,7 @@ Section ProofSysChdirBody.
             iSplitR; [iPureIntro; exact Hdok |].
             iSplitR; [iPureIntro; exact Hddix |].
             iSplitR; [iPureIntro; exact Hdoc |].
+            iSplitR; [iPureIntro; exact Hduq |].
             iSplitL "Hdlnk"; [iExact "Hdlnk" |].
             iFrame "Hdiat".
             iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -2060,6 +2062,7 @@ Section ProofSysChdirBody.
             iSplitR; [iPureIntro; exact Hdok |].
             iSplitR; [iPureIntro; exact Hddix |].
             iSplitR; [iPureIntro; exact Hdoc |].
+            iSplitR; [iPureIntro; exact Hduq |].
             iSplitL "Hdlnk"; [iExact "Hdlnk" |].
             iFrame "Hdiat".
             iSplitL "Hity Himaj Himin Hinl Hisz".

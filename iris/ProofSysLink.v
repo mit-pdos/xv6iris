@@ -104,6 +104,7 @@ Require Import SleepLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import IcacheBoot.
 Require Import KallocInv.
@@ -1358,7 +1359,7 @@ Section ProofSysLinkBody.
           assert (Hils1 : (mil !!! Regidx Rs1 : mword 64) = ientry kk)
             by exact (sl_regs_s1 _ _ _ _ _ Hilregs).
           iDestruct "Hload" as (dat)
-            "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
+            "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlnk & Hdiat & Hmeta & Haddrs & Hind &
               Hblocks)".
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_type) in "Hity".
@@ -1426,6 +1427,7 @@ Section ProofSysLinkBody.
                iSplitR; [iPureIntro; exact Hdok |].
                iSplitR; [iPureIntro; exact Hddix |].
                iSplitR; [iPureIntro; exact Hdoc |].
+               iSplitR; [iPureIntro; exact Hduq |].
                iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                iFrame "Hdiat".
                iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -1575,6 +1577,7 @@ Section ProofSysLinkBody.
                   iSplitR; [iPureIntro; exact Hdok |].
                   iSplitR; [iPureIntro; exact Hddix |].
                   iSplitR; [iPureIntro; exact Hdoc |].
+                  iSplitR; [iPureIntro; exact Hduq |].
                   iSplitL "Hdlnk"; [iExact "Hdlnk" |].
                   iFrame "Hdiat".
                   iSplitL "Hity Himaj Himin Hinl Hisz".
@@ -1829,6 +1832,10 @@ Section ProofSysLinkBody.
                      exact (sl_tdir_zne _ Hty) |].
                   iSplitR;
                     [iPureIntro; apply dir_orphan_clean_not_dir;
+                     rewrite /sl_incnl sl_setnl_type;
+                     exact (sl_tdir_zne _ Hty) |].
+                  iSplitR;
+                    [iPureIntro; apply dir_uniq_not_dir;
                      rewrite /sl_incnl sl_setnl_type;
                      exact (sl_tdir_zne _ Hty) |].
                   iSplitL "Hdlnk2"; [iExact "Hdlnk2" |].
@@ -2153,7 +2160,7 @@ Section ProofSysLinkBody.
                    assert (Htyd : di_type dnd = SpecDirlookup.T_DIR)
                      by (symmetry; exact Htyd0).
                    iDestruct "Hloadd" as (datd)
-                     "(%Hdiok & %Hddok & %Hddixd & %Hdocd & Hdlnkd & Hdiatd &
+                     "(%Hdiok & %Hddok & %Hddixd & %Hdocd & %Hduqd & Hdlnkd & Hdiatd &
                        Hmetad & Haddrsd & Hindd & Hblocksd)".
                    (* ============================================================ *)
                    (*  THE ORPHAN GUARD, +0x84 .. +0x88 (xv6 f60ff58).              *)
@@ -2225,7 +2232,7 @@ Section ProofSysLinkBody.
                      (* the parent's record, handed back whole: the guard READ
                         the halfword and wrote nothing. *)
                      iDestruct (ic_mk_loaded gfs gi cov logstart kd dinum dnd bmd
-                                  datd Hdiok Hddok Hddixd Hdocd
+                                  datd Hdiok Hddok Hddixd Hdocd Hduqd
                                   with "Hdlnkd Hdiatd Hmetad Haddrsd Hindd Hblocksd")
                        as "Hloadd".
                      iDestruct (sl_bs3 bn with "[Hbs1d Hbs2d]") as "Hbsl";
@@ -2584,6 +2591,7 @@ Section ProofSysLinkBody.
                          iSplitR; [iPureIntro; exact Hddok |].
                          iSplitR; [iPureIntro; exact Hddixd |].
                          iSplitR; [iPureIntro; exact Hdocd |].
+                         iSplitR; [iPureIntro; exact Hduqd |].
                          iSplitL "Hdlnkd"; [iExact "Hdlnkd" |].
                          iFrame "Hdiatd Hmetad". rewrite /inode_map.
                          iDestruct "Hmapd" as "[Ha Hi]". iFrame "Ha Hi Hblocksd". }
@@ -2713,6 +2721,21 @@ Section ProofSysLinkBody.
                        { apply dir_orphan_clean_live. rewrite Hnleq.
                          intro Hc. apply Hdnl0. apply bv_eq. rewrite Hc.
                          vm_compute. reflexivity. }
+                       (* ...and the UNIQUENESS clause across the same write.
+                          [Hatom] -- SpecDirlink's relay of writei's
+                          single-block atomicity -- is what makes it true at
+                          all: a PARTIAL record would go live carrying the
+                          name bytes the last deletion left, and those may
+                          duplicate a live name.  [Hnone] is dirlink's own
+                          guard, and it is what pays for the full write. *)
+                       assert (Hduq' : dir_uniq dnd' datd').
+                       { apply (dir_uniq_dirlink dnd dnd' datd datd'
+                                 (sl_low16 inum) (bname 14 nf)
+                                 (dir_nrec (bv_unsigned (di_size dnd)))
+                                 (dir_slot datd (dir_nrec (bv_unsigned (di_size dnd))))
+                                 tot eq_refl eq_refl Hatom
+                                 (bname_length_le 14 nf) (cut_nul_nonul _)
+                                 Htyeq Hszmax Hrng Hnone Hduqd). }
                        assert (Hdtynz : bv_unsigned (di_type dnd') <> 0)
                          by (rewrite Htyeq;
                              exact (proj1 (proj2 (proj2 (proj2 Hdiok))))).
@@ -2769,6 +2792,7 @@ Section ProofSysLinkBody.
                               iSplitR; [iPureIntro; exact Hddok' |].
                               iSplitR; [iPureIntro; exact Hddix' |].
                               iSplitR; [iPureIntro; exact Hdoc' |].
+                              iSplitR; [iPureIntro; exact Hduq' |].
                               iSplitL "Hdlnkd'"; [iExact "Hdlnkd'" |].
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.
@@ -3159,6 +3183,7 @@ Section ProofSysLinkBody.
                               iSplitR; [iPureIntro; exact Hddok' |].
                               iSplitR; [iPureIntro; exact Hddix' |].
                               iSplitR; [iPureIntro; exact Hdoc' |].
+                              iSplitR; [iPureIntro; exact Hduq' |].
                               iSplitL "Hdlnkd'"; [iExact "Hdlnkd'" |].
                               rewrite Hdn0e. iFrame "Hdiatd Hmetad".
                               rewrite /inode_map.

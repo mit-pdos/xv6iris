@@ -184,6 +184,7 @@ Require Export SwtchCtx.
 Require Import WpUart.
 Require Import FsCrash.
 Require Import InodeRegion.
+Require Import FsTree.
 Require Import IcacheEscrow.
 Require Import ByteBuf.
 Require Import ElfEnc.
@@ -1114,7 +1115,7 @@ Section KexecABody.
       rewrite /Q2 upd_ne; [| regne]. exact (HQ1thr r Hr Nsp Ns0 Ns1 Ns2 Ns4). }
     (* ---- peel the loaded content for readi ---- *)
     iDestruct "Hload" as (datl)
-      "(%Hiok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdiat & Hmeta & Haddrs & Hindres
+      "(%Hiok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdiat & Hmeta & Haddrs & Hindres
        & Hblocks)".
     destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes & Hsized).
     iAssert (inode_map gfs (ientry k) bml) with "[Haddrs Hindres]" as "Hmap".
@@ -1446,6 +1447,7 @@ Section KexecABody.
           iSplitR; [iPureIntro; exact Hdok |].
           iSplitR; [iPureIntro; exact Hddix |].
           iSplitR; [iPureIntro; exact Hdoc |].
+          iSplitR; [iPureIntro; exact Hduq |].
           iSplitL "Hdlk"; [iExact "Hdlk" |].
           iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
@@ -1506,6 +1508,7 @@ Section KexecABody.
           iSplitR; [iPureIntro; exact Hdok |].
           iSplitR; [iPureIntro; exact Hddix |].
           iSplitR; [iPureIntro; exact Hdoc |].
+          iSplitR; [iPureIntro; exact Hduq |].
           iSplitL "Hdlk"; [iExact "Hdlk" |].
           iDestruct "Hmap" as "[Haddrs Hindres]".
           iSplitL "Hdiat"; [iExact "Hdiat" |].
@@ -1579,6 +1582,7 @@ Section KexecABody.
         iSplitR; [iPureIntro; exact Hdok |].
         iSplitR; [iPureIntro; exact Hddix |].
         iSplitR; [iPureIntro; exact Hdoc |].
+        iSplitR; [iPureIntro; exact Hduq |].
         iSplitL "Hdlk"; [iExact "Hdlk" |].
         iDestruct "Hmap" as "[Haddrs Hindres]".
         iSplitL "Hdiat"; [iExact "Hdiat" |].

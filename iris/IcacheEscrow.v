@@ -162,6 +162,7 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import DirView.
 Require Import DirLinks.
+Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload clause *)
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
@@ -463,6 +464,7 @@ Section IcacheEscrow.
        ⌜dir_ok icfg_nib dn0 data0⌝ ∗
        ⌜dir_dots_ix (bv_unsigned inum) dn0 data0⌝ ∗
        ⌜dir_orphan_clean dn0 data0⌝ ∗
+       ⌜dir_uniq dn0 data0⌝ ∗
        dir_links (bv_unsigned inum) dn0 data0 ∗
        dinode_at γi inum dn0 ∗
        ind_res γfs bm0 ∗
@@ -531,6 +533,7 @@ Section IcacheEscrow.
        ⌜dir_ok icfg_nib dn data⌝ ∗
        ⌜dir_dots_ix (bv_unsigned inum) dn data⌝ ∗
        ⌜dir_orphan_clean dn data⌝ ∗
+       ⌜dir_uniq dn data⌝ ∗
        dir_links (bv_unsigned inum) dn data ∗
        dinode_at γi inum dn ∗
        inode_meta (ientry k) dn ∗
@@ -1043,6 +1046,7 @@ Section IcacheEscrow.
     dir_ok icfg_nib dn data ->
     dir_dots_ix (bv_unsigned inum) dn data ->
     dir_orphan_clean dn data ->
+    dir_uniq dn data ->
     dir_links (bv_unsigned inum) dn data -∗
     dinode_at γi inum dn -∗
     inode_meta (ientry k) dn -∗
@@ -1051,10 +1055,10 @@ Section IcacheEscrow.
     inode_blocks γfs bm data -∗
     ic_loaded γfs γi cov logstart k inum dn bm.
   Proof.
-    intros Hok Hdok Hddix Hdoc. iIntros "Hl Hd Hm Ha Hr Hb".
+    intros Hok Hdok Hddix Hdoc Hduq. iIntros "Hl Hd Hm Ha Hr Hb".
     rewrite /ic_loaded.
     iExists data. iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-    iSplitR; [done |].
+    iSplitR; [done |]. iSplitR; [done |].
     iSplitL "Hl"; [iExact "Hl" |]. iSplitL "Hd"; [iExact "Hd" |].
     iSplitL "Hm"; [iExact "Hm" |]. iSplitL "Ha"; [iExact "Ha" |].
     iSplitL "Hr"; [iExact "Hr" | iExact "Hb"].
@@ -1470,7 +1474,7 @@ Section IcacheEscrow.
     { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
-        "(%Hok & %Hdok & %Hddix & %Hdoc & Hdlk & Hdat & Hmeta & Haddrs & Hind &
+        "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind &
           Hblks)".
       pose proof Hok as Hok'.
       destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
@@ -1487,6 +1491,7 @@ Section IcacheEscrow.
          pool exactly as the loaded arm held it *)
       iSplitR; [iPureIntro; exact Hddix |].
       iSplitR; [iPureIntro; exact Hdoc |].
+      iSplitR; [iPureIntro; exact Hduq |].
       iSplitL "Hdlk"; [iExact "Hdlk" |]. iFrame. }
     (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
        Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
@@ -1683,7 +1688,7 @@ Section IcacheEscrow.
     rewrite /ic_payload. destruct v.
     - iIntros "Hpay".
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
-      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & Hmeta & _)".
+      iDestruct "Hlk" as (data) "(_ & _ & _ & _ & _ & _ & _ & Hmeta & _)".
       rewrite /inode_meta. iDestruct "Hmeta" as "(_ & _ & _ & _ & Hsz)".
       iExists (di_size dn). iExact "Hsz".
     - iIntros "[Hu _]". iApply (ic_unloaded_size with "Hu").

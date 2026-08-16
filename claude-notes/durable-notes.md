@@ -756,6 +756,38 @@ completed at the one point the slots are back in hand.  **A `-∗` premise is
 how a linear resource that a callee borrows and returns should be threaded;
 a bare conjunct beside it is how it gets claimed twice.**
 
+## A CLAUSE ABOUT **NAMES** MUST TAKE THE WRITE'S ATOMICITY; ONE ABOUT
+## INUMS OR INDICES NEED NOT
+
+A payload invariant crossing a byte-range write is usually priced by
+looking at the WINDOW: does the write touch the records the clause speaks
+about?  That is the right question for a clause about a record's INUM
+(`DirView.dir_ok`: the mod-256 argument covers a one-byte write) or about
+an INDEX (`dir_dots_ix`: `dir_slot` keeps the window away from records 0
+and 1).  It is the WRONG question for a clause about NAMES, and the
+failure is silent until the proof.
+
+The reason is the on-disk format: xv6's unlink zeroes only the inum
+halfword, so **a free record still carries the name bytes of whatever was
+deleted from it**.  A PARTIAL `dirlink` write (`0 < tot < 16`) puts a live
+inum into such a record while leaving some of those stale name bytes in
+place — so the record goes live under a name nobody chose, which may
+duplicate a live one.  `FsTree.dir_uniq` is false there; so is any future
+clause of the form "the live names are …".
+
+**The fix is free and already in the contracts**: `SpecWritei`'s
+`wi16_atomic` (`wi_blocks off n = 1 -> tot = 0 \/ tot = n`) is relayed by
+`SpecDirlink`'s `dl_post` as `tot = 0 \/ tot = 16`, and every caller
+destructs it already.  Take it as a premise of the preservation lemma.
+The same clause is what `DirLinks.dir_link_at`'s re-park needed for an
+unrelated reason (there is no ticket for a half-written record), so a
+walk that has one has the other.
+
+Corollary for reviewers: when a new pure conjunct is proposed for
+`ic_loaded`, ask *"is it about names?"* before believing a "free at
+dirlink" estimate.  (Cost: one design revision in the `dir_uniq`
+increment, which had been priced as free off a landed lemma.)
+
 ## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
 
 Strengthening a lemma's HYPOTHESIS weakens the lemma, so it stays provable from
