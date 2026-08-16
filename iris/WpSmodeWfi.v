@@ -526,7 +526,7 @@ Section WpSmodeWfi.
   Proof.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -645,7 +645,7 @@ Section WpSmodeWfi.
         { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm". }
+      iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm Hwit". }
       iFrame "Hfile Hcnt". }
     iIntros "Hhs' Hpc' (Hsc & Hcap & Hfile & Hcnt)".
     iApply ("Hcont" with "[Hhs' Hsc Hcap Hfile] Hcnt Hpc'").

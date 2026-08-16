@@ -296,6 +296,7 @@ Section UsertrapRes.
       iPureIntro. split; [| split; [| split; [| split]]]; vm_compute; reflexivity. }
     rewrite /sie_cap /ut_stack Hsp.
     iFrame "Hstk Hstr Harm".
+    iSplitR; [ iApply sie_cap_wit_KT0 |].
     rewrite (tp_pin_id m Htp). iExact "Hgpr".
   Qed.
 

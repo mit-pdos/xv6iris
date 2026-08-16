@@ -168,7 +168,7 @@ Proof.
      is substituted: the body below is the pre-move proof VERBATIM. *)
   iApply wp_next_off_intro.
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -293,7 +293,7 @@ Proof.
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
   iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
-  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
      obligation is discharged by instantiating it here. *)
@@ -392,7 +392,7 @@ Proof.
      is substituted: the body below is the pre-move proof VERBATIM. *)
   iApply wp_next_off_intro.
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -523,7 +523,7 @@ Proof.
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
   iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
-  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".
   iDestruct (sie_cap_retarget m

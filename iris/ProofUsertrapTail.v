@@ -236,7 +236,7 @@ Section UtRet2.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (sconf_priv_open with "Hsc") as (msf) "(Hcl & Hpriv & Hmsown)".
     iDestruct "Hmsown" as "(Hms & Hhalf & Htie & %Hmsf)".
-    iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Hwit)".
     iDestruct (sie_arm_half_agree false (un_pj N) msf with "Hhalf Harm") as %Hsie0.
     iDestruct (ghost_var_agree with "Hhalf Hq4") as %Hvb.
     rewrite Hsie0 in Hvb. rewrite -Hvb.
@@ -261,7 +261,7 @@ Section UtRet2.
       iSplitL "Hhs"; [iExact "Hhs"|]. iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitR "Hfile"; [| iExact "Hfile"].
       iSplitL "Hstk"; [iExact "Hstk"|]. iSplitL "Hstr"; [iExact "Hstr"|].
-      iExact "Harm". }
+      iSplitL "Harm"; [iExact "Harm"|]. iExact "Hwit". }
     iDestruct (ut_own_priv with "Hown") as "(Hpv & Hsy & Hownback)".
     (* [ut_caps] is NOT destructured here: +0xb2..+0xc6 calls nothing, so no
        member of it is needed, and destructuring an intuitionistic hypothesis
@@ -610,7 +610,7 @@ Section UtRet2.
          too, are NOT in [ut_trap]: they go to the boundary raw (above). *)
       iSplitL "Hcap Hhalf Htie Hq4 Hkptr Hsret Hcpu Hclm".
       + rewrite /ut_trap /ut_stack /ut_ghosts.
-        iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+        iDestruct "Hcap" as "(Hstk & Hstr & Harm & _)".
         iSplitL "Hstk". { rewrite /S9 upd_eq. iExact "Hstk". }
         iSplitL "Hstr". { iExact "Hstr". }
         iSplitL "Harm". { iExact "Harm". }

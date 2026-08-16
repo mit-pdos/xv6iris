@@ -289,7 +289,7 @@ Proof.
   (* ---- open the bundle: this is where [intr_config_of_v2] used to be, and
          the funnel's copy of it is gone with the two [intr_config] lemmas. ---- *)
   iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   (* [Hrcpt] is the enabled arm's KPT RECEIPT (IntrDefs §6b).  The engine
      neither reads nor moves it -- a trap cannot change which table is
      installed -- it just hands it to the handler, which owes the arm back. *)
@@ -445,7 +445,7 @@ Proof.
              Hcells Hcnt Hclm Hires Hrcpt Hpcr Hnpc]" as "Hentry".
     { rewrite /ihs_entry_of /sie_cap_gpr_of /sie_cap_of /sie_arm_of.
       rewrite Hc2.
-      iFrame "Hhs Hsc Hstk Hfile Hsppc Hsepc Hscause Hstval Hclm Hrcpt".
+      iFrame "Hhs Hsc Hstk Hfile Hsppc Hsepc Hscause Hstval Hclm Hrcpt Hwit".
       iSplitL "Hbit1 Htlb Hq1".
       { iSplitL "Hbit1 Htlb".
         - iApply (strans_inv_intro root_ppn with "Hbit1 Htlb").
@@ -483,7 +483,7 @@ Proof.
     { rewrite /sie_cap /sie_arm. iFrame "Hstk".
       iSplitL "Hbit1 Htlb".
       { iApply (strans_inv_intro root_ppn with "Hbit1 Htlb"). }
-      iFrame "Hq1 Hires Hrcpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu". }
+      iFrame "Hq1 Hires Hrcpt Hsepcx Hscausex Hstvalx Hsppc Hclm Hcpu Hwit". }
     iModIntro. iLeft.
     iExists retval, s_exec.
     iSplitR; [iPureIntro; exact Hha |].

@@ -780,7 +780,7 @@ Section ProofPrepareReturn.
     iDestruct "Harm" as "(Hstk & %Hsie1 & Harm)".
     iAssert (sie_cap U12 (trap_res b + (av - 2))%nat false p)
       with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm". iApply sie_cap_wit_KT0. }
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
     assert (Hsie1' : _get_Mstatus_SIE ms1 = ('b"0" : mword 1))

@@ -1435,7 +1435,7 @@ Section KernelvecHandler.
     iEval (rewrite -intr_res_of_eq) in "Hires".
     (* ---- the bundle -> the raw cells the VC tier runs on ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-    iDestruct "Hcap" as "(Hstk & Htr & Hq0)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hq0 & #Hwit0)".
     iDestruct "Hsc" as "(_ & _ & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Htie & %Hmsf)".
     iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
@@ -1671,7 +1671,7 @@ Section KernelvecHandler.
     { rewrite /sie_cap. iSplitL "Hdeep". { rewrite Hsp_l. iExact "Hdeep". }
       iSplitL "Hbit1 Htlbinv".
       { iApply (strans_inv_intro root_ppn with "Hbit1 Htlbinv"). }
-      iExact "Hq0". }
+      iSplitL "Hq0"; [ iExact "Hq0" |]. iExact "Hwit0". }
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
@@ -1689,7 +1689,7 @@ Section KernelvecHandler.
     iEval (rewrite Hret) in "Hpcf".
     iDestruct (sie_cap_gpr_at_close with "Hcgf") as "Hcgf".
     iDestruct (sie_cap_gpr_split with "Hcgf") as "(Hhsf & Hscf & Hcapf & Hfilef)".
-    iDestruct "Hcapf" as "(Hstkf & Htrf & Hq0f)".
+    iDestruct "Hcapf" as "(Hstkf & Htrf & Hq0f & #Hwitf)".
     (* THE RESUMING HART'S OWN [hw_config] / [minstret_inv]: both hold that
        hart's register cells, so the section's copies are the wrong ones here. *)
     iDestruct "Hscf" as "(#Hhwf & #Hinvf & Hprivf & Hmsxf & Hmiexf & Hmenvxf)".
@@ -1837,7 +1837,7 @@ Section KernelvecHandler.
     { rewrite /sie_cap. iSplitL "Hstk". { iExact "Hstk". }
       iSplitL "Hbit1f Htlbinvf".
       { iApply (strans_inv_intro (CID := CIDn) root_ppnf with "Hbit1f Htlbinvf"). }
-      iExact "Hq0f". }
+      iSplitL "Hq0f"; [ iExact "Hq0f" |]. iExact "Hwitf". }
     iDestruct (sie_cap_gpr_join (CID := CIDn) with "Hhsf Hscf Hcapf Hfilef") as "Hcgs".
     iApply (wp_sret_s_sconf (CID := CIDn)
               (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) m av pc0

@@ -878,7 +878,7 @@ Section WpSconfLock.
       by exact (src_ok_rget_indep m rs1 CID CID0).
     assert (Lpin_rs2 : tp_pin (CID := CID) m (Regidx rs2) = rget m rs2)
       by exact (src_ok_rget_indep m rs2 CID CID0).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -1080,7 +1080,7 @@ Section WpSconfLock.
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+    { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m !!! Regidx csp_rs1)

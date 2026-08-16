@@ -354,7 +354,7 @@ Section ProofKerneltrapParts.
     iDestruct (sconf_at_sret ms0 ('b"1") ('b"1") with "Hsc Hmir") as %[Hspp0 Hspie0].
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm". iApply sie_cap_wit_KT0. }
     set (A3 := <[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2).
     change (<[Regidx s1_idx := regval_into_reg (sstatus_read ms0)]> A2) with A3.
     assert (HA3sp : A3 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)
@@ -450,7 +450,7 @@ Section ProofKerneltrapParts.
       by (cbn [sie_bit] in Hsie1'; exact Hsie1').
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc [Hstk Htr Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm". iApply sie_cap_wit_KT0. }
     set (A7 := <[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> A6).
     change (<[Regidx a5_idx := regval_into_reg (sstatus_read ms1)]> A6) with A7.
     assert (HA7sp : A7 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 6)
@@ -763,7 +763,7 @@ Section ProofKerneltrapParts.
     iDestruct (sconf_at_sret msx ('b"1") ('b"1") with "[Hcgat] Hmir") as %[Hxspp Hxspie].
     { iDestruct "Hcgat" as "(_ & Hsc & _ & _)". iExact "Hsc". }
     iAssert (⌜ _get_Mstatus_SIE msx = ('b"0" : mword 1) ⌝)%I as %Hxsie.
-    { iDestruct "Hcgat" as "(_ & [(_ & Hsie & _ & _) _] & (_ & _ & Harm) & _)".
+    { iDestruct "Hcgat" as "(_ & [(_ & Hsie & _ & _) _] & (_ & _ & Harm & _) & _)".
       iApply (sie_arm_half_agree false p msx with "Hsie Harm"). }
     (* the register round-trip: every callee-saved slot is the caller's *)
     assert (Hcs : callee_saved m0 E6).

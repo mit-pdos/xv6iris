@@ -678,7 +678,7 @@ Section WpSconfCsr.
                   = m !!! Regidx csp_rs1)
       by (apply upd_ne; congruence).
     tp_refold Hrdtp "Hfmap".
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     (* EVERY HART-INDEXED TERM WRITTEN FRESH NEEDS THE ANNOTATION, and that
        includes the ghost NAME: [sie_gname] is [sie_name cpu_id], so an
        unannotated occurrence names the ENTRY hart's ghost while [Hhalf] came
@@ -897,7 +897,7 @@ Section WpSconfCsr.
     assert (Hsp : <[Regidx rd := regval_into_reg (sstatus_read ms0)]> m !!! Regidx csp_rs1
                   = m !!! Regidx csp_rs1)
       by (apply upd_ne; congruence).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     destruct b.
     - (* ---- b = true: the real flip.  The caller holds NEITHER eighth here
            (both are in the arm); what it hands over is the pure fact, and
@@ -957,7 +957,7 @@ Section WpSconfCsr.
                        (trap_res true + n)%nat false p)
         with "[Hstk Htr Hq]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iFrame "Htr". iExact "Hq". }
+        iFrame "Htr Hwit". iExact "Hq". }
       iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms1. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
@@ -1022,7 +1022,7 @@ Section WpSconfCsr.
                        (trap_res false + n)%nat false p)
         with "[Hstk Htr Hq0]" as "Hcap".
       { iSplitL "Hstk". { rewrite Hsp. iExact "Hstk". }
-        iFrame "Htr". iExact "Hq0". }
+        iFrame "Htr Hwit". iExact "Hq0". }
       iAssert (sconf (CID := CID0)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
       { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
         iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
@@ -1153,7 +1153,7 @@ Section WpSconfCsr.
        question outright. *)
     destruct b.
     { iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
       iDestruct "Harm" as "(Hq1 & Hhx' & Hkptr' & Hsepcx' & Hscausex' & Hstvalx' & Hsppc' & Hclmx' & Hcells')".
       iDestruct "Hsepcx" as (v1) "Hsepc1".
       iDestruct "Hsepcx'" as (v2) "Hsepc2".
@@ -1182,7 +1182,7 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     (* ---- the real restore: interrupts were off ---- *)
     destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
@@ -1222,7 +1222,7 @@ Section WpSconfCsr.
     iAssert (sie_cap m (trap_res false + n)%nat true p)
       with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
-      iFrame "Htr".
+      iFrame "Htr Hwit".
       iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
       (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the
          count eighth the flip just produced at '1'. *)
@@ -1395,10 +1395,10 @@ Section WpSconfCsr.
     (* [Hcap : sie_cap m n true] already -- the arm rides through untouched;
        the only thing wanted from it is its own eighth, for the agreement
        that pins the live bit at '1'. *)
-    iDestruct "Hcap" as "(Hstk & Htr & Hq1 & Harest)".
+    iDestruct "Hcap" as "(Hstk & Htr & (Hq1 & Harest) & #Hwit)".
     iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
     iAssert (sie_cap (CID := CID) m n true p) with "[Hstk Htr Hq1 Harest]" as "Hcap".
-    { iFrame "Hstk Htr Hq1 Harest". }
+    { iFrame "Hstk Htr Hq1 Harest Hwit". }
     destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
@@ -1536,7 +1536,7 @@ Section WpSconfCsr.
        ghosts agree about nothing. *)
     destruct b.
     2: { iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-         iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+         iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
          iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
          iDestruct (ghost_var_agree with "Hcnt Harm") as %Hbad.
          exfalso. apply (f_equal (@bv_unsigned _)) in Hbad.
@@ -1572,7 +1572,7 @@ Section WpSconfCsr.
       by (unfold s_pc; tmig; exact Lmisa).
     assert (Himm2 : eq_vec (mword_of_int 2 : mword 5) (zeros' 5) = false)
       by (vm_compute; reflexivity).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     (* the only reachable arm: interrupts were ON ---- the flip is real, and
        both eighths are in the arm (its own, and the one inside [cpu_hart 0
        true p]), which the callback delivers at the rebound hart. *)
@@ -1612,7 +1612,7 @@ Section WpSconfCsr.
     iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
     iAssert (sie_cap (CID := CID) m (trap_res true + n)%nat false p) with "[Hstk Htr Hq]" as "Hcap".
     { iSplitL "Hstk"; [iExact "Hstk" |].
-      iFrame "Htr". iExact "Hq". }
+      iFrame "Htr Hwit". iExact "Hq". }
     iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
       iExists ms1. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
@@ -1687,10 +1687,10 @@ Section WpSconfCsr.
       by (vm_compute; reflexivity).
     (* the disabled arm IS its own eighth; the agreement pins the live bit
        at '0', which is what makes the write idempotent. *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (ghost_var_agree with "Hhalf Harm") as %Hb0.
     iAssert (sie_cap (CID := CID) m n false p) with "[Hstk Htr Harm]" as "Hcap".
-    { iFrame "Hstk Htr Harm". }
+    { iFrame "Hstk Htr Harm Hwit". }
     destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
@@ -1953,7 +1953,7 @@ Section WpSconfCsr.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & _ & _ & %HmisaS & %HmisaC & %HmisaU & _)".
     (* the live SIE bit is the arm index *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (sie_arm_half_agree false p ms with "Hhalf Harm") as %Hsie_ms.
     (* the four field equalities [flip_core] wants: the premises pin [wval]'s
        side to a constant, [sconf_ms_facts] pins [ms]'s side to the same one. *)
@@ -2028,7 +2028,7 @@ Section WpSconfCsr.
       iIntros (ms') "(Hms' & Hhalf' & Hspp' & %Hmsf')".
       iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
       iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'. }
-    rewrite /sie_cap. iFrame "Hstk Htr Harm Hfile".
+    rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit Hfile".
   Qed.
 
   (* ---- THE RESTORE SHAPE: the written word is one an earlier [csrr
@@ -2466,7 +2466,7 @@ Section WpSconfCsr.
     (* THE BORROW, taken inside: the receipt pins the arm, the arm's
        [tlb_res_pt] lends the cell, and both closures are held until the
        bundle is rebuilt below. *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (strans_inv_acc_kpt with "Hkptr Htr") as (root) "(Htlb & Htrback)".
     iDestruct (tlb_res_pt_satp_acc with "Htlb")
       as (v) "(Hcell & %Hmode & %Hasid & %Hppn & Htlbback)".
@@ -2521,7 +2521,7 @@ Section WpSconfCsr.
       by (symmetry; apply upd_ne; congruence).
     tp_refold Hrdtp "Hfile".
     iDestruct (sie_cap_retarget m (<[Regidx rd := regval_into_reg v]> m) n false Hsp
-                 with "[Hstk Htr Harm]") as "Hcap"; [rewrite /sie_cap; iFrame "Hstk Htr Harm"|].
+                 with "[Hstk Htr Harm]") as "Hcap"; [rewrite /sie_cap; iFrame "Hstk Htr Harm Hwit"|].
     iDestruct (sie_cap_gpr_join with
       "Hhs' [$Hhw $Hminv $Hpriv Hms Hsie Hsret $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
     { iExists ms0. iFrame "Hms Hsie Hsret". iPureIntro. exact Hmsf. }

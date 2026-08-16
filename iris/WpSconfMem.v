@@ -369,7 +369,7 @@ Section WpSconfMem.
        execution lemmas below still see [ea]. *)
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
       by exact (src_ok_rget_indep m rs1 CID CID0).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
     iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
@@ -542,7 +542,7 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+    { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     assert (Hspne : Regidx csp_rs1 ≠ Regidx rd) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (ext v)]> m !!! Regidx csp_rs1)
@@ -1068,7 +1068,7 @@ Section WpSconfMem.
       by exact (src_ok_rget_indep m rs1 CID CID0).
     assert (Lpin_rs2 : tp_pin (CID := CID) m !!! Regidx rs2 = rget m rs2)
       by exact (src_ok_rget_indep m rs2 CID CID0).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
     iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
@@ -1238,7 +1238,7 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+    { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
@@ -1614,7 +1614,7 @@ Section WpSconfMem.
       by exact (src_ok_rget_indep m rs1 CID CID0).
     assert (Lpin_rs2 : tp_pin (CID := CID) m !!! Regidx rs2 = rget m rs2)
       by exact (src_ok_rget_indep m rs2 CID CID0).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
     iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
@@ -1757,7 +1757,7 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+    { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
@@ -1946,7 +1946,7 @@ Section WpSconfMem.
        execution lemmas below still see [ea]. *)
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
       by exact (src_ok_rget_indep m rs1 CID CID0).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
     iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
@@ -2103,7 +2103,7 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+    { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
@@ -2197,7 +2197,7 @@ Section WpSconfMem.
        execution lemmas below still see [ea]. *)
     assert (Lpin_rs1 : tp_pin (CID := CID) m !!! Regidx rs1 = rget m rs1)
       by exact (src_ok_rget_indep m rs1 CID CID0).
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hcwit)".
     (* the witness crosses the funnel's hart rebinding -- see the note on
        [sie_ktier_wit_rebind] above. *)
     iDestruct (sie_ktier_wit_rebind (CID := CID0) kt b p CID Hs with "Hwit Harm")
@@ -2353,7 +2353,7 @@ Section WpSconfMem.
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+    { rewrite /sie_cap. iFrame "Hstk Harm Htr Hcwit". }
     iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
     iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".

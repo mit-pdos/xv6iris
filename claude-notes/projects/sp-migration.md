@@ -1032,29 +1032,14 @@ vacuous upstream (the stacks trace to the SpecUserinit axiom). Making
 the paid park FEEDABLE means flipping that cone to KT1.
 
 - [x] **K1 — the mint** — LANDED; see "K1 findings" below.
-- [ ] **K2 — the post-boot tier flip** (DESIGN FORK, coordinator+user):
-  the trap fixpoint's tier (`ihs_*_of` chain takes the binder), the
-  uservec/usertrap/forkret cone's stack conjuncts to `(KTR := KT1)`,
-  post-boot files pin `Local Instance : CurKtier := KT1`. THE FORK is
-  witness delivery for the flipped cone's leaf accesses:
-  - (A) REVISIT the phase-D valve: put `sr_ktier_wit strans_regime
-    cur_ktier` into `sie_cap` as a conjunct after all, paying the
-    measured ~20-file positional-destructure repair ONCE; the engines
-    then feed the witness to leaves like `sr_inv`, and a flipped file's
-    proofs keep their ambient spellings — per-file cost ≈ the pin line.
-  - (B) keep the valve: every stack-touching leaf application in every
-    flipped proof moves to the `_t` rule + an explicit witness — the
-    same edit at thousands of sites.
-  The phase-D valve was RIGHT for phase D (nothing consumed the
-  witness); at flip time the amortization reverses. **RESOLVED: (A)**
-  (user decision, 2026-08-16). The conjunct is
-  `sr_ktier_wit strans_regime cur_ktier` reading the bundle's OWN
-  ambient instance — no explicit args anywhere: post-boot files pin
-  `Local Instance : CurKtier := KT1`, dual-regime files use a section
-  Context, explicit `(KTR := …)` only at seams. Its real content is the
-  SIE=0 KT1 windows (post-boot push_off), where today only `trap_csrs`
-  carries the receipt; the SIE='1' arm already implies it (phase A). The
-  ~20-file cost is positional-destructure pattern slots, one per site.
+- [x] **K2a — the witness conjunct** — LANDED; see "K2a findings" below.
+  `sie_cap`/`sie_cap_of` carry `sr_ktier_wit strans_regime cur_ktier`.
+- [ ] **K2b — the cone genericization**: the trap fixpoint's tier
+  (`ihs_*_of` chain takes the binder), the uservec/usertrap/forkret
+  cone's stack conjuncts to `(KTR := KT1)`, post-boot files pin
+  `Local Instance : CurKtier := KT1`. The witness-delivery fork is
+  settled by K2a; what is LEFT is the engine funnels, which drop the
+  witness on the way through (K2a findings, "What K2b must know").
 - [ ] **K3 — the lifecycle** (restores the RED-era kexit shape, now
   payable): `proc_dormant` gains the stack in BOTH arms; allocproc hands
   it out (beside `fd_slots FDSPARE`, via `proc_dormant_unused`); kexit
@@ -1209,16 +1194,144 @@ while `proc_dormant` is keyed by the slot address `proc_addr i` — the
 correspondence `KSTACK(i) = p->kstack` for slot `i` is what procinit
 stores, and `KstackArith.v` is the arithmetic that proves it.
 
+### K2a findings (LANDED)
+
+The capability carries the tier witness. `sie_cap_of` and `sie_cap` each
+gained a FOURTH conjunct, `SRegime.sr_ktier_wit strans_regime cur_ktier`,
+read off the bundle's own ambient `CurKtier` exactly as its `stack_own`
+conjunct is. **34 files, all PROOF files; every `Spec*.v` is
+byte-identical** and no function spec, engine signature or leaf statement
+moved. Outside `IntrDefs.v` the whole change is **~90 edited lines in 33
+files**, and 16 of those files are a SINGLE changed line.
+
+**PLACEMENT: at `sie_cap_of`/`sie_cap`, LAST, and in neither arm.** Sitting
+at the capability rather than inside `sie_arm_of` is what makes a KT1
+capability attest the access right regardless of `b` — and the SIE=0
+windows (post-boot push_off) are precisely the ones the flip needs, since
+the enabled arm already carries `kpt_on` and `trap_csrs` covers the
+interrupts-off handler body. It goes LAST rather than beside `strans_inv`
+because that way the first three
+conjuncts then keep their positions, which is what makes a repair site a
+one-name edit. `sie_arm_of`'s own `kpt_on` member STAYS: it is
+hart-rebind-load-bearing (`WpSconfMem.sie_ktier_wit_rebind`'s `b = true`
+branch needs the receipt AT THE HART THE FUNNEL REBOUND TO), while the new
+conjunct is the SIE-independent one, at the capability's own hart. The two
+coexist at KT1 and both are persistent.
+
+**THE REPAIR IS ONE PATTERN NAME, AND PERSISTENCE IS WHY.** The conjunct
+is persistent at both tiers, so the whole repair at a site that OPENS the
+bundle is `… & #Hwit)` — the witness lands in the intuitionistic context
+and is then visible inside every later `with "[…]"` selection without
+being listed, so the matching REBUILD is one extra name in an `iFrame`
+that already exists. Sites that build a capability from an engine
+callback's triple have no witness to re-frame and take
+`IntrDefs.sie_cap_wit_KT0` instead (one line).
+
+| file | edited lines |
+|---|---|
+| IntrDefs.v | the two definitions + every internal opener (`sie_cap_on_kpt`, `sie_cap_wit`, `sie_cap_ktier_up`, `sie_cap_intro_bare`, `retarget`/`push`/`pop`/`grow`/`shrink`) |
+| WpSconfCsr.v | 19 |
+| WpSconfMem.v | 11 (see the name clash below) |
+| ProofKernelvec.v, ProofKvminithart.v, ProofUart.v, WpPlic.v, WpSmodeIntr.v, WpVirtioDev.v | 5 each |
+| ProofKerneltrapParts.v, ProofSched.v, ProofUsertrapTail.v, WpIntrInv.v | 4 each |
+| ProofSwtch.v, ProofUsertrap.v, WpSconfLock.v, WpSconfSret.v, WpSmodeWfi.v | 3 each |
+| CpuOwn.v, ProofForkret.v, ProofPrepareReturn.v, ProofPushOff.v, ProofClockintr.v, UsertrapRes.v | 1–2 each |
+| ProofBunpin, ProofFilealloc, ProofFileclose, ProofFiledup, ProofIdup, ProofIget, ProofIput, ProofKexecTail, ProofPipeclose, ProofSysExec | 1 each — all the SAME line, `iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)"` |
+
+**PHASE D'S ~20-FILE MEASUREMENT WAS A FILE COUNT OF `rewrite /sie_cap`
+SITES, AND THAT IS THE WRONG POPULATION — IT MISSES A THIRD OF THE
+RIPPLE AND INCLUDES FILES THAT DO NOT MOVE.** `ProofMain`, `ProofCopyin`
+and `ProofCopyinstr` were on the list and needed **nothing**: their
+`rewrite /sie_cap` is followed by `iIntros "$"`, which frames a conjunct
+it never names. The ten files in the last row were on no list at all —
+they are lock-level proofs reading the arm's eighth out of a FOLDED
+`sie_cap_gpr` and they never mention `sie_cap`, so no grep for the unfold
+sites finds them. **Size a positional-conjunct ripple by grepping for the
+NEIGHBOURING conjuncts' hypothesis names, not for the definition's.** The
+extra files cost nothing — 16 of the 33 are one changed line — but a plan that
+budgets by file count will be off by 70 %.
+
+**LEMMA OUTCOMES.**
+
+| lemma | outcome |
+|---|---|
+| `sie_cap_wit` | NEW, trivial (the conjunct is persistent): `sie_cap … -∗ sie_cap … ∗ sr_ktier_wit strans_regime cur_ktier`, at BOTH arms. **Supersedes and replaces phase D's `sie_cap_ktier_wit`** (enabled-arm-only; zero consumers) |
+| `sie_cap_wit_KT0` | NEW: `⊢ sr_ktier_wit strans_regime cur_ktier` at the ambient default. The one-line closer at the six sites that rebuild a capability from an engine triple |
+| `sie_cap_ktier_mono`, `sie_cap_gpr_ktier_mono` | **DELETED.** The bundle is NOT tier-covariant any more — `emp` does not entail `kpt_on cpu_id` — and both had zero consumers. Deleting is the honest shape: adding a `kpt_on` premise would just be `_up` under another name |
+| `sie_cap_ktier_up` | re-derived, and its CONCLUSION SHRANK to `sie_cap (KTR := kt') …`: the upgraded capability now carries the witness, so handing it back separately was redundant. `sie_cap_gpr_ktier_up` is the same, replacing `sie_cap_gpr_ktier_mono` |
+| `sie_cap_on_kpt` | conclusion gains the witness. Its one consumer (`WpSmodeIntr`) re-assembles the capability from the pieces, and at KT1 could not re-conjure it |
+| `sie_cap_intro_bare` | **LOSES its `` `{KTR : !CurKtier} `` binder** — KT0 only. A KT1 boot capability would have to attest `kpt_on cpu_id` over a still-BARE hart, which must not be constructible. Statement text and `BootBridge.v`'s call site are unchanged (both resolve at the default) |
+| `strans_ktier_wit_intro`, `trap_csrs_ktier_wit` | unchanged; both still needed (they hold at any tier index and without a capability in hand) |
+| the Banach fixpoint | **untouched.** `ihs_*_of` still name `sie_cap_gpr_of` bare at the KT0 default, so their witness conjunct is a closed constant; `ires_of_contractive` and `ihs_of_ne`'s `rewrite …; solve_proper` closed with no change |
+
+**FOUR TRAPS, all of which report something else.**
+
+- **`cur_ktier` IS `Typeclasses Opaque`, SO `iFrame` CANNOT MATCH A
+  `kt`-SPELLED WITNESS AGAINST A BUNDLE'S OWN `cur_ktier`-SPELLED SLOT.**
+  Ordinary `apply`/`exact` conversion crosses `@cur_ktier kt ≡ kt` fine;
+  `iFrame`'s `Frame` search does not, because instance resolution will not
+  unfold it. The symptom is not a framing error: `iFrame` silently leaves
+  the witness conjunct in the goal, and the NEXT tactic fails — here
+  `iApply: cannot apply (stack_own …)`, naming the term it had just
+  produced correctly. Never write an explicit-tier statement whose proof
+  has to frame a witness into a `cur_ktier` slot; either close that
+  conjunct with `iApply strans_ktier_wit_intro` (its `kt` is an evar, so
+  unification assigns it) or drop the redundant conjunct — which is what
+  `sie_cap_ktier_up`'s shrunk conclusion is.
+- **`sie_cap_wit_KT0` NEEDS ITS OWN `` `{CIDx : CpuId} `` BINDER.** At KT0
+  the witness is `emp` at every hart, but the TERM is hart-indexed, so a
+  section-hart statement does not match a goal at a rebound `CIDn`
+  (durable-notes, "A HART-INDEXED TERM WRITTEN FRESH IN A PROOF MEANS THE
+  *SECTION* HART").
+- **A PATTERN THAT USED TO REACH *INTO* `sie_arm` SILENTLY RE-ASSOCIATES.**
+  `"(Hstk & Htr & Hq1 & Harest)"` meant stack / slot / the arm's eighth /
+  the arm's rest; with a fourth conjunct it becomes stack / slot / the
+  WHOLE arm / the witness, and the failure lands later, at a
+  `ghost_var_agree` whose hypothesis prints as `sie_arm false p ∗
+  sr_ktier_wit …`. Bracket the arm:
+  `"(Hstk & Htr & (Hq1 & Harest) & #Hwit)"`. (`WpSconfCsr`'s
+  `wp_csrsi_sie_on_s_sconf`; the same shape is why the ten lock-level
+  proofs above needed `(_ & _ & Harm & _)`.) A trailing `_` in a shorter
+  pattern absorbs the new conjunct harmlessly, which is why every
+  `"(Hstk & _ & _)"` site compiled untouched.
+- Naming: **`WpSconfMem.v` already calls the `_t` leaves' EXPLICIT witness
+  premise `#Hwit`**, so the capability's is `#Hcwit` there. They are
+  different propositions (`kt` vs `cur_ktier`) and must not be confused.
+
+**What K2b must know.**
+
+1. **THE ENGINE FUNNELS DROP THE WITNESS, AND THAT IS K2b's FIRST JOB.**
+   `WpSconfCsr`'s sstatus leaves hand their σ-callback the capability as a
+   TRIPLE (`stack_own ∗ ⌜SIE = sie_bit b⌝ ∗ sie_arm b p`) and take it back
+   the same way, so nothing about the tier survives the crossing. Six
+   sites therefore re-conjure the witness with `sie_cap_wit_KT0`:
+   `ProofKerneltrapParts` ×2, `ProofPrepareReturn`, `ProofPushOff`,
+   `ProofSched`, `ProofUsertrap`, plus `UsertrapRes`'s `ut_trap` unpack.
+   **Every one of those is exactly what stops working when its file pins
+   `CurKtier := KT1`** — grep for `sie_cap_wit_KT0` to find them. The fix
+   is to widen the engine triple (or thread the folded `sie_cap`), which
+   restates leaf signatures and is why it was not done here.
+2. `WpSconfMem.sie_ktier_wit_rebind` is unchanged and still needed: it
+   crosses a HART, not a tier, and the capability's witness is at the
+   capability's own hart.
+3. `sie_cap_intro_bare` is KT0-only, so a boot-cone file cannot be flipped
+   by pinning `CurKtier := KT1`; the boot arm has to stay KT0 and the
+   conversion stays at kvminithart's exit (`sie_cap_ktier_up`).
+4. The fixpoint's tier is still the open decision. When `ihs_*_of` take
+   the binder, `WpIntrInv`'s two rebuild sites already frame the witness
+   by name (`Hwit`) and need nothing further.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
   sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) and D are
   LANDED, and so is the `sie_cap` tier index on top of them; `main` is
-  GREEN. NEXT: the KSTACK campaign — K1 (the mint) is LANDED, so the tree
-  now carries real KT1 facts; see "K1 findings" and then K2. The one design
-  question still open in this area is the TRAP CONTRACT's tier: the Banach
-  fixpoint's bundle is pinned at KT0 and moving it is a decision, not a
-  mechanical step.
+  GREEN. NEXT: the KSTACK campaign — K1 (the mint) and K2a (the witness
+  conjunct in `sie_cap`) are LANDED, so the tree carries real KT1 facts and
+  a capability that attests the access right; see "K1 findings" and "K2a
+  findings", then K2b. The one design question still open in this area is
+  the TRAP CONTRACT's tier: the Banach fixpoint's bundle is pinned at KT0
+  and moving it is a decision, not a mechanical step.
 - The `sp-migration-red` quarry branch is DELETED: the identity-pin
   deviation (phase C findings) left nothing to mine from it.
 - `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch

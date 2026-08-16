@@ -80,7 +80,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
     by exact (src_ok_rget_indep m rs1 CID CID0).
   assert (Lpin_rs2 : tp_pin (CID := CID) m (Regidx rs2) = rget m rs2)
     by exact (src_ok_rget_indep m rs2 CID CID0).
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -204,7 +204,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
   iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
      obligation is discharged by instantiating it here. *)
@@ -268,7 +268,7 @@ Qed.
      say the words are the same. *)
   assert (Lpin_rs1 : tp_pin (CID := CID) m (Regidx rs1) = rget m rs1)
     by exact (src_ok_rget_indep m rs1 CID CID0).
-  iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
@@ -399,7 +399,7 @@ Qed.
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
   iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
-  { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
+  { rewrite /sie_cap. iFrame "Hstk Harm Htr Hwit". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".
   iDestruct (sie_cap_retarget (CID := CID) m

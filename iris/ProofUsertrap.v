@@ -353,7 +353,8 @@ Section UtEntry.
     iDestruct (sconf_at_close with "Hscf") as "Hscf".
     iDestruct (sie_cap_gpr_join with "Hhs Hscf [Hstk Htr Harm] Hfile") as "Hcg".
     { rewrite /sie_cap. iSplitL "Hstk"; [iExact "Hstk" |].
-      iSplitL "Htr"; [iExact "Htr" | iExact "Harm"]. }
+      iSplitL "Htr"; [iExact "Htr" |].
+      iSplitL "Harm"; [iExact "Harm" |]. iApply sie_cap_wit_KT0. }
     set (M3 := <[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2).
     change (<[Regidx Ra5 := regval_into_reg (sstatus_read ms1)]> M2) with M3.
     assert (HM3sp : M3 !!! Regidx csp_rs1 = pa_stk ksp 4)

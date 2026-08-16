@@ -101,7 +101,7 @@ Section ProofClockintr.
     iDestruct "Hcnt" as "[_ Hic]".
     destruct n as [|n'].
     - iDestruct (sie_cap_gpr_split with "Hcg") as "(_ & _ & Hsie & _)".
-      iDestruct "Hsie" as "(_ & _ & Hbit)".
+      iDestruct "Hsie" as "(_ & _ & Hbit & _)".
       destruct eb.
       + iDestruct (ghost_var_agree with "Hbit Hic") as %Hbad.
         exfalso. apply (f_equal (@bv_unsigned _)) in Hbad. vm_compute in Hbad. discriminate.

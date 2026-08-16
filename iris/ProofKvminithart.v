@@ -297,7 +297,7 @@ Section KvminithartBody.
     rewrite Lva2 in Hex2.
     rewrite (satp_legalized_sv39 (register_lookup satp s_pc2.(sregs)) (kvi_satp_word root) (kvi_satp_mode root)) in Hex2.
     (* open the Bare arm of the translation slot; do the switch *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iDestruct (strans_inv_acc_bare with "Hbit Htr") as "(Hbit & Hbit2 & Hbare & Hstv)".
     iDestruct "Hbare" as (satp0) "(Hsatpc & %HbareMode & Hpmp)".
     iMod (reg_update _ satp _ (kvi_satp_word root) with "Hreg Hsatpc") as "[Hreg Hsatpc]".
@@ -313,7 +313,7 @@ Section KvminithartBody.
     iMod (strans_flip with "Hbit Hbit2") as "[Hbitkpt2 #Hbitkpt]".
     iDestruct (strans_inv_intro root with "Hbitkpt2 Htlbinv") as "Htr".
     iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iModIntro. iExists (set_reg s_pc2 satp (kvi_satp_word root)).
     iSplitR.
     { iPureIntro. rewrite Hpceq2. fold s_pc2.
@@ -361,7 +361,7 @@ Section KvminithartBody.
     destruct (exec_execute_SFENCE_VMA_S s_pc3 Lpriv3p ltac:(rewrite Lms3p; exact HTVM3))
       as (tlbz3 & Hex3 & Hnone3).
     (* open the KPT arm to reach the tlb cell; flush; re-seal *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & _)".
     iDestruct "Htr" as "[(Hbit0 & _ & _) | (Hbit1 & Hk)]".
     { iDestruct (kpt_on_pending_False with "Hbitkpt Hbit0") as %[]. }
     iDestruct "Hk" as (root_ppn) "Htlbinv".
@@ -377,7 +377,7 @@ Section KvminithartBody.
                  with "Hsatp Htlbc Hlb3 Hpmp Hkinv3") as "Htlbinv".
     iDestruct (strans_inv_intro root_ppn with "Hbit1 Htlbinv") as "Htr".
     iAssert (sie_cap S4 (K - 2) false pcur) with "[Hstk Htr Harm]" as "Hcap".
-    { rewrite /sie_cap. iFrame "Hstk Htr Harm". }
+    { rewrite /sie_cap. iFrame "Hstk Htr Harm Hwit". }
     iModIntro. iExists (set_reg s_pc3 tlb tlbz3).
     iSplitR.
     { iPureIntro. rewrite Hpceq3. fold s_pc3. rewrite Hzreg. exact Hex3. }

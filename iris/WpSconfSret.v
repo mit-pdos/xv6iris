@@ -213,7 +213,7 @@ Section WpSconfSret.
     (* ---- THE FOUR-PIECE FLIP.  Identical to the csrsi restore: the bundle's
          tied half, the capability eighth (the whole of [sie_arm false]), the
          count eighth the caller brought, and the invariant quarter. ---- *)
-    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
     iEval (rewrite /intr_res) in "Hhx".
     iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
     iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi") as "(Hhalf & Hqcap & Hqcnt & Hqi)".
@@ -267,7 +267,7 @@ Section WpSconfSret.
     iAssert (sie_cap m n true p)
       with "[Hqcap Hqcnt Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
-      iFrame "Htr".
+      iFrame "Htr Hwit".
       iFrame "Hqcap Hintr Hkptr Hsepcx Hscausex Hstvalx Hsppc Hclm".
       (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the count
          eighth the flip just produced at '1'. *)

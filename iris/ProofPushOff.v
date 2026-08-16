@@ -1351,7 +1351,7 @@ Section ProofPushOff.
        needed only pre-port, when the arm was an internal [A ∨ B]). *)
     iDestruct "Hrep" as "[%HSIEr Hq0]".
     iAssert (sie_cap P3 (trap_res bexit + (av - 2))%nat false p) with "[Hstk Htr Hq0]" as "Hcapsc".
-    { iFrame "Hstk Htr". iExact "Hq0". }
+    { iFrame "Hstk Htr Hq0". iApply sie_cap_wit_KT0. }
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcapsc Hfile") as "Hcg".
     assert (Hsst2 : neq_vec (and_vec (sstatus_read msr)

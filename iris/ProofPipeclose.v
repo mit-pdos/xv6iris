@@ -100,7 +100,7 @@ Section ProofPipeclose.
     - iDestruct "Hcnt" as "%Hb". destruct Hb as (-> & -> & _). done.
     - destruct n0 as [|n']; [ | done ].
       iDestruct "Hcnt" as "[_ Hint]".
-      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm) & _)".
+      iDestruct "Hcg" as "(_ & _ & (_ & _ & Harm & _) & _)".
       iDestruct (ghost_var_agree with "Harm Hint") as %Heq.
       destruct eb0; [ exfalso | done ].
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.

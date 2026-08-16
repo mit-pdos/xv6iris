@@ -150,7 +150,7 @@ Section WpSmodeIntr.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     (* the translation slot: SIE = '1' forces the KPT arm *)
-    iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn) "(Hstk & Hbit1 & Htlbinv & Harm)".
+    iDestruct (sie_cap_on_kpt with "Hcap") as (root_ppn) "(Hstk & Hbit1 & Htlbinv & Harm & #Hwit)".
     iDestruct "Hpc" as "[Hpcr Hnpc]".
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpcr")   as %Lpc.
@@ -203,7 +203,7 @@ Section WpSmodeIntr.
       { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    { rewrite /sie_cap. iFrame "Hstk Harm".
+    { rewrite /sie_cap. iFrame "Hstk Harm Hwit".
       iApply (strans_inv_intro (CID := CID) root_ppn with "Hbit1 Htlbinv"). }
     iDestruct (reg_valid with "Hreg' Hpcr") as %Lpc_exec.
     rewrite Lpc_σf in Hexec.
@@ -290,7 +290,7 @@ Section WpSmodeIntr.
     - (* ---- b = false: the dispatch-None engine, SIE=0 from ghost ---- *)
       iDestruct (wp_next_here with "H") as "H".
       iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
       iRename "Harm" into "Hq0".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
       iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -322,7 +322,7 @@ Section WpSmodeIntr.
         { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
-      { iFrame "Hstk". iFrame "Htr". iExact "Hq0". }
+      { iFrame "Hstk Htr Hwit". iExact "Hq0". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".

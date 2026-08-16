@@ -800,7 +800,7 @@ Proof.
      which the closer would re-park. *)
   iDestruct "Hsc" as "(#Hhw & #Hmin & Hprivc & Hmsx & Hmiex & Hmenvx)".
   iDestruct "Hmsx" as (msg) "(Hms & Hhalf & Htie & %Hmsg)".
-  iDestruct "Hcap" as "(Hstk & Hstr & Harm)".
+  iDestruct "Hcap" as "(Hstk & Hstr & Harm & #Hwit)".
   (* THE QUARTER'S VALUE IS NOT A DEGREE OF FREEDOM.  prepare_return leaves
      it existential because it never reads it; the arm it also hands back is
      at [false], and [sie_arm_half_agree] reads the live SIE off that index,

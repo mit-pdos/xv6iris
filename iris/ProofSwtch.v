@@ -101,7 +101,7 @@ Section ProofSwtch.
        sie_cap into stack + strans_inv + arm ---- *)
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iEval (rewrite /sie_cap) in "Hcap".
-    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm)".
+    iDestruct "Hcap" as "(Hstk & Htr & Hsiearm & #Hwit)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
@@ -288,7 +288,7 @@ Section ProofSwtch.
        is [intr_off_tok] by conversion now (an INDEX, not a disjunction), so
        building [sie_cap] at [false] needs no [iLeft]. ---- *)
     iAssert (sie_cap (vregs_den rho swtch_regs1) av_t false p) with "[Hstk_t Htr Hq0]" as "Hcap_t".
-    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr". iExact "Hq0". }
+    { rewrite /sie_cap Hcsp_t. iFrame "Hstk_t Htr Hwit". iExact "Hq0". }
     (* [Hfile] comes back from the block as the bare [gpr_file (vregs_den
        rho swtch_regs1)] (it went in the same way, via [Hden]); re-fold it
        under [tp_pin] -- a no-op, since that map's own tp slot is ALREADY

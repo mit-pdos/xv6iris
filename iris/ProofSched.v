@@ -975,7 +975,7 @@ Section ProofSched.
     set (C10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read ms2)]> C9).
     iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join C10 (av - 6)%nat false pj with "Hhs Hsc [Hstk Htlbinv Harm] Hfile") as "Hcg".
-    { rewrite /sie_cap. iFrame "Hstk Htlbinv Harm". }
+    { rewrite /sie_cap. iFrame "Hstk Htlbinv Harm". iApply sie_cap_wit_KT0. }
     assert (Hpc40 : add_vec_int (mword_of_int (KernelSyms.sched + 0x3c) : mword 64) 4 = mword_of_int (KernelSyms.sched + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc40) in "Hpc".
     (* +0x40 c.andi a5,a5,2 *)
@@ -1327,12 +1327,12 @@ Section ProofSched.
          runs at avail 0 and the tail crosses in the payload instead. *)
       iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
       iEval (rewrite /sie_cap) in "Hcap".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
       iEval (rewrite Hcsp_Mc) in "Hstk".
       iAssert (sie_cap Mc 0%nat false pj) with "[Htr Harm]" as "Hcap0".
       { rewrite /sie_cap. iSplitR "Htr Harm".
         { rewrite Hcsp_Mc. by iApply stack_own_0. }
-        iFrame "Htr Harm". }
+        iFrame "Htr Harm Hwit". }
       iDestruct (sie_cap_gpr_join Mc 0%nat false pj with "Hhs Hsc Hcap0 Hfile") as "Hcg0".
       (* frame ++ tail = the whole region sched was called with *)
       assert (Hgeom6 : pa_stk sp0 6 = spd).
