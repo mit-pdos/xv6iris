@@ -1006,6 +1006,73 @@ handler contract's bundle is pinned at KT0 by the fixpoint, so the first
 KSTACK step that needs a trap to be takeable on a kstack frame must first
 carry out the fixpoint's tier move above.
 
+## The KSTACK campaign (worklist; recon 2026-08-16)
+
+The gate: `SpecForkretParkPaid.forkret_park_pkg`'s
+`stack_own (add_vec ks 4096) av` — the paid park is a THEOREM, kfork
+carries the `FORKRET_PARK` Axiom only because nothing hands out the
+KSTACK words. Recon facts: `proc_mapstacks` returns the 64 stack pages
+as `page_own` (physical, identity); `WpKvminithart.kvm_M_mint` mints the
+64 `kmap_at (kstack_vpn i) (pas i) KP_rw` claims; both flow through
+main's boot arm, which is the conversion site; `phys_to_mem_map` at KT1
+is the constructor; `procs_inv` is PERSISTENT and cannot hold the words —
+the deposit container is `proc_dormant` (the reverted
+`proc_dormant_prestk` shape, deposit at `procs_inv_alloc` pass 3);
+`ProcDefs.kstack_free`/`kstack_closer`/`KSTACK_AV = 400` exist unused —
+NOTE they predate ktier and elaborate at ambient KT0: they must be
+re-pinned `(KTR := KT1)` on their stack conjuncts (`is_kstack` itself
+stays KT0 — the p->kstack FIELD is static proc-table data).
+
+**THE VACUITY ALERT (why the flip is load-bearing, not cosmetic):** every
+post-boot stack conjunct in the tree — `forkret_park_pkg`'s,
+`ut_stack`'s, the trap fixpoint's `sie_cap` reserve, every syscall
+spec's — elaborates at the KT0 default today, and a KT0 `stack_own` at a
+KSTACK va is UNSATISFIABLE. Those proofs are sound but conditionally
+vacuous upstream (the stacks trace to the SpecUserinit axiom). Making
+the paid park FEEDABLE means flipping that cone to KT1.
+
+- [ ] **K1 — the mint** (green, standalone): `kstack_own_intro i` —
+  `kmap_at (kstack_vpn i) (pas i) KP_rw -∗ page_own (pa_of_pas i) -∗
+  stack_own (KTR := KT1) (kstack_va i + 4096) 512` (whole page;
+  premises: canonicality of KSTACK vas < 2^38, `addr_is_ram` off
+  `page_valid`, `ktier_pin KT1 = I`; per-byte `phys_to_mem_map KT1`,
+  bytes→words→`stack_own`). Thread main's boot arm to run it 64× after
+  kvminithart, park the results in a boot-side bank the later increments
+  draw from. Validates the whole KT1 pipeline with the tree's FIRST real
+  KT1 facts.
+- [ ] **K2 — the post-boot tier flip** (DESIGN FORK, coordinator+user):
+  the trap fixpoint's tier (`ihs_*_of` chain takes the binder), the
+  uservec/usertrap/forkret cone's stack conjuncts to `(KTR := KT1)`,
+  post-boot files pin `Local Instance : CurKtier := KT1`. THE FORK is
+  witness delivery for the flipped cone's leaf accesses:
+  - (A) REVISIT the phase-D valve: put `sr_ktier_wit strans_regime
+    cur_ktier` into `sie_cap` as a conjunct after all, paying the
+    measured ~20-file positional-destructure repair ONCE; the engines
+    then feed the witness to leaves like `sr_inv`, and a flipped file's
+    proofs keep their ambient spellings — per-file cost ≈ the pin line.
+  - (B) keep the valve: every stack-touching leaf application in every
+    flipped proof moves to the `_t` rule + an explicit witness — the
+    same edit at thousands of sites.
+  The phase-D valve was RIGHT for phase D (nothing consumed the
+  witness); at flip time the amortization reverses. RECOMMENDATION: (A).
+- [ ] **K3 — the lifecycle** (restores the RED-era kexit shape, now
+  payable): `proc_dormant` gains the stack in BOTH arms; allocproc hands
+  it out (beside `fd_slots FDSPARE`, via `proc_dormant_unused`); kexit
+  DONATES the stack through its final swtch (the park with no
+  post-resume arm — the dying thread never returns, so giving away the
+  page it runs on is sound); the scheduler side deposits it in the
+  ZOMBIE slot's lock record at release; kwait/freeproc take it back out
+  to rebuild UNUSED. This is where `kstack_closer` earns its shape.
+- [ ] **K4 — retire `FORKRET_PARK`**: kfork's contract supplies
+  `forkret_park_pkg` (K1-K3's stack + the kernel-environment closer:
+  `bslots bn 3`, `fileclose_bm`, the `initproc` share — where a fresh
+  process's half of the kernel environment comes from is its own design
+  question); sys_fork and the syscall environment follow;
+  `LinkForkretPark`'s Axiom module is replaced by the paid functor.
+- [ ] **K5 — the text tier** (the old phase E): `text_pointsto` gets the
+  same index and witness; TRAMPOLINE fetch ownership becomes
+  expressible.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
