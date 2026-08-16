@@ -113,6 +113,8 @@ Require Import FdSlots FileInv.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
@@ -640,9 +642,10 @@ Definition wp_fileclose_sconf_body
      claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb p -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γfl γf -∗
   panic_wp_any -∗
+  panic_env -∗
   file_ref γf k q Cf -∗
   fileclose_env fn on us n eb p Cf -∗
   (* THE CROSSING IS THE LITERAL [true], NOT [b].  The FD_INODE / FD_DEVICE

@@ -58,6 +58,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd.
@@ -132,6 +133,7 @@ Definition wp_sys_close_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   is_ftable γl γf -∗
   panic_wp_any -∗
+  panic_env -∗
   proc_priv γf p pid V -∗
   (* THE CLOSING ENVIRONMENT.  sys_close closes a descriptor of unknown type,
      so it owns both of fileclose's bundles and hands over whichever the

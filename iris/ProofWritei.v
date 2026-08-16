@@ -68,6 +68,7 @@ Require Import ProcInv.
 Require Import FileInvDefs.
 Require Import CodeWritei.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import SpecBmap SpecBread SpecBrelse SpecLogWrite SpecEitherCopyin
         SpecIupdate.
 Require Import ProofWriteiParts.
@@ -1043,9 +1044,10 @@ Section WriteiJoin.
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (WI + 0xd2) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -1080,7 +1082,7 @@ Section WriteiJoin.
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
            Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
     iDestruct (CpuOwn.cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -1191,7 +1193,7 @@ Section WriteiJoin.
               ltac:(rewrite Hdneq; exact Hstab)
               ltac:(rewrite Hdneq; exact Hnlk)
               Hadr Hdirlen Hj Hgl HT1a0
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl2 Hlb0 Hcrdu Hop").
     all: try lkbelow.
@@ -1421,9 +1423,10 @@ Section WriteiSize.
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (WI + 0xbc) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -1464,7 +1467,7 @@ Section WriteiSize.
     assert (Hcovf : bm_covers bm' (bv_unsigned (di_size (wi_dinode dn bm' off tot))))
       by exact (ProofWriteiParts.wi_covers_final bm' dn off tot
                   ltac:(clear -Hofflt; lia) HcovS HcovT).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
     iDestruct (CpuOwn.cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -1715,7 +1718,7 @@ Section WriteiSize.
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
                 Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDz3) ltac:(wp_next_chain)
@@ -1921,7 +1924,7 @@ Section WriteiSize.
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
                 Hdb Hd0 Hdk Hrange Hker Htotn eq_refl Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDQA5) ltac:(wp_next_chain)
@@ -2126,6 +2129,7 @@ Section WriteiLoop.
               #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
+    iPoseProof (printk_env_panic with "Hprkenv") as "#Hpanenv".
     iDestruct (CpuOwn.cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (wri_82 with "Htext") as "Hi82".
     iPoseProof (wri_86 with "Htext") as "Hi86".
@@ -2227,7 +2231,7 @@ Section WriteiLoop.
               Hgeom0 Hgok Hprkc
               ltac:(intros Hc; exact (proj1 (bool_decide_eq_true _) Hc))
               Hfbnlt HwfI Hj Hgl HA3a0 HA3a1
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hidev Hmap
+              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hkdata Hprkenv Hpanenv Hbio Hlctx Hidev Hmap
                     Hblocks Hppid
                     Hszc Hbmsc Hbmres
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
@@ -2417,7 +2421,7 @@ Section WriteiLoop.
                       cbv zeta; rewrite Hfb0 -Hbm0 -HS0; split_and!;
                       [ lia | left; exact Ht0 | intros Hpos; exfalso; lia ])
                 HextI Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (b := true) (CIDa := CIDa3) (CIDb := CIDa6) ltac:(wp_next_chain)
@@ -2527,7 +2531,7 @@ Section WriteiLoop.
                 HKbr Hblt' eq_refl Hbcov'
                 eq_refl Hj Hgl HB3a0 HB3a1
                 ltac:(lkbelow)
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
       all: try lkbelow.
       iIntros (CIDa9 Hqa9 mBr kkb bsB bsdB dB)
         "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -3472,7 +3476,7 @@ Section WriteiLoop.
                                     ltac:(lia) eq_refl (proj2 Hinv3) ltac:(lia)
                                     ltac:(lia) ltac:(lia))))
                       ltac:(lia) HsbSb3 Hwi16B Hext2 Hbelow
-                      with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                      with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hprocs Hdevi
                             Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                             Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
             iApply (wp_next_shift (b := true) (CIDa := CIDa14) (CIDb := CIDc11)
@@ -3836,7 +3840,7 @@ Section WriteiLoop.
                                   ltac:(lia) ltac:(lia))))
                     ltac:(lia) HsbSb3 Hwi16C
                     Hext2 Hbelow
-                    with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                    with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                           Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
           iApply (wp_next_shift (b := true) (CIDa := CIDa14) (CIDb := CIDd7)
@@ -4002,6 +4006,7 @@ Section WriteiMain.
               Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres #Hireg Hdn Hsrc
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+    iPoseProof (SpecPrintk.printk_env_panic with "Hprkenv") as "#Hpanenv".
     iDestruct (CpuOwn.cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc Hbmres]" as "Hba".
     { rewrite /bm_alloc_res /A. iSplitR; [iPureIntro; exact Hgok|].
@@ -4741,7 +4746,7 @@ Section WriteiMain.
                       [ lia | left; reflexivity | intros Hpos; exfalso; lia ])
                 ltac:(apply uptd_ext_refl)
                 ltac:(lkbelow)
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                with "Hcg Hcnt Hextc Hextm Htext Hkdata Hpc Hpanic Hpanenv Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (b := true) (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)

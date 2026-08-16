@@ -1344,9 +1344,55 @@ Section IntrDefsBase.
       iApply (res_tmode root_ppn σ HSXL with "Hri Ht").
   Qed.
 
+  (* THE WITNESSED ARM (SRegime.v's [sr_kwit]/[sr_absorb_wit],
+     claude-notes/projects/sp-migration.md design §3): the slot's witness
+     pins its arm at KPT.  Mirrors [strans_absorb]'s case split -- the
+     Bare arm holds [strans_pending], which conflicts with the witness
+     [kpt_on cpu_id] by [kpt_on_pending_False]; the KPT arm delegates to
+     [res_absorb] exactly as [strans_absorb]'s right branch does. *)
+  Lemma strans_absorb_wit :
+    forall acc va pa (ppn : mword 44) (pc : kperm) σ (E : coPset), s_acc_ok acc ->
+      kperm_allows pc acc ->
+      neq_vec (bits_of_virtaddr (Virtaddr va))
+         (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+      zero_extend' 64 (concat_vec ppn
+          (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+      register_lookup misa σ.(sregs) = MISA_C ->
+      register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+      register_lookup htif_tohost_base σ.(sregs) = None ->
+      register_lookup cur_privilege σ.(sregs) = Supervisor ->
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+        = Some (Supervisor, σ) ->
+      exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+      pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+      ↑kptN ⊆ E ->
+      ⊢ kpt_on cpu_id -∗ kmap_at (svpn_of va) ppn pc -∗
+        reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ strans_inv ={E}=∗
+        ∃ σ' : mstate,
+          ⌜ exec (translateAddr (Virtaddr va) acc) σ
+            = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+          ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+          ⌜ (σ'.(sregs) = σ.(sregs) \/
+             exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+          ⌜ pmp_grant_facts σ' ⌝ ∗
+          reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ strans_inv.
+  Proof.
+    intros acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall HE.
+    iIntros "Hwit Hat Hri Hgh [(Hbit & Hb & Hstv) | (Hbit & Hk)]".
+    - iDestruct (kpt_on_pending_False with "Hwit Hbit") as %[].
+    - iDestruct "Hk" as (root_ppn) "Ht".
+      iMod (res_absorb root_ppn acc va pa ppn pc σ E Hacc Hallow Hcanon Hconcat Hmisa Hmenv Hhtif Hcp HSXL Heff Hss Hall I HE
+              with "Hat Hri Hgh Ht") as (σ') "(%Htr & %Hmdev & %Hsh & %Hpmp & Hri & Hgh & Ht)".
+      iModIntro. iExists σ'.
+      iSplit; [done |]. iSplit; [done |]. iSplit; [done |]. iSplit; [done |].
+      iFrame "Hri Hgh". iRight. iFrame "Hbit". iExists root_ppn. iExact "Ht".
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
-            strans_absorb strans_transform strans_tmode.
+            strans_absorb strans_transform strans_tmode
+            (kpt_on cpu_id) _ strans_absorb_wit.
 
   (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
      leaf/engine call sites use without unfolding the record. *)

@@ -41,6 +41,8 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.

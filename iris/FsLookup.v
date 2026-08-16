@@ -100,6 +100,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -580,8 +582,9 @@ Definition wp_dirlookup_tree_body
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY: the cells, and THE NODE FRAGMENT ---- *)
@@ -683,7 +686,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
   Proof.
     unfold wp_dirlookup_tree_body. cbv zeta.
     intros HK Hlg Hbwf Hbcov Hszb Hdio Hdisj Horph Hdpi Hj Hgs Ha0 Ha2 Heb Hlkb.
-    iIntros "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap Hfdir
+    iIntros "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap Hfdir
              Hname Hpoff Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
              Hitb2 Hitbl Hesc Hisl Hedges Hcont".
     iDestruct "Hfdir" as "(Hdiat & Hblocks & %Hrep)".
@@ -702,7 +705,7 @@ Module FsLookupTree (DL : DIRLOOKUP).
               pidv dq dqd dqn m K eb b lks
               HK (node_rep_T_DIR ents dn data Hrep) Hlg Hbwf Hbcov Hszb
               Hdio Hdisj Horph Htynz Hj Hgs Ha0 Ha2 Heb Hlkb
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv
+              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv
                     Hidev Hmeta Hmap Hblocks Hname Hpoff
                     Hppid Hprocs Hdev Hdgeom Hdlk Hbslot
                     Hitb2 Hitbl Hesc Hisl Hedges Hdiat").

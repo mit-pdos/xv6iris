@@ -86,6 +86,7 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import CodeInitlog.
+Require Import SpecPanic.
 Require Import SpecInitlock.
 Require Import SpecBread SpecBrelse.
 Require Import SpecInstallTrans SpecWriteHead.
@@ -295,7 +296,7 @@ Section ProofInitlog.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
     
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio #Hseam #Hcert Hmirf
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv #Hbio #Hseam #Hcert Hmirf
               Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
@@ -817,7 +818,7 @@ Section ProofInitlog.
               T3 (K - 6)%nat true b
               _ HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hs1u").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1085,7 +1086,7 @@ Section ProofInitlog.
               _ HKit Hgeomok Hj Hgl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
                     Hnil2 Hs2 [] []").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1197,7 +1198,7 @@ Section ProofInitlog.
               D2 (K - 6)%nat true b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
               _ HKwh Hgeomok Hj Hgl Hshape0
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpenv Hbio Hfroz Hppid Hprocs Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf]").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

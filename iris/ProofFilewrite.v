@@ -808,6 +808,7 @@ Require Import KallocInv.
 Require Import SchedCtx.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FileOff.
 Require Import FileInvDefs.
 (* THE FOUR CLASSES THAT ARE NOT WHERE THEY LOOK.  [diskGhostG],
@@ -944,9 +945,15 @@ Proof.
   - apply fw_neq_moi; [exact Ha | lia].
 Qed.
 
+(* filewrite's ELSE arm reaches [panic("filewrite")] with the frame already
+   pushed 12 slots deep; [ProofFilewriteParts.fw_panic] is the whole block. *)
+Lemma fw_panic_K (K : nat) :
+  (filewrite_stack <= K)%nat -> (panic_stack <= K - 12)%nat.
+Proof. lia. Qed.
+
 Module FilewriteProof (Pipewrite : PIPEWRITE) (Ilock : ILOCK) (Writei : WRITEI)
                       (Iunlock : IUNLOCK) (BeginOp : BEGIN_OP) (EndOp : END_OP)
-                      (Consolewrite : CONSOLEWRITE) : FILEWRITE.
+                      (Consolewrite : CONSOLEWRITE) (PN : PANIC) : FILEWRITE.
 
 Section ProofFilewrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -1572,6 +1579,7 @@ Section ProofFilewrite.
              Href Hpriv #Hkenv
              #Hbio #Hlog #Hcrash #Hgc #Hkd #Hpk #Hit #Hescs #Hireg
              #Hslks #Hdev #Hgeo #Hdlk Hout Hcont".
+    iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX.  Same one-liner as the contract's own proof below, and
        needed for the same reason: the body calls THREE [true]-crossing
        parking contracts (ilock, writei, end_op), whose chain facts are
@@ -1858,7 +1866,7 @@ Section ProofFilewrite.
               (* ilock's bound is "bcache"(4); fw_loop's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hit Hesc Hireg
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hit Hesc Hireg
                     Hslk2 Hshrl Hsbi Hppid Hprocs
                     Hdev Hgeo Hdlk Hbsl1").
     all: try lkbelow.
@@ -2351,7 +2359,7 @@ Section ProofFilewrite.
               pidv (DfracOwn (1/4)) X3 (K - 12)%nat eb b lks
               (fw_av_end_op K HK) P1 Hjp Hgsj
               Hbelow
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hcrash Hgc
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hcrash Hgc
                     Hppid Hprocs Hdev Hgeo Hdlk Hlogop").
     all: try lkbelow.
     { rewrite Heb /trap_csrs_ext. done. }
@@ -2689,7 +2697,7 @@ Section ProofFilewrite.
     cbv beta delta [wp_filewrite_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Hfnj Hfnps Ha0 Ha2 Hn Heb Hbelow.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpanic #Hpenv Href Hpriv Hkenv #Hprocs Henv Hcont".
     (* PIN THE INDEX.  This contract carries [eb = true ->] and [cpu_own] at
        level 0, so [cpu_own_eb_agree] forces [b] to be the literal [true].
        That is what reconciles the [true]-spelled crossings (this contract's
@@ -4206,9 +4214,14 @@ Section ProofFilewrite.
                        with "Hcg Hpc Hi2c").
              iApply bi.later_intro. iIntros (CID13 Hs13) "Hcg Hpc".
              iEval (rewrite Htgt10a) in "Hpc".
-             iApply (fw_panic (CID0 := CID13) G7 (K - 12)%nat sp0
-                       w3 w5 w6 w9 w10 w11 pj b HG7sp
-                       with "Hcg Htext Hpc Hpanic Hb3 Hb5 Hb6 Hb9 Hb10 Hb11").
+             (* [cpu_own] IS HART-INDEXED: the block states it at its own
+                [CID0], and the walk still holds the ENTRY hart's copy. *)
+             iDestruct (cpu_own_transport CID CID13 0%nat eb pj b
+                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
+             iApply (fw_panic (fun (h : CpuId) => PN.wp_panic_sconf (CID := h)) (CID0 := CID13) G7 (K - 12)%nat sp0
+                       w3 w5 w6 w9 w10 w11 pj eb b lks HG7sp
+                       (fw_panic_K K HK) Hbelow
+                       with "Hcg Hcnt Htext Hkd Hpc Hpenv Hb3 Hb5 Hb6 Hb9 Hb10 Hb11").
   Qed.
 
 End ProofFilewrite.

@@ -77,6 +77,8 @@ Require Import CpuOwn.
 Require Import SleepLock.   (* [is_sleeplock]: the nightly dead-import sweep re-pointed the chain that used to carry it *)
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import WpUart.
@@ -1072,6 +1074,8 @@ Section KexecAExit.
   (* =================================================================== *)
   Lemma fs_fabric_mk gs gu gd gk pd pav pu bn g gfs gi cn gtl
       cov logstart inodestart nib dev :
+    kernel_data -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
@@ -1088,9 +1092,11 @@ Section KexecAExit.
     fs_fabric gs gu gd gk pd pav pu bn g gfs gi cn gtl
               cov logstart inodestart nib dev.
   Proof.
-    iIntros "Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hprocs
+    iIntros "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv Hesc Hslks Hireg Hprocs
              Hdevi Hdgeom Hdlock".
     rewrite /fs_fabric.
+    iSplitL "Hkd"; [iExact "Hkd" |].
+    iSplitL "Hpenv"; [iExact "Hpenv" |].
     iSplitL "Hbio"; [iExact "Hbio" |].
     iSplitL "Hlogc"; [iExact "Hlogc" |].
     iSplitL "Hcrash"; [iExact "Hcrash" |].
@@ -1350,7 +1356,7 @@ Section KexecABad.
     (* depth 0 with interrupts on forces the held set empty, so iunlockput's
        order premise needs no hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     iDestruct (kxa_esc_acc cn gfs gi cov logstart k Hk with "Hesc") as "#Hesck".
@@ -1404,7 +1410,7 @@ Section KexecABad.
               B2 (K - 68)%nat true true lks
               ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
                     Hity Hkeep Hbm Hins Hbits Hppid Hprocs Hdevi Hdgeom Hdlock Hbs
                     Hlog").
@@ -1443,7 +1449,7 @@ Section KexecABad.
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
               true true lks ltac:(lia) Hlg Hjp Hgs
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
+              with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }

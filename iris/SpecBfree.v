@@ -75,6 +75,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -157,8 +159,9 @@ Definition wp_bfree_gen_body
      claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* sb.bmapstart, read once at +0x12 *)
@@ -289,8 +292,9 @@ Definition wp_bfree_sconf_body
      claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* sb.bmapstart, read once at +0x12 *)

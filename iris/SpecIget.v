@@ -173,7 +173,10 @@ Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import DiskPtsto.
+Require Import WpUart.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
@@ -191,7 +194,7 @@ Local Open Scope Z_scope.
 Notation K_iget := (58%nat) (only parsing).
 Definition wp_iget_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-      !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
@@ -202,7 +205,9 @@ Definition wp_iget_sconf_body
   let pcE : mword 64 := mword_of_int KernelSyms.iget in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_iget <= K)%nat ->
-  (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* [+3], not [+1]: iget's own [acquire] is one, and the LIVE panic arm
+     fires INSIDE that critical section, where printk takes two more. *)
+  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
   (* the requested inum is inside the inode region: [ipool_acc]'s premise on
      the recycle arm, and the ONLY constraint on either argument *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
@@ -216,7 +221,7 @@ Definition wp_iget_sconf_body
   locks_below lks "itable" ->
   sie_cap_gpr m K b p -∗
   cpu_own n eb p b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   (* the [ref] words *)
@@ -225,6 +230,10 @@ Definition wp_iget_sconf_body
   ic_escrows cn γfs γi cov logstart -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
   panic_wp_any -∗
+  (* ...and it is an ORDINARY CALL: [kernel_data] mints the literal and this
+     is the console bundle printk needs.  Note the arm fires while iget
+     HOLDS itable.lock, which is why "itable" ranks below "pr". *)
+  panic_env -∗
   (* THE precondition that makes the mint safe, on both arms *)
   iref_slot -∗
   (* THE LICENCE: borrowed here, returned below at the SAME [l] *)
@@ -246,7 +255,7 @@ Definition wp_iget_sconf_body
 Module Type IGET.
   Parameter wp_iget_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)

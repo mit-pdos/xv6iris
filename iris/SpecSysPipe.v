@@ -109,6 +109,7 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
+Require Import SpecPanic.
 Require Import SpecFdalloc.
 Require Import WpUart.
 Require Import DiskPtsto.
@@ -198,6 +199,7 @@ Definition wp_sys_pipe_sconf_body
   trap_csrs_ext eb -∗
   cpu_claim_ext eb p -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
+  panic_env -∗
   is_ftable γfl γf -∗
   (* the kmem lock, the sealed page count and panic's contract: pipealloc
      needs the allocator and copyout needs it again for vmfault, and every

@@ -133,6 +133,10 @@ Require Import DinodeEnc.
 Require Import DinodeSlot.
 Require Import CodeIlock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import WpUart.
+Require Import SpecPanic.
 Require Import SpecAcquiresleep SpecBread SpecBrelse SpecMemmove.
 Require Import SpecIlock.
 From Kernel Require KernelSyms.
@@ -260,7 +264,56 @@ Section IlockParts.
 End IlockParts.
 
 
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  ilock's one LIVE arm is [panic("ilock: no type")] *)
+(*  at +0xaa -- a FREE inode read off the disk; the literal sits at       *)
+(*  0x80007470 in .rodata, fourteen characters and a NUL.  (The OTHER     *)
+(*  panic, "ilock" at +0x22, is refuted from [ip <> 0] and needs nothing.) *)
+(*  NAMED pure lemmas, not inline [ltac:] -- see optimization.md.         *)
+(* ===================================================================== *)
+Definition il_msg_a : Z := 0x80007470.
+Definition il_msg : string := "ilock: no type".
+
+Lemma il_panic_K (K : nat) : (K_ilock <= K)%nat -> (panic_stack <= K - 4)%nat.
+Proof. lia. Qed.
+
+Lemma il_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+Lemma il_panic_below (lks : gset string) :
+  locks_below lks "bcache" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "bcache" "pr" H). vm_compute; lia. Qed.
+
+Lemma il_msg_nz : eq_vec (mword_of_int il_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma il_msg_nonul : PrintkFmt.nonul il_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma il_msg_bytes :
+  forall j b, cstring_bytes il_msg !! j = Some b ->
+    KernelData.kernel_data !! (il_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 15 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section IlockMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma il_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int il_msg_a : mword 64) ↦ₛ□ il_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string il_msg_a il_msg _ eq_refl
+              ltac:(unfold text_end, il_msg_a; lia) il_msg_bytes with "Hd").
+  Qed.
+End IlockMsg.
+
 Module IlockProof (ASL : ACQUIRESLEEP) (BR : BREAD) (MM : MEMMOVE) (BL : BRELSE)
+                  (PN : PANIC)
   : ILOCK.
 
 Notation Rra := (mword_of_int 1 : mword 5).
@@ -674,9 +727,10 @@ Section IlockLoad.
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x36) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     ireg_inv gi gfs inodestart nib -∗
     procs_inv gs -∗
@@ -729,7 +783,7 @@ Section IlockLoad.
     assert (HMs2 : M !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64))
       by (apply Hthr; iuidx).
     pose proof (il_thr6_of_5 m M Hthr) as Hthr6.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
               #Hdlock Hframe Hppid Hidev Hinumc Hsb Hsl
               Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]. *)
@@ -959,7 +1013,7 @@ Section IlockLoad.
               L7 (K - 4)%nat eb b
               _ HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1
               Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl").
     all: try lkbelow.
     iIntros (CID9 Hq9 mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1870,8 +1924,27 @@ Section IlockLoad.
                          (sign_extend' 64 (mword_of_int 2086260 : mword 21))
                        = mword_of_int KernelSyms.panic) by pcw.
       iEval (rewrite Htgtpn) in "Hpc".
-      iPoseProof (panic_wp_any_at CIDp4 with "Hpanic") as "Hpan".
-      iApply ("Hpan" with "Htext Hpc Hcg"). }
+      (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+         a0 holds &"ilock: no type"; [kernel_data] mints the literal.
+         [cpu_own] has to arrive AT THE PANIC HART (CIDp4), and its source
+         is brelse's continuation (CID33), not where brelse was called. *)
+      iPoseProof (il_msg_str with "Hkd") as "#Hstr".
+      iDestruct (cpu_own_transport CID33 CIDp4 0 eb (proc_addr j) b
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+      pose (PA3 := <[Regidx Rra := regval_into_reg
+                      (add_vec_int
+                         (mword_of_int (KernelSyms.ilock + 0xaa) : mword 64) 4)]> PA2).
+      assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int il_msg_a : mword 64))
+        by pcw.
+      iApply (PN.wp_panic_sconf (CID := CIDp4) PA3 (K - 4)%nat
+                0%nat eb b (proc_addr j) (PkAStr DfracDiscarded il_msg) lks
+                (il_panic_K K HK) eq_refl il_panic_noff
+                (il_panic_below lks Hbelow)
+                with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+      { rewrite /pk_desc_res Ha0msg.
+        iSplit; [iPureIntro; exact il_msg_nonul|].
+        iSplit; [iPureIntro; exact il_msg_nz|]. iExact "Hstr". } }
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
     iDestruct "Hal" as (fl bm data)
@@ -1997,7 +2070,7 @@ Section ProofIlockMain.
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (il_entry_nonzero k Hk)).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hitbl #Hesc #Hireg #Hslk
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hitbl #Hesc #Hireg #Hslk
               Href Hsb Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [il_epilogue]/[il_load]. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -2383,7 +2456,7 @@ Section ProofIlockMain.
                 pidv dq dqs m Q1 K eb b lks
                 HK HQ1sp HQ1thr HQ1s1 Hipe Hk Hgeom Hst Hcov Hinlt Hj Hgl
                 Hbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hireg Hprocs Hdevi Hdgeom
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hireg Hprocs Hdevi Hdgeom
                       Hdlock Hframe Hppid Hidev Hinumc Hsb
                       Hsl Hstok Hpid Hdep Hvalid Hraw Hpool Hpend Hcont").
   Qed.

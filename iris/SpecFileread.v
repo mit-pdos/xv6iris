@@ -144,10 +144,12 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
+Require Import KernelDataInv.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -695,8 +697,14 @@ Definition wp_fileread_sconf_body
   sie_cap_gpr m K b pj -∗
   (* noff = 0: everything below reaches sleep *)
   cpu_own 0%nat eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  (* WHAT THE DEFAULT ARM COSTS.  [f->type] outside {FD_PIPE, FD_DEVICE,
+     FD_INODE} reaches [panic("fileread")], and panic is an ordinary call:
+     the literal comes out of [kernel_data] and the console credentials
+     printk needs out of [panic_env].  Both are persistent and both are
+     already in every caller's hand, so neither costs the caller anything. *)
+  panic_env -∗
   (* the borrowed reference -- at an ARBITRARY fraction, and given back *)
   file_ref γf k q Cf -∗
   (* ambient, because three of the four arms copy into user memory *)

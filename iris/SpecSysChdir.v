@@ -110,6 +110,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -232,6 +233,7 @@ Definition wp_sys_chdir_sconf_body
   cpu_claim_ext eb pj -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   (* ---- the block layer ---- *)
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗

@@ -125,6 +125,8 @@ Require Import SpecWritei.
 Require Import SpecDirlookup.
 Require Import SpecDirlink.
 Require Import SpecNamex.
+Require Import SpecPanic.
+Require Import SpecPrintk.
 Require Import SpecNamei.
 Require Import SpecNameiparent.
 Require Import CodeSysLink.
@@ -729,6 +731,7 @@ Section ProofSysLinkBody.
     iIntros "Hcg Hown _ _ #Htext #Hdata Hpc #Hpanic #Hprk #Hbio #Hlog Hseam
              Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks
              #Hireg Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hir Hpriv Hcont".
+    iPoseProof (printk_env_panic with "Hprk") as "#Hpe".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
     { intro r. rewrite Hlkempty. apply locks_below_empty. }
@@ -1230,7 +1233,7 @@ Section ProofSysLinkBody.
                   ltac:(exact Kna) Hcdev Hcnib Hclog Hcist HdevR Hnib0 Hgeom
                   Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                   (sl_plen_lt pk1 Hpk1) (sl_bud_walk _) Hj Hgl Heb
-                  with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hkenv Hitab Hitinv
+                  with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hkenv Hitab Hitinv
                         Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                         Hbmres Hpidq Hcwd Hcwdref [Hbufk] Hbsl Hir2 HopS").
         { iEval (rewrite HQ2a0). iExact "Hbufk". }
@@ -1344,7 +1347,7 @@ Section ProofSysLinkBody.
                     R0 (K - 38)%nat eb b lks
                     ltac:(exact Kil) Hkk Hgeom Hist0 Hiblk Hinb Hj Hgl HR0a0
                     (Hlb "bcache"%string)
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hesck
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hitinv Hesck
                           Hireg Hslkk Hshr Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
           { rewrite Heb /trap_csrs_ext. done. }
           { rewrite Heb /cpu_claim_ext. done. }
@@ -1454,7 +1457,7 @@ Section ProofSysLinkBody.
                        Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                        (sl_regs_sp _ _ _ _ _ HR2regs)
                        (sl_regs_thr _ _ _ _ _ HR2regs) HR2s1 HR2s2 Hal
-                       with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                       with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                              Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep
                              Hidev Hiinum Hivalid Hload Hshot Hkeep Hsbb Hsbi
                              Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl [HopS]
@@ -1607,7 +1610,7 @@ Section ProofSysLinkBody.
                           Hiu1 Hj Hgl Hlkempty ltac:(reflexivity)
                           (sl_regs_sp _ _ _ _ _ HR5regs)
                           (sl_regs_thr _ _ _ _ _ HR5regs) HR5s1 HR5s2 Hal
-                          with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam
+                          with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam
                                 Hgen Hitab Hitinv Hesck Hireg Hslkk Hslkd Hslpid
                                 Hdep Hidev Hiinum Hivalid Hload Hshot Hkeep Hsbb
                                 Hsbi Hbmres Hpidq Hprocs Hdev Hgeo Hdlk Hbsl
@@ -1792,7 +1795,7 @@ Section ProofSysLinkBody.
                           Hnl
                           ltac:(rewrite /sl_incnl sl_setnl_addrs; exact Haddreq)
                           Hdirlen Hj Hgl HS2a0 Heb (Hlb "log"%string)
-                          with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hidev Hiinum
+                          with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hidev Hiinum
                                 Hmeta Hmap Hsbi Hireg Hdiat Hpidq Hprocs Hdev
                                 Hgeo Hdlk Hbs2 HopS").
                 iIntros (CID41 Hq41 miu)
@@ -1988,7 +1991,7 @@ Section ProofSysLinkBody.
                           Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb
                           Hpcstr2 (sl_plen_lt pk2 Hpk2)
                           ltac:(exact (sl_walk2_need _ w1 c1 Hu2)) Hj Hgl Heb
-                          with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hkenv Hitab
+                          with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hkenv Hitab
                                 Hitinv Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk
                                 Hsbb Hsbi Hbmres Hpidq Hcwd Hcwdref [Hbufw]
                                 [Hnm14] Hbsl Hir2 HopS").
@@ -2137,7 +2140,7 @@ Section ProofSysLinkBody.
                              U0 (K - 38)%nat eb b lks
                              ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl
                              HU0a0 (Hlb "bcache"%string)
-                             with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv
+                             with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hitinv
                                    Hescd Hireg Hslkd0 Hshrd Hsbi Hpidq Hprocs Hdev
                                    Hgeo Hdlk Hbs1d").
                    { rewrite Heb /trap_csrs_ext. done. }
@@ -2284,7 +2287,7 @@ Section ProofSysLinkBody.
                                (sl_regs_sp _ _ _ _ _ HUgregs)
                                (sl_regs_thr _ _ _ _ _ HUgregs) HUgs1 HUgs2 Hal
                                Hncd
-                               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam
+                               with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam
                                      Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
                                      Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
                                      Hslpidd
@@ -2656,7 +2659,7 @@ Section ProofSysLinkBody.
                                  (sl_regs_sp _ _ _ _ _ Hdlregs)
                                  (sl_regs_thr _ _ _ _ _ Hdlregs) Hdls1 Hdls2 Hal
                                  Hncd
-                                 with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam
+                                 with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam
                                        Hgen Hitab Hitinv Hesck Hescd Hireg Hslkk
                                        Hslkd0 Hkeep Hshr Hshot2 Hilink Hslkdd
                                        Hslpidd
@@ -2900,7 +2903,7 @@ Section ProofSysLinkBody.
                                       Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk
                                       Hdiblog Hdinb Hcovb Hiu3 Hj Hgl HW1a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog
                                             Hitab Hitinv Hescd Hireg Hslkd0 Hslkdd
                                             Hslpidd Hdepd Hidevd Hiinumd Hivalidd
                                             Hloadd Hshotd3 Hkeepd Hsbb Hsbi Hbmres
@@ -2985,7 +2988,7 @@ Section ProofSysLinkBody.
                                       Hbmlog Hist0 Hiblk Hiblog Hinb Hcovb Hiu4 Hj
                                       Hgl HW3a0
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog
                                             Hitab Hitinv Hesck Hireg Hslkk Hrefip
                                             Hsbb Hsbi Hbmres Hpidq Hprocs Hdev Hgeo
                                             Hdlk Hbsl [HopS]").
@@ -3031,7 +3034,7 @@ Section ProofSysLinkBody.
                                       (DfracOwn (1/4)) W4 (K - 38)%nat eb b lks
                                       ltac:(exact Keo) Hgeom Hj Hgl
                                       ltac:(rewrite Hlkempty; apply locks_below_empty)
-                                      with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog
                                             Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
                             { rewrite Heb /trap_csrs_ext. done. }
                             { rewrite Heb /cpu_claim_ext. done. }
@@ -3275,7 +3278,7 @@ Section ProofSysLinkBody.
                                       (sl_regs_sp _ _ _ _ _ Hdlregs)
                                       (sl_regs_thr _ _ _ _ _ Hdlregs) Hdls1 Hdls2 Hal
                                       Hncd
-                                      with "Hcg Hown Htext Hpc Hpanic Hbio Hlog
+                                      with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog
                                             Hseam Hgen Hitab Hitinv Hesck Hescd
                                             Hireg Hslkk Hslkd0 Hkeep Hshr Hshot2
                                             Hilink
@@ -3360,7 +3363,7 @@ Section ProofSysLinkBody.
                              (sl_regs_sp _ _ _ _ _ HT3regs)
                              (sl_regs_thr _ _ _ _ _ HT3regs)
                              (sl_regs_s1 _ _ _ _ _ HT3regs) Hal Hncd
-                             with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                             with "Hcg Hown Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                                    Hitab Hitinv Hesck Hireg Hslkk Hkeep Hshr
                                    Hshot2 Hilink Hsbb Hsbi Hbmres Hpidq Hprocs
                                    Hdev Hgeo
@@ -3409,7 +3412,7 @@ Section ProofSysLinkBody.
                     ltac:(reflexivity)
                     (sl_regs_sp _ _ _ _ _ HQ3regs) (sl_regs_thr _ _ _ _ _ HQ3regs)
                     HQ3s2 Hal
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                           Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
                           HbN HbW HbO
                           [Hbsl Hsbb Hsbi Hsbs Hbmres Hir1 Hir2b Hcwd Hcwdref

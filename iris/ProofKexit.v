@@ -84,6 +84,9 @@ Require Import BitmapInv DinodeEnc InodeInv.
 Require Import SpecFileclose SpecReparent SpecWakeup.
 Require Import SpecBeginOp SpecEndOp SpecIput.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
 Require Import SpecProcinit.
 Require Import SpecKexit.
 From Kernel Require KernelInstrs KernelSyms.
@@ -204,10 +207,57 @@ Definition kxt_regs (M : regfile) (pj sv : mword 64) : Prop :=
   M !!! Regidx (mword_of_int 20) = sv /\
   (forall r : regidx, r ∈ dom (rf_to_gmap M)).
 
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  kexit's live arm is [panic("init exiting")] at    *)
+(*  +0x34 -- initproc calling exit(); the literal sits at 0x80007200 in   *)
+(*  .rodata, twelve characters and a NUL.  NAMED pure lemmas, not inline  *)
+(*  [ltac:] -- see optimization.md and the panic recipe.                  *)
+(* ===================================================================== *)
+Definition kx_msg_a : Z := 0x80007200.
+Definition kx_msg : string := "init exiting".
+
+Lemma kx_panic_K (av : nat) : (K_kexit <= av)%nat -> (panic_stack <= av - 6)%nat.
+Proof. lia. Qed.
+
+Lemma kx_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+Lemma kx_panic_below (lks : gset string) :
+  locks_below lks "log" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
+
+Lemma kx_msg_nz : eq_vec (mword_of_int kx_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma kx_msg_nonul : PrintkFmt.nonul kx_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma kx_msg_bytes :
+  forall j b, cstring_bytes kx_msg !! j = Some b ->
+    KernelData.kernel_data !! (kx_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 13 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section KexitMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma kx_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int kx_msg_a : mword 64) ↦ₛ□ kx_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string kx_msg_a kx_msg _ eq_refl
+              ltac:(unfold text_end, kx_msg_a; lia) kx_msg_bytes with "Hd").
+  Qed.
+End KexitMsg.
+
 Module KexitProof (Myproc : MYPROC) (Fileclose : FILECLOSE)
                   (BeginOp : BEGIN_OP) (Iput : IPUT) (EndOp : END_OP)
                   (Acquire : ACQUIRE) (Reparent : REPARENT) (Wakeup : WAKEUP)
-                  (Release : RELEASE) (Sched : SCHED) : KEXIT.
+                  (Release : RELEASE) (Sched : SCHED) (PN : PANIC) : KEXIT.
 
 (* ===================================================================== *)
 (* The prologue.  No call in it, so [CID] can be a section variable.      *)
@@ -383,9 +433,10 @@ Section KexitLoop.
        iterations), and fileclose's own contract now needs [lks] below
        "ftable"'s rank (the lowest fileclose's callees ever touch). *)
     locks_below lks "log" ->
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     is_ftable γft γf -∗
     panic_wp_any -∗
+    panic_env -∗
     (* the exit continuation: control at [begin_op]'s call site, every
        descriptor null.
 
@@ -428,7 +479,7 @@ Section KexitLoop.
       WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.
-    iIntros "#Htext #Hft #Hpanic Hqexit".
+    iIntros "#Htext #Hkd #Hft #Hpanic #Hpe Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
                  ∀ (fd : nat) (M : regfile) (V : pprivate),
@@ -704,7 +755,7 @@ Section KexitLoop.
         { rewrite Hfnj Hfndq Hfnpid. iExact "Hpidq". }
         iApply (Fileclose.wp_fileclose_sconf (CID := CIDn)  γft γf kf q Cf fn onk usk M42 0 eb pj av b lks
                   ltac:(lia) ltac:(lia) HM42a0 Hfresh
-                  with "Hcg Hown Htce Hcce Htext Hpc Hft Hpanic Href Hfcenv").
+                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hft Hpanic Hpe Href Hfcenv").
         all: try lkbelow.
         iIntros (CIDo Hso mr) "Hcg Hown Htce Hcce Hpc %Hcs Hfdslot Hout".
         iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
@@ -1385,8 +1436,8 @@ Section KexitRest.
        and give it back, and all three cross at the literal [true]. *)
     trap_csrs_ext eb -∗
     cpu_claim_ext eb pj -∗
-    kernel_text -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
-    procs_inv γs -∗ panic_wp_any -∗
+    kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
+    procs_inv γs -∗ panic_wp_any -∗ panic_env -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1414,7 +1465,7 @@ Section KexitRest.
     intros pj Hj Hgl Hav Hgeom Hregs Hof Hcdev Hcnib
            Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb Hfresh.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
-    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl".
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanic #Hpanenv #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
     iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hslks Hsbb Hsbi Hbmres".
     iIntros "Hinit Hsp Hir Hpriv".
@@ -1542,7 +1593,7 @@ Section KexitRest.
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl
               ltac:(rewrite HQ2a0; exact Hipe)
               Hfresh
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hitab Hitinv Hescrow
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpanenv Hbio Hlog Hitab Hitinv Hescrow
                     Hireg Hslk Href Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop").
     all: try lkbelow.
@@ -1590,7 +1641,7 @@ Section KexitRest.
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av eb b lks
               ltac:(lia) Hgeom Hj Hgl
               Hfresh_log
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
+              with "Hcg Hown Htce Hcce Htext Hkd Hpc Hpanic Hpanenv Hbio Hlog Hseam Hgen Hpidq Hprocs Hdev Hgeo Hdlk Hop").
     all: try lkbelow.
     iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
@@ -1679,7 +1730,7 @@ Section ProofKexit.
     cbv beta delta [wp_kexit_sconf_body].
     intros pcE pj Hfn Hj Hgl HK Hgeom Hfresh. subst fn.
     
-    iIntros "Hcg Hown Htce Hcce #Htext Hpc #Hprocs #Hpanic #Hwl #Hft".
+    iIntros "Hcg Hown Htce Hcce #Htext #Hkd Hpc #Hprocs #Hpanic #Hpanenv #Hwl #Hft".
     iIntros "#Hkmem Hav0".
     iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl #Hicenv Hbm".
     iIntros "Hinit Hsp Hir Hpriv".
@@ -1896,8 +1947,27 @@ Section ProofKexit.
                        (sign_extend' 64 (mword_of_int 2090964 : mword 21)) = mword_of_int KernelSyms.panic)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjpn) in "Hpc".
-      iPoseProof (panic_wp_any_at CIDB with "Hpanic") as "Hpw".
-      iApply ("Hpw" with "Htext Hpc Hcg").
+      (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+         a0 holds &"init exiting"; [kernel_data] mints the literal, and
+         [cpu_own] has to arrive AT THE PANIC HART (CIDB) -- its source is
+         myproc's continuation (CID2), not where myproc was called. *)
+      iPoseProof (kx_msg_str with "Hkd") as "#Hstr".
+      iDestruct (cpu_own_transport CID2 CIDB 0 eb pj b
+                   ltac:(wp_next_chain) with "Hown") as "Hown".
+      (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+      pose (B2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
+                      (add_vec_int (mword_of_int (KX + 0x34) : mword 64) 4)]> B1).
+      assert (Ha0msg : B2 !!! Regidx (mword_of_int 10 : mword 5)
+                       = (mword_of_int kx_msg_a : mword 64))
+        by (apply bv_eq; vm_compute; reflexivity).
+      iApply (PN.wp_panic_sconf (CID := CIDB) B2 (av - 6)%nat
+                0%nat eb b pj (PkAStr DfracDiscarded kx_msg) lks
+                (kx_panic_K av HK) eq_refl kx_panic_noff
+                (kx_panic_below lks Hfresh)
+                with "Hcg Hown Htext Hkd Hpc Hpanenv [Hstr]").
+      { rewrite /pk_desc_res Ha0msg.
+        iSplit; [iPureIntro; exact kx_msg_nonul|].
+        iSplit; [iPureIntro; exact kx_msg_nz|]. iExact "Hstr". }
     - (* the ordinary path: into the fd loop at +0x3e *)
       assert (Htaken : neq_vec (rget (CID := CID7) A5 (mword_of_int 15 : mword 5))
                                (rget (CID := CID7) A5 (mword_of_int 10 : mword 5)) = true).
@@ -1981,7 +2051,7 @@ Section ProofKexit.
                     (av - 6)%nat eb b lks Hj eq_refl eq_refl eq_refl
                     ltac:(lia)
                     Hfresh
-                    with "Htext Hft Hpanic") as "Hloop".
+                    with "Htext Hkd Hft Hpanic Hpanenv") as "Hloop".
       iSpecialize ("Hloop" with "[Hinit Hsp Hir Hframe]").
       { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Htce Hcce Hpc Hpriv Hpenv Hfenv".
         iDestruct "Hfenv" as (usx) "Hfenv".
@@ -2001,7 +2071,7 @@ Section ProofKexit.
                   Hj Hgl ltac:(lia) Hgeom Hxregs Hxof
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
                   ltac:(lkbelow)
-                  with "Hcg Hown Htce Hcce Htext Hpc Hprocs Hpanic Hwl
+                  with "Hcg Hown Htce Hcce Htext Hkd Hpc Hprocs Hpanic Hpanenv Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hslks Hsbb Hsbi Hbmres
                         Hinit Hsp Hir Hpriv"). }

@@ -76,6 +76,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import SpecProcinit.   (* [wait_lock_addr] *)
 Require Import SpecKexit.      (* [K_kexit] -- the budget this one is built on *)
 From Kernel Require KernelSyms.
@@ -136,6 +137,7 @@ Definition wp_sys_exit_sconf_body
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗
   panic_wp_any -∗
+  panic_env -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

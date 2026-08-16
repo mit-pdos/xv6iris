@@ -1361,6 +1361,7 @@ Section ProofDirlinkMain.
               Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi Hsbs Hsbb Hbmr
               #Hiregi Hdat Hppid #Hprocs #Hdev #Hgeom #Hdlk Hbsl
               #Hitb2 #Hitbl #Hesc #Hslks Hislot Hlinks Hop Hcont".
+    iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
     (* PIN THE INDEX.  This contract still carries [eb = true ->], and at
        level 0 [cpu_own_eb_agree] gives [eb = b], so [b] IS the literal
        [true] here.  The crossings below are the literal [true] (this
@@ -1801,7 +1802,7 @@ Section ProofDirlinkMain.
               HR7a0
               ltac:(cbn [negb]; rewrite HR7a2 dlk_zero_moi; exact (eq_vec_refl _))
               Heb
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+              with "Hcg Hcnt Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
                     Hblocks Hnm [] Hppid Hprocs Hdev Hgeom Hdlk Hbs1
                     Hitb2 Hitbl Hesc Hislot Hlinks Hdat").
     all: try lkbelow.
@@ -1893,7 +1894,7 @@ Section ProofDirlinkMain.
                 Hcblk Hcblog Hinb Hcovb ltac:(exact (dl_3le _ _ ncount Hnc)) Hj Hgs
                 HE1a0
                 Hbelow
-                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlog Hitb2 Hitbl Hesck
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hitb2 Hitbl Hesck
                       Hiregi Hslk Href Hsbb Hsbi Hbmr Hppid Hprocs Hdev Hgeom
                       Hdlk Hbsl [] Hop").
       all: try lkbelow.
@@ -3005,7 +3006,7 @@ Section ProofDirlinkMain.
                     (* readi's own floor is "bcache"(4); dirlink's is
                        "itable"(2), and [locks_below_mono] weakens it. *)
                     ltac:(lkbelow)
-                    with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
+                    with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hkenv Hidev Hmeta Hmap
                           Hblocks Hdst Hprocs Hdev Hgeom Hdlk Hbs1").
           all: try lkbelow.
           { rewrite Heb /trap_csrs_ext. done. }
@@ -3098,7 +3099,6 @@ Section ProofDirlinkMain.
                arm was entered on. *)
 
             iPoseProof (dl_msg_str with "Hkd") as "#Hstr".
-            iPoseProof (printk_env_panic with "Hpk") as "#Hpenv".
             iDestruct (cpu_own_transport CIDrd CIDpa4 0%nat eb (proc_addr j) b
                          ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".
             (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE.  [wp_jal_s_sconf]

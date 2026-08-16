@@ -96,6 +96,8 @@ Require Import IcacheEscrow.
 Require Import CodeFsinit.
 Require Import SpecBread SpecBrelse SpecMemmove.
 Require Import SpecInitlog SpecIreclaim.
+Require Import SpecPrintk.
+Require Import SpecPanic.
 Require Import SpecFsinit.
 From Kernel Require KernelSyms.
 Require Import ProcAvail.
@@ -580,6 +582,7 @@ Section FsinitMain.
               Hlock0 Hlname Hlcpu Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk
               HauthL HauthD Hdirty Hhdr Hlslots Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hiref Hcont".
+    iPoseProof (printk_env_panic with "Hpenv") as "#Hpanenv".
     iAssert (fsi_cont (CID0 := CID) γfs bn cov logstart bmapstart inodestart
                ninodes size used dev v_magic v_size v_nblocks v_nlog bs_sb
                pidv dq j m K b lks)%I with "[Hcont]" as "Hcont";
@@ -800,7 +803,7 @@ Section FsinitMain.
               (* bread's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt [] [] Htext Hkdata Hpc Hpanic Hpanenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     { rewrite /trap_csrs_ext. done. }
@@ -1391,7 +1394,7 @@ Section FsinitMain.
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hbio Hseam Hgen Hmirror
+              with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpanenv Hbio Hseam Hgen Hmirror
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hls Hlock0 Hlname Hlcpu
                     Hlstart Hldev Hlout Hlcmt Hlnc Hlhn Hlhblk HauthL HauthD
                     Hdirty Hhdr Hlslots Hsl34").

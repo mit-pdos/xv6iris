@@ -32,9 +32,9 @@ Require Import LinkMyproc LinkBeginOp LinkNamei LinkIlock LinkReadi
         LinkIunlockput LinkEndOp LinkProcPagetable LinkProcFreepagetable
         LinkWalkaddr LinkFlags2perm LinkUvmalloc LinkUvmclear LinkStrlen
         LinkCopyout LinkSafestrcpy
-        ProofKexec.
+        LinkPanic ProofKexec.
 
 Module Kexec := KexecProof Myproc BeginOp Namei Ilock Readi Iunlockput EndOp
                            ProcPagetableGen ProcFreepagetable Walkaddr
                            Flags2perm Uvmalloc Uvmclear Strlen Copyout
-                           Safestrcpy.
+                           Safestrcpy Panic.

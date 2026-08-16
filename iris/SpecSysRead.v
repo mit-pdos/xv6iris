@@ -150,6 +150,7 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -296,6 +297,10 @@ Definition wp_sys_read_sconf_body
   (* fileread itself never panics on a well-typed file; its default arm and
      its callees do, and this is theirs *)
   panic_wp_any -∗
+  (* fileread's default arm calls [panic("fileread")], which is an ordinary
+     call: [kernel_data] above mints the literal, and this is the console
+     bundle printk needs.  Persistent, and syscall already holds it. *)
+  panic_env -∗
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗

@@ -79,6 +79,14 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import WpUart.
+Require Import DiskPtsto.
+Require Import WpLock.
+Require Import SpecPanic.
+Require Import CpuOwn.
+Require Import LockRank.
 Require Import IcacheRef.
 Require Import CodeFilewrite.
 Require Import ProofFilereadParts.
@@ -87,6 +95,53 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 Notation FW := KernelSyms.filewrite (only parsing).
+
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  filewrite's one live arm is [panic("filewrite")]  *)
+(*  at +0x11e -- the ELSE of the type dispatch; the literal sits at       *)
+(*  0x800075a8 in .rodata, nine characters and a NUL.  Hoisted as NAMED   *)
+(*  pure lemmas rather than inline [ltac:] -- see optimization.md, and    *)
+(*  the panic recipe's third trap ([lia]/[lkbelow] against an evar).      *)
+(* ===================================================================== *)
+Definition fw_msg_a : Z := 0x800075a8.
+Definition fw_msg : string := "filewrite".
+
+Lemma fw_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+(* "log" (rank 1) is below "pr" (16).  A CLOSED lemma over the plain gset,
+   not an inline [ltac:(lkbelow)]. *)
+Lemma fw_panic_below (lks : gset string) :
+  locks_below lks "log" -> locks_below lks "pr".
+Proof. intros H. apply (locks_below_mono lks "log" "pr" H). vm_compute; lia. Qed.
+
+Lemma fw_msg_nz : eq_vec (mword_of_int fw_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fw_msg_nonul : PrintkFmt.nonul fw_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma fw_msg_bytes :
+  forall j b, cstring_bytes fw_msg !! j = Some b ->
+    KernelData.kernel_data !! (fw_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 10 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section FilewriteMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma fw_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int fw_msg_a : mword 64) ↦ₛ□ fw_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string fw_msg_a fw_msg _ eq_refl
+              ltac:(unfold text_end, fw_msg_a; lia) fw_msg_bytes with "Hd").
+  Qed.
+End FilewriteMsg.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE 96-BYTE FRAME                                                      *)
@@ -1190,22 +1245,44 @@ Section ProofFilewriteParts.
   (* =================================================================== *)
   (*  +0x10a .. +0x11e -- THE ELSE ARM.  panic("filewrite").              *)
   (*                                                                      *)
-  (*  A COMPLETE arm, not a fragment: [SpecPanic.panic_wp_any] closes it,  *)
-  (*  and panic never returns, so there is nothing after the [jal].  gcc   *)
-  (*  emitted the six shrink-wrapped spills here too (the arm is laid out  *)
-  (*  after the returns), which is why the block consumes six frame slots  *)
-  (*  and gives nothing back.  Decode note 3: this is the ELSE arm -- the  *)
-  (*  type is none of FD_PIPE / FD_DEVICE / FD_INODE -- and NOT a          *)
-  (*  short-write panic.                                                   *)
+  (*  A COMPLETE arm, not a fragment: panic never returns, so there is     *)
+  (*  nothing after the [jal].  gcc emitted the six shrink-wrapped spills  *)
+  (*  here too (the arm is laid out after the returns), which is why the   *)
+  (*  block consumes six frame slots and gives nothing back.  Decode note  *)
+  (*  3: this is the ELSE arm -- the type is none of FD_PIPE / FD_DEVICE / *)
+  (*  FD_INODE -- and NOT a short-write panic.                             *)
+  (*                                                                       *)
+  (*  panic() IS AN ORDINARY CALL.  This file is a plain [Section], not a  *)
+  (*  functor, so the contract arrives as a [Hypothesis] on the nested     *)
+  (*  section below and only THIS lemma gains an argument; ProofFilewrite  *)
+  (*  supplies it from its own [(PN : PANIC)].                             *)
   (* =================================================================== *)
-  Lemma fw_panic `{GEN : GenId} `{CID0 : CpuId}
+  Section FwPanicArm.
+    Context `{!lockG Σ, !uartGhostG Σ, !diskGhostG Σ}.
+    Context `{GEN : GenId}.
+
+    (* CID is EXPLICIT here, unlike [PANIC]'s own [`{CID : CpuId}]: a
+       maximally-inserted implicit is instantiated the moment the constant
+       is named, so [PN.wp_panic_sconf] passed as an argument would arrive
+       already pinned at one hart.  The call site eta-expands. *)
+    Hypothesis wp_panic_sconf :
+      forall (CID : CpuId) (m : regfile) (K : nat)
+        (n : nat) (eb : bool) (b : bool) (p : mword 64)
+        (dm : pk_arg_desc) (lks : gset string),
+        wp_panic_sconf_body (CID := CID) m K n eb b p dm lks.
+
+  Lemma fw_panic `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
-      (u3 u5 u6 u9 u10 u11 : mword 64) (p : mword 64) (b : bool) :
+      (u3 u5 u6 u9 u10 u11 : mword 64) (p : mword 64) (eb b : bool)
+      (lks : gset string) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 12 ->
+    (panic_stack <= K)%nat ->
+    locks_below lks "log" ->
     sie_cap_gpr Mt K b p -∗
-    kernel_text -∗
+    cpu_own 0%nat eb p b lks -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (FW + 0x10a) : mword 64) -∗
-    panic_wp_any -∗
+    panic_env -∗
     word_pointsto (pa_stk sp0 3) (DfracOwn 1) u3 -∗
     word_pointsto (pa_stk sp0 5) (DfracOwn 1) u5 -∗
     word_pointsto (pa_stk sp0 6) (DfracOwn 1) u6 -∗
@@ -1214,8 +1291,8 @@ Section ProofFilewriteParts.
     word_pointsto (pa_stk sp0 11) (DfracOwn 1) u11 -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hmtsp.
-    iIntros "Hcg #Htext Hpc #Hpanic Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
+    intros Hmtsp HK Hbelow.
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hpenv Hb3 Hb5 Hb6 Hb9 Hb10 Hb11".
     iPoseProof (fwri_10a with "Htext") as "Hi10a".
     iPoseProof (fwri_10c with "Htext") as "Hi10c".
     iPoseProof (fwri_10e with "Htext") as "Hi10e".
@@ -1325,9 +1402,31 @@ Section ProofFilewriteParts.
               = mword_of_int KernelSyms.panic)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpanic) in "Hpc".
-    iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpanic0".
-    iApply ("Hpanic0" with "Htext Hpc Hcg").
+    (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+       a0 holds &"filewrite"; [kernel_data] mints the literal and
+       [panic_env] is the console bundle printk needs.  [cpu_own] has to
+       arrive AT THE PANIC HART (CID9), not at the one the block was
+       entered on. *)
+    iPoseProof (fw_msg_str with "Hkd") as "#Hstr".
+    iDestruct (cpu_own_transport CID0 CID9 0%nat eb p b
+                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE: [wp_jal_s_sconf]
+       hands back [sie_cap_gpr (<[rd := pc+4]> m)], so passing [P2] makes
+       the unifier grind on [P2 =?= <[Rra := _]> P2] and never return. *)
+    pose (P3 := <[Regidx Rra := regval_into_reg
+                   (add_vec_int (mword_of_int (FW + 0x11e) : mword 64) 4)]> P2).
+    assert (Ha0msg : P3 !!! Regidx Ra0 = (mword_of_int fw_msg_a : mword 64))
+      by (apply bv_eq; vm_compute; reflexivity).
+    iApply (wp_panic_sconf CID9 P3 K
+              0%nat eb b p (PkAStr DfracDiscarded fw_msg) lks
+              HK eq_refl fw_panic_noff (fw_panic_below lks Hbelow)
+              with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+    { rewrite /pk_desc_res Ha0msg.
+      iSplit; [iPureIntro; exact fw_msg_nonul|].
+      iSplit; [iPureIntro; exact fw_msg_nz|]. iExact "Hstr". }
   Qed.
+
+  End FwPanicArm.
 
   (* =================================================================== *)
   (*  +0xf4 .. the epilogue -- THE FD_INODE ARM'S WHOLE TAIL.             *)

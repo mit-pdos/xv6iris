@@ -701,6 +701,7 @@ Section ProofSysUnlinkBody.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int KernelSyms.sys_unlink) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
@@ -819,7 +820,7 @@ Section ProofSysUnlinkBody.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
     set (sp0 := m !!! Regidx csp_rs1 : mword 64).
-    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hpenv2 #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg
              Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hir Hpriv Hseamk Hcont".
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
@@ -1188,7 +1189,7 @@ Section ProofSysUnlinkBody.
                 Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hpcstr1
                 (proj2 (su_len_range pk1 Hpk1))
                 ltac:(exact (su_walk_need_closes _)) Hj Hgl Heb
-                with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hkenv Hitab Hitinv
+                with "Hcg Hown Htext Hdata Hpc Hpanic Hpenv2 Hbio Hlog Hkenv Hitab Hitinv
                       Hescrows Hslks Hireg Hprocs Hdev Hgeo Hdlk Hsbb Hsbi
                       Hbmres Hpidq Hcwd Hcwdref [Hbufp] [Hnm14] Hbsl Hir
                       HopS").
@@ -1318,7 +1319,7 @@ Section ProofSysUnlinkBody.
                   m N4 sp0 K eb b lks u4 u5 u6 u27 u30 bd0 bnf bpf be0
                   ltac:(exact Keo) K30 Kpop Hgeom Hj Hgl Hlkempty
                   ltac:(reflexivity) HN4sp HN4thr HN4s2 HN4s3 Hal
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                  with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpenv2 Hbio Hlog Hseam Hgen
                         Hpidq Hprocs Hdev Hgeo Hdlk [HopS] Hf1 Hf2 Hf3 Hf4
                         Hf5 Hf6 HbD HbNj HbPj H27 HbE H30
                         [Hcont Hbsl Hsbb Hsbi Hsbs Hbmres Hir2 Hcwd Hpback
@@ -1455,8 +1456,9 @@ Section ProofSysUnlinkBody.
     uptd_ext (pv_upt V) P1 ->
     sie_cap_gpr M (K - 30) b (proc_addr jx) -∗
     cpu_own 0 eb (proc_addr jx) b lks -∗
-    kernel_text -∗ pc_is (mword_of_int (SU + 0x15a)) -∗
+    kernel_text -∗ kernel_data -∗ pc_is (mword_of_int (SU + 0x15a)) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
@@ -1527,7 +1529,7 @@ Section ProofSysUnlinkBody.
     intros HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblk
            Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr HMs1 HMs2
            HMs3 Hal Heb Hupt1.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
+    iIntros "Hcg Hown #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlog Hseam Hgen #Hitab #Hitinv
              #Hesck #Hireg #Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
              #Hshot Hkeep Hsbb Hsbi Hsbs Hbmres Hpidq Hpre #Hprocs #Hdev #Hgeo
              #Hdlk Hbsl Hir Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27
@@ -1541,7 +1543,7 @@ Section ProofSysUnlinkBody.
               HKup HKeo HK30 Kpop Hkk Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0
               Hiblk Hiblog Hinb Hcovb Hiu Hj Hgl Hlkempty Hsp0 HMsp HMthr
               HMs1 HMs2 HMs3 Hal
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hitab
+              with "Hcg Hown [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen Hitab
                     Hitinv Hesck Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum
                     Hivalid Hload Hshot Hkeep Hsbb Hsbi Hbmres Hpidq Hprocs
                     Hdev Hgeo Hdlk Hbsl Hop Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD HbNj
@@ -1635,6 +1637,7 @@ Section ProofSysUnlinkBody.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (SU + 0x30)) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
     log_ctx g bn gfs cov logstart dev -∗
     fs_crash_seam cov logstart -∗
@@ -1790,7 +1793,7 @@ Section ProofSysUnlinkBody.
            Hcovb Hiregb Hj Hgl Heb Hsp0 Hal Hregs Hma0 Hn1 Hupt1.
     destruct (su_kb K HK) as (Knp & Kdl & Kre & Kwr & Kar & Kbo & Keo & Kil
                               & Kiupd & Kiup & Knc & K2 & K10 & K30 & Kpop).
-    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hbio #Hlog Hseam Hgen
+    iIntros "Hcg Hown #Htext #Hdata Hpc #Hpanic #Hpenv2 #Hbio #Hlog Hseam Hgen
              #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows #Hslks #Hireg
              Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hir Hpriv Hheld HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30
@@ -1874,7 +1877,7 @@ Section ProofSysUnlinkBody.
               gyd dev dinum pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
               ltac:(exact Kil) Hkd Hgeom Hist0 Hdiblk Hdinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hescd Hireg
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpenv2 Hbio Hitinv Hescd Hireg
                     Hslkd0 Hshrd Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -2021,7 +2024,7 @@ Section ProofSysUnlinkBody.
                 ltac:(rewrite (su_regs_s1 _ _ _ _ _ _ Hn1regs); exact Hdpe)
                 (su_regs_s2 _ _ _ _ _ _ Hn1regs)
                 (su_regs_s3 _ _ _ _ _ _ Hn1regs) Hal Heb Hupt1
-                with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hitab
+                with "Hcg Hown Htext Hdata Hpc Hpanic Hpenv2 Hbio Hlog Hseam Hgen Hitab
                       Hitinv Hescd Hireg Hslkd0 Hslkdd Hslpid Hdep Hidev
                       Hiinum Hivalid Hload Hshotl Hkeepd Hsbb Hsbi Hsbs
                       Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
@@ -2177,7 +2180,7 @@ Section ProofSysUnlinkBody.
                   ltac:(rewrite (su_regs_s1 _ _ _ _ _ _ Hn2regs); exact Hdpe)
                   (su_regs_s2 _ _ _ _ _ _ Hn2regs)
                   (su_regs_s3 _ _ _ _ _ _ Hn2regs) Hal Heb Hupt1
-                  with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hitab
+                  with "Hcg Hown Htext Hdata Hpc Hpanic Hpenv2 Hbio Hlog Hseam Hgen Hitab
                         Hitinv Hescd Hireg Hslkd0 Hslkdd Hslpid Hdep Hidev
                         Hiinum Hivalid Hload Hshotl Hkeepd Hsbb Hsbi Hsbs
                         Hbmres Hpidq Hpre Hprocs Hdev Hgeo Hdlk
@@ -2352,7 +2355,7 @@ Section ProofSysUnlinkBody.
                   ltac:(cbn [negb]; apply (proj2 (eq_vec_false_iff _ _));
                         exact Hoffnz)
                   Heb (Hlb "bcache"%string)
-                  with "Hcg Hown Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta
+                  with "Hcg Hown Htext Hdata Hpc Hpanic Hpenv2 Hbio Hkenv Hidev Hmeta
                         [Haddrs Hind] Hblocks [Hnm14] [H27hi] Hpidq Hprocs
                         Hdev Hgeo Hdlk Hbs1 Hitab Hitinv Hescrows Hislot
                         Hdlnk Hdiat").
@@ -2504,7 +2507,7 @@ Section ProofSysUnlinkBody.
                     Kiup Keo K30 Kpop Hkd Hgeom Hsize Hbm0 Hbmcov Hbmlog
                     Hist0 Hdiblk Hdiblog Hdinb Hcovb Hiu Hj Hgl Hlkempty
                     Hsp0 HR13sp HR13thr HR13s1 HR13s3 Hal
-                    with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                    with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpenv2 Hbio Hlog Hseam Hgen
                           Hitab Hitinv Hescd Hireg Hslkd0 Hslkdd Hslpid Hdep
                           Hidev Hiinum Hivalid Hload Hshotl Hkeepd Hsbb Hsbi
                           Hbmres Hpidq Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2]
@@ -2865,7 +2868,7 @@ Section ProofSysUnlinkBody.
               ltac:(rewrite HN6a4;
                     apply (rd_arg32_small 16); vm_compute; reflexivity)
               (Hlb "bcache"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta
+              with "Hcg Hown [] [] Htext Hkd Hpc Hpanic Hpe Hbio Hkenv Hidev Hmeta
                     Hmap Hblocks [Hbuf Hpidq] Hprocs Hdev Hgeo Hdlk Hbslot").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -3761,7 +3764,7 @@ Section ProofSysUnlinkBody.
               pid (DfracOwn (1/4)) dqs R0 (K - 30)%nat eb b lks
               ltac:(exact Kil) Hks Hgeom Hist0 Hiblki Hinb Hj Hgl HR0a0
               (Hlb "bcache"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hitinv Hesci Hireg
+              with "Hcg Hown [] [] Htext Hkd Hpc Hpanic Hpe Hbio Hitinv Hesci Hireg
                     Hslki Hshri Hsbi Hpidq Hprocs Hdev Hgeo Hdlk Hbs1").
     { rewrite Heb /trap_csrs_ext. done. }
     { rewrite Heb /cpu_claim_ext. done. }
@@ -3978,7 +3981,7 @@ Section ProofSysUnlinkBody.
                   Kiup Keo K30 Kpop Hkd Hks Hgeom Hsize Hbm0 Hbmcov Hbmlog
                   Hist0 Hdiblk Hdiblog Hdinb Hiblki Hiblogi Hinb Hcovb Hiu2
                   Hj Hgl Hlkempty Hsp0 HMxsp HMxthr HMxs1 HMxs2 Hal
-                  with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+                  with "Hcg Hown [] [] Htext Hkd Hpc Hpanic Hpe Hbio Hlog Hseam Hgen
                         Hitab Hitinv Hescd Hesci Hireg Hslkd Hslkdq Hslpidd
                         Hdepd Hidevd Hiinumd Hivalidd Hloadd Hshotd Hkeepd
                         Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi Hivalidi
@@ -4283,6 +4286,7 @@ Section ProofSysUnlinkBody.
              Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hkeepi HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
+    iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq. cbn in Hbeq.
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -4998,7 +5002,7 @@ Section ProofSysUnlinkBody.
               ltac:(intros _; exact Hibd16)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hkeepd Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbsl [] HopS").
@@ -5163,7 +5167,7 @@ Section ProofSysUnlinkBody.
               ltac:(exact Hdecr)
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hidevi Hiinumi Hmetai
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hidevi Hiinumi Hmetai
                     [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket] [] Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsi Hindi". }
@@ -5291,7 +5295,7 @@ Section ProofSysUnlinkBody.
               Kiup Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hkeepi Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
@@ -5342,7 +5346,7 @@ Section ProofSysUnlinkBody.
               g gfs cov logstart dev n3 pid (DfracOwn (1/4)) E3 (K - 30)%nat
               eb b lks Keo Hgeom Hj Hgl
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hseam Hgen
                     Hpidq Hprocs Hdev Hgeo Hdlk [HopS]").
     { rewrite /log_op. iExists Sb3. iExact "HopS". }
     iIntros (D32 Hd32 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
@@ -5728,6 +5732,7 @@ Section ProofSysUnlinkBody.
              Hdiati Hmetai Haddrsi Hindi Hblocksi #Hshoti Hkeepi HopS
              Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27lo H27hi HbE H30
              Hcont".
+    iPoseProof (printk_env_panic with "Hprenv") as "#Hpanenv".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbeq. cbn in Hbeq.
     iDestruct (cpu_own_zero_empty with "Hown") as "[%Hlkempty Hown]".
     assert (Hlb : forall r : string, locks_below lks r).
@@ -6706,7 +6711,7 @@ Section ProofSysUnlinkBody.
               ltac:(rewrite su_setnl_addrs; exact Haddr'v)
               ltac:(exact (blkmap_wf_dir_len cov logstart bm' Hwf'))
               Hj Hgl HG4a0 Heb (Hlb "log"%string)
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hidevd Hiinumd Hmetad
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hidevd Hiinumd Hmetad
                     [Haddrsd Hindd] Hsbi Hireg [Hdiatd] [Hticket2] [] Hpidq
                     Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsd Hindd". }
@@ -6814,7 +6819,7 @@ Section ProofSysUnlinkBody.
               Kiup Hkd Hcrbd2 Hcrud2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
               Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hkeepd Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
@@ -6989,7 +6994,7 @@ Section ProofSysUnlinkBody.
               ltac:(exact Hdecr)
               ltac:(rewrite su_setnl_addrs; exact Haddri)
               Hdirleni Hj Hgl HC9a0 Heb (Hlb "log"%string)
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hidevi Hiinumi Hmetai
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hidevi Hiinumi Hmetai
                     [Haddrsi Hindi] Hsbi Hireg Hdiati [Hticket Hipar] []
                     Hpidq Hprocs Hdev Hgeo Hdlk Hbs2 HopS").
     { rewrite /inode_map. iFrame "Haddrsi Hindi". }
@@ -7175,7 +7180,7 @@ Section ProofSysUnlinkBody.
               Kiup Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
               Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
-              with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+              with "Hcg Hown [] [] Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hkeepi Hsbb Hsbi Hbmres Hpidq
                     Hprocs Hdev Hgeo Hdlk [Hbs1 Hbs2] [] HopS").
@@ -7226,7 +7231,7 @@ Section ProofSysUnlinkBody.
               g gfs cov logstart dev n3 pid (DfracOwn (1/4)) E3 (K - 30)%nat
               eb b lks Keo Hgeom Hj Hgl
               ltac:(rewrite Hlkempty; apply locks_below_empty)
-              with "Hcg Hown Htce Hcce Htext Hpc Hpanic Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htce Hcce Htext Hdata Hpc Hpanic Hpanenv Hbio Hlog Hseam Hgen
                     Hpidq Hprocs Hdev Hgeo Hdlk [HopS]").
     { rewrite /log_op. iExists Sb3. iExact "HopS". }
     iIntros (D32 Hd32 meo) "%Hcseo Hcg Hown Htce Hcce Hpc Hpidq".
@@ -7432,13 +7437,14 @@ Section ProofSysUnlinkBody.
              Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl #Hitab #Hitinv #Hescrows
              #Hslks #Hireg Hsbb Hsbi Hsbs Hbmres #Hkenv #Hprocs Hir Hpriv
              Hcont".
+    iPoseProof (printk_env_panic with "Hprenv") as "#Hpenv".
     (* ---- W1, +0x00..+0x2e: the prologue, argstr, begin_op, nameiparent ---- *)
     iApply (su_w1 gf ga gs jx gl gu gd gk pd pav pu bn g gfs gi cn gtl cov
               logstart bmapstart inodestart nib size dev used dqb dqs dqbs
               v0 pid V m K eb b lks HK Hcdev Hcnib Hclog Hcist HdevR Hnib0
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hcovb Hiregb Hj Hgl Heb
               Harg0
-              with "Hcg Hown Htext Hdata Hpc Hpanic Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
                     Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg
                     Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv [] Hcont").
     iIntros (CIDa Ms P1 n1 Sb1 used1 w1 dpv nf bp bnm0 bd be w4 w5 w6 w27 w30).
@@ -7455,7 +7461,7 @@ Section ProofSysUnlinkBody.
               HK Hcdev Hcnib Hcist Hnib0 Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hist0 Hcovb Hiregb Hj Hgl Heb eq_refl Hal Hregs1 Hma01 Hn1
               Hupt1
-              with "Hcg Hown Htext Hdata Hpc Hpanic Hbio Hlog Hseam Hgen
+              with "Hcg Hown Htext Hdata Hpc Hpanic Hpenv Hbio Hlog Hseam Hgen
                     Hdev Hgeo Hdlk Hbsl Hitab Hitinv Hescrows Hslks Hireg
                     Hsbb Hsbi Hsbs Hbmres Hkenv Hprocs Hir Hpriv Hheld HopS
                     Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 HbD Hnm14 Hnm2 HbP H27 HbE H30

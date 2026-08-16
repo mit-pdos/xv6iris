@@ -40,6 +40,8 @@ Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import ByteBuf.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -223,9 +225,10 @@ Section ItruncTail.
     cpu_own 0 eb (proc_addr j) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr j) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -257,7 +260,7 @@ Section ItruncTail.
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl Hsp Hthr Hs3 Hlkbelow.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl #Hcrdu Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iti_38 with "Htext") as "Hi38".
@@ -373,7 +376,7 @@ Section ItruncTail.
               Hstab Hnlk
               (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0 Hlkbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hlb0 Hcrdu Hop").
     all: try lkbelow.
@@ -732,9 +735,10 @@ Section ItruncDLoop.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x20) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -761,7 +765,7 @@ Section ItruncDLoop.
     induction fuel as [|fuel IH];
       intros CID0 k M Hk Hfuel Hsp Hthr Hs1 Hs2 Hs3 Hlkbelow;
       [ exfalso; unfold NDIRECT in Hk, Hfuel; lia |].
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     pose proof HK as HK'. 
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
@@ -930,7 +934,7 @@ Section ItruncDLoop.
         iDestruct (cpu_claim_ext_transport CID0 CID4 eb (proc_addr jx)
                      ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
         iApply (IH CID4 (S k) L1 Hk' Hf' HL1sp HL1thr HL1s1 HL1s2 HL1s3 Hlkbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hst Hexit").
     - (* ---------- FREE: the slot names a block ---------- *)
       iPoseProof (iti_24 with "Htext") as "Hi24".
@@ -1071,7 +1075,7 @@ Section ItruncDLoop.
                 (Hblen k ltac:(unfold MAXFILE, NDIRECT in *; lia))
                 Hj Hgl HL3a0 HL3a1
                 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsbb [Hbmr] Hfsb Htok
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hsbb [Hbmr] Hfsb Htok
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
       all: try lkbelow.
       { iExact "Hbmr". }
@@ -1230,7 +1234,7 @@ Section ItruncDLoop.
         iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CID8 (S k) N1 Hk'' Hf'' HN1sp HN1thr HN1s1 HN1s2 HN1s3 Hlkbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hst Hexit").
   Qed.
 
@@ -1316,9 +1320,10 @@ Section ItruncELoop.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x6c) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -1340,7 +1345,7 @@ Section ItruncELoop.
     induction fuel as [|fuel IH];
       intros CID0 q M Hq Hfuel Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hlkbelow;
       [ exfalso; unfold NINDIRECT in Hq, Hfuel; lia |].
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     pose proof HK as HK'. 
     pose proof (blkmap_wf_ent_len _ _ _ Hwf) as Hentlen.
@@ -1511,7 +1516,7 @@ Section ItruncELoop.
         iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDb (S q) E1 Hq'' Hf'' HE1sp HE1thr HE1s1 HE1s2 HE1s3 HE1s4 Hlkbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hbuf Hst Hexit").
 
     - (* ---------- FREE ---------- *)
@@ -1634,7 +1639,7 @@ Section ItruncELoop.
                                           lia))
                 Hj Hgl HE3a0 HE3a1
                 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hfsb Htok
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hsbb Hbmr Hfsb Htok
                       Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
       all: try lkbelow.
       iIntros (CIDf Hqf mfE) "%Hcs Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hbmr
@@ -1770,7 +1775,7 @@ Section ItruncELoop.
         iDestruct (wp_next_shift (b := true) (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDr (S q) F1 Hqf'' Hff'' HF1sp HF1thr HF1s1 HF1s2 HF1s3 HF1s4 Hlkbelow
-                  with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hbuf Hst Hexit").
 
   Qed.
@@ -1853,9 +1858,10 @@ Section ItruncIArm.
     cpu_own 0 eb (proc_addr jx) b lks -∗
     trap_csrs_ext eb -∗
     cpu_claim_ext eb (proc_addr jx) -∗
-    kernel_text -∗
+    kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (IT + 0x50) : mword 64) -∗
     panic_wp_any -∗
+    panic_env -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
@@ -1879,7 +1885,7 @@ Section ItruncIArm.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hindnz Hj Hgl
            Hsp Hthr Hs3 Ha1 Hlkbelow.
     pose proof HK as HK'. 
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
               Hres Hbmr Hpaid Hexit".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
     iPoseProof (iti_50 with "Htext") as "Hi50".
@@ -2022,7 +2028,7 @@ Section ItruncIArm.
               (* bread's bound is "bcache"(4); it_iarm's own is "log"(3),
                  and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc
                                           Hppid Hheld".
@@ -2166,7 +2172,7 @@ Section ItruncIArm.
               Hkk Hj Hgl
               0%nat A4 ltac:(unfold NINDIRECT; lia) ltac:(lia)
               HA4sp HA4thr HA4s1 HA4s2 HA4s3 HA4s4 Hlkbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hbuf Hst").
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hbuf Hst").
     (* ===== the loop is done: +0x7a onwards ===== *)
     iIntros (CID9 Hq9 Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hextc Hextm Hpc
                            Hppid Hidev Hsbb Hsl Hbuf Hst".
@@ -2387,7 +2393,7 @@ Section ItruncIArm.
               ltac:(rewrite ind_bytes_length Hentlen; reflexivity)
               Hj Hgl HC2a0 HC2a1
               Hlkbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hindblk
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hsbb Hbmr Hindblk
                     Hindtok Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hcrbm Hop").
     all: try lkbelow.
     iIntros (CID16 Hq16 mZ) "%Hcs3 Hcg Hcnt Hextc Hextm Hpc Hppid Hsbb Hbmr Hsl Hop".
@@ -2563,7 +2569,7 @@ Section ItruncMain.
     { intros i Hi Hnz.
       exact (proj2 (blkmap_slot_inrange cov logstart size bm
                       (proj1 Hgeom) Hbelow Hwf i Hi Hnz)). }
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinum Hmeta Hmap
               Hblks Hsbb Hsbi Hbmr #Hireg Hdn Hppid #Hprocs #Hdevi
               #Hdgeom #Hdlock Hsl #Hcru Hop Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -2822,7 +2828,7 @@ Section ItruncMain.
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
               0%nat Q3 ltac:(unfold NDIRECT; lia) ltac:(lia)
               HQ3sp HQ3thr HQ3s1 HQ3s2 HQ3s3 Hlkbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs
                     Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hst").
     (* ===== the direct loop is done: +0x32 onwards ===== *)
     iIntros (CID12x Hq12x Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hextc Hextm Hpc Hppid
@@ -2934,7 +2940,7 @@ Section ItruncMain.
                 HK
                 Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl HR0sp HR0thr HR0s3
                 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs
                       Hframe Hppid Hidev Hinum Hsbb Hsbi
                       Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
                       [Hsl Hslp] Hcru1 Hop [Hcont]").
@@ -2996,7 +3002,7 @@ Section ItruncMain.
                 pidv dq dqd dqb crb Sb e0 u m R0 K b eb lks
                 HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
                 Hj Hgl HR0sp HR0thr HR0s3 HR0a1 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs
                       Hppid Hidev Hsbb Hdevi Hdgeom Hdlock [Hf6]
                       [Hsl Hslp] Hmap Hres0 Hbmr Hpaid").
       { iExact "Hf6". }
@@ -3020,7 +3026,7 @@ Section ItruncMain.
                 HK
                 Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hj Hgl HMzsp HMzthr HMzs3
                 Hlkbelow
-                with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hprocs
+                with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hprocs
                       [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
                       Hsbi Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
                       Hsl Hcru2 Hop [Hcont]").
@@ -3078,7 +3084,7 @@ Section ItruncMain.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hdtnz Hstab Hnlk Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Hlkbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hidev Hinum Hmeta Hmap
               Hblks Hsbb Hsbi Hbmr #Hireg Hdn Hppid #Hprocs #Hdevi
               #Hdgeom #Hdlock Hsl Hop Hcont".
     (* THE WITNESS: the set the counted reservation was hiding, and -- one
@@ -3096,7 +3102,7 @@ Section ItruncMain.
               HK ltac:(discriminate)
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
               Hnib Hdtnz Hstab Hnlk Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Hlkbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hidev Hinum Hmeta Hmap
                     Hblks Hsbb Hsbi Hbmr Hireg Hdn Hppid Hprocs Hdevi
                     Hdgeom Hdlock Hsl Hcru Hop [Hcont]").
     all: try lkbelow.

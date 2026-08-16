@@ -154,7 +154,58 @@ Local Open Scope Z_scope.
    durable-notes.md's rule. *)
 Set Printing Depth 40.
 
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import SpecPanic.
+
 Notation KXB := KernelSyms.kexec (only parsing).
+
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  kexec's one live arm is loadseg's                 *)
+(*  [panic("loadseg: address should exist")] at +0xd6 -- walkaddr came    *)
+(*  back null for a segment page; the literal sits at 0x800075c0 in       *)
+(*  .rodata, twenty-nine characters and a NUL.  NAMED pure lemmas, not    *)
+(*  inline [ltac:] -- see optimization.md and the panic recipe.           *)
+(* ===================================================================== *)
+Definition kxc_msg_a : Z := 0x800075c0.
+Definition kxc_msg : string := "loadseg: address should exist".
+
+Lemma kxc_panic_K (K : nat) : (K_kexec <= K)%nat -> (panic_stack <= K - 68)%nat.
+Proof. lia. Qed.
+
+Lemma kxc_panic_noff : (Z.of_nat 0 + 2 < 2 ^ 31)%Z.
+Proof. lia. Qed.
+
+Lemma kxc_panic_below (lks : gset string) : lks = ∅ -> locks_below lks "pr".
+Proof. intros ->. apply locks_below_empty. Qed.
+
+Lemma kxc_msg_nz : eq_vec (mword_of_int kxc_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma kxc_msg_nonul : PrintkFmt.nonul kxc_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma kxc_msg_bytes :
+  forall j b, cstring_bytes kxc_msg !! j = Some b ->
+    KernelData.kernel_data !! (kxc_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 30 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section KexecMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma kxc_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int kxc_msg_a : mword 64) ↦ₛ□ kxc_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string kxc_msg_a kxc_msg _ eq_refl
+              ltac:(unfold text_end, kxc_msg_a; lia) kxc_msg_bytes with "Hd").
+  Qed.
+End KexecMsg.
 
 (* ===================================================================== *)
 (*  THE FRAME ALGEBRA AND THE FOURTEEN-RESOURCE BUNDLE now live in          *)
@@ -180,7 +231,7 @@ Notation KXB := KernelSyms.kexec (only parsing).
 Module KexecB2Proof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                     (Ilock : ILOCK) (Readi : READI) (Iunlockput : IUNLOCKPUT)
                     (EndOp : END_OP) (PFP : PROC_FREEPAGETABLE)
-                    (Walkaddr : WALKADDR) : KEXECB2.
+                    (Walkaddr : WALKADDR) (PN : PANIC) : KEXECB2.
 
 Module A := ProofKexecTail.KexecTailProof Myproc BeginOp Namei Ilock Readi
                                           Iunlockput EndOp.
@@ -760,7 +811,7 @@ Section KexecB2Loops.
     (* depth 0 forces the held set empty, so readi's order premise needs no
        hypothesis of this lemma's own. *)
     iDestruct (cpu_own_zero_empty with "Hcnt") as "[%Hlkempty Hcnt]".
-    iDestruct "Hfab" as "(#Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
+    iDestruct "Hfab" as "(#Hkd & #Hpenv & #Hbio & #Hlogc & #Hcrash & #Hcert & #Hitab & #Hitinv &
                           #Hesc & #Hslks & #Hireg & #Hprocs & #Hdevi & #Hdgeom &
                           #Hdlock)".
     rewrite /kxc_res.
@@ -976,8 +1027,26 @@ Section KexecB2Loops.
                 ltac:(rewrite Htpn; vm_compute; reflexivity)
                 with "Hcg Hpc Hi0d6").
       iIntros (CIDp3 Hsp3) "Hcg Hpc". iEval (rewrite Htpn) in "Hpc".
-      iPoseProof (panic_wp_any_at CIDp3 with "Hpanic") as "Hpan".
-      iApply ("Hpan" with "Htext Hpc Hcg"). }
+      (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+         a0 holds &"loadseg: address should exist"; [kernel_data] and
+         [panic_env] both come out of [fs_fabric], and [cpu_own] has to
+         arrive AT THE PANIC HART (CIDp3). *)
+      iPoseProof (kxc_msg_str with "Hkd") as "#Hstr".
+      iDestruct (cpu_own_transport CID0 CIDp3 0%nat true (proc_addr jp) true
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+      pose (Np3 := <[Regidx Rra := regval_into_reg
+                       (add_vec_int (mword_of_int (KXB + 0xd6) : mword 64) 4)]> Np2).
+      assert (Ha0msg : Np3 !!! Regidx Ra0 = (mword_of_int kxc_msg_a : mword 64))
+        by lpcw.
+      iApply (PN.wp_panic_sconf (CID := CIDp3) Np3 (K - 68)%nat
+                0%nat true true (proc_addr jp) (PkAStr DfracDiscarded kxc_msg) lks
+                (kxc_panic_K K HK) eq_refl kxc_panic_noff
+                (kxc_panic_below lks Hlkempty)
+                with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+      { rewrite /pk_desc_res Ha0msg.
+        iSplit; [iPureIntro; exact kxc_msg_nonul|].
+        iSplit; [iPureIntro; exact kxc_msg_nz|]. iExact "Hstr". } }
     (* ===== walkaddr hit: the page is there ===== *)
     destruct (upt_ad_view_vu P.(ud_tfp) P.(ud_um) m_ad (svpn_of vai) wpte
                 Hview Hsome Hvu) as (w0 & Hum0 & Hppn0).
@@ -1285,7 +1354,7 @@ Section KexecB2Loops.
                       pose proof Hszb as Hs; rewrite Hmb in Hs; lia)
                 Hjp Hgs HD6a0
                 ltac:(rewrite HD6a1; vm_compute; reflexivity) HD6a3 HD6a4
-                with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hka Hidev Hmeta Hmap
+                with "Hcg Hcnt [] [] Htext Hkd Hpc Hpanic Hpenv Hbio Hka Hidev Hmeta Hmap
                       Hblocks [Hdst Hppid] Hprocs Hdevi Hdgeom Hdlock Hbs1").
       all: try lkbelow.
       { rewrite /trap_csrs_ext. done. }
@@ -1512,7 +1581,7 @@ Section KexecB2Loops.
                     with "Hcg Hcnt Htext Hpanic Hpc [] Hka
                           [Hopen Hlog Hirs Hbm Hins Hbits Hbs Hpt Hpriv Hpath
                            Hargv Hargs Helf Hframe] Hcont Hc116").
-          { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+          { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                          Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                          Hdlock"). }
           { rewrite /kxc_res.
@@ -1562,7 +1631,7 @@ Section KexecB2Loops.
                   with "Hcg Hcnt Htext Hpanic Hpc [] Hopen Hbm Hins Hbits Hka
                         Hpt Hpriv Hpath Hargv Hargs Helf Hbs Hirs Hlog Hframe
                         Hcont").
-        { iApply (A.fs_fabric_mk with "Hbio Hlogc Hcrash Hcert Hitab Hitinv
+        { iApply (A.fs_fabric_mk with "Hkd Hpenv Hbio Hlogc Hcrash Hcert Hitab Hitinv
                                        Hesc Hslks Hireg Hprocs Hdevi Hdgeom
                                        Hdlock"). } }
 

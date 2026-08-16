@@ -110,6 +110,10 @@ Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIget.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import PrintkArgs.
+Require Import WpUart.
+Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIget.
 Require Import IgetLic.
@@ -321,11 +325,66 @@ Proof. set_solver. Qed.
 (*  2.  THE FUNCTION                                                      *)
 (* ===================================================================== *)
 
-Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) : IGET.
+(* ===================================================================== *)
+(*  THE PANIC MESSAGE.  iget's one live arm is [panic("iget: no inodes")] *)
+(*  at +0xa6 -- the full-table scan; the literal sits at 0x80007400 in    *)
+(*  .rodata, fifteen characters and a NUL.  NAMED pure lemmas, not inline *)
+(*  [ltac:] -- see optimization.md and the panic recipe.                  *)
+(* ===================================================================== *)
+Definition ig_msg_a : Z := 0x80007400.
+Definition ig_msg : string := "iget: no inodes".
+
+Lemma ig_panic_K (K : nat) (b : bool) :
+  (K_iget <= K)%nat -> (panic_stack <= trap_res b + (K - 6))%nat.
+Proof. lia. Qed.
+
+Lemma ig_panic_noff (n : nat) :
+  (Z.of_nat n + 3 < 2 ^ 31)%Z -> (Z.of_nat (S n) + 2 < 2 ^ 31)%Z.
+Proof. rewrite Nat2Z.inj_succ. lia. Qed.
+
+(* THE ARM FIRES HOLDING itable.lock (rank 14), which is why the rank table
+   puts "itable" below "pr" (16).  A CLOSED lemma over the plain gset, not
+   an inline [ltac:(lkbelow)]. *)
+Lemma ig_panic_below (lks : gset string) :
+  locks_below lks "itable" -> locks_below ({["itable"]} ∪ lks) "pr".
+Proof.
+  intros H. apply locks_below_union_singleton; [vm_compute; lia|].
+  apply (locks_below_mono lks "itable" "pr" H). vm_compute; lia.
+Qed.
+
+Lemma ig_msg_nz : eq_vec (mword_of_int ig_msg_a : mword 64) zero_reg = false.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma ig_msg_nonul : PrintkFmt.nonul ig_msg = true.
+Proof. vm_compute; reflexivity. Qed.
+
+Lemma ig_msg_bytes :
+  forall j b, cstring_bytes ig_msg !! j = Some b ->
+    KernelData.kernel_data !! (ig_msg_a + Z.of_nat j)%Z = Some b.
+Proof.
+  intros j b Hj.
+  do 16 (destruct j as [|j]; [ vm_compute in Hj |- *; congruence | ]).
+  vm_compute in Hj; discriminate.
+Qed.
+
+Section IgetMsg.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId}.
+
+  Lemma ig_msg_str :
+    (kernel_data : iProp Σ) -∗ (mword_of_int ig_msg_a : mword 64) ↦ₛ□ ig_msg.
+  Proof.
+    iIntros "#Hd".
+    iApply (kernel_data_string ig_msg_a ig_msg _ eq_refl
+              ltac:(unfold text_end, ig_msg_a; lia) ig_msg_bytes with "Hd").
+  Qed.
+End IgetMsg.
+
+Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) (PN : PANIC) : IGET.
 
 Section ProofIget.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ, !irefslotG Σ,
-            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -423,7 +482,7 @@ Section ProofIget.
        RETURNING arms, and simply dropped on the diverging
        panic("iget: no inodes") arm at +0x6a -- which is what a partial
        correctness post owes there and nothing more. *)
-    iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hescs #Hpanic Hislot Hlic Hcont".
+    iIntros "Hcg Hcnt #Htext #Hkd Hpc #Hlock #Hinv #Hescs #Hpanic #Hpenv Hislot Hlic Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.
     set (spr := add_vec (m !!! Regidx csp_rs1 : mword 64)
                         (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))).
@@ -617,7 +676,7 @@ Section ProofIget.
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string
               (itable_res2 cn γfs γi cov logstart nib dev) mA
-              n eb p (K - 6)%nat b lks HnZ ltac:(lia) Hfresh
+              n eb p (K - 6)%nat b lks ltac:(lia) ltac:(lia) Hfresh
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }
@@ -1105,8 +1164,28 @@ Section ProofIget.
                                (sign_extend' 64 (mword_of_int 2087190 : mword 21))
                              = mword_of_int KernelSyms.panic) by pcw.
             iEval (rewrite Htgtpn) in "Hpc".
-            iPoseProof (panic_wp_any_at _ with "Hpanic") as "Hpan".
-            iApply ("Hpan" with "Htext Hpc Hcg").
+            (* ---- panic() AS AN ORDINARY CALL, against SpecPanic ----
+               a0 holds &"iget: no inodes".  The whole scan runs with
+               interrupts OFF (acquire's push_off), so no hart ever moves
+               and [cpu_own] needs no transport -- but it IS at [S n] and
+               at [{["itable"]} ∪ lks], which is what the rank table's
+               "itable" < "pr" edge exists for. *)
+            iPoseProof (ig_msg_str with "Hkd") as "#Hstr".
+            (* THE REGFILE THE SPEC WANTS IS THE POST-JAL ONE. *)
+            pose (PA3 := <[Regidx Rra := regval_into_reg
+                            (add_vec_int
+                               (mword_of_int (KernelSyms.iget + 0xa6) : mword 64) 4)]> PA2).
+            assert (Ha0msg : PA3 !!! Regidx Ra0 = (mword_of_int ig_msg_a : mword 64))
+              by pcw.
+            iApply (PN.wp_panic_sconf PA3 (trap_res b + (K - 6))%nat
+                      (S n) eb false p (PkAStr DfracDiscarded ig_msg)
+                      ({["itable"]} ∪ lks)
+                      (ig_panic_K K b HK) eq_refl (ig_panic_noff n HnZ)
+                      (ig_panic_below lks Hfresh)
+                      with "Hcg Hcnt Htext Hkd Hpc Hpenv [Hstr]").
+            { rewrite /pk_desc_res Ha0msg.
+              iSplit; [iPureIntro; exact ig_msg_nonul|].
+              iSplit; [iPureIntro; exact ig_msg_nz|]. iExact "Hstr". }
           + (* ===== THE RECYCLE, four stores wide ===== *)
             iPoseProof (igi_6e with "Htext") as "Hi6e".
             iPoseProof (igi_72 with "Htext") as "Hi72".

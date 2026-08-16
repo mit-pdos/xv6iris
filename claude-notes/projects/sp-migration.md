@@ -496,6 +496,81 @@ facts phases B–D need:
   Bare-arm refutation `strans_absorb_wit` needs is exactly
   `kpt_on_pending_False`.
 
+### Phase B findings (LANDED)
+
+Landed exactly as designed — additive only, whole-tree build green, no
+consumer touched (every call site reaches the record through the `sr_*`
+projection functions, never positional/eta destructuring, so appending
+three fields at the end of `SRegime.s_regime` was a pure extension).
+
+- **The three fields, in order, at the end of the record** (`SRegime.v`):
+  `sr_kwit : iProp Σ`, `sr_kwit_pers : Persistent sr_kwit`, `sr_absorb_wit`.
+  All three `SRegime …` constructor applications (`bare_regime`,
+  `kpt_share_regime`, `strans_regime`) only needed their three new
+  positional arguments appended; nothing about the first six changed.
+- **`sr_absorb_wit`'s statement** is `sr_absorb`'s premise list with the
+  `sr_adm va ppn` conjunct deleted and `sr_kwit -∗` added at the head of
+  the resource chain, immediately before `kmap_at (svpn_of va) ppn pc`:
+  ```coq
+  sr_absorb_wit : forall (acc : MemoryAccessType mem_payload) (va pa : mword 64)
+      (ppn : mword 44) (pc : kperm) (σ : mstate) (E : coPset),
+    s_acc_ok acc -> kperm_allows pc acc ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    zero_extend' 64 (concat_vec ppn
+        (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa ->
+    register_lookup misa σ.(sregs) = MISA_C ->
+    register_lookup menvcfg σ.(sregs) = MENVCFG_S ->
+    register_lookup htif_tohost_base σ.(sregs) = None ->
+    register_lookup cur_privilege σ.(sregs) = Supervisor ->
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    exec (effectivePrivilege acc (register_lookup mstatus σ.(sregs)) Supervisor) σ
+      = Some (Supervisor, σ) ->
+    exec (is_shadow_stack_access acc) σ = Some (false, σ) ->
+    pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
+    ↑kptN ⊆ E ->
+    ⊢ sr_kwit -∗ kmap_at (svpn_of va) ppn pc -∗
+      reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ sr_inv ={E}=∗
+      ∃ σ' : mstate,
+        ⌜ exec (translateAddr (Virtaddr va) acc) σ
+          = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ') ⌝ ∗
+        ⌜ σ'.(mdev) = σ.(mdev) ⌝ ∗
+        ⌜ (σ'.(sregs) = σ.(sregs) \/
+           exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type ⌝ ∗
+        ⌜ pmp_grant_facts σ' ⌝ ∗
+        reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ sr_inv;
+  ```
+  This is the exact shape phase C/D's leaf rules call: `sr_kwit` is the
+  ambient witness resource (from `ktier_wit`/the capability), no `sr_adm`
+  discharge needed on that arm.
+- **The three instances**, each a new lemma beside the regime's existing
+  `_absorb`:
+  - `bare_regime` → `sr_kwit := (False : iProp Σ)`, `bare_absorb_wit`
+    proved by `iIntros "H"; iDestruct "H" as %[]`. `Persistent False` is
+    stock (no new instance declared).
+  - `kpt_share_regime root_ppn` → `sr_kwit := emp`, `res_absorb_wit`
+    proved by discarding the `emp` and delegating verbatim to `res_absorb`
+    with `I` for the dropped `True` argument (`res_absorb`'s `sr_adm` was
+    already `fun _ _ => True`, so the callee's signature needed no
+    change). `Persistent emp` is stock.
+  - `strans_regime` → `sr_kwit := kpt_on cpu_id`, new lemma
+    `strans_absorb_wit` beside `strans_absorb` in `IntrDefs.v`: case-splits
+    `strans_inv`, refutes the Bare arm (`strans_pending`) against the
+    witness with `kpt_on_pending_False`, and the KPT arm delegates to
+    `res_absorb` with `I`, mirroring `strans_absorb`'s right branch
+    exactly. `Persistent (kpt_on c)` already existed from phase A.
+- **No deviations from the design.** No leaf, no consumer, no notation
+  touched; every `SRegime.v`/`IntrDefs.v` file elsewhere compiled
+  unchanged. `sr_kwit_pers` was supplied per-instance as a plain
+  `Persistent` proof term (`_` resolves to the stock instances for `False`/
+  `emp`; `kpt_on_persistent` for the strans instance) — no new `Instance`
+  declaration was needed anywhere.
+- **Open for phase C/D**: `sr_kwit`/`sr_absorb_wit` are unused by anything
+  yet (by design — "purely additive... unused"). Phase C's tier-preserving
+  leaf rule is expected to call `sr_absorb_wit R` on the KT1 arm exactly as
+  sketched in design §4, handing it whatever `ktier_wit g` unfolds to at
+  the ambient regime.
+
 ## State
 
 - DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc

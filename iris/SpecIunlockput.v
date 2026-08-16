@@ -73,6 +73,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -163,8 +165,9 @@ Definition wp_iunlockput_sconf_body
      claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)
@@ -293,8 +296,9 @@ Definition wp_iunlockput_gen_body
      claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   log_ctx g bn gfs cov logstart dev -∗
   (* ---- THE ICACHE'S PERSISTENT SET ---- *)

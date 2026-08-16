@@ -46,6 +46,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -118,8 +120,9 @@ Definition wp_bread_sconf_body
      and claude-notes/completed/eb-generic-sweep.md. *)
   trap_csrs_ext eb -∗
   cpu_claim_ext eb pj -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  panic_env -∗
   bio_ctx bn V -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗

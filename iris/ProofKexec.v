@@ -113,6 +113,7 @@ Require Import SpecSafestrcpy.
 Require Import ProofKexecSeam.
 Require Import ProofKexecA.
 Require Import ProofKexecB.
+Require Import SpecPanic.
 Require Import ProofKexecB2.
 Require Import ProofKexecB3.
 Require Import ProofKexecC.
@@ -134,14 +135,14 @@ Module KexecProof (Myproc : MYPROC) (BeginOp : BEGIN_OP) (Namei : NAMEI)
                   (PFP : PROC_FREEPAGETABLE) (Walkaddr : WALKADDR)
                   (Flags2perm : FLAGS2PERM) (Uvmalloc : UVMALLOC)
                   (Uvmclear : UVMCLEAR) (Strlen : STRLEN) (Copyout : COPYOUT)
-                  (SS : SAFESTRCPY) : KEXEC.
+                  (SS : SAFESTRCPY) (PN : PANIC) : KEXEC.
 
 Module PA := ProofKexecA.KexecAProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp.
 Module PB := ProofKexecB.KexecBProof Myproc BeginOp Namei Ilock Readi
                                      Iunlockput EndOp PPT.
 Module PB2 := ProofKexecB2.KexecB2Proof Myproc BeginOp Namei Ilock Readi
-                                        Iunlockput EndOp PFP Walkaddr.
+                                        Iunlockput EndOp PFP Walkaddr PN.
 Module PB3 := ProofKexecB3.KexecB3Proof Myproc BeginOp Namei Ilock Readi
                                         Iunlockput EndOp PFP Walkaddr
                                         Flags2perm Uvmalloc PB2.

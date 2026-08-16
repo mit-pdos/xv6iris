@@ -139,6 +139,7 @@ Section ProofUsertrapTail.
                            & #Hkm & #Hdk & #Hbio & #Hlog & #Hseam & #Hgc & #Hdev
                            & #Hgeom & #Hav & #Hic)".
     iDestruct "Hown" as "(Hbs & Hbm & Hip & Hfd & Hir & Hpv & _)".
+    iPoseProof (SpecPrintk.printk_env_panic with "Hpk") as "#Hpe".
     iApply (KE.wp_kexit_sconf (un_ft N) (un_f N) (un_w N) (un_s N) (un_j N) (un_l N)
               (un_u N) (un_v N) (un_k N) (un_pd N) (un_pav N) (un_pu N)
               (un_bn N) (un_lg N) (un_fs N) (un_cov N) (un_logstart N) (un_dev N)
@@ -147,7 +148,7 @@ Section ProofUsertrapTail.
               (un_nib N) (un_size N) (un_dqb N) (un_dqs N) (un_us N)
               None (un_fn N) m nx b b _ (un_pid N) V
               eq_refl Hj Hjl Hnx Hlg Hbelow
-              with "Hcg Hcpu Hcsrs Hclm Htext Hpc Hpi Hpa Hw Hft Hkm Hav
+              with "Hcg Hcpu Hcsrs Hclm Htext Hkd Hpc Hpi Hpa Hpe Hw Hft Hkm Hav
                     Hbio Hlog Hseam Hgc Hdev Hgeom Hdk Hbs Hic Hbm Hip Hfd Hir Hpv").
     all: try lkbelow.
   Qed.

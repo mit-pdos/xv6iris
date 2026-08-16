@@ -165,6 +165,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import PanicStub.
+Require Import KernelDataInv.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -308,8 +310,13 @@ Definition wp_dirlookup_sconf_body
   locks_below lks "bcache" ->
   sie_cap_gpr m K b pj -∗
   cpu_own 0 eb pj b lks -∗
-  kernel_text -∗ pc_is pcE -∗
+  kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
+  (* THE SHORT READ arm calls [panic("dirlookup read")], and panic is an
+     ordinary call: the literal comes out of [kernel_data] above and the
+     console credentials printk needs out of [panic_env].  Both persistent,
+     and every caller of dirlookup already holds them. *)
+  panic_env -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   kalloc_env γa None -∗
   (* ---- THE LOCKED DIRECTORY, readi's bundle verbatim ---- *)

@@ -1069,7 +1069,7 @@ Section ProofBfreeMain.
     { rewrite HbnoB. exact (proj2 Hbm31). }
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl #Hcredit Hop Hcont".
     (* bfree enters at level 0, so the live index IS the saved base -- one
        variable [b] carries both from here on (the porting guide's "derive
@@ -1385,7 +1385,7 @@ Section ProofBfreeMain.
               RA (K - 4)%nat b b lks
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1
               ltac:(lkbelow)
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hppid Hprocs
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hsl1").
     all: try lkbelow.
     iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hextc Hextm Hpc Hppid Hheld".
@@ -1861,7 +1861,7 @@ Section ProofBfreeMain.
     cbv beta delta [wp_bfree_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
-    iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
+    iIntros "Hcg Hcnt Hextc Hextm #Htext #Hkd Hpc #Hpanic #Hpenv #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     (* the counted form opens its own birth epoch and presents the EMPTY
@@ -1875,7 +1875,7 @@ Section ProofBfreeMain.
               pidv dq dqb m K eb b lks
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow
-              with "Hcg Hcnt Hextc Hextm Htext Hpc Hpanic Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
+              with "Hcg Hcnt Hextc Hextm Htext Hkd Hpc Hpanic Hpenv Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hsl Hcredit Hop [Hcont]").
     all: try lkbelow.
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
