@@ -213,6 +213,38 @@ Fixpoint hfrun {X : Type} (n : nat) (D Drw : gset register) (rs : regstate)
       end
   end.
 
+(* THE REDUCTION EQUATIONS, and the trap they exist to avoid (measured):
+   NEVER [cbn [... hfrun ...]] against a FOLDED model term.  To expose the
+   [match m] scrutinee, cbn has to reduce [m] itself, and it does so with
+   no regard for the whitelist -- [cbn [hfrun]] on
+   [hfrun 6 D Drw rs (should_inc_minstret Machine)] does not finish in
+   60 s, while the same goal with the spine pre-reduced and [hfrun] stepped
+   by these equations is milliseconds.  This is the [hregread_resume_red]
+   discipline again: reduce the SPINE with a whitelisted cbn, then step the
+   walker one node at a time by [rewrite]. *)
+Lemma hfrun_ret {X : Type} (n : nat) (D Drw : gset register)
+    (rs : regstate) (x : X) :
+  hfrun (S n) D Drw rs (Interface.Ret x) = Some (x, rs).
+Proof. reflexivity. Qed.
+
+Lemma hfrun_read {X : Type} (n : nat) (D Drw : gset register)
+    (rs : regstate) (r : register) (ak : option unit)
+    (k : type_of_register r -> M X) :
+  hfrun (S n) D Drw rs (Interface.Next (Interface.RegRead r ak) k)
+  = if bool_decide (r ∈ D)
+    then hfrun n D Drw rs (k (register_lookup r rs))
+    else None.
+Proof. reflexivity. Qed.
+
+Lemma hfrun_write {X : Type} (n : nat) (D Drw : gset register)
+    (rs : regstate) (r : register) (ak : option unit)
+    (v : type_of_register r) (k : unit -> M X) :
+  hfrun (S n) D Drw rs (Interface.Next (Interface.RegWrite r ak v) k)
+  = if bool_decide (r ∈ Drw)
+    then hfrun n D Drw (register_set r v rs) (k tt)
+    else None.
+Proof. reflexivity. Qed.
+
 (* ====================================================================== *)
 (* 2. Structural well-foundedness of the monad: each span step's           *)
 (*    continuation is an immediate subterm.  The [Acc] fixpoint is what    *)

@@ -26,7 +26,8 @@ From iris.program_logic Require Import language weakestpre.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec HartLift HartEvents.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec HartSwp
+        HartLift HartEvents.
 Require Import ColdBoot.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

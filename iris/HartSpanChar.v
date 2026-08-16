@@ -257,4 +257,45 @@ Section swp_hfrun.
              (hfrun_hval n (Drw ∪ Dro) Drw rs m x rs' Hf)).
   Qed.
 
+  (* the two rules that fire constantly: a read of a register the caller
+     PINS (in either frame), and a write of one it OWNS.  Both are
+     [swp_hfrun] at fuel 2 -- the walker is the whole proof. *)
+  Lemma swp_read_reg_pinned (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (r : register) :
+    Drw ## Dro ->
+    r ∈ Drw ∪ Dro ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (Defs.read_reg r)
+      (fun v => ⌜v = register_lookup r rs⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj Hin.
+    apply (swp_hfrun 2 Drw Dro Df rs rs (Defs.read_reg r)
+             (register_lookup r rs) Hdisj).
+    cbn. by rewrite (bool_decide_eq_true_2 _ Hin).
+  Qed.
+
+  Lemma swp_write_reg_owned (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (r : register)
+      (v : type_of_register r) :
+    Drw ## Dro ->
+    r ∈ Drw ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (Defs.write_reg r v)
+      (fun _ => hreg_frame (register_set r v rs) Drw ∗
+                hreg_frame_ro Df (register_set r v rs) Dro).
+  Proof.
+    intros Hdisj Hin.
+    iIntros "#Hcert Hrw Hro".
+    iApply (swp_mono with "[] [-]"); [|iApply (swp_hfrun 2 Drw Dro Df rs
+      (register_set r v rs) (Defs.write_reg r v) tt Hdisj with
+      "Hcert Hrw Hro")].
+    { iIntros (u) "(_ & Hrw & Hro)". iFrame. }
+    cbn. by rewrite (bool_decide_eq_true_2 _ Hin).
+  Qed.
+
 End swp_hfrun.

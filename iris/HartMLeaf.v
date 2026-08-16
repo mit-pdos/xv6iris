@@ -27,7 +27,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec
-        HartLift HartRegNode HartSpan HartSpanChar HartLift2
+        HartSwp HartLift HartRegNode HartSpan HartSpanChar HartLift2
         HartEvents HartMCycle HartMDispatch HartMPmp HartMFetch HartPilot.
 (* ADDED for the proof (all below the red line): RiscvTryStep/RiscvExtras
    (pmp range cells, avi0, fetch_pa_id, autocast ids), ColdBoot (the anchor
