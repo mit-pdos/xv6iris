@@ -104,8 +104,7 @@ From Kernel Require KernelSyms.
 
 (* printk's own frame is 24 slots ([addi sp,sp,-192] at 0x8000050a), over
    printint's 24. *)
-Definition printk_stack : nat := 48%nat.
-
+Notation printk_stack := (48%nat) (only parsing).
 Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γpr : gname) (γl : gname) (γd : uart_names) (γv : disk_names)
     (m0 : regfile) (K : nat) (bs : list (bv 8))

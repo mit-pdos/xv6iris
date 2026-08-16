@@ -154,8 +154,12 @@ Definition wp_pipealloc_sconf_body
   let pf1 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* pipealloc's own frame is 6 slots (c.addi16sp sp,-48); of its four callees
-     fileclose is the deepest, wanting [fileclose_stack] = 68 below that. *)
-  (74 <= K)%nat ->
+     fileclose is the deepest, wanting [SpecFileclose.fileclose_stack] = 84
+     below that, so 90.  A LITERAL, not the expression: this file reaches
+     SpecFileclose only in prose (no Require), and pulling the whole fileclose
+     cone in for one numeral is the worse trade.  Drift risk is real -- if
+     fileclose_stack moves, this must too. *)
+  (90 <= K)%nat ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   (* pipealloc's cone bottoms out at ftable.lock (1), via

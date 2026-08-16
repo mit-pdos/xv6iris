@@ -1343,7 +1343,7 @@ Section KexecABad.
   Proof.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hibc Hibl Hib Hcovb Hn2
            Hjp Hgs Hu2 Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts4 Hthr.
-    unfold K_kexec in HK.
+    
     iIntros "Hcg Hcnt #Htext #Hpanic Hpc #Hfab #Hslkk Hslkd Hslpid Hdep Hidev
              Hiinum Hivalid Hload Hity Hkeep Hbm Hins Hbits #Hka Hpriv Hpath Hargv
              Hargs Hbs Hirs Hlog Hframe Hcont".
@@ -1402,7 +1402,7 @@ Section KexecABad.
               gi cn gtl gil gisl cov logstart bmapstart inodestart nib size dev
               used2 k qi sq gy inum dn bm n2 pidv (DfracOwn (1/4)) dqb dqs
               B2 (K - 68)%nat true true lks
-              ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
+              ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
@@ -1442,7 +1442,7 @@ Section KexecABad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true true lks ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+              true true lks ltac:(lia) Hlg Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert Hppid
                     Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.
@@ -1714,7 +1714,7 @@ Section KexecCBad.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hused Hsp Hra Hs0 Hs1 Hs2 Hmtsp Hmts3 Hmts6 Hbelow Hcov.
-    unfold K_kexec in HK.
+    
     iIntros "Hcg Hcnt #Htext Hpc Hpt #Hka Hbm Hins Hbits Hpriv Hpath Hargv
              Hargs Hbs Hirs Hframe Hcont".
     (* depth 0 forces the held set empty, so proc_freepagetable's order

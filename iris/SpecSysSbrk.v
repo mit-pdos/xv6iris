@@ -83,8 +83,7 @@ Local Open Scope Z_scope.
 
 (* sys_sbrk's own frame is 6 slots; growproc wants 46 below it, argint 18
    and myproc 10, so 46 covers every call. *)
-Definition sys_sbrk_stack : nat := 52%nat.
-
+Notation sys_sbrk_stack := (52%nat) (only parsing).
 (* ===================================================================== *)
 (*  The two syscall arguments, as the machine reads them back.            *)
 (* ===================================================================== *)

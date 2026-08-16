@@ -112,7 +112,7 @@ Section ProofStatiMain.
   Proof.
     cbv beta delta [wp_stati_sconf_body].
     intros pcE ret_tgt HK Ha0 Ha1.
-    pose proof HK as HK'. unfold K_stati in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg #Htext Hpc Hidev Hinum Hmeta Hstat Hcont".
     iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
     iDestruct "Hstat" as "(Hsdev & Hsino & Hsty & Hsnl & Hssz)".

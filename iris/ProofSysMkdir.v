@@ -209,8 +209,7 @@ Lemma md_kb (K : nat) : (K_sys_mkdir <= K)%nat ->
   (K_iunlockput <= K - 18)%nat /\
   (18 <= K)%nat /\ ((K - 18) + 18 = K)%nat.
 Proof.
-  unfold K_sys_mkdir, K_create, argstr_stack, K_begin_op, K_end_op,
-         K_iunlockput.
+  
   intro H. split_and!; lia.
 Qed.
 

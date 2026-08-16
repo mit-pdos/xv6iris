@@ -651,7 +651,7 @@ Section UwBodies.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x88)) (mword_of_int 5 : mword 6)
               E9 (av - 10)%nat 10%nat true Hpop with "Hcg Hpc Hi88 Hframe").
     iIntros (CIDe10 Hse10) "Hcg Hpc".
-    assert (Hav10 : ((av - 10) + 10)%nat = av) by (unfold uartwrite_stack in Hav; lia).
+    assert (Hav10 : ((av - 10) + 10)%nat = av) by (lia).
     iEval (rewrite Hav10) in "Hcg".
     set (E10 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E9 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> E9).
@@ -890,7 +890,7 @@ Section UwBodies.
                    with "Hcnt") as "Hcnt".
       iApply (SleepPrepare.wp_sleep_prepare_sconf γs j γlp Q2 (av - 10)%nat 0%nat true true lks
                 Hj Hjlp ltac:(rewrite HQ2a0; vm_compute; reflexivity) ltac:(lia)
-                ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
+                ltac:(lia) Hfresh
                 with "Hcg Hcnt Ht Hpc Hpinv").
       all: try lkbelow.
       iIntros (CIDp Hsp' MP) "%HcsP Hcg Hcnt Hpc".
@@ -932,7 +932,7 @@ Section UwBodies.
                    with "Hcnt") as "Hcnt".
       iApply (Acquire.wp_acquire_sconf γl "uart"%string (tx_res γu) Q4
                 0%nat true pj (av - 10)%nat true lks ltac:(lia)
-                ltac:(unfold uartwrite_stack in Hav; lia)
+                ltac:(lia)
                 ltac:(lkbelow)
                 with "Hcg Hcnt Ht Hpc [Hlk]").
       all: try lkbelow.
@@ -1018,7 +1018,7 @@ Section UwBodies.
         iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) K2
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HK2a0; apply uw_addv_0)
-                  ltac:(unfold uartwrite_stack in Hav; lia)
+                  ltac:(lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu l with "Hown"). }
         iIntros (CIDr Hsr MR) "Hcg Hpc %HcsR Hcnt".
@@ -1050,7 +1050,7 @@ Section UwBodies.
         iDestruct (cpu_own_transport CIDr CIDa5 0 true pj true ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
         iApply (Sleep.wp_sleep_sconf γs j γlp K3 (av - 10)%nat true lks Hj Hjlp
-                  ltac:(unfold uartwrite_stack in Hav; lia) Hfresh
+                  ltac:(lia) Hfresh
                   with "Hcg Hcnt Ht Hpc Hpinv [] []").
         all: try lkbelow.
         { rewrite /trap_csrs_ext. done. }
@@ -1177,7 +1177,7 @@ Section UwBodies.
         iApply (Release.wp_release_sconf γl a_tx_lock "uart"%string (tx_res γu) G4
                   0%nat true pj (av - 10)%nat ({["uart"]} ∪ lks)
                   ltac:(rewrite HG4a0; apply uw_addv_0)
-                  ltac:(unfold uartwrite_stack in Hav; lia)
+                  ltac:(lia)
                   with "Hcg Ht Hpc Hlk Htok [Hown] Hcnt Hpay").
         { iApply (tx_res_intro γu ((l ++ [f i])%list) with "Hown"). }
         iIntros (CIDr2 Hsr2 MR2) "Hcg Hpc %HcsR2 Hcnt".
@@ -1431,7 +1431,7 @@ Section ProofUartwrite.
       { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
       iApply (wp_caddi16sp_push_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x04))
                 (mword_of_int 59 : mword 6) m av 10%nat true
-                ltac:(unfold uartwrite_stack in Hav; lia) Hpush with "Hcg Hpc Hi04").
+                ltac:(lia) Hpush with "Hcg Hpc Hi04").
       iIntros (CID2 Hs2) "Hcg Hframe Hpc".
       iEval (rewrite Hspm) in "Hframe".
       set (A0 := <[Regidx csp_rs1 := regval_into_reg

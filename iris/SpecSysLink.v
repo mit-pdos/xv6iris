@@ -197,8 +197,7 @@ Local Open Scope Z_scope.
    ([c.addi16sp sp,-304] at +0x00).  Its deepest callee is namei (106);
    nameiparent wants 104, dirlink 100, iunlockput 64, argstr 60, iput 60,
    end_op 58, ilock 44, iupdate 44, begin_op 26, iunlock 26. *)
-Definition K_sys_link : nat := 144%nat.
-
+Notation K_sys_link := (154%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  Three, and the third one is nameiparent's:
    see the header's reference ledger. *)
 Definition sys_link_slots : nat := 3%nat.

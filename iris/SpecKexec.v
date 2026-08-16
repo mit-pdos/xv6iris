@@ -223,8 +223,7 @@ Definition USERSTACK : nat := 1%nat.
    one 168 -> 174.  None of it is a soundness question, it is all just "the
    callee needs six more slots than it did" (SpecReadi.v's header has the
    arithmetic). *)
-Definition K_kexec : nat := 174%nat.
-
+Notation K_kexec := (184%nat) (only parsing).
 (* ===================================================================== *)
 (*  The argument-stack model.                                             *)
 (* ===================================================================== *)

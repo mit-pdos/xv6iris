@@ -187,8 +187,7 @@ Local Open Scope Z_scope.
    has the accounting.  pipewrite (64), begin_op / end_op / ilock / iunlock
    are all below both.  A CONSTANT, not a per-arm bound: the stack a
    function may need is a property of the function (durable-notes.md). *)
-Definition filewrite_stack : nat := (12 + K_writei)%nat.
-
+Notation filewrite_stack := ((12 + K_writei)%nat) (only parsing).
 (* &devsw[mj].write.  [struct devsw] is two function pointers with [read]
    FIRST, so the entry is 16 bytes and this field is at offset 8 -- which is
    what the [slli a5,a5,4] / [ld a5,8(a5)] pair at +0x6c / +0x78 computes.

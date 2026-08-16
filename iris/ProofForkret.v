@@ -149,9 +149,9 @@ Proof.
   intros pcE p ksp Hjlt Hav2 Hpr Hut Hsp Hupt Hnorm Hptwf Hgap Hkw.
   (* the budget in numbers [lia] can see *)
   pose proof Hut as Hut'.
-  unfold K_usertrap, kv_frame_slots, K_syscall, K_sys_exit, K_kexit in Hut'.
+  
   pose proof Hpr as Hpr'.
-  unfold K_prepare_return in Hpr'.
+  
   (* the frame's six slots come off the top and go back on at the exit *)
   assert (Havsum : av = (6 + (trap_res eb + av2))%nat) by lia.
   iIntros "#Htext #Hwire #Hclaimmap Hpc #Hfirst Hcg Hcpu Htc Hclm

@@ -81,8 +81,7 @@ Import Defs.
 
 (* write_head's own frame is 4 slots ([c.addi sp,sp,-32] at +0x00); its
    deepest callee is bread (40).  bwrite/brelse want less. *)
-Definition K_write_head : nat := 44%nat.
-
+Notation K_write_head := (62%nat) (only parsing).
 Definition wp_write_head_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}

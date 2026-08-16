@@ -661,7 +661,7 @@ Section WriteHeadBlocks.
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbw : (K_bwrite <= K - 4)%nat)
-      by (unfold K_bwrite, K_write_head in *; lia).
+      by (lia).
     (* the header image's [n] field, needed HERE (the permit is deposited at
        the bwrite, not at the return) *)
     assert (Hhn_early : hdr_n (f <$> seq 0 1024) = Z.of_nat n).
@@ -779,7 +779,7 @@ Section WriteHeadBlocks.
     iDestruct (wp_next_shift (b := true) (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
-      by (unfold K_brelse, K_write_head in *; lia).
+      by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat eb (proc_addr j)
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
@@ -924,7 +924,7 @@ Section WriteHeadBlocks.
     set (P5 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (P4 !!! Regidx csp_rs1 : mword 64)
                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> P4).
-    assert (Hnk : ((K - 4) + 4)%nat = K) by (unfold K_write_head in HK; lia).
+    assert (Hnk : ((K - 4) + 4)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     assert (Hpp5c : add_vec_int (mword_of_int (KernelSyms.write_head + 0x5a) : mword 64) 2
                     = mword_of_int (KernelSyms.write_head + 0x5c))
@@ -1346,7 +1346,7 @@ Section ProofWriteHead.
     intros pcE pj ret_tgt HK Hgeom Hj Hgl Hbatch Hbelow.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct Hbatch as [HnW HnB].
-    unfold K_write_head in HK.
+    
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
     (* LEVEL 0 TIES THE TWO INDICES, as in [wh_tail]. *)
@@ -1609,7 +1609,7 @@ Section ProofWriteHead.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat eb b lks

@@ -188,7 +188,7 @@ Section ProofFlags2perm.
   Proof.
     cbv beta delta [wp_flags2perm_sconf_body].
     intros pcE fl ret_tgt HK.
-    unfold K_flags2perm in HK.
+    
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec (mm !!! Regidx csp_rs1 : mword 64)
                   (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).

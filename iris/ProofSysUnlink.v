@@ -1382,7 +1382,7 @@ Section ProofSysUnlinkBody.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* ================================================================== *)
@@ -5181,13 +5181,19 @@ Section ProofSysUnlinkBody.
                       : mword 64)) 31 0)))) bmi)
       with "[Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi]" as "Hloadi".
     { rewrite /ic_loaded. iExists dati.
-      iFrame "Hdlnki2 Hdiati Hmetai Haddrsi Hindi Hblocksi".
-      iPureIntro. split_and!.
-      - exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki).
-      - exact (su_setnl_dir_ok icfg_nib dni dati _ Hdoki).
-      - apply dir_dots_ix_not_dir. rewrite su_setnl_type. exact Htynzi.
-      - apply dir_orphan_clean_not_dir. rewrite su_setnl_type. exact Htynzi.
-      - apply dir_uniq_not_dir. rewrite su_setnl_type. exact Htynzi. }
+      iSplit; [iPureIntro; exact (su_setnl_inode_ok cov logstart dni bmi dati _ Hioki) |].
+      iSplit; [iPureIntro; exact (su_setnl_dir_ok icfg_nib dni dati _ Hdoki) |].
+      iSplit; [iPureIntro; apply dir_dots_ix_not_dir;
+               rewrite su_setnl_type; exact Htynzi |].
+      iSplit; [iPureIntro; apply dir_orphan_clean_not_dir;
+               rewrite su_setnl_type; exact Htynzi |].
+      iSplit; [iPureIntro; apply dir_uniq_not_dir;
+               rewrite su_setnl_type; exact Htynzi |].
+      iSplitL "Hdlnki2"; [iExact "Hdlnki2" |].
+      iSplitL "Hdiati"; [iExact "Hdiati" |].
+      iSplitL "Hmetai"; [iExact "Hmetai" |].
+      iSplitL "Haddrsi"; [iExact "Haddrsi" |].
+      iSplitL "Hindi"; [iExact "Hindi" | iExact "Hblocksi"]. }
     iAssert (ity_shot gyi (di_type (su_setnl dni (trunc16 (sign_extend' 64
                (subrange_vec_dec
                   (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
@@ -5201,24 +5207,34 @@ Section ProofSysUnlinkBody.
     iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
       as "#Hesci".
     iDestruct (log_opS_named with "HopS") as (e1) "HopS".
+    pose (dni2 := su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+              (add_vec (zero_extend' 64 (di_nlink dni : mword 16) : mword 64)
+                 (sign_extend' 64
+                    (sign_extend' 12 (mword_of_int 63 : mword 6))))
+              31 0)))).
+    assert (Hcrb2 : false = true ->
+              bmapstart ∈ (Sb2 ∪ {[IBLOCK (zero_extend' 32
+                (dir_inum datd kk : mword 16) : mword 32) inodestart]})).
+    { intros Hfalse. discriminate Hfalse. }
+    assert (Hcru2 : true = true ->
+              IBLOCK (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                inodestart ∈ (Sb2 ∪ {[IBLOCK (zero_extend' 32
+                  (dir_inum datd kk : mword 16) : mword 32) inodestart]})).
+    { intros _. apply elem_of_union_r, elem_of_singleton. reflexivity. }
+    assert (Hnu2 : (iput_units <= c2)%nat).
+    { unfold iput_units. lia. }
     iApply (Iunlockput.wp_iunlockput_gen (CID := D29) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev used2 ks qsi si gyi
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
-              (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                 (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                           : mword 64)
-                    (sign_extend' 64
-                       (sign_extend' 12 (mword_of_int 63 : mword 6))
-                     : mword 64)) 31 0))))
+              dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
               false true false e1 pid (DfracOwn (1/4)) dqb dqs
               E2 (K - 30)%nat eb b lks
-              ltac:(exact Kiup) Hks ltac:(discriminate)
-              ltac:(intros _; set_solver)
+              Kiup Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
-              ltac:(unfold iput_units; lia) Hj Hgl HE2a0 (Hlb "log"%string)
+              Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hkeepi Hsbb Hsbi Hbmres Hpidq
@@ -5230,6 +5246,7 @@ Section ProofSysUnlinkBody.
     iIntros (D30 Hd30 mip n3 used3 Sb3 wh)
       "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi %Husd3 Hbmres Hbsl %Hsb3
        %Hwh %Hwhc %Hn3 HopS Hisl2".
+    clear Hcrb2 Hcru2 Hnu2 dni2.
     assert (Hpcd4 : ret_pc (E2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xd4)) by (rewrite HE2ra; pcw).
     iEval (rewrite Hpcd4) in "Hpc".
@@ -6712,20 +6729,27 @@ Section ProofSysUnlinkBody.
     iDestruct (su_esc_acc cn gfs gi cov logstart kd Hkd with "Hescrows")
       as "#Hescd".
     iDestruct (log_opS_named with "HopS") as (e0) "HopS".
+    pose (dnW2 := su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
+              (add_vec (zero_extend' 64 (di_nlink dnW : mword 16) : mword 64)
+                 (sign_extend' 64
+                    (sign_extend' 12 (mword_of_int 63 : mword 6))))
+              31 0)))).
+    assert (Hcrbd2 : false = true ->
+              bmapstart ∈ (Sbw ∪ {[IBLOCK dinum inodestart]})).
+    { intros Hfalse. discriminate Hfalse. }
+    assert (Hcrud2 : true = true ->
+              IBLOCK dinum inodestart ∈ (Sbw ∪ {[IBLOCK dinum inodestart]})).
+    { intros _. apply elem_of_union_r, elem_of_singleton. reflexivity. }
+    assert (Hnud2 : (iput_units <= S c1)%nat).
+    { unfold iput_units. lia. }
     iApply (Iunlockput.wp_iunlockput_gen (CID := D20) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gild gisld cov logstart bmapstart
-              inodestart nib size dev usedw kd qdi sd gyd dinum (su_setnl dnW (trunc16 (sign_extend' 64 (subrange_vec_dec
-                  (add_vec (zero_extend' 64 (di_nlink dnW : mword 16)
-                            : mword 64)
-                     (sign_extend' 64
-                        (sign_extend' 12 (mword_of_int 63 : mword 6))
-                      : mword 64)) 31 0)))) bm'
+              inodestart nib size dev usedw kd qdi sd gyd dinum dnW2 bm'
               (S c1) (Sbw ∪ {[IBLOCK dinum inodestart]}) false true false e0 pid (DfracOwn (1/4)) dqb dqs
               C5 (K - 30)%nat eb b lks
-              ltac:(exact Kiup) Hkd ltac:(discriminate)
-              ltac:(intros _; set_solver)
+              Kiup Hkd Hcrbd2 Hcrud2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hdiblk Hdiblog Hdinb Hcovb
-              ltac:(unfold iput_units; lia) Hj Hgl HC5a0 (Hlb "log"%string)
+              Hnud2 Hj Hgl HC5a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                     Hescd Hireg Hslkd Hslkdq Hslpidd Hdepd Hidevd Hiinumd
                     Hivalidd Hloadd Hshotd2 Hkeepd Hsbb Hsbi Hbmres Hpidq
@@ -6737,6 +6761,7 @@ Section ProofSysUnlinkBody.
     iIntros (D21 Hd21 mup n2 used2 Sb2 wg)
       "%Hcsup Hcg Hown _ _ Hpc Hpidq Hsbb Hsbi %Husd2 Hbmres Hbsl %Hsb2 %Hwg
        %Hwgc %Hn2 HopS Hisl".
+    clear Hcrbd2 Hcrud2 Hnud2 dnW2.
     assert (Hpcbe : ret_pc (C5 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xbe)) by (rewrite HC5ra; pcw).
     iEval (rewrite Hpcbe) in "Hpc".
@@ -7058,24 +7083,34 @@ Section ProofSysUnlinkBody.
     iDestruct (su_esc_acc cn gfs gi cov logstart ks Hks with "Hescrows")
       as "#Hesci".
     iDestruct (log_opS_named with "HopS") as (e1) "HopS".
+    pose (dni2 := su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
+              (add_vec (zero_extend' 64 (di_nlink dni : mword 16) : mword 64)
+                 (sign_extend' 64
+                    (sign_extend' 12 (mword_of_int 63 : mword 6))))
+              31 0)))).
+    assert (Hcrb2 : false = true ->
+              bmapstart ∈ (Sb2 ∪ {[IBLOCK (zero_extend' 32
+                (dir_inum datd kk : mword 16) : mword 32) inodestart]})).
+    { intros Hfalse. discriminate Hfalse. }
+    assert (Hcru2 : true = true ->
+              IBLOCK (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
+                inodestart ∈ (Sb2 ∪ {[IBLOCK (zero_extend' 32
+                  (dir_inum datd kk : mword 16) : mword 32) inodestart]})).
+    { intros _. apply elem_of_union_r, elem_of_singleton. reflexivity. }
+    assert (Hnu2 : (iput_units <= c2)%nat).
+    { unfold iput_units. lia. }
     iApply (Iunlockput.wp_iunlockput_gen (CID := D29) gs jx gl gu gd gk pd pav
               pu bn g gfs gi cn gtl gili gisli cov logstart bmapstart
               inodestart nib size dev used2 ks qsi si gyi
               (zero_extend' 32 (dir_inum datd kk : mword 16) : mword 32)
-              (su_setnl dni (trunc16 (sign_extend' 64 (subrange_vec_dec
-                 (add_vec (zero_extend' 64 (di_nlink dni : mword 16)
-                           : mword 64)
-                    (sign_extend' 64
-                       (sign_extend' 12 (mword_of_int 63 : mword 6))
-                     : mword 64)) 31 0))))
+              dni2
               bmi c2 (Sb2 ∪ {[IBLOCK (zero_extend' 32
                 (dir_inum datd kk : mword 16) : mword 32) inodestart]})
               false true false e1 pid (DfracOwn (1/4)) dqb dqs
               E2 (K - 30)%nat eb b lks
-              ltac:(exact Kiup) Hks ltac:(discriminate)
-              ltac:(intros _; set_solver)
+              Kiup Hks Hcrb2 Hcru2
               Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist0 Hiblki Hiblogi Hinb Hcovb
-              ltac:(unfold iput_units; lia) Hj Hgl HE2a0 (Hlb "log"%string)
+              Hnu2 Hj Hgl HE2a0 (Hlb "log"%string)
               with "Hcg Hown [] [] Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
                     Hesci Hireg Hslki Hslkiq Hslpidi Hdepi Hidevi Hiinumi
                     Hivalidi Hloadi Hshoti2 Hkeepi Hsbb Hsbi Hbmres Hpidq
@@ -7087,6 +7122,7 @@ Section ProofSysUnlinkBody.
     iIntros (D30 Hd30 mip n3 used3 Sb3 wh)
       "%Hcsip Hcg Hown Htce Hcce Hpc Hpidq Hsbb Hsbi %Husd3 Hbmres Hbsl %Hsb3
        %Hwh %Hwhc %Hn3 HopS Hisl2".
+    clear Hcrb2 Hcru2 Hnu2 dni2.
     assert (Hpcd4 : ret_pc (E2 !!! Regidx Rra : mword 64)
                     = mword_of_int (SU + 0xd4)) by (rewrite HE2ra; pcw).
     iEval (rewrite Hpcd4) in "Hpc".

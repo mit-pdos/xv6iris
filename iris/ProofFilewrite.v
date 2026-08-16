@@ -374,40 +374,40 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 
 Lemma fw_K12 (K : nat) : (filewrite_stack <= K)%nat -> (12 <= K)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_writei (K : nat) :
   (filewrite_stack <= K)%nat -> (K_writei <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_writei. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_pipe (K : nat) :
   (filewrite_stack <= K)%nat -> (pipewrite_stack <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack, pipewrite_stack. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_cons (K : nat) :
   (filewrite_stack <= K)%nat -> (consolewrite_stack <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_ilock (K : nat) :
   (filewrite_stack <= K)%nat -> (K_ilock <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_ilock. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_iunlock (K : nat) :
   (filewrite_stack <= K)%nat -> (K_iunlock <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_iunlock. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_begin_op (K : nat) :
   (filewrite_stack <= K)%nat -> (K_begin_op <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_begin_op. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fw_av_end_op (K : nat) :
   (filewrite_stack <= K)%nat -> (K_end_op <= K - 12)%nat.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack, K_end_op. lia. Qed.
+Proof. lia. Qed.
 
 (* The frame trade-back, at the arity the epilogue wants. *)
 Lemma fw_K_back (K : nat) :
   (filewrite_stack <= K)%nat -> ((K - 12) + 12)%nat = K.
-Proof. unfold filewrite_stack, K_writei, consolewrite_stack. lia. Qed.
+Proof. lia. Qed.
 
 (* ---------------------------------------------------------------------- *)
 (*  THE BUDGET.                                                            *)

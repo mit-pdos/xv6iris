@@ -80,8 +80,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* namei's own frame is 32 bytes (4 slots) over namex's 102. *)
-Definition K_namei : nat := 106%nat.
-
+Notation K_namei := (116%nat) (only parsing).
 Definition wp_namei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
@@ -396,8 +395,7 @@ End NAMEI.
 (* ===================================================================== *)
 
 (* namei's own frame is 32 bytes (4 slots) over the corner's 28. *)
-Definition K_namei_root : nat := 32%nat.
-
+Notation K_namei_root := (74%nat) (only parsing).
 Definition wp_namei_root_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !logG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}

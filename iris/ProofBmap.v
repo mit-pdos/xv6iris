@@ -679,7 +679,7 @@ Section BmapEpilogue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hled.
-    unfold K_bmap in HK.
+    
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hidev Hmap Hblocks Hsl Hkit Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
     iPoseProof (bmi_8a with "Htext") as "Hi8a".
@@ -1027,7 +1027,7 @@ Section BmapRelease.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hs4 Hkk Hwf' Hag Hkeep Hnoal Hrv Hdat Hled Hbc.
-    pose proof HK as HK'. unfold K_bmap in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hprocs Hframe Hppid
               Hidev Hmap Hblocks Hkit Hlk Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -1080,7 +1080,7 @@ Section BmapRelease.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 6)%nat) by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev ibn dq T1 (K - 6)%nat eb (proc_addr j) bsX bsdX dX b
               _ HKbl Hkk HT1a0 Hbc
@@ -1260,7 +1260,7 @@ Section BmapTail.
   Proof.
     intros HK Hgeom HwfI Hfbn Hq Hagr Hindnz HakI Haknz Hn3i Hcrb Hcri Hled0 Hbud2
            HSbI Hba Hlw Hj Hgl Hsp Hthr Hs1 Hs2 Hs3 Hbc Hlog.
-    pose proof HK as HK'. unfold K_bmap in HK'.
+    pose proof HK as HK'. 
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
     (* the indirect block is a covered home block with a small number *)
@@ -1373,7 +1373,7 @@ Section BmapTail.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 6)%nat) by (lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bmI) dq
               I2 (K - 6)%nat eb b lks
@@ -1697,7 +1697,7 @@ Section BmapTail.
                    ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
       iDestruct (wp_next_shift (b := true) (CIDa := CID3) (CIDb := CID14) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
-      assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
+      assert (HKba : (K_balloc <= K - 6)%nat) by (lia).
       (* the two units balloc wants in hand, out of what the tail's premise
          guarantees; [w] is what is left AFTER balloc's own credited spend
          and the [log_write] that follows it *)
@@ -1949,7 +1949,7 @@ Section BmapTail.
           rewrite /G2 upd_ne; [| regne]. exact (HG1thr c Hcs N2 N8 N9 N18 N19 N20). }
         iDestruct (cpu_own_transport CID15 CID20 0 eb (proc_addr j) b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        assert (HKlw : (K_log_write <= K - 6)%nat) by (unfold K_log_write; lia).
+        assert (HKlw : (K_log_write <= K - 6)%nat) by (lia).
         iDestruct (bm_slots_split bn 1 1 with "Hsl") as "[Hsl1 Hslr]".
         iApply (Hlogwrite _ _ bn γ γfs γd cov logstart dev kk pidv
                   (bm_ind bmI) (ind_bytes (<[q := blk]> (bm_ent bmI)))
@@ -2184,7 +2184,7 @@ Section ProofBmapMain.
   Proof.
     cbv beta delta [bm_gen_stmt].
     intros pcE pj ret_tgt bnw HK Hn5i Hcr0 Haknz Hgeom Hfbn Hwf Hj Hgl Ha0 Ha1.
-    pose proof HK as HK'. unfold K_bmap in HK'.
+    pose proof HK as HK'. 
     pose proof Hfbn as Hfbn0. unfold MAXFILE in Hfbn0.
     pose proof (blkmap_wf_dir_len cov logstart bm Hwf) as Hdirlen.
     pose proof (blkmap_wf_ent_len cov logstart bm Hwf) as Hentlen.
@@ -2598,7 +2598,7 @@ Section ProofBmapMain.
                      ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID17) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
-        assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
+        assert (HKba : (K_balloc <= K - 6)%nat) by (lia).
         remember (n - 2)%nat as u2 eqn:Hu2eq.
         assert (Hnn : n = (2 + u2)%nat)
           by (pose proof (bmap_need_ge2 cr (bmap_ind fbn)); lia).
@@ -3174,7 +3174,7 @@ Section ProofBmapMain.
                      ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
         iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID19) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
-        assert (HKba : (K_balloc <= K - 6)%nat) by (unfold K_balloc; lia).
+        assert (HKba : (K_balloc <= K - 6)%nat) by (lia).
         remember (n - 2)%nat as u2 eqn:Hu2eq.
         assert (Hnn : n = (2 + u2)%nat)
           by (pose proof (bmap_need_ge2 cr (bmap_ind fbn)); lia).

@@ -66,11 +66,11 @@ Proof. reflexivity. Qed.
    with any mword in context (the bitvector zify hook), so every numeric
    side condition of a leaf or a callee spec is discharged by one of these. *)
 Lemma vdrw_K12 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (12 <= K)%nat.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrw_K10 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (10 <= K - 12)%nat.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrw_K22 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (22 <= K - 12)%nat.
-Proof. unfold K_virtio_disk_rw. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrw_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 
@@ -482,7 +482,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* the sleep/free_desc stack budgets, mword-free *)
 Lemma vdrwb_K20 (K : nat) : (K_virtio_disk_rw <= K)%nat -> (K_free_desc <= K - 12)%nat.
-Proof. unfold K_virtio_disk_rw, K_free_desc. lia. Qed.
+Proof. lia. Qed.
 Lemma vdrwb_lvl1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 

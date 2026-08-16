@@ -87,8 +87,7 @@ Import Defs.
 (* end_op's own frame is 8 slots ([c.addi16sp sp,-64] at +0x00); its deepest
    callee is install_trans (50).  write_head wants 44, bread 40, sleep-free
    acquire/release 10. *)
-Definition K_end_op : nat := 58%nat.
-
+Notation K_end_op := (76%nat) (only parsing).
 Definition wp_end_op_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}

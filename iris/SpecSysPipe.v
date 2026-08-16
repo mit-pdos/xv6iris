@@ -128,8 +128,7 @@ Local Open Scope Z_scope.
    wants 74, fileclose 68, copyout 50, argaddr 18, fdalloc 14, myproc 10 --
    so pipealloc sets the bound, and what makes pipealloc the deepest is the
    fileclose on its own error path. *)
-Definition sys_pipe_stack : nat := 82%nat.
-
+Notation sys_pipe_stack := (98%nat) (only parsing).
 Section SpecSysPipe.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
 

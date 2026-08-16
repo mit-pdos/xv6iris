@@ -130,7 +130,8 @@ Require Import WpUart.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import InodeRegion.
-Require Import SpecSysExit.   (* [K_sys_exit]: the deepest entry in the table *)
+Require Import SpecSysExit.
+Require Import SpecSysExec.   (* [K_sys_exec]: the deepest entry in the table *)
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import ProcAvail.
@@ -142,8 +143,7 @@ Import Defs.
    a literal, so a change to kexit's budget cannot silently leave this one
    behind -- the drift would be invisible until a caller's [av] premise
    failed somewhere far away. *)
-Definition K_syscall : nat := (4 + K_sys_exit)%nat.
-
+Notation K_syscall := ((4 + K_sys_exec)%nat) (only parsing).
 Definition wp_syscall_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

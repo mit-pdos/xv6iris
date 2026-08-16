@@ -417,7 +417,7 @@ Section ProofGrowproc.
   Proof.
     cbv beta delta [wp_growproc_sconf_body].
     intros pcE nv ret_tgt Hav.
-    unfold growproc_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).

@@ -899,7 +899,7 @@ Proof. lia. Qed.
 Lemma kmk_consume (nb gt g7 : nat) :
   (166 < nb)%nat -> gt = 101%nat -> g7 = 0%nat ->
   ((nb - (1 + gt)) - (64 + g7))%nat = (nb - K_kvmmake)%nat.
-Proof. unfold K_kvmmake. lia. Qed.
+Proof. lia. Qed.
 
 (* ===================================================================== *)
 (* STEP 3-4: prologue (4-slot frame push, ra/s0/s1 saves, s0:=sp+32),     *)
@@ -1089,7 +1089,7 @@ Section KvmmakeBody.
     iEval (rewrite Hret0e) in "Hpc".
     (* success arm: nb > 166 so kalloc cannot fail *)
     assert (Hcnt : Some nb = Some (S (nb - 1))).
-    { f_equal. unfold K_kvmmake in Hnb. lia. }
+    { f_equal. lia. }
     iEval (rewrite Hcnt) in "Hkpost".
     iDestruct (kalloc_post_success with "Hkpost") as "(%Hpv & Hpage & Havail2)".
     assert (Hav1 : Some (nb - 1)%nat = avail_sub (Some nb) 1).
@@ -2121,7 +2121,7 @@ Section KvmmakeBody.
     intros Hlvl HK Hex Hbelow.
     destruct Hex as (nb & Hon & Hnbk).
     subst lvl. subst on.
-    assert (Hnb : (166 < nb)%nat) by (unfold K_kvmmake in Hnbk; exact Hnbk).
+    assert (Hnb : (166 < nb)%nat) by (exact Hnbk).
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
     iIntros "Hcg Hcnt #Htext Hpc Henv Hcont".
     (* ---- prologue: frame + root kalloc + memset -> pt_empty_node bppn ---- *)

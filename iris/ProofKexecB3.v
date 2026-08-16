@@ -859,7 +859,7 @@ Section KexecB3Body.
   Proof.
     intros HK Hk Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Hdevc
            Hsp Hra Hs0 Hs1 Hs2.
-    pose proof HK as HK'. unfold K_kexec in HK'.
+    pose proof HK as HK'. 
     assert (Hmb : (Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)%Z)
       by (vm_compute; reflexivity).
     iIntros "#Htext #Hpanic #Hfab Hst Hcont Hout".
@@ -1102,7 +1102,7 @@ Section KexecB3Body.
     iApply (Readi.wp_readi_sconf gs jp gl gu gd gk pd pav pu bn gfs ga gf
               cov logstart dev (ientry kf) bmf datl dnf false offn 56%nat phb V
               pidv (DfracOwn (1/4)) (DfracOwn (1/2)) U5 (K - 68)%nat true
-              true ∅ ltac:(unfold K_readi; lia) Hlg Hbmwf Hbmcov Hszb
+              true ∅ ltac:(lia) Hlg Hbmwf Hbmcov Hszb
               ltac:(rewrite HoffnZ; lia)
               ltac:(intros Hg; rewrite HoffnZ in Hg |- *;
                     pose proof Hszb as Hs; rewrite Hmb in Hs;
@@ -1798,7 +1798,7 @@ Section KexecB3Body.
                   rewrite /U14 upd_ne; [| reg_ne_side].
                   exact (HU13get r Hr Hne). }
                 iApply (Flags2perm.wp_flags2perm_sconf U15 (K - 68)%nat true
-                          (proc_addr jp) ltac:(unfold K_flags2perm; lia)
+                          (proc_addr jp) ltac:(lia)
                           with "Hcg Htext Hpc").
                 iIntros (CIDz2 Hsz2 M3) "Hcg Hpc %Hcsf %Hf2p".
                 assert (Hpc174 : ret_pc (U15 !!! Regidx Rra)
@@ -3177,7 +3177,7 @@ Section KexecB3Close.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs.
-    pose proof HK as HK'. unfold K_kexec in HK'.
+    pose proof HK as HK'. 
     iIntros "#Htext #Hpanic #Hfab Hst Hout".
     rewrite /kxc_at_1a4.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs4 & %HMs6) &
@@ -3252,7 +3252,7 @@ Section KexecB3Close.
               gi cn gtl gilf gislf cov logstart bmapstart inodestart nib size
               dev used2 kf qf sf gyf inumf dnf bmf n2 pidv (DfracOwn (1/4))
               dqb dqs B2 (K - 68)%nat true true ∅
-              ltac:(unfold K_iunlockput, K_iput in *; lia) Hk Hlg Hsz Hbm0 Hbmc
+              ltac:(lia) Hk Hlg Hsz Hbm0 Hbmc
               Hbml Hins0 Hibc Hibl Hib Hcovb Hn2 Hjp Hgs HB2a0
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hitab Hitinv Hesck
                     Hireg Hslkk Hslkd Hslpid Hdep Hidev Hiinum Hivalid Hload
@@ -3308,7 +3308,7 @@ Section KexecB3Close.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (EndOp.wp_end_op_sconf gs jp gl gu gd gk pd pav pu bn g gfs
               cov logstart dev n3 pidv (DfracOwn (1/4)) B3 (K - 68)%nat
-              true true ∅ ltac:(unfold K_end_op; lia) Hlg Hjp Hgs
+              true true ∅ ltac:(lia) Hlg Hjp Hgs
               with "Hcg Hcnt [] [] Htext Hpc Hpanic Hbio Hlogc Hcrash Hcert
                     Hppid Hprocs Hdevi Hdgeom Hdlock Hlog").
     all: try lkbelow.

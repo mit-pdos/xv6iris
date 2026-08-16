@@ -372,7 +372,7 @@ Section ProofUartPutc.
   Proof.
     cbv beta delta [wp_uartputc_sconf_body].
     intros ra_idx a0_idx pcE ra0 a00 ret_tgt sb HK Hn Hfresh.
-    assert (HK14 : (14 <= K)%nat) by (unfold uartputc_stack in HK; exact HK).
+    assert (HK14 : (14 <= K)%nat) by (exact HK).
     assert (HK4 : (4 <= K)%nat) by lia.
     assert (Hav : (10 <= K - 4)%nat) by lia.
     pose (sp0 := (m0 !!! Regidx csp_rs1 : mword 64)).

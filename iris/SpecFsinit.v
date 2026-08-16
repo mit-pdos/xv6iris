@@ -165,8 +165,7 @@ Local Open Scope Z_scope.
 (* fsinit's own frame is 32 bytes (4 slots) -- [c.addi sp,sp,-32] at +0x00,
    with ra/s0/s1/s2 pushed at 24/16/8/0.  Its deepest callee is ireclaim
    (68); initlog wants 56, bread 40, brelse 26, memmove 2. *)
-Definition K_fsinit : nat := 72%nat.
-
+Notation K_fsinit := (88%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE SUPERBLOCK: ITS EIGHT CELLS, ITS 32 BYTES, AND ITS MAGIC          *)
 (*                                                                        *)

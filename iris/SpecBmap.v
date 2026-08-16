@@ -131,8 +131,7 @@ Local Open Scope Z_scope.
    (s4 rides in the same frame, at slot 0, on the indirect paths).  Its
    deepest callee is balloc (58, itself dominated by printk's out-of-blocks
    path); bread wants 40 and log_write 18. *)
-Definition K_bmap : nat := 64%nat.
-
+Notation K_bmap := (74%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE ARMS, AS THE CALLER READS THEM OFF THE BLOCK MAP                  *)
 (*  (fs-icache.md section 18: "bmap: ONE credit (the bitmap), arm-wise    *)

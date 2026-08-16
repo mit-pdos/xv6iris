@@ -124,17 +124,17 @@ Set Printing Depth 40.
    discharges them cannot run at the call site, where the context holds a
    register file (durable-notes, "an [mword] merely in CONTEXT"). *)
 Lemma fst_K10 (K : nat) : (filestat_stack <= K)%nat -> (10 <= K)%nat.
-Proof. unfold filestat_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma fst_av_myproc (K : nat) : (filestat_stack <= K)%nat -> (10 <= K - 10)%nat.
-Proof. unfold filestat_stack. lia. Qed.
+Proof. lia. Qed.
 Lemma fst_av_ilock (K : nat) : (filestat_stack <= K)%nat -> (K_ilock <= K - 10)%nat.
-Proof. unfold filestat_stack, K_ilock. lia. Qed.
+Proof. lia. Qed.
 Lemma fst_av_stati (K : nat) : (filestat_stack <= K)%nat -> (K_stati <= K - 10)%nat.
-Proof. unfold filestat_stack, K_stati. lia. Qed.
+Proof. lia. Qed.
 Lemma fst_av_iunlock (K : nat) : (filestat_stack <= K)%nat -> (K_iunlock <= K - 10)%nat.
-Proof. unfold filestat_stack, K_iunlock. lia. Qed.
+Proof. lia. Qed.
 Lemma fst_av_copyout (K : nat) : (filestat_stack <= K)%nat -> (52 <= K - 10)%nat.
-Proof. unfold filestat_stack. lia. Qed.
+Proof. lia. Qed.
 
 Lemma fst_noff0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z.
 Proof. change (2 ^ 31)%Z with 2147483648%Z. lia. Qed.

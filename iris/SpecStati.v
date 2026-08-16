@@ -130,8 +130,7 @@ Section StatBuf.
 End StatBuf.
 
 (* stati's own frame is 16 bytes (2 slots); it calls nothing. *)
-Definition K_stati : nat := 2%nat.
-
+Notation K_stati := (2%nat) (only parsing).
 Definition wp_stati_sconf_body
     `{!riscvGS Σ, !sieG Σ, !diskGhostG Σ, !fsLogG Σ}
     `{GEN : GenId} `{CID : CpuId}

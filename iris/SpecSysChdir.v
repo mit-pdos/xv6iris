@@ -147,8 +147,7 @@ Local Open Scope Z_scope.
    at +0x00), of which sixteen are the [path] buffer.  Its deepest callee is
    namei (106); iunlockput wants 64, argstr 60, iput 60, end_op 58, ilock
    44, begin_op 26, iunlock 26, myproc 10. *)
-Definition K_sys_chdir : nat := 126%nat.
-
+Notation K_sys_chdir := (136%nat) (only parsing).
 Section SpecSysChdir.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ}.

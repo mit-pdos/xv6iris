@@ -8147,7 +8147,7 @@ Section ProofPrintk.
   Proof using All.
     cbv beta delta [wp_printk_sconf_body].
     intros rai a0i pcE0 ra00 rtgt fmtv0 HK Hflen Hnn Hkinds Hdlen Hn2 Hbelow.
-    unfold printk_stack in HK.
+    
     assert (HK24 : (24 <= K)%nat) by lia.
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc Hfmt Hdescs #Hlk #Hdev #Htxl #Hsub Hcont".
     iDestruct (cpu_own_eb_agree m0 K n eb p b with "Hcg Hcnt") as %Houtb.

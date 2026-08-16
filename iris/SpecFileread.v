@@ -193,8 +193,7 @@ Local Open Scope Z_scope.
    piperead and consoleread 62, ilock 44, iunlock 26.  A CONSTANT, not a
    per-arm bound: the stack a function may need is a property of the function
    (durable-notes.md). *)
-Definition fileread_stack : nat := (6 + K_readi)%nat.
-
+Notation fileread_stack := ((6 + K_readi)%nat) (only parsing).
 (* NDEV, as the bounds test reads it: [bltu a4,a3] with a4 = 9 against the
    ZERO-EXTENDED 16-bit major, so "in range" is exactly [major <= 9] and a
    negative [short] is caught by the zero extension rather than by a signed

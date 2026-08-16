@@ -675,7 +675,7 @@ Section WriteiRet.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
            Hwf' Hhz' Hadr' Hsz' Hcov' Hcap' Hsized' Hdb Hd0 Hdk Hrange Hker Harm
            Hlo Hhi Hsbsub Hwi16 Hwiany Hwiat Hext.
-    pose proof HK as HK'. unfold K_writei in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop Hcont".
     iDestruct (CpuOwn.cpu_own_eb_agree with "Hcg Hcnt") as %Hbm.
@@ -1079,7 +1079,7 @@ Section WriteiJoin.
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hdk Hrange Hker Htotn Hdneq
            Hlo Hhi Hhi1 Hsbsub Hwi16 Hext Hlkbelow.
-    pose proof HK as HK'. unfold K_writei in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
@@ -1150,7 +1150,7 @@ Section WriteiJoin.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKiu : (K_iupdate <= K - 14)%nat) by (unfold K_iupdate; lia).
+    assert (HKiu : (K_iupdate <= K - 14)%nat) by (lia).
     assert (Hdirlen : length (bm_dir bm') = NDIRECT)
       by exact (blkmap_wf_dir_len cov logstart bm' Hwf').
     iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
@@ -1457,7 +1457,7 @@ Section WriteiSize.
            Hrngt Hsized'
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hdk Hrange Hker Htotn Hlo Hhi Hhi1 Hsbsub
            Hwi16 Hext Hlkbelow.
-    pose proof HK as HK'. unfold K_writei in HK'.
+    pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
     (* the coverage the join needs: whichever size [wi_dinode] installs is
        covered, because both candidates are *)
@@ -2102,7 +2102,7 @@ Section WriteiLoop.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hstab Hnlk Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
-    pose proof HK as HK'. unfold K_writei in HK'.
+    pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hszdn, Hofflt, Hnlt.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -2200,7 +2200,7 @@ Section WriteiLoop.
                  ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDa3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbm : (K_bmap <= K - 14)%nat) by (unfold K_bmap; lia).
+    assert (HKbm : (K_bmap <= K - 14)%nat) by (lia).
     (* the allocation bundle opens for exactly this call and closes again
        right after: [bm_bitmap]'s index is [ba_used A] throughout, so the
        loop invariant never mentions the bitmap's current set. *)
@@ -2513,7 +2513,7 @@ Section WriteiLoop.
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextc") as "Hextc".
       iDestruct (IntrDefs.cpu_claim_ext_transport CIDa4 CIDa8 eb (proc_addr j)
                    ltac:(rewrite Hbm; wp_next_chain) with "Hextm") as "Hextm".
-      assert (HKbr : (K_bread <= K - 14)%nat) by (unfold K_bread; lia).
+      assert (HKbr : (K_bread <= K - 14)%nat) by (lia).
       iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
       (* BORROW the pid share for bread, and close it again at once: the
          body below hands the source bracket WHOLE to either_copyin. *)
@@ -2905,7 +2905,7 @@ Section WriteiLoop.
                   (proc_addr j) pidv (upd_upt V PI) user mm
                   (fun jj => src_bytes (tot + jj)%nat)
                   (fun i => (data2 fbn) !!! (o + i)%nat) b lks
-                  ltac:(unfold either_copyin_stack; lia)
+                  ltac:(lia)
                   ltac:(rewrite HD8a1; exact Husv) HD8a3
                   ltac:(destruct user;
                         [change (2 ^ 64)%Z with 18446744073709551616%Z
@@ -3066,7 +3066,7 @@ Section WriteiLoop.
           assert (HF2a0 : F2 !!! Regidx Ra0 = bnode kkb) by lkp.
           iDestruct (cpu_own_transport CIDb9 CIDc3 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          assert (HKlw : (K_log_write <= K - 14)%nat) by (unfold K_log_write; lia).
+          assert (HKlw : (K_log_write <= K - 14)%nat) by (lia).
           iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
           (* THE ABSORPTION, claimed as a decidable read of the op's set: if
              bmap just allocated this data block then balloc's [bzero]
@@ -3205,7 +3205,7 @@ Section WriteiLoop.
           assert (HF4a0 : F4 !!! Regidx Ra0 = bnode kkb) by lkp.
           iDestruct (cpu_own_transport CIDc4 CIDc6 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          assert (HKbl : (K_brelse <= K - 14)%nat) by (unfold K_brelse; lia).
+          assert (HKbl : (K_brelse <= K - 14)%nat) by (lia).
           (* BORROW the pid share for brelse.  The bracket is now at
              [upd_upt V P2] -- either_copyin extended the descriptor -- and
              the borrow closes before this iteration hands the bracket on. *)
@@ -3592,7 +3592,7 @@ Section WriteiLoop.
           assert (HJ2s1 : J2 !!! Regidx Rs1 = bnode kkb) by lkp.
           iDestruct (cpu_own_transport CIDb9 CIDd3 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          assert (HKlw : (K_log_write <= K - 14)%nat) by (unfold K_log_write; lia).
+          assert (HKlw : (K_log_write <= K - 14)%nat) by (lia).
           iDestruct (wi_slots_split bn 1 1 with "Hsl2") as "[Hsla Hslb]".
           (* THE ABSORPTION, claimed as a decidable read of the op's set: if
              bmap just allocated this data block then balloc's [bzero]
@@ -3714,7 +3714,7 @@ Section WriteiLoop.
           assert (HJ4a0 : J4 !!! Regidx Ra0 = bnode kkb) by lkp.
           iDestruct (cpu_own_transport CIDd4 CIDd6 0 eb (proc_addr j) b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          assert (HKbl : (K_brelse <= K - 14)%nat) by (unfold K_brelse; lia).
+          assert (HKbl : (K_brelse <= K - 14)%nat) by (lia).
           (* the same borrow on the break arm *)
           iDestruct (wi_src_pid γf j pidv dq user (upd_upt V P2)
                        (m !!! Regidx Ra2 : mword 64) n src_bytes with "Hsrc")
@@ -3993,7 +3993,7 @@ Section WriteiMain.
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Hbelow.
     (* the whole allocation side travels as ONE record from here down *)
     set (A := MkBmAlloc γ bmapstart size used dqb dqbs γpr).
-    pose proof HK as HK'. unfold K_writei in HK'.
+    pose proof HK as HK'. 
     change (2 ^ 31)%Z with 2147483648%Z in Hsum, Hszdn.
     assert (Hofflt : (Z.of_nat off < 2147483648)%Z) by lia.
     assert (Hnlt : (Z.of_nat n < 2147483648)%Z) by lia.

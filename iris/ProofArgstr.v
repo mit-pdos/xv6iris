@@ -94,7 +94,7 @@ Section ProofArgstr.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
     intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31 Hlkbelow.
-    unfold argstr_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).
@@ -386,7 +386,7 @@ Section ProofArgstr.
       rewrite /A3 upd_ne; [| congruence].
       rewrite /A2 upd_ne; [| congruence].
       rewrite /A1 upd_ne; [| congruence]. apply HthrA; assumption. }
-    assert (HKfs : (fetchstr_stack <= av - 4)%nat) by (unfold fetchstr_stack; lia).
+    assert (HKfs : (fetchstr_stack <= av - 4)%nat) by (lia).
     iEval (rewrite -HA3a1) in "Hbuf".
     (* ---- fetchstr(addr, buf, max) ---- *)
     iDestruct (cpu_own_transport CID10 CID13 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".

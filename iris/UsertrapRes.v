@@ -102,8 +102,7 @@ Import Defs.
    [intr_on] pays for them out of its.  Only the syscall arm needs it, but a
    function has one budget.  The other four arms never re-enable, so they
    fit in [4 + K_syscall] and nothing there notices. *)
-Definition K_usertrap : nat := (4 + kv_frame_slots + K_syscall)%nat.
-
+Notation K_usertrap := ((4 + kv_frame_slots + K_syscall)%nat) (only parsing).
 Section UsertrapRes.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
@@ -1184,7 +1183,7 @@ Section UsertrapRes.
     (K_usertrap <= av)%nat -> (trap_res b + nx)%nat = (av - 4)%nat ->
     (K_syscall <= nx)%nat.
   Proof.
-    unfold K_usertrap, trap_res, kv_frame_slots. destruct b; lia.
+    unfold trap_res. destruct b; lia.
   Qed.
 
   (* ...and the STRONGER bound the [csrsi] at +0x9e needs, which is available
@@ -1196,7 +1195,7 @@ Section UsertrapRes.
   Lemma ut_nx_bound_off (av nx : nat) :
     (K_usertrap <= av)%nat -> (trap_res false + nx)%nat = (av - 4)%nat ->
     (kv_frame_slots + K_syscall <= nx)%nat.
-  Proof. unfold K_usertrap, trap_res, kv_frame_slots. lia. Qed.
+  Proof. unfold trap_res. lia. Qed.
 
   (* WHAT THE FLIP AT +0x9e TAKES OUT OF THE PER-CPU BUNDLE.  The enabling
      leaf wants the counting token and the cells SEPARATELY (at the enabled

@@ -1483,12 +1483,13 @@ Section KernelvecHandler.
        mentions -- see [kv_file_restore]. *)
     iDestruct (gpr_file_x0 Me (mword_of_int 0 : mword 5)
                  ltac:(vm_compute; reflexivity) with "Hfile") as "[%Hx0m Hfile]".
-    (* ---- SPLIT THE CARVE.  78 + av below the interrupted sp: kernelvec's
-           own 32-slot frame on top, and [46 + av] underneath that ARE
-           kerneltrap's cone budget -- so its [kerneltrap_stack <= av']
-           premise is [lia] with nothing to supply. ---- *)
-    assert (Hkvs : (trap_res false + (trap_res true + av))%nat = (32 + (46 + av))%nat)
-      by (unfold trap_res, kv_frame_slots; lia).
+    (* ---- SPLIT THE CARVE.  [kv_frame_slots] = 90 + av below the interrupted
+           sp: kernelvec's own 32-slot frame on top, and [58 + av] underneath
+           that ARE kerneltrap's cone budget -- so its [kerneltrap_stack <= av']
+           premise is [lia] with nothing to supply.  The 58 is
+           [kv_frame_slots - 32] and moves with it. ---- *)
+    assert (Hkvs : (trap_res false + (trap_res true + av))%nat = (32 + (58 + av))%nat)
+      by (unfold trap_res; lia).
     iEval (rewrite Hkvs stack_own_app) in "Hstk".
     iDestruct "Hstk" as "[Hstk Hdeep]".
 
@@ -1665,7 +1666,7 @@ Section KernelvecHandler.
       { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
       repeat split; try assumption; reflexivity. }
-    iAssert (sie_cap (kv_m2 Me) (46 + av) false p)
+    iAssert (sie_cap (kv_m2 Me) (58 + av) false p)
       with "[Hdeep Hbit1 Htlbinv Hq0]" as "Hcapn".
     { rewrite /sie_cap. iSplitL "Hdeep". { rewrite Hsp_l. iExact "Hdeep". }
       iSplitL "Hbit1 Htlbinv".
@@ -1674,8 +1675,8 @@ Section KernelvecHandler.
     iDestruct (sie_cap_gpr_join with "Hhs Hscn Hcapn [Hfile]") as "Hcgk".
     { rewrite Hpin2. iExact "Hfile". }
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γdk γtl γs pd pav pu
-              (kv_m2 Me) (46 + av) p pc0 sc tv ∅
-              Hgs ltac:(unfold kerneltrap_stack; lia) Hdi Hpc0
+              (kv_m2 Me) (58 + av) p pc0 sc tv ∅
+              Hgs ltac:(lia) Hdi Hpc0
               with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
     all: try lkbelow.
     { iFrame "Hcpu". }
@@ -1811,8 +1812,8 @@ Section KernelvecHandler.
        the callee budget underneath. *)
     iAssert (stack_own (m !!! Regidx csp_rs1) (trap_res true + av)) with "[Hstk Hstkf]" as "Hstk".
     { iEval (rewrite -Hsppin).
-      assert (Hkvs' : (trap_res true + av)%nat = (32 + (46 + av))%nat)
-        by (unfold trap_res, kv_frame_slots; lia).
+      assert (Hkvs' : (trap_res true + av)%nat = (32 + (58 + av))%nat)
+        by (unfold trap_res; lia).
       rewrite Hkvs'. iApply stack_own_app. iSplitL "Hstk"; [iExact "Hstk" |].
       rewrite -(kv_slot_addr0 Me) -Hspf. iExact "Hstkf". }
     (* ---- instr #38: THE SRET, at the sconf tier.  It is the instruction

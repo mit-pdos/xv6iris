@@ -170,7 +170,7 @@ Section ProofSysWrite.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res bb + kk)%nat with "Hstk").
-    destruct bb; unfold trap_res, kv_frame_slots; lia.
+    destruct bb; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)
@@ -346,7 +346,7 @@ Section ProofSysWrite.
            Harg0 Harg1 Harg2 Hn0 Heb.
     (* every budget, or [lia] cannot see past [filewrite_stack] -- it is an
        expression, not a literal, on purpose (SpecSysWrite.v). *)
-    unfold sys_write_stack, filewrite_stack, K_writei, consolewrite_stack in Hav.
+    
     (* THE UPPER HALF IS FREE (SpecSysRead.sys_rw_count_lt); only the lower
        bound is owed upward.  Hoisted to a NAMED fact rather than written as
        an inline [ltac:] in argument position -- durable-notes' divergence
@@ -535,7 +535,7 @@ Section ProofSysWrite.
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 6)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w5 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
-              ltac:(unfold argaddr_stack; lia) Hpv
+              ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs5").
     iIntros (CID8 Hs8 A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs5".
     iEval (rewrite HM5a1) in "Hs5".
@@ -714,7 +714,7 @@ Section ProofSysWrite.
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 6)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
     { iApply (ofd_out_null _ _ HN4a1). }
     iIntros (CID17 Hs17 A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
@@ -951,7 +951,7 @@ Section ProofSysWrite.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filewrite.wp_filewrite_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S4 (av - 6)%nat eb (sys_rw_count v2) b lks
-                ltac:(unfold filewrite_stack, K_writei, consolewrite_stack; lia) Hkk Hj Hgs Hlens
+                ltac:(lia) Hkk Hj Hgs Hlens
                 Hfj Hfprocs HS4a0' HS4a2 Hnrange Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.

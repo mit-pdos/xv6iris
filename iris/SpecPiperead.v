@@ -66,9 +66,8 @@ Local Open Scope Z_scope.
    to spare.  Raising this to 64 would over-charge every caller for slots the
    call site never needs.  (Consequence for the proof: the [52 <= ...] premise
    no longer falls to a bare [lia] -- [trap_res true] has to be reduced first,
-   `assert (trap_res true = 78%nat) as -> by reflexivity; lia`.)  *)
-Definition piperead_stack : nat := 62%nat.
-
+   `assert (trap_res true = 90%nat) as -> by reflexivity; lia`.)  *)
+Notation piperead_stack := (62%nat) (only parsing).
 Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)

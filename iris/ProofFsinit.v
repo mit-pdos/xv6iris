@@ -314,7 +314,7 @@ Section FsinitEpilogue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsub Hsp Hthr.
-    pose proof HK as HK'. unfold K_fsinit in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hmg Hsz Hnb Hni Hnl Hls Hist
               Hbms Hfsb Hlctx Hsl Hiref Hbm Hcont".
     iPoseProof (fsi_58 with "Htext") as "Hi58".
@@ -558,7 +558,7 @@ Section FsinitMain.
            Hbmlog Hcovb Hhdr0 Hpk Hj Hgl Ha0 Heb Hbelow.
     subst eb. subst v_ninodes. subst v_inodestart. subst v_bmapstart.
     subst v_logstart.
-    pose proof HK as HK'. unfold K_fsinit in HK'.
+    pose proof HK as HK'. 
     (* ---- the image, pointwise, below 32 ---- *)
     assert (Hfimg : forall jj, (jj < 32)%nat ->
               bs_sb !!! jj
@@ -793,7 +793,7 @@ Section FsinitMain.
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               M5 (K - 4)%nat true b lks
-              ltac:(unfold K_bread; lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
+              ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
               HM5a0 HM5a1
               (* bread's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1161,7 +1161,7 @@ Section FsinitMain.
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq Q1 (K - 4)%nat true (proc_addr j)
               bs_sb bsd0 d0 b lks
-              ltac:(unfold K_brelse; lia) Hkk HQ1a0
+              ltac:(lia) Hkk HQ1a0
               (* brelse's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1384,7 +1384,7 @@ Section FsinitMain.
               cov logstart dev sb_base bs_hdr L D
               vlock vname vcpu v_start v_dev v_nc v_n
               pidv dq (DfracOwn 1) Q9 (K - 4)%nat true b lks
-              ltac:(unfold K_initlog; lia) Hgeom Hj Hgl eq_refl Hhdr0
+              ltac:(lia) Hgeom Hj Hgl eq_refl Hhdr0
               HQ9a0 HQ9a1
               (* initlog's bound is "bcache"(4); fsinit's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1463,7 +1463,7 @@ Section FsinitMain.
               γlog γfs γi cn gtl γpr cov logstart bmapstart inodestart
               ninodes nib size used dev pidv dq (DfracOwn 1) (DfracOwn 1)
               (DfracOwn 1) R1 (K - 4)%nat true b lks
-              ltac:(unfold K_ireclaim; lia) Hgeom Hist0 Hblk Hsize Hbm0
+              ltac:(lia) Hgeom Hist0 Hblk Hsize Hbm0
               Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31 Hpk Hj Hgl HR1a0 eq_refl
               Hbelow
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hpenv Hbio Hlctx Hseam

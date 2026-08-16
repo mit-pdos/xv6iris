@@ -153,7 +153,7 @@ Section ProofSysFstat.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res b + kk)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -336,7 +336,7 @@ Section ProofSysFstat.
     intros pcE pj ret_tgt Hav Hj Hgs Hlens Harg0 Harg1 Heb.
     (* BOTH budgets, or [lia] cannot see past [filestat_stack] -- it is an
        expression, not a literal, on purpose (SpecSysFstat.v). *)
-    unfold sys_fstat_stack, filestat_stack in Hav.
+    
     (* the push_off bound, with [2^31] evaluated by hand: [lia] cannot reduce
        a power (durable-notes.md). *)
     assert (Hnoff : (Z.of_nat 0 + 1 < 2 ^ 31)%Z)
@@ -507,7 +507,7 @@ Section ProofSysFstat.
     iApply (Argaddr.wp_argaddr_sconf M5 (av - 4)%nat 0%nat eb pj 1%nat
               (ud_tfp (pv_upt V)) (pv_tf V) v1 w4 (DfracOwn (1/4)) b lks
               ltac:(unfold NARG; lia) HM5a0 Harg1 Hnoff
-              ltac:(unfold argaddr_stack; lia) Hpv
+              ltac:(lia) Hpv
               with "Hcg Hcpu Htext Hdata Hpc Htfc Htfp Hs4").
     iIntros (CID8 Hs8 A0) "%HcsA0 Hcg Hcpu Hpc Htfc Htfp Hs4".
     iEval (rewrite HM5a1) in "Hs4".
@@ -610,7 +610,7 @@ Section ProofSysFstat.
     iApply (Argfd.wp_argfd_sconf γf N4 (av - 4)%nat 0%nat eb pj 0%nat v
               pidv V (bv_0 32) w3 b lks
               ltac:(unfold NARG; lia) HN4a0 Harg0 Hnzf Hnoff
-              ltac:(unfold argfd_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv [] Hs3").
     { iApply (ofd_out_null _ _ HN4a1). }
     iIntros (CID13 Hs13 A) "%HcsA Hcg Hcpu Hpc Hpriv Hpost".
@@ -806,7 +806,7 @@ Section ProofSysFstat.
                    ltac:(rewrite Hb; wp_next_chain) with "Hcpu") as "Hcpu".
       iApply (Filestat.wp_filestat_sconf γa γf γs j γlp kk qq Cf fn pidv V
                 S3 (av - 4)%nat eb b lks
-                ltac:(unfold filestat_stack; lia) Hkk Hj Hgs Hlens HS3a0' Heb
+                ltac:(lia) Hkk Hj Hgs Hlens HS3a0' Heb
                 with "Hcg Hcpu Htext Hpc Hpanic Href Hcore Hkenv Hprocs Hfenv").
       all: try lkbelow.
       iIntros (CID20 Hs20 mf rv P')

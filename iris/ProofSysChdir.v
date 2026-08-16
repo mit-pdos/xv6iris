@@ -230,8 +230,7 @@ Lemma sc_kb (K : nat) : (K_sys_chdir <= K)%nat ->
   (K_iput <= K - 20)%nat /\ (K_iunlockput <= K - 20)%nat /\
   (10 <= K - 20)%nat /\ (20 <= K)%nat /\ ((K - 20) + 20 = K)%nat.
 Proof.
-  unfold K_sys_chdir, K_namei, argstr_stack, K_begin_op, K_end_op,
-         K_ilock, K_iunlock, K_iput, K_iunlockput.
+  
   intro H. split_and!; lia.
 Qed.
 

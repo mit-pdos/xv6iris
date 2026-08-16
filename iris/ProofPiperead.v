@@ -577,7 +577,7 @@ Section ProofPiperead.
   Proof.
     cbv beta delta [wp_piperead_sconf_body].
     intros pcE pj pi ret_tgt Hj Hjl Hlen Ha2 Hnrng Hav Heb Hbelow. subst eb.
-    unfold piperead_stack in Hav.
+    
     (* piperead's own cone bottoms out at "pipe" (7); killed/sleep_prepare/
        sleep/wakeup all sit at "proc" (11), strictly higher, so this ONE
        weakening (LockRank.locks_below_mono) covers every one of them. *)
@@ -1962,7 +1962,7 @@ Section ProofPiperead.
         (* copyout's stack ask is 52 (a 14-slot frame over vmfault's 38):
            it keeps [psz] in s11 across its callees, so s11 is saved. *)
         assert (HK52 : (52 <= trap_res true + (av - 12))%nat)
-          by (assert (trap_res true = 78%nat) as -> by reflexivity; lia).
+          by (assert (trap_res true = 90%nat) as -> by reflexivity; lia).
         iApply (Copyout.wp_copyout_sconf γa K10 P' (pv_sz V) 1%nat
                   (fun _ => trunc8 (K5 !!! Regidx Ra5)) (trap_res true + (av - 12))%nat 1%nat true pj
                   false ({["pipe"]} ∪ lks)

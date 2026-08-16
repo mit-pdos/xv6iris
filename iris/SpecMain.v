@@ -182,8 +182,7 @@ Require Import ProcAvail.
    init cone needs.  The boot bridge hands out [kv_frame_slots + K_main]
    ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
    4096-byte per-hart stack, so nothing upstream has to change. *)
-Definition K_main : nat := 100%nat.
-
+Notation K_main := (122%nat) (only parsing).
 Section SpecMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.

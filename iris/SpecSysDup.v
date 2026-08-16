@@ -75,8 +75,7 @@ Local Open Scope Z_scope.
 
 (* sys_dup's own frame is 6 slots (addi sp,sp,-48); argfd wants 24 below it,
    fdalloc 14 and filedup 14, so argfd sets the bound. *)
-Definition sys_dup_stack : nat := 30%nat.
-
+Notation sys_dup_stack := (30%nat) (only parsing).
 Section SpecSysDup.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 

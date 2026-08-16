@@ -87,8 +87,7 @@ Local Open Scope Z_scope.
    34 was not wrong, only loose -- it over-charged every caller by four slots.
    Nothing downstream constrains this constant: consolewrite, uartwrite's only
    caller, is unproven. *)
-Definition uartwrite_stack : nat := 30%nat.
-
+Notation uartwrite_stack := (30%nat) (only parsing).
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 

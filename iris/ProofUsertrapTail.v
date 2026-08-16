@@ -220,7 +220,7 @@ Section UtRet2.
     (* the budget, in numbers [lia] can see -- every one of these is a
        [Definition] and the index arithmetic below is what needs them *)
     pose proof Hav as Hav'.
-    unfold K_usertrap, kv_frame_slots, K_syscall, K_sys_exit, K_kexit in Hav'.
+    
     destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hcpu Hclm Hsepc Hscause Hstval Hsret Hstvec Hq4
              Hkptr [#Hcaps Hown] Hframe Hcont".
@@ -664,7 +664,7 @@ Section UtRet.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iPoseProof (uti_0ae with "Htext") as "Hiae".
@@ -701,7 +701,7 @@ Section UtRet.
     iDestruct (trap_csrs_ext_transport CID CID1 b (un_pj N)
                  ltac:(wp_next_chain) with "Hcsrs") as "Hcsrs".
     iApply (PR.wp_prepare_return_sconf (un_f N) (un_ks N) (un_pid N) V
-              M1 nx (un_pj N) uepc b lks ltac:(unfold K_prepare_return; lia) Hepc
+              M1 nx (un_pj N) uepc b lks ltac:(lia) Hepc
               with "Hcg Hcpu Hcsrs Htext Hpc Hkst Hpv [-]").
     iIntros (CIDp Hkp mf ksat kroot vb)
       "%Hcspr %Hmode %Hasid %Hppn Hcg Hcpu Hclmpay Hsepc Hscause Hstval
@@ -788,7 +788,7 @@ Section UtA6.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv Hbelow.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iPoseProof (uti_0a6 with "Htext") as "Hia6".
@@ -947,7 +947,7 @@ Section UtA6.
       iApply (ut_kexit (CID := CID7) Rsys N V
                 (<[Regidx Rra := regval_into_reg
                      (add_vec_int (mword_of_int (UT + 0xf8) : mword 64) 4)]> K2)
-                nx b lks Hwf' ltac:(unfold K_kexit; lia) ltac:(lkbelow)
+                nx b lks Hwf' ltac:(lia) ltac:(lkbelow)
                 with "Htext Hpc Hcg [-]").
       rewrite /ut_hold. iSplitL "Hcpu"; [iExact "Hcpu"|].
       iSplitL "Hcsrs"; [iExact "Hcsrs"|].
@@ -1026,7 +1026,7 @@ Section UtFa.
   Proof.
     intros Hwf Hav Hnx Htfpe Hksp Hm0sp Hmsp Hms1 Hcs Hmiev Hmenvv.
     pose proof (ut_nx_bound b av nx Hav Hnx) as Hks.
-    unfold K_syscall, K_sys_exit, K_kexit in Hks.
+    
     pose proof Hwf as Hwf'. destruct Hwf as (Hj & Hjl & Hlen & Hlg).
     iIntros "#Htext Hpc Hcg Hhold Hframe Hcont".
     iPoseProof (uti_0fc with "Htext") as "Hifc".

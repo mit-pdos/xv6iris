@@ -365,7 +365,7 @@ Section KexecCSetup.
     intros HK Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
            Halen_bound Halen_cstr Halen_4096 Havf_na.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hst Hcont Hout".
     rewrite /kxc_at_1ae.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs2 & %HMs6) &
@@ -942,7 +942,7 @@ Section KexecCSetup.
       iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                 size used used2 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa m U0 K ∅ sp0 ra0 s00 s10 s20 pv av P (pgroundup szv)
-                ltac:(unfold K_kexec; lia) Hu2
+                ltac:(lia) Hu2
                 Hmsp Hmra Hms0 Hms1 Hms2 HU0sp HU0s3 HU0s6
                 Hbelow_pground Hcov_pground
                 with "Hcg Hcnt Htext Hpc Hptback Hka Hbm Hins Hbits Hpriv
@@ -1961,7 +1961,7 @@ Section KexecCExitM1.
     intros HK Hc33 Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13
            HMsp HMs4 HMs6 Hbelow Hcov Htgt.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hi1 Hi2 Hpc Hcg Hcnt Hres Hcont".
     rewrite /kxc_c_res.
     iDestruct "Hres" as "(Hirs & Hbm & Hins & Hbits & Hbs & #Hka & Hpt & Hpriv &
@@ -2004,7 +2004,7 @@ Section KexecCExitM1.
     iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
               size used2 used2 plen pfun na avf alen aslen afun pidv V
               dqb dqs dqa m Mt K ∅ sp0 ra0 s00 s10 s20 pv av P sz1
-              ltac:(unfold K_kexec; lia) ltac:(reflexivity)
+              ltac:(lia) ltac:(reflexivity)
               Hmsp Hmra Hms0 Hms1 Hms2 HMtsp HMts3 HMts6 Hbelow Hcov
               with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
                     Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
@@ -2264,7 +2264,7 @@ Section KexecCLoop.
   Proof.
     intros HK Hcna Halenlt Hcstr Halen4096 Hsz1ge Hnamax Hal
            Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
-    unfold K_kexec in HK. unfold MAXARG in Hnamax.
+    unfold MAXARG in Hnamax.
     iIntros "#Htext Hst Hcont Hout".
     rewrite /kxc_at_21a.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMa0 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
@@ -2586,7 +2586,7 @@ Section KexecCLoop.
                 pidv V dqb dqs dqa m T3 K sp0 ra0 s00 s10 s20 pv av
                 w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P sz1 c 0x358
                 (sign_extend' 21 (concat_vec (mword_of_int 1854 : mword 11) ('b"0")))
-                ltac:(unfold K_kexec; lia) ltac:(lia) Hal
+                ltac:(lia) ltac:(lia) Hal
                 Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
                 Hmw12 Hmw13 HT3sp HT3s4 HT3s6 Hbelow Hcov ltac:(pcw)
                 with "Htext Hi358 Hi35a Hpc Hcg Hcnt Hres Hcont").
@@ -3526,7 +3526,7 @@ Section KexecCLoop.
                        afun pidv V dqb dqs dqa m U4 K sp0 ra0 s00 s10 s20 pv av
                        w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 sz1 (S c) 0x26e
                        (sign_extend' 21 (concat_vec (mword_of_int 1971 : mword 11) ('b"0")))
-                       ltac:(unfold K_kexec; lia) ltac:(lia) Hal
+                       ltac:(lia) ltac:(lia) Hal
                        Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
                        Hmw12 Hmw13 HU4sp HU4s4 HU4s6' HbelowF2 HcovF2 ltac:(pcw)
                        with "Htext Hi26e Hi270 Hpc Hcg Hcnt Hres Hcont").
@@ -3611,7 +3611,7 @@ Section KexecCLoop.
                   pidv V dqb dqs dqa m T13 K sp0 ra0 s00 s10 s20 pv av
                   w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef Pfinal2 sz1 c 0x35c
                   (sign_extend' 21 (concat_vec (mword_of_int 1852 : mword 11) ('b"0")))
-                  ltac:(unfold K_kexec; lia) ltac:(lia) Hal
+                  ltac:(lia) ltac:(lia) Hal
                   Hmsp Hmra Hms0 Hms1 Hms2 Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11
                   Hmw12 Hmw13 HT13sp HT13s4 HT13s6' HbelowF2 HcovF2 ltac:(pcw)
                   with "Htext Hi35c Hi35e Hpc Hcg Hcnt Hres Hcont").
@@ -4069,7 +4069,7 @@ Section KexecCClose.
   Proof.
     intros HK Hsz1ge Hal Hmsp Hmra Hms0 Hms1 Hms2
            Hmw5 Hmw6 Hmw7 Hmw8 Hmw9 Hmw10 Hmw11 Hmw12 Hmw13.
-    unfold K_kexec in HK.
+    
     iIntros "#Htext Hst Hcont Hout".
     rewrite /kxc_at_272.
     iDestruct "Hst" as "((%HMsp & %HMs0 & %HMs1 & %HMs2 & %HMs4 & %HMs5 & %HMs6 &
@@ -4556,7 +4556,7 @@ Section KexecCClose.
       iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                 size used2 used2 plen pfun na avf alen aslen afun pidv V
                 dqb dqs dqa m X7 K ∅ sp0 ra0 s00 s10 s20 pv av P sz1
-                ltac:(unfold K_kexec; lia) ltac:(reflexivity)
+                ltac:(lia) ltac:(reflexivity)
                 Hmsp Hmra Hms0 Hms1 Hms2 HX7sp HX7s3 HX7s6 Hbelow Hcov
                 with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
                       Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").
@@ -4949,7 +4949,7 @@ Section KexecCClose.
         iApply (TC.kxc_bad_1d6 jp ga gf bn gfs cov logstart bmapstart inodestart
                   size used2 used2 plen pfun na avf alen aslen afun pidv V
                   dqb dqs dqa m X13 K ∅ sp0 ra0 s00 s10 s20 pv av P2 sz1
-                  ltac:(unfold K_kexec; lia) ltac:(reflexivity)
+                  ltac:(lia) ltac:(reflexivity)
                   Hmsp Hmra Hms0 Hms1 Hms2 HX13sp HX13s3 HX13s6' Hbelow2 Hcov2
                   with "Hcg Hcnt Htext Hpc Hpt Hka Hbm Hins Hbits Hpriv
                         Hpath Hargv Hargs Hbs Hirs Hframeat Hcont").

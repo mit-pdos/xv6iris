@@ -49,8 +49,7 @@ Require Import ProcAvail.
 Import Defs.
 
 (* rw's own frame is 96 bytes (12 slots); its deepest callee is sleep (22). *)
-Definition K_virtio_disk_rw : nat := 34%nat.
-
+Notation K_virtio_disk_rw := (34%nat) (only parsing).
 (* the caller's buffer bundle [buf_own] (blockno at 1/2, disk and data full)
    now lives in BufOwn.v (via DiskInv's re-export): the bio.c layer shares
    it, and the bcache scan is why the blockno half stays behind. *)

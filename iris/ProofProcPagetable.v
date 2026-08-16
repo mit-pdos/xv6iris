@@ -94,7 +94,7 @@ Proof. lia. Qed.
 
 Lemma ppt_nodes_le (g1 g2 : nat) :
   (g1 <= 2)%nat -> (g2 <= 0)%nat -> (1 + g1 + g2 <= K_proc_pagetable)%nat.
-Proof. unfold K_proc_pagetable. lia. Qed.
+Proof. lia. Qed.
 
 
 Lemma ppt_lt1 (i : nat) : (i < 1)%nat -> i = 0%nat.
@@ -112,7 +112,7 @@ Lemma ppt_fail_n1 (on : option nat) (g : nat) : (g <= 2)%nat ->
   exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n).
 Proof.
   intros Hg Hz. exists (1 + g)%nat.
-  split; [unfold K_proc_pagetable; lia |]. rewrite avail_sub_add. exact Hz.
+  split; [lia |]. rewrite avail_sub_add. exact Hz.
 Qed.
 
 Lemma ppt_fail_n2 (on : option nat) (g1 g2 : nat) : (g1 <= 2)%nat -> (g2 <= 0)%nat ->
@@ -120,13 +120,13 @@ Lemma ppt_fail_n2 (on : option nat) (g1 g2 : nat) : (g1 <= 2)%nat -> (g2 <= 0)%n
   exists n : nat, (n <= K_proc_pagetable)%nat /\ avail_zero (avail_sub on n).
 Proof.
   intros H1 H2 Hz. exists (1 + g1 + g2)%nat.
-  split; [unfold K_proc_pagetable; lia |]. rewrite -ppt_env_recomb. exact Hz.
+  split; [lia |]. rewrite -ppt_env_recomb. exact Hz.
 Qed.
 
 Lemma ppt_fail_refute (nb n : nat) :
   (K_proc_pagetable < nb)%nat -> (n <= K_proc_pagetable)%nat ->
   avail_zero (avail_sub (Some nb) n) -> False.
-Proof. rewrite avail_sub_Some. unfold avail_zero, K_proc_pagetable. lia. Qed.
+Proof. rewrite avail_sub_Some. unfold avail_zero. lia. Qed.
 
 Module ProcPagetableCore (UV : UVMCREATE) (MP : MAPPAGES)
                          (UF : UVMFREE) (UUF : UVMUNMAP_FIXED) : PROC_PAGETABLE_GEN.
@@ -621,7 +621,7 @@ Section ProofProcPagetable.
       iApply ("EPI" $! M1 (mword_of_int 0 : mword 64) with "[%] Hcg Hcnt Hpc Htfcell []").
       { split_and!; [exact HM1sp | exact HM1s1 | exact HM1thr]. }
       { iRight. iFrame "Henv0". iPureIntro; split_and!; [reflexivity |].
-        exists 0%nat. split; [unfold K_proc_pagetable; lia |].
+        exists 0%nat. split; [lia |].
         rewrite avail_sub_0. exact Hav0. } }
     assert (Hroot0r : root0 = zero_extend' 64 (concat_vec b0 (zeros' 12 : mword 12)))
       by exact Hroot0.

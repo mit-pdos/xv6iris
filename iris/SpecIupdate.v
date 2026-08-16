@@ -111,8 +111,7 @@ Local Open Scope Z_scope.
 (* iupdate's own frame is 32 bytes (4 slots) -- [c.addi sp,sp,-32] at +0x00,
    ra/s0/s1/s2 pushed.  Its deepest callee is bread (40); brelse wants 26,
    log_write 18 and memmove 2. *)
-Definition K_iupdate : nat := 44%nat.
-
+Notation K_iupdate := (62%nat) (only parsing).
 (* [sb_inodestart] -- the [sb + 24] cell iupdate reads at +0x18 -- now
    lives in InodeInv.v, where ilock's contract can also name it. *)
 

@@ -454,7 +454,7 @@ Section ProofArgfd.
   Proof.
     cbv beta delta [wp_argfd_sconf_body].
     intros pcE pfd pf ret_tgt Hi Ha0 Harg Hnzf Hn Hav.
-    unfold argfd_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
     set (s00 := m !!! Regidx (mword_of_int 8 : mword 5)).

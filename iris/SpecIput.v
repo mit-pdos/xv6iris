@@ -112,8 +112,7 @@ Local Open Scope Z_scope.
 (* iput's own frame is 48 bytes; its deepest callee is bread (40) below
    itrunc's own frame, plus acquiresleep.  Sized like balloc's, one frame
    deeper. *)
-Definition K_iput : nat := 60%nat.
-
+Notation K_iput := (72%nat) (only parsing).
 (* itrunc's two (bitmap block + its closing iupdate) plus iput's own
    iupdate at +0x6c.  SPEND-AT-MOST: the fast path spends nothing. *)
 Definition iput_units : nat := 3%nat.

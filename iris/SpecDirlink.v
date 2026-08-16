@@ -226,8 +226,7 @@ Local Open Scope Z_scope.
    arithmetic.  writei also grew (78, dominated by the same bmap chain, not
    the copyout one), but stays under dirlookup, so dirlookup alone still
    fixes this number: 10 + 90 = 100. *)
-Definition K_dirlink : nat := 100%nat.
-
+Notation K_dirlink := (110%nat) (only parsing).
 (* writei's [wi_cost off 16] at a 16-aligned [off] (= 7), which dominates
    iput's 3. *)
 Definition dirlink_units : nat := 7%nat.

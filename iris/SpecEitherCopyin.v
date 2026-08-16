@@ -64,8 +64,7 @@ Local Open Scope Z_scope.
 
 (* 6 own slots + the 50 copyin wants below it (myproc's 10 and memmove's 2
    both fit inside that). *)
-Definition either_copyin_stack : nat := 56%nat.
-
+Notation either_copyin_stack := (56%nat) (only parsing).
 Section SpecEitherCopyin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
 

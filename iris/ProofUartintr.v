@@ -286,7 +286,7 @@ Section ProofUartintr.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.uartintr + 0x54)) (mword_of_int 2 : mword 6)
               E4 (av - 4)%nat 4%nat b Hpop with "Hcg Hpc Hi54 Hframe").
     iIntros (CID5 Hs5) "Hcg Hpc".
-    assert (Hav4 : ((av - 4) + 4)%nat = av) by (unfold uartintr_stack in Hav; lia).
+    assert (Hav4 : ((av - 4) + 4)%nat = av) by (lia).
     iEval (rewrite Hav4) in "Hcg".
     set (E5 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E4 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E4).
@@ -450,7 +450,7 @@ Section ProofUartintr.
           apply callee_saved_refl. }
         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (Consoleintr.wp_consoleintr_sconf γu γv G1 γs pme lvl (av - 4)%nat eb b lks
-                  ltac:(unfold consoleintr_stack, uartintr_stack in *; lia)
+                  ltac:(lia)
                   Hlen ltac:(lia) Hbelow
                   with "Hcg Hcnt Ht Hpc Hpanic Hpinv Hdinv Hccaps").
         all: try lkbelow.
@@ -594,7 +594,7 @@ Section ProofUartintr.
                     = pa_stk (m !!! Regidx csp_rs1) 4%nat).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4%nat b
-              ltac:(unfold uartintr_stack in Hav; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
     set (A0 := <[Regidx csp_rs1 := regval_into_reg
@@ -802,7 +802,7 @@ Section ProofUartintr.
         apply callee_saved_refl. }
       iDestruct (cpu_own_transport CID CIDW3 lvl eb pme b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iApply (Wakeup.wp_wakeup_sconf T3 γs pme lvl (av - 4)%nat eb b lks
-                ltac:(unfold uartintr_stack in Hav; lia)
+                ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
                 Hlen
                 ltac:(lia)

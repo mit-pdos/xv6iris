@@ -396,7 +396,7 @@ Section IlockEpilogue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hfr.
-    pose proof HK as HK'. unfold K_ilock in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hppid Hsb
               Hsl Hstok Hpid Hdep Hidev Hinumc Hvalid Hlk #Hshot Hcont".
     (* LEVEL 0 TIES THE TWO INDICES: ilock never push_off's on its own (only
@@ -705,7 +705,7 @@ Section IlockLoad.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr HMs1 Hip Hk Hgeom Hst Hcov Hinlt Hj Hgl Hbelow.
-    pose proof HK as HK'. unfold K_ilock in HK'.
+    pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hcov) as [Hibpos Hiblt].
     assert (Hib : 0 <= IBLOCK inum inodestart < 2147483648)
@@ -950,7 +950,7 @@ Section IlockLoad.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     (* bread is index-generic now: ilock's own complement (untouched since
        entry -- nothing between il_load's own start and here touches it) is
        exactly what bread asks for, and it hands back the same shape. *)
@@ -1721,7 +1721,7 @@ Section IlockLoad.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
     (* brelse is NOT generalized: its contract does not mention
        [trap_csrs_ext]/[cpu_claim_ext] at all, so [Hextc]/[Hextm] are simply
        not threaded through this call -- they stay stranded at [CID9] (where
@@ -1993,7 +1993,7 @@ Section ProofIlockMain.
   Proof.
     cbv beta delta [wp_ilock_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hst Hcov Hinlt Hj Hgl Ha0 Hbelow.
-    pose proof HK as HK'. unfold K_ilock in HK'.
+    pose proof HK as HK'. 
     assert (Hipe : ip = ientry k) by reflexivity.
     assert (Hipnz : uint ip <> 0)
       by (rewrite Hipe; exact (il_entry_nonzero k Hk)).

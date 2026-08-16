@@ -260,8 +260,7 @@ Lemma nx_kb (K : nat) : (K_namex <= K)%nat ->
   /\ (K_iunlockput <= K - 12)%nat /\ (K_dirlookup <= K - 12)%nat
   /\ (K_iput <= K - 12)%nat /\ ((K - 12) + 12 = K)%nat /\ (12 <= K)%nat.
 Proof.
-  unfold K_namex, K_idup, K_iget, K_ilock, K_iunlock,
-         K_iunlockput, K_dirlookup, K_iput.
+  
   intro H. split_and!; lia.
 Qed.
 

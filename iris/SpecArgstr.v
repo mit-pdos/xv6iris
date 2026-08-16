@@ -73,8 +73,7 @@ Local Open Scope Z_scope.
    vmfault (SpecCopyinstr.v), so its own budget went 20 -> 50 and fetchstr's
    went 26 -> 56 (SpecFetchstr.v).  argstr's whole body is the fetchstr call,
    so it takes the rise straight through: 4 + 56 = 60. *)
-Definition argstr_stack : nat := 60%nat.
-
+Notation argstr_stack := (60%nat) (only parsing).
 Definition wp_argstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)

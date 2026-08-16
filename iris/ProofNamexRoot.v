@@ -89,7 +89,7 @@ Set Printing Depth 40.
    [sie_cap_gpr] carves want. *)
 Lemma nxr_kb (K : nat) : (K_namex_root <= K)%nat ->
   (K_iget <= K - 12)%nat /\ (12 <= K)%nat /\ ((K - 12) + 12 = K)%nat.
-Proof. unfold K_namex_root, K_iget. intro H. split_and!; lia. Qed.
+Proof. intro H. split_and!; lia. Qed.
 
 Module NamexRootProof (IG : IGET) : NAMEX_ROOT.
 

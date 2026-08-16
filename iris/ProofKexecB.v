@@ -388,7 +388,7 @@ Section KexecBBody.
     intros HK Hlg Hsz Hbm0 Hbmc Hbml Hins0 Hcovb Hiregb Hjp Hgs Heb Hu2
            Hk Hib Hn2 Hsp Hra Hs0 Hs1 Hs2
            HM90sp HM90s0 HM90s1 HM90s2 HM90s4 HM90thr.
-    pose proof HK as HK'. unfold K_kexec in HK'.
+    pose proof HK as HK'. 
     destruct (Hiregb inumf Hib) as [Hibc Hibl].
     iIntros "#Htext #Hpanic #Hfab Hpc Hcg Hcnt Hopen Hlog Hirs Hbm Hins Hbits
              Hbs #Hka Hpriv Hpath Hargv Hargs Hframe Hcont Hcont1a2 Hcont12c".

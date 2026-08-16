@@ -154,8 +154,7 @@ Local Open Scope Z_scope.
    real stack need (48, printk_stack) dominates bmap (64), which dominates
    readi (78, SpecReadi.v's header has the arithmetic) -- so this one is
    12 + 78 = 90. *)
-Definition K_dirlookup : nat := 90%nat.
-
+Notation K_dirlookup := (100%nat) (only parsing).
 (* T_DIR, read off the [li a5,1] at +0x1a that [lh a4,68(a0)] is compared
    against. *)
 Definition T_DIR : mword 16 := mword_of_int 1.

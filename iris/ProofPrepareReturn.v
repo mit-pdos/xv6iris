@@ -139,7 +139,7 @@ Section ProofPrepareReturn.
   Proof.
     cbv beta delta [wp_prepare_return_sconf_body].
     intros pcE ret_tgt Hav Hepc.
-    unfold K_prepare_return in Hav.
+    
     set (ra_idx := (mword_of_int 1  : mword 5)).
     set (s0_idx := (mword_of_int 8  : mword 5)).
     set (tp_idx := (mword_of_int 4  : mword 5)).

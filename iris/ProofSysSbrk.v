@@ -405,7 +405,7 @@ Section ProofSysSbrk.
       apply Hethr; assumption. }
     iDestruct (cpu_own_transport CID0 CIDb 0%nat eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Growproc.wp_growproc_sconf γa γf G2 (av - 6)%nat eb p pid V b lks
-              ltac:(unfold growproc_stack; lia)
+              ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpriv Henv").
     iIntros (CIDg Hsg mg P' szv') "%Hcsg %Hok Hcg Hcpu Hpc Hpriv".
     rewrite HG2a0 in Hok.
@@ -504,7 +504,7 @@ Section ProofSysSbrk.
   Proof.
     cbv beta delta [wp_sys_sbrk_sconf_body].
     intros pcE ret_tgt Harg0 Harg1 Hav.
-    unfold sys_sbrk_stack in Hav.
+    
     set (sp0 := m !!! Regidx csp_rs1).
     set (ra0 := m !!! Regidx Rra).
     set (s00 := m !!! Regidx Rs0).

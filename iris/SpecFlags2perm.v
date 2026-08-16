@@ -63,8 +63,7 @@ Local Open Scope Z_scope.
 
 
 (* flags2perm's own 2-slot frame; it calls nothing. *)
-Definition K_flags2perm : nat := 2%nat.
-
+Notation K_flags2perm := (2%nat) (only parsing).
 (* THE ANSWER, as a function of the two bits the machine actually inspects. *)
 Definition f2p (fl : mword 64) : Z :=
   (if Z.testbit (bv_unsigned fl) 0 then 8 else 0)

@@ -194,8 +194,7 @@ Local Open Scope Z_scope.
    balloc's out-of-blocks arm 50 -> 58, which pushed bmap 56 -> 64 (6 + 58).
    either_copyout's 58 (SpecCopyout.v's own, unrelated, [psz]-in-s11 chain)
    does NOT reach printk, so it is unaffected and is no longer the max. *)
-Definition K_readi : nat := 78%nat.
-
+Notation K_readi := (88%nat) (only parsing).
 (* ===================================================================== *)
 (*  THE TWO PURE FUNCTIONS THE CONTRACT SPEAKS IN                        *)
 (* ===================================================================== *)

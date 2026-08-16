@@ -646,7 +646,7 @@ Section BfreeTail.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hbelow HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel.
-    pose proof HK as HK'. unfold K_bfree in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hsb Hsl #Hcredit Hop Hfsb Hpool Hheld Hcont".
     iPoseProof (bfi_4a with "Htext") as "Hi4a".
     iPoseProof (bfi_4e with "Htext") as "Hi4e".
@@ -685,7 +685,7 @@ Section BfreeTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID1) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
+    assert (HKlw : (K_log_write <= K - 4)%nat) by (lia).
     iEval (rewrite -Hbno) in "Hfsb".
     (* the credit travels under the block's OWN name, and [Hbno] is the one
        fact tying bfree's [bmapstart] to the register the buffer carries *)
@@ -768,7 +768,7 @@ Section BfreeTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID1) (CIDb := CID4) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 4)%nat) by (lia).
     (* brelse does not thread the trap-CSR complement either: same
        stranding as log_write above. *)
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
@@ -1043,7 +1043,7 @@ Section ProofBfreeMain.
     cbv beta delta [wp_bfree_gen_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Hbelow.
-    pose proof HK as HK'. unfold K_bfree in HK'.
+    pose proof HK as HK'. 
     destruct Hgeom as [Hcovok Hlogsub].
     destruct (Hcovok _ Hbmcov) as [Hbmpos Hbmlt].
     (* ---- the pure arithmetic of the block number: all of it comes from
@@ -1378,7 +1378,7 @@ Section ProofBfreeMain.
                  ltac:(wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID) (CIDb := CID12) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 4)%nat) by (lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq

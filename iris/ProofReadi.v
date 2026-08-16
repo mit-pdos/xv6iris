@@ -339,7 +339,7 @@ Section ReadiRet.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs2 Hs3 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
-    pose proof HK as HK'. unfold K_readi in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -653,7 +653,7 @@ Section ReadiJoin.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs3v Hs2 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
-    pose proof HK as HK'. unfold K_readi in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hframe Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -815,7 +815,7 @@ Section ReadiExit.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs3v Hext Htotle Harm Hab Hbc Hcd Hde Hef Htgt Hal.
-    pose proof HK as HK'. unfold K_readi in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt Hextc Hextm #Htext Hpc Hia Hib Hic Hid Hie Hif Hframe
               Hidev Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Heb2b. cbn in Heb2b.
@@ -1097,7 +1097,7 @@ Section ReadiLoop.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hwf Hcov Hszmax Hsum Hncn Hoffnc Hncdef Husv Hj Hgl Hbelow.
-    pose proof HK as HK'. unfold K_readi in HK'.
+    pose proof HK as HK'. 
     change (2 ^ 32)%Z with 4294967296%Z in Hsum.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -1218,7 +1218,7 @@ Section ReadiLoop.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CIDa3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbm : (K_bmap <= K - 14)%nat) by (unfold K_bmap; lia).
+    assert (HKbm : (K_bmap <= K - 14)%nat) by (lia).
     iApply (BM.wp_bmap_noalloc_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev ip bm data fbn pidv (rd_q user dq) dqd
               A3 (K - 14)%nat eb b
@@ -1357,7 +1357,7 @@ Section ReadiLoop.
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextc") as "Hextc".
     iDestruct (cpu_claim_ext_transport CIDa4 CIDa8 eb (proc_addr j)
                  ltac:(rewrite Heb2b; wp_next_chain) with "Hextm") as "Hextm".
-    assert (HKbr : (K_bread <= K - 14)%nat) by (unfold K_bread; lia).
+    assert (HKbr : (K_bread <= K - 14)%nat) by (lia).
     iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (blkmap_get bm fbn)
               (rd_q user dq)
@@ -1728,7 +1728,7 @@ Section ReadiLoop.
                 (proc_addr j) pidv (upd_upt V PI) user mm
                 (fun i => (data fbn) !!! (o + i)%nat)
                 (fun jj => rd_delivered data dst_olds off tot (tot + jj)%nat) b lks
-                ltac:(unfold either_copyout_stack; lia)
+                ltac:(lia)
                 ltac:(rewrite HD8a0; exact Husv) HD8a3
                 ltac:(destruct user;
                       [change (2 ^ 64)%Z with 18446744073709551616%Z
@@ -1832,7 +1832,7 @@ Section ReadiLoop.
                       = (mword_of_int (Z.of_nat mm) : mword 64))
         by (rewrite (callee_saved_lookup HcsEc Rs11 ltac:(vm_compute; reflexivity));
             exact HD7s11).
-      assert (HKbl : (K_brelse <= K - 14)%nat) by (unfold K_brelse; lia).
+      assert (HKbl : (K_brelse <= K - 14)%nat) by (lia).
       destruct HrE as [Hr0 | Hrm1].
       - (* ============ THE COPY SUCCEEDED ============ *)
         iPoseProof (rdi_068 with "Htext") as "Hi68".
@@ -2406,7 +2406,7 @@ Section ReadiMain.
     cbv beta delta [wp_readi_sconf_body].
     intros pcE pj dst ret_tgt HK Hgeom Hwf Hcov Hszmax Hoff32 Hsumg Hj Hgl
            Ha0 Ha1 Ha3 Ha4 Hbelow.
-    pose proof HK as HK'. unfold K_readi in HK'.
+    pose proof HK as HK'. 
     change (2 ^ 32)%Z with 4294967296%Z in Hoff32.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     assert (HmbZ : Z.of_nat MAXFILE * Z.of_nat BSIZE = 274432)

@@ -1388,7 +1388,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     (* the table entry's address IS [sys_getpid]'s entry pc *)
@@ -1457,7 +1457,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 12) : mword 64)
@@ -1479,7 +1479,7 @@ Section SyscallArms.
       "(#Hkalloc & _)".
     (* ---- the call ---- *)
     iApply (SysSbrk.wp_sys_sbrk_sconf γa γf M (av - 4)%nat true pj pid V v0 v1 true lks
-              Hv0 Hv1 ltac:(unfold sys_sbrk_stack; lia)
+              Hv0 Hv1 ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Hpriv Hkalloc").
     iIntros (CIDy Hsy mf P' szv') "%Hcs %Hok Hcg Hcpu Hpc Hpriv".
     assert (Htfp' : ud_tfp P' = ud_tfp (pv_upt V))
@@ -1527,7 +1527,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -1546,7 +1546,7 @@ Section SyscallArms.
       "(#Hkalloc & _ & _ & #Hwaitlk & _)".
     (* ---- the call ---- *)
     iApply (SysWait.wp_sys_wait_sconf γa γf γw γs j γl M (av - 4)%nat true true lks pid V v0
-              Hj Hgamma Hv0 ltac:(unfold sys_wait_stack, SpecKwait.K_kwait; lia) eq_refl
+              Hj Hgamma Hv0 ltac:(lia) eq_refl
               with "Hcg Hcpu Htext Hdata Hpc Hprocs Hpanic Hwaitlk Hkalloc Hpriv").
     iIntros (CIDy Hsy mf P' rv) "%Hcs %Hext Hcg Hcpu Hpc Hpriv".
     destruct Hcs as [Hcs _].
@@ -1606,7 +1606,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 14) : mword 64)
@@ -1661,7 +1661,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 6) : mword 64)
@@ -1720,7 +1720,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -1799,7 +1799,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 10) : mword 64)
@@ -1816,7 +1816,7 @@ Section SyscallArms.
       "(_ & _ & _ & _ & #Hftable & _)".
     (* ---- the call ---- *)
     iApply (SysDup.wp_sys_dup_sconf γft γf M (av - 4)%nat 0%nat true pj v0 pid V true ∅
-              Hv0 sysc_noff0 ltac:(unfold sys_dup_stack; lia) (locks_below_empty "ftable")
+              Hv0 sysc_noff0 ltac:(lia) (locks_below_empty "ftable")
               with "Hcg Hcpu Htext Hdata Hpc Hftable Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpost".
     iDestruct (sysc_dup_priv with "Hpost") as (V') "[%Htfp' Hpriv]".
@@ -1859,7 +1859,7 @@ Section SyscallArms.
     rewrite /sysc_arm_goal /sysc_arm_pre.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
     assert (Hpce : (mword_of_int (sysc_target 1) : mword 64)
@@ -1872,7 +1872,7 @@ Section SyscallArms.
     (* ---- the call ---- *)
     iApply (SysFork.wp_sys_fork_sconf γa γp γw γft γf γil γic γs cn γics cov logstart nib
               M 0%nat (av - 4)%nat true pj true pid V ∅
-              ltac:(unfold K_sys_fork, SpecKfork.K_kfork; lia) sysc_noff0b
+              ltac:(lia) sysc_noff0b
               (locks_below_empty "wait_lock")
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hnextpid Hwaitlk Hftable Hitable Hitinv Hkalloc Hpav Hpriv").
     iIntros (CIDy Hsy mf) "%Hcs Hcg Hcpu Hpc Hpriv Hka %Hrv".
@@ -2002,7 +2002,7 @@ Section SyscallArms.
   Proof.
     intros Hj Hpj HMsp HMs1 HMother Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Hpanic & #Henv & Hbs & Hfc & Hip & Hfd & Hir & Hpriv)".
     iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont".
@@ -2294,7 +2294,7 @@ Section SyscallMain.
     cbv beta delta [wp_syscall_sconf_body].
     intros pcE pj ret_tgt Hj Hgamma Hav.
     assert (Hav82 : (82 <= av)%nat)
-      by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit in Hav; lia).
+      by (lia).
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc Hprocs Hpanic Hbs Hfc Hip Hfd Hir HR Hpriv Hcont".
     (* ===================== PROLOGUE (32-byte frame) ===================== *)
@@ -2701,7 +2701,7 @@ Section SyscallMain.
       assert (HD0armsp : D0 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4)
         by (rewrite HD0sp; exact Hspd4).
       assert (HD0avb : (K_syscall <= av)%nat)
-        by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit; lia).
+        by (lia).
       assert (HD0other : forall r : mword 5, is_cs_idx r = true ->
           r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
           D0 !!! Regidx r = m !!! Regidx r).
@@ -2792,7 +2792,7 @@ Section SyscallMain.
       assert (HB5armsp : B5 !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4)
         by (rewrite HB5sp; exact Hspd4).
       assert (HB5avb : (K_syscall <= av)%nat)
-        by (unfold K_syscall, SpecSysExit.K_sys_exit, SpecKexit.K_kexit; lia).
+        by (lia).
       assert (HB5other : forall r : mword 5, is_cs_idx r = true ->
           r <> csp_rs1 -> r <> Rs0 -> r <> Rs1 -> r <> Rs2 ->
           B5 !!! Regidx r = m !!! Regidx r).

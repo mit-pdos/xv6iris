@@ -57,8 +57,7 @@ Import Defs.
 
 (* bwrite's own frame is 32 bytes (4 slots); its deepest callee is
    virtio_disk_rw (34). *)
-Definition K_bwrite : nat := 38%nat.
-
+Notation K_bwrite := (38%nat) (only parsing).
 Definition wp_bwrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}

@@ -103,8 +103,7 @@ Local Open Scope Z_scope.
    (50), on top of sleep (22) and acquire/release (10); the constant is
    piperead's, which is the honest bound for "a blocking read into user
    memory". *)
-Definition consoleread_stack : nat := 62%nat.
-
+Notation consoleread_stack := (70%nat) (only parsing).
 Definition wp_consoleread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}

@@ -119,8 +119,7 @@ Local Open Scope Z_scope.
 (* sys_write's own frame is 6 slots ([c.addi16sp sp,sp,-48]); below it
    filewrite wants [filewrite_stack] = 82, which dominates argfd's 24 and
    argint's / argaddr's 18. *)
-Definition sys_write_stack : nat := (6 + filewrite_stack)%nat.
-
+Notation sys_write_stack := ((6 + filewrite_stack)%nat) (only parsing).
 (* WHAT SYS_WRITE RETURNS.  Indexed by [arg_fd], not by [r]: filewrite's own
    -1 (not writable / a short write / a bad device major) is not
    distinguishable from argfd's by the value. *)

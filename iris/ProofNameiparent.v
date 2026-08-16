@@ -120,7 +120,7 @@ Proof. apply npi_frm. apply bv_eq; vm_compute; reflexivity. Qed.
    and the [sie_cap_gpr] pop want *)
 Lemma npi_kb (K : nat) : (K_nameiparent <= K)%nat ->
   (K_namex <= K - 2)%nat /\ (2 <= K)%nat /\ ((K - 2) + 2 = K)%nat.
-Proof. unfold K_nameiparent, K_namex. intro H. split_and!; lia. Qed.
+Proof. intro H. split_and!; lia. Qed.
 
 (* [li a1,1] makes namex's ghost flag TRUE *)
 Lemma npi_a1_true :

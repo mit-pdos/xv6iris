@@ -131,7 +131,7 @@ Section ProofIdup.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
     intros pcE ret_tgt HK HnZ Hk Ha0 Hfresh.
-    unfold K_idup in HK.
+    
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv Hislot Href Hcont".
     iDestruct (sie_b_agree m n K eb b p lks with "Hcg Hcnt") as %Houtb.

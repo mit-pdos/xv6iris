@@ -600,7 +600,7 @@ Section LogWriteBlocks.
               (log_res γ bn γfs cov logstart) E3 n eb p (K - 4)%nat
               ({["log"]} ∪ lks)
               ltac:(rewrite HE3a0; rewrite /log_addr; apply bv_eq; vm_compute; reflexivity)
-              ltac:(unfold K_log_write in HK; lia)
+              ltac:(lia)
               with "Hcg Htext Hpc [Hlock] Htok HRres Hcnt Hpay").
     { iExact "Hlock". }
     iIntros (CID1 Hs1 mr) "Hcg Hpc %Hrelpins Hcnt".
@@ -687,7 +687,7 @@ Section LogWriteBlocks.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.log_write + 0xc0)) (mword_of_int 2 : mword 6)
               P3 (K - 4)%nat 4 b Hpop with "Hcg Hpc Hic0 Hframe4").
     iIntros (CID5 Hs5) "Hcg Hpc".
-    assert (Hnk : ((K - 4) + 4)%nat = K) by (unfold K_log_write in HK; lia).
+    assert (Hnk : ((K - 4) + 4)%nat = K) by (lia).
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg
       (add_vec (P3 !!! Regidx csp_rs1 : mword 64)
@@ -843,7 +843,7 @@ Section LogWriteBlocks.
       rewrite /A1 upd_ne; [reflexivity | regne]. }
     iApply (Bpin.wp_bpin_sconf bn (fs_view γfs γd dev cov) k A2 (S n) eb p
               (trap_res b + (K - 4))%nat false ({["log"]} ∪ lks)
-              ltac:(unfold K_log_write in HK; lia)
+              ltac:(lia)
               ltac:(rewrite Nat2Z.inj_succ; lia) Hk HA2a0 Hnobc2
               with "Hcg Hcnt Htext Hpc Hbio Hslot").
     all: try lkbelow.
@@ -1808,7 +1808,7 @@ Section ProofLogWrite.
                     = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 b
-              ltac:(unfold K_log_write in HK; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1 : mword 64)
@@ -1964,7 +1964,7 @@ Section ProofLogWrite.
                  bs bsd Φfsb Bud m K n eb p b lks ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (Acquire.wp_acquire_sconf (ln_lk γ) "log"%string
               (log_res γ bn γfs cov logstart) mA n eb p (K - 4)%nat b lks
-              ltac:(lia) ltac:(unfold K_log_write in HK; lia) Hno
+              ltac:(lia) ltac:(lia) Hno
               with "Hcg Hcnt Htext Hpc [Hlock]").
     all: try lkbelow.
     { iEval (rewrite HmAa0). iExact "Hlock". }

@@ -101,7 +101,7 @@ Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compu
    hands it. *)
 Lemma ms_bounds (K : nat) : (K_main_secondary <= K)%nat ->
   (2 <= K)%nat /\ (48 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
-Proof. unfold K_main_secondary, kv_frame_slots. lia. Qed.
+Proof. lia. Qed.
 
 (* ===================================================================== *)
 Module MainSecondaryProof

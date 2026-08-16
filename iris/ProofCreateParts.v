@@ -570,8 +570,7 @@ Lemma cr_kb (K : nat) : (K_create <= K)%nat ->
   /\ (K_ialloc <= K - 10)%nat /\ (K_iupdate <= K - 10)%nat
   /\ (K_dirlink <= K - 10)%nat /\ ((K - 10) + 10)%nat = K.
 Proof.
-  unfold K_create, K_nameiparent, K_ilock, K_dirlookup, K_iunlockput,
-         K_ialloc, K_iupdate, K_dirlink. lia.
+  lia.
 Qed.
 
 (* ===================================================================== *)
@@ -635,7 +634,7 @@ Qed.
    that pushed dirlookup 84 -> 90 (SpecCreate.v's note on [K_create] has the
    whole ladder); 9da28f5's [dp->nlink == 0] guard did NOT move it, because
    the frame is still 80 bytes. *)
-Lemma cr_K_value : K_create = 114%nat.
+Lemma cr_K_value : K_create = 124%nat.
 Proof. reflexivity. Qed.
 
 Lemma cr_slots_value : create_slots = 3%nat.

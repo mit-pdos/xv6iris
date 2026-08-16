@@ -123,8 +123,7 @@ Definition disk_lock : mword 64 :=
 (* [virtio_disk_init]'s own frame is 32 bytes (4 slots) and its deepest callee
    is [kalloc], which needs 14 -- stated as a CONSTANT, per the spec-design
    rule that a stack bound is never coupled to the arguments. *)
-Definition K_virtio_disk_init : nat := 18%nat.
-
+Notation K_virtio_disk_init := (18%nat) (only parsing).
 (* THE POSTCONDITION, as one named predicate rather than a twenty-wand chain
    spelled inline at the end of the body.  This is a performance-critical
    abstraction, not tidiness: the whole-function proof carries the continuation

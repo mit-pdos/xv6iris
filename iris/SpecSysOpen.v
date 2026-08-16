@@ -222,8 +222,7 @@ Local Open Scope Z_scope.
    fits under that: namei 106, fileclose [8 + K_iput] = 68, iunlockput 64,
    argstr 60, end_op 58, itrunc 50, ilock 44, begin_op 26, iunlock 26,
    argint 18, filealloc 14, fdalloc 14. *)
-Definition K_sys_open : nat := 138%nat.
-
+Notation K_sys_open := (148%nat) (only parsing).
 (* THE REFERENCE ALLOWANCE.  create's own, and for create's own reason; see
    the header's reference ledger. *)
 Definition sys_open_slots : nat := create_slots.

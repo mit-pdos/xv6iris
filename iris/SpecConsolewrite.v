@@ -110,8 +110,7 @@ Local Open Scope Z_scope.
    and the reserve is not available to them.  Raising [SpecFilewrite]'s
    [filewrite_stack] from [12 + K_writei] to [12 + 72] is the whole cost of
    that, and it stops there: nothing above sys_write reads the constant. *)
-Definition consolewrite_stack : nat := 72%nat.
-
+Notation consolewrite_stack := (72%nat) (only parsing).
 Definition wp_consolewrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !fileG Σ, !kallocG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ}

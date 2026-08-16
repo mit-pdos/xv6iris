@@ -87,8 +87,7 @@ Local Open Scope Z_scope.
 
 (* growproc's own frame is 4 slots; uvmalloc wants 42 below it (mappages 32,
    kalloc 14, uvmdealloc 26) and myproc 10, so 42 covers every call. *)
-Definition growproc_stack : nat := 46%nat.
-
+Notation growproc_stack := (46%nat) (only parsing).
 (* ===================================================================== *)
 (*  WHAT growproc DID, as a function of [n] and the return value.         *)
 (* ===================================================================== *)

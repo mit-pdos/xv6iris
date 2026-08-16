@@ -239,9 +239,9 @@ Proof. lia. Qed.
 Lemma ap_lvlS (lvl : nat) : (Z.of_nat lvl + 2 < 2 ^ 31)%Z -> (Z.of_nat (S lvl) + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
 Lemma ap_nb_pt (n : nat) : (K_allocproc < S n)%nat -> (K_proc_pagetable < n)%nat.
-Proof. unfold K_allocproc, K_proc_pagetable. lia. Qed.
+Proof. lia. Qed.
 Lemma ap_nb_pos (n : nat) : (K_allocproc < n)%nat -> n <> 0%nat.
-Proof. unfold K_allocproc. lia. Qed.
+Proof. lia. Qed.
 (* The two facts the FAILURE TAILS need about the budget.
 
    [ap_sub_dec] re-associates: proc_pagetable is called with the trapframe
@@ -277,7 +277,7 @@ Lemma ap_zero_of_int : (mword_of_int 0 : mword 64) = (zero_reg : mword 64).
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 Lemma ap_nodes_le (n : nat) : (n <= K_proc_pagetable)%nat -> (S n <= K_allocproc)%nat.
-Proof. unfold K_allocproc, K_proc_pagetable. lia. Qed.
+Proof. lia. Qed.
 
 (* THE LOCK-ORDER DERIVATIONS.  allocproc's own premise ([Hbelow], added to
    [SpecAllocproc.wp_allocproc_core_body]/[wp_allocproc_sconf_body]) is

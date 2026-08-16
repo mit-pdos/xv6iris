@@ -43,8 +43,7 @@ Require Import ProcAvail.
 Import Defs.
 
 (* intr's own frame is 32 bytes (4 slots); its deepest callee is wakeup (18) *)
-Definition K_virtio_disk_intr : nat := 22%nat.
-
+Notation K_virtio_disk_intr := (22%nat) (only parsing).
 Definition wp_virtio_disk_intr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}

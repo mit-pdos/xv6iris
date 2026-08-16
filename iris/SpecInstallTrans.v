@@ -125,8 +125,7 @@ Import Defs.
 
 (* install_trans's own frame is 10 slots ([c.addi sp,sp,-80] at +0x0c); its
    deepest callee is bread (40).  memmove/bwrite/bunpin/brelse want less. *)
-Definition K_install_trans : nat := 50%nat.
-
+Notation K_install_trans := (68%nat) (only parsing).
 Definition wp_install_trans_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}

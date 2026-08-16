@@ -110,8 +110,7 @@ Import Defs.
 (* initlog's own frame is 6 slots ([c.addi16sp sp,-48] at +0x00); its
    deepest callee is install_trans (50).  write_head wants 44, bread 40,
    initlock 2. *)
-Definition K_initlog : nat := 56%nat.
-
+Notation K_initlog := (74%nat) (only parsing).
 (* the string literal initlog passes to initlock -- it sits in .rodata past
    etext with no ELF symbol of its own (the [auipc a1,0x4 ; addi a1,a1,-1658]
    pair at +0x1a/+0x1e), so it is spelled out here; the proof reads its bytes

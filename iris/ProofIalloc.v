@@ -555,7 +555,7 @@ Section IallocEpilogue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hty Hsp Hthr.
-    pose proof HK as HK'. unfold K_ialloc in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsl Harms Hcont".
     iPoseProof (iali_80 with "Htext") as "Hi80".
     iPoseProof (iali_82 with "Htext") as "Hi82".
@@ -779,7 +779,7 @@ Section IallocOut.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hty Hpk Hsp Hthr.
-    pose proof HK as HK'. unfold K_ialloc in HK'.
+    pose proof HK as HK'. 
     pose proof ia_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hpenv Hframe Hppid
               Hsbn Hsbi Hsl Hiref Hop Hcont".
@@ -1152,7 +1152,7 @@ Section IallocClaim.
   Proof.
     intros HK Hgeom Hsp Hthr Hs1 Hs3 Hs5 Hs6 Hs2 Hkk Hbno Hcov Hlog
            Hnib Hdswf Ht0 Hty Hinum Halign Hbelow.
-    pose proof HK as HK'. unfold K_ialloc in HK'.
+    pose proof HK as HK'. 
     pose proof (DinodeEnc.islot_lt inum) as Hsl16.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hireg #Hprocs
               #Hdevi #Hdgeom #Hdlock Hitb2 Hitbl Hesc Hiref
@@ -1442,7 +1442,7 @@ Section IallocClaim.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKlw : (K_log_write <= K - 8)%nat) by (unfold K_log_write; lia).
+    assert (HKlw : (K_log_write <= K - 8)%nat) by (lia).
     (* THE ONE GHOST STEP (fs-icache.md §16.5): no resource in, [True] out.
        The free inum's fragment is INSIDE the region and stays there, at the
        [fresh_shape] arm; the buffer is the serialiser. *)
@@ -1557,7 +1557,7 @@ Section IallocClaim.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (b := true) (CIDa := CID8) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    assert (HKbl : (K_brelse <= K - 8)%nat) by (unfold K_brelse; lia).
+    assert (HKbl : (K_brelse <= K - 8)%nat) by (lia).
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq W7 (K - 8)%nat true (proc_addr j)
               (diblk_bytes (<[DinodeEnc.islot inum := ialloc_fresh ty]> ds))
@@ -1658,7 +1658,7 @@ Section IallocClaim.
                  with "Hcont") as "Hcont".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
               WA 0%nat true (proc_addr j) (K - 8)%nat b lks
-              ltac:(unfold K_iget; lia) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(vm_compute; reflexivity)
               Hnib HWAa0 HWAa1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
@@ -1946,7 +1946,7 @@ Section IallocScan.
          WP (Loop : expr riscv_lang))).
   Proof.
     intros HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl Hbelow.
-    pose proof HK as HK'. unfold K_ialloc in HK'.
+    pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "#Htext #Hkdata #Hpanic #Hpenv #Hbio #Hlctx #Hireg #Hprocs
               #Hdevi #Hdgeom #Hdlock #Hitb2 #Hitbl #Hesc".
@@ -2158,7 +2158,7 @@ Section IallocScan.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (b := true) (CIDa := CIDc) (CIDb := CID5) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
-      assert (HKbr : (K_bread <= K - 8)%nat) by (unfold K_bread; lia).
+      assert (HKbr : (K_bread <= K - 8)%nat) by (lia).
       iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
@@ -2521,7 +2521,7 @@ Section IallocScan.
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (wp_next_shift (b := true) (CIDa := CID5) (CIDb := CID14) ltac:(wp_next_chain)
                      with "Hcont") as "Hcont".
-        assert (HKbl : (K_brelse <= K - 8)%nat) by (unfold K_brelse; lia).
+        assert (HKbl : (K_brelse <= K - 8)%nat) by (lia).
         iAssert (bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bno
                    (diblk_bytes ds) bsd0 d0) with "[Hheld]" as "Hlk";
           [rewrite /bio_locked; iExact "Hheld" |].
@@ -2760,7 +2760,7 @@ Section IallocMain.
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hn1 Hnnib Hn31 Hty Hpk Hj Hgl
            Ha0 Ha1 Heb Hbelow.
     subst eb.
-    pose proof HK as HK'. unfold K_ialloc in HK'.
+    pose proof HK as HK'. 
     assert (Hnsext : (sign_extend' 64 (mword_of_int ninodes : mword 32) : mword 64)
                      = mword_of_int ninodes)
       by (apply sext32_64_small; change (2^31)%Z with 2147483648%Z; lia).

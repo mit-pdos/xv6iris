@@ -425,7 +425,7 @@ Section CrBodies.
     iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (CR + 0xde)) (mword_of_int 6 : mword 6)
               E8 (av - 12)%nat 12%nat true Hpop with "Hcg Hpc Hi0de Hframe").
     iIntros (CIDp Hsp') "Hcg Hpc".
-    assert (Havx : (av - 12 + 12)%nat = av) by (unfold consoleread_stack in Hav; lia).
+    assert (Havx : (av - 12 + 12)%nat = av) by (lia).
     iEval (rewrite Havx) in "Hcg".
     set (E9 := <[Regidx csp_rs1 := regval_into_reg
         (add_vec (E8 !!! Regidx csp_rs1)
@@ -764,7 +764,7 @@ Section ProofConsoleread.
       rewrite /X1 upd_ne; [| congruence]. reflexivity. }
     iApply (Release.wp_release_sconf γc a_cons "cons"%string cons_res X3
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HX3lka
-              ltac:(unfold consoleread_stack in Hav; lia)
+              ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
     iIntros (CIDr Hsr mr) "Hcg Hpc %Hcsr Hcnt". rgall.
     assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
@@ -1394,8 +1394,8 @@ Section ProofConsoleread.
     assert (HG5ra : G5 !!! Regidx Rra = add_vec_int (mword_of_int (CR + 0xa8) : mword 64) 4)
       by (rewrite /G5; apply upd_eq).
     assert (Hstk : (either_copyout_stack <= trap_res true + (av - 12))%nat).
-    { assert (trap_res true = 78%nat) as -> by reflexivity.
-      unfold either_copyout_stack, consoleread_stack in *. lia. }
+    { assert (trap_res true = 90%nat) as -> by reflexivity.
+      lia. }
     iApply (EitherCopyout.wp_either_copyout_sconf γa γf G5
               (trap_res true + (av - 12))%nat 1%nat true (proc_addr jp) pid
               (upd_upt V P') true 1%nat (fun _ => trunc8 (H8 !!! Regidx Ra4))
@@ -1794,8 +1794,8 @@ Section ProofConsoleread.
           [vm_compute; reflexivity | apply callee_saved_refl]).
     iApply (Myproc.wp_myproc_sconf W1 (trap_res true + (av - 12))%nat 1%nat true
               (proc_addr jp) false _ cr_lvl1
-              ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
-                    unfold consoleread_stack in Hav; lia)
+              ltac:(assert (trap_res true = 90%nat) as -> by reflexivity;
+                    lia)
               with "Hcg Hcnt Ht Hpc").
     iApply wp_next_off_intro. iIntros (ms1 mmp) "%Hms1 Hcg Hcnt Hpc %Hmpf". rgall.
     destruct Hmpf as [Hcsmp Hmpa0].
@@ -1826,8 +1826,8 @@ Section ProofConsoleread.
         [vm_compute; reflexivity | apply callee_saved_refl]. }
     iApply (Killed.wp_killed_sconf γs jp γlp W2 (trap_res true + (av - 12))%nat 1%nat true
               (proc_addr jp) false ({["cons"]} ∪ lks) HW2a0 Hjp Hjl cr_lvl1
-              ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
-                    unfold consoleread_stack in Hav; lia)
+              ltac:(assert (trap_res true = 90%nat) as -> by reflexivity;
+                    lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Ht Hpc Hpinv").
     all: try lkbelow.
@@ -1912,7 +1912,7 @@ Section ProofConsoleread.
         apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
       iApply (Release.wp_release_sconf γc a_cons "cons"%string cons_res K3
                 0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HK3lka
-                ltac:(unfold consoleread_stack in Hav; lia)
+                ltac:(lia)
                 with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
       iIntros (CIDr Hsr mrl) "Hcg Hpc %Hcsrl Hcnt". rgall.
       assert (Hsetback : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
@@ -1992,8 +1992,8 @@ Section ProofConsoleread.
     iApply (SleepPrepare.wp_sleep_prepare_sconf γs jp γlp S2
               (trap_res true + (av - 12))%nat 1%nat true false ({["cons"]} ∪ lks) Hjp Hjl
               ltac:(rewrite HS2a0; exact a_cons_r_nz) cr_lvl1
-              ltac:(assert (trap_res true = 78%nat) as -> by reflexivity;
-                    unfold consoleread_stack in Hav; lia)
+              ltac:(assert (trap_res true = 90%nat) as -> by reflexivity;
+                    lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Ht Hpc Hpinv").
     all: try lkbelow.
@@ -2044,7 +2044,7 @@ Section ProofConsoleread.
       apply callee_saved_insert_r; [vm_compute; reflexivity | apply callee_saved_refl]. }
     iApply (Release.wp_release_sconf γc a_cons "cons"%string cons_res S4
               0%nat true (proc_addr jp) (av - 12)%nat ({["cons"]} ∪ lks) HS4lka
-              ltac:(unfold consoleread_stack in Hav; lia)
+              ltac:(lia)
               with "Hcg Ht Hpc Hlk Hlocked Hres Hcnt Hpay").
     iIntros (CIDr0 Hsr0 mrl0) "Hcg Hpc %Hcsrl0 Hcnt". rgall.
     assert (Hsetback2 : ({["cons"]} ∪ lks) ∖ {["cons"]} = lks)
@@ -2078,7 +2078,7 @@ Section ProofConsoleread.
     iDestruct (cpu_own_transport CIDr0 CIDs0 0%nat true (proc_addr jp) true
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Sleep.wp_sleep_sconf γs jp γlp S5 (av - 12)%nat true lks Hjp Hjl
-              ltac:(unfold consoleread_stack in Hav; lia)
+              ltac:(lia)
               ltac:(lkbelow)
               with "Hcg Hcnt Ht Hpc Hpinv [] []").
     all: try lkbelow.
@@ -2127,7 +2127,7 @@ Section ProofConsoleread.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γc "cons"%string cons_res S7 0%nat true
               (proc_addr jp) (av - 12)%nat true lks cr_lvl0
-              ltac:(unfold consoleread_stack in Hav; lia)
+              ltac:(lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.
@@ -2474,7 +2474,7 @@ Section ProofConsoleread.
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (cnri_000 with "Ht") as "Hi00".
     iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 58 : mword 6) m av 12%nat true
-              ltac:(unfold consoleread_stack in Hav; lia) Hpush with "Hcg Hpc Hi00").
+              ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc". rgall.
     iEval (rewrite Hspm) in "Hframe".
     set (P0 := <[Regidx csp_rs1 := regval_into_reg
@@ -2754,7 +2754,7 @@ Section ProofConsoleread.
     iDestruct (cpu_own_transport CID CIDp17 0%nat true pj true ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γc "cons"%string cons_res P8 0%nat true pj
-              (av - 12)%nat true lks cr_lvl0 ltac:(unfold consoleread_stack in Hav; lia)
+              (av - 12)%nat true lks cr_lvl0 ltac:(lia)
               Hbelow
               with "Hcg Hcnt Ht Hpc []").
     all: try lkbelow.

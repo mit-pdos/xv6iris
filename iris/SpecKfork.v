@@ -182,8 +182,7 @@ Local Open Scope Z_scope.
    allocproc's UNCOUNTED core, [wp_allocproc_core_body] (48) -- deeper than
    uvmcopy (42), freeproc (44), filedup/idup (14 apiece), acquire/release
    (10), myproc (10), safestrcpy (2). *)
-Definition K_kfork : nat := 56%nat.
-
+Notation K_kfork := (56%nat) (only parsing).
 Definition kfork_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !pavG Σ}
     `{GEN : GenId} `{CID : CpuId}

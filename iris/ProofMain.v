@@ -139,8 +139,8 @@ Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compu
 (* the third conjunct is the SCHEDULER's, and it is what [K_main] is sized by:
    the loop-head enable funds [kv_frame_slots] out of what main hands it. *)
 Lemma mn_bounds (K : nat) : (K_main <= K)%nat ->
-  (2 <= K)%nat /\ (50 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
-Proof. unfold K_main, kv_frame_slots. lia. Qed.
+  (2 <= K)%nat /\ (K_userinit <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
+Proof. lia. Qed.
 
 (* ===================================================================== *)
 Module MainProof
@@ -378,7 +378,7 @@ Section ProofMain.
   Local Lemma mn_grp_printk 
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool) :
-    (50 <= n)%nat ->
+    (K_userinit <= n)%nat ->
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ kernel_data -∗ panic_wp -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
@@ -725,7 +725,7 @@ Section ProofMain.
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
-    (50 <= n)%nat ->
+    (K_userinit <= n)%nat ->
     phystop = (mword_of_int 0x88000000 : mword 64) ->
     (* [kmem_lo] IS the dumped `end` symbol -- see [SpecMain]'s premise *)
     s1entry = add_vec (and_vec (add_vec (mword_of_int kmem_lo : mword 64)
@@ -929,7 +929,7 @@ Section ProofMain.
   Local Lemma mn_grp_trap 
       (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (p0 : mword 64) :
-    (50 <= n)%nat ->
+    (K_userinit <= n)%nat ->
     cid_word = (zero_reg : mword 64) ->
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
@@ -1087,7 +1087,7 @@ Section ProofMain.
       (γa : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8) :
-    (50 <= n)%nat ->
+    (K_userinit <= n)%nat ->
     (K_kvmmake + 64 + 3 < length ps)%nat ->
     virtio_live c0 = false ->
     sie_cap_gpr m n false p0 -∗
@@ -1234,7 +1234,7 @@ Section ProofMain.
     iDestruct (mn_pin_sie_cap_gpr with "Hcg") as "Hcg".
     iApply (VirtioDiskInit.wp_virtio_disk_init_sconf γv γa (tp_pin F4) n false p0
               (avail_sub (Some (length ps)) K_kvmmake) c0
-              vdl vdn vdc pd0 pav0 pu0 free0 ∅ ltac:(unfold K_virtio_disk_init; lia)
+              vdl vdn vdc pd0 pav0 pu0 free0 ∅ ltac:(lia)
               Hnb3 (rget_tp F4) Hlive
               with "Hcg Hcpu Htext Hkdata Hpc Hkenv Hdinv Hcfg
                     Hdw Hdn Hdc Hdd0 Hda0 Hdu0 Hdiskfree").
@@ -1301,7 +1301,7 @@ Section ProofMain.
     iEval (rewrite Htgtui) in "Hpc".
     iApply (Userinit.wp_userinit_sconf γa γs F5 n false p0
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3) iv0 false ∅
-              ltac:(unfold K_userinit; lia) Hnb8
+              ltac:(lia) Hnb8
               with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpinv Hkenv Hinitproc").
     iApply wp_next_off_intro.
     iIntros (mui) "Hcg Hpc %Hcsui Hcpu _ _".

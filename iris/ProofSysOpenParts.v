@@ -229,9 +229,7 @@ Proof.
   (* [fileclose_stack] is [8 + K_iput], so it has to be unfolded BEFORE
      [K_iput] -- [unfold] walks its argument list once, and a constant it
      EXPOSES later in the list stays folded. *)
-  unfold K_sys_open, K_create, K_namei, argstr_stack,
-         K_begin_op, K_end_op, K_ilock, K_iunlock, K_itrunc,
-         K_iunlockput, fdalloc_stack, fileclose_stack, K_iput.
+  
   intro H. split_and!; lia.
 Qed.
 

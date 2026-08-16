@@ -324,7 +324,7 @@ Section IreclaimEpilogue.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsub Hsp Hthr.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hsbn Hsbi Hsbb Hsl Hiref Hbm Hcont".
     iPoseProof (irci_b2 with "Htext") as "Hib2".
     iPoseProof (irci_b4 with "Htext") as "Hib4".
@@ -708,7 +708,7 @@ Section IreclaimStep.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hsub Hfuel Hinum Hsp Hthr Hs1 Hs4 Hs5 Hs6.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     pose proof (bv_unsigned_in_range _ inum) as [Hinum0 Hinum32].
     assert (Hm32 : bv_modulus (MachineWord.MachineWord.Z_idx 32) = 4294967296)
       by (vm_compute; reflexivity).
@@ -991,7 +991,7 @@ Section IreclaimOrphan.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hnnib Hn31 Hpk
            Hj Hgl Hfuel Hinum Hsub Hkk Hsp Hthr Hs1 Hs2 Hs3 Hs4 Hs5 Hs6 Hbelow.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     pose proof irc_msg_fmt as (Hkmsg & Hnmsg & Hlmsg).
     assert (Hnibin : bv_unsigned inum < 16 * Z.of_nat nib) by lia.
     destruct (Hblk inum Hnibin) as [Hibcov Hiblog].
@@ -1259,7 +1259,7 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (IG.wp_iget_sconf gtl cn γfs γi cov logstart nib dev inum
               O6 0%nat true (proc_addr j) (K - 8)%nat b lks
-              ltac:(unfold K_iget; lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
+              ltac:(lia) ltac:(cbn [Z.of_nat]; lia) Hnibin
               HO6a0 HO6a1
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hitb2 Hitbl Hesc Hpanic Hiref").
@@ -1392,7 +1392,7 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq O9 (K - 8)%nat true (proc_addr j)
-              bs bsd0 d0 b lks ltac:(unfold K_brelse; lia) Hkk HO9a0
+              bs bsd0 d0 b lks ltac:(lia) Hkk HO9a0
               (* brelse's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1477,7 +1477,7 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (BO.wp_begin_op_sconf γs j γl bn γ γfs cov logstart dev pidv dq
               OA (K - 8)%nat true b lks
-              ltac:(unfold K_begin_op; lia) Hj Hgl
+              ltac:(lia) Hj Hgl
               (* begin_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1588,7 +1588,7 @@ Section IreclaimOrphan.
     iApply (IL.wp_ilock_sconf γs j γl γu γd γk pd pav pu bn γfs γi cn gil gisl
               cov logstart inodestart nib kslot (q/2)%Qp gsh dev inum
               pidv dq dqs OC (K - 8)%nat true b lks
-              ltac:(unfold K_ilock; lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
+              ltac:(lia) Hkslot Hgeom Hst Hibcov Hnibin Hj Hgl
               HOCa0
               (* ilock's bound is "bcache"(4); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
@@ -1697,7 +1697,7 @@ Section IreclaimOrphan.
     iApply (IU.wp_iunlock_sconf γs γfs γi cn gil gisl cov logstart kslot
               (q/2)%Qp gsh dev inum dnl bml pidv dq OE (K - 8)%nat true
               (proc_addr j) b lks
-              ltac:(unfold K_iunlock; lia) Hkslot HOEa0
+              ltac:(lia) Hkslot HOEa0
               (* iunlock's bound is "sleep lock"(6); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1801,7 +1801,7 @@ Section IreclaimOrphan.
     iApply (IP.wp_iput_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl
               gil gisl cov logstart bmapstart inodestart nib size dev usedn
               kslot q inum MAXOPBLOCKS pidv dq dqb dqs OG (K - 8)%nat true b lks
-              ltac:(unfold K_iput; lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
+              ltac:(lia) Hkslot Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hst Hibcov Hiblog Hnibin Hcovb
               ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hj Hgl HOGa0
               Hbelow
@@ -1873,7 +1873,7 @@ Section IreclaimOrphan.
                  with "Hcont") as "Hcont".
     iApply (EO.wp_end_op_sconf γs j γl γu γd γk pd pav pu bn γ γfs cov logstart
               dev n' pidv dq OH (K - 8)%nat true b lks
-              ltac:(unfold K_end_op; lia) Hgeom Hj Hgl
+              ltac:(lia) Hgeom Hj Hgl
               (* end_op's bound is "log"(3); irc_orphan's own is
                  "itable"(2), and [locks_below_mono] weakens it. *)
               ltac:(lkbelow)
@@ -1982,7 +1982,7 @@ Section IreclaimRelease.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hn31 Hfuel Hinum Hsub Hkk Hsp Hthr Hs1 Hs2 Hs4 Hs5 Hs6 Hbelow.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hprocs Hframe Hppid Hsbn Hsbi
               Hsbb Hsl Hiref Hbm Hlk Hloop Hcont".
     iPoseProof (irci_aa with "Htext") as "Hiaa".
@@ -2050,7 +2050,7 @@ Section IreclaimRelease.
                  with "Hcont") as "Hcont".
     iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq V2 (K - 8)%nat true (proc_addr j)
-              bs bsd0 d0 b lks ltac:(unfold K_brelse; lia) Hkk HV2a0
+              bs bsd0 d0 b lks ltac:(lia) Hkk HV2a0
               ltac:(lkbelow)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
     all: try lkbelow.
@@ -2170,7 +2170,7 @@ Section IreclaimScan.
   Proof.
     intros HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb Hn1 Hnnib Hn31
            Hpk Hj Hgl Hbelow.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "#Htext #Hkdata #Hpanic #Hpenv #Hbio #Hlctx #Hseam #Hgen #Hireg
               #Hitb2 #Hitbl #Hesc #Hslks #Hprocs #Hdevi #Hdgeom #Hdlock".
@@ -2428,7 +2428,7 @@ Section IreclaimScan.
       iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
                 (fs_view γfs γd dev cov) pidv dev bno dq
                 W6 (K - 8)%nat true b lks
-                ltac:(unfold K_bread; lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
+                ltac:(lia) Hbnolt eq_refl Hbnocov eq_refl Hj Hgl
                 HW6a0 HW6a1
                 (* bread's bound is "bcache"(4); irc_scan's own is
                    "itable"(2), and [locks_below_mono] weakens it. *)
@@ -2923,7 +2923,7 @@ Section IreclaimMain.
     intros pcE pj ret_tgt HK Hgeom Hst Hblk Hsize Hbm0 Hbmcov Hbmlog Hcovb
            Hn1 Hnnib Hn31 Hpk Hj Hgl Ha0 Heb Hbelow.
     subst eb.
-    pose proof HK as HK'. unfold K_ireclaim in HK'.
+    pose proof HK as HK'. 
     assert (Hnsext : (sign_extend' 64 (mword_of_int ninodes : mword 32) : mword 64)
                      = mword_of_int ninodes)
       by (apply sext32_64_small; change (2^31)%Z with 2147483648%Z; lia).

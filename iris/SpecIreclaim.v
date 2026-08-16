@@ -182,8 +182,7 @@ Local Open Scope Z_scope.
    with ra/s0/s1/s2/s3/s4/s5/s6 pushed at 56/48/40/32/24/16/8/0.  Its deepest
    callee is iput (60); end_op wants 58, ilock 44, bread 40, iunlock 26,
    begin_op 26, brelse 26, iget 16. *)
-Definition K_ireclaim : nat := 68%nat.
-
+Notation K_ireclaim := (84%nat) (only parsing).
 Definition wp_ireclaim_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

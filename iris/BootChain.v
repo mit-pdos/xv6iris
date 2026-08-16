@@ -111,13 +111,12 @@ Definition sp_of (n : nat) : Z := KernelSyms.stack0 + 4096 * (Z.of_nat n + 1).
    is exactly [uint sp0 - 8*512, uint sp0), which is what makes the ONE range
    serve both [wp_entry_boot]'s [4 <= n] and the bridge's
    [boot_stack_slots K_main = 180 <= n]. *)
-Definition boot_stack_depth : nat := 512%nat.
-
+Notation boot_stack_depth := (512%nat) (only parsing).
 Lemma boot_stack_depth_entry : (4 <= boot_stack_depth)%nat.
-Proof. unfold boot_stack_depth. lia. Qed.
+Proof. lia. Qed.
 
 Lemma boot_stack_depth_bridge : (boot_stack_slots K_main <= boot_stack_depth)%nat.
-Proof. rewrite boot_stack_slots_main. unfold boot_stack_depth. lia. Qed.
+Proof. rewrite boot_stack_slots_main. lia. Qed.
 
 (* [_entry]'s computed sp, at this image's [stack0] and a concrete hart id.
    This is what [SpecEntry.wp_entry_boot]'s defining premise for [sp0] wants,
@@ -219,7 +218,7 @@ Qed.
    against [K_main] alone.  Nothing is retuned: [kv_frame_slots] only ever
    makes the available budget LARGER. *)
 Lemma K_main_secondary_le : (K_main_secondary <= kv_frame_slots + K_main)%nat.
-Proof. unfold K_main_secondary, K_main, kv_frame_slots. lia. Qed.
+Proof. lia. Qed.
 
 (* the boot arm's, likewise: it used to be [le_n K_main] at the call site. *)
 Lemma K_main_boot_le : (K_main <= kv_frame_slots + K_main)%nat.

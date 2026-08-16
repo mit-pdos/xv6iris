@@ -62,8 +62,7 @@ Local Open Scope Z_scope.
 
 (* namecmp's own frame is 16 bytes (2 slots); its only callee is strncmp,
    which wants 2. *)
-Definition K_namecmp : nat := 4%nat.
-
+Notation K_namecmp := (4%nat) (only parsing).
 Definition wp_namecmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (mm : regfile) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac)
     (b : bool) (p : mword 64) :=

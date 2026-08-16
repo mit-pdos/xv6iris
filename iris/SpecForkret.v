@@ -110,6 +110,7 @@ Require Import DiskPtsto WpUart FsBlocks LogInv FsCrash KallocInv.
 Require Import BioDefs.
 Require Import IrefSlots InodeRegion ProcAvail.
 Require Import SpecPrepareReturn.
+Require Import SpecKexec.
 Require Import SpecUsertrap.
 Require Import UsertrapRes.
 From Kernel Require KernelSyms.
@@ -123,8 +124,7 @@ Definition first_addr : mword 64 := mword_of_int KernelSyms.first_1.
    prepare_return's 12 (myproc's and release's 10 are subsumed).  Written as
    an expression so a change to prepare_return's budget cannot silently
    leave this one behind. *)
-Definition K_forkret : nat := (6 + K_prepare_return)%nat.
-
+Notation K_forkret := ((6 + K_kexec)%nat) (only parsing).
 Section SpecForkret.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,

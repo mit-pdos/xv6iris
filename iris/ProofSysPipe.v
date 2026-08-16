@@ -275,11 +275,11 @@ Qed.
    a step).  Every arithmetic obligation of this file is therefore packaged
    as a closed lemma over plain [Z]/[nat] and applied as a fact. *)
 Lemma sp_bounds (av : nat) : (sys_pipe_stack <= av)%nat ->
-  (8 <= av)%nat /\ (10 <= av - 8)%nat /\ (74 <= av - 8)%nat /\ (52 <= av - 8)%nat /\
+  (8 <= av)%nat /\ (10 <= av - 8)%nat /\ (90 <= av - 8)%nat /\ (52 <= av - 8)%nat /\
   (argaddr_stack <= av - 8)%nat /\ (fdalloc_stack <= av - 8)%nat /\
   (fileclose_stack <= av - 8)%nat.
 Proof.
-  unfold sys_pipe_stack, argaddr_stack, fdalloc_stack, fileclose_stack, K_iput.
+  
   lia.
 Qed.
 
@@ -423,7 +423,7 @@ Section ProofSysPipe.
   Proof.
     iIntros (Hk) "(_ & _ & (Hstk & _ & _) & _)".
     iApply (stack_own_sp_bounds _ (trap_res b + k)%nat with "Hstk").
-    destruct b; unfold trap_res, kv_frame_slots; lia.
+    destruct b; unfold trap_res; lia.
   Qed.
 
   (* =================================================================== *)

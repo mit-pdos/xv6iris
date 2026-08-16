@@ -217,7 +217,7 @@ Section ProofConsputc.
   Proof.
     cbv beta delta [wp_consputc_sconf_body].
     intros ra_i pcE ra0 ret_tgt HK Hn Hbelow.
-    assert (HK16 : (16 <= K)%nat) by (unfold consputc_stack in HK; exact HK).
+    assert (HK16 : (16 <= K)%nat) by (exact HK).
     pose proof (cp_cap_bounds K HK16) as (Hc2 & HK4).
     iIntros "Hcg Hcpu #Htext Hpc #Hdev #Htxl #Hsub Hcont".
     iPoseProof (cpi_00 with "Htext") as "Hi00".

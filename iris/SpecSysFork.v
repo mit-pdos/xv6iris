@@ -86,8 +86,7 @@ Import Defs.
 Local Open Scope Z_scope.
 
 (* kfork's budget plus this function's own two slots. *)
-Definition K_sys_fork : nat := (K_kfork + 2)%nat.
-
+Notation K_sys_fork := ((K_kfork + 2)%nat) (only parsing).
 Definition wp_sys_fork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
       !irefslotG Σ, !pavG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}

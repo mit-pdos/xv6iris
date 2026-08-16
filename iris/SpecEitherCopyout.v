@@ -92,8 +92,7 @@ Local Open Scope Z_scope.
    argument dies before their first call, so their frames stayed at 12 slots
    and their budget stayed 50 -- which is why [either_copyin_stack] is
    correctly still 56 while this one is 58. *)
-Definition either_copyout_stack : nat := 58%nat.
-
+Notation either_copyout_stack := (58%nat) (only parsing).
 Section SpecEitherCopyout.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
 
