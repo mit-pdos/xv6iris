@@ -618,16 +618,17 @@ Section fetch.
   Qed.
 
   Lemma swp_mem_read_M (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pa : physaddr) (w : SailStdpp.Values.mword 32) :
+      (rs : regstate) (pa : physaddr) (w : SailStdpp.Values.mword 32)
+      (pv : Privilege) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs = Machine ->
+    register_lookup cur_privilege rs = pv ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine pa 4
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA pv pa 4
               false false false false)
          (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
@@ -670,16 +671,17 @@ Section fetch.
 
   (* the 2-byte instance *)
   Lemma swp_mem_read_M2 (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pa : physaddr) (w : SailStdpp.Values.mword 16) :
+      (rs : regstate) (pa : physaddr) (w : SailStdpp.Values.mword 16)
+      (pv : Privilege) :
     Drw ## Dro ->
     (mstatus : register) ∈ Drw ∪ Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs = Machine ->
+    register_lookup cur_privilege rs = pv ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
-       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Machine pa 2
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA pv pa 2
               false false false false)
          (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
                    hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
@@ -753,7 +755,7 @@ Section fetch.
     iApply (swp_use_cer
               (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pc) 4
                  false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
-    { iApply (swp_mem_read_M Drw Dro Df rs (Physaddr pc) w Hdisj HDmst
+    { iApply (swp_mem_read_M Drw Dro Df rs (Physaddr pc) w Machine Hdisj HDmst
                 HDpriv Hpriv with "Hcert Hrw Hro Hcmr"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite autocast_id mcer_ret.
@@ -798,15 +800,21 @@ Section fetch.
     iApply (swp_use_cer
               (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr gs) 2
                  false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
-    { iApply (swp_mem_read_M2 Drw Dro Df rs (Physaddr gs) w Hdisj HDmst
+    { iApply (swp_mem_read_M2 Drw Dro Df rs (Physaddr gs) w Machine Hdisj HDmst
                 HDpriv Hpriv with "Hcert Hrw Hro Hcmr"). }
     iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
     rewrite autocast_id mcer_ret.
     iApply ("Hcont" $! (@FetchBytes_Success 2 w)). by iFrame.
   Qed.
 
+  (* THE LANDING FILE IS A PARAMETER.  Everything this rule does itself --
+     the PC reads and the alignment tests -- happens at [rs], and then it
+     hands off to [fetch_bytes]; where THAT lands is the fetch's business,
+     not this rule's.  M-mode's fetch lands back on [rs] (a physical read
+     writes nothing) and instantiates [rsf := rs]; S-mode's may fill the TLB
+     and lands elsewhere. *)
   Lemma swp_fetch (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs : regstate) (pc : SailStdpp.Values.mword 64)
+      (rs rsf : regstate) (pc : SailStdpp.Values.mword 64)
       (w : SailStdpp.Values.mword 32) :
     Drw ## Dro ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
@@ -820,12 +828,12 @@ Section fetch.
     (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
        swp (fetch_bytes pc pc 4)
          (fun r => ⌜r = @FetchBytes_Success 4 w⌝ ∗
-                   hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro)) -∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
     swp (fetch tt)
       (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
                       then F_RVC (subrange_vec_dec w 15 0)
                       else F_Base w)⌝ ∗
-                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
   Proof.
     intros Hdisj HDpc Hpc Hb0 Hb1 Hal.
     iIntros "#Hcert Hrw Hro Hfb".
@@ -1145,7 +1153,7 @@ Section fetch.
   Proof.
     intros Hdisj HDpc HDmst HDpriv Hpc Hpriv Hb0 Hb1 Hal.
     iIntros "#Hcert Hrw Hro Hcmr".
-    iApply (swp_fetch Drw Dro Df rs pc w Hdisj HDpc Hpc Hb0 Hb1 Hal
+    iApply (swp_fetch Drw Dro Df rs rs pc w Hdisj HDpc Hpc Hb0 Hb1 Hal
               with "Hcert Hrw Hro [Hcmr]").
     iIntros "Hrw Hro".
     iApply (swp_fetch_bytes_M Drw Dro Df rs pc w Hdisj HDmst HDpriv Hpriv

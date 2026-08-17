@@ -37,8 +37,14 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvExtras
         RiscvFetchExec.
 Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb.
-Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree.
+Require Import WpDecodeBridge Pt4kWalk CommonWalk PtTree PtTreeAdue.
+Require Import HartMFetch.
 Local Open Scope Z_scope.
+
+(* the same spelling [HartMFetch] uses for the misalignment tests *)
+Local Notation zerobit :=
+  (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 1)
+     (BinaryString.Raw.to_N "0" 0%N)).
 
 (* the lookup, as a footprinted walk: one register read and a pure match.
    [Pt4kWalk.exec_lookup_TLB_hit_ent]'s twin, and stated with exactly its
@@ -260,6 +266,103 @@ Section strans.
               H2i H2nl H1i H1nl H0i H0nl Hchk0 H0N H1ig H2ig H0ig Hchk0g
               Drw Dro Df rs dst asid menvcfg0 Hdisj HD Hag HWtlb Hmisa Hmenv
               HPBMTE Hnoupd with "Hcert Hrw Hro Hrd2 Hrd1 Hrd0").
+  Qed.
+
+
+  (* ------------------------------------------------------------------ *)
+  (* [fetch_bytes] AT SUPERVISOR.  Structurally the M-mode twin           *)
+  (* ([HartMFetch.swp_fetch_bytes_M]) and it takes the same shape of        *)
+  (* obligation, but the address the READ uses is the TRANSLATED one:       *)
+  (* M-mode reads at [Physaddr pc] only because Bare translation is the     *)
+  (* identity.  The translation is an obligation because it may WRITE (the  *)
+  (* TLB fill), which is why the read runs at a different file [rsf].       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_fetch_bytes_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf : regstate) (pc pa : mword 64) (w : mword 32) :
+    Drw ## Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rsf = Supervisor ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame rsf Drw -∗ hreg_frame_ro Df rsf Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
+              (Physaddr pa) 4 false false false false)
+         (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch_bytes pc pc 4)
+      (fun r => ⌜r = @FetchBytes_Success 4 w⌝ ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    intros Hdisj HDmst HDpriv Hpriv.
+    iIntros "#Hcert Hrw Hro Htr Hcmr".
+    rewrite /swp. iIntros (C) "%HC Hcont".
+    unfold fetch_bytes.
+    cbn beta iota zeta delta [ext_fetch_check_pc].
+    rewrite mbind0_ret.
+    iApply (swp_use_cer (translateAddr (Virtaddr pc) (InstructionFetch tt))
+              _ _ C HC with "[Hrw Hro Htr] [-]").
+    { iApply ("Htr" with "Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    iApply (swp_use_cer
+              (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4
+                 false false false) _ _ C HC with "[Hrw Hro Hcmr] [-]").
+    { iApply (swp_mem_read_M Drw Dro Df rsf (Physaddr pa) w Supervisor Hdisj
+                HDmst HDpriv Hpriv with "Hcert Hrw Hro Hcmr"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn beta iota.
+    rewrite autocast_id mcer_ret.
+    iApply ("Hcont" $! (@FetchBytes_Success 4 w)). by iFrame.
+  Qed.
+
+
+  (* ==================================================================== *)
+  (* THE S-MODE FETCH.  This is [HartRunGen]'s outstanding obligation, and  *)
+  (* it needed no new fetch rule: [HartMFetch.swp_fetch] was already        *)
+  (* privilege-generic, and once its LANDING FILE became a parameter it     *)
+  (* serves both modes.  What is S-mode-specific is entirely below it --    *)
+  (* the translation walks and may fill the TLB, which is what [rsf] is.    *)
+  (* ==================================================================== *)
+  Lemma swp_fetch_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs rsf : regstate) (pc pa : mword 64) (w : mword 32) :
+    Drw ## Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (mstatus : register) ∈ Drw ∪ Dro ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup cur_privilege rsf = Supervisor ->
+    neq_vec (access_vec_dec pc 0) zerobit = false ->
+    neq_vec (access_vec_dec pc 1) zerobit = false ->
+    is_aligned_vaddr (Virtaddr pc) 4 = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    (hreg_frame rs Drw -∗ hreg_frame_ro Df rs Dro -∗
+       swp (translateAddr (Virtaddr pc) (InstructionFetch tt))
+         (fun r => ⌜r = Values.Ok (Physaddr pa, PBMT_PMA, init_ext_ptw)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    (hreg_frame rsf Drw -∗ hreg_frame_ro Df rsf Dro -∗
+       swp (checked_mem_read (InstructionFetch tt) PBMT_PMA Supervisor
+              (Physaddr pa) 4 false false false false)
+         (fun r => ⌜r = Values.Ok (w, tt)⌝ ∗
+                   hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro)) -∗
+    swp (fetch tt)
+      (fun r => ⌜r = (if isRVC (subrange_vec_dec w 15 0)
+                      then F_RVC (subrange_vec_dec w 15 0)
+                      else F_Base w)⌝ ∗
+                hreg_frame rsf Drw ∗ hreg_frame_ro Df rsf Dro).
+  Proof.
+    intros Hdisj HDpc HDmst HDpriv Hpc Hpriv Hb0 Hb1 Hal.
+    iIntros "#Hcert Hrw Hro Htr Hcmr".
+    iApply (swp_fetch Drw Dro Df rs rsf pc w Hdisj HDpc Hpc Hb0 Hb1 Hal
+              with "Hcert Hrw Hro [Htr Hcmr]").
+    iIntros "Hrw Hro".
+    iApply (swp_fetch_bytes_S Drw Dro Df rs rsf pc pa w Hdisj HDmst HDpriv
+              Hpriv with "Hcert Hrw Hro Htr Hcmr").
   Qed.
 
 
