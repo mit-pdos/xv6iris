@@ -109,6 +109,7 @@ WpSmodePtLock.v
 WpSmodePtUart.v
 UptTree.v
 UserPtTree.v
+HartSTrans.v
 UserFetchPt.v
 MemAmo4.v
 UserMemPt.v
