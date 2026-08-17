@@ -166,6 +166,14 @@ are working on that effort — the relevant `projects/` file.
   synchronization is message passing through the rings, QUEUE_NOTIFY/ISR
   are hints; Layer 1's only change is the fabric-marker label `LDev`.
   Read it for the device-side assumptions the final theorem carries.
+- **[`weak-memory-m4-retarget.md`](projects/weak-memory-m4-retarget.md)** —
+  the M4 RETARGET plan (2026-08-17): the survey of the instruction-atomic
+  weak tier's nine chokepoints, the three design items (invariants held
+  across an instruction; the register-interface mismatch; NO symbolic
+  discharge route in the event tier), and THE DECISION — bridge from the
+  existing symbolic `exec_eff` certificates with one derived rule
+  (`ewp_ev_exec_eff`), consuming the 17k-line mirror library rather than
+  redoing it; volatile registers (`sig_seip`) as the one new semantic item.
 - **[`weak-memory-soundness.md`](projects/weak-memory-soundness.md)** — THE
   ONE-MACHINE SOUNDNESS CAPSTONE, CLOSED 2026-08-17
   (`iris/WeakEvCapstone.xv6_ev_weak_robust`, 5 rv64d axioms): the record of Phase B (the event language as a Layer-1 instance, hart side)
