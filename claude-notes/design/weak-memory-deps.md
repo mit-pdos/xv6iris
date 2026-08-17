@@ -118,6 +118,53 @@ With `V(srcs) := ⊔ { w_regv r | DReg r ∈ srcs } ⊔ (w_ldv if DLdRes ∈ src
 - fences, promise arm, `LDev`: unchanged.
 The promise-free fragment (`wp_pf_step`) gets the same arms fused as today.
 
+### 2.3′ THE RULE TABLE — PARM verbatim, with our spellings and the recorded deviations (2026-08-17)
+
+Source: `snu-sf/promising-arm`, `src/promising/Promising.v` `Module Local`
+(state `mk coh vrn vwn vro vwo vcap vrel fwdbank exbank promises`, lines
+~779–1000 at the tip) and `src/lib/Lang.v` (`sem_expr`: an expression's view
+is the JOIN of its registers' views; `step_load` puts the read's `res` (value
++ `view_post`) into `rmap[res]`; `step_if` emits `Event.control (view of the
+condition)`).  Our names: `w_coh/w_vrNew/w_vwNew/w_vrOld/w_vwOld/w_vRel/
+w_fwd` = `coh/vrn/vwn/vro/vwo/vrel/fwdbank`; NEW `w_regv` = `rmap`'s views,
+`w_vcap` = `vcap`, `w_ldv` = the pending `res` view of the current load.
+
+| PARM rule | PARM formula | ours (D2) |
+|---|---|---|
+| `Local.read` | `view_pre = view(addr) ⊔ vrn ⊔ (ord ≥ acquire ? vrel)`; `COH: latest loc ts coh(loc)`; `LATEST: latest loc ts view_pre`; `view_post = view_pre ⊔ fwd_read_view`; `coh(loc) ⊔= view_post`; `vrn,vwn ⊔= (ord ≥ acquire_pc ? view_post)`; `vro ⊔= view_post`; **`vcap ⊔= view(addr)`**; `exbank := (loc, ts, view_post)` if `ex`; `res := (val, view_post)` | `LLoad aq lat base tvs asrc`: `vaddr := V(asrc)`; `vpre := load_vpre ws aq ⊔ vaddr` (today's `load_vpre` already carries the `vrel` term); `readable`/`read_ok` at `vpre` per byte as today; post = today's `load_post_run` PLUS `w_vcap ⊔= vaddr`, `w_ldv := vpost` (max over the bytes) |
+| `Local.fulfill` (`writable`) | `view_pre = view(loc) ⊔ view(val) ⊔ vcap ⊔ vwn ⊔ (ord ≥ release_pc ? vro ⊔ vwo) ⊔ (ex ∧ riscv ? exbank.view)`; `COH: coh(loc) < ts`; `EXT: view_pre < ts`; `EX: exclusive window`; post `coh(loc) := ts`; `vwo ⊔= ts`; **`vcap ⊔= view(loc)`**; `vrel ⊔= (ord ≥ release ? ts)`; `fwd(loc) := (ts, view(loc) ⊔ view(val), ex)`; `res := (0, view ts if ex∧riscv)` | `LStore rl base data asrc dsrc` / `LRmw … asrc dsrc`: `fulfil_vpre := today's (w_vwNew ⊔ (rl ? vrOld ⊔ vwOld)) ⊔ V(asrc) ⊔ V(dsrc) ⊔ w_vcap ⊔ (rmw ? the read half's post-view)`; COH/EXT/`excl_ok` as today; post = today's `store_post_run` PLUS `w_vcap ⊔= V(asrc)`, forward bank view := `V(asrc) ⊔ V(dsrc)` |
+| `Local.control` | `vcap ⊔= ctrl` (`step_if`: ctrl = view of the branch condition) | `LCtrl srcs`: `w_vcap ⊔= V(srcs)`; emitted for conditional branches (srcs = rs1, rs2) AND indirect jumps (`jalr`: srcs = rs1) — RVWMO ppo 11 names both; PARM's language has no indirect jump, so this is a strengthening WITHIN RVWMO (deviation D-3) |
+| `step_assign` / `sem_expr` | `rmap[lhs] := (val, ⊔ views of the registers read)` | `LRegW rd srcs`: `w_regv[rd] := V(srcs)`, srcs = the instruction's integer source registers (from `deps_of_bits`); the load's `res` = `DLdRes` |
+| `Local.dmb rr rw wr ww` | `vrn ⊔= (rr? vro) ⊔ (wr? vwo)`; `vwn ⊔= (rw? vro) ⊔ (ww? vwo)` | today's `fence_post pr pw sr sw` (rr=pr∧sr, wr=pw∧sr, rw=pr∧sw, ww=pw∧sw) — unchanged |
+| `Local.isb` | `vrn ⊔= vcap` | n/a on RISC-V (`fence.i` is not `isb`; today's inert `LFence false…` stays) |
+| `Local.promise` | append; views untouched | unchanged (`WPPromise` unconditional) |
+
+Recorded deviations (each with polarity; "STRONGER" = removes behaviors and
+needs the containment argument, "WEAKER" = adds behaviors, free):
+- **D-1 (per byte).** All views per byte as today; a multi-byte access is
+  its per-byte events; `w_ldv` = the max post-view over the bytes.
+- **D-2 (fused RMW, exbank).** PARM's exclusive write joins `exbank.view`
+  (= the exclusive read's `view_post`) into `view_pre`; today's fused
+  `fulfil_ok (load_post_run …)` includes it ONLY when `aq`.  D2 adds the
+  read half's post-view unconditionally — STRONGER than today, EQUAL to
+  PARM.  PARM's SC-result register view (`res = ts` for `ex ∧ riscv`) has no
+  counterpart (an AMO's `rd` is the READ's `res`, view = the read's
+  `view_post`; xv6 has no `sc`) — WEAKER (free); note it in the ledger.
+- **D-3 (`jalr` control).** As above: STRONGER than PARM's language, inside
+  RVWMO ppo 11.
+- **D-4 (CSR / non-GPR registers).** `w_regv` tracks GPRs only; CSR-mediated
+  chains and PC are NOT dependencies (RVWMO's syntactic dependency is on
+  the integer/FP source registers) — WEAKER or equal, free.  `x0` never
+  gets a view.
+- **D-5 (`.aq`/`.rl` orders).** Keep today's mapping of the access kinds to
+  `aq`/`rl` (`WeakInterp.classify`); PARM's `acquire_pc` vs `acquire`
+  distinction (RCpc vs RCsc) is today's `aq` for the `vrn/vwn` raise and
+  the `vrel` join — re-audit `load_vpre`/`load_post` against the two `ifc`s
+  when D2 is written and record the outcome here.
+- **D-6 (the disk agent).** `virtio_prog`'s events carry empty `srcs`; its
+  ordering is aq/fence-based — WEAKER than a hart with the same accesses
+  (free), and exact for what the driver relies on.
+
 ### 2.4 Where the operand names come from — the ONE model change (LANDED 2026-08-17: `-D SYMBOLIC`)
 
 **LANDED**: the model is regenerated with `-D SYMBOLIC` (the Sail library's
