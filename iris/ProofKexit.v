@@ -1249,7 +1249,7 @@ Section KexitPark.
         [| let H1 := fresh in let H2 := fresh in
            intro H1; injection H1 as H2; vm_compute in H2; congruence].
       rewrite /P9 upd_eq. unfold ZOMBIE. exact kx_zombie. }
-    iApply (wp_sw_s_sconf (CID := CIDa) (mword_of_int (KX + 0x86))
+    iApply (wp_sw_s_sconf (CID := CIDa) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x86))
               (mword_of_int 15 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 24 : mword 12)
               P9 (trap_res b + av)%nat RUNNING false with "Hcg Hpc Hi86 [Hstate]").
     { iEval (rewrite Hsaddr). iExact "Hstate". }

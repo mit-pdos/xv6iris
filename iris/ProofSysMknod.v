@@ -1535,7 +1535,7 @@ Section ProofSysMknodBody.
       { rewrite (rget_ne (CID := CID21) N0 Rs0 ltac:(vm_compute; discriminate))
                 HN0s0. apply mn_maj. }
       iEval (rewrite -Hamaj) in "Hmajlo".
-      iApply (wp_lh_s_sconf (CID := CID21) (kt := KT1) (ktd := KT0) (mword_of_int (MN + 0x36)) Ra2 Rs0
+      iApply (wp_lh_s_sconf (CID := CID21) (kt := KT1) (ktd := KT1) (mword_of_int (MN + 0x36)) Ra2 Rs0
                 (mword_of_int 3948 : mword 12) N0 (K - 20)%nat
                 (hw_lo (arg_int32 v1)) b (dqm := DfracOwn 1)
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi36 Hmajlo").

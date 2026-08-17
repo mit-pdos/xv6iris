@@ -7604,7 +7604,7 @@ Section ProofCreateMain.
     assert (HZ5regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                         (ientry kslot) ty major minor Z5)
       by (rewrite /Z5; apply cr_regs3_caller; [exact Hcsra | exact HZ4regs]).
-    iPoseProof (cr_dot_window (Z5 !!! Regidx Ra1)
+    iPoseProof (cr_dot_window_kt1 (Z5 !!! Regidx Ra1)
                   ltac:(exact HZ5a1) with "Hkd") as "Hdotw".
     assert (Hns3 : (1 + (ns - 3))%nat = (ns - 2)%nat) by exact (cr_ns_3 ns Hns).
     iEval (rewrite -Hns3 iref_slots_op) in "Hislr".
@@ -7961,7 +7961,7 @@ Section ProofCreateMain.
       assert (HY5regs : cr_regs3 m sp0 (ientry kd) (mword_of_int 0 : mword 64)
                           (ientry kslot) ty major minor Y5)
         by (rewrite /Y5; apply cr_regs3_caller; [exact Hcsra | exact HY4regs]).
-      iPoseProof (cr_dotdot_window (Y5 !!! Regidx Ra1)
+      iPoseProof (cr_dotdot_window_kt1 (Y5 !!! Regidx Ra1)
                     ltac:(exact HY5a1) with "Hkd") as "Hddw".
       iDestruct (cpu_own_transport CIDd1 CIDe6 0%nat eb (proc_addr j) b
                    ltac:(rewrite Hb; wp_next_chain) with "Hcnt") as "Hcnt".

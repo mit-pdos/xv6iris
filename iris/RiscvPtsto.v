@@ -1043,6 +1043,16 @@ Global Instance mem_pointsto_timeless `{!riscvGS Σ} (KTR : CurKtier)
   Timeless (mem_pointsto (KTR := KTR) a dq v).
 Proof. rewrite /mem_pointsto. apply _. Qed.
 
+(* ...AND ITS [ktier]-TYPED TWIN.  [simple apply] will not unfold the class,
+   so ONE instance cannot serve both a goal whose tier argument is the
+   ambient instance ([curktier_default : CurKtier]) and one written at a
+   LITERAL ([KT0 : ktier]).  Every tier-family instance below is declared
+   twice for that reason. *)
+Global Instance mem_pointsto_timeless' `{!riscvGS Σ} (ktr : ktier)
+    (a : Arch.pa) (dq : dfrac) (v : bv 8) :
+  Timeless (mem_pointsto (KTR := ktr) a dq v).
+Proof. exact (mem_pointsto_timeless ktr a dq v). Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* SHARING a byte: agreement and the fractional split.  [↦ₘ] carries a real
    [dfrac], so a resource that is read-only-while-shared (a reference-counted
@@ -1419,6 +1429,11 @@ Global Instance word4_pointsto_timeless `{!riscvGS Σ} (KTR : CurKtier)
   Timeless (word4_pointsto (KTR := KTR) a dq w).
 Proof. rewrite /word4_pointsto. apply _. Qed.
 
+Global Instance word4_pointsto_timeless' `{!riscvGS Σ} (ktr : ktier)
+    (a : Arch.pa) (dq : dfrac) (w : bv 32) :
+  Timeless (word4_pointsto (KTR := ktr) a dq w).
+Proof. exact (word4_pointsto_timeless ktr a dq w). Qed.
+
 Section word4_pointsto.
   Context `{!riscvGS Σ}.
   Context `{KTR : !CurKtier}.
@@ -1537,6 +1552,10 @@ Section string_pointsto.
   Global Instance string_pointsto_persistent (ktr : CurKtier) a s :
     Persistent (string_pointsto (KTR := ktr) a DfracDiscarded s).
   Proof. rewrite /string_pointsto /mem_pointsto. apply _. Qed.
+
+  Global Instance string_pointsto_persistent' (ktr : ktier) a s :
+    Persistent (string_pointsto (KTR := ktr) a DfracDiscarded s).
+  Proof. exact (string_pointsto_persistent ktr a s). Qed.
 
   Lemma string_pointsto_bytes a dq s :
     string_pointsto a dq s ⊣⊢
@@ -1936,6 +1955,10 @@ Section Bridge.
     Persistent (mem_pointsto (KTR := ktr) a DfracDiscarded b).
   Proof. rewrite /mem_pointsto. apply _. Qed.
 
+  Global Instance mem_pointsto_discarded_persistent' (ktr : ktier) a b :
+    Persistent (mem_pointsto (KTR := ktr) a DfracDiscarded b).
+  Proof. exact (mem_pointsto_discarded_persistent ktr a b). Qed.
+
   (* discard the fraction: turn any memory byte into the persistent read-only one. *)
   Lemma mem_pointsto_persist a dq b : a ↦ₘ{dq} b ==∗ a ↦ₘ□ b.
   Proof.
@@ -2182,9 +2205,17 @@ Section pointsto_persist.
   Global Instance word_pointsto_discarded_persistent (ktr : CurKtier) a w :
     Persistent (word_pointsto (KTR := ktr) a DfracDiscarded w).
   Proof. rewrite /word_pointsto. apply _. Qed.
+
+  Global Instance word_pointsto_discarded_persistent' (ktr : ktier) a w :
+    Persistent (word_pointsto (KTR := ktr) a DfracDiscarded w).
+  Proof. exact (word_pointsto_discarded_persistent ktr a w). Qed.
   Global Instance word4_pointsto_discarded_persistent (ktr : CurKtier) a w :
     Persistent (word4_pointsto (KTR := ktr) a DfracDiscarded w).
   Proof. rewrite /word4_pointsto. apply _. Qed.
+
+  Global Instance word4_pointsto_discarded_persistent' (ktr : ktier) a w :
+    Persistent (word4_pointsto (KTR := ktr) a DfracDiscarded w).
+  Proof. exact (word4_pointsto_discarded_persistent ktr a w). Qed.
 
   Lemma word_pointsto_persist a dq w : a ↦₈{dq} w ==∗ a ↦₈□ w.
   Proof.

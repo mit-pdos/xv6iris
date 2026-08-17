@@ -3143,7 +3143,7 @@ Section ProofDirlinkMain.
                           = mword_of_int (DK + 0x42)) by pcw.
           iEval (rewrite Hbb42) in "Hpc".
           (* +0x42 lhu a5,-80(s0) : de.inum *)
-          iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DK + 0x42)) Ra5 Rs0
+          iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DK + 0x42)) Ra5 Rs0
                     (mword_of_int 4016 : mword 12) mrd (K - 10)%nat
                     (dir_inum data i) b ltac:(nz) ltac:(rdok)
                     with "Hcg Hpc Hj42 [Hdehi]").

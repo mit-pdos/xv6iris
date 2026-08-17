@@ -249,6 +249,30 @@ Section CreateParts.
     exfalso. lia.
   Qed.
 
+  (* ...and the same two windows WEAKENED to KT1, which is the tier
+     [SpecDirlink]'s name-buffer premise is stated at (its other caller,
+     sys_link, passes a frame local).  The [.]/[..] strings are .rodata, so
+     the KT0 window is the real fact and this is [mem_ktier_mono]. *)
+  Lemma cr_dot_window_kt1 (a : mword 64) :
+    a = mword_of_int cr_dot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ[KT1]□ cr_dot_f j).
+  Proof.
+    intros ->. iIntros "Hkd".
+    iDestruct (cr_dot_window _ eq_refl with "Hkd") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iApply (mem_ktier_mono _ KT1 with "H").
+  Qed.
+
+  Lemma cr_dotdot_window_kt1 (a : mword 64) :
+    a = mword_of_int cr_dotdot_addr ->
+    kernel_data -∗ ([∗ list] j ∈ seq 0 14, (pa_add a j) ↦ₘ[KT1]□ cr_dotdot_f j).
+  Proof.
+    intros ->. iIntros "Hkd".
+    iDestruct (cr_dotdot_window _ eq_refl with "Hkd") as "H".
+    iApply (big_sepL_mono with "H"). iIntros (k j _) "H".
+    iApply (mem_ktier_mono _ KT1 with "H").
+  Qed.
+
 End CreateParts.
 
 (* ===================================================================== *)

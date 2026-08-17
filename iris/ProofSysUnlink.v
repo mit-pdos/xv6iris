@@ -2949,7 +2949,7 @@ Section ProofSysUnlinkBody.
     iPoseProof (suli_11c with "Htext") as "Hi11c".
     iPoseProof (suli_120 with "Htext") as "Hi120".
     (* ===== +0x11c lhu a5,-232(s0) -- de.inum ===== *)
-    iApply (wp_lhu_s_sconf (CID := CID9) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x11c)) Ra5 Rs0
+    iApply (wp_lhu_s_sconf (CID := CID9) (kt := KT1) (ktd := KT1) (mword_of_int (SU + 0x11c)) Ra5 Rs0
               (mword_of_int 3864 : mword 12) N7 (K - 30)%nat
               (dir_inum dati jj : mword 16) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi11c [Hhalf]").

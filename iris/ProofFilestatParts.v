@@ -221,6 +221,7 @@ Section FilestatParts.
     iEval (rewrite Hw2) in "H2". iEval (rewrite Hw3) in "H3".
     iExists W. iApply word4_pointsto_intro; [exact Hal |].
     cbn [seq]. iFrame "H0 H1 H2 H3". done.
+  Show Existentials.
   Qed.
 
   Lemma fst_bytes_w2 (a : Arch.pa) :

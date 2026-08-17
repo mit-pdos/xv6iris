@@ -208,6 +208,10 @@ Section IcacheEscrow.
     Timeless (word2_pointsto (KTR := ktr) a dq w).
   Proof. rewrite /word2_pointsto. apply _. Qed.
 
+  Global Instance word2_pointsto_timeless' (ktr : ktier) (a : Arch.pa) (dq : dfrac) (w : bv 16) :
+    Timeless (word2_pointsto (KTR := ktr) a dq w).
+  Proof. exact (word2_pointsto_timeless ktr a dq w). Qed.
+
   Global Instance inode_meta_timeless (ip : mword 64) (d : dinode) :
     Timeless (inode_meta ip d).
   Proof. rewrite /inode_meta. apply _. Qed.

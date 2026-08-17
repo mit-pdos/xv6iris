@@ -436,7 +436,7 @@ Section KexecBFrame.
     rewrite (bb_split3 (KTR := KT1) a o 2 r n f Hn).
     iIntros "(Hpre & Hmid & Hsuf)".
     iSplitL "Hmid".
-    { iApply (word2_pointsto_intro _ _ _ Hal).
+    { iApply (word2_pointsto_intro (KTR := KT1) _ _ _ Hal).
       iApply (big_sepL_mono with "Hmid"). intros ii jj Hj.
       apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
       rewrite (le_at_nth_byte 16 f o 2 ii ltac:(lia) Hlt). reflexivity. }

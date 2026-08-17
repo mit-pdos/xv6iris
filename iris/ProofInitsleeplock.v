@@ -340,7 +340,7 @@ Section ProofInitsleeplock.
     iEval (rewrite Hpc2a) in "Hpc".
     (* persist the name field, pairing with the caller's [name ↦ₛ□ s] -> sl_name *)
     iApply fupd_wp.
-    iMod (word_pointsto_persist with "Hnamefield") as "#Hnamefield".
+    iMod (word_pointsto_persist (KTR := KT0) with "Hnamefield") as "#Hnamefield".
     iModIntro.
     iAssert (sl_name slk s) as "#Hslname".
     { iExists name. iFrame "Hnamefield". iExact "Hnames". }

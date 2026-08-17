@@ -467,6 +467,10 @@ Global Instance word_pointsto_timeless' `{!riscvGS Σ} (ktr : CurKtier) (a : Arc
     (w : bv 64) : Timeless (word_pointsto (KTR := ktr) a dq w).
 Proof. rewrite /word_pointsto. apply _. Qed.
 
+Global Instance word_pointsto_timeless'' `{!riscvGS Σ} (ktr : ktier) (a : Arch.pa) (dq : dfrac)
+    (w : bv 64) : Timeless (word_pointsto (KTR := ktr) a dq w).
+Proof. exact (word_pointsto_timeless' ktr a dq w). Qed.
+
 Section FileInv.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
 

@@ -1813,7 +1813,7 @@ Section ProofPiperead.
           as [db Hlk].
         iDestruct (pr_data_acc pi bs idx db Hlk with "Hdat") as "[Hbyte Hdback]".
         iPoseProof (pri_a4 with "Htext") as "Hia4".
-        iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.piperead + 0xa4)) Ra5 Ra5 (mword_of_int 24 : mword 12)
+        iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.piperead + 0xa4)) Ra5 Ra5 (mword_of_int 24 : mword 12)
                   K4 (trap_res true + (av - 12))%nat (db : mword 8) false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia4 [Hbyte]").
         { rgall. iEval (rewrite HK4a5 pr_dataddr). iExact "Hbyte". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hbyte". rgall. iEval (rewrite HK4a5 pr_dataddr) in "Hbyte".

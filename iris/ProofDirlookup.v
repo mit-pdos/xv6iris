@@ -1856,7 +1856,7 @@ Section ProofDirlookupMain.
             by (rewrite /N4; apply upd_eq).
           iEval (rewrite -HN4a0) in "Hnm".
           iEval (rewrite -HN4a1) in "Hdenm".
-          iApply (NC.wp_namecmp_sconf KT1 KT0 N4 fn (dir_name data i) (K - 12)%nat
+          iApply (NC.wp_namecmp_sconf KT1 KT1 N4 fn (dir_name data i) (K - 12)%nat
                     dqn (DfracOwn 1) b pj ltac:(lia)
                     with "Hcg Htext Hpc Hnm Hdenm").
           iIntros (CIDnc Hsnc mnc) "%Hcsnc Hcg Hpc Hnm Hdenm %Hiff".
