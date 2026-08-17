@@ -283,7 +283,7 @@ Qed.
 Section complete.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.
@@ -517,9 +517,9 @@ Section complete.
       + split.
         * eexists.
           by apply (PFStore pstep pcls i c ag rl base data
-                      (pcls (LStore rl base data) (pa_ws ag)) p' dd).
+                      (pcls (pa_st ag) (LStore rl base data) (pa_ws ag)) p' dd).
         * exists [WMsg base data (Some i)
-                    (pcls (LStore rl base data) (pa_ws ag))].
+                    (pcls (pa_st ag) (LStore rl base data) (pa_ws ag))].
           split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
@@ -547,9 +547,9 @@ Section complete.
       + split.
         * eexists.
           by apply (PFRmw pstep pcls i c ag aq rl base tvs' data'
-                      (pcls (LRmw aq rl base tvs' data') (pa_ws ag)) p'' dd').
+                      (pcls (pa_st ag) (LRmw aq rl base tvs' data') (pa_ws ag)) p'' dd').
         * exists [WMsg base data' (Some i)
-                    (pcls (LRmw aq rl base tvs' data') (pa_ws ag))].
+                    (pcls (pa_st ag) (LRmw aq rl base tvs' data') (pa_ws ag))].
           split; [done|].
           by apply list_relations.Forall_singleton.
       + simpl. by eapply (lookup_insert_self _ _ _ _ Hag).
@@ -857,7 +857,7 @@ Global Arguments cone_of {P D} _ _ _.
 Section persist.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.

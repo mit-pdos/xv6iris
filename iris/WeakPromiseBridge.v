@@ -89,13 +89,24 @@ Section bridge.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
 
-  (** THE MESSAGE CLASS, PINNED AT FULFIL TIME (G6a).  [pcls l ws] is the
-      class the machine stamps on the message a store/rmw labelled [l]
-      appends, read at the FULFILLING agent's own [wstate] — which is
-      exactly the data the class is a function of on the model side
-      ([WeakInterp.wm_class_of ak ws] reads [w_relp ws] and the label's
-      access kind).  It is ABSTRACT here, as [pstep] is: Layer 1 never
-      inspects it.
+  (** THE MESSAGE CLASS, PINNED AT FULFIL TIME (G6a).  [pcls p l ws] is
+      the class the machine stamps on the message a store/rmw labelled [l]
+      appends, read at the FULFILLING agent's own PRE-STEP program state
+      [p] and [wstate] [ws] — which is exactly the data the class is a
+      function of on the model side ([WeakInterp.wm_class_of ak ws] reads
+      [w_relp ws] and the ACCESS KIND, and the access kind is NOT in the
+      label: [wlabel]'s [LStore] carries only [(rl, base, data)], so an
+      exclusive RAM write is labelled exactly like a plain one and only the
+      residual monad node — the program state — tells them apart).  It is
+      ABSTRACT here, as [pstep] is: Layer 1 never inspects it.
+
+      WHY THE PROGRAM STATE IS AN ARGUMENT (G6a follow-up).  With the
+      earlier signature [wlabel → wstate → wm_class] the class function
+      could not see a conditional RAM write, so an [amoswap.w.aq] (which
+      xv6's [acquire] executes on every lock) appends a message the
+      interpreter classes [WCexcl] while a label-indexed class function can
+      only answer [WCrel]/[WCplain].  Indexing by the program state removes
+      that gap at the source; nothing else about the pinning changes.
 
       WHY AT FULFIL AND NOT AT PROMISE.  The class is not derivable from
       the program state — the program never sees a [wstate] — so [pstep]
@@ -131,7 +142,7 @@ Section bridge.
       run of a pinned machine), and the retag is what DISCHARGES
       canonicity today.  So the full machine keeps its free binder and the
       replay takes canonicity as [WeakRetag] supplies it. *)
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
 
   Implicit Types c cfg : wpcfg P D.
 
@@ -165,7 +176,7 @@ Section bridge.
       pc_ags cfg !! i = Some ag →
       pstep (pa_st ag) (pc_dev cfg) (WeakPromise.LStore rl base data) st' d' →
       data ≠ [] →
-      k = pcls (WeakPromise.LStore rl base data) (pa_ws ag) →
+      k = pcls (pa_st ag) (WeakPromise.LStore rl base data) (pa_ws ag) →
       wp_pf_step i (WeakPromise.LStore rl base data) cfg
         (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
                (<[i := WPAgent st'
@@ -180,7 +191,7 @@ Section bridge.
       length tvs = length data →
       read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
       excl_ok (pc_log cfg) i base tvs (S (length (pc_log cfg))) →
-      k = pcls (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
+      k = pcls (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
       wp_pf_step i (WeakPromise.LRmw aq rl base tvs data) cfg
         (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i) k]) d'
                (<[i := WPAgent st'
@@ -623,17 +634,23 @@ Section bridge.
       layer down, and it is free for every consumer that builds its
       execution from a pf run in the first place ([wp_pf_bridge] emits
       [proj_lbl (pcls …) …]). *)
-  Definition mstep_cls_ok (σ : mstate) (i : agent) (lb : WeakAxiomatic.lbl)
-      : Prop :=
+  Definition mstep_cls_ok (p : P) (σ : mstate) (i : agent)
+      (lb : WeakAxiomatic.lbl) : Prop :=
     match lb with
-    | WeakAxiomatic.LStore _ _ _ k => k = pcls (unproj_lbl lb) (ms_ws σ i)
-    | WeakAxiomatic.LRmw _ _ _ _ _ _ k => k = pcls (unproj_lbl lb) (ms_ws σ i)
+    | WeakAxiomatic.LStore _ _ _ k => k = pcls p (unproj_lbl lb) (ms_ws σ i)
+    | WeakAxiomatic.LRmw _ _ _ _ _ _ k =>
+        k = pcls p (unproj_lbl lb) (ms_ws σ i)
     | _ => True
     end.
 
-  Definition exec_cls_ok (E : exec) : Prop :=
-    ∀ n s, ex_tr E !! n = Some s →
-      mstep_cls_ok (stt E n) (es_ag s) (es_lb s).
+  (** The program state the equation is read at is the acting agent's, and
+      under [prog_free] that state never moves (every arm below re-uses
+      [pa_st ag] as the successor), so it is the agent's INITIAL program
+      [ps !! es_ag s] throughout — which is why [exec_cls_ok] is indexed by
+      [ps] and not by a per-step program trace ([exec] has none). *)
+  Definition exec_cls_ok (ps : list P) (E : exec) : Prop :=
+    ∀ n s p, ex_tr E !! n = Some s → ps !! es_ag s = Some p →
+      mstep_cls_ok p (stt E n) (es_ag s) (es_lb s).
 
   Lemma rd_ok_read_ok img log ws aq base ts vs :
     rd_ok img log ws aq base ts vs →
@@ -663,14 +680,20 @@ Section bridge.
     wp_pf_step i l c c' → length (pc_ags c') = length (pc_ags c).
   Proof. destruct 1; by rewrite /= length_insert. Qed.
 
+  (** The conclusion also records that the step left every agent's PROGRAM
+      state alone: [prog_free] lets each arm re-use [pa_st ag] as the
+      successor, and [exec_prefix_pf_run] needs exactly that to know which
+      program state [exec_cls_ok] is speaking about. *)
   Lemma mstep_wp_pf_step σ σ' i lb c :
     prog_free → cfg_match c σ → (i < length (pc_ags c))%nat →
-    mstep_cls_ok σ i lb →
+    (∀ ag, pc_ags c !! i = Some ag → mstep_cls_ok (pa_st ag) σ i lb) →
     mstep σ i lb σ' →
-    ∃ c', wp_pf_step i (unproj_lbl lb) c c' ∧ cfg_match c' σ'.
+    ∃ c', wp_pf_step i (unproj_lbl lb) c c' ∧ cfg_match c' σ' ∧
+          pa_st <$> pc_ags c' = pa_st <$> pc_ags c.
   Proof.
-    intros Hpf Hm Hi Hck Hms.
+    intros Hpf Hm Hi Hck0 Hms.
     destruct (lookup_lt_is_Some_2 (pc_ags c) i Hi) as [ag Hlk].
+    have Hck := Hck0 ag Hlk. clear Hck0.
     destruct σ as [img lg f].
     destruct Hm as (Himg & Hlg & Hf). simpl in Himg, Hlg, Hf.
     subst img lg.
@@ -683,6 +706,13 @@ Section bridge.
       eapply (cfg_match_upd_gen _ _ _ _ i ag st' w pr f); [done|done| |].
       - by rewrite upd_ws_eq.
       - intros j Hne. by rewrite upd_ws_ne. }
+    (* every arm re-uses [pa_st ag], so the program-state projection is
+       untouched *)
+    have Hst : ∀ (w : wstate) (pr : gset nat),
+      pa_st <$> (<[i := WPAgent (pa_st ag) w pr]> (pc_ags c))
+      = pa_st <$> pc_ags c.
+    { intros w pr. rewrite list_fmap_insert /=.
+      apply list_insert_id. by rewrite list_lookup_fmap Hlk. }
     (* [Hck] is REVERTED across the inversion: [simplify_eq/=] would reduce
        [mstep_cls_ok] at the constructor and substitute the class binder
        away, which is exactly the binder each arm still has to name. *)
@@ -695,25 +725,28 @@ Section bridge.
       intros Hck.
     - (* load *)
       pose proof Hrd as [Hlen _].
-      eexists. split.
+      eexists. split_and!.
       + apply (PFLoad i c ag aq false base (zip ts vs) (pa_st ag) (pc_dev c));
           [done|apply Hpf|].
         rewrite -(Hf i ag Hlk). by apply rd_ok_read_ok.
       + rewrite fst_zip; [lia|]. rewrite (Hf i ag Hlk). apply Hmatch.
+      + apply Hst.
     - (* store *)
-      eexists. split.
+      eexists. split_and!.
       + apply (PFStore i c ag rl base vs kc (pa_st ag) (pc_dev c));
           [done|apply Hpf|done|].
         rewrite -(Hf i ag Hlk). exact Hck.
       + rewrite (Hf i ag Hlk). apply Hmatch.
+      + apply Hst.
     - (* fence *)
-      eexists. split.
+      eexists. split_and!.
       + apply (PFFence i c ag pr pw sr sw (pa_st ag) (pc_dev c));
           [done|apply Hpf].
       + rewrite (Hf i ag Hlk). apply Hmatch.
+      + apply Hst.
     - (* rmw *)
       pose proof Hrd as [Hlen' _].
-      eexists. split.
+      eexists. split_and!.
       + apply (PFRmw i c ag aq rl base (zip ts rvs) wvs kc (pa_st ag)
                  (pc_dev c));
           [done|apply Hpf|done| | | |].
@@ -722,47 +755,55 @@ Section bridge.
         * by apply (rmw_latest_excl_ok (pc_img c) _ i base ts rvs).
         * rewrite -(Hf i ag Hlk). exact Hck.
       + rewrite fst_zip; [lia|]. rewrite (Hf i ag Hlk). apply Hmatch.
+      + apply Hst.
   Qed.
 
   Lemma exec_prefix_pf_run ps d0 E n :
-    prog_free → exec_wf E → exec_cls_ok E →
+    prog_free → exec_wf E → exec_cls_ok ps E →
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
     (n ≤ length (ex_tr E))%nat →
     ∃ c, rtc wp_pf_run (wp_init (ex_img E) d0 ps) c ∧
-         length (pc_ags c) = length ps ∧ cfg_match c (stt E n).
+         length (pc_ags c) = length ps ∧ pa_st <$> pc_ags c = ps ∧
+         cfg_match c (stt E n).
   Proof.
     intros Hpf HE Hck Hag. induction n as [|n IH]; intros Hn.
-    - exists (wp_init (ex_img E) d0 ps). split_and!; [done| |].
+    - exists (wp_init (ex_img E) d0 ps). split_and!; [done| | |].
       + by rewrite /= length_map.
+      + rewrite /wp_init /=. rewrite -list_fmap_compose.
+        by apply list_fmap_id.
       + split_and!.
         * done.
         * by apply (exec_log_init E HE).
         * intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
           destruct (ps !! i) as [p|]; simplify_eq/=.
           by apply (exec_ws_init E i HE).
-    - destruct (IH ltac:(lia)) as (c & Hrun & Hlen & Hm).
+    - destruct (IH ltac:(lia)) as (c & Hrun & Hlen & Hst & Hm).
       destruct (exec_tr_lookup E n ltac:(lia)) as [s Hs].
       pose proof (exec_step_at E n s HE Hs) as Hms.
       destruct (mstep_wp_pf_step (stt E n) (stt E (S n)) (es_ag s)
                   (es_lb s) c Hpf Hm ltac:(rewrite Hlen; by eapply Hag)
-                  (Hck n s Hs) Hms)
-        as (c' & Hstep & Hm').
-      exists c'. split_and!; [|by rewrite (wp_pf_step_ags_length _ _ _ _ Hstep)|done].
-      eapply rtc_r; [done|]. by exists (es_ag s), (unproj_lbl (es_lb s)).
+                  (λ ag Hlk, Hck n s (pa_st ag) Hs
+                     ltac:(rewrite -Hst list_lookup_fmap Hlk; done))
+                  Hms)
+        as (c' & Hstep & Hm' & Hst').
+      exists c'. split_and!;
+        [|by rewrite (wp_pf_step_ags_length _ _ _ _ Hstep)| |done].
+      + eapply rtc_r; [done|]. by exists (es_ag s), (unproj_lbl (es_lb s)).
+      + by rewrite Hst'.
   Qed.
 
   (** THE REVERSE BRIDGE.  With a program LTS that admits everything, every
       [exec_wf] execution over agents [0 .. length ps - 1] is the projection
       of a promise-free run of the full machine. *)
   Theorem exec_wf_pf_run ps d0 E :
-    prog_free → exec_wf E → exec_cls_ok E →
+    prog_free → exec_wf E → exec_cls_ok ps E →
     (∀ k s, ex_tr E !! k = Some s → (es_ag s < length ps)%nat) →
     ∃ c, rtc wp_pf_run (wp_init (ex_img E) d0 ps) c ∧
          cfg_match c (stt E (length (ex_tr E))).
   Proof.
     intros Hpf HE Hck Hag.
     destruct (exec_prefix_pf_run ps d0 E (length (ex_tr E)) Hpf HE Hck Hag
-                ltac:(lia)) as (c & ? & _ & ?).
+                ltac:(lia)) as (c & ? & _ & _ & ?).
     by exists c.
   Qed.
 

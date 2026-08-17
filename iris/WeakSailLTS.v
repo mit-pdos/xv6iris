@@ -217,7 +217,7 @@
 
         SINCE G6a THE ⇒ DIRECTION OWES IT TOO, AND OWES MORE (G6a finding).
         [WeakPromiseBridge]'s promise-free fragment no longer leaves the
-        message class a free binder: [PFStore]/[PFRmw] PIN it to [pcls l ws]
+        message class a free binder: [PFStore]/[PFRmw] PIN it to [pcls p l ws]
         at the fulfilling agent's own [wstate].  So the bracket can no longer
         append the interpreter's [WCexcl] at a conditional write, and it
         carries the ⇒-side side condition [wrun_plainw] (§5).
@@ -242,8 +242,17 @@
         class by the PROGRAM STATE ([pcls : P → wlabel → wstate → wm_class]
         in [WeakPromiseBridge]), where the access kind still lives — after
         which the class function is exact at every write and no side
-        condition is needed at all.  (2) is a Layer-1 change and is out of
-        this file's scope.
+        condition is needed at all.
+
+        THE RETYPE OF (2) HAS LANDED (G6a follow-up) — but it does NOT by
+        itself lift the restriction, and no restriction moved with it.  The
+        archive route instantiates the new signature at the PROGRAM-BLIND
+        [WeakSailLTS2.lbl_class_p] (the old [lbl_class] with the program
+        argument discarded), so this bracket still stamps [WCrel]/[WCplain]
+        at a conditional write and still carries [wrun_plainw] verbatim.
+        What (2) buys is that the SIGNATURE can now express the exact class
+        function; supplying one that reads the [MemWrite] node's access kind
+        is the separate step, and it is out of this file's scope.
 
     (e') THE ANSWERS THE SHAPE PREDICATES QUANTIFY OVER ARE THE ANSWERS THIS
         LTS SUPPLIES.  [sail_mstep]'s memory arms hand the continuation
@@ -818,7 +827,7 @@ Qed.
 (** THE ⇒-SIDE CLASS CONDITION (G6a; header delta (e''), second half).
 
     Since G6a the promise-free fragment PINS the class of the message a
-    store appends to [pcls l ws], while [WeakInterp.wrun] COMPUTES it as
+    store appends to [pcls p l ws], while [WeakInterp.wrun] COMPUTES it as
     [wm_class_of ak ws] — and [ak] is the ACCESS KIND, which the [wlabel] of
     a plain store does not carry.  The two therefore agree exactly where
     [ak_latest ak = false] ([WeakSailLTS2.lbl_class_store]), and the bracket,
@@ -856,18 +865,18 @@ Section bracket.
   Context (next : bool → M unit) (i : agent).
 
   (** THE MESSAGE CLASS THE PF FRAGMENT PINS (G6a).  [WeakPromiseBridge]'s
-      promise-free fragment stamps the class [pcls l ws] on the message a
+      promise-free fragment stamps the class [pcls p l ws] on the message a
       store/rmw appends, so the bracket is stated at an ARBITRARY [pcls] —
       [WeakSailLTS2.lbl_class], the one the archive route uses, is not in
       scope here, and nothing below needs it to be.  The one place the class
       is not free is where the bracket must reproduce the INTERPRETER's log:
       there the two must agree, which is [Hpcls] (satisfied by [lbl_class] —
       [WeakSailLTS2.lbl_class_store]) together with [wrun_plainw]. *)
-  Context (pcls : wlabel → wstate → wm_class).
-  Context (Hpcls : ∀ ak ws base data,
+  Context (pcls : psail → wlabel → wstate → wm_class).
+  Context (Hpcls : ∀ p ak ws base data,
               ak_latest ak = false →
               wm_class_of ak ws
-              = pcls (WeakPromise.LStore (ak_sync ak) base data) ws).
+              = pcls p (WeakPromise.LStore (ak_sync ak) base data) ws).
 
   Implicit Types ags : list (wpagent psail).
 
@@ -933,7 +942,7 @@ Section bracket.
     ags !! i = Some ag →
     sail_step next (pa_st ag) (WeakPromise.LStore rl base data) p1 →
     data ≠ [] →
-    k = pcls (WeakPromise.LStore rl base data) (pa_ws ag) →
+    k = pcls (pa_st ag) (WeakPromise.LStore rl base data) (pa_ws ag) →
     rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
@@ -959,7 +968,7 @@ Section bracket.
     length tvs = length data →
     read_ok img log (pa_ws ag) aq false base tvs →
     excl_ok log i base tvs (S (length log)) →
-    k = pcls (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
+    k = pcls (pa_st ag) (WeakPromise.LRmw aq rl base tvs data) (pa_ws ag) →
     rtc (wp_pf_run (pstep_unit (sail_step next)) pcls)
         (WPCfgU img (log ++ [WMsg base data (Some i) k])
            (<[i := WPAgent p1
@@ -1191,11 +1200,11 @@ Require Import RiscvLang.
 
 Section instr.
   Context (i : agent).
-  Context (pcls : wlabel → wstate → wm_class).
-  Context (Hpcls : ∀ ak ws base data,
+  Context (pcls : psail → wlabel → wstate → wm_class).
+  Context (Hpcls : ∀ p ak ws base data,
               ak_latest ak = false →
               wm_class_of ak ws
-              = pcls (WeakPromise.LStore (ak_sync ak) base data) ws).
+              = pcls p (WeakPromise.LStore (ak_sync ak) base data) ws).
 
   Lemma pf_silent_last ags p0 p1 ws prom img log :
     (i < length ags)%nat →
@@ -1248,10 +1257,11 @@ End instr.
     [WPCfgU img log [WPAgent p ws ∅]] the W5 composition starts from
     ([<[0 := a]> [b]] reduces to [[a]], so this is [sail_instr_bracket] read
     at [i := 0] with a singleton agent list). *)
-Corollary sail_instr_bracket_single (pcls : wlabel → wstate → wm_class)
-    (Hpcls : ∀ ak ws base data,
+Corollary sail_instr_bracket_single (pcls : psail → wlabel → wstate → wm_class)
+    (Hpcls : ∀ p ak ws base data,
         ak_latest ak = false →
-        wm_class_of ak ws = pcls (WeakPromise.LStore (ak_sync ak) base data) ws)
+        wm_class_of ak ws
+        = pcls p (WeakPromise.LStore (ak_sync ak) base data) ws)
     (tick : bool) s x s' :
   sail_shaped (riscv_step tick) →
   wrun (Some 0%nat) (riscv_step tick) s x s' →
