@@ -321,7 +321,13 @@ explicit fences). If a future proof needs ppo 9–13 (e.g. a seqlock), register
 views can be added then — the cost lands in `run`/`exec`'s RegRead/RegWrite
 arms and nowhere in the logic's interfaces. The forward bank stores the
 weakest sound view (the store's fence floor `w_vwNew` at store time; 0 is
-also sound) — over-weak is safe, over-strong is not. DECIDED after M0: the
+also sound) — over-weak is safe, over-strong is not.
+**CORRECTION (2026-08-17, deps design §2.3′ D-7): that parenthesis had the
+polarity backwards — `w_vwNew` is LARGER than PARM's `FwdItem` view
+(`V(asrc) ⊔ V(dsrc)`, RVWMO ppo 12), so it removed hardware behaviours;
+`WeakMem.store_post` now banks `0`, the dependency-free PARM value, and D2
+will replace it by `V(asrc) ⊔ V(dsrc)`.**
+DECIDED after M0: the
 bank gets **wired into the load rule at M1** (a load reading the hart's own
 latest store takes the banked view instead of the timestamp). M0 left it
 write-only (`vpost = vpre ⊔ t` unconditionally), which is sound-but-

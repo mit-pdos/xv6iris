@@ -35,17 +35,34 @@
             no [ppo_op] edge, no [ord_pw]/[ord_pr] edge, and no coherence
             cycle exists — [cand_axiomatic_ok] holds.
 
-        (b) THE FORWARD-BANK LEAK.  [store_post] banks [w_vwNew] and
-            [fwd_view] hands that BANKED view to a plain read of the agent's
-            own store, whence [w_vrOld] and then, past a [pr,sr] fence,
-            [w_vrNew].  The source of such a value is a publication that
-            reached [w_vwNew] through a fence with [sw] — and [ord_pw] /
-            [ord_pr] both require [sr], so no single [ord] edge, and in fact
-            no [ob] path at all, connects the source to the target read.
+        (b) THE FORWARD-BANK LEAK — SINCE REMOVED AT ITS SOURCE (D-7,
+            2026-08-17); see (b') below.  As it stood: [store_post] banked
+            [w_vwNew] and [fwd_view] handed that BANKED view to a plain read
+            of the agent's own store, whence [w_vrOld] and then, past a
+            [pr,sr] fence, [w_vrNew].  The source of such a value is a
+            publication that reached [w_vwNew] through a fence with [sw] —
+            and [ord_pw] / [ord_pr] both require [sr], so no single [ord]
+            edge, and in fact no [ob] path at all, connects the source to the
+            target read.
             Witness (§14(1), argued in full, not machine-checked):
             [store x; fence pw,sw; store y; load y (forwarded);
             fence pr,sr; load a] against a foreign write of [a] below the
             first store's timestamp.
+
+        (b') WHAT CHANGED.  [WeakMem.store_post] now banks PARM's
+            dependency-free [FwdItem] view [0] instead of [w_vwNew] (deps
+            design §2.3′ D-7: the fence floor was LARGER than PARM's and so
+            REMOVED hardware behaviours).  A forwarded plain read therefore
+            contributes [max vpre 0 = vpre] — nothing the pre-view did not
+            already carry — so the witness above no longer blocks in the
+            machine, and leak (b) is closed at its source rather than by a
+            premise.  [cand_pub_clean] is nevertheless KEPT here: the
+            induction below uses it at every read (via
+            [cand_pub_clean_pub_r]) to obtain [pub_r], and dropping it needs
+            §8's [w_vrOld]/[w_vrNew] conjuncts re-proved for a forwarded read
+            (whose contribution is now the pre-view, not its timestamp).
+            That re-proof is NOT attempted here, so the theorem below is
+            weaker than it now needs to be — not wrong.
 
         Both leaks are exactly the two seams slice 1 §7(3) and slice 2 §6(b)
         RECORDED as places where the machine is stronger than the modelled
@@ -54,6 +71,8 @@
         ([w_vRel] stays 0), and [cand_pub_clean] kills (b) by making every
         read externally sourced or acquire, hence never forwarded
         ([pub_r_fwd_view]), so no banked view ever enters a view component.
+        (Post-D-7 the bank holds [0], so (b) is dead on the machine side as
+        well; [cand_pub_clean] is retained because the PROOF still uses it.)
 
     Slice 2's definitions are used verbatim; nothing here weakens any of them.
     DEPENDENCY-FREE like its parents: stdpp + [WeakMem] + [WeakAxiomatic] +
@@ -852,7 +871,9 @@ Qed.
     forward bank carry NO conjunct: under [cand_pub_clean] the bank is never
     consulted ([fwd_view] is the identity on every timestamp actually read),
     so no banked view ever reaches a floor — which is precisely the leak the
-    premise closes. *)
+    premise closes.  (Post-D-7 the bank holds [0], so a consulted bank would
+    contribute nothing either; the premise is belt-and-braces here — see the
+    header's (b').) *)
 
 Definition invw (k : nat) (i : agent) (ws : wstate) : Prop :=
   (∀ a, frdom_b E i k a (coh ws a)) ∧
@@ -1864,6 +1885,14 @@ Qed.
     the [pr,sr] fence lifts that to [w_vrNew = 2]; step 6's floor is therefore
     2 and timestamp 1 writes byte 0 inside (0,2] — [readable] fails.
 
+    THIS WITNESS IS DEAD AS OF D-7 (2026-08-17).  [store_post] banks [(3, 0)],
+    not [(3, 2)]: step 4's [fwd_view] returns 0, [w_vrOld] stays 0, the
+    [pr,sr] fence lifts nothing, and step 6's floor is 0 — the machine ALLOWS
+    the trace, matching the axiomatic side computed just below.  So there is
+    no known counterexample forcing [cand_pub_clean] any more; it survives as
+    a premise the PROOF uses, not one the STATEMENT needs.  See the header's
+    (b') for what removing it would cost.
+
     AXIOMATIC SIDE (why no axiom catches it):
     - [ord_pw] needs a fence with [pw ∧ sr]: step 2 has [sr = false], step 5
       has [pw = false].  So there is NO [ord_pw] edge at all.
@@ -1911,6 +1940,11 @@ Qed.
         [load_vpre]'s acquire arm, and bank [0] instead of [w_vwNew].  Both
         are ADEQUACY-SAFE in the sense that they only remove ordering, but
         both change [WeakMem.v], i.e. they are Decision-3-level calls.
+        HALF OF (c) HAS LANDED (D-7, 2026-08-17, for an independent reason —
+        the fence floor was a behaviour-REDUCING deviation from RVWMO ppo 12):
+        [store_post] banks [0].  So (b)'s leak is gone and [cand_pub_clean] is
+        now only a PROOF-side premise; the [w_vRel] half of (c) is untouched
+        and [cand_rl_free] still corresponds to a real machine/[ppo_op] gap.
 
     ------------------------------------------------------------------
     (3) OWED LIFTS (for W4's batch), all proved here against [.vo]s this slice
