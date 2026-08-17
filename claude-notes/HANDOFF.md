@@ -1,5 +1,18 @@
 # SESSION HANDOFF — 2026-08-17 (branch `weak-memory`)
 
+**LATEST (end of day): the Sail model is now generated with `-D SYMBOLIC`
+(`d978b255`): `riscv_step` emits `InstrAnnounce`/`BranchAnnounce` nodes; 12
+one-line proof fixes; tree green; capstone on the 5 axioms.  Plans of
+record for what comes next: `design/weak-memory-deps.md` (dependency
+tracking in the full machine + a machine-checked Layer 2 — awaiting the
+user's go on D2+), `design/weak-memory-premise-discharge.md` (the
+`main_premises` findings: `edges_split` and `dev_epoch_ok` are FALSE for xv6
+as stated — Track A0/A0′ repairs owed), `projects/weak-memory-m4-retarget.md`
+(the `exec_eff` bridge spike PASSED).  Landed the same day after the
+capstone: `WeakEvDisk.v` (disk-thread EWP rules), `WeakRobustDisc.v`
+(Track A1–A6), `WeakEvExecEff.v` (M4-S1).**
+
+
 **State: tree green, everything committed on `weak-memory` (NOT pushed —
 push when the user wants).  No work in flight.**  Entry point as always:
 `README.md` → `durable-notes.md`; then the worklist below.
