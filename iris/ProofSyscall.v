@@ -142,40 +142,57 @@
        `fileclose_bm`'s three should now be a straight port of
        `sysc_arm_exec`.
 
-   `sys_exit` (k = 2) stays outside `sysc_arm_goal` regardless of any of
-   this: its contract DIVERGES (bare `WP Loop`, no continuation), so it
-   needs a bespoke branch -- and the divergence is the EASY half.  What
-   actually blocks it, measured against `SpecSysExit.wp_sys_exit_sconf_body`:
+   `sys_exit` (k = 2) IS DOWN TO ONE BLOCKER, and it is not any of the ones
+   this header used to list.  Re-measured against
+   `SpecSysExit.wp_sys_exit_sconf_body` after `sysc_fs_env` landed:
 
-     - Its `fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
-       cov logstart dev pid (DfracOwn (1/4)) γi cn γtl bmapstart inodestart
-       nib size dqb dqs` premise forces SIX ties between the ambient
-       dispatch parameters and `fn`'s own fields: `fcn_procs fn = γs`,
-       `fcn_j fn = j`, `fcn_plock fn = γl`, `fcn_bio fn = bn`,
-       `fcn_pid fn = pid`, `fcn_dq fn = DfracOwn (1/4)`.  Only the last two
-       of those six mention things `syscall_env γf pj bn fn` is INDEXED BY
-       (`bn`, `fn`); `γs`, `j`, `γl` and `pid` are not indices of it, so the
-       ties cannot be stated inside its body at all -- widening the body is
-       not enough, `syscall_env`'s TYPE (SpecSyscall.v's `Parameter`, and
-       with it `wp_syscall_sconf_body`'s `R` and `UsertrapRes.ut_own`'s
-       `Rsys` slot) would have to grow a `pid` index at minimum.  (`j` alone
-       IS recoverable, from `pj = proc_addr (fcn_j fn)` plus
-       `ProcGeom.proc_addr_inj`; `γs`/`γl`/`pid` are not.)
-     - Even granting the ties, NINE resource families it wants are absent:
-       the kmem lock and `kalloc_avail` AT `fn`'s OWN `fcn_kmem`/`fcn_kalloc`
-       (`syscall_env`'s `kalloc_env γa None` existentially quantifies its
-       own, so the two can never be shown equal -- the unreachable-witness
-       problem SpecSyscall.v's header names), `bio_ctx`, `log_ctx`,
-       `fs_crash_seam`, `gen_cert`, `dev_inv` at `fn`'s `fcn_uart`/`fcn_disk`
-       (again `printk_env`'s are existential), `disk_geom`, the virtio_disk
-       lock, and `fileclose_ic_env fn` (whose `ic_escrows`/`ireg_inv`/
-       `ic_sleeplocks` and nine pure geometry facts nothing here carries),
-       plus the pure `log_geom_ok cov logstart`.
-     Its BUDGET premise, by contrast, is exactly dischargeable:
-     `K_syscall = 4 + K_sys_exit` and an arm runs at `av - 4`.  So sys_exit
-     is a `syscall_env`-shape decision, not a proof detail -- the same one
-     the eight GAP entries wait on, and the reason it is grouped with them
-     rather than with the nine wired arms.
+     - THE DIVERGENCE IS FREE.  Its contract ends in a bare `WP Loop` with no
+       continuation, which reads like it cannot fit `sysc_arm_goal` -- but
+       `iProp` is AFFINE, so an arm may simply DROP the `Hcont` the goal hands
+       it and produce `WP Loop` from the callee directly.  No bespoke branch,
+       no shape change.
+     - THE SIX `fn` TIES DISSOLVE, and the trick is that `pj` is an index of
+       `syscall_env` too.  The arm is free to instantiate sys_exit's own
+       `γs`/`j`/`γl` AT `fn`'s fields rather than at the dispatch's, so what
+       it needs is `procs_inv (fcn_procs fn)`, `⌜fcn_procs fn !! fcn_j fn =
+       Some (fcn_plock fn)⌝` and `⌜pj = proc_addr (fcn_j fn)⌝` -- every one
+       statable inside the bundle, since all three mention only `fn` and
+       `pj`.  `fcn_dq fn = DfracOwn (1/4)` is likewise statable.  Only
+       `fcn_pid fn = pid` reaches outside, and it is DERIVABLE rather than
+       assumable: carry the quarter `p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq
+       fn} fcn_pid fn` that `SpecFileclose.fileclose_fs_env` already carries,
+       and read the equality off points-to agreement against `proc_priv`'s
+       own pid cell.  So `syscall_env`'s TYPE still does not have to grow.
+     - THE RESOURCE LIST IS DOWN TO ONE FAMILY.  `sysc_fs_env` already
+       supplies `bio_ctx`, `log_ctx`, `fs_crash_seam`, `gen_cert`, `dev_inv`,
+       `disk_geom`, the virtio_disk lock, `ic_escrows`/`ireg_inv`/
+       `ic_sleeplocks` and `log_geom_ok`, all at `fn`'s own names.  What is
+       still at a fresh existential is the allocator: sys_exit wants the kmem
+       lock and `kalloc_avail` at `fn`'s OWN `fcn_kmem`/`fcn_kalloc`, where
+       the bundle has `kalloc_env γa None`.  That is the same naming fix
+       `sysc_fs_env` already is, applied once more.
+     - WHAT ACTUALLY BLOCKS IT IS `kstack_closer`, WHICH NOTHING HERE CAN
+       MINT.  `ProcDefs.kstack_closer pj sp av` is the plain wand `stack_own
+       sp av -∗ kstack_free pj` -- NOT persistent, and `SpecSyscall.v` threads
+       neither it nor `is_kstack` nor any `stack_own` above syscall's own
+       frame.  `kstack_closer_top` is free (its input `is_kstack` is
+       persistent) but is anchored at the PAGE TOP; walking the anchor down to
+       sys_exit's entry sp costs `kstack_closer_frame` the cells between, i.e.
+       USERTRAP'S OWN FRAME, which usertrap still needs in order to return on
+       the other twenty-one entries.  So the closer cannot be built by the
+       caller either: the decision is made inside the dispatch.
+       The shape that works is to thread the INGREDIENTS rather than the
+       closer -- `is_kstack pj ks` (persistent, free) plus the `stack_own` of
+       the region above syscall's entry sp -- in through
+       `wp_syscall_sconf_body` and back out of its continuation, so the nine
+       returning arms hand them back untouched and only the sys_exit arm
+       spends them.  That is a real contract change with a real ripple
+       (`SpecUsertrap.v`, `UsertrapRes.v`, `ProofUsertrapSys.v`, plus
+       threading through `sysc_arm_pre`/`sysc_hcont_ty`/`sysc_ret_tail`/
+       `sysc_epilogue_tail` and all nine arms), which is why sys_exit is
+       still on this list.  Its BUDGET premise, by contrast, is exactly
+       dischargeable: `K_syscall = 4 + K_sys_exec` and `K_sys_exit` is below
+       it, and an arm runs at `av - 4`.
 
    THE ACTUAL SHAPE OF THE REMAINING WORK, worked out by reading the
    precedents below (do this before touching the proof, it will save many
