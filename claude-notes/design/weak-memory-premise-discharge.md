@@ -64,6 +64,32 @@ Two facts shape any discharge:
    before `used->idx`) is DEFINITIONAL — provable once, for all traces,
    with no site enumeration.
 
+## 2b. FINDING (2026-08-17, orchestrator): `edges_split` AS STATED IS FALSE FOR xv6 — the premise must be relativized to the fulfils the walk actually uses
+
+`edges_split` demands, for a cross rf edge into reader `j`'s plain read at
+`k`, that EVERY later fulfil `k'` of `j` be `edge_ok` (a `pr∧sw` fence
+between `k` and `k'`, or `covered` AT THE READ `k`).  xv6's `acquire` is
+`push_off(); if(holding(lk)) panic; while(amoswap.aq …); fence; lk->cpu = …`:
+`holding` PLAINLY reads `lk->locked` (a foreign `WCexcl`/`WCrel` message —
+not `bad`), and the reader's next fulfil is the acquire RMW itself with no
+fence between and no coverage at the read (the reader has acquired nothing
+yet).  So the edge is not `edge_ok`, and — worse — an early store po-after a
+plain load to a different address is a LEGAL RVWMO reordering (LB shape), so
+no per-edge inequality `ts < ts'` over ALL later fulfils can hold in every
+behavior.  The behavior is HARMLESS: the walk (`WeakRobustAcyc2`) consumes
+`rf_edges_ok` at ONE place (`mile_mu_gain`'s cross-rf arm) and only for a
+reader ON A CYCLE, whose relevant later fulfil is the one the cycle leaves
+through — i.e. a fulfil whose message is itself READ CROSS-AGENT (a
+milestone source).  For xv6 those fulfils are: the acquire RMW (whose write
+sits above the release it read: `ts < ts_rel < ts'`) and every CS store
+(covered after the acquire).  Track A must therefore FIRST relativize the
+premise (Track A0): weaken `edge_ok`/`edges_split` to exactly the
+(reader, later-fulfil) pairs the walk needs — the later fulfil is a milestone
+source, and coverage is evaluated at the FULFIL's EXT view (`fulfil_vpre`),
+which for an RMW is after its own aq read — re-prove S1/the walk with it, and
+only then discharge.  The weaker premise makes `robust_main` STRONGER (fewer
+obligations), so it is a pure improvement of Layer 1.
+
 ## 3. The plan (three tracks, in order)
 
 ### Track A — the machine-side theory (Layer 1, generic, no xv6)
