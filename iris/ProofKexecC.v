@@ -2652,7 +2652,7 @@ Section KexecCLoop.
                         = pa_add av (8 * c)).
       { rewrite HT4s11 Hz0imm. exact (avi0 (pa_add av (8 * c))). }
       iEval (rewrite -Havcaddr) in "Hac".
-      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXC + 0x232)) Rs3 Rs11
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXC + 0x232)) Rs3 Rs11
                 (mword_of_int 0 : mword 12) T4 (K - 68)%nat (avf c) true
                 (dqm := dqa) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi232 Hac").
       iIntros (CID9 Hs9) "Hcg Hpc Hac". iEval (rewrite Havcaddr) in "Hac".
@@ -3243,7 +3243,7 @@ Section KexecCLoop.
                             = pa_stk sp0 (46 - c)).
         { rewrite HU1a5 Hz0imm256. exact (avi0 (pa_stk sp0 (46 - c))). }
         iEval (rewrite -Hstoreaddr) in "Hslot".
-        iApply (wp_sd_s_sconf (mword_of_int (KXC + 0x256)) Rs2 Ra5
+        iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXC + 0x256)) Rs2 Ra5
                   (mword_of_int 0 : mword 12) U1 (K - 68)%nat wold true
                   with "Hcg Hpc Hi256 Hslot").
         iIntros (CID24 Hs24) "Hcg Hpc Hslot".
@@ -3385,7 +3385,7 @@ Section KexecCLoop.
           assert (Heq89a : (8 * c + 8 = 8 * S c)%nat) by lia.
           rewrite Heq89a. reflexivity. }
         iEval (rewrite -Hnextaddr) in "Han".
-        iApply (wp_ld_s_sconf (mword_of_int (KXC + 0x264)) Ra0 Rs11
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXC + 0x264)) Ra0 Rs11
                   (mword_of_int 8 : mword 12) U3 (K - 68)%nat (avf (S c)) true
                   (dqm := dqa) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi264 Han").
         iIntros (CID28' Hs28') "Hcg Hpc Han". iEval (rewrite Hnextaddr) in "Han".
@@ -4244,7 +4244,7 @@ Section KexecCClose.
                         = pa_stk sp0 (46 - c)).
     { rewrite HX2a5 Hse3840. apply kxc_ustack_slot_addr. lia. }
     iEval (rewrite -Hstoreaddr) in "Hslot".
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KXC + 0x27c)) Ra5
+    iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXC + 0x27c)) Ra5
               (mword_of_int 3840 : mword 12) X2 (K - 68)%nat wold true
               with "Hcg Hpc Hi27c Hslot").
     iIntros (CID4 Hs4) "Hcg Hpc Hslot".
@@ -4793,7 +4793,7 @@ Section KexecCClose.
       (* ---- the source buffer: [S c] frame slots become [8 * S c] NAMED
          bytes.  The alignment facts [slotsn_bytes_own] hands out are what
          [bytes_own_slotsn] needs to put them back afterwards. ---- *)
-      iDestruct (slotsn_bytes_own sp0 46 (S c) ltac:(lia) with "Hustex")
+      iDestruct (slotsn_bytes_own (KTR := KT1) sp0 46 (S c) ltac:(lia) with "Hustex")
         as "[%Halust Hubytes]".
       iDestruct (bytes_own_name (8 * S c) (pa_stk sp0 46) with "Hubytes")
         as (ufun) "Hubytes".
@@ -4805,7 +4805,7 @@ Section KexecCClose.
       { rewrite uint_unsigned.
         change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hmax.
         change (2 ^ 38)%Z with 274877906944%Z. lia. }
-      iApply (Copyout.wp_copyout_sconf KT0 ga X12 P sz1 (8 * S c)%nat ufun
+      iApply (Copyout.wp_copyout_sconf KT1 ga X12 P sz1 (8 * S c)%nat ufun
                 (K - 68)%nat 0%nat true (proc_addr jp) true ∅
                 ltac:(lia) HX12a0 HX12a1
                 ltac:(rewrite HX12a4; f_equal; lia)
@@ -4828,9 +4828,9 @@ Section KexecCClose.
       assert (Htfp2 : P2.(ud_tfp) = P.(ud_tfp))
         by (destruct Hext2 as (_ & Ht & _); exact Ht).
       (* ---- the ustack, back from bytes to one opaque [stack_own] ---- *)
-      iDestruct (bytes_own_of_name (8 * S c) (pa_stk sp0 46) ufun with "Hubytes")
+      iDestruct (bytes_own_of_name (KTR := KT1) (8 * S c) (pa_stk sp0 46) ufun with "Hubytes")
         as "Hubytes".
-      iDestruct (bytes_own_slotsn sp0 46 (S c) ltac:(lia) Halust with "Hubytes")
+      iDestruct (bytes_own_slotsn (KTR := KT1) sp0 46 (S c) ltac:(lia) Halust with "Hubytes")
         as "Hustex".
       iDestruct (kxc_ustack_collapse_ex sp0 (S c) ltac:(lia) with "Hustex") as "Hurun".
       iEval (rewrite Hdepth) in "Hurun".

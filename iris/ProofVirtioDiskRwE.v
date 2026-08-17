@@ -254,7 +254,7 @@ Section ProofVirtioDiskRwE.
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -284,7 +284,7 @@ Section ProofVirtioDiskRwE.
                                     (vdrwd_sldata wr bs_buf bs_disk))
                                (h, m2, t) pin) -∗
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-       vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
+       vdrw_idx (KTR := KT1) sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
        ⌜tri_ok (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
@@ -674,7 +674,7 @@ Section ProofVirtioDiskRwE.
       assert (Haddr : add_vec (Mf !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                       = (b_disk b : SailStdpp.Values.mword 64))
         by (rewrite HMfs3; apply vdrwe_bdisk_addr).
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca) : mword 64) Ra5 Rs3
+      iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ca) : mword 64) Ra5 Rs3
                 (mword_of_int 4 : mword 12) Mf (trap_res eb + (K - 12))%nat dv false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a8 [Hbd]").
@@ -818,7 +818,7 @@ Section ProofVirtioDiskRwE.
     assert (Haddr0 : add_vec (N1 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 4 : mword 12))
                      = (b_disk b : SailStdpp.Values.mword 64))
       by (rewrite HN1s3; apply vdrwe_bdisk_addr).
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a2) : mword 64) Ra5 Rs3
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a2) : mword 64) Ra5 Rs3
               (mword_of_int 4 : mword 12) N1 (trap_res eb + (K - 12))%nat dv false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18e [Hbd]").

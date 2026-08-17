@@ -1118,7 +1118,7 @@ Section KexecDCommit.
       destruct Hcstr as [_ Hnul].
       assert (Hqp : (q + (plen - q))%nat = plen) by lia.
       rewrite Hqp. exact Hnul. }
-    iApply (SS.wp_safestrcpy_sconf E4 PNAMELEN (S plen - q)%nat
+    iApply (SS.wp_safestrcpy_sconf KT0 KT1 E4 PNAMELEN (S plen - q)%nat
               (fun j => pfun (q + j)%nat) (kxd_name_fn (pv_name V))
               (K - 68)%nat (DfracOwn 1) true (proc_addr jp)
               ltac:(unfold PNAMELEN; lia)
@@ -1237,7 +1237,7 @@ Section KexecDCommit.
                        = p_pagetable (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hppaddr1) in "Hppt".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2e4)) Rs6 Rs5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e4)) Rs6 Rs5
               (mword_of_int 80 : mword 12) F1 (K - 68)%nat
               (page_base (ud_root (pv_upt V))) true
               with "Hcg Hpc Hi2e4 Hppt").
@@ -1252,7 +1252,7 @@ Section KexecDCommit.
                       = p_sz (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Hszaddr) in "Hpsz".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2e8)) Rs4 Rs5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2e8)) Rs4 Rs5
               (mword_of_int 72 : mword 12) F1 (K - 68)%nat (pv_sz V) true
               with "Hcg Hpc Hi2e8 Hpsz").
     iIntros (CID8 Hs8) "Hcg Hpc Hpsz". iEval (rewrite Hszaddr) in "Hpsz".
@@ -1363,7 +1363,7 @@ Section KexecDCommit.
       { unfold tf_epc_idx. lia. }
       unfold tf_epc_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr24) in "Hword3".
-    iApply (wp_csd_s_sconf (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
+    iApply (wp_csd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f4)) Ra4 Ra5
               (mword_of_int 24 : mword 12) F3 (K - 68)%nat u3 true
               with "Hcg Hpc Hi2f4 Hword3").
     iIntros (CID11 Hs11) "Hcg Hpc Hword3". iEval (rewrite Haddr24) in "Hword3".
@@ -1378,7 +1378,7 @@ Section KexecDCommit.
                        = p_trapframe (proc_addr jp))
       by (rewrite HF3s5; reflexivity).
     iEval (rewrite -Htfaddr2) in "Hptf".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2f6)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2f6)) Ra5 Rs5
               (mword_of_int 88 : mword 12) F3 (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2f6 Hptf").
@@ -1428,7 +1428,7 @@ Section KexecDCommit.
       { unfold kxc_tf_sp_idx. lia. }
       unfold kxc_tf_sp_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr48) in "Hword6".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2fa)) Rs2 Ra5
               (mword_of_int 48 : mword 12) F4 (K - 68)%nat u6 true
               with "Hcg Hpc Hi2fa Hword6").
     iIntros (CID13 Hs13) "Hcg Hpc Hword6". iEval (rewrite Haddr48) in "Hword6".
@@ -1945,7 +1945,7 @@ Section KexecDMain.
                       = p_trapframe (proc_addr jp))
       by (rewrite HMs5; reflexivity).
     iEval (rewrite -Htfaddr) in "Hptf".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2a6)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2a6)) Ra5 Rs5
               (mword_of_int 88 : mword 12) M (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2a6 Hptf").
@@ -1988,7 +1988,7 @@ Section KexecDMain.
       { unfold tf_arg_idx. lia. }
       unfold tf_arg_idx. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Haddr120) in "Hword".
-    iApply (wp_sd_s_sconf (mword_of_int (KXD + 0x2aa)) Rs2 Ra5
+    iApply (wp_sd_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2aa)) Rs2 Ra5
               (mword_of_int 120 : mword 12) D1 (K - 68)%nat u15 true
               with "Hcg Hpc Hi2aa Hword").
     iIntros (CID2 Hs2) "Hcg Hpc Hword".
@@ -2052,7 +2052,7 @@ Section KexecDMain.
                      = pa_add pv 0)
       by (rewrite HD2a5; apply kxd_add_zero).
     iEval (rewrite -Haddr0) in "Hbyte0".
-    iApply (wp_lbu_s_sconf (mword_of_int (KXD + 0x2b2)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXD + 0x2b2)) Ra4 Ra5
               (mword_of_int 0 : mword 12) D2 (K - 68)%nat (pfun 0%nat) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2b2 Hbyte0").
     iIntros (CID4 Hs4) "Hcg Hpc Hbyte0". iEval (rewrite Haddr0) in "Hbyte0".

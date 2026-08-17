@@ -396,6 +396,7 @@ Module SafestrcpyProof : SAFESTRCPY.
 Section ProofSafestrcpy.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kts ktt : ktier}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -618,8 +619,8 @@ Section ProofSafestrcpy.
     sie_cap_gpr KT1 (CID := CID0) M (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.safestrcpy + 0x18) : mword 64) -∗
-    ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j) -∗
-    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ h j) -∗
+    ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ[ktt]{dq} f j) -∗
+    ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kts] h j) -∗
     wp_next (CID0 := CIDh) b p (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (hf : nat -> bv 8),
         ⌜exists k, ssc_stop f n k /\ ssc_post f g hf n k⌝ -∗
@@ -629,8 +630,8 @@ Section ProofSafestrcpy.
             Mt !!! Regidx r = mm !!! Regidx r⌝ -∗
         sie_cap_gpr KT1 Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.safestrcpy + 0x2e) : mword 64) -∗
-        ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ{dq} f j) -∗
-        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
+        ([∗ list] j ∈ seq 0 ns, (pa_add t j) ↦ₘ[ktt]{dq} f j) -∗
+        ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ[kts] hf j) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -664,7 +665,7 @@ Section ProofSafestrcpy.
         by (intros CID'; rgne; exact Ha5).
       iDestruct (sie_cap_gpr_x0 M (K - 2)%nat b p Rz
                    ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-      iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
+      iApply (wp_sb_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
                 (mword_of_int 0 : mword 12) M (K - 2)%nat (h d) b
                 with "Hcg Hpc Hi2a [Hdb]").
       { iEval (rewrite (Ha5' _) addv_sext0). iExact "Hdb". }
@@ -765,7 +766,7 @@ Section ProofSafestrcpy.
          plus the invariant's [bb_nonul f d], not from [d < n]. *)
       pose proof (ssc_cursor_lt f n ns d Hsok Hnn Hdlt1) as Hdns.
       iDestruct (bb_byte_acc t ns d f dq Hdns with "Hsrc") as "[Hsb Hsback]".
-      iApply (wp_lbu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.safestrcpy + 0x20)) Ra4 Ra1
+      iApply (wp_lbu_s_sconf (kt := KT1) (ktd := ktt) (mword_of_int (KernelSyms.safestrcpy + 0x20)) Ra4 Ra1
                 (mword_of_int 4095 : mword 12) Q2 (K - 2)%nat (f d : mword 8) b (dqm := dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi20 [Hsb]").
@@ -788,7 +789,7 @@ Section ProofSafestrcpy.
       iPoseProof (sscp_24 with "Htext") as "Hi24".
       (* ---- +0x24: sb a4,-1(a5) ---- *)
       iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdn with "Hdst") as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.safestrcpy + 0x24)) Ra4 Ra5
+      iApply (wp_sb_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.safestrcpy + 0x24)) Ra4 Ra5
                 (mword_of_int 4095 : mword 12) Q3 (K - 2)%nat (h d) b
                 with "Hcg Hpc Hi24 [Hdb]").
       { iEval (rewrite (HQ3a5' _) (ssc_back1 s d)). iExact "Hdb". }
@@ -833,7 +834,7 @@ Section ProofSafestrcpy.
           by (intros CID'; rgne; exact HQ3a5).
         iDestruct (sie_cap_gpr_x0 Q3 (K - 2)%nat b p Rz
                      ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-        iApply (wp_sb_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
+        iApply (wp_sb_s_sconf (kt := KT1) (ktd := kts) (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
                   (mword_of_int 0 : mword 12) Q3 (K - 2)%nat (h' (S d)) b
                   with "Hcg Hpc Hi2a [Hdb2]").
         { iEval (rewrite (HQ3a5'' _) addv_sext0). iExact "Hdb2". }
@@ -885,7 +886,7 @@ Section ProofSafestrcpy.
   (* ================================================================== *)
   Lemma wp_safestrcpy_sconf (mm : regfile)
       (n ns : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_safestrcpy_sconf_body mm n ns f g K dq b p.
+    : wp_safestrcpy_sconf_body kts ktt mm n ns f g K dq b p.
   Proof.
     cbv beta delta [wp_safestrcpy_sconf_body].
     intros pcE s t ret_tgt HK Hn2 Hn31 Hsok.

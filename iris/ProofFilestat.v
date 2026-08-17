@@ -743,7 +743,7 @@ Section ProofFilestat.
       iEval (rewrite -Hipk) in "Hidev".
       iEval (rewrite -Hipk) in "Hinum".
       (* ---- the stat buffer: slots 9/8/7 -> [stat_at] + the hole ---- *)
-      iDestruct (slots3_bytes_own sp0 9 u9 u8 u7 ltac:(lia) with "Hb9 Hb8 Hb7")
+      iDestruct (slots3_bytes_own (KTR := KT1) sp0 9 u9 u8 u7 ltac:(lia) with "Hb9 Hb8 Hb7")
         as "[%Hal Hbuf]".
       destruct Hal as (Hal9 & Hal8 & Hal7).
       iDestruct (fst_bytes_stat (pa_stk sp0 9) Hal9
@@ -802,7 +802,7 @@ Section ProofFilestat.
                       = a_fip k).
       { rgne. rewrite HI2s1. reflexivity. }
       iEval (rewrite -Hpip2) in "Hcip".
-      iApply (wp_cld_s_sconf (mword_of_int (FST + 0x30)) Ra0 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x30)) Ra0 Rs1
                 (mword_of_int 24 : mword 12) I2 (K - 10)%nat (fc_ip Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30 Hcip").
@@ -918,7 +918,7 @@ Section ProofFilestat.
                         (sign_extend' 64 (mword_of_int 24 : mword 12)) = a_fip k).
       { rgne. rewrite Hmsts1. reflexivity. }
       iEval (rewrite -Hpip3) in "Hcip".
-      iApply (wp_cld_s_sconf (mword_of_int (FST + 0x36)) Ra0 Rs1
+      iApply (wp_cld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x36)) Ra0 Rs1
                 (mword_of_int 24 : mword 12) mst (K - 10)%nat (fc_ip Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 Hcip").
@@ -1081,7 +1081,7 @@ Section ProofFilestat.
                      = p_sz pj)
         by (rgne; rewrite HU3s2; reflexivity).
       iEval (rewrite -Hsza) in "Hszc".
-      iApply (wp_ld_s_sconf (mword_of_int (FST + 0x42)) Ra1 Rs2
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x42)) Ra1 Rs2
                 (mword_of_int 72 : mword 12) U3 (K - 10)%nat (pv_sz V) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi42 Hszc").
@@ -1098,7 +1098,7 @@ Section ProofFilestat.
                      = p_pagetable pj)
         by (rgne; rewrite HU4s2; reflexivity).
       iEval (rewrite -Hpta) in "Hptc".
-      iApply (wp_ld_s_sconf (mword_of_int (FST + 0x46)) Ra0 Rs2
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (FST + 0x46)) Ra0 Rs2
                 (mword_of_int 80 : mword 12) U4 (K - 10)%nat
                 (page_base (ud_root (pv_upt V))) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1172,7 +1172,7 @@ Section ProofFilestat.
       iEval (rewrite -HU6a3) in "Hbuf".
       iDestruct (cpu_own_transport CIDiu CID31 0%nat eb pj b ltac:(rewrite Hb; wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Copyout.wp_copyout_sconf KT0 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
+      iApply (Copyout.wp_copyout_sconf KT1 γa U6 (pv_upt V) (pv_sz V) 24%nat fbytes
                 (K - 10)%nat 0%nat eb pj b lks
                 (fst_av_copyout K HK) HU6a0 HU6a1 HU6a4 fst_len24 Hszb fst_noff0
                 with "Hcg Hcnt Htext Hpc Hpt Hkenv Hbuf").
@@ -1194,7 +1194,7 @@ Section ProofFilestat.
         exact (HU6thr c Hcs N2 N8 N9 N18 N19 N20). }
       (* ---- the source run goes back to being three frame words ---- *)
       iDestruct (fst_bytes_any (pa_stk sp0 9) fbytes 24 with "Hbuf") as "Hbuf".
-      iDestruct (bytes_own_slots3 sp0 9 ltac:(lia) Hal9 Hal8 Hal7 with "Hbuf")
+      iDestruct (bytes_own_slots3 (KTR := KT1) sp0 9 ltac:(lia) Hal9 Hal8 Hal7 with "Hbuf")
         as (v9 v8 v7) "(Hb9 & Hb8 & Hb7)".
       (* ---- +0x4e sraiw a0,a0,31 ---- *)
       assert (Hrgco : rget mco Ra0 = mco !!! Regidx Ra0)

@@ -531,7 +531,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* [ns := n = 16]: kfork owns all sixteen bytes of [p->name], so the
        source-ownership premise is [ssc_src_ok]'s first (budget) disjunct. *)
-    iApply (SS.wp_safestrcpy_sconf M6 16%nat 16%nat
+    iApply (SS.wp_safestrcpy_sconf KT0 KT0 M6 16%nat 16%nat
               (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
               (rsv + (K - 8))%nat (DfracOwn 1) false pme
               ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31

@@ -589,7 +589,7 @@ Section VdrwfP6.
     assert (Hdptr : add_vec (N1 !!! Regidx Rs3) (sign_extend' 64 (mword_of_int 0 : mword 12))
                     = (d_desc_ptr : SailStdpp.Values.mword 64))
       by (rewrite HN1s3; apply vdrwf_dptr_addr).
-    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f8) : mword 64) Ra5 Rs3
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1f8) : mword 64) Ra5 Rs3
               (mword_of_int 0 : mword 12) N1 av pd false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1d6 []").
@@ -771,7 +771,7 @@ Section VdrwfP6.
     perm_receipt kq.2 Q -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    vdrw_saved sp0 m -∗
+    vdrw_saved (KTR := KT1) sp0 m -∗
     b_blockno b ↦₄{DfracOwn (1/2)} bno -∗
     (* NO caller-held [trap_csrs_pay]: the function is trap-CSR-balanced, so
        the ONE pay in play is the one the interior acquire minted and the
@@ -1018,7 +1018,7 @@ Section VdrwfP6.
                       (sign_extend' 64 (mword_of_int 4000 : mword 12))
                     = (pa_stk sp0 12 : SailStdpp.Values.mword 64))
       by (rewrite Hs0; apply vdrw_idx0_addr).
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) Rs2 Rs0
+    iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) Rs2 Rs0
               (mword_of_int 4000 : mword 12) M (trap_res eb + (K - 12))%nat
               (mword_of_int (Z.of_nat h) : SailStdpp.Values.mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1121,7 +1121,7 @@ Section VdrwfP6.
                      (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_info_b h : SailStdpp.Values.mword 64)).
     { rewrite /E6 upd_eq HE5a5 HE5a4. apply vdrwf_infob_addr. }
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e8) : mword 64) Ra5
+    iApply (wp_sd_zero_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x1e8) : mword 64) Ra5
               (mword_of_int 8 : mword 12) E6 (trap_res eb + (K - 12))%nat
               (b : SailStdpp.Values.mword 64) false
               with "Hcg Hpc Hi1c6 [Hinfob]").
