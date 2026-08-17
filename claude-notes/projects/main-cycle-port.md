@@ -269,6 +269,43 @@ every read is one `swp_read_reg_pinned` and the rest is pure data — roughly te
   makes the closing `reflexivity` grind on two ISA-sized terms, and it looks
   exactly like the blowup above.
 
+**THE REMAINING LEAVES, MAPPED BY WHAT THEY OWN — this is the map to work from.**
+Surveyed by extracting each leaf's own `↦ᵣ` premises and comparing against what
+its `execute` writes.  Three groups, and only ONE of them touches the wrapper:
+
+1. **Leaves that OWN every cell they write — no wrapper change needed.**
+   `WpGprCsrwB`'s `mideleg`, `satp` (the menvcfg three-step recipe: assemble the
+   `goodb` certificate, prune the dispatch in a pure goal, read off the clause),
+   `sie` (writes `mie`, and owns `mie` + `mideleg`), `pmpaddr0` (writes
+   `pmpaddr_n`, owns it).  `WpGprCsrrCommon` owns nothing and only writes rd.
+
+2. **ONE genuine obligation gap: `wp_csrw_stimecmp_gpr` writes `mip`.**
+   `mip` is a CLOCK cell — it arrives via `pc_is` → `clock_res` and is therefore
+   in `mm_Drw`, held by the wrapper for the whole obligation.  The leaf's
+   statement does not mention it, so it cannot write it.  Fix: lend `mip` in the
+   obligation exactly as `PC` is lent (writable, returned at whatever the
+   instruction left).  Cost: one more lent cell plus a two-token edit in each of
+   the 13 converted leaves' obligation proofs.  Nothing else in the leaf set
+   writes `mcycle`/`mtime`/`minstret`, so this is the LAST obligation change.
+
+3. **`wp_instr_config` must be rebuilt — MRET and the two `_raw` CSR leaves do
+   not take `mmode_config` at all.**  `wp_mret_gpr`, `wp_csrw_mstatus_raw` and
+   `wp_csrw_pmpcfg0_raw` take `hw_config` plus `hart_state` / `cur_privilege` /
+   `mstatus` at FULL ownership.  That is not an accident and `wp_instr` cannot
+   serve them: MRET *changes* cur_privilege (Machine -> Supervisor) and mstatus,
+   so the bundle is NOT invariant across the instruction and `mmode_config`
+   cannot be handed in and taken back.  The old stack had `wp_instr_config` for
+   exactly this (3 call sites); it was deleted in this port and has to come
+   back, as a raw-cell wrapper whose config cells are exclusive and may change.
+
+**AND A FORCED STATEMENT CHANGE, the first in the sweep.**  Those same three
+leaves take `minstret_inv` as a premise, and `minstret_inv` no longer exists —
+the counter facts moved into `pc_is`'s `minstret_res` when invariants became
+owned resources.  The premise must be DELETED from their statements.  That is a
+weakening (the lemma gets stronger), so it is benign for the theorem, but it IS
+a statement diff and callers stop supplying it.  It is the only statement change
+the sweep has needed so far; the other 17 leaves are byte-identical.
+
 **WHAT REMAINS, per family:**
 - `WpGprCsrwA/B`, `WpGprCsrrCommon` (8 leaves): substitution, plus one write
   peel each.  Same-shaped CSRs (read old / write legalized / read back) are
