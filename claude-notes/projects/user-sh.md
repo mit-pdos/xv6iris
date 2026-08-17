@@ -112,6 +112,33 @@ fails; `morecore(12)` clamps `nu` to 4096 and calls `sbrk(65536)`; `free`
 links that block after `base`; the rescan splits it, returning
 `hp + 4084*16 + 16`.  So the heap region must be at least 65536 bytes.
 
+## STATE
+
+Proved and axiom-clean: `UmodeFrame.v` (the gcc 16-byte prologue/epilogue,
+protocol- and program-generic: `uv_slot16`, `wp_uv_prologue16`,
+`wp_uv_epilogue16`), and `UProofShLib.v` — the nine syscall stubs, `sbrk`,
+`strlen`, `strchr`.  `strlen` is instruction-for-instruction echo's and its
+proof replayed.
+
+Contracts written and compiling for all 21 functions: `USpecSh.v` (layout,
+stubs, library, heap, IO, `runcmd`, `main`, the top statement) and
+`USpecShParse.v` (the tokenization model, `peek`, `gettoken`, the four
+`parse*`, `nulterminate`).
+
+Left to prove: `memset`, `free` (in flight), then `malloc`, `execcmd`,
+`peek`, `gettoken`, `parseredirs`, `parseexec`/`parsepipe`/`parseline`,
+`nulterminate`, `parsecmd`, `gets`, `getcmd`, `fork1`, `runcmd`, `main`,
+`start`.
+
+**Two rules this effort produced, both in durable-notes.md**: a hedged
+conjunct (`⌜P \/ True⌝`) is a false statement that compiles, and a function
+that writes a caller's buffer disturbs TWO windows — its own frame and the
+buffer — so `uM_only` is the wrong shape and `uM_only_in` (over a list of
+windows) is the right one.  A third, local to the specs: `sh_frame_ok`
+exists because `uv_stack` only guarantees the frame is above 4096 while
+sh's TEXT runs to 8192, so without it a prologue spill can clobber the
+program image and no `ui_sh_*` fact survives.
+
 ## The machinery this needs on top of echo's
 
 - **leaves, and the collapse that made them cheap.**  Every non-jumping,

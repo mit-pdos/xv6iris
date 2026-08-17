@@ -196,6 +196,10 @@ UCodeEcho.v
 USpecEcho.v
 UCodeSh.v
 USpecSh.v
+USpecShParse.v
+UmodeFrame.v
+UProofShLib.v
+UProofShMem.v
 UProofEchoA.v
 UProofEcho.v
 UserMemArms.v

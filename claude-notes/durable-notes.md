@@ -162,6 +162,39 @@ state it as `gset_disjUR (mword 64) (EqDecision0 := @…Decidable_eq_mword 64)
 unpinned functor field takes stdpp's instances and then fails to unify at
 every use site, with an error naming neither.
 
+## A HEDGED CONJUNCT IS A FALSE STATEMENT THAT COMPILES
+
+**Never write `⌜P \/ True⌝` (or `(H : True)`) into a contract as a
+placeholder for a fact you have not pinned down yet.** `right; exact I`
+discharges it, so the postcondition says NOTHING where it appears, and it
+reads at a glance exactly like a postcondition that says something. Three
+of `USpecSh.v`'s image postconditions shipped that way and were caught only
+because a proof agent was asked to report contract drift rather than work
+around it. If the fact is not yet known, leave the conjunct OUT — a missing
+conjunct fails loudly at the first call site that needs it; a vacuous one
+never fails at all.
+
+The same rule covers the mirror case: **a textual reorder of a contract can
+silently EAT a conjunct.** Reordering `wp_sh_sbrk_body`'s two image effects
+by `str.replace` dropped its return-value conjunct, so the contract stopped
+saying what `sbrk` returns — which is the one thing its only caller needs.
+After any edit to a `_body` definition, diff the conjunct COUNT, not just
+the compile result.
+
+## A FUNCTION THAT WRITES A CALLER'S BUFFER DISTURBS *TWO* WINDOWS
+
+`uM_only M M' a n` says "only `[a, a+n)` moved", which is right for a
+function whose only writes are its own frames. It is WRONG — not weak — for
+one that also writes a caller-supplied buffer: the gcc prologue spills `ra`
+and `s0` into the frame and the epilogue only RELOADS them, so those bytes
+differ in `M'` and any "only the buffer moved" claim is false. `memset`'s
+first contract asserted exactly that and was unprovable.
+
+The fix is `UmodeAbi.uM_only_in M M' ws` over a LIST of windows, with
+`uM_only` recovered as the one-window case (`uM_only_in_one`) and the usual
+`_trans` / `_weaken` / transports. State a callee's image effect as its own
+frame window PLUS whatever it was asked to write.
+
 ## THREE `f_equal`/`rewrite` PAPER CUTS THAT REPORT SOMETHING ELSE
 
 All three cost real time in the verified-user proofs and none of the messages

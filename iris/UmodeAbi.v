@@ -34,6 +34,7 @@ Definition sp_idx : mword 5 := mword_of_int 2.
 Definition a0_idx : mword 5 := mword_of_int 10.
 Definition a1_idx : mword 5 := mword_of_int 11.
 Definition a2_idx : mword 5 := mword_of_int 12.
+Definition a3_idx : mword 5 := mword_of_int 13.
 
 (* ===================================================================== *)
 (* §2 Image inclusion: program bytes [img] (a dumped [<prog>_bytes] /      *)
@@ -741,3 +742,68 @@ Definition uargv_at (M : gmap Z (bv 8)) (pv : Z)
 Definition uexec_args (M : gmap Z (bv 8)) (pa pv : Z)
     (path : list (bv 8)) (args : list (list (bv 8))) : Prop :=
   ustr_at M pa path /\ uargv_at M pv args.
+
+(* ===================================================================== *)
+(* §11 SEVERAL disturbed windows.                                         *)
+(*                                                                        *)
+(* [uM_only] describes a call that touched ONE contiguous range.  That is  *)
+(* right for a function whose only writes are its own frames, but a        *)
+(* function that also writes a caller-supplied buffer disturbs TWO         *)
+(* disjoint windows -- its frame and the buffer -- and stating either one  *)
+(* alone is WRONG, not merely weak: `only the buffer moved' is false of a  *)
+(* prologue that spilled ra and s0 and never restored those bytes.        *)
+(* ===================================================================== *)
+
+Definition uM_in_windows (ws : list (Z * Z)) (k : Z) : Prop :=
+  exists w : Z * Z, w ∈ ws /\ fst w <= k < fst w + snd w.
+
+Definition uM_only_in (M M' : gmap Z (bv 8)) (ws : list (Z * Z)) : Prop :=
+  (forall k : Z, is_Some (M !! k) -> is_Some (M' !! k)) /\
+  (forall k : Z, ~ uM_in_windows ws k -> M' !! k = M !! k).
+
+Lemma uM_only_in_one (M M' : gmap Z (bv 8)) (a n : Z) :
+  uM_only M M' a n <-> uM_only_in M M' [(a, n)].
+Proof.
+  split; intros [Hd He]; split; try exact Hd; intros k Hk.
+  - apply He. destruct (decide (k < a)); [ by left | right ].
+    destruct (decide (a + n <= k)); [ done | ].
+    exfalso. apply Hk. exists (a, n). split; [ apply elem_of_list_here | ]. simpl. lia.
+  - apply He. intros (w & Hw & Hin).
+    apply elem_of_list_singleton in Hw. subst w. simpl in Hin. lia.
+Qed.
+
+Lemma uM_only_in_trans (M1 M2 M3 : gmap Z (bv 8)) (ws : list (Z * Z)) :
+  uM_only_in M1 M2 ws -> uM_only_in M2 M3 ws -> uM_only_in M1 M3 ws.
+Proof.
+  intros [D1 E1] [D2 E2]. split.
+  - intros k H. exact (D2 k (D1 k H)).
+  - intros k Hk. rewrite (E2 k Hk). exact (E1 k Hk).
+Qed.
+
+Lemma uM_only_in_weaken (M M' : gmap Z (bv 8)) (ws ws' : list (Z * Z)) :
+  uM_only_in M M' ws -> ws ⊆ ws' -> uM_only_in M M' ws'.
+Proof.
+  intros [D E] Hsub. split; [ exact D | ].
+  intros k Hk. apply E. intros (w & Hw & Hin).
+  apply Hk. exists w. split; [ by apply Hsub | exact Hin ].
+Qed.
+
+(* the transports, at the multi-window reading *)
+Lemma uM_only_in_rd (pt : uptd) (M M' : gmap Z (bv 8)) (b n : Z)
+    (ws : list (Z * Z)) :
+  uM_only_in M M' ws ->
+  (forall k : Z, b <= k < b + n -> ~ uM_in_windows ws k) ->
+  uv_rd pt M b n -> uv_rd pt M' b n.
+Proof.
+  intros [_ E] Hdisj [Hlo Hn0 Hhi Hleaf Hb]. constructor; try assumption.
+  intros j Hj. rewrite (E (b + j) (Hdisj (b + j) ltac:(lia))). exact (Hb j Hj).
+Qed.
+
+Lemma uM_only_in_img (img M M' : gmap Z (bv 8)) (ws : list (Z * Z)) (lim : Z) :
+  (forall (k : Z) (b : bv 8), img !! k = Some b -> k < lim) ->
+  (forall k : Z, k < lim -> ~ uM_in_windows ws k) ->
+  uM_only_in M M' ws -> uimg_sub img M -> uimg_sub img M'.
+Proof.
+  intros Hkeys Hdisj [_ E] Hsub k b Hk.
+  rewrite (E k (Hdisj k (Hkeys k b Hk))). exact (Hsub k b Hk).
+Qed.

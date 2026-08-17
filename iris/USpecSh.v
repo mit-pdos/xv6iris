@@ -94,6 +94,13 @@ Definition sh_execs_echo `{!riscvGS Σ}
     (path : list (bv 8)) (args : list (list (bv 8))) : iProp Σ :=
   (⌜path = sh_echo_path /\ args = sh_echo_argv⌝)%I.
 
+(* THE premise four contracts were missing.  [uv_stack] only guarantees
+   [4096 <= uint sp0 - n], but sh's text keys run to 8192 and its heap sits
+   above the data page, so a prologue spill could land on the image and no
+   [ui_sh_*] fact would survive it.  Stated once, threaded everywhere. *)
+Definition sh_frame_ok (hbase hlen : Z) (sp0 : mword 64) (n : Z) : Prop :=
+  hbase + hlen <= uint sp0 - n.
+
 Section USpecSh.
   Context `{!riscvGS Σ} `{!uioG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -103,6 +110,15 @@ Section USpecSh.
 
   Local Notation Psh := (xv6_io_protocol C pt gin gbrk hbase hlen Q).
   Local Notation UVG m M := (uv_cap_gpr C pt Psh M m).
+
+  Definition sh_zeroed (M : gmap Z (bv 8)) (a lo hi : Z) : Prop :=
+    forall j : Z, lo <= j < hi -> M !! (a + j) = Some ubyte0.
+
+  (* [n] copies of one byte at [a] -- memset's result.  Named, because an
+     inline [forall] inside [⌜ ⌝] parses in the bi scope and fails with an
+     unrelated "expected to have type Type". *)
+  Definition sh_filled (M : gmap Z (bv 8)) (a n : Z) (c : bv 8) : Prop :=
+    forall j : Z, 0 <= j < n -> M !! (a + j) = Some c.
 
   (* ------------------------------------------------------------------- *)
   (* §1 THE SYSCALL STUBS.                                                 *)
@@ -200,7 +216,10 @@ Section USpecSh.
       (str : list (bv 8)) :=
     forall (Hpre : StubPre M m)
       (Hbuf : uv_wr pt M (uint (m !!! Regidx a1_idx))
-                         (uint (m !!! Regidx a2_idx))),
+                         (uint (m !!! Regidx a2_idx)))
+      (* the buffer must miss the text, else the [ret] the stub returns to
+         has no [uinstr] fact in the image [read] hands back *)
+      (Hbufhi : 8192 <= uint (m !!! Regidx a1_idx)),
     UVG m M -∗
     ustdin gin str -∗
     pc_is (mword_of_int ShSyms.read) -∗
@@ -240,15 +259,20 @@ Section USpecSh.
       (Hst : uv_stack pt M sp0 16)
       (Hrange : hbase <= b /\ 0 <= sint (m !!! Regidx a0_idx) /\
                 b + sint (m !!! Regidx a0_idx) <= hbase + hlen)
+      (Hfr : sh_frame_ok hbase hlen sp0 16)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     ubrk gbrk b -∗
     pc_is (mword_of_int ShSyms.sbrk) -∗
     (∀ CID : CpuId, ∀ (m' : regfile) (M' M'' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
+       (* what sbrk RETURNS -- the old break.  [morecore] needs exactly this. *)
        ⌜m' !!! Regidx a0_idx = (mword_of_int b : mword 64)⌝ -∗
-       ⌜uM_grown M M' b (sint (m !!! Regidx a0_idx))⌝ -∗
-       ⌜uM_only M' M'' (uint sp0 - 16) 16⌝ -∗
+       (* the code carves its frame FIRST and calls sbrk second; stating it
+          the other way round forces the caller to build the intermediate
+          image by hand for no gain *)
+       ⌜uM_only M M' (uint sp0 - 16) 16⌝ -∗
+       ⌜uM_grown M' M'' b (sint (m !!! Regidx a0_idx))⌝ -∗
        ubrk gbrk (b + sint (m !!! Regidx a0_idx)) -∗
        UVG m' M'' -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -275,6 +299,7 @@ Section USpecSh.
       (Hrd : uv_rd pt M s (len + 1))
       (Hlen : 0 <= len < 2 ^ 31)
       (Habove : uint sp0 <= s \/ s + len + 1 <= uint sp0 - 16)
+      (Hfr : sh_frame_ok hbase hlen sp0 16)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.strlen) -∗
@@ -306,6 +331,7 @@ Section USpecSh.
       (Hstr : ustr_at M s bs)
       (Hrd : uv_rd pt M s (Z.of_nat (length bs) + 1))
       (Habove : uint sp0 <= s \/ s + Z.of_nat (length bs) + 1 <= uint sp0 - 16)
+      (Hfr : sh_frame_ok hbase hlen sp0 16)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.strchr) -∗
@@ -336,6 +362,11 @@ Section USpecSh.
       (Hn : m !!! Regidx a2_idx = (mword_of_int n : mword 64))
       (Hnr : 0 <= n < 2 ^ 31)
       (Hwr : uv_wr pt M dst n)
+      (Hfr : sh_frame_ok hbase hlen sp0 16)
+      (* the destination must miss the program image: [uleaf_ok] is
+         "permitted", so a store-permitting leaf and a fetch-permitting one
+         are jointly satisfiable and nothing else excludes dst = 0 *)
+      (Hdsthi : 8192 <= dst)
       (Habove : uint sp0 <= dst \/ dst + n <= uint sp0 - 16)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
@@ -343,8 +374,13 @@ Section USpecSh.
     (∀ CID : CpuId, ∀ (m' : regfile) (M' : gmap Z (bv 8)),
        ⌜ucallee_saved m m'⌝ -∗
        ⌜m' !!! Regidx a0_idx = (mword_of_int dst : mword 64)⌝ -∗
-       ⌜uM_written M M' dst (replicate (Z.to_nat n) c)⌝ -∗
-       ⌜uM_only M M' (uint sp0 - 16) 16 \/ True⌝ -∗
+       (* the destination now reads [c] ... *)
+       ⌜sh_filled M' dst n c⌝ -∗
+       (* ... and NOTHING outside the destination and memset's own frame
+          moved.  Stating only the destination would be wrong, not weak:
+          the prologue spills ra and s0 into the frame and never restores
+          those bytes. *)
+       ⌜uM_only_in M M' [(dst, n); (uint sp0 - 16, 16)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -386,7 +422,8 @@ Section USpecSh.
       (Hst : uv_stack pt M sp0 16)
       (Hap : m !!! Regidx a0_idx = (mword_of_int (bp + 16) : mword 64))
       (Hbp : bp = hbase)
-      (Hnu : 0 < nu /\ bp + 16 * nu <= hbase + hlen)
+      (* [free] reads bp->s.size with a SIGNED 4-byte [lw] *)
+      (Hnu : 0 < nu < 2 ^ 31 /\ bp + 16 * nu <= hbase + hlen)
       (* freep = &base, base.s.ptr = &base, base.s.size = 0 *)
       (Hfreep : uM_bytes M SH_FREEP 8 (mword_of_int SH_BASE : mword 64))
       (Hbaseptr : uM_bytes M SH_BASE 8 (mword_of_int SH_BASE : mword 64))
@@ -395,6 +432,7 @@ Section USpecSh.
       (Hbpsz : uM_bytes M (bp + 8) 8 (mword_of_int nu : mword 64))
       (Hheapw : uv_wr pt M bp (16 * nu))
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
+      (Hfr : sh_frame_ok hbase hlen sp0 16)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     pc_is (mword_of_int ShSyms.free) -∗
@@ -405,7 +443,7 @@ Section USpecSh.
        ⌜uM_bytes M' bp 8 (mword_of_int SH_BASE : mword 64)⌝ -∗
        ⌜uM_bytes M' (bp + 8) 8 (mword_of_int nu : mword 64)⌝ -∗
        ⌜uM_bytes M' SH_FREEP 8 (mword_of_int SH_BASE : mword 64)⌝ -∗
-       ⌜uM_only M M' (uint sp0 - 16) 16 \/ True⌝ -∗
+       ⌜uM_only_in M M' [(uint sp0 - 16, 16); (SH_FREEP, 8); (SH_BASE, 16); (bp, 16)]⌝ -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
        WP (Loop : expr riscv_lang)) -∗
@@ -422,7 +460,7 @@ Section USpecSh.
       (Hnr : 0 < nbytes /\ 16 * sh_nunits nbytes <= 65536)
       (Hfreep0 : uM_bytes M SH_FREEP 8 (mword_of_int 0 : mword 64))
       (Hbssw : uv_wr pt M SH_FREEP 0x88)
-      (Hbrk : True)
+      (Hfr : sh_frame_ok hbase hlen sp0 96)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
     UVG m M -∗
     ubrk gbrk hbase -∗
@@ -435,7 +473,8 @@ Section USpecSh.
        (* the returned block is writable and disjoint from image and stack *)
        ⌜uv_wr pt M' (hbase + 65536 - 16 * (sh_nunits nbytes - 1))
                     (16 * (sh_nunits nbytes - 1))⌝ -∗
-       ⌜uM_only M M' hbase 65536 \/ True⌝ -∗
+       ⌜uM_only_in M M' [(hbase, 65536); (SH_FREEP, 8); (SH_BASE, 16);
+                         (uint sp0 - 96, 96)]⌝ -∗
        ubrk gbrk (hbase + 65536) -∗
        UVG m' M' -∗
        pc_is (m !!! Regidx ra_idx) -∗
@@ -448,8 +487,6 @@ Section USpecSh.
   (* a zero-filled byte range, as a named Prop: an inline [forall] inside
      [⌜ ⌝] parses in the bi scope and fails with an unrelated "expected to
      have type Type" *)
-  Definition sh_zeroed (M : gmap Z (bv 8)) (a lo hi : Z) : Prop :=
-    forall j : Z, lo <= j < hi -> M !! (a + j) = Some ubyte0.
 
   Definition wp_sh_execcmd_body (M : gmap Z (bv 8)) (m : regfile)
       (sp0 : mword 64) :=
