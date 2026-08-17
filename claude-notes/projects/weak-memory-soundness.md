@@ -64,30 +64,28 @@ arity (mechanical), the PLIC hart index (trivial) and THE DISK'S DMA READ.
   wp_init …` at a fresh era.
 - **B4** the capstone STATED with the burst arm as its single open case.
 
-## Phase C — M5 device views (design by the orchestrator, then subagents)
+## Phase C — M5: the disk as a weak-memory AGENT (design: `design/weak-memory-m5.md`)
 
-Sketch (to be written out as `design/weak-memory-m5.md` before building):
-- The disk's DMA reads become ORDINARY view-based reads at the disk agent's
-  own `wstate` (`EDisk` already carries `dws`): the virtio request
-  processing is rewritten as a small READ MONAD program (`DM`: `Read pa n k`
-  / `Ret`), run node by node in the language exactly like a hart's Sail
-  monad — one `PFLoad`-shaped event per `Read`, commit at `Ret`.  Footprint
-  = the read trace; no multi-address label, no `lat` read anywhere.  The SC
-  tree keeps `virtio_req_step`; a lemma equates the two over a flat memory.
-- The fabric carries a VIEW for the virtio window: a hart's MMIO write
-  publishes its store floor (`w_vwNew`), the disk's burst start acquires
-  it (and symmetrically the disk publishes at completion, hart MMIO reads
-  acquire).  Layer 1: `wpcfg` gains a machine-owned `pc_fv`, two label
-  constructors (`LDevW`/`LDevR`) with view arms; the replay retimes `pc_fv`
-  by π like every view; the `gdev` chain already orders these events.
-- **DEVIATION from Decision 6's "strict I/O bits", recorded:** the
-  generated Sail model DROPS the FENCE I/O bits (`execute_FENCE` looks only
-  at bits 1:0 — `fence iorw,iorw` arrives as `Barrier_RISCV_rw_rw`, and a
-  bare `fence w,o` is NO barrier), so a strict model needs a Sail-fork
-  regeneration.  Phase C models MMIO accesses as ordered by FENCE's MEMORY
-  bits (the QEMU/typical-interconnect behavior; the driver's `iorw,iorw`
-  sites prove identically) and records this as a model assumption in the
-  same slot as no-icache, with the regeneration as the upgrade path.
+DECIDED 2026-08-17 (the orchestrator's design; the "fabric view" sketch of
+this file's first draft is WITHDRAWN — no fabric view, no view-carrying
+label, no replay change): the virtio device becomes a small PROGRAM in a
+read/write/fence monad (`VirtioModel.DM`, `virtio_prog`) that acquire-loads
+`avail->idx`, plain-loads the ring/descriptors/header/buffer at the acquired
+view, stores the completion, FENCES, stores `used->idx` — one event per
+node at the disk agent's own `dws`, with the hart's labels.  Driver/device
+synchronization is message passing through the rings (the virtio spec's own
+barrier protocol); QUEUE_NOTIFY/ISR are hints (the device polls — a
+superset).  Layer 1's ONLY change is the fabric-marker label `LDev`.  The
+FENCE I/O-bit issue (Sail drops the bits) is MOOT for safety under this
+model; recorded as assumption 3 of the design.
+- **C1** `VirtioModel`: `DM`, `dres`, `virtio_prog`, and the equivalence
+  lemma with `virtio_req_step`/`virtio_stalled` over a flat `mv`.
+- **C2** `WeakEvLang`: `EDisk gen (dp : option (DM dres)) dws`; the arms of
+  the design; `wflat`/`wdisk_step`/`pend` leave the event language.
+- **C3** `WeakEvInst`/`WeakEvPf`: the disk arms as `PFLoad`/`PFStore`/
+  `PFFence`/`PFSilent(LDev)`; ⇒ holds for the disk; the capstone closes.
+- **C4** (later, M4-port track): per-node EWP rules for the disk thread; the
+  driver proof that `DWild` is unreachable.
 
 ## After the capstone
 
