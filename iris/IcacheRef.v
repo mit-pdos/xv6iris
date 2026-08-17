@@ -78,7 +78,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers agree csum excl updates local_updates.
 From iris.algebra.lib Require Import dfrac_agree.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat.
+From iris.base_logic.lib Require Import gen_heap invariants own ghost_var mono_nat ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
@@ -408,10 +408,14 @@ Class icacheG (Σ : gFunctors) := IcacheG {
      ([SpecIget]), and every one of those files already carries
      [icacheG]. *)
   icache_linkG :: inG Σ linkUR;
+  (* OPTION A escrow: the redemption ticket and the per-inum name registry. *)
+  icache_tickG :: inG Σ (exclR unitO);
+  icache_regG :: ghost_mapG Σ Z (gname * gname)%type;
 }.
 Definition icacheΣ : gFunctors :=
   #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32);
-    GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR].
+    GFunctor iliveUR; ghost_varΣ ic_dep; GFunctor ityR; GFunctor linkUR;
+    GFunctor (exclR unitO); ghost_mapΣ Z (gname * gname)%type].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
@@ -496,6 +500,12 @@ Class icfg := MkIcfg {
      whoever proves forkret's first branch (see SpecForkret's [first_addr]
      IOU). *)
   icfg_boot : gname;
+  (* OPTION A (reordered iput): the per-inum escrow-name REGISTRY's gname.
+     Ambient for [icfg_iref]'s reason -- [region_pending] parks a half in
+     [ireg_slot] and the other in [ipool_shape]'s pending arm, so a threaded
+     name would enter every fs contract.  Registers every inum: the full
+     element refutes the pending arm at [ireg_claim_au] by fraction overflow. *)
+  icfg_reg : gname;
 }.
 
 (* the pool at BOOT: one whole unit at each of the fifty slots, as ONE map,
@@ -617,7 +627,13 @@ Lemma icfg_alloc {Σ} `{!riscvGS Σ, !icacheG Σ, !lockG Σ} (dv : mword 32) (ni
       ([∗ list] k ∈ seq 0 (16 * nib),
          mono_nat_auth_own (icfg_iep (Z.of_nat k)) 1 0) ∗
       ([∗ list] k ∈ seq 0 NINODE,
-         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None).
+         sl_free_tok (icfg_isl k) ∗ slh_auth (icfg_isl k) None) ∗
+      (* OPTION A (option 1, in-body registry): the escrow registry's auth,
+         handed out EMPTY.  [ireg_alloc] populates it over every inum (dummy
+         escrow gnames; the reordered-iput walk re-mints real ones at deposit)
+         and parks the whole thing inside [ireg_body], where [reg_full]
+         refutes [ireg_claim_au]'s pending arm with no premise. *)
+      ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname)).
 Proof.
   intros HLM.
   iMod (iep_fun_alloc (16 * nib) 0) as (fep) "Hep".
@@ -632,8 +648,14 @@ Proof.
   iMod (own_alloc (live_boot_map g0)) as (γl) "Hl".
   { apply live_boot_map_valid. }
   iMod (own_alloc LM) as (γlk) "Hlk"; [exact HLM |].
-  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0), g0.
-  cbn [icfg_iep icfg_isl icfg_boot]. by iFrame "Ha Hl Hlk Hep Hisl Hboot".
+  (* OPTION A escrow registry gname: minted here for the ambient [icfg_reg].
+     Its auth is affinely dropped at this bupd altitude; the reordered-iput
+     boot fupd re-mints it registered over every inum and parks it in
+     [ireg_body] (where [reg_full] refutes the pending arm). *)
+  iMod (ghost_map_alloc (∅ : gmap Z (gname * gname))) as (γreg) "[Hreg _]".
+  iModIntro. iExists (MkIcfg γ dv nib γl γlk γlog ist fep fisl g0 γreg), g0.
+  cbn [icfg_iep icfg_isl icfg_boot icfg_reg].
+  by iFrame "Ha Hl Hlk Hep Hisl Hboot Hreg".
 Qed.
 
 (* ===================================================================== *)

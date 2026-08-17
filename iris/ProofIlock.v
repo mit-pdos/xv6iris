@@ -1079,8 +1079,11 @@ Section IlockLoad.
                     ind_res gfs bm ∗ inode_blocks gfs bm data))
                 ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
       with "[Hpool HL]" as ">[HL Hrest]".
-    { rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | [Hmk | Hoff]]";
-        last (iApply (InodeRegion.offlock_enabled_absurd with "Hoff")).
+    { (* OPTION A (b)(ii): redeem any pending entry to [imark] pool-locally,
+         then the fill sees the Timeless 2-arm shape. *)
+      iMod (ipool_shape_to_np ⊤ gfs gi cov logstart inum ltac:(solve_ndisj)
+              with "Hpool") as "Hpool".
+      rewrite /ipool_shape_np. iDestruct "Hpool" as "[Hal | Hmk]".
       - iDestruct "Hal" as (dn0 bm0 data0)
           "(%Hok0 & %Hdok0 & %Hddix0 & %Hdoc0 & %Hduq0 & Hdlk0 & Hdn & Hind & Hblk)".
         iMod (ireg_read ⊤ gi gfs inodestart nib inum dn0

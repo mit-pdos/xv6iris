@@ -166,6 +166,8 @@ Require Import FsTree.        (* [dir_uniq] -- the name-uniqueness payload claus
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.
+Require Import EscrowDefs.
+Require Import EscrowInode.   (* OPTION A: pool_pending, reg_full *)
 Require Import IrefSlots.
 Require Import IcacheInv.
 From Kernel Require KernelSyms.
@@ -470,22 +472,51 @@ Section IcacheEscrow.
        ind_res γfs bm0 ∗
        inode_blocks γfs bm0 data0)%I.
 
+  (* OPTION A: the NON-PENDING (Timeless) pool shape -- the ORIGINAL two-arm
+     shape, unchanged.  It is what the escrow's parked bundle [ic_unloaded]
+     carries, so the escrow (and the whole loaded/unloaded/evict/fill/recycle
+     lifecycle) is untouched.  [reg_full] does NOT ride here: it lives in the
+     [regN] invariant, borrowed by [ireg_claim_au]'s callers. *)
+  Definition ipool_shape_np (γfs : fs_names) (γi : gname) (cov : gset Z)
+      (logstart : Z) (inum : mword 32) : iProp Σ :=
+    (ipool_alloc γfs γi cov logstart inum ∨ imark γi (bv_unsigned inum))%I.
+
+  (* the PENDING-capable pool shape -- lives ONLY at the itable free pool,
+     which is LOCK-HELD (never [iInv .. as ">"], verified), so the non-Timeless
+     [pool_pending] (an [esc_inv]) is fine here.  A pending entry has disk
+     type=0 and is provably never filled ([ireg_withdraw] needs type<>0), hence
+     never enters the escrow's [ipool_shape_np] side. *)
   Definition ipool_shape (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) : iProp Σ :=
-    (ipool_alloc γfs γi cov logstart inum ∨ imark γi (bv_unsigned inum)
-     (* OPTION A, STAGE 1b: the PENDING-FREE pool arm -- an entry whose region
-        record was cleared off-lock but whose imark is still escrowed.  Dead in
-        the current binary ([offlock_enabled] is [False]); Stage 3 replaces it
-        with the escrow (esc_inv + redemption ticket) the redeemer consumes. *)
-     ∨ InodeRegion.offlock_enabled)%I.
+    (ipool_shape_np γfs γi cov logstart inum
+     ∨ pool_pending γi (bv_unsigned inum))%I.
+
+  (* OPTION A (b)(ii): turn a pending-CAPABLE pool shape into the Timeless
+     [ipool_shape_np] the escrow's unloaded arm needs, REDEEMING a genuine
+     pending entry to its [imark] pool-locally.  This is what lets the iget
+     recycle and the ilock fill convert [ipool_acc]'s full shape without the
+     region invariant.  Walk-stable: it discharges real deposits, not just the
+     flip-gate's empty pool. *)
+  Lemma ipool_shape_to_np E γfs γi cov logstart (inum : mword 32) :
+    ↑escAN (bv_unsigned inum) ⊆ E ->
+    ipool_shape γfs γi cov logstart inum ={E}=∗
+    ipool_shape_np γfs γi cov logstart inum.
+  Proof.
+    iIntros (HE) "H". rewrite /ipool_shape. iDestruct "H" as "[Hnp | Hpp]".
+    - by iModIntro.
+    - iDestruct "Hpp" as (ge gr) "(#Hesc & #Hcom & Htk)".
+      iMod (escA_redeem E ge gr γi (bv_unsigned inum) HE with "Hesc Htk Hcom")
+        as "Hmk".
+      iModIntro. rewrite /ipool_shape_np. iRight. iExact "Hmk".
+  Qed.
 
   Global Instance ipool_alloc_timeless γfs γi cov logstart inum :
     Timeless (ipool_alloc γfs γi cov logstart inum).
   Proof. rewrite /ipool_alloc. apply _. Qed.
 
-  Global Instance ipool_shape_timeless γfs γi cov logstart inum :
-    Timeless (ipool_shape γfs γi cov logstart inum).
-  Proof. rewrite /ipool_shape. apply _. Qed.
+  Global Instance ipool_shape_np_timeless γfs γi cov logstart inum :
+    Timeless (ipool_shape_np γfs γi cov logstart inum).
+  Proof. rewrite /ipool_shape_np. apply _. Qed.
 
   (* A LOADED entry's parked content: the in-memory record [dn] in the five
      metadata cells and the block map in the thirteen addrs cells, with the
@@ -552,7 +583,7 @@ Section IcacheEscrow.
      WHOEVER wins the sleeplock race finds what the fill needs. *)
   Definition ic_unloaded (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (k : nat) (inum : mword 32) : iProp Σ :=
-    (inode_raw (ientry k) ∗ ipool_shape γfs γi cov logstart inum)%I.
+    (inode_raw (ientry k) ∗ ipool_shape_np γfs γi cov logstart inum)%I.
 
   Global Instance ic_loaded_timeless γfs γi cov logstart k inum dn bm :
     Timeless (ic_loaded γfs γi cov logstart k inum dn bm).
@@ -1032,7 +1063,7 @@ Section IcacheEscrow.
 
   Lemma ic_mk_unloaded γfs γi cov logstart k (inum : mword 32) :
     inode_raw (ientry k) -∗
-    ipool_shape γfs γi cov logstart inum -∗
+    ipool_shape_np γfs γi cov logstart inum -∗
     ic_unloaded γfs γi cov logstart k inum.
   Proof.
     iIntros "Hr Hp". rewrite /ic_unloaded.
@@ -1476,7 +1507,9 @@ Section IcacheEscrow.
        (7)): an evicted slot leaves [M], its whole unit goes back to the free
        arm, and the next recycle bumps again -- so a free slot carries no
        obligation and dropping the token is exactly right. *)
-    { destruct v; [| iDestruct "Hpay" as "[Hpu _]"; iExact "Hpu" ].
+    { destruct v;
+        [| iDestruct "Hpay" as "[[Hr Hp] _]"; iFrame "Hr";
+           rewrite /ipool_shape; iLeft; iExact "Hp" ].
       iDestruct "Hpay" as (dn bm) "[Hlk _]".
       iDestruct "Hlk" as (data)
         "(%Hok & %Hdok & %Hddix & %Hdoc & %Hduq & Hdlk & Hdat & Hmeta & Haddrs & Hind &
@@ -1489,7 +1522,7 @@ Section IcacheEscrow.
       { rewrite /inode_raw. iSplitL "Hmeta"; [by iExists dn |].
         iExists (bm_cells bm). iSplitR; [iPureIntro; exact Hcelllen |].
         iExact "Haddrs". }
-      rewrite /ipool_shape /ipool_alloc. iLeft. iExists dn, bm, data.
+      rewrite /ipool_shape /ipool_shape_np /ipool_alloc. iLeft. iLeft. iExists dn, bm, data.
       iSplitR; [iPureIntro; exact Hok |].
       iSplitR; [iPureIntro; exact Hdok |].
       (* the eviction moves no byte and no field: the clause goes back to the
@@ -2001,9 +2034,9 @@ Section IcacheEscrow.
     iIntros "H". iFrame.
   Qed.
 
-  Global Instance ipool_timeless γfs γi cov logstart P :
-    Timeless (ipool γfs γi cov logstart P).
-  Proof. rewrite /ipool. apply _. Qed.
+  (* [ipool] is NO LONGER Timeless (its pending arm holds an [esc_inv]); the
+     instance was unused (verified) and is removed.  The itable free pool is
+     lock-held, never [iInv .. as ">"], so Timelessness is not needed there. *)
 
   (* ------------------------------------------------------------------ *)
   (*  6.  THE itable LOCK'S RESOURCE, v2                                 *)

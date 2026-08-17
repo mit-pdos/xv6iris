@@ -1,0 +1,130 @@
+(* ============================================================================
+   OPTION A (reordered iput) -- the imark-FREE escrow tokens, keyed on the
+   ambient registry gname [icfg_reg].  Below InodeRegion so [ireg_slot]'s
+   pending arm can carry [region_pending].  Ported from the validated
+   EscrowRegionA.v de-risk; the escrow BODY (which mentions [imark]) lives in
+   EscrowInode.v, above InodeRegion.
+   ========================================================================== *)
+
+From Stdlib Require Import ZArith Lia.
+From stdpp Require Import gmap.
+From iris.algebra Require Import excl dfrac.
+From iris.proofmode Require Import proofmode.
+From iris.base_logic.lib Require Import ghost_map mono_nat own invariants.
+Require Import RiscvPtsto.
+Require Import IcacheRef.
+
+Notation ST_EMPTY := 0%nat.
+Notation ST_FILLED := 1%nat.
+Notation ST_REDEEMED := 2%nat.
+
+Section EscrowDefs.
+  Context `{!riscvGS Σ, !icacheG Σ}.
+  Context `{ICFG : icfg}.
+
+  (* the one-shot "deposit happened" flag (mono_natG is ambient from riscvGS) *)
+  Definition committedA (ge : gname) : iProp Σ := mono_nat_lb_own ge ST_FILLED.
+  Global Instance committedA_persistent ge : Persistent (committedA ge).
+  Proof. rewrite /committedA. apply _. Qed.
+  Global Instance committedA_timeless ge : Timeless (committedA ge).
+  Proof. rewrite /committedA. apply _. Qed.
+
+  (* the exclusive redemption ticket (icacheG's [icache_tickG]) *)
+  Definition redeem_ticketA (gr : gname) : iProp Σ := own gr (Excl ()).
+  Global Instance redeem_ticketA_timeless gr : Timeless (redeem_ticketA gr).
+  Proof. rewrite /redeem_ticketA. apply _. Qed.
+  Lemma redeem_ticketA_excl gr : redeem_ticketA gr -∗ redeem_ticketA gr -∗ False.
+  Proof.
+    rewrite /redeem_ticketA. iIntros "H1 H2".
+    iDestruct (own_valid_2 with "H1 H2") as %Hv.
+    exfalso. exact (exclusive_l (Excl ()) (Excl ()) Hv).
+  Qed.
+
+  (* the per-inum registry element (icacheG's [icache_regG], over [icfg_reg]).
+     A pending slot holds the HALF region-side; the pool's pending_free arm
+     holds the other half; a non-pending/boot-free inum's FULL element rides
+     the pool's imark/alloc arm, where it refutes the pending branch at
+     [ireg_claim_au] by fraction overflow. *)
+  Definition reg_half (z : Z) (ge gr : gname) : iProp Σ :=
+    (z ↪[icfg_reg]{# (1/2)} (ge, gr))%I.
+  Definition reg_full (z : Z) (ge gr : gname) : iProp Σ :=
+    (z ↪[icfg_reg] (ge, gr))%I.
+
+  Global Instance reg_half_timeless z ge gr : Timeless (reg_half z ge gr).
+  Proof. rewrite /reg_half. apply _. Qed.
+  Global Instance reg_full_timeless z ge gr : Timeless (reg_full z ge gr).
+  Proof. rewrite /reg_full. apply _. Qed.
+
+  (* two halves agree on the escrow name pair -- forces the redeemer's pool
+     ticket and the region's committed to name the SAME escrow *)
+  Lemma reg_half_agree z ge1 gr1 ge2 gr2 :
+    reg_half z ge1 gr1 -∗ reg_half z ge2 gr2 -∗ ⌜ge1 = ge2 /\ gr1 = gr2⌝.
+  Proof.
+    rewrite /reg_half. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_agree with "H1 H2") as %Heq.
+    iPureIntro. split; congruence.
+  Qed.
+
+  (* THE ireg_claim_au REFUTATION: a full element and any half of the SAME key
+     exceed fraction 1 -- impossible.  ialloc holds [reg_full z] for the inum
+     it claims (rijoined from the redeem, or read from the pool's imark arm for
+     a boot-free inum), so the pending arm's [reg_half] is refuted here. *)
+  Lemma reg_full_half_False z ge gr ge' gr' :
+    reg_full z ge gr -∗ reg_half z ge' gr' -∗ False.
+  Proof.
+    rewrite /reg_full /reg_half. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_valid_2 with "H1 H2") as %[Hv _].
+    exfalso. rewrite dfrac_op_own dfrac_valid_own in Hv.
+    exact (Qp.not_add_le_l 1 (1/2) Hv).
+  Qed.
+
+  Lemma reg_join z ge gr :
+    reg_half z ge gr -∗ reg_half z ge gr -∗ reg_full z ge gr.
+  Proof.
+    rewrite /reg_full /reg_half. iIntros "H1 H2".
+    iDestruct (ghost_map_elem_combine with "H1 H2") as "[H _]".
+    rewrite dfrac_op_own Qp.div_2. iExact "H".
+  Qed.
+
+  (* the region-side pending payload: reg_half (½ of the registry element) +
+     committed (persistent).  [esc_inv] (not Timeless) rides the POOL side, so
+     this stays Timeless and [ireg_body]'s [iInv .. as ">"] is unaffected. *)
+  Definition region_pending (z : Z) : iProp Σ :=
+    (∃ ge gr, reg_half z ge gr ∗ committedA ge)%I.
+  Global Instance region_pending_timeless z : Timeless (region_pending z).
+  Proof. rewrite /region_pending. apply _. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE REGISTRY INVARIANT (option 1's [reg_full] home)                 *)
+  (* ------------------------------------------------------------------ *)
+  (* Holds the whole [icfg_reg] auth and every region inum's [reg_full].
+     Timeless body ([ghost_map_auth] + [reg_full] are Timeless), so it opens
+     with [>].  Boot registers every inum; the pure clause is what lets
+     [ireg_claim_au]'s pending branch find [reg_full inum].  At the flip-gate
+     the body is flat; the reordered walk evolves it to a per-inum
+     [reg_full ∨ pending-split] (walk-plan item). *)
+  Definition regN : namespace := nroot .@ "iregreg".
+  Definition ireg_reg_body (nib : nat) : iProp Σ :=
+    (∃ m : gmap Z (gname * gname),
+       ⌜∀ z : Z, (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (m !! z)⌝ ∗
+       ghost_map_auth icfg_reg 1 m ∗
+       ([∗ map] z ↦ p ∈ m, reg_full z (fst p) (snd p)))%I.
+  Definition ireg_reg_inv (nib : nat) : iProp Σ := inv regN (ireg_reg_body nib).
+  Global Instance ireg_reg_inv_persistent nib : Persistent (ireg_reg_inv nib).
+  Proof. rewrite /ireg_reg_inv. apply _. Qed.
+
+  (* the pending branch's one-liner: [reg_full inum] (from the registry) and the
+     pending arm's [reg_half inum] exceed fraction 1 -- impossible.  Proves any
+     goal.  The registry is left open in this (dead) branch, which is sound. *)
+  Lemma reg_pending_absurd E (z : Z) (nib : nat) (ge gr : gname) (P : iProp Σ) :
+    ↑regN ⊆ E → (0 <= z < 16 * Z.of_nat nib)%Z →
+    ireg_reg_inv nib -∗ reg_half z ge gr ={E}=∗ P.
+  Proof.
+    iIntros (HE Hz) "#Hinv Hrh".
+    iInv "Hinv" as ">(%m & %Hcov & Hauth & Hfulls)" "Hcl".
+    destruct (Hcov z Hz) as [[ge0 gr0] Hp].
+    iDestruct (big_sepM_lookup_acc _ _ _ _ Hp with "Hfulls") as "[Hrf _]".
+    iDestruct (reg_full_half_False with "Hrf Hrh") as "[]".
+  Qed.
+
+End EscrowDefs.

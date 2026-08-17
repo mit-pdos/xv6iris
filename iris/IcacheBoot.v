@@ -538,6 +538,21 @@ Section IcacheBootRegion.
     forall z : Z, z ∈ region_inums nib -> z = ireg_root ->
       1 <= bv_unsigned (di_nlink (image_dinode dss z)).
 
+  (* OPTION A: the boot registry map.  Every inum maps to a DUMMY escrow gname
+     pair -- at boot no inum is in escrow, and [ireg_claim_au]'s pending-arm
+     refutation is value-agnostic (it collides fractions, not gnames).  The
+     reordered-iput walk re-mints real (committedA, redeem) gnames and updates
+     this map's entry when it actually deposits. *)
+  Definition dummy_reg (nib : nat) : gmap Z (gname * gname) :=
+    gset_to_gmap (1%positive, 1%positive) (region_inums nib).
+
+  Lemma dummy_reg_cov (nib : nat) (z : Z) :
+    (0 <= z < 16 * Z.of_nat nib)%Z -> is_Some (dummy_reg nib !! z).
+  Proof.
+    intros Hz. rewrite /dummy_reg. eexists.
+    apply lookup_gset_to_gmap_Some. split; [apply region_inums_spec; lia | reflexivity].
+  Qed.
+
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
@@ -569,7 +584,10 @@ Section IcacheBootRegion.
        fsblock γfs (inodestart + Z.of_nat bi) (bss bi)) -∗
     (* the boot-shelter token rides through, from [icfg_alloc] to fsinit
        (fs-fragments.md §7.12) -- carried, never consumed here *)
-    ireg_boot
+    ireg_boot -∗
+    (* OPTION A: the escrow registry's EMPTY auth ([icfg_alloc]'s new hand-out);
+       populated here over every inum and parked inside [ireg_body]. *)
+    ghost_map_auth icfg_reg 1 (∅ : gmap Z (gname * gname))
     ={E}=∗ ∃ (γi : gname) (dss : list (list dinode)),
       ⌜length dss = nib⌝ ∗ ⌜Forall diblk_wf dss⌝ ∗
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
@@ -581,7 +599,14 @@ Section IcacheBootRegion.
     intros Hnib Hlen Himg.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     destruct (Himg dss Hl Hwf He) as (Hl3 & Hl4 & Hrt0).
-    iIntros "Hlk Hepa Hblks Hboot".
+    iIntros "Hlk Hepa Hblks Hboot Hrauth".
+    (* OPTION A: bulk-register every inum with a dummy escrow gname pair, then
+       wrap as [ireg_registry] for the region body. *)
+    iMod (ghost_map_insert_big (dummy_reg nib) with "Hrauth") as "[Hrauth Hfulls]".
+    { apply map_disjoint_empty_r. }
+    rewrite right_id_L.
+    iDestruct (ireg_registry_from_map (dummy_reg nib) nib (dummy_reg_cov nib)
+                with "Hrauth Hfulls") as "Hreg".
     iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
     iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
       [apply ireg_M0_MK_disj |].
@@ -633,8 +658,8 @@ Section IcacheBootRegion.
     iDestruct "Hall" as "[Hslots Hout]".
     iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
     iAssert (ireg_body γi γfs inodestart nib)%I
-      with "[Ha Hblks Hslots]" as "Hbody".
-    { iExists (ireg_M0 dss nib ∪ ireg_MK nib). iFrame "Ha".
+      with "[Ha Hblks Hslots Hreg]" as "Hbody".
+    { iExists (ireg_M0 dss nib ∪ ireg_MK nib). iFrame "Ha Hreg".
       iDestruct (big_sepL_sep_2 with "Hblks Hslots") as "H".
       iApply (big_sepL_mono with "H").
       intros idx bi Hbi. apply lookup_seq in Hbi as [-> Hidx].
@@ -673,7 +698,7 @@ Section IcacheBootPool.
   Lemma ipool_shape_free (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (inum : mword 32) :
     imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
-  Proof. iIntros "Hmk". rewrite /ipool_shape. iRight. iLeft. iExact "Hmk". Qed.
+  Proof. iIntros "Hmk". rewrite /ipool_shape /ipool_shape_np. iLeft. iRight. iExact "Hmk". Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
      image-wf family for exactly the reason [inode_ok] did: it is a fact
@@ -709,7 +734,7 @@ Section IcacheBootPool.
     ipool_shape γfs γi cov logstart inum.
   Proof.
     iIntros (Hok Hdok Hddix Hdoc Hduq) "Hdlk Hdn Hind Hblk".
-    rewrite /ipool_shape. iLeft.
+    rewrite /ipool_shape /ipool_shape_np. iLeft. iLeft.
     iExists dn, bm, data.
     iSplitR; [iPureIntro; exact Hok |].
     iSplitR; [iPureIntro; exact Hdok |].

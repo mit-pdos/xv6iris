@@ -348,6 +348,7 @@ WpLock.v
 ArrCursor.v
 FdSlots.v
 IcacheRef.v
+EscrowDefs.v
 FileInvDefs.v
 FileInv.v
 FileOff.v
@@ -927,6 +928,7 @@ IcacheInv.v
 InodeRef.v
 InodeLock.v
 InodeRegion.v
+EscrowInode.v
 FsRep.v
 IregLinkNz.v
 IgetLic.v

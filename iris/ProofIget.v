@@ -1300,6 +1300,11 @@ Section ProofIget.
               iModIntro. iExists inumT. iFrame "Hincell". iIntros "Hincell".
               iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
+              (* OPTION A (b)(ii): redeem a genuine pending entry to [imark]
+                 pool-locally, converting the full pool shape to the [np] the
+                 escrow's unloaded arm needs -- no [ireg_inv]. *)
+              iMod (ipool_shape_to_np (⊤ ∖ ↑minstretN ∖ ↑icEscN) γfs γi cov logstart
+                      inum ltac:(solve_ndisj) with "Hbundle") as "Hbundle".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1]") as "_".
               { iApply bi.later_intro. iApply ic_close_mid.
                 iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
