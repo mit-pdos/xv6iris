@@ -109,6 +109,29 @@ Proof.
   apply hfrun_ret.
 Qed.
 
+Lemma hfrun_write_CSR_mcounteren (D Drw : gset register) (rs : regstate)
+    (v : mword 64) :
+  (mcounteren : register) ∈ D -> (mcounteren : register) ∈ Drw ->
+  hfrun 8 D Drw rs (write_CSR csr_mcounteren v)
+  = Some (Values.Ok (zero_extend' 64
+                       (legalize_mcounteren (register_lookup mcounteren rs) v)),
+          register_set mcounteren
+            (legalize_mcounteren (register_lookup mcounteren rs) v) rs).
+Proof.
+  intros HD HW. unfold write_CSR. skip_csr_false_clauses.
+  cbn beta iota zeta delta [Defs.bind Defs.bind0 Interface.iMon_bind
+    Defs.read_reg Defs.write_reg Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+  cbn beta iota zeta delta [Defs.bind Defs.bind0 Interface.iMon_bind
+    Defs.write_reg Defs.read_reg Defs.returnm returnM].
+  rewrite hfrun_write (bool_decide_eq_true_2 _ HW).
+  cbn beta iota zeta delta [Defs.bind Interface.iMon_bind Defs.read_reg
+    Defs.returnm returnM].
+  rewrite hfrun_read (bool_decide_eq_true_2 _ HD).
+  rewrite register_lookup_set.
+  apply hfrun_ret.
+Qed.
+
 Lemma exec_csr_id_write_callback_medeleg (d : mword 64) s :
   exec (csr_id_write_callback csr_medeleg d) s = Some (tt, s).
 Proof.
@@ -973,63 +996,70 @@ Section WpCsrwGprNewA.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrs1) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
+    iIntros (Hpmp Hstat Hrs1) "Hmm Hpmpc Hpc Hf Hcsr Hinstr Hcont".
+    assert (Hfresh : cw_fresh mcounteren)
+      by (rewrite /cw_fresh; split_and!; vm_compute; reflexivity).
+    assert (Hchk : exec (check_CSR_result csr_mcounteren Machine CSRWrite) dstateM
+                   = Some (CSR_Check_OK tt, dstateM)).
+    { vm_compute; reflexivity. }
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iDestruct "Hmm_k" as "(#Hhw & #Hinv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
+    iDestruct "Hmm_k" as "(#Hhw & Hhs_k & Hpriv_k & Hmst_k)".
+    iDestruct (hw_config_cert with "Hhw") as "#Hcert".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & #Hsenv & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr pc false (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW)) pmpcfg0
-              Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    iDestruct (reg_valid_dq with "Hreg Hpriv_k") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa")   as %Lmisa.
-    iDestruct (reg_valid    with "Hreg Hcsr")     as %Lcsr.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfmap") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lrs1u.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfmap".
-    assert (Lprivp : register_lookup cur_privilege s_pc.(sregs) = Machine)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmisap : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    assert (Lcsrp : register_lookup mcounteren s_pc.(sregs) = mcounteren0)
-      by (unfold s_pc; tmig; exact Lcsr).
-    assert (Lrs1p : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                    = m !!! Regidx rs1).
-    { rewrite rf_lookup -Lrs1u.
-      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
-      reflexivity. }
-    iMod (reg_update _ mcounteren _ (legalize_mcounteren mcounteren0 (m !!! Regidx rs1))
-            with "Hreg Hcsr") as "[Hreg Hcsr]".
-    iModIntro.
-    iExists (set_reg s_pc mcounteren (legalize_mcounteren mcounteren0 (m !!! Regidx rs1))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      change (execute (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW)))
-        with (execute_CSRReg csr_mcounteren (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_mcounteren_full rs1 s_pc Hrs1 Lprivp
-                 ltac:(rewrite Lmisap; exact HmisaU)).
-      rewrite ?Lcsrp Lrs1p. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc mcounteren (legalize_mcounteren mcounteren0 (m !!! Regidx rs1))).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (mmode_config (DfracOwn (q/2)))%I
-      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hinv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k". iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
-    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
-    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
-    iApply ("Hcont" with "Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hfmap Hcsr").
+      "(#Hmisa & #Hmseccfg & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+        _ & %Hmisaval & %Hsecval & _)".
+    subst misa0 mseccfg0.
+    iApply (wp_instr pc (add_vec_int pc 4) false
+              (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW)) m m pmpcfg0
+              (mmode_config (DfracOwn (q/2)) ∗
+               pmpcfg_n ↦ᵣ{DfracOwn (q/2)} pmpcfg0 ∗
+               mcounteren ↦ᵣ legalize_mcounteren mcounteren0 (m !!! Regidx rs1))%I
+              Hpmp Hstat
+              with "Hmm_wp Hpmpc_wp Hpc Hf Hinstr
+                    [Hhs_k Hpriv_k Hmst_k Hpmpc_k Hcsr] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iDestruct (cw_frames_in (DfracOwn (q/2)) mcounteren mcounteren0 Hfresh
+                   with "Hcsr Hpriv_k Hmseccfg Hmisa") as "[Hrw Hro]".
+      iApply (swp_mono with "[HPC HnPC Hhs_k Hmst_k Hpmpc_k] [Hf Hrw Hro]");
+        [| iApply (swp_execute_CSRReg_csrw (cw_Drw mcounteren) cw_Dro
+                     (cw_Df (DfracOwn (q/2))) (cw_rs mcounteren mcounteren0) _ m
+                     csr_mcounteren rs1 _ (cw_disj mcounteren Hfresh)
+                     (cw_in_priv mcounteren) (cw_in_sec mcounteren)
+                     (cw_in_misa mcounteren)
+                     (cw_rs_priv mcounteren mcounteren0 Hfresh)
+                     (cw_rs_sec mcounteren mcounteren0 Hfresh)
+                     (cw_rs_misa mcounteren mcounteren0 Hfresh)
+                     ltac:(vm_compute; reflexivity)
+                     ltac:(vm_compute; reflexivity)
+                     Hchk
+                     ltac:(vm_compute; reflexivity)
+                     (hfrun_write_CSR_mcounteren (cw_Drw mcounteren ∪ cw_Dro)
+                        (cw_Drw mcounteren) (cw_rs mcounteren mcounteren0)
+                        (m !!! Regidx rs1) (cw_in_r mcounteren) (cw_w_r mcounteren))
+                     ltac:(vm_compute; reflexivity)
+                     with "Hcert Hf Hrw Hro") ].
+      iIntros (e) "(-> & Hf & Hrw & Hro)".
+      rewrite (cw_rs_r mcounteren mcounteren0).
+      iDestruct (cw_rw_ext mcounteren _ _
+                   (reg_agree_l _ _ _ _
+                      (cw_set_agree mcounteren mcounteren0 _ Hfresh))
+                   with "Hrw") as "Hrw".
+      iDestruct (cw_ro_ext (DfracOwn (q/2)) _ _
+                   (reg_agree_r _ _ _ _
+                      (cw_set_agree mcounteren mcounteren0 _ Hfresh))
+                   with "Hro") as "Hro".
+      iDestruct (cw_frames_out (DfracOwn (q/2)) mcounteren _ Hfresh
+                   with "[$Hrw $Hro]") as "(Hcsr & Hpriv_k & _ & _)".
+      iSplitR; [done|]. iFrame "Hf HPC HnPC".
+      iSplitL "Hhs_k Hpriv_k Hmst_k".
+      { iFrame "Hhw Hhs_k Hpriv_k Hmst_k". }
+      iFrame "Hpmpc_k Hcsr".
+    - iNext. iIntros "Hmm' Hpmpc' Hpc' Hf' (Hmm_k' & Hpmpc_k' & Hcsr')".
+      iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
+      iCombine "Hpmpc' Hpmpc_k'" as "Hpmpc''".
+      iApply ("Hcont" with "Hmm'' Hpmpc'' Hpc' Hf' Hcsr'").
   Qed.
 
   (* ---- menvcfg ---- *)
