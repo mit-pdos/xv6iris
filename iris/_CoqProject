@@ -1070,6 +1070,7 @@ WeakEvLang.v
 WeakEvPf.v
 WeakEvAdequacy.v
 WeakEvLift.v
+WeakEvDisk.v
 WeakEvStarted.v
 WeakEvInst.v
 WeakEvCapstone.v
