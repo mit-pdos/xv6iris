@@ -1,65 +1,65 @@
 Some high-level ideas that might be interesting for some eventual paper:
 
-- loop language, no real expr; WP has no postcondition Φ
++ loop language, no real expr; WP has no postcondition Φ
 - vcgen
 - predicates capturing config registers (mmode_config, smode_config)
-- ghost_var to track interesting config register bits (SIE)
++ ghost_var to track interesting config register bits (SIE)
 - instr predicate (instr memory points-to, abstract 2-byte vs 4-byte, decode)
 - tlb_inv
-- minstret_inv (invariant counting retired instructions in minstret register), clock_inv
++ minstret_inv (invariant counting retired instructions in minstret register), clock_inv
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
-- interrupt handling with a WP for the address in stvec (kernelvec)
-- intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
-- sie_inv owns free stack locations, requires sufficient depth for interrupt/kernelvec, gives more stack when interrupts disabled
-- swtch spec
-- acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
-- kalloc/kfree separation-logic-style specs
-- kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None (same for allocproc)
++ interrupt handling with a WP for the address in stvec (kernelvec)
++ intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
++ sie_inv owns free stack locations, requires sufficient depth for interrupt/kernelvec, gives more stack when interrupts disabled
++ swtch spec
++ acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
++ kalloc/kfree separation-logic-style specs
++ kalloc_avail tracks number of free pages, for early-boot tracking; then switches to None (same for allocproc)
 - re-proving across source code changes (symbolic names, generic decode Ltac, agent does gruntwork)
-- background agent does continuous performance optimizations
++ background agent does continuous performance optimizations
 - perf: concrete decode + equivalence to symbolic (WpDecodeBridge)
-- user-mode exec: predicate for all possible decode results (4-byte and 2-byte), then proof for every instruction in that predicate
-- shared CLAUDE.md memory in repo
++ user-mode exec: predicate for all possible decode results (4-byte and 2-byte), then proof for every instruction in that predicate
++ shared CLAUDE.md memory in repo
 - device model: DevLoop opcode, concurrent WP, shared access to CPU SEIP
-- UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write; should allow concurrent rx + tx
-- user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
-- start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
-- userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v); not needed during kvminithart because Bare has no TLB entries
++ UART ghost append-only log, includes FIFO (uartputc/uartwrite does not wait to flush), ownership proves no race between TX_IDLE check and THR write; should allow concurrent rx + tx
++ user-mode exec surprise: WRS.NTO instruction can put HART to sleep from user mode
++ start was not enabling ADUE; qemu happened to enable ADUE by default which isn't really correct
++ userret: tricky state at second sfence.vma: new page table but old TLB contents (TransPt.v); not needed during kvminithart because Bare has no TLB entries
 - kpt_regime: unified Bare + Sv39 page-table configurations
 - needed axioms about load_reservation and cancel_reservation, which aren't specified in Sail model
 - push_off returns intr_count counting token, which is needed to call pop_off to ensure no panic
-- use fable to state specs, opus to prove them
++ use fable to state specs, opus to prove them
 - kernel ptsto: PA own + VA map fact via kmap_at (code RX, data RW), monotonic for Bare-to-Sv39
 - page tables need to track kmap_at for intermediate PT pages, to reconstruct data ptsto
 - MMIO just needs mapping fact, no memory points-to (because it's not memory)
 - kvminithart: need strans_bit to track whether satp is currently Bare or Sv39
-- filedup ref overflow: track which [fd_slot] owns a reference; there can't be more than 2^31
-- cancellable lock invariant: pipe->lock needs to be cancelled when underlying pipe page is freed; pipe lock invariant conditional on holding a reference on pipe
-- gcc's 0x4fa4fa4fa4fa4fa5 optimization
-- printk spec: format string translates into precondition requirements on varargs
-- uartwrite needs to know the FIFO isn't full; uartintr guarantees this via is_txlock invariant
++ filedup ref overflow: track which [fd_slot] owns a reference; there can't be more than 2^31
++ cancellable lock invariant: pipe->lock needs to be cancelled when underlying pipe page is freed; pipe lock invariant conditional on holding a reference on pipe
++ gcc's 0x4fa4fa4fa4fa4fa5 optimization
++ printk spec: format string translates into precondition requirements on varargs
++ uartwrite needs to know the FIFO isn't full; uartintr guarantees this via is_txlock invariant
 - user PT coherence with p->sz: nothing mapped above p->sz (needed to prove growproc's uvmalloc doesn't panic)
 - some device invariant has to hold from power-up, not just after driver initialization, e.g., to conclude no stray DMA
-- sloppy UART ownership: printk can collide with uartwrite and cause FIFO overflow
-- swtch WP for a runnable proc must be for LoopE on any CPUID; not the "current" CPUID from ambient CpuId instance; this bubbles through the entire WP postcondition pattern
-- KPT shared across cores: concurrent updates to A/D bits, so PT must be owned by invariant
-- TLB invariant must allow for page table to be updated by another core, so TLB has stale A/D bits
++ sloppy UART ownership: printk can collide with uartwrite and cause FIFO overflow
++ swtch WP for a runnable proc must be for LoopE on any CPUID; not the "current" CPUID from ambient CpuId instance; this bubbles through the entire WP postcondition pattern
++ KPT shared across cores: concurrent updates to A/D bits, so PT must be owned by invariant
++ TLB invariant must allow for page table to be updated by another core, so TLB has stale A/D bits
 - ownership of cpu struct goes into interrupt-handling invariant when interrupts are enabled (but expose stable cur_proc)
-- big refactors get mired in complexity on the first pass: kpt-rwx refactor, explicit-cpuid refactor, user-mode execution, cleaning up first version of instruction leaf specs
-- crash handling: ghost "power" thread turns on/off power repeatedly, bumping generation counter and forking off HART "threads" when powering up a new gen
++ big refactors get mired in complexity on the first pass: kpt-rwx refactor, explicit-cpuid refactor, user-mode execution, cleaning up first version of instruction leaf specs
++ crash handling: ghost "power" thread turns on/off power repeatedly, bumping generation counter and forking off HART "threads" when powering up a new gen
 - user-mode proof: kernel either has a proven WP for user process, or a generic safety-only WP valid for all user code
 - explicit power on / power off forced instantiating WPs for HART entry, which caught pma_matches_all unsatisfiability
 - use Sail's reset spec (init_model) to initialize HART on power-on
-- tangentially found bug corresponding to usertests partial_write
++ tangentially found bug corresponding to usertests partial_write
 - owning current proc should be separate from owning the FD table: we may look up some FD, pass the struct file to another function, but that function also wants to own current proc (and that double-owns the struct file)
-- bug: freeproc did not hold wait_lock when zeroing out p->parent
-- bug: fence.i missing when jumping to userspace code
++ bug: freeproc did not hold wait_lock when zeroing out p->parent
++ bug: fence.i missing when jumping to userspace code
 - bug: missing fence iorw,iorw in virtio disk driver
 - RVWMO doesn't cover icache behavior, Sail model doesn't include icache either; also no precise model of MMIO/DMA
-- Sail model represents A/D page table flushes as regular reads/writes, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
-- gen_code.py generates CodeF.v, helps with updating proofs after xv6 source changes.
++ Sail model represents A/D page table flushes as regular reads/writes, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
++ gen_code.py generates CodeF.v, helps with updating proofs after xv6 source changes.
 - promise-free weak memory plan; need soundness proof for LB without promises
-- log_write tracks set of blocks, to ensure they fit within MAXOPBLOCKS after absorption
++ log_write tracks set of blocks, to ensure they fit within MAXOPBLOCKS after absorption
 - ghost var for SPP flag in sstatus: owned when interrupts disabled, otherwise in sie invariant
 - unsynchronized access to ip->ref in ilock, could be tricky to prove under weak memory
 - proved intr_handler_spec is contractive to enable recursive defn (inside sie_cap_gpr)
@@ -68,15 +68,15 @@ Some high-level ideas that might be interesting for some eventual paper:
 - weak memory: objective points-to for SC-like memory, fractional for SC-like read-only sharing
 - weak memory: lock invariant is vProp; refers to different view inside lock vs after acquiring lock
 - weak memory: need execution context notion, to soundly frame resources across migration to different CPU; locks also have context for lock inv resources
-- namei(/a/../b/../c/../etc) exceeds MAXOPBLOCKS if namei keeps racing with unlink/rmdir and iput falls through to iupdate each time
-- xv6 bug: cwd could be unlinked with dangling .., accessing .. can panic
-- why kexec can't panic by calling uvmalloc(TRAPFRAME): will run out of memory before getting to such a high address
-- xv6 bug: scheduler did not reset intena, could miss process wakeup between loop and wfi
++ namei(/a/../b/../c/../etc) exceeds MAXOPBLOCKS if namei keeps racing with unlink/rmdir and iput falls through to iupdate each time
++ xv6 bug: cwd could be unlinked with dangling .., accessing .. can panic
++ why kexec can't panic by calling uvmalloc(TRAPFRAME): will run out of memory before getting to such a high address
++ xv6 bug: scheduler did not reset intena, could miss process wakeup between loop and wfi
 - weak memory: expose internal steps of architecture model, expr gets Cycle which executes Sail monad, so every memory op is explicit and separate in trace
-- resources tracking possible sleeplock holders, to reason about iput's acquiresleep while holding itable.lock
++ resources tracking possible sleeplock holders, to reason about iput's acquiresleep while holding itable.lock
 - Sail model concrete evaluator [hfrun] that takes partial knowledge of HART registers
-- kernel proc exit requires owning entire stack, so callers must pass THEIR stack frame ownership down into functions that never return (usertrap -> syscall -> sys_exit -> kexit)
-- kernel memory points-to is generation-indexed (bare or KPT), monotonic fact about current CPU's mapping regime (still bare, or installed KPT), needed because one HART could have already constructed KSTACK pointers, but another HART is still before kvminithart.
++ kernel proc exit requires owning entire stack, so callers must pass THEIR stack frame ownership down into functions that never return (usertrap -> syscall -> sys_exit -> kexit)
++ kernel memory points-to is generation-indexed (bare or KPT), monotonic fact about current CPU's mapping regime (still bare, or installed KPT), needed because one HART could have already constructed KSTACK pointers, but another HART is still before kvminithart.
 
 Big things that still need to be done/explored:
 
