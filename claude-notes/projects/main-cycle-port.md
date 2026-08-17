@@ -9,55 +9,83 @@ measured ways to make a proof take minutes instead of milliseconds.
 
 ## CHECKPOINT
 
-Branch `hart-node-port` (off `main`), HEAD `e79d99b3`.  The port replaces the
-whole-instruction hart step with a per-node one, so a page walk, a TLB fill, a
-fetch and a data access of one instruction can interleave with other harts.
+Branch `hart-node-port` (off `main`).  The port replaces the whole-instruction
+hart step with a per-node one, so a page walk, a TLB fill, a fetch and a data
+access of one instruction can interleave with other harts.
 
-**THE WRAPPER IS DONE AND THE LEAF SWEEP IS MOSTLY DONE.**  `wp_instr` is proved
-for all four fetch shapes with no admits and at exactly the 5 rv64d platform
-axioms.  Ten leaf files plus `ProofSpin` are converted, **18 leaf statements
-verified byte-identical** (checked mechanically against the pre-sweep commit
-`0bac621b`), and the sweep has needed **zero statement changes**.
+**BOTH WRAPPERS ARE DONE AND THE CSR FAMILIES ARE GREEN.**  No admits anywhere;
+`wp_instr` closes at exactly the 5 rv64d platform axioms.  The sweep has needed
+**zero leaf statement changes** (18 verified byte-identical against the
+pre-sweep commit `0bac621b`).
 
-Tree: **416 of 1179 `.vo`**, **6 red roots**.  Do not trust these numbers — rerun
-`make -f CoqMakefile -j16 -k` and recount; they have been stale before.
+Do not trust a `.vo` count in this file — rerun `make -f CoqMakefile -jN -k`
+and recount; the numbers here have gone stale before.
 
-GREEN leaf files: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`,
-`WpMmodeAddiw`, `WpMmodeMul`, `WpMmodeUtype`, `WpMmodeJal`, `WpMmodeJalr`,
-`WpGprCsrwA` (all 4 CSR leaves), `ProofSpin` (a whole-function proof, by Löb —
-the wrapper survives Löb, which was worth knowing).
+GREEN: `WpMmodeRtype`, `WpMmodeItype`, `WpMmodeShiftiop`, `WpMmodeAddiw`,
+`WpMmodeMul`, `WpMmodeUtype`, `WpMmodeJal`, `WpMmodeJalr`, `WpGprCsrwA` (4
+leaves), `WpGprCsrrCommon`, `WpGprCsrrA` (3), `WpGprCsrrB` (3),
+`WpGprCsrwB` (4), `WpInstrRun`, `WpInstr`, `WpInstrConfig`, and `ProofSpin`
+(a whole-function proof, by Löb — the wrapper survives Löb, which was worth
+knowing).
 
-RED ROOTS, with the first error and what each needs:
-| file | error | needs |
-|---|---|---|
-| `WpGprCsrrCommon` :193 | `iIntuitionistic` | ordinary leaf conversion; owns nothing, writes only rd — cheapest left |
-| `WpGprCsrwB` :805 | `iIntuitionistic` | 4 leaves on existing machinery + `stimecmp` (see §mip below) |
-| `WpMmodeLoad` :61 | `iIntuitionistic` | width-8 sweep of `HartMStore` (37 sites) |
-| `WpMmodeStore` :64 | `iIntuitionistic` | ditto |
-| `WpMmodeMret` :69 | `wp_instr_config` not found | rebuild `wp_instr_config` (raw-cell wrapper, config may CHANGE) |
-| `SmodeCore` | not yet diagnosed past imports | the S-mode twin; reuses `swp_exec_step_decode_execute` verbatim |
-
-`WpGprCsrwC` is NOT green — it is blocked behind `WpGprCsrwB`, and it has 4 uses
-of `wp_instr_config`, so it lands with MRET.
+RED ROOTS, with what each needs:
+| file | needs |
+|---|---|
+| `WpGprCsrwStimecmp` | the cycle rule's post-file as a PREDICATE, so a leaf may write mip — see §"the two cells a leaf cannot have" |
+| `WpMmodeMret` | the MRET walk: ~15 nodes, plus a value-preserving write rule for elp — same § |
+| `WpGprCsrwC` | ordinary porting; its two `_raw` leaves' wrapper (`wp_instr_config`) now exists |
+| `WpMmodeLoad`, `WpMmodeStore` | width-**8** sweep of `HartMStore` (37 sites hardcoded to 4) |
+| `SmodeCore` | the S-mode twin; reuses `swp_exec_step_decode_execute` verbatim, needs its own `s_cycle` and fetch |
 
 **IMMEDIATE NEXT STEPS, in the order I would do them:**
-1. **`wp_instr_config`** — a raw-cell twin of `wp_instr`.  `wp_mret_gpr` and
-   `WpGprCsrwC`'s two `_raw` leaves take `hw_config` + `hart_state` /
-   `cur_privilege` / `mstatus` at FULL ownership, not `mmode_config`, and MRET
-   *changes* cur_privilege (Machine→Supervisor) and mstatus — so the bundle is
-   not invariant across the instruction and `wp_instr`'s hand-in-take-back shape
-   cannot serve them.  The old stack had this wrapper for exactly these sites;
-   deleting it in this port was premature.
-2. **`WpGprCsrrCommon`** — cheapest; owns nothing.
-3. **The `tk_clock3`-agreement generalization**, then `stimecmp`, then
-   `WpGprCsrwB`'s other four (`mideleg`/`satp` take the menvcfg recipe verbatim;
-   `sie`/`pmpaddr0` own what they write).  Then `WpGprCsrwC` follows from (1).
-4. **Load/Store** last — the only remaining item needing no new machinery, just
-   volume: every leaf is a width-**8** access and `HartMStore`'s chain is
-   hardcoded to 4 across 37 sites (`mem_write_ea`, the
-   `split_on_page_boundary .. 4 = (4,0)` premise, `subrange_vec_dec d 31 0`, the
-   4-alignment side conditions).  `swp_vmem_write_gen` already took the address
-   stretch as an obligation, which was the part blocked on the wrapper's shape.
+1. **`WpGprCsrwC`** — no new machinery: two `_raw` leaves on `wp_instr_config`
+   plus whatever else that file holds.  Cheapest remaining.
+2. **Load/Store** — volume, no new machinery: every leaf is a width-8 access
+   and `HartMStore`'s chain is hardcoded to 4 (`mem_write_ea`, the
+   `split_on_page_boundary .. 4 = (4,0)` premise, `subrange_vec_dec d 31 0`,
+   the 4-alignment side conditions).  `swp_vmem_write_gen` already takes the
+   address stretch as an obligation, which was the part blocked on the
+   wrapper's shape.
+3. **The cycle-rule generalization**, then `stimecmp`.
+4. **MRET**, which is independent of (3) and needs only the elp rule.
+5. **`SmodeCore`** — biggest lever (600–700 dependents) and biggest job.
+
+### The two cells a leaf cannot have
+
+Both remaining M-mode leaves fail for the same reason and in opposite
+directions, and the analysis is done in both cases:
+
+**mip, for `csrw stimecmp`.**  `write_CSR csr_stimecmp` calls
+`clint_dispatch`, which refreshes mip from the CLINT: it reads mtime /
+mtimecmp / stimecmp / the plic wires (∀-peels, nothing owns them) and then
+WRITES mip.  mip is in `mm_Drw` — the cycle wrapper owns it, exclusively,
+because the tick writes it.  Lending it to a leaf is sound, and the reason is
+already in the cycle rule: `mm_tick_agree` constrains the post-file only OFF
+`tk_clock3`, and mip ∈ `tk_clock3`.  What blocks it is that
+`swp_exec_step_decode_execute` takes the post-file `rsB` as a PARAMETER, so
+the body cannot choose it.  The fix is to take a PREDICATE instead (which is
+what `wp_loop_cycle`/`swp_try_step_gen` already do one level down — the
+specialization to `rsx = wrap_post rsB mi` happens in
+`swp_exec_step_decode_execute` itself), thread it through `mm_cycle` and
+`wp_instr_ex`, and hand the leaf the mip cell in and an arbitrary one back.
+
+**elp, for MRET.**  MRET writes elp with the value it already holds
+(`NO_LP_EXPECTED`, forced by `hw_config`'s pin), so the write is a no-op —
+but `hw_config` holds elp at `DfracDiscarded`, so no leaf can own it, and
+**the span semantics genuinely forbid the step**: `hspan_node` gates a write
+on `r ∈ Drw` with no value-preserving exception, and adding one is not
+possible without making `hspan_stops` file-dependent (it is a bool on the
+term, and a term that both may step and is a stopping point makes `hval`
+unprovable).  So the walk must SPLIT at that node and use a `swp`-level rule:
+
+    swp_write_reg_same : hregwrite_val_at r m = Some v ->
+      gen_cert -* r |->r{dq} v -* (r |->r{dq} v -* swp (hregwrite_resume m) Φ)
+      -* swp m Φ
+
+proved from `HartRegNode.swp_hart_regwrite` plus `reg_interp_set_same`.  The
+surrounding walk is ~15 nodes of reads/writes of cells the leaf holds; get
+their exact order by PRINTING the reduced term (see §"printing a model term"
+in the traps section) rather than guessing the bind structure.
 
 **`minstret_inv := emp`, PERSISTENT, ON PURPOSE (MinstretInv.v).**  The Iris
 invariant is gone — counter facts are owned resources in `pc_is`'s
@@ -65,19 +93,20 @@ invariant is gone — counter facts are owned resources in `pc_is`'s
 would have been the sweep's only statement change.  It carries no information.
 **Delete it once the tree is green**, as a standalone premise-removal commit.
 
-**THE DOWNSTREAM CLAIM IS STILL UNVERIFIED.**  ~760 of 1179 files sit behind the
-red roots, so no whole-function proof has been re-checked.  Identical leaf
-statements are necessary, not sufficient.  Known exposure: 6 files DESTRUCTURE
-`pc_is` (`WpIntrInv`, `WpSmodeIntr`, `WpSmodeWfi`, `UserKernelBridge`, …) and
-each needs the one-line fix `ProofSpin` needed, because `pc_is` now carries
-`minstret_res ∗ clock_res`.
+**THE DOWNSTREAM CLAIM IS STILL UNVERIFIED.**  Most of the tree sits behind the
+red roots, so no whole-function proof but `ProofSpin` has been re-checked.
+Identical leaf statements are necessary, not sufficient.  Known exposure: 6
+files DESTRUCTURE `pc_is` (`WpIntrInv`, `WpSmodeIntr`, `WpSmodeWfi`,
+`UserKernelBridge`, …) and each needs the one-line fix `ProofSpin` needed,
+because `pc_is` now carries `minstret_res ∗ clock_res`.
 
 Where to read next: the "THE LEAF SWEEP" section below (the rule that decides
 every remaining case, and the per-family costs), then `iris/WpInstr.v`
-(`wp_instr` + `mm_cycle`), `iris/HartMCycle.v`
-(`swp_exec_step_decode_execute`, mode-agnostic on purpose),
-`iris/WpMmodeSwpBase.v` (the node shapes), `iris/WpMmodeJump.v` and
-`iris/WpMmodeCsrSwp.v` (the two worked non-template families).
+(`wp_instr_ex` + `wp_instr` + `mm_cycle`), `iris/WpInstrRun.v` (the fetch
+dispatch both wrappers share), `iris/WpInstrConfig.v` (the raw-cell wrapper),
+`iris/HartMCycle.v` (`swp_exec_step_decode_execute`, mode-agnostic on
+purpose), and `iris/WpMmodeCsrSwp.v` (both CSR engines and the three
+footprints).
 
 ## What exists
 
@@ -215,6 +244,8 @@ Evidence:
 | `HartMCycle.swp_step_ex` | introduces the fetched word's existential | the word must be existential in the obligation, or a caller that dispatches on fetch SHAPE cannot instantiate it per branch |
 | `HartMCycle.reg_agree_l/_r` | footprint weakening | |
 | `HartMCycle.wrap_pre_*` / `wrap_post_*` | cell-by-cell reads of the tick's pre/post files | |
+| `WpInstrRun.swp_run_hart_active_instr` | the FETCH-SHAPE DISPATCH: takes the `instr` resource, dispatches on the fetch result inside it and on pc's 4-alignment | the fifth member of `HartMRun`'s family and the only one a wrapper calls; the other four each take a concrete shape.  Both wrappers share it, so adding a wrapper costs its own bundle bookkeeping and nothing else |
+| `WpInstr.wp_instr_ex` | the engine: post-GPR-file EXISTENTIAL | `csrr rd, time` reads mtime, which the tick writes, so no leaf can pin the value before the step and none can NAME its post-file.  `wp_instr` is the instance that names it |
 | `WpInstr.wp_instr` | THE leaf wrapper, all four fetch shapes | takes `npc` explicitly (the old one recovered it from `s_exec`); lends PC read-only for AUIPC/JAL |
 | `WpInstr.mm_cycle` | the M-mode instance of the cycle rule | adds only the two bundle↔frame bridges |
 | `HartMFrame.swp_rX_file` / `swp_wX_file` | GPR access at `gpr_file`, not at three cells | operand ALIASING is free this way; an instruction may name the same register twice |
@@ -224,6 +255,12 @@ Evidence:
 | `WpMmodeSwpBase` | the NODE SHAPES: `swp_execute_rw`/`rw2`/`rrw`/`rrw2`/`w`/`pure_w`/`pcw` | every register-only instruction is one of these; each takes the model's reduction as a hypothesis discharged by `eq_refl`, so an instruction family is one-line corollaries |
 | `WpMmodeJump` | `hfrun_jump_to_zca`, `hval_update_elp_state`, `swp_jump_to_zca`, `swp_execute_JALR_ret`, `swp_execute_JAL`, `swp_execute_JAL_zreg`, `swp_wX_zero`, the `cw_Drw`/`cw_Dro` footprint | the first family needing both routes |
 | `WpMmodeCsrSwp` | `swp_doCSR_csrw`, `swp_execute_CSRReg_csrw`, `cw_rs`/`cw_fresh`/`cw_frames`/`cw_set_agree` | one lemma for all ten CSR writes; the write is an OBLIGATION, not an `hfrun` fact |
+| `WpInstrConfig` | `wp_instr_config` + `mc_cycle` + `mc_rs` (cur_privilege PARAMETRIC) + `mc_ro_acc` | the wrapper for the three instructions that WRITE the cells `mmode_config` bundles, where "hand the bundle in, get the same bundle back" is the wrong contract.  THE FOOTPRINT IS UNCHANGED: a cell is in `Drw` so the WALKER may write it; these are written by the LEAF, which holds them as points-to during the instruction |
+| `WpMmodeCsrSwp.swp_doCSR_csrr` / `swp_execute_CSRReg_csrr(_gen)` | the READ engine, mirror of the write one | the CSR read is an obligation for the reason the write is: `read_CSR` is read-only, so `goodb` certifies its SHAPE, but its VALUE is the caller's register content.  `_gen` carries an abstract `Q` on the read value, for the CSR nobody owns |
+| `WpMmodeCsrSwp.cr_*` / `cr0_*` / `cw2_*` | three footprints: read with one owned cell, read with none, write with one EXTRA read cell | a csrr writes nothing (rd is in `gpr_file`, outside every frame), so its writable half is EMPTY; `cw2` covers sie/satp/pmpaddr0, whose written value comes from a second cell |
+| `WpMmodeCsrSwp.hval_read_any` / `hval_ret` | ∀-peel a read of a register NOBODY owns | `hfrun` answers reads from the pinned file, so it needs them owned; the span's read case is ungated, so a stretch whose RESULT ignores the value needs neither.  `HartMCycle.tick_clock_hvalE`'s `tk_peel_any` move, as a lemma.  **Belongs in `HartSpanChar` once a second family wants it** |
+| `WpMmodeCsrSwp.swp_read_reg_any` | the same at the `swp` layer | `csrr rd, time` |
+| `WpGprCsrrCommon.drive_csr_term` | `drive_csr` at the TERM instead of inside `exec` | the guards are in the term, not in the interpreter, so ONE walk serves `exec` and `hfrun` both.  Every per-CSR `_red` lemma is one call |
 | `WpDecodeBridge.goodb_bind` / `goodb_bind0` | **goodb COMPOSES along a bind** | the key to certifying a stretch that carries SYMBOLIC data — assemble the certificate instead of computing it |
 | `HartMStore.swp_vmem_write_gen` | `vmem_write` with the address computation as an obligation + an abstract rider `Q` | an `hfrun` premise only discharges at CONCRETE operands; `Q` carries `gpr_file` through |
 | `InstrBytes.mmode_config_cert` | `gen_cert` out of the bundle without consuming it | every leaf's obligation needs it and the bundle is gone by then |
@@ -580,6 +617,29 @@ painful once B′ puts those leaves back in scope.
 All measured.  **The first group now lives in design §5 item 1** (the
 reduction discipline, heads (a)–(g)) — read it there, and do not duplicate
 it here.  What is left is the rest:
+
+- **PRINTING A MODEL TERM IS HOW YOU GET A `_red` LEMMA — do not guess the
+  bind structure.**  A pruned model function is a term equation both
+  interpreters can use, but hand-writing its RHS gets the ASSOCIATION wrong
+  and `reflexivity` then grinds (measured: 15 GB, killed).  Instead prune in a
+  throwaway goal and print:
+
+      Goal forall v, write_CSR (mword_of_int 0x303) v = returnM (Ok v).
+      Proof. intros v. unfold write_CSR. drive_csr_term.
+        match goal with |- ?g => idtac g end. Abort.
+
+  All five `write_CSR` shapes this port needed came out of ONE 13-second run
+  that way.  The same trick with `Eval vm_compute in` gives a whole
+  read-only stretch outright — `check_CSR_result csr_time Machine CSRRead`
+  printed as two reads and a `Ret`, which is what showed that leaf needs no
+  premises at all.
+- **A MIS-ORDERED EXPLICIT ARGUMENT LIST IS A HANG, NOT AN ERROR.**  A
+  `rewrite (hfrun_bind n k D Drw rs …)` with the three file arguments in the
+  wrong positions did not fail — elaboration ran for 10 minutes and was
+  killed.  The same call in a small scratch file failed in 5 seconds with a
+  clear type error.  So when a file that compiled in 20 s suddenly does not
+  finish, suspect the newest positional application first, and re-check it in
+  a scratch file rather than waiting.
 
 - Walking a stretch at a symbolic file with pins as a `register_set` tower
   fails both ways: `cbn` stalls on the tower lookups (~30 s), `lazy`
