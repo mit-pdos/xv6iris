@@ -717,7 +717,7 @@ Section ProofCopyout.
       iPoseProof (coi_42 with "Htext") as "Hi42".
       (* both arms reach +0x36 with s2 = n; factor the rest over [nn] *)
       iAssert (∀ (CIDc : CpuId) (Mn : regfile) (nn : nat),
-          co_copy_body (kt := kt) b p K lvl eb lks szv P spr va0 dstva src rem done navail
+          co_copy_body b p K lvl eb lks szv P spr va0 dstva src rem done navail
             len src_bytes Pd pa0 CIDc Mn nn)%I
         as "Hcopy".
       { iIntros (CIDc Mn nn)

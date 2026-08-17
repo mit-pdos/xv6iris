@@ -165,11 +165,11 @@ Section ProofArgfd.
     sie_cap_gpr kt Mt nav b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.argfd + 0x38) : mword 64) -∗
-    ofd_out pfd oldfd -∗
+    ofd_out (kt := kt) pfd oldfd -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr kt Mt nav b p -∗
       pc_is (mword_of_int (KernelSyms.argfd + 0x40) : mword 64) -∗
-      ofd_out pfd wfd -∗
+      ofd_out (kt := kt) pfd wfd -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -957,7 +957,7 @@ Section ProofArgfd.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = p_ofile p fd)
         by (rewrite HC4a0; apply addv_sext0).
       iEval (rewrite -Haddrof) in "Hcell".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.argfd + 0x34))
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.argfd + 0x34))
                 (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0 : mword 12)
                 C4 (av - 6)%nat fv b
                 ltac:(vm_compute; discriminate) ltac:(rdok)

@@ -298,7 +298,7 @@ Section FsinitEpilogue.
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fsinit + 0x58) : mword 64) -∗
-    fsi_frame m -∗
+    fsi_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_magic ↦₄ v_magic -∗
     BitmapInv.sb_size ↦₄ v_size -∗
@@ -699,7 +699,7 @@ Section FsinitMain.
     iEval (rewrite Hb2; rgne; rewrite HM1s0) in "Hf2".
     iEval (rewrite Hb3; rgne; rewrite HM1s1) in "Hf3".
     iEval (rewrite Hb4; rgne; rewrite HM1s2) in "Hf4".
-    iAssert (fsi_frame m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
+    iAssert (fsi_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
     { rewrite /fsi_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" | iExact "Hf4"]. }
@@ -1221,7 +1221,7 @@ Section FsinitMain.
                      = sb_magic).
     { rgne. rewrite HQ2a4. rewrite /sb_magic /sb_base /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hmgadr) in "Hmg".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.fsinit + 0x34)) Ra4 Ra4
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fsinit + 0x34)) Ra4 Ra4
               (mword_of_int 934 : mword 12) Q2 (K - 4)%nat v_magic b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 Hmg").
     iIntros (CID22 Hq22) "Hcg Hpc Hmg".

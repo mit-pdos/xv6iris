@@ -1680,7 +1680,7 @@ Section ProofIget.
         assert (Hpa4a : add_vec (rget L1 Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = i_dev (ientry j)).
         { rewrite (rget_ne L1 Rs1 ltac:(nz)) HL1s1. reflexivity. }
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.iget + 0x4a)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x4a)) Ra4 Rs1
                   (mword_of_int 0 : mword 12) L1 (trap_res b + (K - 6))%nat dj false
                   (dqm := DfracOwn qj') ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi4a [Hdcell]").
@@ -1752,7 +1752,7 @@ Section ProofIget.
         assert (Hpa50 : add_vec (rget L2 Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                         = i_inum (ientry j)).
         { rewrite (rget_ne L2 Rs1 ltac:(nz)) HL2s1. reflexivity. }
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.iget + 0x50)) Ra4 Rs1
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.iget + 0x50)) Ra4 Rs1
                   (mword_of_int 4 : mword 12) L2 (trap_res b + (K - 6))%nat ij false
                   (dqm := DfracOwn qj') ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hi50 [Hncell]").

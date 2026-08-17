@@ -253,8 +253,8 @@ Module FreewalkProof (Kfree : KFREE) : FREEWALK.
 
 Section ProofFreewalk.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
-  Context `{GEN : GenId}.
   Context {kt : ktier}.
+  Context `{GEN : GenId}.
   (* NOTE: no shared [Context `{CID : CpuId}] here -- fw_epilogue / fw_loop /
      fw_body apply each other at a hart a [wp_next] crossing may have
      migrated to, so each needs its OWN implicit per-lemma [CID] binder

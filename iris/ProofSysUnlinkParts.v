@@ -876,17 +876,17 @@ Section ProofSysUnlinkFrame.
                        H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27 & H28 &
                        H29 & H30 & _)".
     change 16%nat with (8 * 2)%nat at 1.
-    iDestruct (slotsn_bytes_own sp0 8 2 ltac:(lia) with "[H7 H8]")
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 8 2 ltac:(lia) with "[H7 H8]")
       as "[%HalD HbD]".
     { cbn [seq]. iSplitL "H8"; [iExact "H8" |]. iSplitL "H7"; [iExact "H7" |].
       done. }
     change 16%nat with (8 * 2)%nat at 1.
-    iDestruct (slotsn_bytes_own sp0 10 2 ltac:(lia) with "[H9 H10]")
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 10 2 ltac:(lia) with "[H9 H10]")
       as "[%HalN HbN]".
     { cbn [seq]. iSplitL "H10"; [iExact "H10" |].
       iSplitL "H9"; [iExact "H9" |]. done. }
     change 128%nat with (8 * 16)%nat at 1.
-    iDestruct (slotsn_bytes_own sp0 26 16 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 26 16 ltac:(lia)
                  with "[H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23
                         H24 H25 H26]") as "[%HalP HbP]".
     { cbn [seq].
@@ -900,7 +900,7 @@ Section ProofSysUnlinkFrame.
       iSplitL "H12"; [iExact "H12" |]. iSplitL "H11"; [iExact "H11" |].
       done. }
     change 16%nat with (8 * 2)%nat.
-    iDestruct (slotsn_bytes_own sp0 29 2 ltac:(lia) with "[H28 H29]")
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 29 2 ltac:(lia) with "[H28 H29]")
       as "[%HalE HbE]".
     { cbn [seq]. iSplitL "H29"; [iExact "H29" |].
       iSplitL "H28"; [iExact "H28" |]. done. }
@@ -926,13 +926,13 @@ Section ProofSysUnlinkFrame.
     (* the [8 * n] conversions go INSIDE the framing braces, never on the
        goal -- a goal-level [change] survives into the [cbn [seq]] and then
        leaves the frame's own [seq] partially reduced. *)
-    iDestruct (bytes_own_slotsn sp0 8 2 ltac:(lia) HalD with "[HbD]") as "HsD".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 8 2 ltac:(lia) HalD with "[HbD]") as "HsD".
     { change (8 * 2)%nat with 16%nat. iExact "HbD". }
-    iDestruct (bytes_own_slotsn sp0 10 2 ltac:(lia) HalN with "[HbN]") as "HsN".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 10 2 ltac:(lia) HalN with "[HbN]") as "HsN".
     { change (8 * 2)%nat with 16%nat. iExact "HbN". }
-    iDestruct (bytes_own_slotsn sp0 26 16 ltac:(lia) HalP with "[HbP]") as "HsP".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 26 16 ltac:(lia) HalP with "[HbP]") as "HsP".
     { change (8 * 16)%nat with 128%nat. iExact "HbP". }
-    iDestruct (bytes_own_slotsn sp0 29 2 ltac:(lia) HalE with "[HbE]") as "HsE".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 29 2 ltac:(lia) HalE with "[HbE]") as "HsE".
     { change (8 * 2)%nat with 16%nat. iExact "HbE". }
     cbn [seq].
     iDestruct "HsD" as "(K8 & K7 & _)".
@@ -968,21 +968,21 @@ Section ProofSysUnlinkFrame.
      window, not [bytes_own]. *)
   Lemma su_bytes_name (a : mword 64) (N : nat) :
     bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := kt) a N). Qed.
 
   Lemma su_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := kt) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): nameiparent reads the NUL-terminated prefix and
      the rest rides through untouched *)
   Lemma su_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j)
+    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[kt] f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[kt] f j)
     ∗ ([∗ list] j ∈ seq 0 (127 - k)%nat,
-         pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat).
+         pa_add (pa_add a (S k)) j ↦ₘ[kt] f (S k + j)%nat).
   Proof.
     intro Hk.
     replace 128%nat with (S k + (127 - k))%nat by lia.
@@ -991,9 +991,9 @@ Section ProofSysUnlinkFrame.
 
   Lemma su_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[kt] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
-       pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
+       pa_add (pa_add a (S k)) j ↦ₘ[kt] f (S k + j)%nat) -∗
     bytes_own (KTR := kt) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".
@@ -1008,17 +1008,17 @@ Section ProofSysUnlinkFrame.
      two trailing bytes ride through nameiparent and both namecmps and
      dirlookup untouched. *)
   Lemma su_nm_split (a : mword 64) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ f j)
-    ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ f (14 + j)%nat).
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] f j) -∗
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j)
+    ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[kt] f (14 + j)%nat).
   Proof.
     change 16%nat with (14 + 2)%nat.
     rewrite (bb_split a 14 2 f). iIntros "[$ $]".
   Qed.
 
   Lemma su_nm_join (a : mword 64) (f g : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ g j) -∗
-    ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ f (14 + j)%nat) -∗
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] g j) -∗
+    ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[kt] f (14 + j)%nat) -∗
     bytes_own (KTR := kt) (DfracOwn 1) a 16.
   Proof.
     iIntros "H1 H2".

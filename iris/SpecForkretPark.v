@@ -87,7 +87,7 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γs : list gname)
+    (kt : ktier) (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
   (length rest = 12%nat) ->
@@ -101,13 +101,13 @@ Definition forkret_park_body
        cwd's own unit is NOT here -- a live process has a real [cwd_ref] and
        the unit is parked in the itable against it. *)
     iref_slots IREFSPARE -∗
-    |==> ▷ proc_ctx γs pa.
+    |==> ▷ proc_ctx (kt := kt) γs pa.
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γs : list gname)
+      (kt : ktier) (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),
-      forkret_park_body γs γf pa ks rest pid V.
+      forkret_park_body kt γs γf pa ks rest pid V.
 End FORKRET_PARK.

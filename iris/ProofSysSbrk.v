@@ -870,7 +870,7 @@ Section ProofSysSbrk.
               add_vec (rget (CID := CID') D Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p).
     { intros CID'; rgne. rewrite HDa0; reflexivity. }
     iEval (rewrite -(Hszaddr CIDD)) in "Hszc".
-    iApply (wp_cld_s_sconf (CID := CIDD) (mword_of_int (KernelSyms.sys_sbrk + 0x22)) Rs1 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDD) (mword_of_int (KernelSyms.sys_sbrk + 0x22)) Rs1 Ra0
               (mword_of_int 72 : mword 12) D (av - 6)%nat (pv_sz V) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 Hszc").
@@ -1351,7 +1351,7 @@ Section ProofSysSbrk.
               add_vec (rget (CID := CID') E1 Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p).
     { intros CID'; rgne. rewrite HE1a0; reflexivity. }
     iEval (rewrite -(Hszaddr2 CIDs31)) in "Hszc".
-    iApply (wp_cld_s_sconf (CID := CIDs31) (mword_of_int (KernelSyms.sys_sbrk + 0x50)) Ra5 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDs31) (mword_of_int (KernelSyms.sys_sbrk + 0x50)) Ra5 Ra0
               (mword_of_int 72 : mword 12) E1 (av - 6)%nat (pv_sz V) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi50 Hszc").

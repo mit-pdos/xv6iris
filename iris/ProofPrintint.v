@@ -422,7 +422,7 @@ Section ProofPrintint.
     (* +0x34 sb a5,0(a3) : buf[i] = digit *)
     iDestruct (bytes_own_acc (DfracOwn 1) buf 24 i Hi24 with "Hbuf") as "[Hbi Hbcl]".
     iDestruct "Hbi" as (bold) "Hbi".
-    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printint + 0x34)) a5_idx a3_idx (mword_of_int 0 : mword 12)
+    iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.printint + 0x34)) a5_idx a3_idx (mword_of_int 0 : mword 12)
               D6 (K - 8)%nat (bold : mword 8) b with "Hcg Hpc Hi34 [Hbi]").
     { iEval (rgne; rewrite HD6a3 Hz0 kv_addv_zero). iExact "Hbi". }
     iIntros (CID7 Hs7) "Hcg Hpc Hbi". iEval (rgne; rewrite HD6a3 Hz0 kv_addv_zero) in "Hbi".

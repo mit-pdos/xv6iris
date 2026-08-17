@@ -201,7 +201,7 @@ Section ProofKforkB5.
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
     (* on the raw context allocproc left, before releasing.               *)
     (* -------------------------------------------------------------- *)
-    iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd Hirsp")
+    iMod (FP.forkret_park kt γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd Hirsp")
       as "Hpctx".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".
@@ -355,7 +355,7 @@ Section ProofKforkB5.
     { assert (Hr : rget mr5 Rs4 = mr5 !!! Regidx Rs4) by (rgne; reflexivity).
       rewrite Hr Hr5s4. apply WaitInv.p_parent_sext. }
     iPoseProof (kfk_0d4 with "Htext") as "Hi_d4".
-    iApply (wp_sd_s_sconf (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
+    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
               mr5 (trap_res b + (K - 8))%nat vold false with "Hcg Hpc Hi_d4 [Hpcell]").
               iClear "Hi_d4".
     { iEval (rewrite Hea_d4). iExact "Hpcell". }
@@ -536,7 +536,7 @@ Section ProofKforkB5.
     { assert (Hr : rget M11 Rs4 = M11 !!! Regidx Rs4) by (rgne; reflexivity).
       rewrite Hr HM11s4. apply ProcGeom.p_state_sext. }
     iPoseProof (kfk_0ec with "Htext") as "Hi_ec".
-    iApply (wp_sw_s_sconf (mword_of_int (KF + 0xec)) Ra5 Rs4 (mword_of_int 24 : mword 12)
+    iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0xec)) Ra5 Rs4 (mword_of_int 24 : mword 12)
               M11 (trap_res b + (K - 8))%nat USED false with "Hcg Hpc Hi_ec [Hpst2]").
               iClear "Hi_ec".
     { iEval (rewrite Hea_ec). iExact "Hpst2". }

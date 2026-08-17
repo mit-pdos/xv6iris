@@ -631,7 +631,7 @@ Section BfreeTail.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    bf_frame m -∗
+    bf_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗
@@ -1188,7 +1188,7 @@ Section ProofBfreeMain.
     iEval (rewrite Hb2; rgne; rewrite HR1s0) in "Hf2".
     iEval (rewrite Hb3; rgne; rewrite HR1s1) in "Hf3".
     iEval (rewrite Hb4; rgne; rewrite HR1s2) in "Hf4".
-    iAssert (bf_frame m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
+    iAssert (bf_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
     { rewrite /bf_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |]. iExact "Hf4". }
@@ -1294,7 +1294,7 @@ Section ProofBfreeMain.
                      = sb_bmapstart).
     { rgne. rewrite HR5a1. rewrite /sb_bmapstart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x16)) Ra1 Ra1
               (mword_of_int 2504 : mword 12) R5 (K - 4)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16 Hsb").
@@ -1601,7 +1601,7 @@ Section ProofBfreeMain.
                      = pa_add (b_data (bpa kk)) d).
     { rgne. rewrite HB5a4. apply bf_data_off. }
     iEval (rewrite -Hbyadr) in "Hbyte".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bfree + 0x32)) Ra4 Ra4
               (mword_of_int 88 : mword 12) B5 (K - 4)%nat
               (bm_byte used q) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi32 Hbyte").

@@ -955,7 +955,7 @@ Section ProofUvmunmap.
     (*  which is why the whole [df] split is ONE [destruct] here.         *)
     (* ================================================================ *)
     iAssert (wp_next b p (fun (CIDs : CpuId) =>
-        uu_store_body (kt := kt) b p spr va uroot done npages df um K ilvl eb mm mw t
+        uu_store_body b p spr va uroot done npages df um K ilvl eb mm mw t
           CIDs lks))%I with "[TAIL]" as "STORE".
     { iIntros (CIDs Hss ms).
       iIntros "(%Hmksp & %Hss1 & %Hmks2 & %Hmks3 & %Hmks4 & %Hmks5 & %Hmks6 & %Hmkthr)
@@ -975,7 +975,7 @@ Section ProofUvmunmap.
         replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
           with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         apply kv_addv_zero. }
-      iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x46)) Rs1
+      iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.uvmunmap + 0x46)) Rs1
                 (mword_of_int 0 : mword 12) ms (K - 8) w0 b
                 with "Hcg Hpc Hi46s [Hcell]").
       { iEval (rewrite Hzoff; rgne; rewrite Hss1 Ha0v). iExact "Hcell". }

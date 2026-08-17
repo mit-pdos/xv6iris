@@ -51,7 +51,7 @@ Definition wp_memset_head_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
   wp_next b pcur (fun (CID : CpuId) =>
     sie_cap_gpr kt m2 (n - 2) b pcur -∗
     pc_is (add_vec_int pcE 8) -∗
-    pa_ra ↦₈ ra0 -∗ pa_s0 ↦₈ s00 -∗
+    pa_ra ↦₈[kt] ra0 -∗ pa_s0 ↦₈[kt] s00 -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -163,8 +163,8 @@ Definition wp_memset_suffix_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `
   instr (mword_of_int (KernelSyms.memset + 0x22) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) -∗
   instr (mword_of_int (KernelSyms.memset + 0x24) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1 : mword 5), zreg)) -∗
   pc_is (mword_of_int (KernelSyms.memset + 0x1e) : mword 64) -∗
-  add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈ ra0e -∗
-  add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈ s00e -∗
+  add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) ↦₈[kt] ra0e -∗
+  add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) ↦₈[kt] s00e -∗
   wp_next b pcur (fun (CID : CpuId) =>
     ∀ mf,
     sie_cap_gpr kt mf (n + 2) b pcur -∗

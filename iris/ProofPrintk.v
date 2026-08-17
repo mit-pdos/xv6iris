@@ -2146,7 +2146,7 @@ Section ProofPrintk.
     { rgne. rewrite HD2s0. unfold s0v, pa_stk, add_vec_int. rewrite pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite Hap23 -Hap23') in "Hap".
-    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0xd0)) (mword_of_int 14 : mword 5) s0_idx (mword_of_int 3976 : mword 12)
+    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.printk + 0xd0)) (mword_of_int 14 : mword 5) s0_idx (mword_of_int 3976 : mword 12)
               D2 K (pk_ap s0v k) b with "Hcg Hpc Hidc Hap").
     iIntros (CID3 Hst3) "Hcg Hpc Hap". iEval (rewrite Hap23') in "Hap". iEval (rgne) in "Hap". iEval (rewrite HD2a4) in "Hap".
     assert (Hpe0 : add_vec_int (mword_of_int (KernelSyms.printk + 0xd0) : mword 64) 4 = mword_of_int (KernelSyms.printk + 0xd4)) by (apply bv_eq; vm_compute; reflexivity).
@@ -3963,7 +3963,7 @@ Section ProofPrintk.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     iEval (rewrite -Hlba) in "Hb".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printk + 0x224)) a0_idx (mword_of_int 20 : mword 5)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0x224)) a0_idx (mword_of_int 20 : mword 5)
               (mword_of_int 0 : mword 12) L2 K (pk_fbyte s (S i)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb").
@@ -4132,7 +4132,7 @@ Section ProofPrintk.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     iEval (rewrite -Hlba) in "Hb".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printk + 0x216)) a0_idx (mword_of_int 20 : mword 5)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0x216)) a0_idx (mword_of_int 20 : mword 5)
               (mword_of_int 0 : mword 12) S1 K (pk_fbyte s 0) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb").
@@ -4490,7 +4490,7 @@ Section ProofPrintk.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     iEval (rewrite -Hlba) in "Hdb".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printk + 0x1da)) a0_idx a5_idx
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0x1da)) a0_idx a5_idx
               (mword_of_int 0 : mword 12) P2 K (dbyte : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hdb").
@@ -5162,7 +5162,7 @@ Section ProofPrintk.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     iEval (rewrite -Hla0) in "Hb0".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printk + 0x88)) (mword_of_int 21 : mword 5)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0x88)) (mword_of_int 21 : mword 5)
               (mword_of_int 14 : mword 5) (mword_of_int 0 : mword 12) D3 K
               (pk_fbyte f (S i)) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -5226,7 +5226,7 @@ Section ProofPrintk.
         by (apply bv_eq; vm_compute; reflexivity).
       apply pa_add_S. }
     iEval (rewrite -Hla1) in "Hb1".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printk + 0x90)) (mword_of_int 13 : mword 5)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0x90)) (mword_of_int 13 : mword 5)
               (mword_of_int 14 : mword 5) (mword_of_int 1 : mword 12) D4 K
               (pk_fbyte f (S (S i))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -6606,7 +6606,7 @@ Section ProofPrintk.
         with (pa_add (pa_add fmt (S i)) 2).
       rewrite pa_add_add. f_equal. lia. }
     iEval (rewrite -Hla2) in "Hb2".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.printk + 0xe4)) (mword_of_int 13 : mword 5)
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.printk + 0xe4)) (mword_of_int 13 : mword 5)
               a5_idx (mword_of_int 2 : mword 12) J2 K (pk_fbyte f (S (S (S i)))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc [] Hb2").

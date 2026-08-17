@@ -433,7 +433,7 @@ Section IlockEpilogue.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x1e) : mword 64) -∗
-    il_frame m -∗
+    il_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslot bn -∗
@@ -738,7 +738,7 @@ Section IlockLoad.
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
-    il_frame m -∗
+    il_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{DfracOwn (1/2)} dev -∗
     i_inum ip ↦₄{DfracOwn (1/2)} inum -∗
@@ -829,7 +829,7 @@ Section IlockLoad.
                      = i_inum ip).
     { rgne. rewrite HMs1. reflexivity. }
     iEval (rewrite -Hinadr) in "Hinumc".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.ilock + 0x38)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x38)) Ra5 Rs1
               (mword_of_int 4 : mword 12) M (K - 4)%nat inum b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi38 Hinumc").
     iIntros (CID2 Hq2) "Hcg Hpc Hinumc".
@@ -901,7 +901,7 @@ Section IlockLoad.
                      = sb_inodestart).
     { rgne. rewrite HL3a1. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hsbadr) in "Hsb".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ilock + 0x42)) Ra1 Ra1
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x42)) Ra1 Ra1
               (mword_of_int 1700 : mword 12) L3 (K - 4)%nat
               (mword_of_int inodestart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42 Hsb").
@@ -951,7 +951,7 @@ Section IlockLoad.
                     = i_dev ip).
     { rgne. rewrite HL5s1. reflexivity. }
     iEval (rewrite -Hdadr) in "Hidev".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.ilock + 0x48)) Ra0 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x48)) Ra0 Rs1
               (mword_of_int 0 : mword 12) L5 (K - 4)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi48 Hidev").
     iIntros (CID7 Hq7) "Hcg Hpc Hidev".
@@ -1257,7 +1257,7 @@ Section IlockLoad.
                         (sign_extend' 64 (mword_of_int 4 : mword 12)) = i_inum ip).
     { rgne. rewrite HB2s1. reflexivity. }
     iEval (rewrite -Hinadr2) in "Hinumc".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.ilock + 0x54)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x54)) Ra5 Rs1
               (mword_of_int 4 : mword 12) B2 (K - 4)%nat inum b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi54 Hinumc").
     iIntros (CID12 Hq12) "Hcg Hpc Hinumc".
@@ -1528,7 +1528,7 @@ Section IlockLoad.
                      = pa_add (pa_add (b_data (bpa kk)) (64 * islot inum)%nat) 8).
     { rgne. rewrite HF3a1. apply (iu_disp _ 8 8%nat); [lia | lia | reflexivity]. }
     iEval (rewrite -Hs8adr) in "Hd8".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.ilock + 0x7c)) Ra5 Ra1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x7c)) Ra5 Ra1
               (mword_of_int 8 : mword 12) F3 (K - 4)%nat (di_size dn : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7c Hd8").
     iIntros (CID24 Hq24) "Hcg Hpc Hd8".
@@ -1997,7 +1997,7 @@ Section IlockLoad.
     iIntros "Hcg Hpc".
     iEval (rewrite Hjmp) in "Hpc".
     (* ---- into the join ---- *)
-    iAssert (il_frame m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
+    iAssert (il_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4]" as "Hframe".
     { rewrite /il_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |]. iExists _. iExact "Hf4". }
@@ -2156,7 +2156,7 @@ Section ProofIlockMain.
     iEval (rewrite Hb1; rgne; rewrite HR1ra) in "Hf1".
     iEval (rewrite Hb2; rgne; rewrite HR1s0) in "Hf2".
     iEval (rewrite Hb3; rgne; rewrite HR1s1) in "Hf3".
-    iAssert (il_frame m) with "[Hf1 Hf2 Hf3 S4]" as "Hframe".
+    iAssert (il_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 S4]" as "Hframe".
     { rewrite /il_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |].
@@ -2369,7 +2369,7 @@ Section ProofIlockMain.
                       = i_valid ip).
     { rgne. rewrite HmfS1. reflexivity. }
     iEval (rewrite -Hvaladr) in "Hvalid".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.ilock + 0x1a)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ilock + 0x1a)) Ra5 Rs1
               (mword_of_int 64 : mword 12) mf (K - 4)%nat (valid_word vv) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1a Hvalid").
     iIntros (CID12 Hq12) "Hcg Hpc Hvalid".

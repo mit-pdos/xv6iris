@@ -234,7 +234,7 @@ Module Type SYSCALL.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
              !irefslotG Σ, !pavG Σ, !iregG Σ}
-      `{GEN : GenId}(kt : ktier) {kt : ktier} ,
+      `{GEN : GenId} {kt : ktier},
       gname -> mword 64 -> bio_names -> fclose_names -> iProp Σ.
   Parameter wp_syscall_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
@@ -246,5 +246,5 @@ Module Type SYSCALL.
       (ip : mword 64) (dqi : dfrac)
       (m : regfile) (av : nat)
       (pid : mword 32) (V : pprivate) (lks : gset string),
-      wp_syscall_sconf_body kt syscall_env γf γs j γl bn fn us ip dqi m av pid V lks.
+      wp_syscall_sconf_body kt (syscall_env (kt := kt)) γf γs j γl bn fn us ip dqi m av pid V lks.
 End SYSCALL.

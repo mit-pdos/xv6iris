@@ -513,7 +513,7 @@ Section ProofFileread.
                    = a_freadable k).
     { rewrite (rget_ne R2 Ra0 ltac:(vm_compute; discriminate)) HR2a0. reflexivity. }
     iEval (rewrite -Hprd) in "Hcrd".
-    iApply (wp_lbu_s_sconf (mword_of_int (FR + 0x0a)) Ra5 Ra0
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x0a)) Ra5 Ra0
               (mword_of_int 8 : mword 12) R2 (K - 6)%nat (fc_readable Cf : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a Hcrd").
@@ -761,7 +761,7 @@ Section ProofFileread.
       { rewrite (rget_ne B3 Ra0 ltac:(vm_compute; discriminate)) HB3a0.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hpty) in "Hcty".
-      iApply (wp_clw_s_sconf (mword_of_int (FR + 0x1a)) Ra5 Ra0
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x1a)) Ra5 Ra0
                 (mword_of_int 0 : mword 12) B3 (K - 6)%nat (fc_type Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a Hcty").
@@ -844,7 +844,7 @@ Section ProofFileread.
                       = a_fpipe k).
         { rewrite (rget_ne B5 Ra0 ltac:(vm_compute; discriminate)) HB5a0. reflexivity. }
         iEval (rewrite -Hpp) in "Hcpp".
-        iApply (wp_cld_s_sconf (mword_of_int (FR + 0x64)) Ra0 Ra0
+        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x64)) Ra0 Ra0
                   (mword_of_int 16 : mword 12) B5 (K - 6)%nat (fc_pipe Cf) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi64 Hcpp").
@@ -1267,7 +1267,7 @@ Section ProofFileread.
              { rewrite (rget_ne D8 Ra5 ltac:(vm_compute; discriminate)) HD8a5.
                apply addv_sext0. }
              iEval (rewrite -Hpsl) in "Hslot".
-             iApply (wp_cld_s_sconf (mword_of_int (FR + 0x8e)) Ra5 Ra5
+             iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x8e)) Ra5 Ra5
                        (mword_of_int 0 : mword 12) D8 (K - 6)%nat (frn_rp fn (dev_major Cf)) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi8e Hslot").
@@ -1742,7 +1742,7 @@ Section ProofFileread.
                             = a_fip k).
              { rewrite (rget_ne B7 Ra0 ltac:(vm_compute; discriminate)) HB7a0. reflexivity. }
              iEval (rewrite -Hpip) in "Hcip".
-             iApply (wp_cld_s_sconf (mword_of_int (FR + 0x2e)) Ra0 Ra0
+             iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x2e)) Ra0 Ra0
                        (mword_of_int 24 : mword 12) B7 (K - 6)%nat (fc_ip Cf) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi2e Hcip").
@@ -1892,7 +1892,7 @@ Section ProofFileread.
                              = a_foff k).
              { rewrite (rget_ne J1 Rs1 ltac:(vm_compute; discriminate)) HJ1s1. reflexivity. }
              iEval (rewrite -Hpoff) in "Hoff".
-             iApply (wp_clw_s_sconf (mword_of_int (FR + 0x36)) Ra3 Rs1
+             iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x36)) Ra3 Rs1
                        (mword_of_int 32 : mword 12) J1 (K - 6)%nat v b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi36 Hoff").
@@ -1931,7 +1931,7 @@ Section ProofFileread.
                              = a_fip k).
              { rewrite (rget_ne J4 Rs1 ltac:(vm_compute; discriminate)) HJ4s1. reflexivity. }
              iEval (rewrite -Hpip2) in "Hcip".
-             iApply (wp_cld_s_sconf (mword_of_int (FR + 0x3c)) Ra0 Rs1
+             iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x3c)) Ra0 Rs1
                        (mword_of_int 24 : mword 12) J4 (K - 6)%nat (fc_ip Cf) b
                        ltac:(vm_compute; discriminate) ltac:(rdok)
                        with "Hcg Hpc Hi3c Hcip").
@@ -2165,7 +2165,7 @@ Section ProofFileread.
                 { rewrite (rget_ne M1 Rs1 ltac:(vm_compute; discriminate)) HM1s1.
                   reflexivity. }
                 iEval (rewrite -Hpip3) in "Hcip".
-                iApply (wp_cld_s_sconf (mword_of_int (FR + 0x4e)) Ra0 Rs1
+                iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x4e)) Ra0 Rs1
                           (mword_of_int 24 : mword 12) M1 (K - 6)%nat (fc_ip Cf) b
                           ltac:(vm_compute; discriminate) ltac:(rdok)
                           with "Hcg Hpc Hi4e Hcip").
@@ -2329,7 +2329,7 @@ Section ProofFileread.
                 { rewrite (rget_ne M1 Rs1 ltac:(vm_compute; discriminate)) HM1s1.
                   reflexivity. }
                 iEval (rewrite -Hpoff2) in "Hoff".
-                iApply (wp_clw_s_sconf (mword_of_int (FR + 0x48)) Ra5 Rs1
+                iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x48)) Ra5 Rs1
                           (mword_of_int 32 : mword 12) M1 (K - 6)%nat v b
                           ltac:(vm_compute; discriminate) ltac:(rdok)
                           with "Hcg Hpc Hi48 Hoff").
@@ -2444,7 +2444,7 @@ Section ProofFileread.
                 { rewrite (rget_ne M4 Rs1 ltac:(vm_compute; discriminate)) HM4s1.
                   reflexivity. }
                 iEval (rewrite -Hpip3) in "Hcip".
-                iApply (wp_cld_s_sconf (mword_of_int (FR + 0x4e)) Ra0 Rs1
+                iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FR + 0x4e)) Ra0 Rs1
                           (mword_of_int 24 : mword 12) M4 (K - 6)%nat (fc_ip Cf) b
                           ltac:(vm_compute; discriminate) ltac:(rdok)
                           with "Hcg Hpc Hi4e Hcip").

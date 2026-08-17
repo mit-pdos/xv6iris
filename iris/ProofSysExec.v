@@ -366,6 +366,7 @@ Proof. lia. Qed.
 (* ===================================================================== *)
 Section SysExecZeros.
   Context `{!riscvGS Σ}.
+  Context {kt : ktier}.
 
   Lemma sx_zero_slot (a : mword 64) (zb : bv 8) :
     (forall j, (j < 8)%nat -> nth_byte (mword_of_int 0 : mword 64) j = zb) ->

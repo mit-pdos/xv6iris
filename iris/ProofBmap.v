@@ -3607,7 +3607,7 @@ Section BmapSeal.
     iAssert (bm_prk (kt := kt) (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γu γd)
       as "#Hprk".
     { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
-    iApply (Core.wp_bmap_gen kt γs j γl γu γd γk pd pav pu bn
+    iApply (Core.wp_bmap_gen (kt := kt) γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γfs
               cov logstart dev ip bm data fbn n false Sb0 pidv dq dqd m K eb b lks
               ltac:(intros _ GEN0 CID0;
@@ -3689,7 +3689,7 @@ Section BmapSeal.
     iAssert (bm_prk (kt := kt) (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γu γd)
       as "#Hprk".
     { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
-    iApply (Core.wp_bmap_gen kt γs j γl γu γd γk pd pav pu bn
+    iApply (Core.wp_bmap_gen (kt := kt) γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γfs
               cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb b lks
               ltac:(intros _ GEN0 CID0;

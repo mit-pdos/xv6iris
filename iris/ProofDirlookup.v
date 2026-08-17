@@ -755,7 +755,7 @@ Section ProofDirlookupMain.
                     = mword_of_int (DL + 0x26)) by pcw.
     iEval (rewrite Hpp26) in "Hpc".
     (* ===== +0x26 c.lw a5,76(a0) : dp->size ===== *)
-    iApply (wp_clw_s_sconf (mword_of_int (DL + 0x26)) Ra5 Ra0
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (DL + 0x26)) Ra5 Ra0
               (mword_of_int 76 : mword 12) R7 (K - 12)%nat (di_size dn : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi26 [Hisz]").
     { iEval (rgne; rewrite HR7a0). iExact "Hisz". }
@@ -891,7 +891,7 @@ Section ProofDirlookupMain.
     (* ================================================================= *)
     assert (Hcsra : is_cs_idx Rra = false) by (vm_compute; reflexivity).
     iAssert (□ wp_next (CID0 := CID) true pj (fun CIDt : CpuId =>
-               dl_tail_body (kt := kt) m sp0 pj ret_tgt K b CIDt))%I with "[]" as "#Htail".
+               dl_tail_body m sp0 pj ret_tgt K b CIDt))%I with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt uu10 dnew) "%HTr Hcg Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7
                                       Hb8 Hb9 Hb10 Hde Hqc".
@@ -1239,7 +1239,7 @@ Section ProofDirlookupMain.
       (* =============================================================== *)
       iAssert (∀ fuel : nat,
         wp_next (CID0 := CID) true pj (fun CIDl : CpuId =>
-          dl_loop_body (kt := kt) nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks
+          dl_loop_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b eb hasp lks
             dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr bm fuel CIDl))%I
         with "[]" as "Hloop".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -1262,7 +1262,7 @@ Section ProofDirlookupMain.
         assert (Hoffs : Z.of_nat (16 * S i) = Z.of_nat (16 * i) + 16) by lia.
         (* ------------- THE LATCH at +0x52 (both misses land here) ------- *)
         iAssert (wp_next (CID0 := CIDl) true pj (fun CIDp : CpuId =>
-                   dl_latch_body (kt := kt) nrec dn data s m sp0 ip nb pf pj ret_tgt K b
+                   dl_latch_body nrec dn data s m sp0 ip nb pf pj ret_tgt K b
                      eb hasp lks dq dqd dqn dev pofv pidv fn bn gfs gi dinum dr
                      bm i CIDp))%I
           with "[]" as "Hlatch".
@@ -1306,7 +1306,7 @@ Section ProofDirlookupMain.
           (* +0x54 lw a5,76(s2) : the size is re-read every iteration *)
           iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
           iEval (rewrite /i_size) in "Hisz".
-          iApply (wp_lw_s_sconf (mword_of_int (DL + 0x54)) Ra5 Rs2
+          iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (DL + 0x54)) Ra5 Rs2
                     (mword_of_int 76 : mword 12) Q1 (K - 12)%nat
                     (di_size dn : mword 32) b
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi54 [Hisz]").

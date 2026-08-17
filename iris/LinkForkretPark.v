@@ -28,8 +28,8 @@ Require Import SpecForkretPark.
 Module ForkretPark : FORKRET_PARK.
   Axiom forkret_park :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γs : list gname)
+      (kt : ktier) (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),
-      forkret_park_body γs γf pa ks rest pid V.
+      forkret_park_body kt γs γf pa ks rest pid V.
 End ForkretPark.

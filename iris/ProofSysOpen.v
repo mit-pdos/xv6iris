@@ -571,7 +571,7 @@ Section ProofSysOpenBody.
     iPoseProof (soi_0b4 with "Htext") as "Hib4".
     (* ===== +0x88 sd s1,24(s2) -- f->ip = ip ===== *)
     iEval (rewrite /a_fip /foff_of) in "Hfip".
-    iApply (wp_sd_s_sconf (CID := CID0) (mword_of_int (SO + 0x88)) Rs1 Rs2
+    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (CID := CID0) (mword_of_int (SO + 0x88)) Rs1 Rs2
               (mword_of_int 24 : mword 12) N (K - 24)%nat ipold b
               with "Hcg Hpc Hi88 [Hfip]").
     { iEval (rgne; rewrite HNs2). iExact "Hfip". }
@@ -644,7 +644,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp94) in "Hpc".
     (* ===== +0x98 sb a4,8(s2) -- f->readable ===== *)
     iEval (rewrite /a_freadable /foff_of) in "Hfrd".
-    iApply (wp_sb_s_sconf (CID := CID4) (mword_of_int (SO + 0x98)) Ra4 Rs2
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (CID := CID4) (mword_of_int (SO + 0x98)) Ra4 Rs2
               (mword_of_int 8 : mword 12) N3 (K - 24)%nat rd0 b
               with "Hcg Hpc Hi98 [Hfrd]").
     { iEval (rgne; rewrite HN3s2). iExact "Hfrd". }
@@ -690,7 +690,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hppa0) in "Hpc".
     (* ===== +0xa4 sb a4,9(s2) -- f->writable ===== *)
     iEval (rewrite /a_fwritable /foff_of) in "Hfwr".
-    iApply (wp_sb_s_sconf (CID := CID7) (mword_of_int (SO + 0xa4)) Ra4 Rs2
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (CID := CID7) (mword_of_int (SO + 0xa4)) Ra4 Rs2
               (mword_of_int 9 : mword 12) N5 (K - 24)%nat wr0 b
               with "Hcg Hpc Hia4 [Hfwr]").
     { iEval (rgne; rewrite HN5s2). iExact "Hfwr". }
@@ -1746,7 +1746,7 @@ Section ProofSysOpenBody.
     iEval (rewrite Hpp80) in "Hpc".
     (* ===== +0x84 sw zero,32(s2) -- f->off = 0 ===== *)
     iEval (rewrite /a_foff /foff_of) in "Hfoff".
-    iApply (wp_sw_zero_s_sconf (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
+    iApply (wp_sw_zero_s_sconf (kt := kt) (ktd := KT0) (CID := CID15) (mword_of_int (SO + 0x84)) Rs2
               (mword_of_int 32 : mword 12) M8 (K - 24)%nat voff b
               with "Hcg Hpc Hi84 [Hfoff]").
     { iEval (rgne; rewrite HM8s2). iExact "Hfoff". }

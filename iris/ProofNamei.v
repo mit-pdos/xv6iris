@@ -15,7 +15,7 @@
    So the one ghost move here is the FRAME CARVE, dirlookup's [de] move at a
    different depth: two [stack_own] words become sixteen bytes
    ([StackBytes.slot_bytes_own]), the sixteen are named by a function
-   ([ByteBuf.bb_any_named]) and split 14 + 2, the fourteen are what namex's
+   ([ByteBuf.bb_any_named (KTR := kt)]) and split 14 + 2, the fourteen are what namex's
    contract asks for, and after the call the fourteen (now at namex's
    UNSPECIFIED [nf]) and the untouched two are re-joined and folded back into
    two words for the pop.  Nothing about the buffer reaches this contract --
@@ -186,26 +186,26 @@ Section ProofNameiMain.
 
   Lemma nam_bytes_name (a : mword 64) (N : nat) :
     bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := kt) a N). Qed.
 
   Lemma nam_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := kt) a N f). Qed.
 
   (* 16 = 14 + 2: namex writes at most fourteen; the two above ride through *)
   Lemma nam_buf_split (a : mword 64) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ f j)
-    ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ f (14 + j)%nat).
+    ([∗ list] j ∈ seq 0 16, pa_add a j ↦ₘ[kt] f j) -∗
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] f j)
+    ∗ ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[kt] f (14 + j)%nat).
   Proof.
     change 16%nat with (14 + 2)%nat.
     rewrite (bb_split a 14 2 f). iIntros "[$ $]".
   Qed.
 
   Lemma nam_buf_join (a : mword 64) (f nf : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ nf j) -∗
-    ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ f (14 + j)%nat) -∗
+    ([∗ list] j ∈ seq 0 14, pa_add a j ↦ₘ[kt] nf j) -∗
+    ([∗ list] j ∈ seq 0 2, pa_add (pa_add a 14) j ↦ₘ[kt] f (14 + j)%nat) -∗
     bytes_own (KTR := kt) (DfracOwn 1) a 16.
   Proof.
     iIntros "H1 H2".

@@ -350,7 +350,7 @@ Section BallocEpilogue.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x7e) : mword 64) -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -621,7 +621,7 @@ Section BallocOut.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0xe8) : mword 64) -∗
     printk_env γpr γu γd -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -823,7 +823,7 @@ Section BallocOut.
       destruct (decide (c = Rs7)) as [->|Nx7]; [exact HQ7s7|].
       destruct (decide (c = Rs8)) as [->|Nx8]; [exact HQ7s8|].
       exact (HQ7thr9 c Hcs N2 N8 N9 Nx2 Nx3 Nx4 Nx5 Nx6 Nx7 Nx8). }
-    iAssert (ba_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]"
+    iAssert (ba_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]"
       as "Hframe".
     { rewrite /ba_frame.
       iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -1013,7 +1013,7 @@ Section BallocExhaust.
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv (kt := kt) γs -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1148,7 +1148,7 @@ Section BallocExhaust.
                      = sb_size).
     { rgne. rewrite HE2s6. unfold sb_size, pa_add, add_vec_int. apply f_equal. pcw. }
     iEval (rewrite -Hszadr) in "Hsbsz".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0x94)) Ra5 Rs6
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0x94)) Ra5 Rs6
               (mword_of_int 4 : mword 12) E2 (K - 10)%nat
               (mword_of_int size : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi94 Hsbsz").
@@ -1233,7 +1233,7 @@ Section BallocRestore.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x70) : mword 64) -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1437,7 +1437,7 @@ Section BallocRestore.
       destruct (decide (c = Rs7)) as [->|Nx7]; [exact HR7s7|].
       destruct (decide (c = Rs8)) as [->|Nx8]; [exact HR7s8|].
       exact (HR7thr9 c Hcs N2 N8 N9 Nx2 Nx3 Nx4 Nx5 Nx6 Nx7 Nx8). }
-    iAssert (ba_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]"
+    iAssert (ba_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]"
       as "Hframe".
     { rewrite /ba_frame.
       iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
@@ -1516,7 +1516,7 @@ Section BallocBzero.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2099,7 +2099,7 @@ Section BallocAlloc.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2557,7 +2557,7 @@ Section BallocScan.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    ba_frame m -∗
+    ba_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -3016,7 +3016,7 @@ Section BallocScan.
                          = pa_add (b_data (bpa kk)) d).
         { rgne. rewrite HS6a2. apply ba_data_off. }
         iEval (rewrite -Hbyadr) in "Hbyte".
-        iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.balloc + 0xd4)) Ra2 Ra2
+        iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xd4)) Ra2 Ra2
                   (mword_of_int 88 : mword 12) S6 (K - 10)%nat
                   (bm_byte used q) b ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hid4 Hbyte").
@@ -3627,7 +3627,7 @@ Section BallocMain.
                       = sb_size).
     { rgne. rewrite HR3a5. rewrite /sb_size /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hszadr1) in "Hsbsz".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0xe)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xe)) Ra5 Ra5
               (mword_of_int 2920 : mword 12) R3 (K - 10)%nat
               (mword_of_int size : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi00e Hsbsz").
@@ -3779,7 +3779,7 @@ Section BallocMain.
     iEval (rewrite Hb8; rgne; rewrite HR4s6) in "Hf8".
     iEval (rewrite Hb9; rgne; rewrite HR4s7) in "Hf9".
     iEval (rewrite Hb10; rgne; rewrite HR4s8) in "Hf10".
-    iAssert (ba_frame m)
+    iAssert (ba_frame (kt := kt) m)
       with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hframe".
     { rewrite /ba_frame.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
@@ -4008,7 +4008,7 @@ Section BallocMain.
     { rgne. rewrite HR12s6. unfold sb_bmapstart, pa_add, add_vec_int.
       apply f_equal. pcw. }
     iEval (rewrite -Hbmadr) in "Hsbbm".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0xa0)) Ra5 Rs6
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xa0)) Ra5 Rs6
               (mword_of_int 28 : mword 12) R12 (K - 10)%nat
               (mword_of_int bmapstart : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0a0 Hsbbm").
@@ -4243,7 +4243,7 @@ Section BallocMain.
     { rgne. rewrite HW1s6. unfold sb_size, pa_add, add_vec_int.
       apply f_equal. pcw. }
     iEval (rewrite -Hszadr2) in "Hsbsz".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.balloc + 0xae)) Ra0 Rs6
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.balloc + 0xae)) Ra0 Rs6
               (mword_of_int 4 : mword 12) W1 (K - 10)%nat
               (mword_of_int size : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0ae Hsbsz").

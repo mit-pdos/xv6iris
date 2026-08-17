@@ -1288,10 +1288,10 @@ Section ProofPiperead.
     (* the frame slots and the caller's continuation.                     *)
     (* ================================================================= *)
     pose (CPP := (wp_next (CID0 := CID) true pj (fun (CIDc : CpuId) =>
-        pr_cphase_body (kt := kt) spr s0v pi addrv pj sp0 vs6 vs7 vs8
+        pr_cphase_body spr s0v pi addrv pj sp0 vs6 vs7 vs8
           n m av γl γp w q pid V CIDc lks) : iProp Σ)).
     pose (EPIC := (wp_next (CID0 := CID) true pj (fun (CIDx : CpuId) =>
-               pr_epic_body (kt := kt) sp0 spr vs6 vs7 vs8 m av pj γp w q pid V n CIDx lks) : iProp Σ)).
+               pr_epic_body sp0 spr vs6 vs7 vs8 m av pj γp w q pid V n CIDx lks) : iProp Σ)).
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".

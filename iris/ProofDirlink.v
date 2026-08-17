@@ -605,6 +605,7 @@ Section DlBuf.
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             ICFG : icfg, !icacheG Σ, !irefslotG Σ, !pavG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
+  Context {kt : ktier}.
 
   (* the two frame slots the [de] occupies (10 and 9), carved into sixteen
      named bytes and put back *)
@@ -1580,7 +1581,7 @@ Section ProofDirlinkMain.
     (*  they get here, which is what [dl_tregs] says.                     *)
     (* ================================================================= *)
     iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDt : CpuId =>
-               dl_tail_body (kt := kt) j m sp0 ret_tgt K b CIDt))%I
+               dl_tail_body j m sp0 ret_tgt K b CIDt))%I
       with "[]" as "#Htail".
     { iModIntro.
       iIntros (CIDt Hst Mt w3 w5 w6 dnew)
@@ -2015,7 +2016,7 @@ Section ProofDirlinkMain.
       (* +0x1e lw s1,76(s2) : s1 := dp->size *)
       iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
       iEval (rewrite /i_size) in "Hisz".
-      iApply (wp_lw_s_sconf (mword_of_int (DK + 0x1e)) Rs1 Rs2
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (DK + 0x1e)) Rs1 Rs2
                 (mword_of_int 76 : mword 12) mdl (K - 10)%nat
                 (di_size dn : mword 32) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1e [Hisz]").
@@ -2043,7 +2044,7 @@ Section ProofDirlinkMain.
       (*  own continuation.                                                 *)
       (* ================================================================= *)
       iAssert (□ wp_next (CID0 := CID) true (proc_addr j) (fun CIDa : CpuId =>
-                 dl_after_body (kt := kt) j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
+                 dl_after_body j m sp0 ip nb dqd dev dqf dinum dn dn0 gfs bm
                    data dqn fn dqs inodestart dqbs size dqb bmapstart cov
                    logstart used gi dq pidv bn g ncount Sb K b eb k0 inum
                    nrec s ret_tgt CIDa lks))%I

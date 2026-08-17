@@ -1527,7 +1527,7 @@ Section ReadiLoop.
     (*  travel as wands.                                                 *)
     (* ================================================================ *)
     iAssert (∀ (CIDb : CpuId) (Mb : regfile) (mm : nat),
-        rd_chunk_body (kt := kt) j b K m nc tot o kkb usv ip off CIDa14 CIDb Mb mm)%I
+        rd_chunk_body j b K m nc tot o kkb usv ip off CIDa14 CIDb Mb mm)%I
       with "[Hcnt Hextc Hextm Hcont Hframe Hidev Hmeta Hmap Hdst
              Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
     { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs2 %Hbs4 %Hbs7
@@ -2495,7 +2495,7 @@ Section ReadiMain.
                        (sign_extend' 64 (mword_of_int 76 : mword 12))
                      = i_size ip) by (rgne; rewrite Ha0; reflexivity).
     iEval (rewrite -Hszadr) in "Hmz".
-    iApply (wp_clw_s_sconf pcE Ra5 Ra0 (mword_of_int 76 : mword 12)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) pcE Ra5 Ra0 (mword_of_int 76 : mword 12)
               m K (di_size dn : mword 32) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi00 Hmz").
     iIntros (CIDp0 Hqp0) "Hcg Hpc Hmz".
@@ -2981,7 +2981,7 @@ Section ReadiMain.
     (*  register file and the clamped count travel.                      *)
     (* ================================================================ *)
     iAssert (∀ (CIDt : CpuId) (Mt : regfile) (nc : nat),
-        rd_readtail_body (kt := kt) j b K m ip dn off n szn CIDs5 CIDt Mt nc)%I
+        rd_readtail_body j b K m ip dn off n szn CIDs5 CIDt Mt nc)%I
       with "[Hcnt Hextc Hextm Hcont Hframe Hidev Hmeta Hmap Hblocks
              Hdst Hsl]" as "TAIL".
     { iIntros (CIDt Mt nc) "%Hanch %Hncdef %Hncn %Hoffnc %Htsp %Hts5 %Hts6 %Hts7

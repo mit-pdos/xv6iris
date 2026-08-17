@@ -328,7 +328,7 @@ Section ProofSysMknodFrame.
                        H11 & H12 & H13 & H14 & H15 & H16 & H17 & H18 & H19 &
                        H20 & _)".
     change 128%nat with (8 * 16)%nat.
-    iDestruct (slotsn_bytes_own sp0 18 16 ltac:(lia)
+    iDestruct (slotsn_bytes_own (KTR := kt) sp0 18 16 ltac:(lia)
                  with "[H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
                         H17 H18]") as "[%Hal Hb]".
     { cbn [seq].
@@ -354,7 +354,7 @@ Section ProofSysMknodFrame.
   Proof.
     intro Hal. iIntros "H1 H2 H19 H20 Hb".
     change 128%nat with (8 * 16)%nat.
-    iDestruct (bytes_own_slotsn sp0 18 16 ltac:(lia) Hal with "Hb") as "Hs".
+    iDestruct (bytes_own_slotsn (KTR := kt) sp0 18 16 ltac:(lia) Hal with "Hb") as "Hs".
     cbn [seq].
     iDestruct "Hs" as "(K18 & K17 & K16 & K15 & K14 & K13 & K12 & K11 & K10 &
                         K9 & K8 & K7 & K6 & K5 & K4 & K3 & _)".
@@ -378,21 +378,21 @@ Section ProofSysMknodFrame.
      [seq]-indexed byte window, not [bytes_own] *)
   Lemma mn_bytes_name (a : mword 64) (N : nat) :
     bytes_own (KTR := kt) (DfracOwn 1) a N ⊢
-    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j.
-  Proof. rewrite /bytes_own. exact (bb_any_named a N). Qed.
+    ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j.
+  Proof. rewrite /bytes_own. exact (bb_any_named (KTR := kt) a N). Qed.
 
   Lemma mn_name_bytes (a : mword 64) (N : nat) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
-  Proof. rewrite /bytes_own. exact (bb_named_any a N f). Qed.
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[kt] f j) ⊢ bytes_own (KTR := kt) (DfracOwn 1) a N.
+  Proof. rewrite /bytes_own. exact (bb_named_any (KTR := kt) a N f). Qed.
 
   (* 128 = (k+1) + (127-k): create reads the NUL-terminated prefix, the rest
      rides through untouched *)
   Lemma mn_buf_split (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ f j) -∗
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j)
+    ([∗ list] j ∈ seq 0 128, pa_add a j ↦ₘ[kt] f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[kt] f j)
     ∗ ([∗ list] j ∈ seq 0 (127 - k)%nat,
-         pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat).
+         pa_add (pa_add a (S k)) j ↦ₘ[kt] f (S k + j)%nat).
   Proof.
     intro Hk.
     replace 128%nat with (S k + (127 - k))%nat by lia.
@@ -401,9 +401,9 @@ Section ProofSysMknodFrame.
 
   Lemma mn_buf_join (a : mword 64) (f : nat -> bv 8) (k : nat) :
     (k < 128)%nat ->
-    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ f j) -∗
+    ([∗ list] j ∈ seq 0 (S k), pa_add a j ↦ₘ[kt] f j) -∗
     ([∗ list] j ∈ seq 0 (127 - k)%nat,
-       pa_add (pa_add a (S k)) j ↦ₘ f (S k + j)%nat) -∗
+       pa_add (pa_add a (S k)) j ↦ₘ[kt] f (S k + j)%nat) -∗
     bytes_own (KTR := kt) (DfracOwn 1) a 128.
   Proof.
     intro Hk. iIntros "H1 H2".

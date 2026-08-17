@@ -422,7 +422,7 @@ Section ProofVirtioDiskRw.
                     = (b_blockno bp : mword 64)).
     { rewrite HR4a0 vdrw_sext_12. unfold b_blockno. reflexivity. }
     iPoseProof (rwi_01c with "Htext") as "Hi01c".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x01c) : mword 64) Rs7 Ra0
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.virtio_disk_rw + 0x01c) : mword 64) Rs7 Ra0
               (mword_of_int 12 : mword 12) R4 (K - 12)%nat bno eb (dqm := DfracOwn (1/2))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi01c [Hbno]").

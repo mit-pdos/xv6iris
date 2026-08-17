@@ -1650,7 +1650,7 @@ Section ProofCreateMain.
     ret_pc (m !!! Regidx Rra : mword 64) = ret_tgt ->
     kernel_text -∗
     □ wp_next (CID0 := CID) true (proc_addr j)
-        (fun CIDt : CpuId => cr_tail_body (kt := kt) j m sp0 ret_tgt K b lks CIDt).
+        (fun CIDt : CpuId => cr_tail_body j m sp0 ret_tgt K b lks CIDt).
   Proof.
     intros HKsum Hal10 Hal9 Hspm Hrt.
     assert (Hcsa0 : is_cs_idx Ra0 = false) by (vm_compute; reflexivity).
@@ -2012,7 +2012,7 @@ Section ProofCreateMain.
           retargeting, so this file hands over [Hcont] untouched. *)
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body (kt := kt) γfs γi cn γ γf bn cov logstart bmapstart inodestart
+            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
                          nib ninodes size dev used plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -2182,7 +2182,7 @@ Section ProofCreateMain.
        log_opS γ n3 Sb3 -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body (kt := kt) γfs γi cn γ γf bn cov logstart bmapstart inodestart
+            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
                          nib ninodes size dev used plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -2359,7 +2359,7 @@ Section ProofCreateMain.
        log_opS γ n4 Sb4 -∗
        wp_next (CID0 := CID) true (proc_addr j)
          (fun CIDc : CpuId =>
-            cr_cont_body (kt := kt) γfs γi cn γ γf bn cov logstart bmapstart inodestart
+            cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart
                          nib ninodes size dev used plen pfun pv ty major minor
                          V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                          ret_tgt CIDc) -∗
@@ -2450,7 +2450,7 @@ Section ProofCreateMain.
     log_opS γ u Sb -∗
     (* ---- THE PARKED ALLOCATE HALF, as a HYPOTHESIS ---- *)
     wp_next true (proc_addr j) (fun CIDa : CpuId =>
-      cr_alloc_body (kt := kt) γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
+      cr_alloc_body γs j γl γu γd γk pd pav pu bn γ γfs γi cn gtl γa γf γpr
                     cov logstart bmapstart inodestart nib ninodes size dev
                     used plen pfun (m !!! Regidx Ra0 : mword 64)
                     ty major minor V u Sb ns pidv dqb dqs dqbs dqn m
@@ -2458,7 +2458,7 @@ Section ProofCreateMain.
                     (ret_pc (m !!! Regidx Rra : mword 64)) K eb b lks CIDa) -∗
     (* ---- the contract's own continuation ---- *)
     wp_next true (proc_addr j) (fun CIDc : CpuId =>
-      cr_cont_body (kt := kt) γfs γi cn γ γf bn cov logstart bmapstart inodestart nib
+      cr_cont_body γfs γi cn γ γf bn cov logstart bmapstart inodestart nib
                    ninodes size dev used plen pfun (m !!! Regidx Ra0 : mword 64)
                    ty major minor V u Sb ns pidv dqb dqs dqbs dqn m K eb b lks j
                    (ret_pc (m !!! Regidx Rra : mword 64)) CIDc) -∗

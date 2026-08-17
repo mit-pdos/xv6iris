@@ -239,7 +239,7 @@ Section ProofWakeup.
        so the induction hypothesis is re-enterable at a migrated hart. *)
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
-                 wk_loop_body (kt := kt) pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
+                 wk_loop_body pme spF chan vra vs0 vs1 vs2 vs3 vs4 vs5
                    vs6 vs7 vs8 vs9 vs10 vs11 av lvl eb b lks CID0 fuel CID))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -458,7 +458,7 @@ Section ProofWakeup.
       (* the p++ tail at 0x30.                                            *)
       (* Stated at the FIXED hart CIDf -- the whole stretch is at [false]. *)
       (* =============================================================== *)
-      iAssert (wk_rel_body (kt := kt) γs γk pme spF chan av lvl k eb b
+      iAssert (wk_rel_body γs γk pme spF chan av lvl k eb b
                  vs6 vs7 vs8 vs9 vs10 vs11 CIDf)%I
         with "[Hown Hpay Hframe Htail]"
         as "Hrel".
@@ -591,7 +591,7 @@ Section ProofWakeup.
         replace (sign_extend' 64 (mword_of_int 32 : mword 12)) with (mword_of_int 32 : mword 64)
           by (apply bv_eq; vm_compute; reflexivity).
         reflexivity. }
-      iApply (wp_cld_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x3e))
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x3e))
                 (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12)
                 Macq (trap_res b + av)%nat ch false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e [Hpch]").
@@ -682,7 +682,7 @@ Section ProofWakeup.
           replace (sign_extend' 64 (mword_of_int 32 : mword 12)) with (mword_of_int 32 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           reflexivity. }
-        iApply (wp_sd_zero_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x44))
+        iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x44))
                   (mword_of_int 9 : mword 5) (mword_of_int 32 : mword 12)
                   M3e (trap_res b + av)%nat ch false
                   with "Hcg Hpc Hi44 [Hpch]").
@@ -702,7 +702,7 @@ Section ProofWakeup.
           replace (sign_extend' 64 (mword_of_int 24 : mword 12)) with (mword_of_int 24 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           reflexivity. }
-        iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
                   (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                   M3e (trap_res b + av)%nat st false ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi48 [Hpst]").
@@ -795,7 +795,7 @@ Section ProofWakeup.
             replace (sign_extend' 64 (mword_of_int 24 : mword 12)) with (mword_of_int 24 : mword 64)
               by (apply bv_eq; vm_compute; reflexivity).
             reflexivity. }
-          iApply (wp_sw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
+          iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
                     (mword_of_int 21 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                     M48 (trap_res b + av)%nat st false with "Hcg Hpc Hi4e [Hpst]").
           { iEval (rewrite Hea4e). iExact "Hpst". }

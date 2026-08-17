@@ -1100,7 +1100,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE INNER SCAN, entry +0x58, fuel induction on the remaining count. *)
     (* ================================================================== *)
-    iAssert (□ ( ∀ fuel : nat, sc_scan_body (kt := kt) γs av fuel))%I
+    iAssert (□ ( ∀ fuel : nat, sc_scan_body γs av fuel))%I
       with "[]" as "#Scan".
     { iModIntro. iIntros (fuel). iInduction fuel as [|fuel IH] "IH";
         iIntros (jj M ebc n) "%Hfuel %Hjj %Hn %Hpins %Htie Hcg Hpc Hcpu Hcsrs Hown Hexit".
@@ -1191,7 +1191,7 @@ Section ProofScheduler.
       (* +0x5e c.lw a5,24(s1) : read p->state *)
       assert (Hrec_st : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 24 : mword 12))
                         = p_state (proc_addr jj)) by (rgne; rewrite Hq1; apply sc_state_addr).
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.scheduler + 0x5e)) Ra5 Rs1 (mword_of_int 24 : mword 12)
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.scheduler + 0x5e)) Ra5 Rs1 (mword_of_int 24 : mword 12)
                 macq (av - 10)%nat st false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi5e [Hstate]").
       { iEval (rewrite Hrec_st). iExact "Hstate". }
@@ -1307,7 +1307,7 @@ Section ProofScheduler.
            stored value are read through [rget], so both need respelling. *)
         assert (HM2s1r : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
         assert (HM2s8r : trunc32 (rget M2 Rs8) = RUNNING) by (rgne; exact HM2s8).
-        iApply (wp_sw_s_sconf (mword_of_int (KernelSyms.scheduler + 0x64)) Rs8 Rs1 (mword_of_int 24 : mword 12)
+        iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.scheduler + 0x64)) Rs8 Rs1 (mword_of_int 24 : mword 12)
                   M2 (av - 10)%nat RUNNABLE false with "Hcg Hpc Hi64 [Hstate]").
         { iEval (rewrite HM2s1r sc_state_addr). iExact "Hstate". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
@@ -1323,7 +1323,7 @@ Section ProofScheduler.
         (* DISPATCH: c->proc : 0 -> &proc[jj].  A PLAIN STORE to memory this
            hart already owns whole -- no invariant, no mask change. *)
         assert (HM2s1rr : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
-        iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.scheduler + 0x68))
+        iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.scheduler + 0x68))
                   Rs1 Rs4 (mword_of_int 48 : mword 12)
                   M2 (av - 10)%nat zero_reg false
                   with "Hcg Hpc Hi68 [Hproc]").
@@ -1496,7 +1496,7 @@ Section ProofScheduler.
         (* RECLAIM: c->proc : &proc[jj] -> 0.  A PLAIN STORE, for the same
            reason the dispatch one is.  The hart tag came back WHOLE in the
            park payload and goes into proc jj's lock below. *)
-        iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.scheduler + 0x76))
+        iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.scheduler + 0x76))
                   Rs4 (mword_of_int 48 : mword 12)
                   m' (av - 10)%nat (proc_addr jj) false
                   with "Hcg Hpc Hi76 [Hproc]").
@@ -1716,7 +1716,7 @@ Section ProofScheduler.
     (* ================================================================== *)
     (* THE OUTER DISPATCH LOOP, entry +0x86, by iLöb.                     *)
     (* ================================================================== *)
-    iAssert (□ sc_outer_body (kt := kt) av)%I
+    iAssert (□ sc_outer_body av)%I
       with "[]" as "#Outer".
     { iModIntro. iLöb as "IHo".
       iIntros (M eb n) "%Hpo %Hn Hcg Hpc Hcpu Hcsrs Hown".

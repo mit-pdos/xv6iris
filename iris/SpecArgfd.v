@@ -140,6 +140,9 @@ Qed.
 
 Section SpecArgfd.
   Context `{!riscvGS Σ}.
+  (* the out-parameters are the CALLER's own locals -- stack cells on its
+     frame -- so they ride the caller's regime, not the ambient default. *)
+  Context {kt : ktier}.
 
   (* argfd's result, keyed by the returned a0 -- the [filealloc_post]
      shape.  Both disjuncts carry the pure guard, so the caller learns
@@ -153,7 +156,7 @@ Section SpecArgfd.
      ([pf] keeps its non-null premise: no landed caller passes 0 there.
      sys_read does, and will want the same treatment.) *)
   Definition ofd_out (a : mword 64) (w : mword 32) : iProp Σ :=
-    (if bool_decide (a = (zero_reg : mword 64)) then emp else a ↦₄ w)%I.
+    (if bool_decide (a = (zero_reg : mword 64)) then emp else a ↦₄[kt] w)%I.
 
   (* wand-shaped, so proofs compose with iDestruct/iPoseProof rather than
      needing a setoid rewrite inside the proofmode context *)
@@ -162,13 +165,13 @@ Section SpecArgfd.
   Proof. intro Hz. rewrite /ofd_out bool_decide_true; [|exact Hz]. done. Qed.
 
   Lemma ofd_out_intro (a : mword 64) (w : mword 32) :
-    a <> (zero_reg : mword 64) -> a ↦₄ w -∗ ofd_out a w.
+    a <> (zero_reg : mword 64) -> a ↦₄[kt] w -∗ ofd_out a w.
   Proof.
     intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
   Qed.
 
   Lemma ofd_out_elim (a : mword 64) (w : mword 32) :
-    a <> (zero_reg : mword 64) -> ofd_out a w -∗ a ↦₄ w.
+    a <> (zero_reg : mword 64) -> ofd_out a w -∗ a ↦₄[kt] w.
   Proof.
     intro Hn. rewrite /ofd_out bool_decide_false; [|exact Hn]. iIntros "$".
   Qed.
@@ -176,10 +179,10 @@ Section SpecArgfd.
   Definition argfd_post (pfd pf : mword 64) (oldfd : mword 32) (oldf : mword 64)
       (v : mword 64) (fs : list (mword 64)) (r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ arg_fd v fs = None⌝ ∗
-       ofd_out pfd oldfd ∗ pf ↦₈ oldf
+       ofd_out pfd oldfd ∗ pf ↦₈[kt] oldf
      ∨ ∃ (fd : nat) (fv : mword 64),
          ⌜r = (zero_reg : mword 64) /\ arg_fd v fs = Some (fd, fv)⌝ ∗
-         ofd_out pfd (trunc32 v) ∗ pf ↦₈ fv)%I.
+         ofd_out pfd (trunc32 v) ∗ pf ↦₈[kt] fv)%I.
 
 End SpecArgfd.
 
@@ -205,8 +208,8 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   cpu_own n eb p b lks -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   proc_priv γf p pid V -∗
-  ofd_out pfd oldfd -∗
-  pf ↦₈ oldf -∗
+  ofd_out (kt := kt) pfd oldfd -∗
+  pf ↦₈[kt] oldf -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -214,7 +217,7 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       cpu_own n eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid V -∗
-      argfd_post pfd pf oldfd oldf v (pv_ofile V)
+      argfd_post (kt := kt) pfd pf oldfd oldf v (pv_ofile V)
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

@@ -1329,12 +1329,12 @@ Section ProofSched.
          runs at avail 0 and the tail crosses in the payload instead. *)
       iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
       iEval (rewrite /sie_cap) in "Hcap".
-      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit)".
+      iDestruct "Hcap" as "(Hstk & Htr & Harm & #Hwit2)".
       iEval (rewrite Hcsp_Mc) in "Hstk".
       iAssert (sie_cap kt Mc 0%nat false pj) with "[Htr Harm]" as "Hcap0".
       { rewrite /sie_cap. iSplitR "Htr Harm".
         { rewrite Hcsp_Mc. by iApply (stack_own_0 (KTR := kt)). }
-        iFrame "Htr Harm Hwit". }
+        iFrame "Htr Harm Hwit2". }
       iDestruct (sie_cap_gpr_join Mc 0%nat false pj with "Hhs Hsc Hcap0 Hfile") as "Hcg0".
       (* frame ++ tail = the whole region sched was called with *)
       assert (Hgeom6 : pa_stk sp0 6 = spd).

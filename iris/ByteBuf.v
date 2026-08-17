@@ -279,6 +279,13 @@ Qed.
 
 Section ByteBuf.
   Context `{!riscvGS Σ}.
+  (* A byte run is memory like any other: a disk buffer or a page is KT0, a
+     STACK buffer rides its hart's regime.  So the family takes the ambient
+     tier (StackOwn.v / StackBytes.v's KTR discipline) and every existing KT0
+     consumer keeps resolving it to [curktier_default] for free.  The two
+     [page_own] lemmas are OUTSIDE this section: [KallocInv.byte_any] is
+     KT0-fixed, so they cannot be stated at a variable tier. *)
+  Context `{KTR : !CurKtier}.
 
   (* ------------------------------------------------------------------ *)
   (* Re-anchoring a window.  (InstrBytes has this as a [Local] lemma;    *)
@@ -468,10 +475,10 @@ Section ByteBuf.
   (* ------------------------------------------------------------------ *)
   Lemma bb_named_any (p : mword 64) (n : nat) (f : nat -> bv 8) :
     ([∗ list] j ∈ seq 0 n, pa_add p j ↦ₘ f j)
-    ⊢ [∗ list] j ∈ seq 0 n, byte_any (pa_add p j).
+    ⊢ [∗ list] j ∈ seq 0 n, ∃ b : bv 8, pa_add p j ↦ₘ b.
   Proof.
     iIntros "H". iApply (big_sepL_impl with "H").
-    iIntros "!>" (i j _) "Hb". rewrite /byte_any. iExists (f j). iExact "Hb".
+    iIntros "!>" (i j _) "Hb". iExists (f j). iExact "Hb".
   Qed.
 
   (* CHOICE over a [seq] window: a window of existentials is an existential
@@ -497,19 +504,10 @@ Section ByteBuf.
   Qed.
 
   Lemma bb_any_named (p : mword 64) (n : nat) :
-    ([∗ list] j ∈ seq 0 n, byte_any (pa_add p j))
+    ([∗ list] j ∈ seq 0 n, ∃ b : bv 8, pa_add p j ↦ₘ b)
     ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 n, pa_add p j ↦ₘ f j.
-  Proof. rewrite /byte_any. exact (bb_choose n 0 (fun k b => pa_add p k ↦ₘ b)%I). Qed.
+  Proof. exact (bb_choose n 0 (fun k b => pa_add p k ↦ₘ b)%I). Qed.
 
-  (* the two instances the copy loops actually use: a page, and a window
-     inside a page *)
-  Lemma bb_page_named (q : mword 64) :
-    page_own q ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.
-  Proof. rewrite /page_own. apply bb_any_named. Qed.
-
-  Lemma bb_page_of_named (q : mword 64) (f : nat -> bv 8) :
-    ([∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j) ⊢ page_own q.
-  Proof. rewrite /page_own. apply bb_named_any. Qed.
 
   (* ------------------------------------------------------------------ *)
   (* A [uint64 *] AS A BUFFER.                                          *)
@@ -620,3 +618,20 @@ Section ByteBuf.
   Qed.
 
 End ByteBuf.
+
+(* The two instances the copy loops actually use: a page, and a window inside
+   a page.  KT0 ONLY, and outside the section above for that reason:
+   [KallocInv.page_own] is a run of [byte_any], which is a physical,
+   identity-mapped page and carries no tier index. *)
+Section ByteBufPage.
+  Context `{!riscvGS Σ}.
+
+  Lemma bb_page_named (q : mword 64) :
+    page_own q ⊢ ∃ f : nat -> bv 8, [∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j.
+  Proof. rewrite /page_own /byte_any. apply bb_any_named. Qed.
+
+  Lemma bb_page_of_named (q : mword 64) (f : nat -> bv 8) :
+    ([∗ list] j ∈ seq 0 4096, pa_add q j ↦ₘ f j) ⊢ page_own q.
+  Proof. rewrite /page_own /byte_any. apply bb_named_any. Qed.
+End ByteBufPage.
+

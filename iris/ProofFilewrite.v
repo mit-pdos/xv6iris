@@ -1048,7 +1048,7 @@ Section ProofFilewrite.
   Local Lemma fw_env_fs (gf' : gname)
       (fn' : fwrite_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    filewrite_env (kt := kt) gf' fn' Cf' -∗ filewrite_fs_env gf' fn'.
+    filewrite_env (kt := kt) gf' fn' Cf' -∗ filewrite_fs_env (kt := kt) gf' fn'.
   Proof.
     intro Ht. rewrite /filewrite_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -1341,7 +1341,7 @@ Section ProofFilewrite.
       { rewrite (rget_ne Mt Rs2 ltac:(vm_compute; discriminate)) Hs2.
         reflexivity. }
       iEval (rewrite -Hpoff) in "Hcell".
-      iApply (wp_lw_s_sconf (mword_of_int (FW + 0xaa)) Ra5 Rs2
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0xaa)) Ra5 Rs2
                 (mword_of_int 32 : mword 12) Mt Kn v b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hiaa Hcell").
@@ -1807,7 +1807,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne mbo Rs2 ltac:(vm_compute; discriminate)) Hbos2.
       reflexivity. }
     iEval (rewrite -Hpip) in "Hcip".
-    iApply (wp_ld_s_sconf (mword_of_int (FW + 0x88)) Ra0 Rs2
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x88)) Ra0 Rs2
               (mword_of_int 24 : mword 12) mbo (K - 12)%nat (fc_ip Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi88 Hcip").
@@ -1946,7 +1946,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne Q1 Rs2 ltac:(vm_compute; discriminate)) HQ1s2.
       reflexivity. }
     iEval (rewrite -Hpoff) in "Hcell".
-    iApply (wp_lw_s_sconf (mword_of_int (FW + 0x92)) Ra3 Rs2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x92)) Ra3 Rs2
               (mword_of_int 32 : mword 12) Q1 (K - 12)%nat v b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi92 Hcell").
@@ -1998,7 +1998,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne Q4 Rs2 ltac:(vm_compute; discriminate)) HQ4s2.
       reflexivity. }
     iEval (rewrite -Hpip2) in "Hcip".
-    iApply (wp_ld_s_sconf (mword_of_int (FW + 0x9c)) Ra0 Rs2
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x9c)) Ra0 Rs2
               (mword_of_int 24 : mword 12) Q4 (K - 12)%nat (fc_ip Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi9c Hcip").
@@ -2250,7 +2250,7 @@ Section ProofFilewrite.
     { rewrite (rget_ne X0 Rs2 ltac:(vm_compute; discriminate)) HX0s2.
       reflexivity. }
     iEval (rewrite -Hpip3) in "Hcip".
-    iApply (wp_ld_s_sconf (mword_of_int (FW + 0xb4)) Ra0 Rs2
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0xb4)) Ra0 Rs2
               (mword_of_int 24 : mword 12) X0 (K - 12)%nat (fc_ip Cf) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib4 Hcip").
@@ -2725,7 +2725,7 @@ Section ProofFilewrite.
                    = a_fwritable k).
     { rewrite (rget_ne m Ra0 ltac:(vm_compute; discriminate)) Ha0. reflexivity. }
     iEval (rewrite -Hpwr) in "Hcwr".
-    iApply (wp_lbu_s_sconf pcE Ra5 Ra0 (mword_of_int 9 : mword 12) m K
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) pcE Ra5 Ra0 (mword_of_int 9 : mword 12) m K
               (fc_writable Cf : mword 8) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi00 Hcwr").
@@ -2930,7 +2930,7 @@ Section ProofFilewrite.
       { rewrite (rget_ne G3 Ra0 ltac:(vm_compute; discriminate)) HG3a0.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hpty) in "Hcty".
-      iApply (wp_clw_s_sconf (mword_of_int (FW + 0x1c)) Ra5 Ra0
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x1c)) Ra5 Ra0
                 (mword_of_int 0 : mword 12) G3 (K - 12)%nat (fc_type Cf) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1c Hcty").
@@ -3014,7 +3014,7 @@ Section ProofFilewrite.
                        = a_fpipe k).
         { rewrite (rget_ne G5 Ra0 ltac:(vm_compute; discriminate)) HG5a0. reflexivity. }
         iEval (rewrite -Hppi) in "Hcpp".
-        iApply (wp_cld_s_sconf (mword_of_int (FW + 0x54)) Ra0 Ra0
+        iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FW + 0x54)) Ra0 Ra0
                   (mword_of_int 16 : mword 12) G5 (K - 12)%nat (fc_pipe Cf) b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi54 Hcpp").

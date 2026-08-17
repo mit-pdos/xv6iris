@@ -512,7 +512,7 @@ Section ProofProcdumpLoop.
       (* THE ADVANCE JOIN, +0x66 .. +0x6a                                  *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDa : CpuId) =>
-        pdl_adv_body (kt := kt) CID0 spv p m0 K' eb b lks j CIDa))%I
+        pdl_adv_body CID0 spv p m0 K' eb b lks j CIDa))%I
         with "[]" as "#Hadv".
       { iModIntro. iIntros (CIDa Hsa Ma) "%Hra Hqx2 Hcg Hown Hpc Hpre2 Hsuf2".
         destruct Hra as [Hral Hrah].
@@ -597,7 +597,7 @@ Section ProofProcdumpLoop.
       (* THE PRINT JOIN, +0x56 .. +0x64                                    *)
       (* ================================================================ *)
       iAssert (□ wp_next (CID0 := CIDf) b p (fun (CIDp : CpuId) =>
-        pdl_print_body (kt := kt) CID0 spv p m0 K' eb b lks j CIDp))%I
+        pdl_print_body CID0 spv p m0 K' eb b lks j CIDp))%I
         with "[]" as "#Hprint".
       { iModIntro.
         iIntros (CIDp Hsp Mp sptr ss nm2 dq1 dq2 dq3 st2 pid2)
@@ -611,7 +611,7 @@ Section ProofProcdumpLoop.
                         = p_pid (proc_addr j)).
         { rgne. rewrite Ha3v. apply pd_cur_pid. }
         iEval (rewrite -Hpa56) in "Hpid2".
-        iApply (wp_lw_s_sconf (CID := CIDp)
+        iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (CID := CIDp)
                   (mword_of_int (KernelSyms.procdump + 0x56)) Ra1 Ra3
                   (mword_of_int 3800 : mword 12) Mp K' pid2 b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi56 Hpid2").
@@ -831,7 +831,7 @@ Section ProofProcdumpLoop.
                       = p_state (proc_addr j)).
       { rgne. rewrite (pdl_get_s1 H6e spv j Hrl6e). apply pd_cur_state. }
       iEval (rewrite -Hpa70) in "Hst".
-      iApply (wp_lw_s_sconf (CID := CID1)
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (CID := CID1)
                 (mword_of_int (KernelSyms.procdump + 0x70)) Ra5 Rs1
                 (mword_of_int 3776 : mword 12) H6e K' st b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi70 Hst").
@@ -1069,7 +1069,7 @@ Section ProofProcdumpLoop.
       { rgne. rewrite /H84 upd_eq Ha5_80 (pdl_get_s7 H80 spv j Hrl80).
         exact (pdl_table_addr k Hk). }
       iEval (rewrite -Hpa86) in "Htbl".
-      iApply (wp_cld_s_sconf (CID := CID8)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (CID := CID8)
                 (mword_of_int (KernelSyms.procdump + 0x86)) Ra2 Ra5
                 (mword_of_int 0 : mword 12) H84 K' (pd_state_p k) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi86 Htbl").

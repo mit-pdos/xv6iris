@@ -196,7 +196,7 @@ Section CwBodies.
   Proof.
     intro Hal. rewrite /cw_buf.
     change 32%nat with (8 * 4)%nat.
-    iApply (bytes_own_slotsn sp0 16 4 ltac:(lia) Hal).
+    iApply (bytes_own_slotsn (KTR := kt) sp0 16 4 ltac:(lia) Hal).
   Qed.
 
   (* ---- the register shape the loop maintains ----------------------- *)

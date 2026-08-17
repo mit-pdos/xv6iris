@@ -99,7 +99,7 @@ Section SpecFetchaddr.
   Context `{!riscvGS Σ}.
 
   (* fetchaddr's result, keyed by the returned a0 (the [argfd_post] shape). *)
-  Definition fetchaddr_post (ip oldv addr szv r : mword 64) : iProp Σ :=
+  Definition fetchaddr_post (kt : ktier) (ip oldv addr szv r : mword 64) : iProp Σ :=
     (⌜r = (mword_of_int (-1) : mword 64) /\ ¬ fetch_ok addr szv⌝ ∗ ip ↦₈[kt] oldv
      ∨ ⌜(r = (mword_of_int 0 : mword 64) \/ r = (mword_of_int (-1) : mword 64))
         /\ fetch_ok addr szv⌝ ∗ ∃ w : mword 64, ip ↦₈[kt] w)%I.
@@ -131,7 +131,7 @@ Definition wp_fetchaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG 
       cpu_own 0%nat eb p b lks -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_upt V P') -∗
-      fetchaddr_post ip oldv addr (pv_sz V)
+      fetchaddr_post kt ip oldv addr (pv_sz V)
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

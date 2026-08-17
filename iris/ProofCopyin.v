@@ -718,7 +718,7 @@ Section ProofCopyin.
       (*  THE +0x38 JOIN: the copy proper, over the chunk length [n].     *)
       (* ============================================================== *)
       iAssert (∀ (CIDc : CpuId) (mc : regfile) (n : nat),
-          ci_copy_body (kt := kt) b p CID0 off rem dst done P szv v11 K spr cur va0 pa0
+          ci_copy_body b p CID0 off rem dst done P szv v11 K spr cur va0 pa0
             CIDc mc n)%I
         with "[Hdst Hcnt Hpg Hback HEXIT]" as "BODY".
       { iIntros (CIDc mc n) "%Hanchorc %Hn1 %Hnrem %Hnoff %Hcs1 %Hca0 %Hcsp %Hcs2 %Hcs3

@@ -547,7 +547,7 @@ Section IallocEpilogue.
     cpu_own 0 true (proc_addr j) b lks -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x80) : mword 64) -∗
-    ia_frame m -∗
+    ia_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -770,7 +770,7 @@ Section IallocOut.
     kernel_text -∗ kernel_data -∗
     pc_is (mword_of_int (KernelSyms.ialloc + 0x66) : mword 64) -∗
     printk_env γpr γu γd -∗
-    ia_frame m -∗
+    ia_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -944,7 +944,7 @@ Section IallocOut.
       destruct (decide (c = Rs5)) as [->|Nx5]; [exact HQ6s5|].
       destruct (decide (c = Rs6)) as [->|Nx6]; [exact HQ6s6|].
       exact (HQ6thr8 c Hcs N2 N8 Nx1 Nx2 Nx3 Nx4 Nx5 Nx6). }
-    iAssert (ia_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hframe".
+    iAssert (ia_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hframe".
     { rewrite /ia_frame.
       iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
       iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
@@ -1142,7 +1142,7 @@ Section IallocClaim.
     itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     iref_slot -∗
-    ia_frame m -∗
+    ia_frame (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -1854,7 +1854,7 @@ Section IallocClaim.
       destruct (decide (c = Rs5)) as [->|Nx5]; [exact HV6s5|].
       destruct (decide (c = Rs6)) as [->|Nx6]; [exact HV6s6|].
       exact (HV6thr8 c Hcs N2 N8 Nx1 Nx2 Nx3 Nx4 Nx5 Nx6). }
-    iAssert (ia_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hframe".
+    iAssert (ia_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hframe".
     { rewrite /ia_frame.
       iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
       iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].
@@ -1958,7 +1958,7 @@ Section IallocScan.
          sie_cap_gpr kt Ml (K - 8)%nat b (proc_addr j) -∗
          cpu_own 0 true (proc_addr j) b lks -∗
          pc_is (mword_of_int (KernelSyms.ialloc + 0x30) : mword 64) -∗
-         ia_frame m -∗
+         ia_frame (kt := kt) m -∗
          p_pid (proc_addr j) ↦₄{dq} pidv -∗
          sb_ninodes ↦₄{dqn} (mword_of_int ninodes : mword 32) -∗
          sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -2060,7 +2060,7 @@ Section IallocScan.
                         = sb_inodestart).
       { rgne. rewrite HG0s4. rewrite /sb_inodestart /pa_add /add_vec_int. pcw. }
       iEval (rewrite -Hsbiadr) in "Hsbi".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ialloc + 0x34)) Ra5 Rs4
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0x34)) Ra5 Rs4
                 (mword_of_int 24 : mword 12) G0 (K - 8)%nat
                 (mword_of_int inodestart : mword 32) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 Hsbi").
@@ -2633,7 +2633,7 @@ Section IallocScan.
                           = sb_ninodes).
         { rgne. rewrite HGCs4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
         iEval (rewrite -Hsbnadr) in "Hsbn".
-        iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ialloc + 0x5a)) Ra4 Rs4
+        iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0x5a)) Ra4 Rs4
                   (mword_of_int 12 : mword 12) GC (K - 8)%nat
                   (mword_of_int ninodes : mword 32) b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi5a Hsbn").
@@ -2924,7 +2924,7 @@ Section IallocMain.
                     = sb_ninodes).
     { rgne. rewrite HR3a4. rewrite /sb_ninodes /pa_add /add_vec_int. pcw. }
     iEval (rewrite -Hnadr) in "Hsbn".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.ialloc + 0xc)) Ra4 Ra4
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.ialloc + 0xc)) Ra4 Ra4
               (mword_of_int 2110 : mword 12) R3 (K - 8)%nat
               (mword_of_int ninodes : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0c Hsbn").
@@ -3092,7 +3092,7 @@ Section IallocMain.
     iEval (rewrite Hb6; rgne; rewrite HR5s4) in "Hf6".
     iEval (rewrite Hb7; rgne; rewrite HR5s5) in "Hf7".
     iEval (rewrite Hb8; rgne; rewrite HR5s6) in "Hf8".
-    iAssert (ia_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hframe".
+    iAssert (ia_frame (kt := kt) m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8]" as "Hframe".
     { rewrite /ia_frame.
       iSplitL "Hf1"; [iExact "Hf1"|]. iSplitL "Hf2"; [iExact "Hf2"|].
       iSplitL "Hf3"; [iExact "Hf3"|]. iSplitL "Hf4"; [iExact "Hf4"|].

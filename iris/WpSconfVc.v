@@ -452,7 +452,7 @@ Section WpSconfVc.
   (* ==================================================================== *)
   Definition vframe_own (ρ : nat -> mword 64) (fr : list sval) : iProp Σ :=
     ([∗ list] a ∈ fr, ∃ w : bv 64,
-        word_pointsto (sval_den ρ a) (DfracOwn 1) w)%I.
+        word_pointsto (KTR := kt) (sval_den ρ a) (DfracOwn 1) w)%I.
 
   Lemma vframe_own_nil (ρ : nat -> mword 64) : ⊢ vframe_own ρ [].
   Proof. rewrite /vframe_own big_sepL_nil. done. Qed.
@@ -465,7 +465,7 @@ Section WpSconfVc.
       (fr' : list sval) :
     frame_remove fr a = Some fr' ->
     vframe_own ρ fr ⊣⊢
-    (∃ w : bv 64, word_pointsto (sval_den ρ a) (DfracOwn 1) w) ∗ vframe_own ρ fr'.
+    (∃ w : bv 64, word_pointsto (KTR := kt) (sval_den ρ a) (DfracOwn 1) w) ∗ vframe_own ρ fr'.
   Proof.
     revert fr'. induction fr as [|a0 t IHt]; intros fr' H; simpl in H;
       [discriminate|].
@@ -484,8 +484,8 @@ Section WpSconfVc.
   Lemma vheap_own_delete (ρ : nat -> mword 64) (h : list (sval * sval))
       (i : nat) (a v : sval) :
     h !! i = Some (a, v) ->
-    vheap_own ρ h ⊣⊢
-    ((sval_den ρ a) ↦₈ (sval_den ρ v) ∗ vheap_own ρ (delete i h))%I.
+    vheap_own (KTR := kt) ρ h ⊣⊢
+    ((sval_den ρ a) ↦₈[kt] (sval_den ρ v) ∗ vheap_own (KTR := kt) ρ (delete i h))%I.
   Proof.
     intro Hi.
     rewrite /vheap_own.
@@ -499,8 +499,8 @@ Section WpSconfVc.
 
   Lemma vheap_own_snoc (ρ : nat -> mword 64) (h : list (sval * sval))
       (a v : sval) :
-    vheap_own ρ (h ++ [(a, v)]) ⊣⊢
-    vheap_own ρ h ∗ ((sval_den ρ a) ↦₈ (sval_den ρ v))%I.
+    vheap_own (KTR := kt) ρ (h ++ [(a, v)]) ⊣⊢
+    vheap_own (KTR := kt) ρ h ∗ ((sval_den ρ a) ↦₈[kt] (sval_den ρ v))%I.
   Proof. by rewrite /vheap_own big_sepL_app big_sepL_singleton. Qed.
 
   (* absorbing a pop's slots: the reclaimed region as base-anchored
@@ -509,10 +509,10 @@ Section WpSconfVc.
       (h h' : list (sval * sval)) (fr fr' : list sval) :
     sval_is64 v = true ->
     pop_absorb h fr v js = Some (h', fr') ->
-    vheap_own ρ h -∗ vframe_own ρ fr -∗
-    vheap_own ρ h' ∗ vframe_own ρ fr' ∗
+    vheap_own (KTR := kt) ρ h -∗ vframe_own ρ fr -∗
+    vheap_own (KTR := kt) ρ h' ∗ vframe_own ρ fr' ∗
     ([∗ list] j ∈ js, ∃ w : bv 64,
-       word_pointsto (add_vec_int (sval_den ρ v) (8 * Z.of_nat j)) (DfracOwn 1) w).
+       word_pointsto (KTR := kt) (add_vec_int (sval_den ρ v) (8 * Z.of_nat j)) (DfracOwn 1) w).
   Proof.
     intros Hv64. revert h fr.
     induction js as [|j rest IHjs]; intros h fr Habs; simpl in Habs.
@@ -561,7 +561,7 @@ Section WpSconfVc.
       (k : nat) :
     sval_den ρ v = pa_stk spN k ->
     ([∗ list] j ∈ seq 0 k, ∃ w : bv 64,
-       word_pointsto (add_vec_int (sval_den ρ v) (8 * Z.of_nat j)) (DfracOwn 1) w)
+       word_pointsto (KTR := kt) (add_vec_int (sval_den ρ v) (8 * Z.of_nat j)) (DfracOwn 1) w)
     ⊢ stack_own (KTR := kt) spN k.
   Proof. intro Hb. rewrite (stack_own_base (KTR := kt)) Hb. done. Qed.
 
@@ -580,7 +580,7 @@ Section WpSconfVc.
     sie_cap_gpr kt m (n - vsu st) b p -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
-    vheap_own ρ (vsb st).(vheap) -∗
+    vheap_own (KTR := kt) ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -588,7 +588,7 @@ Section WpSconfVc.
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m0 ⌝ -∗
       sie_cap_gpr kt mf (n - vsu st') b p -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
-      vheap_own ρ (vsb st').(vheap) -∗
+      vheap_own (KTR := kt) ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
       vframe_own ρ (vsf st') -∗
       WP (Loop : expr riscv_lang))) -∗
@@ -816,7 +816,7 @@ Section WpSconfVc.
           iEval (rewrite /wp_next). iIntros (CID6 Hs6) "Hcg Hpc Hslot".
           iEval (rewrite avi_mword) in "Hpc".
           iEval (rewrite Hrget2 Hm2 -Hea) in "Hslot".
-          iAssert (vheap_own ρ (vheap vb ++ [(sval_addZ v1 (zoff6 uimm), v2)]))
+          iAssert (vheap_own (KTR := kt) ρ (vheap vb ++ [(sval_addZ v1 (zoff6 uimm), v2)]))
             with "[Hheap Hslot]" as "Hheap".
           { rewrite vheap_own_snoc. iFrame "Hheap Hslot". }
           iDestruct (wp_next_shift Hs6 with "Hcont") as "Hcont".
@@ -1034,7 +1034,7 @@ Section WpSconfVc.
              iEval (rewrite /wp_next). iIntros (CID13 Hs13) "Hcg Hpc Hslot".
              iEval (rewrite avi_mword) in "Hpc".
              iEval (rewrite Hsv -Hea) in "Hslot".
-             iAssert (vheap_own ρ (vheap vb ++ [(sval_addZ v1 (zimm12 imm), v2)]))
+             iAssert (vheap_own (KTR := kt) ρ (vheap vb ++ [(sval_addZ v1 (zimm12 imm), v2)]))
                with "[Hheap Hslot]" as "Hheap".
              { rewrite vheap_own_snoc. iFrame "Hheap Hslot". }
              iDestruct (wp_next_shift Hs13 with "Hcont") as "Hcont".
@@ -1046,7 +1046,7 @@ Section WpSconfVc.
              iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hcg Hpc Hslot".
              iEval (rewrite avi_mword) in "Hpc".
              iEval (rewrite Hsv -Hea) in "Hslot".
-             iAssert (vheap_own ρ (vheap vb ++ [(sval_addZ v1 (zimm12 imm), v2)]))
+             iAssert (vheap_own (KTR := kt) ρ (vheap vb ++ [(sval_addZ v1 (zimm12 imm), v2)]))
                with "[Hheap Hslot]" as "Hheap".
              { rewrite vheap_own_snoc. iFrame "Hheap Hslot". }
              iDestruct (wp_next_shift Hs14 with "Hcont") as "Hcont".
@@ -1197,7 +1197,7 @@ Section WpSconfVc.
     sie_cap_gpr kt m (n - vsu st) b p -∗
     pc_is (mword_of_int (vsb st).(vpc)) -∗
     block_instrs_s (vsb st).(vpc) prog -∗
-    vheap_own ρ (vsb st).(vheap) -∗
+    vheap_own (KTR := kt) ρ (vsb st).(vheap) -∗
     vheap4_own ρ (vsb st).(vheap4) -∗
     vframe_own ρ (vsf st) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1205,7 +1205,7 @@ Section WpSconfVc.
       ⌜ gpr_matches ρ (vsb st').(vregs) mf ∧ agree_off (vsb st').(vregs) mf m ⌝ -∗
       sie_cap_gpr kt mf (n - vsu st') b p -∗
       pc_is (mword_of_int (vsb st').(vpc)) -∗
-      vheap_own ρ (vsb st').(vheap) -∗
+      vheap_own (KTR := kt) ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
       vframe_own ρ (vsf st') -∗
       WP (Loop : expr riscv_lang))) -∗
