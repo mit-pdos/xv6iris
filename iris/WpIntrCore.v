@@ -40,6 +40,9 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import MinstretInv.
 Require Import WpDecode ExecCommon.
+(* the swp layer, for the footprinted twins of the dispatch chain below *)
+Require Import HartSwp HartLift HartRegNode HartSpan HartSpanChar HartGoodb
+        HartMFrame WpDecodeBridge WpMmodeCsrSwp.
 Require Import WpGprMret.
 Require Import SmodeCore.
 From Kernel Require Import KernelInstrs.
@@ -103,6 +106,125 @@ Proof.
             (exec_external_interrupts_pending_reduce s meip seip HES Hmeip Hseip)).
   rewrite Hmip. apply exec_returnm.
 Qed.
+
+
+(* ===================================================================== *)
+(* THE SAME CHAIN AT THE SWP LAYER.                                       *)
+(*                                                                       *)
+(* THE PLIC WIRES ARE ∀-BOUND, and that is the point rather than a        *)
+(* concession.  [sig_meip] / [sig_seip] are ordinary registers whose      *)
+(* points-to's live in [WireInv.wire_inv], owned exclusively per CPU.  An *)
+(* invariant opens around ONE atomic step and this dispatch is many nodes, *)
+(* so no caller can hold them across it -- and none should want to: under  *)
+(* per-node stepping another hart may move a wire BETWEEN these nodes,     *)
+(* which is exactly why the cycle rule offers both arms.  So the wire      *)
+(* reads are OFF-FRAME reads ([swp_read_reg_any], which needs no ownership *)
+(* at all), they peel to a ∀-binder, and the answer is EXISTENTIAL in      *)
+(* their values.                                                          *)
+(*                                                                       *)
+(* This is also the one stretch of the S-mode path the [goodb] bridge      *)
+(* cannot carry: [getPendingSet] is event-free, but [hval_of_goodb]        *)
+(* requires every certified read to be IN THE FOOTPRINT, and the wires are *)
+(* precisely the registers that cannot be.  Hence a hand walk, mirroring   *)
+(* the exec proofs above node for node.                                    *)
+(* ===================================================================== *)
+Section SwpDispatch.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma swp_external_interrupts_pending_S (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs : regstate) (dst : mstate)
+      (Db : register -> bool) :
+    Drw ## Dro ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (external_interrupts_pending tt)
+      (fun v => ∃ meip seip : mword 1, ⌜v = s_ext_ip meip seip⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDb Hag HES HESg.
+    iIntros "#Hcert Hrw Hro".
+    unfold external_interrupts_pending.
+    (* the FIRST wire: nobody owns it, so it peels to a binder *)
+    iApply (swp_bind_use (Defs.read_reg sig_meip) _ _ _ with "[] [-]").
+    { iApply (swp_read_reg_any sig_meip (fun _ => True%I) with "Hcert").
+      by iIntros (v). }
+    iIntros (meip) "_".
+    iApply (swp_bind_use (currentlyEnabled Ext_S) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_span Drw Dro Df rs rs _ _ Hdisj
+                (hval_of_goodb Db (Drw ∪ Dro) Drw _ dst rs _ HDb Hag HESg HES)
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". cbn match.
+    (* ...and the second *)
+    iApply (swp_bind_use (Defs.read_reg sig_seip) _ _ _ with "[] [-]").
+    { iApply (swp_read_reg_any sig_seip (fun _ => True%I) with "Hcert").
+      by iIntros (v). }
+    iIntros (seip) "_".
+    iApply swp_ret. iExists meip, seip. unfold s_ext_ip. by iFrame.
+  Qed.
+
+
+  Lemma swp_read_mip_S (Drw Dro : gset register) (Df : register -> dfrac)
+      (rs : regstate) (dst : mstate) (Db : register -> bool)
+      (mip_v : mword 64) :
+    Drw ## Dro ->
+    (mip : register) ∈ Drw ∪ Dro ->
+    register_lookup mip rs = mip_v ->
+    (forall r : register, Db r = true -> r ∈ Drw ∪ Dro) ->
+    (forall r : register, Db r = true ->
+       register_lookup r rs = register_lookup r dst.(sregs)) ->
+    exec (currentlyEnabled Ext_S) dst = Some (true, dst) ->
+    goodb Db (currentlyEnabled Ext_S) dst = true ->
+    gen_cert -∗
+    hreg_frame rs Drw -∗
+    hreg_frame_ro Df rs Dro -∗
+    swp (read_mip IncludePlatformInterrupts)
+      (fun v => ∃ meip seip : mword 1, ⌜v = s_mip_bits mip_v meip seip⌝ ∗
+                hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
+  Proof.
+    intros Hdisj HDmip Hmip HDb Hag HES HESg.
+    iIntros "#Hcert Hrw Hro".
+    unfold read_mip. cbn match.
+    iApply (swp_bind_use (Defs.read_reg mip) _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDmip
+                with "Hcert Hrw Hro"). }
+    iIntros (v) "(-> & Hrw & Hro)". rewrite Hmip.
+    iApply (swp_bind_use (external_interrupts_pending tt) _ _ _
+              with "[Hrw Hro] [-]").
+    { iApply (swp_external_interrupts_pending_S Drw Dro Df rs dst Db Hdisj
+                HDb Hag HES HESg with "Hcert Hrw Hro"). }
+    iIntros (v). iDestruct 1 as (meip seip) "(-> & Hrw & Hro)".
+    iApply swp_ret. iExists meip, seip. unfold s_mip_bits. by iFrame.
+  Qed.
+
+  (* [getPendingSet Supervisor] IS THE NEXT ONE, and the two lemmas above are
+     the parts that needed thought -- the wires.  What is left is the two
+     boolean blocks ([mIE], [sIE]) that [exec_getPendingSet_S_reduce] builds
+     inline as [HmIEt] / [HsIE].
+
+     DO NOT peel them by hand with [unfold Defs.or_boolM, Defs.and_boolM] and
+     [mbind_ret]: the operands are [returnM] applications, so [mbind_ret]'s
+     [Interface.Ret] LHS does not match, and widening the [cbn] to fix that
+     unfolds [Defs.bind] across the whole goal -- the reduction discipline's
+     first rule.  BRIDGE them instead: each block reads only mstatus, which is
+     framed, so [set] the block out of the goal, prove its [exec] fact by
+     copying the assert from [exec_getPendingSet_S_reduce] verbatim, prove its
+     [goodb] certificate the way the walk's blocks are done in [CommonWalk],
+     and hand the pair to [hval_of_goodb].  Then the outcome test and the
+     [and_vec_zeros64_r] step are the exec proof's last four lines unchanged.
+
+     After that, [swp_dispatchInterrupt_S] is one [swp_bind_use] over this
+     plus the [findPendingInterrupt] match -- and it is exactly the dispatch
+     obligation [HartRunGen.swp_run_hart_active_gen] asks for, with [Qi]
+     instantiated by the caller. *)
+
+End SwpDispatch.
 
 (* getPendingSet Supervisor, SIE left SYMBOLIC: the M-destined set is dead
    (mie & ~mideleg = 0), and the outcome is the [s_dispatch]-shaped test. *)
