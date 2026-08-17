@@ -495,6 +495,50 @@ Section gpr.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (* A REGISTER NODE AT ONE OWNED CELL.                                    *)
+  (*                                                                      *)
+  (* [HartSpanChar]'s [swp_read_reg_pinned] / [swp_write_reg_owned] are     *)
+  (* frame-shaped, which is right for the wrapper but wrong for a leaf: a    *)
+  (* leaf holds [PC ↦ᵣ pc] and [nextPC ↦ᵣ _], not a footprint.  These are   *)
+  (* the same two nodes at a points-to, proved the way [swp_rX_bits] is.     *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_read_reg_cell (r : register) (v : type_of_register r) :
+    gen_cert -∗ r ↦ᵣ v -∗
+    swp (Defs.read_reg r) (fun w => ⌜w = v⌝ ∗ r ↦ᵣ v).
+  Proof.
+    iIntros "#Hcert Hpt".
+    iApply (swp_hart_regread with "Hcert").
+    { cbn [hregread_at]. apply bool_decide_eq_true_2. reflexivity. }
+    iIntros (σ) "Hsi". rewrite /mstate_interp.
+    iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
+    iDestruct (reg_valid with "Hreg Hpt") as %Lv.
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hcl". iNext. iMod "Hcl" as "_". iModIntro.
+    iSplitL "Hreg Hmem Hdev"; [by iFrame|].
+    rewrite hregread_resume_red Lv.
+    iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_write_reg_cell (r : register) (v w : type_of_register r) :
+    gen_cert -∗ r ↦ᵣ v -∗
+    swp (Defs.write_reg r w) (fun _ => r ↦ᵣ w).
+  Proof.
+    iIntros "#Hcert Hpt".
+    iApply (swp_hart_regwrite r w with "Hcert").
+    { cbn [hregwrite_val_at Defs.write_reg].
+      destruct (decide _) as [Heq|Hne]; [|congruence].
+      assert (Heq = eq_refl) as -> by apply proof_irrel. reflexivity. }
+    iIntros (σ) "Hsi". rewrite /mstate_interp.
+    iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
+    iMod (reg_update _ r _ w with "Hreg Hpt") as "[Hreg Hpt]".
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hcl". iNext. iMod "Hcl" as "_". iModIntro.
+    iSplitL "Hreg Hmem Hdev";
+      [rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg; by iFrame|].
+    rewrite hregwrite_resume_red. iApply swp_ret. iExact "Hpt".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* GPR ACCESS AT [gpr_file], which is what a leaf actually holds.        *)
   (*                                                                      *)
   (* Stated over the WHOLE file rather than three [gpr_pt] cells on        *)

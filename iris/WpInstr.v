@@ -165,10 +165,14 @@ Section WpInstr.
     pc_is pc -∗
     gpr_file m -∗
     instr pc is_rvc i -∗
+    (* PC rides along read-only: AUIPC and JAL compute from it, and the
+       instruction never writes it (tick_pc does, after the instruction). *)
     (gpr_file m -∗
+     (R_bitvector_64 PC) ↦ᵣ pc -∗
      (R_bitvector_64 nextPC) ↦ᵣ (add_vec_int pc (if is_rvc then 2 else 4)) -∗
        swp (execute i)
          (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗ gpr_file m' ∗
+                   (R_bitvector_64 PC) ↦ᵣ pc ∗
                    (R_bitvector_64 nextPC) ↦ᵣ npc ∗ R)) -∗
     ▷ (mmode_config dq -∗ pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
        pc_is npc -∗ gpr_file m' -∗ R -∗
@@ -249,9 +253,9 @@ Section WpInstr.
         iDestruct (mm_ro_ext dq _ _ Hnp with "Hro") as "Hro".
         iDestruct (mm_rw_open with "Hrw")
           as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
-        iApply (swp_mono with "[HPC Hms Hmi Hcy Hti Hip Hro] [-]");
-          [| iApply ("Hex" with "Hgpr HnPC") ].
-        iIntros (u) "(-> & Hgpr & HnPC & HR)".
+        iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hro] [-]");
+          [| iApply ("Hex" with "Hgpr HPC HnPC") ].
+        iIntros (u) "(-> & Hgpr & HPC & HnPC & HR)".
         iSplitR; [done|].
         iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
         { iApply mm_rw_close. iFrame "HPC HnPC Hms Hmi Hcy Hti Hip". }
@@ -304,9 +308,9 @@ Section WpInstr.
         iDestruct (mm_ro_ext dq _ _ Hnp with "Hro") as "Hro".
         iDestruct (mm_rw_open with "Hrw")
           as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
-        iApply (swp_mono with "[HPC Hms Hmi Hcy Hti Hip Hro] [-]");
-          [| iApply ("Hex" with "Hgpr HnPC") ].
-        iIntros (u) "(-> & Hgpr & HnPC & HR)".
+        iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hro] [-]");
+          [| iApply ("Hex" with "Hgpr HPC HnPC") ].
+        iIntros (u) "(-> & Hgpr & HPC & HnPC & HR)".
         iSplitR; [done|].
         iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
         { iApply mm_rw_close. iFrame "HPC HnPC Hms Hmi Hcy Hti Hip". }
@@ -361,9 +365,9 @@ Section WpInstr.
         iDestruct (mm_ro_ext dq _ _ Hnp with "Hro") as "Hro".
         iDestruct (mm_rw_open with "Hrw")
           as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
-        iApply (swp_mono with "[HPC Hms Hmi Hcy Hti Hip Hro] [-]");
-          [| iApply ("Hex" with "Hgpr HnPC") ].
-        iIntros (u) "(-> & Hgpr & HnPC & HR)".
+        iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hro] [-]");
+          [| iApply ("Hex" with "Hgpr HPC HnPC") ].
+        iIntros (u) "(-> & Hgpr & HPC & HnPC & HR)".
         iSplitR; [done|].
         iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
         { iApply mm_rw_close. iFrame "HPC HnPC Hms Hmi Hcy Hti Hip". }
@@ -412,9 +416,9 @@ Section WpInstr.
         iDestruct (mm_ro_ext dq _ _ Hnp with "Hro") as "Hro".
         iDestruct (mm_rw_open with "Hrw")
           as "(HPC & HnPC & Hms & Hmi & Hcy & Hti & Hip)".
-        iApply (swp_mono with "[HPC Hms Hmi Hcy Hti Hip Hro] [-]");
-          [| iApply ("Hex" with "Hgpr HnPC") ].
-        iIntros (u) "(-> & Hgpr & HnPC & HR)".
+        iApply (swp_mono with "[Hms Hmi Hcy Hti Hip Hro] [-]");
+          [| iApply ("Hex" with "Hgpr HPC HnPC") ].
+        iIntros (u) "(-> & Hgpr & HPC & HnPC & HR)".
         iSplitR; [done|].
         iSplitL "HPC HnPC Hms Hmi Hcy Hti Hip".
         { iApply mm_rw_close. iFrame "HPC HnPC Hms Hmi Hcy Hti Hip". }

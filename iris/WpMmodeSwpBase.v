@@ -130,32 +130,33 @@ Section swpbase.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ------------------------------------------------------------------ *)
-  (* THE WHOLE RTYPE BINOP FAMILY, in one lemma.                          *)
+  (* THE NODE SHAPES, once each.                                          *)
   (*                                                                      *)
-  (* The model's [execute_RTYPE] is the same three nodes for every [rop] --  *)
-  (* read rs1, read rs2, write rd -- and differs only in which function     *)
-  (* combines the operands.  Taking that reduction as a HYPOTHESIS (each     *)
-  (* instance discharges it by [eq_refl]) makes the ten ops ten one-line     *)
-  (* corollaries instead of ten proofs.  Mirrors the exec-side split         *)
-  (* [exec_execute_RTYPE_OR] / [_AND] / ... but without repeating the peel.  *)
+  (* Every register-only instruction in the tree is one of three walks over *)
+  (* the GPR file -- read/write, read/read/write, write -- and differs only  *)
+  (* in which function combines the operands.  Taking the model's           *)
+  (* reduction as a HYPOTHESIS (each instance discharges it by [eq_refl]     *)
+  (* after [unfold execute_*; cbn match]) makes an instruction family a set  *)
+  (* of one-line corollaries rather than a set of peels.  This is the same   *)
+  (* factoring the exec side has in [exec_execute_RTYPE_OR] and friends,     *)
+  (* minus the per-op repetition.                                           *)
   (* ------------------------------------------------------------------ *)
-  Lemma swp_execute_RTYPE_bin (rs2 rs1 rd : SailStdpp.Values.mword 5)
-      (m : regfile) (op : rop)
+
+  (* read rs1, read rs2, write rd *)
+  Lemma swp_execute_rrw (rs2 rs1 rd : SailStdpp.Values.mword 5)
+      (m : regfile) (mo : M ExecutionResult) (x : ExecutionResult)
       (f : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64 ->
            SailStdpp.Values.mword 64) :
-    execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op
-    = Defs.bind
-        (Defs.bind (rX_bits (Regidx rs1))
-           (fun a => Defs.bind (rX_bits (Regidx rs2))
-                       (fun b => returnM (f a b))))
-        (fun v => Defs.bind0 (wX_bits (Regidx rd) v)
-                    (returnM RETIRE_SUCCESS)) ->
+    mo = Defs.bind
+           (Defs.bind (rX_bits (Regidx rs1))
+              (fun a => Defs.bind (rX_bits (Regidx rs2))
+                          (fun b => returnM (f a b))))
+           (fun v => Defs.bind0 (wX_bits (Regidx rd) v) (returnM x)) ->
     uint rd <> 0 ->
     gen_cert -∗ gpr_file m -∗
-    swp (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op)
-      (fun e => ⌜e = RETIRE_SUCCESS⌝ ∗
-         gpr_file (<[Regidx rd :=
-            regval_into_reg (f (m !!! Regidx rs1) (m !!! Regidx rs2))]> m)).
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd :=
+          regval_into_reg (f (m !!! Regidx rs1) (m !!! Regidx rs2))]> m)).
   Proof.
     intros Hred Hrd. iIntros "#Hcert Hf". rewrite Hred.
     iApply (swp_bind_use _ _
@@ -171,11 +172,130 @@ Section swpbase.
     iIntros (v) "[-> Hf]".
     iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
     { iApply (swp_wX_file rd m _ Hrd with "Hcert Hf"). }
-    iIntros (u) "Hf".
-    iApply swp_ret. by iFrame.
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
   Qed.
 
-  (* the three ops the M-mode RTYPE leaves actually name *)
+  (* read rs1, write rd *)
+  Lemma swp_execute_rw (rs1 rd : SailStdpp.Values.mword 5)
+      (m : regfile) (mo : M ExecutionResult) (x : ExecutionResult)
+      (g : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64) :
+    mo = Defs.bind
+           (Defs.bind (rX_bits (Regidx rs1)) (fun a => returnM (g a)))
+           (fun v => Defs.bind0 (wX_bits (Regidx rd) v) (returnM x)) ->
+    uint rd <> 0 ->
+    gen_cert -∗ gpr_file m -∗
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd := regval_into_reg (g (m !!! Regidx rs1))]> m)).
+  Proof.
+    intros Hred Hrd. iIntros "#Hcert Hf". rewrite Hred.
+    iApply (swp_bind_use _ _
+              (fun v => ⌜v = g (m !!! Regidx rs1)⌝ ∗ gpr_file m)%I _
+              with "[Hf] [-]").
+    { iApply (swp_bind_use (rX_bits (Regidx rs1)) _ _ _ with "[Hf] [-]").
+      { iApply (swp_rX_file rs1 m with "Hcert Hf"). }
+      iIntros (v1) "[-> Hf]". iApply swp_ret. by iFrame. }
+    iIntros (v) "[-> Hf]".
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m _ Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* write rd only (LUI) *)
+  Lemma swp_execute_w (rd : SailStdpp.Values.mword 5)
+      (m : regfile) (mo : M ExecutionResult) (x : ExecutionResult)
+      (v : SailStdpp.Values.mword 64) :
+    mo = Defs.bind0 (wX_bits (Regidx rd) v) (returnM x) ->
+    uint rd <> 0 ->
+    gen_cert -∗ gpr_file m -∗
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd := regval_into_reg v]> m)).
+  Proof.
+    intros Hred Hrd. iIntros "#Hcert Hf". rewrite Hred.
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m v Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* read rs1, then write rd INSIDE the read's continuation.  The model uses
+     both this and the [rw] shape above (ADDIW and MUL sequence the write
+     directly; ITYPE and RTYPE go through an intermediate [returnM]), which is
+     exactly why these lemmas take the reduction as a hypothesis rather than
+     naming an instruction. *)
+  Lemma swp_execute_rw2 (rs1 rd : SailStdpp.Values.mword 5)
+      (m : regfile) (mo : M ExecutionResult) (x : ExecutionResult)
+      (g : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64) :
+    mo = Defs.bind (rX_bits (Regidx rs1))
+           (fun a => Defs.bind0 (wX_bits (Regidx rd) (g a)) (returnM x)) ->
+    uint rd <> 0 ->
+    gen_cert -∗ gpr_file m -∗
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd := regval_into_reg (g (m !!! Regidx rs1))]> m)).
+  Proof.
+    intros Hred Hrd. iIntros "#Hcert Hf". rewrite Hred.
+    iApply (swp_bind_use (rX_bits (Regidx rs1)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file rs1 m with "Hcert Hf"). }
+    iIntros (v1) "[-> Hf]".
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m _ Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
+  Qed.
+
+  Lemma swp_execute_rrw2 (rs2 rs1 rd : SailStdpp.Values.mword 5)
+      (m : regfile) (mo : M ExecutionResult) (x : ExecutionResult)
+      (f : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64 ->
+           SailStdpp.Values.mword 64) :
+    mo = Defs.bind (rX_bits (Regidx rs1))
+           (fun a => Defs.bind (rX_bits (Regidx rs2))
+                       (fun b => Defs.bind0 (wX_bits (Regidx rd) (f a b))
+                                   (returnM x))) ->
+    uint rd <> 0 ->
+    gen_cert -∗ gpr_file m -∗
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd :=
+          regval_into_reg (f (m !!! Regidx rs1) (m !!! Regidx rs2))]> m)).
+  Proof.
+    intros Hred Hrd. iIntros "#Hcert Hf". rewrite Hred.
+    iApply (swp_bind_use (rX_bits (Regidx rs1)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file rs1 m with "Hcert Hf"). }
+    iIntros (v1) "[-> Hf]".
+    iApply (swp_bind_use (rX_bits (Regidx rs2)) _ _ _ with "[Hf] [-]").
+    { iApply (swp_rX_file rs2 m with "Hcert Hf"). }
+    iIntros (v2) "[-> Hf]".
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m _ Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* a pure value threaded through a [returnM] before the write (LUI) *)
+  Lemma swp_execute_pure_w (rd : SailStdpp.Values.mword 5)
+      (m : regfile) (mo : M ExecutionResult) (x : ExecutionResult)
+      (v : SailStdpp.Values.mword 64) :
+    mo = Defs.bind (returnM v)
+           (fun w => Defs.bind0 (wX_bits (Regidx rd) w) (returnM x)) ->
+    uint rd <> 0 ->
+    gen_cert -∗ gpr_file m -∗
+    swp mo (fun e => ⌜e = x⌝ ∗
+       gpr_file (<[Regidx rd := regval_into_reg v]> m)).
+  Proof.
+    intros Hred Hrd. iIntros "#Hcert Hf". rewrite Hred.
+    iApply (swp_bind_use (returnM v) _ (fun w => ⌜w = v⌝ ∗ gpr_file m)%I _
+              with "[Hf] [-]").
+    { iApply swp_ret. by iFrame. }
+    iIntros (w) "[-> Hf]".
+    iApply (swp_bind0_use _ _ _ _ with "[Hf] [-]").
+    { iApply (swp_wX_file rd m v Hrd with "Hcert Hf"). }
+    iIntros (u) "Hf". iApply swp_ret. by iFrame.
+  Qed.
+
+  (* the RTYPE binops, as one-line instances of the read/read/write shape *)
+  Definition swp_execute_RTYPE_bin (rs2 rs1 rd : SailStdpp.Values.mword 5)
+      (m : regfile) (op : rop)
+      (f : SailStdpp.Values.mword 64 -> SailStdpp.Values.mword 64 ->
+           SailStdpp.Values.mword 64) :=
+    swp_execute_rrw rs2 rs1 rd m
+      (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) op)
+      RETIRE_SUCCESS f.
+
   Definition swp_execute_RTYPE_OR (rs2 rs1 rd : SailStdpp.Values.mword 5)
       (m : regfile) := swp_execute_RTYPE_bin rs2 rs1 rd m OR or_vec eq_refl.
   Definition swp_execute_RTYPE_AND (rs2 rs1 rd : SailStdpp.Values.mword 5)

@@ -8,6 +8,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvExec RiscvFetchExec ExecCommon WpGpr.
 Require Import InstrBytes.
 Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
+Require Import HartSwp HartMFrame WpMmodeSwpBase.   (* the [swp] execute catalogue *)
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 
@@ -156,77 +157,28 @@ Section WpMulGpr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
-    iApply (wp_instr pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
-              Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsi".
-    iDestruct "Hsi" as "[Hreg Hmem]".
-    (* tick nextPC first, so we read the sources against the execute state *)
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    (* read rs1 (x0 or a real register) -- borrow, read, return, so that
-       reading rs2 (possibly = rs1) is an independent borrow *)
-    iDestruct (gpr_file_lookup_acc m (Regidx rs1) with "Hfile") as "[Hr1c Hfb1]".
-    iDestruct (gpr_pt_value rs1 (m (Regidx rs1))
-                 (set_reg σ nextPC (add_vec_int pc 4)) with "Hreg Hr1c") as %Hrv1.
-    iDestruct ("Hfb1" with "Hr1c") as "Hfile".
-    (* read rs2 (independent borrow; rs1 = rs2 is fine) *)
-    iDestruct (gpr_file_lookup_acc m (Regidx rs2) with "Hfile") as "[Hr2c Hfb2]".
-    iDestruct (gpr_pt_value rs2 (m (Regidx rs2))
-                 (set_reg σ nextPC (add_vec_int pc 4)) with "Hreg Hr2c") as %Hrv2.
-    iDestruct ("Hfb2" with "Hr2c") as "Hfile".
-    assert (Hmv : gpr_mul_val rs2 rs1 (set_reg σ nextPC (add_vec_int pc 4))
-                  = mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
-                      (mulop_mul.(mul_op_signed_rs2))
-                      (m !!! Regidx rs1) (m !!! Regidx rs2)
-                      (mulop_mul.(mul_op_result_part))).
-    { unfold gpr_mul_val. rewrite Hrv1. rewrite Hrv2. reflexivity. }
-    (* write rd (rd <> 0, so its entry is the real register points-to) *)
-    iDestruct (gpr_file_insert_acc m (Regidx rd)
-                 (regval_into_reg
-                    (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
-                       (mulop_mul.(mul_op_signed_rs2))
-                       (m !!! Regidx rs1) (m !!! Regidx rs2)
-                       (mulop_mul.(mul_op_result_part))))
-                 with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _
-            (regval_into_reg
-               (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
-                  (mulop_mul.(mul_op_signed_rs2))
-                  (m !!! Regidx rs1) (m !!! Regidx rs2)
-                  (mulop_mul.(mul_op_result_part))))
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-               (R_bitvector_64 (gpr_of_Z (uint rd)))
-               (regval_into_reg
-                  (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
-                     (mulop_mul.(mul_op_signed_rs2))
-                     (m !!! Regidx rs1) (m !!! Regidx rs2)
-                     (mulop_mul.(mul_op_result_part))))).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq.
-      rewrite (exec_execute_MUL_gpr rs2 rs1 rd (set_reg σ nextPC (add_vec_int pc 4)) Hrd).
-      rewrite Hmv. reflexivity. }
-    iSplitL "Hreg Hmem".
-    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    (* continuation: PC/nextPC are both pc+4; hand back mmode_config, pmpcfg,
-       the reassembled [pc_is (pc+4)], and the updated file *)
-    iIntros "Hmm' Hpmpc' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg (set_reg σ nextPC (add_vec_int pc 4))
-                (R_bitvector_64 (gpr_of_Z (uint rd)))
-                (regval_into_reg
+    iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc Hpc Hf Hinstr Hcont".
+    iDestruct (mmode_config_cert with "Hmm") as "[#Hcert Hmm]".
+    iApply (wp_instr pc (add_vec_int pc 4) false
+              (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) m
+              (<[Regidx rd := regval_into_reg
                    (mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1))
-                      (mulop_mul.(mul_op_signed_rs2))
-                      (m !!! Regidx rs1) (m !!! Regidx rs2)
-                      (mulop_mul.(mul_op_result_part))))).(sregs)
-             = add_vec_int pc 4).
-    { rewrite ?sregs_set_reg.
-      tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
+                      (mulop_mul.(mul_op_signed_rs2)) (m !!! Regidx rs1)
+                      (m !!! Regidx rs2) (mulop_mul.(mul_op_result_part)))]> m)
+              pmpcfg0 emp%I Hpmp Hstat
+              with "Hmm Hpmpc Hpc Hf Hinstr [] [Hcont]").
+    - iIntros "Hf HPC HnPC".
+      iApply (swp_mono with "[HPC HnPC] [Hf]");
+        [| iApply (swp_execute_rrw2 rs2 rs1 rd m
+                     (execute (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)))
+                     RETIRE_SUCCESS
+                     (fun a b => mult_to_bits_half xlen
+                        (mulop_mul.(mul_op_signed_rs1))
+                        (mulop_mul.(mul_op_signed_rs2)) a b
+                        (mulop_mul.(mul_op_result_part)))
+                     eq_refl Hrd with "Hcert Hf") ].
+      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
+    - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
+      iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
 End WpMulGpr.

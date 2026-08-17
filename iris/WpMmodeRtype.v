@@ -46,12 +46,12 @@ Section WpLogicRTypeGpr.
                    (or_vec (m !!! Regidx rs1) (m !!! Regidx rs2))]> m)
               pmpcfg0 emp%I Hpmp Hstat
               with "Hmm Hpmpc Hpc Hf Hinstr [] [Hcont]").
-    - iIntros "Hf HnPC".
+    - iIntros "Hf HPC HnPC".
       change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)))
         with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) OR).
-      iApply (swp_mono with "[HnPC] [Hf]");
+      iApply (swp_mono with "[HPC HnPC] [Hf]");
         [| iApply (swp_execute_RTYPE_OR rs2 rs1 rd m Hrd with "Hcert Hf") ].
-      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HnPC".
+      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
     - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
@@ -82,12 +82,12 @@ Section WpLogicRTypeGpr.
                    (and_vec (m !!! Regidx rs1) (m !!! Regidx rs2))]> m)
               pmpcfg0 emp%I Hpmp Hstat
               with "Hmm Hpmpc Hpc Hf Hinstr [] [Hcont]").
-    - iIntros "Hf HnPC".
+    - iIntros "Hf HPC HnPC".
       change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)))
         with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) AND).
-      iApply (swp_mono with "[HnPC] [Hf]");
+      iApply (swp_mono with "[HPC HnPC] [Hf]");
         [| iApply (swp_execute_RTYPE_AND rs2 rs1 rd m Hrd with "Hcert Hf") ].
-      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HnPC".
+      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
     - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
@@ -121,12 +121,12 @@ Section WpLogicRTypeGpr.
                    (add_vec (m !!! Regidx rs1) (m !!! Regidx rs2))]> m)
               pmpcfg0 emp%I Hpmp Hstat
               with "Hmm Hpmpc Hpc Hf Hinstr [] [Hcont]").
-    - iIntros "Hf HnPC".
+    - iIntros "Hf HPC HnPC".
       change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
         with (execute_RTYPE (Regidx rs2) (Regidx rs1) (Regidx rd) ADD).
-      iApply (swp_mono with "[HnPC] [Hf]");
+      iApply (swp_mono with "[HPC HnPC] [Hf]");
         [| iApply (swp_execute_RTYPE_ADD rs2 rs1 rd m Hrd with "Hcert Hf") ].
-      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HnPC".
+      iIntros (e) "[-> Hf]". iSplitR; [done|]. iFrame "Hf HPC HnPC".
     - iNext. iIntros "Hmm Hpmpc Hpc Hf _".
       iApply ("Hcont" with "Hmm Hpmpc Hpc Hf").
   Qed.
