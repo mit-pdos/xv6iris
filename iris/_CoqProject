@@ -1071,6 +1071,8 @@ WeakEvPf.v
 WeakEvAdequacy.v
 WeakEvLift.v
 WeakEvExecEff.v
+WeakEvFunnel.v
+WeakEvWire.v
 WeakEvDisk.v
 WeakEvStarted.v
 WeakEvInst.v
