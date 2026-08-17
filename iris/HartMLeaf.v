@@ -966,13 +966,13 @@ Section leaf.
     iApply (swp_mono _ _ _ with "[] [-]").
     2:{ iApply (swp_try_step_gen Drw Dro Df rs
                   (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
-                     (wrap_pre rs)) _ R Hdisj HDpriv HDhart HDmc HDcfg
+                     (wrap_pre rs)) R Hdisj HDpriv HDhart HDmc HDcfg
                   HDmi HDmi' HDms HDms' HWpc HDpc HDnpc'
                   Hpriv Hhart
                   ltac:(t_peel; rewrite /wrap_pre; t_peel; exact Hhart)
                   ltac:(t_peel; rewrite /wrap_pre; apply register_lookup_set)
                   with "Hcert Hrw Hro [Hmem Hwmem]").
-        iIntros "Hrw Hro".
+        iIntros "Hrw Hro". iApply swp_step_ex.
         iApply (swp_run_hart_active_hp Drw Dro Df (wrap_pre rs)
                   pmar0 pcfg pa d R Hdisj
                   HDpriv HDmisa HDmst HDpc HDnpc HDpma HDcfg2 HDhtif

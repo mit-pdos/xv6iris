@@ -247,9 +247,10 @@ Section KernelText.
     { iApply (instr_bytes_rvc_any pc h (kb_word_at A) H2al Hrvc Hsub).
       iApply (kernel_window_pc A (kb_word_at A) 4 pc Hpc Hbytes with "Ht"). }
     iPureIntro.
-    intros D Drw rs HDpriv HDmisa Hpriv HmC HmA Hmisa Harm.
     cbn [fetch_is_rvc decode_fetch].
-    exists i0. split_and!.
+    exists i0. split; [exact Hlp0|].
+    intros D Drw rs (HDpriv & HDmisa & Hpriv & HmC & HmA & Hmisa & Harm).
+    split.
     - destruct Harm as [(HDsec & Hp & Hs)|(HDenv & Hp & He)].
       + exact (hval_of_goodb D_m D Drw _ dstateM rs i0
                  (Dm_sub D HDpriv HDsec HDmisa)
@@ -257,7 +258,6 @@ Section KernelText.
       + exact (hval_of_goodb D_s D Drw _ dstateS rs i0
                  (Ds_sub D HDpriv HDenv HDmisa)
                  (Ds_agree rs Hp He Hmisa) Hgs Hes).
-    - exact Hlp0.
     - exact (hval_of_goodb (fun _ => false) D Drw _ dstateM rs (ExecuteAs i)
                ltac:(intros r Hr; discriminate Hr)
                ltac:(intros r Hr; discriminate Hr)
@@ -287,7 +287,7 @@ Section KernelText.
     { iApply (instr_bytes_base pc w H2al Hnrvc).
       iApply (kernel_window_pc A w 4 pc Hpc Hbytes with "Ht"). }
     iPureIntro.
-    intros D Drw rs HDpriv HDmisa Hpriv HmC HmA Hmisa Harm.
+    intros D Drw rs (HDpriv & HDmisa & Hpriv & HmC & HmA & Hmisa & Harm).
     cbn [fetch_is_rvc decode_fetch].
     destruct Harm as [(HDsec & Hp & Hs)|(HDenv & Hp & He)].
     - exact (hval_of_goodb D_m D Drw _ dstateM rs i

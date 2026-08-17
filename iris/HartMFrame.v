@@ -220,7 +220,177 @@ Section tower.
   Lemma mm_rs_senv : register_lookup senvcfg mm_rs = senv0.
   Proof. lk. Qed.
 
+
 End tower.
+
+(* [mm_rs]'s body is a SIXTEEN-deep [register_set] tower.  Left transparent,
+   every unification that meets a concrete tower may delta-expand it, and the
+   record-update comparison that follows does not terminate in useful time.
+   The nineteen [mm_rs_*] lookup equations above are the ONLY interface any
+   consumer needs, and they are proved before this line. *)
+Global Opaque mm_rs.
+
+(* ---------------------------------------------------------------------- *)
+(* THE ONE 19-way set decomposition in the whole M-mode stack.  Every       *)
+(* caller that has to compare a derived file (a [wrap_pre], a [wrap_post],  *)
+(* a tick-weakened successor) against a canonical tower goes through this   *)
+(* -- so the decomposition is paid once, and each use is 19 rewrites.       *)
+(* ---------------------------------------------------------------------- *)
+Section agree.
+  Context (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool).
+  Context (cy ti ip mst0 : SailStdpp.Values.mword 64).
+  Context (pcfg : type_of_register pmpcfg_n).
+  Context (mc : SailStdpp.Values.mword 32).
+  Context (micfg misa0 mseccfg0 : SailStdpp.Values.mword 64).
+  Context (pmar0 : type_of_register pma_regions).
+  Context (elp0 : type_of_register elp).
+  Context (senv0 : SailStdpp.Values.mword 64).
+
+  Lemma mm_rs_agree (rs : regstate) :
+    register_lookup (R_bitvector_64 PC) rs = pc ->
+    register_lookup (R_bitvector_64 nextPC) rs = npc ->
+    register_lookup (R_bitvector_64 minstret) rs = ms ->
+    register_lookup (R_bool minstret_increment) rs = bmi ->
+    register_lookup (R_bitvector_64 mcycle) rs = cy ->
+    register_lookup (R_bitvector_64 mtime) rs = ti ->
+    register_lookup (R_bitvector_64 mip) rs = ip ->
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup mstatus rs = mst0 ->
+    register_lookup hart_state rs = HART_ACTIVE tt ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup (R_bitvector_32 mcountinhibit) rs = mc ->
+    register_lookup (R_bitvector_64 minstretcfg) rs = micfg ->
+    register_lookup misa rs = misa0 ->
+    register_lookup mseccfg rs = mseccfg0 ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup elp rs = elp0 ->
+    register_lookup senvcfg rs = senv0 ->
+    reg_agree_on (mm_Drw ∪ mm_Dro) rs
+      (mm_rs pc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0
+         pmar0 elp0 senv0).
+  Proof.
+    intros H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17
+      H18 H19.
+    intros r Hr. rewrite /mm_Drw /mm_Dro in Hr.
+    repeat (apply elem_of_union in Hr as [Hr|Hr]);
+      apply elem_of_singleton in Hr; subst r.
+    all: first
+      [ by rewrite H1 mm_rs_PC | by rewrite H2 mm_rs_nPC
+      | by rewrite H3 mm_rs_ms | by rewrite H4 mm_rs_mi
+      | by rewrite H5 mm_rs_cy | by rewrite H6 mm_rs_ti
+      | by rewrite H7 mm_rs_ip | by rewrite H8 mm_rs_priv
+      | by rewrite H9 mm_rs_mst | by rewrite H10 mm_rs_hart
+      | by rewrite H11 mm_rs_pcfg | by rewrite H12 mm_rs_mc
+      | by rewrite H13 mm_rs_micfg | by rewrite H14 mm_rs_misa
+      | by rewrite H15 mm_rs_sec | by rewrite H16 mm_rs_pma
+      | by rewrite H17 mm_rs_htif | by rewrite H18 mm_rs_elp
+      | by rewrite H19 mm_rs_senv ].
+  Qed.
+  Lemma mm_agree_rw (rs rs' : regstate) :
+    reg_agree_on (mm_Drw ∪ mm_Dro) rs rs' -> reg_agree_on mm_Drw rs rs'.
+  Proof. intros H r Hr. apply H. set_solver. Qed.
+
+  Lemma mm_agree_ro (rs rs' : regstate) :
+    reg_agree_on (mm_Drw ∪ mm_Dro) rs rs' -> reg_agree_on mm_Dro rs rs'.
+  Proof. intros H r Hr. apply H. set_solver. Qed.
+
+  (* the read-only footprint's own agreement, same shape as [mm_rs_agree] and
+     for the same reason: ONE side is a variable, so no tactic here ever has
+     to convert a [register_set] tower against another one. *)
+  Lemma mm_rs_ro_agree (rs : regstate) :
+    register_lookup cur_privilege rs = Machine ->
+    register_lookup mstatus rs = mst0 ->
+    register_lookup hart_state rs = HART_ACTIVE tt ->
+    register_lookup pmpcfg_n rs = pcfg ->
+    register_lookup (R_bitvector_32 mcountinhibit) rs = mc ->
+    register_lookup (R_bitvector_64 minstretcfg) rs = micfg ->
+    register_lookup misa rs = misa0 ->
+    register_lookup mseccfg rs = mseccfg0 ->
+    register_lookup pma_regions rs = pmar0 ->
+    register_lookup htif_tohost_base rs = None ->
+    register_lookup elp rs = elp0 ->
+    register_lookup senvcfg rs = senv0 ->
+    reg_agree_on mm_Dro rs
+      (mm_rs pc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0
+         pmar0 elp0 senv0).
+  Proof.
+    intros H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12.
+    intros r Hr. rewrite /mm_Dro in Hr.
+    repeat (apply elem_of_union in Hr as [Hr|Hr]);
+      apply elem_of_singleton in Hr; subst r.
+    all: first
+      [ by rewrite H1 mm_rs_priv | by rewrite H2 mm_rs_mst
+      | by rewrite H3 mm_rs_hart | by rewrite H4 mm_rs_pcfg
+      | by rewrite H5 mm_rs_mc | by rewrite H6 mm_rs_micfg
+      | by rewrite H7 mm_rs_misa | by rewrite H8 mm_rs_sec
+      | by rewrite H9 mm_rs_pma | by rewrite H10 mm_rs_htif
+      | by rewrite H11 mm_rs_elp | by rewrite H12 mm_rs_senv ].
+  Qed.
+End agree.
+
+
+(* every [mm_rs] lookup as an [apply]-directed step (see the note below on
+   why this may not be a [rewrite]) *)
+Ltac mm_rs_lk :=
+  first [ apply mm_rs_PC | apply mm_rs_nPC | apply mm_rs_ms | apply mm_rs_mi
+        | apply mm_rs_cy | apply mm_rs_ti | apply mm_rs_ip | apply mm_rs_priv
+        | apply mm_rs_mst | apply mm_rs_hart | apply mm_rs_pcfg
+        | apply mm_rs_mc | apply mm_rs_micfg | apply mm_rs_misa
+        | apply mm_rs_sec | apply mm_rs_pma | apply mm_rs_htif
+        | apply mm_rs_elp | apply mm_rs_senv ].
+
+(* nextPC is in [mm_Drw], so the READ-ONLY frame does not see a nextPC write
+   -- which is what lets the execute obligation hand its read-only frame
+   straight back.  Discharged POSITIONALLY through [mm_rs_ro_agree]: a
+   [first [...]] here would run failing [apply]s whose unifier delta-expands
+   [mm_rs] into its [register_set] tower, and that does not terminate in any
+   useful time. *)
+Lemma mm_ro_nPC (pc x y ms : SailStdpp.Values.mword 64) (bmi : bool)
+    (cy ti ip mst0 : SailStdpp.Values.mword 64)
+    (pcfg : type_of_register pmpcfg_n) (mc : SailStdpp.Values.mword 32)
+    (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+    (pmar0 : type_of_register pma_regions) (elp0 : type_of_register elp) :
+  reg_agree_on mm_Dro
+    (mm_rs pc x ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0 pmar0
+       elp0 senv0)
+    (mm_rs pc y ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0 pmar0
+       elp0 senv0).
+Proof.
+  apply mm_rs_ro_agree;
+    [ apply mm_rs_priv | apply mm_rs_mst | apply mm_rs_hart | apply mm_rs_pcfg
+    | apply mm_rs_mc | apply mm_rs_micfg | apply mm_rs_misa | apply mm_rs_sec
+    | apply mm_rs_pma | apply mm_rs_htif | apply mm_rs_elp
+    | apply mm_rs_senv ].
+Qed.
+
+(* and a nextPC write, against the tower that already names the new value *)
+Lemma mm_npc_agree (pc npc' ms : SailStdpp.Values.mword 64) (bmi : bool)
+    (cy ti ip mst0 : SailStdpp.Values.mword 64)
+    (pcfg : type_of_register pmpcfg_n) (mc : SailStdpp.Values.mword 32)
+    (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+    (pmar0 : type_of_register pma_regions) (elp0 : type_of_register elp)
+    (v : SailStdpp.Values.mword 64) :
+  reg_agree_on (mm_Drw ∪ mm_Dro)
+    (register_set (R_bitvector_64 nextPC) v
+       (mm_rs pc npc' ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0
+          pmar0 elp0 senv0))
+    (mm_rs pc v ms bmi cy ti ip mst0 pcfg mc micfg misa0 mseccfg0 pmar0
+       elp0 senv0).
+Proof.
+  (* NOTE: no generic [rewrite] here.  [mm_rs]'s body IS a [register_set]
+     tower, so an ssreflect rewrite with [register_lookup_set]'s pattern
+     searches inside it and detonates the record-update conversion bomb.
+     Goal 2 is the nextPC cell; every other goal is [apply]-directed. *)
+  apply mm_rs_agree.
+  2:{ apply register_lookup_set. }
+  all: (etransitivity;
+        [ apply irrelevant_register_set; vm_compute; reflexivity | ]).
+  all: mm_rs_lk.
+Qed.
+
+
+
 
 Section gpr.
   Context `{!riscvGS Σ}.
@@ -411,6 +581,82 @@ Section gpr.
     unfold mm_Df.
     repeat (rewrite decide_False; [|discriminate]).
     by rewrite !bi.sep_assoc.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* DIRECTED forms of the frame bridges.                                *)
+  (*                                                                    *)
+  (* [mm_rw_split] / [hreg_frame_ext] are [⊣⊢] and [↔], so using them    *)
+  (* means [rewrite] -- and a [rewrite] inside a proofmode goal fires on  *)
+  (* the WHOLE entailment, context included.  Measured: the seven-cell    *)
+  (* split plus its seven lookup rewrites cost ~110s that way inside      *)
+  (* [wp_instr]'s arms.  The same steps, proved ONCE here where the goal  *)
+  (* is two lines long, are free, and the call sites become [iDestruct] / *)
+  (* [iApply].  Nothing downstream should [rewrite] a frame lemma.        *)
+  (* ------------------------------------------------------------------ *)
+  (* Stated over the frame's OWN footprint, with both files VARIABLES.  Every
+     concrete instance is then a term application, never a rewrite: a rewrite
+     whose pattern carries a concrete [mm_rs] tower on EACH side is the
+     two-tower trap again (measured: [mm_ro_ext_nPC] proved by [rewrite] did
+     not finish in four minutes; by application it is free). *)
+  Lemma mm_rw_ext' (rs rs' : regstate) :
+    reg_agree_on mm_Drw rs rs' ->
+    hreg_frame rs mm_Drw -∗ (hreg_frame rs' mm_Drw : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ext _ _ mm_Drw Hag).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma mm_ro_ext' (dq : dfrac) (rs rs' : regstate) :
+    reg_agree_on mm_Dro rs rs' ->
+    hreg_frame_ro (mm_Df dq) rs mm_Dro -∗
+    (hreg_frame_ro (mm_Df dq) rs' mm_Dro : iProp Σ).
+  Proof.
+    intros Hag. rewrite (hreg_frame_ro_ext (mm_Df dq) _ _ mm_Dro Hag).
+    iIntros "H". iExact "H".
+  Qed.
+
+  Lemma mm_rw_ext (rs rs' : regstate) :
+    reg_agree_on (mm_Drw ∪ mm_Dro) rs rs' ->
+    hreg_frame rs mm_Drw -∗ (hreg_frame rs' mm_Drw : iProp Σ).
+  Proof. intros Hag. exact (mm_rw_ext' rs rs' (mm_agree_rw _ _ Hag)). Qed.
+
+  Lemma mm_ro_ext (dq : dfrac) (rs rs' : regstate) :
+    reg_agree_on (mm_Drw ∪ mm_Dro) rs rs' ->
+    hreg_frame_ro (mm_Df dq) rs mm_Dro -∗
+    (hreg_frame_ro (mm_Df dq) rs' mm_Dro : iProp Σ).
+  Proof. intros Hag. exact (mm_ro_ext' dq rs rs' (mm_agree_ro _ _ Hag)). Qed.
+
+  Lemma mm_rw_open (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool)
+      (cy ti ip mst0 : SailStdpp.Values.mword 64)
+      (pcfg : type_of_register pmpcfg_n) (mc : SailStdpp.Values.mword 32)
+      (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+      (pmar0 : type_of_register pma_regions) (elp0 : type_of_register elp) :
+    hreg_frame (mm_rs pc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0
+                  mseccfg0 pmar0 elp0 senv0) mm_Drw -∗
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip : iProp Σ).
+  Proof.
+    rewrite mm_rw_split mm_rs_PC mm_rs_nPC mm_rs_ms mm_rs_mi mm_rs_cy
+      mm_rs_ti mm_rs_ip. iIntros "H". iExact "H".
+  Qed.
+
+  Lemma mm_rw_close (pc npc ms : SailStdpp.Values.mword 64) (bmi : bool)
+      (cy ti ip mst0 : SailStdpp.Values.mword 64)
+      (pcfg : type_of_register pmpcfg_n) (mc : SailStdpp.Values.mword 32)
+      (micfg misa0 mseccfg0 senv0 : SailStdpp.Values.mword 64)
+      (pmar0 : type_of_register pma_regions) (elp0 : type_of_register elp) :
+    ((R_bitvector_64 PC) ↦ᵣ pc ∗ (R_bitvector_64 nextPC) ↦ᵣ npc ∗
+     (R_bitvector_64 minstret) ↦ᵣ ms ∗ (R_bool minstret_increment) ↦ᵣ bmi ∗
+     (R_bitvector_64 mcycle) ↦ᵣ cy ∗ (R_bitvector_64 mtime) ↦ᵣ ti ∗
+     (R_bitvector_64 mip) ↦ᵣ ip : iProp Σ) -∗
+    hreg_frame (mm_rs pc npc ms bmi cy ti ip mst0 pcfg mc micfg misa0
+                  mseccfg0 pmar0 elp0 senv0) mm_Drw.
+  Proof.
+    rewrite mm_rw_split mm_rs_PC mm_rs_nPC mm_rs_ms mm_rs_mi mm_rs_cy
+      mm_rs_ti mm_rs_ip. iIntros "H". iExact "H".
   Qed.
 
 End gpr.

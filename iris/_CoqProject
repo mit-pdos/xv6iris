@@ -140,6 +140,7 @@ CodeKvminit.v
 CodeKvminithart.v
 CodeKvmmap.v
 InstrBytes.v
+WpInstr.v
 KernelText.v
 StackOwn.v
 CalleeSaved.v

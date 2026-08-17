@@ -271,6 +271,47 @@ Definition wrap_post (rs2 : regstate) (mi : SailStdpp.Values.mword 64)
     (register_set (R_bitvector_64 PC)
        (register_lookup (R_bitvector_64 nextPC) rs2) rs2).
 
+(* and how the head's pre-file reads: ONE write. *)
+Lemma wrap_pre_mi (rs : regstate) :
+  register_lookup (R_bool minstret_increment) (wrap_pre rs)
+  = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
+      (register_lookup (R_bitvector_64 minstretcfg) rs).
+Proof. unfold wrap_pre. by rewrite register_lookup_set. Qed.
+
+Lemma wrap_pre_other (r : register) (rs : regstate) :
+  register_beq r (R_bool minstret_increment) = false ->
+  register_lookup r (wrap_pre rs) = register_lookup r rs.
+Proof.
+  intros H. unfold wrap_pre. by rewrite (irrelevant_register_set _ _ _ _ H).
+Qed.
+
+(* how the tail's post-file reads, cell by cell: TWO writes and nothing
+   else, so a caller reads it off directly *)
+Lemma wrap_post_ms (rs2 : regstate) (mi : SailStdpp.Values.mword 64) :
+  register_lookup (R_bitvector_64 minstret) (wrap_post rs2 mi) = mi.
+Proof. unfold wrap_post. by rewrite register_lookup_set. Qed.
+
+Lemma wrap_post_PC (rs2 : regstate) (mi : SailStdpp.Values.mword 64) :
+  register_lookup (R_bitvector_64 PC) (wrap_post rs2 mi)
+  = register_lookup (R_bitvector_64 nextPC) rs2.
+Proof.
+  unfold wrap_post.
+  rewrite (irrelevant_register_set (R_bitvector_64 PC)
+             (R_bitvector_64 minstret) _ _ eq_refl).
+  by rewrite register_lookup_set.
+Qed.
+
+Lemma wrap_post_other (r : register) (rs2 : regstate)
+    (mi : SailStdpp.Values.mword 64) :
+  register_beq r (R_bitvector_64 minstret) = false ->
+  register_beq r (R_bitvector_64 PC) = false ->
+  register_lookup r (wrap_post rs2 mi) = register_lookup r rs2.
+Proof.
+  intros H1 H2. unfold wrap_post.
+  by rewrite (irrelevant_register_set _ _ _ _ H1)
+     (irrelevant_register_set _ _ _ _ H2).
+Qed.
+
 (* ====================================================================== *)
 (* 3b. THE TICK WITHOUT PREMISES, as an [hvalE].                            *)
 (*                                                                          *)
@@ -661,16 +702,6 @@ Section mcycle.
     iExists rs'. by iFrame.
   Qed.
 
-  (* the read-only frame's counterpart of [hreg_frame_ext] (HartSpan keeps
-     its copy Local) *)
-  Local Lemma hreg_frame_ro_ext_loc (Df : register -> dfrac)
-      (rs rs' : regstate) (Dro : gset register) :
-    reg_agree_on Dro rs rs' ->
-    hreg_frame_ro Df rs Dro ⊣⊢ hreg_frame_ro Df rs' Dro.
-  Proof.
-    intros Hag. rewrite /hreg_frame_ro. apply big_sepS_proper.
-    intros r Hr. by rewrite (Hag r Hr).
-  Qed.
 
   (* ================================================================== *)
   (* THE CYCLE BODY, GENERIC IN THE INSTRUCTION.                         *)
@@ -690,8 +721,15 @@ Section mcycle.
   (* An instruction that clobbers either is not a [try_step] body at all *)
   (* -- the model would trap -- so these are honest side conditions, not *)
   (* an artefact of the decomposition. *)
+  (* NOTE the fetched word is EXISTENTIAL in the instruction obligation, not
+     a parameter.  It is observed once, at the [Step_Execute] the instruction
+     returns, and never used again -- and leaving it a parameter forces every
+     caller that dispatches on the fetch SHAPE to hoist the dispatch above
+     this application (an evar for [w] created before the case split cannot
+     be instantiated with a branch-local word).  The rule this replaces,
+     [wp_exec_step_decode_execute_inv], did not mention the word either. *)
   Lemma swp_try_step_gen (Drw Dro : gset register) (Df : register -> dfrac)
-      (rs rs2 : regstate) (w : SailStdpp.Values.mword 32) (R : iProp Σ) :
+      (rs rs2 : regstate) (R : iProp Σ) :
     Drw ## Dro ->
     (cur_privilege : register) ∈ Drw ∪ Dro ->
     (hart_state : register) ∈ Drw ∪ Dro ->
@@ -715,7 +753,8 @@ Section mcycle.
     hreg_frame_ro Df rs Dro -∗
     (hreg_frame (wrap_pre rs) Drw -∗ hreg_frame_ro Df (wrap_pre rs) Dro -∗
        swp (run_hart_active 0)
-         (fun st => ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+         (fun st => ∃ w : SailStdpp.Values.mword 32,
+                    ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
                     hreg_frame rs2 Drw ∗ hreg_frame_ro Df rs2 Dro ∗ R)) -∗
     swp (try_step 0 false)
       (fun _ => ∃ mi : SailStdpp.Values.mword 64,
@@ -754,7 +793,7 @@ Section mcycle.
     iApply (swp_bind_use (run_hart_active 0) _ _ _
               with "[Hrw Hro Hinstr] [-]").
     { iApply ("Hinstr" with "Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro & HR)". t_glue.
+    iIntros (v) "(%w & -> & Hrw & Hro & HR)". t_glue.
     (* the tail: the hart_state assert, tick_pc, the minstret bump *)
     iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
     { iApply (swp_bind0_use _ _
@@ -817,7 +856,7 @@ Section mcycle.
                     (register_lookup (R_bitvector_64 nextPC) rs2) rs2)).
       unfold wrap_post.
       rewrite (hreg_frame_ext _ _ Drw (reg_set_id_agree_local Drw _ _)).
-      rewrite (hreg_frame_ro_ext_loc Df _ _ Dro (reg_set_id_agree_local Dro _ _)).
+      rewrite (hreg_frame_ro_ext Df _ _ Dro (reg_set_id_agree_local Dro _ _)).
       iFrame.
   Qed.
 
@@ -898,6 +937,133 @@ Section mcycle.
                   with "Hcert Hbody"). }
     iIntros (u). iDestruct 1 as (rs2) "(%Hex & Hrw & Hro & HPsi)".
     iApply ("Hcont" with "[%] Hrw Hro HPsi"). exact Hex.
+  Qed.
+
+  (* the two footprint weakenings every frame client needs *)
+  Lemma reg_agree_l (D1 D2 : gset register) (rs rs' : regstate) :
+    reg_agree_on (D1 ∪ D2) rs rs' -> reg_agree_on D1 rs rs'.
+  Proof. intros H r Hr. apply H. set_solver. Qed.
+
+  Lemma reg_agree_r (D1 D2 : gset register) (rs rs' : regstate) :
+    reg_agree_on (D1 ∪ D2) rs rs' -> reg_agree_on D2 rs rs'.
+  Proof. intros H r Hr. apply H. set_solver. Qed.
+
+  (* the fetched-word existential, introduced at the point where the arm's
+     own [swp_run_hart_active_*] has just produced its concrete word *)
+  Lemma swp_step_ex (Drw Dro : gset register) (Df : register -> dfrac)
+      (rsB : regstate) (Psi : iProp Σ) (w : SailStdpp.Values.mword 32) :
+    swp (run_hart_active 0)
+      (fun st => ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                 hreg_frame rsB Drw ∗ hreg_frame_ro Df rsB Dro ∗ Psi) -∗
+    swp (run_hart_active 0)
+      (fun st => ∃ w' : SailStdpp.Values.mword 32,
+                 ⌜st = Step_Execute (RETIRE_SUCCESS, w')⌝ ∗
+                 hreg_frame rsB Drw ∗ hreg_frame_ro Df rsB Dro ∗ Psi).
+  Proof.
+    iIntros "H". iApply (swp_mono with "[] H").
+    iIntros (st) "(-> & Hrw & Hro & HPsi)". iExists w. by iFrame.
+  Qed.
+
+  (* ==================================================================== *)
+  (* swp_exec_step_decode_execute -- THE [swp] REPLACEMENT FOR             *)
+  (* [wp_exec_step_decode_execute_inv].                                    *)
+  (*                                                                      *)
+  (* The rule it replaces read                                             *)
+  (*                                                                      *)
+  (*   minstret_inv -* hart_state |->r{dq} HART_ACTIVE tt -*               *)
+  (*   (forall s, mstate_interp s ={T\minstretN}=* exists r i s_exec,     *)
+  (*      <fetch/decode/execute facts> * PC |->r .. * mstate_interp s_exec *)
+  (*      * (hart_state |->r{dq} .. -* PC |->r .. -* |> WP Loop)) -*       *)
+  (*   WP Loop                                                             *)
+  (*                                                                      *)
+  (* and this keeps its shape: resources in, ONE obligation, resources     *)
+  (* back with PC at the new value.  Two differences, both forced.         *)
+  (*                                                                      *)
+  (* (a) The obligation is a [swp] over [run_hart_active] at the caller's  *)
+  (*     OWN frames, not a fupd handing back a whole successor sigma --    *)
+  (*     which is the thing per-node stepping invalidates.                 *)
+  (*                                                                      *)
+  (* (b) The continuation quantifies the tick.  The old rule did not have  *)
+  (*     to, because [minstret_inv] and [clock_inv] were INVARIANTS that   *)
+  (*     swallowed the minstret increment and the mcycle/mtime/mip         *)
+  (*     advance.  Those are owned resources now, so the same             *)
+  (*     nondeterminism has to appear in the statement: [exists mi] for    *)
+  (*     the increment, and agreement only OFF [tk_clock3] for the clock.  *)
+  (*     It is the invariants' content made explicit, not a new obligation *)
+  (*     on callers.                                                       *)
+  (*                                                                      *)
+  (* It sees FRAMES, not bundles, and knows NOTHING about which privilege  *)
+  (* regime its caller is in beyond the one fact [try_step] itself reads   *)
+  (* off the file -- exactly as the old rule took only [minstret_inv] and  *)
+  (* [hart_state].  The M-mode and S-mode wrappers differ in their bundles *)
+  (* and in their FETCH, not in their cycle; an S-mode twin reuses this    *)
+  (* verbatim rather than copying the tower/frame machinery.               *)
+  (*                                                                      *)
+  (* [rsA] is given as anything agreeing with [wrap_pre rs1] rather than   *)
+  (* as [wrap_pre rs1] itself, so the caller may name its own canonical    *)
+  (* successor file instead of carrying a [register_set] around.           *)
+  (* ==================================================================== *)
+  Lemma swp_exec_step_decode_execute (Drw Dro : gset register)
+      (Df : register -> dfrac) (rs1 rsA rsB : regstate) (Psi : iProp Σ) :
+    Drw ## Dro ->
+    (R_bitvector_64 mcycle : register) ∈ Drw ->
+    (R_bitvector_64 mtime : register) ∈ Drw ->
+    (R_bitvector_64 mip : register) ∈ Drw ->
+    (cur_privilege : register) ∈ Drw ∪ Dro ->
+    (hart_state : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_32 mcountinhibit : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 minstretcfg : register) ∈ Drw ∪ Dro ->
+    (R_bool minstret_increment : register) ∈ Drw ->
+    (R_bool minstret_increment : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 minstret : register) ∈ Drw ->
+    (R_bitvector_64 minstret : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 PC : register) ∈ Drw ->
+    (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
+    (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
+    register_lookup cur_privilege rs1 = Machine ->
+    register_lookup hart_state rs1 = HART_ACTIVE tt ->
+    register_lookup hart_state rsB = HART_ACTIVE tt ->
+    register_lookup (R_bool minstret_increment) rsB
+      = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
+          (register_lookup (R_bitvector_64 minstretcfg) rs1) ->
+    reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
+    gen_cert -∗
+    hreg_frame rs1 Drw -∗
+    hreg_frame_ro Df rs1 Dro -∗
+    (hreg_frame rsA Drw -∗ hreg_frame_ro Df rsA Dro -∗
+       swp (run_hart_active 0)
+         (fun st => ∃ w : SailStdpp.Values.mword 32,
+                    ⌜st = Step_Execute (RETIRE_SUCCESS, w)⌝ ∗
+                    hreg_frame rsB Drw ∗ hreg_frame_ro Df rsB Dro ∗ Psi)) -∗
+    ▷ (∀ rs3 : regstate,
+         ⌜∃ mi : SailStdpp.Values.mword 64,
+            reg_agree_on ((Drw ∪ Dro) ∖ tk_clock3) rs3
+              (wrap_post rsB mi)⌝ -∗
+         hreg_frame rs3 Drw -∗ hreg_frame_ro Df rs3 Dro -∗ Psi -∗
+         WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
+      HWpc HDpc HDnpc Hpriv Hhart Hhart2 Hmi2 Hpre.
+    iIntros "#Hcert Hrw Hro Hbody Hcont".
+    iApply (wp_loop_cycle Drw Dro Df
+              (fun rsx => exists mi : SailStdpp.Values.mword 64,
+                 rsx = wrap_post rsB mi)
+              Psi Hdisj HWcy HWti HWip with "Hcert [Hrw Hro Hbody] [Hcont]").
+    2:{ iNext. iIntros (rs3) "%Hag Hrw Hro HPsi".
+        destruct Hag as (rsP & (mi & ->) & Hag).
+        iApply ("Hcont" with "[%] Hrw Hro HPsi"). by exists mi. }
+    iNext.
+    iApply (swp_mono with "[] [-]");
+      [| iApply (swp_try_step_gen Drw Dro Df rs1 rsB Psi Hdisj HDpriv
+                   HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
+                   Hpriv Hhart Hhart2 Hmi2 with "Hcert Hrw Hro [Hbody]") ].
+    { iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HPsi)".
+      iExists _. iSplitR; [iPureIntro; by exists mi|]. iFrame. }
+    iIntros "Hrw Hro".
+    rewrite (hreg_frame_ext _ rsA Drw (reg_agree_l _ _ _ _ Hpre)).
+    rewrite (hreg_frame_ro_ext Df _ rsA Dro (reg_agree_r _ _ _ _ Hpre)).
+    iApply ("Hbody" with "Hrw Hro").
   Qed.
 
 End mcycle.

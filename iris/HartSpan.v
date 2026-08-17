@@ -407,7 +407,10 @@ Section span.
 
   (* helper: the ro-frame, like [hreg_frame], only reads the footprint's
      lookups, so it re-anchors across any file agreeing on [Dro]. *)
-  Local Lemma hreg_frame_ro_ext_local Df rs rs' Dro :
+  (* the read-only frame's counterpart of [HartLift.hreg_frame_ext].  NOT
+     [Local]: [HartMFrame]'s directed frame bridges need it and cannot see
+     [HartMCycle], which used to keep the only exported copy. *)
+  Lemma hreg_frame_ro_ext Df rs rs' Dro :
     reg_agree_on Dro rs rs' ->
     hreg_frame_ro Df rs Dro ⊣⊢ hreg_frame_ro Df rs' Dro.
   Proof.
@@ -492,7 +495,7 @@ Section span.
       - simpl. split; [exact Hns|reflexivity].
       - by iApply (hreg_frame_ext (register_set reg regval rs)
                      (register_set reg regval rsM) Drw HagW').
-      - by iApply (hreg_frame_ro_ext_local Df rs (register_set reg regval rsM)
+      - by iApply (hreg_frame_ro_ext Df rs (register_set reg regval rsM)
                      Dro HagO'). }
     (* RegRead and the silent classes: the file does not move *)
     all: iApply fupd_mask_intro; [apply empty_subseteq|]; iIntros "Hmask";
@@ -506,7 +509,7 @@ Section span.
          [ exact Hag
          | simpl; reflexivity
          | by iApply (hreg_frame_ext rs rsM Drw HagW)
-         | by iApply (hreg_frame_ro_ext_local Df rs rsM Dro HagO) ].
+         | by iApply (hreg_frame_ro_ext Df rs rsM Dro HagO) ].
   Qed.
 
   (* helper: an [hspani] step's ∃rs1 only constrains the start file on
@@ -689,7 +692,7 @@ Section span.
       + iApply (hreg_frame_ext rs rs' Drw
                   (reg_agree_mono_local _ Drw _ _ (union_subseteq_l _ _) Hag)
                  with "Hrf").
-      + iApply (hreg_frame_ro_ext_local Df rs rs' Dro
+      + iApply (hreg_frame_ro_ext Df rs rs' Dro
                   (reg_agree_mono_local _ Dro _ _ (union_subseteq_r _ _) Hag)
                  with "Hro").
     - (* A SPAN CLASS: take the node, transport the characterization across
