@@ -25,7 +25,7 @@ From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec RiscvTryStep.
 Require Import HartSpan HartSpanChar WpDecodeBridge.
 Local Open Scope Z_scope.
 
@@ -113,6 +113,77 @@ Proof.
   - exact (IH _ Hg).
   - exact (IH _ Hg).
 Qed.
+
+
+(* ====================================================================== *)
+(* THE EARLY-RETURN WRAPPERS ARE TRANSPARENT TO [goodb].                   *)
+(*                                                                        *)
+(* [liftR] and [catch_early_return] are both [try_catch], which rebuilds   *)
+(* the term with the SAME outcome at every node -- so a footprint          *)
+(* certificate for the body is one for the wrapped term and back.  Without *)
+(* these two the walk's [check_leaf_pte] region (a [catch_early_return]    *)
+(* block) could not be certified at all, since [goodb] would have to see   *)
+(* through the wrapper by computation.                                     *)
+(* ====================================================================== *)
+Lemma goodb_try_catch (Db : register -> bool) {X E1 E2 : Type}
+    (m : Defs.monad E1 X) (h : E1 -> Defs.monad E2 X) (s : mstate) :
+  goodb Db m s = true -> goodb Db (Defs.try_catch m h) s = true.
+Proof.
+  revert m. fix IH 1. intros m.
+  destruct m as [y | T oc k]; [by cbn|].
+  destruct oc; cbn [Defs.try_catch goodb]; intros Hg; try discriminate Hg;
+    try (by apply (IH (k tt)));
+    try (by apply (IH (k 0%Z))).
+  (* RegRead: the outcome is preserved, so the [Db r] conjunct survives *)
+  apply andb_prop in Hg as [Hr Hk]. rewrite Hr. cbn [andb].
+  by apply (IH (k (register_lookup _ s.(sregs)))).
+Qed.
+
+(* ONE DIRECTION ONLY, and that is the useful one: a body that makes no
+   ExtraOutcome (which is what [goodb] certifies) is rebuilt node for node by
+   [try_catch], so its certificate carries to the wrapped term.  The converse
+   is false -- a handler can turn a thrown term into a good one. *)
+Lemma goodb_liftR (Db : register -> bool) {X R : Type}
+    (m : M X) (s : mstate) :
+  goodb Db m s = true -> goodb Db (Defs.liftR (R := R) m) s = true.
+Proof. apply goodb_try_catch. Qed.
+
+Lemma goodb_cer (Db : register -> bool) {X : Type}
+    (m : Defs.monadR X exception X) (s : mstate) :
+  goodb Db m s = true -> goodb Db (Defs.catch_early_return m) s = true.
+Proof. apply goodb_try_catch. Qed.
+
+
+(* [goodb] composes along a bind in the EARLY-RETURN monad too, and this is
+   what makes the page walk's cer regions ([check_leaf_pte], [_rec_pt_walk])
+   bridgeable: without it a certificate for such a region could only be had by
+   re-proving the region at the footprint layer.  Same induction as
+   [WpDecodeBridge.goodb_bind], with [execR] as the interpreter -- and the
+   [inr] says the step RETURNED rather than early-returned, which is exactly
+   when the continuation runs. *)
+Lemma goodb_bindR (Db : register -> bool) {R X Y : Type}
+    (m : Defs.monadR R exception X) (f : X -> Defs.monadR R exception Y)
+    (s : mstate) (x : X) :
+  goodb Db m s = true -> execR m s = Some (inr x, s) ->
+  goodb Db (Defs.bind m f) s = goodb Db (f x) s.
+Proof.
+  revert x. induction m as [y | T oc k IH]; intros x Hg He.
+  - cbn [execR] in He. assert (Hx : x = y) by congruence. subst x. reflexivity.
+  - destruct oc; cbn [goodb execR Defs.bind Interface.iMon_bind] in Hg, He |- *;
+      try discriminate Hg.
+    all: first
+      [ (apply andb_prop in Hg as [HDr Hg']; rewrite HDr;
+         by apply (IH _ x Hg' He))
+      | by apply (IH tt x Hg He)
+      | by apply (IH 0%Z x Hg He) ].
+Qed.
+
+Lemma goodb_bind0R (Db : register -> bool) {R Y : Type}
+    (m : Defs.monadR R exception unit) (n : Defs.monadR R exception Y)
+    (s : mstate) :
+  goodb Db m s = true -> execR m s = Some (inr tt, s) ->
+  goodb Db (Defs.bind0 m n) s = goodb Db n s.
+Proof. intros Hg He. exact (goodb_bindR Db m (fun _ => n) s tt Hg He). Qed.
 
 (* ====================================================================== *)
 (* THE BRIDGE the [instr] bundle uses.                                     *)

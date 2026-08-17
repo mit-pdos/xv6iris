@@ -36,11 +36,17 @@ Local Open Scope Z_scope.
 (*    (state-resolved) execution path -- fully [vm_compute]-able over a    *)
 (*    concrete state.                                                      *)
 (* ===================================================================== *)
-Fixpoint goodb (D : register -> bool) {X} (m : M X) (s : mstate) {struct m} : bool :=
+(* Generic in the ERROR type, not just [M X = monad exception X]: the walk's
+   early-return regions ([check_leaf_pte], [translateAddr]) are
+   [catch_early_return] blocks whose BODY lives in [monadR], and a footprint
+   certificate has to be able to see through the wrapper.  Nothing in the
+   body of [goodb] ever mentions the error type. *)
+Fixpoint goodb (D : register -> bool) {E X} (m : Defs.monad E X) (s : mstate) {struct m} : bool :=
   match m with
   | Interface.Ret _ => true
   | Interface.Next oc k =>
-      (match oc in Interface.outcome _ T return (T -> M X) -> bool with
+      (match oc in Interface.outcome _ T
+             return (T -> Interface.iMon (fun _ => E) X) -> bool with
        | Interface.RegRead r _ => fun k => andb (D r) (goodb D (k (register_lookup r s.(sregs))) s)
        | Interface.InstrAnnounce _   => fun k => goodb D (k tt) s
        | Interface.BranchAnnounce _ _=> fun k => goodb D (k tt) s
