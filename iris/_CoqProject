@@ -11,6 +11,7 @@
 ArchReset.v
 RiscvModelBytes.v
 VirtioModel.v
+VirtioProg.v
 DiskImg.v
 DevModel.v
 RiscvLang.v
