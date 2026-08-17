@@ -1,4 +1,4 @@
-(* HartMIntr.v -- THE CYCLE RULE THAT DOES NOT PICK THE ARM.
+(* HartStepAny.v -- THE CYCLE RULE THAT DOES NOT PICK THE ARM.
 
    [HartMCycle.swp_try_step_gen] covers one arm of [try_step]: the one where
    [dispatchInterrupt] returns None and the instruction retires.  A caller
@@ -38,6 +38,15 @@
    ([WpSmodeWfi]) and the exception arms, which the [| _ => False] branch
    refuses -- adding one is a branch here plus its tail's [retired] value.
 
+   The rule is PRIVILEGE-AGNOSTIC, and has to be: the only client that needs
+   both arms is the S-mode kernel taking a trap, so a rule pinned to Machine
+   would have no caller at all.  What the prelude does with the privilege is
+   read it and hand it to [should_inc_minstret], so [wrap_pre] reads it off
+   the file and [minstret_inc_flag] takes it as an argument; nothing here
+   mentions a mode.  (The strong tick variants in [HartMCycle] --
+   [mcycle_inc_flag], [swp_tick_clock] -- are still Machine-pinned; the cycle
+   rule does not use them.)
+
    THIS FILE IS ADDITIVE TO [HartMCycle] AND BELONGS IN IT.  It is separate
    only so that iterating does not rebuild the ~1000-file cone of a
    bottom-of-tree file; fold it back at a milestone. *)
@@ -65,7 +74,7 @@ Local Ltac i_peel :=
     [ rewrite register_lookup_set
     | rewrite irrelevant_register_set; [ | vm_compute; reflexivity ] ].
 
-Section mintr.
+Section stepany.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -107,7 +116,6 @@ Section mintr.
     (R_bitvector_64 PC : register) ∈ Drw ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
     (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs = Machine ->
     register_lookup hart_state rs = HART_ACTIVE tt ->
     (* every post-file the body may choose keeps the hart active and carries
        the flag the prelude wrote *)
@@ -115,7 +123,8 @@ Section mintr.
     (forall rs2, Q rs2 ->
        register_lookup (R_bool minstret_increment) rs2
        = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
-           (register_lookup (R_bitvector_64 minstretcfg) rs)) ->
+           (register_lookup (R_bitvector_64 minstretcfg) rs)
+           (register_lookup cur_privilege rs)) ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
@@ -137,17 +146,17 @@ Section mintr.
                   hreg_frame_ro Df (wrap_post rs2 mi) Dro ∗ R)%I.
   Proof.
     intros Hdisj HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
-      HWpc HDpc HDnpc Hpriv Hhart HQhart HQmi.
+      HWpc HDpc HDnpc Hhart HQhart HQmi.
     iIntros "#Hcert Hrw Hro Hbody".
     unfold try_step. cbn beta iota zeta delta [ext_pre_step_hook].
     iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
               with "[Hrw Hro] [-]").
     { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
                 with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_bind_use (should_inc_minstret Machine) _ _ _
-              with "[Hrw Hro] [-]").
-    { iApply (swp_should_inc_minstret Drw Dro Df rs Hdisj HDmc HDcfg
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (should_inc_minstret (register_lookup cur_privilege rs))
+              _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_should_inc_minstret Drw Dro Df rs _ Hdisj HDmc HDcfg
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)".
     iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
@@ -155,7 +164,8 @@ Section mintr.
                 (Defs.write_reg (R_bool minstret_increment)
                    (minstret_inc_flag
                       (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                      (register_lookup (R_bitvector_64 minstretcfg) rs)))
+                      (register_lookup (R_bitvector_64 minstretcfg) rs)
+                      (register_lookup cur_privilege rs)))
                 _ _ _ with "[Hrw Hro] [-]").
       { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HWmi
                   with "Hcert Hrw Hro"). }
@@ -252,7 +262,8 @@ Section mintr.
       iIntros (w) "(-> & Hrw & Hro)". i_peel. rewrite Hmi2. i_glue.
       destruct (minstret_inc_flag
                   (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                  (register_lookup (R_bitvector_64 minstretcfg) rs)) eqn:Hmi.
+                  (register_lookup (R_bitvector_64 minstretcfg) rs)
+                  (register_lookup cur_privilege rs)) eqn:Hmi.
       + iApply (swp_bind0_use _ _
                   (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
                   with "[Hrw Hro] [-]").
@@ -325,13 +336,13 @@ Section mintr.
     (R_bitvector_64 PC : register) ∈ Drw ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
     (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs1 = Machine ->
     register_lookup hart_state rs1 = HART_ACTIVE tt ->
     (forall rs2, Q rs2 -> register_lookup hart_state rs2 = HART_ACTIVE tt) ->
     (forall rs2, Q rs2 ->
        register_lookup (R_bool minstret_increment) rs2
        = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
-           (register_lookup (R_bitvector_64 minstretcfg) rs1)) ->
+           (register_lookup (R_bitvector_64 minstretcfg) rs1)
+           (register_lookup cur_privilege rs1)) ->
     reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
     gen_cert -∗
     hreg_frame rs1 Drw -∗
@@ -358,7 +369,7 @@ Section mintr.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
-      HWpc HDpc HDnpc Hpriv Hhart HQhart HQmi Hpre.
+      HWpc HDpc HDnpc Hhart HQhart HQmi Hpre.
     iIntros "#Hcert Hrw Hro Hbody Hcont".
     iApply (wp_loop_cycle Drw Dro Df
               (fun rsx => exists (rs2 : regstate)
@@ -373,7 +384,7 @@ Section mintr.
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_any Drw Dro Df rs1 Q Psi Hdisj HDpriv
                    HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
-                   Hpriv Hhart HQhart HQmi with "Hcert Hrw Hro [Hbody]") ].
+                   Hhart HQhart HQmi with "Hcert Hrw Hro [Hbody]") ].
     { iIntros (u). iDestruct 1 as (rs2 mi) "(%HQ & Hrw & Hro & HPsi)".
       iExists _. iSplitR; [iPureIntro; by exists rs2, mi|]. iFrame. }
     iIntros "Hrw Hro".
@@ -382,4 +393,4 @@ Section mintr.
     iApply ("Hbody" with "Hrw Hro").
   Qed.
 
-End mintr.
+End stepany.

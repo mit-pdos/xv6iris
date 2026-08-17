@@ -68,7 +68,8 @@ Definition hp_post (rs : regstate) (mi : SailStdpp.Values.mword 64)
           (register_set (R_bool minstret_increment)
              (minstret_inc_flag
                 (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))).
+                (register_lookup (R_bitvector_64 minstretcfg) rs)
+                (register_lookup cur_privilege rs)) rs))).
 
 (* [hp_post] IS the generic wrapper's post-file at this word: the
    instruction leaves [nextPC] at pc+2 over the prelude's file, and the
@@ -113,7 +114,8 @@ Proof. unfold hp_post. by rewrite register_lookup_set. Qed.
 Lemma hp_post_mi (rs : regstate) (mi : SailStdpp.Values.mword 64) :
   register_lookup (R_bool minstret_increment) (hp_post rs mi)
   = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
-      (register_lookup (R_bitvector_64 minstretcfg) rs).
+      (register_lookup (R_bitvector_64 minstretcfg) rs)
+      (register_lookup cur_privilege rs).
 Proof.
   unfold hp_post.
   rewrite (irrelevant_register_set (R_bool minstret_increment)
@@ -880,12 +882,14 @@ Section leaf.
       (register_set (R_bool minstret_increment)
          (minstret_inc_flag
             (register_lookup (R_bitvector_32 mcountinhibit) rs)
-            (register_lookup (R_bitvector_64 minstretcfg) rs)) rs)
+            (register_lookup (R_bitvector_64 minstretcfg) rs)
+            (register_lookup cur_privilege rs)) rs)
       (is_landing_pad_expected tt)
       = Some (false, register_set (R_bool minstret_increment)
                        (minstret_inc_flag
                           (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                          (register_lookup (R_bitvector_64 minstretcfg) rs))
+                          (register_lookup (R_bitvector_64 minstretcfg) rs)
+                          (register_lookup cur_privilege rs))
                        rs) ->
     (forall i, pmpLocked (SailStdpp.Values.vec_access_dec pcfg i) = false) ->
     pma_allows_ram pmar0 ->
@@ -904,21 +908,24 @@ Section leaf.
          (register_set (R_bool minstret_increment)
             (minstret_inc_flag
                (register_lookup (R_bitvector_32 mcountinhibit) rs)
-               (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))
+               (register_lookup (R_bitvector_64 minstretcfg) rs)
+               (register_lookup cur_privilege rs)) rs))
       (rX_bits (creg2reg_idx
                   (encdec_creg_backwards (subrange_vec_dec hp_half 4 2))))
       = Some (d, register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
                    (register_set (R_bool minstret_increment)
                       (minstret_inc_flag
                          (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                         (register_lookup (R_bitvector_64 minstretcfg) rs))
+                         (register_lookup (R_bitvector_64 minstretcfg) rs)
+                         (register_lookup cur_privilege rs))
                       rs)) ->
     hfrun 8 (Drw ∪ Dro) Drw
       (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
          (register_set (R_bool minstret_increment)
             (minstret_inc_flag
                (register_lookup (R_bitvector_32 mcountinhibit) rs)
-               (register_lookup (R_bitvector_64 minstretcfg) rs)) rs))
+               (register_lookup (R_bitvector_64 minstretcfg) rs)
+               (register_lookup cur_privilege rs)) rs))
       (get_transformed_data_addr
          (creg2reg_idx (encdec_creg_backwards (subrange_vec_dec hp_half 9 7)))
          (sign_extend' 64
@@ -936,7 +943,8 @@ Section leaf.
                 (register_set (R_bool minstret_increment)
                    (minstret_inc_flag
                       (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                      (register_lookup (R_bitvector_64 minstretcfg) rs))
+                      (register_lookup (R_bitvector_64 minstretcfg) rs)
+                      (register_lookup cur_privilege rs))
                    rs)) ->
     gen_cert -∗
     hreg_frame rs Drw -∗
@@ -968,7 +976,7 @@ Section leaf.
                   (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2)
                      (wrap_pre rs)) R Hdisj HDpriv HDhart HDmc HDcfg
                   HDmi HDmi' HDms HDms' HWpc HDpc HDnpc'
-                  Hpriv Hhart
+                  Hhart
                   ltac:(t_peel; rewrite /wrap_pre; t_peel; exact Hhart)
                   ltac:(t_peel; rewrite /wrap_pre; apply register_lookup_set)
                   with "Hcert Hrw Hro [Hmem Hwmem]").
@@ -1008,7 +1016,7 @@ Section leaf.
     Definition mlb_post (ms1 cy1 ti1 ip1 : SailStdpp.Values.mword 64)
         : regstate :=
       ml_rs (add_vec_int hp_pc 2) mst0 misa0 mcfg mccfg menv0 mc pcfg pmar0
-        elp0 tcmp scmp (minstret_inc_flag mc mcfg) ms1 cy1 ti1 ip1.
+        elp0 tcmp scmp (minstret_inc_flag mc mcfg Machine) ms1 cy1 ti1 ip1.
 
     (* the two intermediate files the wrapper reaches inside the cycle:
        after the [minstret_increment] write, and after [nextPC] *)
@@ -1021,7 +1029,8 @@ Section leaf.
       (register_set (R_bool minstret_increment)
          (minstret_inc_flag
             (register_lookup (R_bitvector_32 mcountinhibit) mlb_pre)
-            (register_lookup (R_bitvector_64 minstretcfg) mlb_pre)) mlb_pre).
+            (register_lookup (R_bitvector_64 minstretcfg) mlb_pre)
+            (register_lookup cur_privilege mlb_pre)) mlb_pre).
 
     Local Notation mlb_rs2 :=
       (register_set (R_bitvector_64 nextPC) (add_vec_int hp_pc 2) mlb_rs1).

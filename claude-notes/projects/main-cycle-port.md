@@ -35,8 +35,8 @@ RED ROOTS, with what each needs and what it GATES (dependent counts off
 
 | file | dependents | needs |
 |---|---|---|
-| `WpIntrCore` | 711 | THE INTERRUPT-ENTRY ENGINE.  Its cycle rule now EXISTS (`HartMIntr.swp_exec_step_any`); what is left is the S-mode `run_hart_active` with a DISJUNCTIVE conclusion — see §"the arm nobody can pick".  Also blocks `WpSmodeWfi` (needs the `Enter_Wait` arm too) and `UserStepFull` |
-| `SmodeCorePt` | 464 | the S-MODE FETCH (Sv39 + TLB), then `wp_instr_s` / `s_cycle` on it.  `TrampStepPt` (19) is the same story |
+| `WpIntrCore` | 711 | THE INTERRUPT-ENTRY ENGINE.  Fails at line 602 on `wp_exec_step_minstret`, one of the three `wp_exec_step_*` rules deleted in `c1b82ebc`.  Its cycle rule now EXISTS (`HartStepAny.swp_exec_step_any`); what is left is the S-mode `run_hart_active` with a DISJUNCTIVE conclusion — see §"the arm nobody can pick".  Also blocks `WpSmodeWfi` (needs the `Enter_Wait` arm too) and `UserStepFull` |
+| `SmodeCorePt` | 464 | fails at line 667 on `SmodeCore.wp_exec_step_decode_execute_inv_priv` (deleted — the swp replacement needs the S-mode fetch).  So: the S-MODE FETCH (Sv39 + TLB), then `wp_instr_s` / `s_cycle` on it.  `TrampStepPt` (19) is the same story |
 | `WpMmodeLoad` | 8 | width-8 sweep of `HartMStore` |
 | `WpMmodeStore` | 7 | ditto |
 | `WpGprCsrwStimecmp` | 7 | the cycle rule's post-file as a PREDICATE, so a leaf may write mip — see §"the two cells a leaf cannot have" |
@@ -63,7 +63,7 @@ gates above.
    rule the fetch does.
 1. **The S-MODE FETCH itself** — `swp_fetch_ram`'s twin through Sv39 and the TLB.
    Everything else on that side reuses M-mode machinery: the cycle rule
-   (`swp_exec_step_decode_execute`) is already privilege-agnostic, the four
+   (`swp_exec_step_decode_execute`) is now privilege-agnostic, the four
    fetch SHAPES are `WpInstrRun.swp_run_hart_active_instr`'s business, and
    `instr` itself is privilege-generic by construction.  What is genuinely new
    is one fetch that WALKS, and it is the reason the port exists — a page walk
@@ -156,7 +156,7 @@ clear the dispatch short-circuits BEFORE the wires
 both sound and complete for this kernel.  The S-mode side has no such
 shortcut.
 
-`HartMIntr.swp_exec_step_any` is the rule this forces, and it is proved.  What
+`HartStepAny.swp_exec_step_any` is the rule this forces, and it is proved.  What
 feeds it is the piece to write next:
 
 **an S-mode `run_hart_active` rule with a DISJUNCTIVE conclusion** —
@@ -179,6 +179,42 @@ piece: `SmodeCorePt.s_regime_fetch` is the exec-side version (a bupd over the
 Some (r, σf)` plus σf's frame properties), and its `swp` twin is the work.  It
 WRITES (the TLB fill), so it is not a `goodb` transport; it is a walk with
 memory events, the shape `HartMFetch.swp_fetch_ram` has in M-mode.
+
+### The privilege belongs on the FILE, not on the rule
+
+`should_inc_minstret` takes the current privilege, so the prelude's
+`minstret_increment` value depends on it.  The first version of the cycle chain
+answered that by PINNING the rule to Machine: `minstret_inc_flag mc micfg` had
+`Machine` baked into its body and `swp_try_step_gen` carried a
+`register_lookup cur_privilege rs = Machine` premise.
+
+That is backwards, and the two-armed rule is where it shows: the ONLY client
+that needs both arms is the S-mode kernel taking a trap, so a Machine-pinned
+version of it has no caller at all.  The fix is that the flag takes the
+privilege as an ARGUMENT and `wrap_pre` reads it off the file:
+
+    minstret_inc_flag mc mcfg p  (* was: ... with Machine inlined *)
+    wrap_pre rs := register_set minstret_increment
+                     (minstret_inc_flag (lookup mcountinhibit rs)
+                        (lookup minstretcfg rs) (lookup cur_privilege rs)) rs
+
+Nothing else about the chain changes — the prelude reads the privilege whatever
+it is, and every M-mode caller instantiates `p := Machine` because its tower
+pins `cur_privilege` (`mm_rs_priv` / `ml_rs_priv` / `mc_rs`'s parameter).
+`WpSmodeWfi` already stated its exec-level facts this way, which is the
+independent confirmation the file is the right home.
+
+Not to be confused with the STRONG TICK variants that stay Machine-pinned
+(`mcycle_inc_flag`, `hfrun_tick_clock`, `swp_tick_clock` in `HartMCycle`): those
+compute a mcycle value, the wrapper's tick axis does not go through them, and
+the cycle rule does not use them.
+
+The naming follows: the privilege-generic two-armed rule lives in
+`HartStepAny.v` (it was briefly `HartMIntr.v`, which was wrong twice over —
+this kernel never takes an interrupt in M-mode, and the rule is not M-mode).
+`HartMCycle`'s own "M" is now a misnomer for its privilege-generic part;
+`HartMFetch` / `HartMRun` / `HartMLeaf` keep theirs legitimately, since those
+really are the Machine-mode instances.
 
 **`minstret_inv := emp`, PERSISTENT, ON PURPOSE (MinstretInv.v).**  The Iris
 invariant is gone — counter facts are owned resources in `pc_is`'s
@@ -334,7 +370,7 @@ Evidence:
 | where | what | why it exists |
 |---|---|---|
 | `HartMCycle.swp_exec_step_decode_execute` | the cycle rule: resources in, ONE obligation, resources back with PC at the new value | replaces `wp_exec_step_decode_execute_inv`.  **MODE-AGNOSTIC ON PURPOSE** — no privilege, misa or mstatus.  S-mode reuses it verbatim; baking M-mode in here was a bug I had to undo |
-| `HartMIntr.swp_try_step_any` / `swp_exec_step_any` | the cycle rule that does NOT pick the arm: the body's postcondition MATCHES on the step reached, and the post-file is a PREDICATE | `dispatchInterrupt` reads the PLIC wires, which live in `WireInv.wire_inv` and can move BETWEEN the dispatch's nodes, so no caller can promise whether a cycle retires or traps.  The predicate post-file is independently what `csrw stimecmp` needs.  `swp_try_step_gen` / `swp_exec_step_decode_execute` are the singleton-`Q`, retire-only instances and should become instances at the fold-back |
+| `HartStepAny.swp_try_step_any` / `swp_exec_step_any` | the cycle rule that does NOT pick the arm: the body's postcondition MATCHES on the step reached, and the post-file is a PREDICATE | `dispatchInterrupt` reads the PLIC wires, which live in `WireInv.wire_inv` and can move BETWEEN the dispatch's nodes, so no caller can promise whether a cycle retires or traps.  The predicate post-file is independently what `csrw stimecmp` needs.  `swp_try_step_gen` / `swp_exec_step_decode_execute` are the singleton-`Q`, retire-only instances and should become instances at the fold-back.  PRIVILEGE-AGNOSTIC — see §"the privilege belongs on the FILE" |
 | `HartMCycle.swp_step_ex` | introduces the fetched word's existential | the word must be existential in the obligation, or a caller that dispatches on fetch SHAPE cannot instantiate it per branch |
 | `HartMCycle.reg_agree_l/_r` | footprint weakening | |
 | `HartMCycle.wrap_pre_*` / `wrap_post_*` | cell-by-cell reads of the tick's pre/post files | |
@@ -571,7 +607,7 @@ each needs the one-line fix `ProofSpin` needed, because `pc_is` now carries
    |---|---|---|
    | leaves | `wp_or_gpr`, `wp_jalr_gpr`, … | 135 sites / 38 files |
    | wrappers | `wp_instr` (33), `wp_instr_s_sconf` (68), `wp_instr_s_config_regime` (14), `wp_instr_config` (3), `wp_instr_s_regime` (2), `wp_instr_s_intr` (1) | 6 |
-   | decode+execute | `InstrBytes.wp_exec_step_decode_execute_inv`, `SmodeCore.wp_exec_step_decode_execute_inv_priv` | 2 |
+   | decode+execute | `InstrBytes.wp_exec_step_decode_execute_inv`; the S-mode twin (`SmodeCore.wp_exec_step_decode_execute_inv_priv`) is DELETED — the swp side is `HartMCycle.swp_exec_step_decode_execute` (privilege-agnostic) and what it still needs is the S-mode fetch | 1 |
    | cycle | `wp_exec_step_hart_active_inv` → … → `wp_exec_step` | DONE (deleted; `HartMCycle.swp_try_step_gen` / `wp_loop_cycle`) |
 
    **THE LEAF STATEMENTS SURVIVE VERBATIM, and that is the thing to

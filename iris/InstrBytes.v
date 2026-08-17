@@ -908,7 +908,7 @@ Section InstrBytes.
     reg_agree_on (mm_Drw ∪ mm_Dro)
       (wrap_pre (mm_rs pc pc ms bmi cy ti ip mst0 pcfg mc micfg misa0
                    mseccfg0 pmar0 elp0 senv0))
-      (mm_rs pc pc ms (minstret_inc_flag mc micfg) cy ti ip mst0 pcfg mc micfg
+      (mm_rs pc pc ms (minstret_inc_flag mc micfg Machine) cy ti ip mst0 pcfg mc micfg
          misa0 mseccfg0 pmar0 elp0 senv0).
   Proof.
     apply mm_rs_agree.

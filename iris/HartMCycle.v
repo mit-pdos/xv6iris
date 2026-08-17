@@ -56,10 +56,15 @@ Local Notation zerobit :=
   (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 1)
      (BinaryString.Raw.to_N "0" 0%N)).
 
+(* THE PRIVILEGE IS A PARAMETER, and it has to be: [should_inc_minstret p]
+   filters on the privilege, and the CYCLE is not an M-mode notion -- the
+   S-mode side runs the same [try_step] and takes its interrupts there.  Only
+   the FETCH is privilege-specific (identity translation, PMP at M), which is
+   why [HartMFetch] / [HartMRun] keep their M and this does not. *)
 Definition minstret_inc_flag (mc : SailStdpp.Values.mword 32)
-    (mcfg : SailStdpp.Values.mword 64) : bool :=
+    (mcfg : SailStdpp.Values.mword 64) (p : Privilege) : bool :=
   if eq_vec (_get_Counterin_IR mc) zerobit
-  then eq_vec (counter_priv_filter_bit mcfg Machine) zerobit
+  then eq_vec (counter_priv_filter_bit mcfg p) zerobit
   else false.
 
 (* ====================================================================== *)
@@ -94,13 +99,14 @@ Local Ltac t_cbn :=
      Defs.read_reg Defs.write_reg Defs.and_boolM Defs.or_boolM
      andb orb negb not get_config_print_clint].
 
-Lemma hfrun_should_inc_minstret (D Drw : gset register) (rs : regstate) :
+Lemma hfrun_should_inc_minstret (D Drw : gset register) (rs : regstate)
+    (p : Privilege) :
   (R_bitvector_32 mcountinhibit : register) ∈ D ->
   (R_bitvector_64 minstretcfg : register) ∈ D ->
-  hfrun 6 D Drw rs (should_inc_minstret Machine)
+  hfrun 6 D Drw rs (should_inc_minstret p)
   = Some (minstret_inc_flag
             (register_lookup (R_bitvector_32 mcountinhibit) rs)
-            (register_lookup (R_bitvector_64 minstretcfg) rs), rs).
+            (register_lookup (R_bitvector_64 minstretcfg) rs) p, rs).
 Proof.
   intros HDmc HDcfg.
   unfold should_inc_minstret, minstret_inc_flag.
@@ -260,10 +266,13 @@ Qed.
    its tail leaves behind (nextPC committed into PC, minstret bumped -- the
    bumped VALUE stays a parameter, because both arms of the config branch
    reach this same shape and differ only in what the counter reads) *)
+(* the privilege comes off the FILE, so [wrap_pre] needs no extra argument
+   and the cycle rule needs no premise about which regime it is in *)
 Definition wrap_pre (rs : regstate) : regstate :=
   register_set (R_bool minstret_increment)
     (minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
-       (register_lookup (R_bitvector_64 minstretcfg) rs)) rs.
+       (register_lookup (R_bitvector_64 minstretcfg) rs)
+       (register_lookup cur_privilege rs)) rs.
 
 Definition wrap_post (rs2 : regstate) (mi : SailStdpp.Values.mword 64)
     : regstate :=
@@ -275,7 +284,8 @@ Definition wrap_post (rs2 : regstate) (mi : SailStdpp.Values.mword 64)
 Lemma wrap_pre_mi (rs : regstate) :
   register_lookup (R_bool minstret_increment) (wrap_pre rs)
   = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
-      (register_lookup (R_bitvector_64 minstretcfg) rs).
+      (register_lookup (R_bitvector_64 minstretcfg) rs)
+      (register_lookup cur_privilege rs).
 Proof. unfold wrap_pre. by rewrite register_lookup_set. Qed.
 
 Lemma wrap_pre_other (r : register) (rs : regstate) :
@@ -586,22 +596,22 @@ Section mcycle.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma swp_should_inc_minstret (Drw Dro : gset register)
-      (Df : register -> dfrac) (rs : regstate) :
+      (Df : register -> dfrac) (rs : regstate) (p : Privilege) :
     Drw ## Dro ->
     (R_bitvector_32 mcountinhibit : register) ∈ Drw ∪ Dro ->
     (R_bitvector_64 minstretcfg : register) ∈ Drw ∪ Dro ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
-    swp (should_inc_minstret Machine)
+    swp (should_inc_minstret p)
       (fun b => ⌜b = minstret_inc_flag
                        (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                       (register_lookup (R_bitvector_64 minstretcfg) rs)⌝ ∗
+                       (register_lookup (R_bitvector_64 minstretcfg) rs) p⌝ ∗
                 hreg_frame rs Drw ∗ hreg_frame_ro Df rs Dro).
   Proof.
     intros Hdisj HDmc HDcfg.
-    apply (swp_hfrun 6 Drw Dro Df rs rs (should_inc_minstret Machine) _ Hdisj).
-    exact (hfrun_should_inc_minstret (Drw ∪ Dro) Drw rs HDmc HDcfg).
+    apply (swp_hfrun 6 Drw Dro Df rs rs (should_inc_minstret p) _ Hdisj).
+    exact (hfrun_should_inc_minstret (Drw ∪ Dro) Drw rs p HDmc HDcfg).
   Qed.
 
   Lemma swp_tick_pc (Drw Dro : gset register) (Df : register -> dfrac)
@@ -742,12 +752,12 @@ Section mcycle.
     (R_bitvector_64 PC : register) ∈ Drw ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
     (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs = Machine ->
     register_lookup hart_state rs = HART_ACTIVE tt ->
     register_lookup hart_state rs2 = HART_ACTIVE tt ->
     register_lookup (R_bool minstret_increment) rs2
       = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs)
-          (register_lookup (R_bitvector_64 minstretcfg) rs) ->
+          (register_lookup (R_bitvector_64 minstretcfg) rs)
+          (register_lookup cur_privilege rs) ->
     gen_cert -∗
     hreg_frame rs Drw -∗
     hreg_frame_ro Df rs Dro -∗
@@ -762,17 +772,17 @@ Section mcycle.
                   hreg_frame_ro Df (wrap_post rs2 mi) Dro ∗ R)%I.
   Proof.
     intros Hdisj HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
-      HWpc HDpc HDnpc Hpriv Hhart Hhart2 Hmi2.
+      HWpc HDpc HDnpc Hhart Hhart2 Hmi2.
     iIntros "#Hcert Hrw Hro Hinstr".
     unfold try_step. cbn beta iota zeta delta [ext_pre_step_hook].
     iApply (swp_bind_use (Defs.read_reg cur_privilege) _ _ _
               with "[Hrw Hro] [-]").
     { iApply (swp_read_reg_pinned Drw Dro Df rs _ Hdisj HDpriv
                 with "Hcert Hrw Hro"). }
-    iIntros (v) "(-> & Hrw & Hro)". rewrite Hpriv.
-    iApply (swp_bind_use (should_inc_minstret Machine) _ _ _
-              with "[Hrw Hro] [-]").
-    { iApply (swp_should_inc_minstret Drw Dro Df rs Hdisj HDmc HDcfg
+    iIntros (v) "(-> & Hrw & Hro)".
+    iApply (swp_bind_use (should_inc_minstret (register_lookup cur_privilege rs))
+              _ _ _ with "[Hrw Hro] [-]").
+    { iApply (swp_should_inc_minstret Drw Dro Df rs _ Hdisj HDmc HDcfg
                 with "Hcert Hrw Hro"). }
     iIntros (v) "(-> & Hrw & Hro)".
     iApply (swp_bind_use _ _ _ _ with "[Hrw Hro] [-]").
@@ -780,7 +790,8 @@ Section mcycle.
                 (Defs.write_reg (R_bool minstret_increment)
                    (minstret_inc_flag
                       (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                      (register_lookup (R_bitvector_64 minstretcfg) rs)))
+                      (register_lookup (R_bitvector_64 minstretcfg) rs)
+                      (register_lookup cur_privilege rs)))
                 _ _ _ with "[Hrw Hro] [-]").
       { iApply (swp_write_reg_owned Drw Dro Df rs _ _ Hdisj HWmi
                   with "Hcert Hrw Hro"). }
@@ -824,7 +835,8 @@ Section mcycle.
     iIntros (v) "(-> & Hrw & Hro)". t_peel. rewrite Hmi2. t_glue.
     destruct (minstret_inc_flag
                 (register_lookup (R_bitvector_32 mcountinhibit) rs)
-                (register_lookup (R_bitvector_64 minstretcfg) rs)) eqn:Hmi.
+                (register_lookup (R_bitvector_64 minstretcfg) rs)
+                (register_lookup cur_privilege rs)) eqn:Hmi.
     - iApply (swp_bind0_use _ _
                 (fun _ => (hreg_frame _ Drw ∗ hreg_frame_ro Df _ Dro)%I) _
                 with "[Hrw Hro] [-]").
@@ -1020,12 +1032,12 @@ Section mcycle.
     (R_bitvector_64 PC : register) ∈ Drw ->
     (R_bitvector_64 PC : register) ∈ Drw ∪ Dro ->
     (R_bitvector_64 nextPC : register) ∈ Drw ∪ Dro ->
-    register_lookup cur_privilege rs1 = Machine ->
     register_lookup hart_state rs1 = HART_ACTIVE tt ->
     register_lookup hart_state rsB = HART_ACTIVE tt ->
     register_lookup (R_bool minstret_increment) rsB
       = minstret_inc_flag (register_lookup (R_bitvector_32 mcountinhibit) rs1)
-          (register_lookup (R_bitvector_64 minstretcfg) rs1) ->
+          (register_lookup (R_bitvector_64 minstretcfg) rs1)
+          (register_lookup cur_privilege rs1) ->
     reg_agree_on (Drw ∪ Dro) (wrap_pre rs1) rsA ->
     gen_cert -∗
     hreg_frame rs1 Drw -∗
@@ -1044,7 +1056,7 @@ Section mcycle.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hdisj HWcy HWti HWip HDpriv HDhart HDmc HDcfg HWmi HDmi HWms HDms
-      HWpc HDpc HDnpc Hpriv Hhart Hhart2 Hmi2 Hpre.
+      HWpc HDpc HDnpc Hhart Hhart2 Hmi2 Hpre.
     iIntros "#Hcert Hrw Hro Hbody Hcont".
     iApply (wp_loop_cycle Drw Dro Df
               (fun rsx => exists mi : SailStdpp.Values.mword 64,
@@ -1057,7 +1069,7 @@ Section mcycle.
     iApply (swp_mono with "[] [-]");
       [| iApply (swp_try_step_gen Drw Dro Df rs1 rsB Psi Hdisj HDpriv
                    HDhart HDmc HDcfg HWmi HDmi HWms HDms HWpc HDpc HDnpc
-                   Hpriv Hhart Hhart2 Hmi2 with "Hcert Hrw Hro [Hbody]") ].
+                   Hhart Hhart2 Hmi2 with "Hcert Hrw Hro [Hbody]") ].
     { iIntros (u). iDestruct 1 as (mi) "(Hrw & Hro & HPsi)".
       iExists _. iSplitR; [iPureIntro; by exists mi|]. iFrame. }
     iIntros "Hrw Hro".
