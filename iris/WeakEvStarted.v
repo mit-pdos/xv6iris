@@ -641,8 +641,8 @@ End wait_seq.
     computed values, and the VM only ever runs inside a conversion check.
 
     WHAT THE MEASUREMENT SHOWS (numbers in the worklist's S5 table): the
-    instruction is 107 silent nodes to the fetch, 178 from the fetch to the
-    store, and a short tail — 293 in all — and each stretch is ONE application
+    instruction is 107 silent nodes to the fetch, 179 (SYMBOLIC model: +1 for the [InstrAnnounce] node) from the fetch to the
+    store, and a short tail — 294 in all — and each stretch is ONE application
     plus one VM-checked equation.  The footprint [ev_D] is computed, not
     guessed: [ev_regs] is a measurement-side collector (it is NOT part of the
     proof interface) that lists the registers a stretch touches. *)
@@ -797,12 +797,12 @@ Definition ev_reqw : Interface.WriteReq.t 4 :=
     kernel rechecks with the VM too rather than with its lazy evaluator). *)
 
 (** (i) THE INSTRUCTION'S EVENT STRUCTURE.  107 silent nodes to the fetch,
-    178 more to the store, 8 more to [Ret]: 293 silent nodes, three stretches,
+    179 more to the store, 8 more to [Ret]: 294 silent nodes, three stretches,
     two memory events, one instruction. *)
 Lemma ev_len1 : ecount 400 ev_D ev_x0 = 107%nat.
 Proof. vm_cast_no_check (eq_refl 107%nat). Qed.
-Lemma ev_len2 : ecount 600 ev_D (ecur_read (bv_unsigned ev_wf) ev_x1) = 178%nat.
-Proof. vm_cast_no_check (eq_refl 178%nat). Qed.
+Lemma ev_len2 : ecount 600 ev_D (ecur_read (bv_unsigned ev_wf) ev_x1) = 179%nat.
+Proof. vm_cast_no_check (eq_refl 179%nat). Qed.
 Lemma ev_len3 : ecount 400 ev_D (ecur_write ev_x2) = 8%nat.
 Proof. vm_cast_no_check (eq_refl 8%nat). Qed.
 
@@ -914,7 +914,7 @@ End instantiated.
     per-site proof terms O(1)".
 
     WHAT WAS TRUE ALL ALONG.  The COMPUTATION is O(1)-ish and fast: the whole
-    instruction is 293 silent nodes in three stretches, and each stretch
+    instruction is 294 silent nodes in three stretches, and each stretch
     reduces in the VM in ~0.1–0.3 s at the real registers.
 
     WHAT WAS FALSE AS ORIGINALLY SPECIFIED, and is now fixed.  The equation

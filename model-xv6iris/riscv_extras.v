@@ -32,3 +32,9 @@ Definition sys_enable_experimental_extensions (_:unit) : bool := false.
 Definition mults_vec {n} (l : mword n) (r : mword n) : mword (2 * n) := mults_vec l r.
 Definition mult_vec {n} (l : mword n) (r : mword n) : mword (2 * n) := mult_vec l r.
 Definition print_string (_ _:string) : unit := tt.
+
+(* Appended by tools/regen_sail_model.sh: the model is generated with
+   -D SYMBOLIC, whose Isla-only extern [mark_register] has no Coq builtin.
+   Register marking is a no-op here (it only annotates Isla traces). *)
+Definition mark_register {register : Type} {type_of_register : register -> Type} {a : Type}
+  (_ : @register_ref register type_of_register a) (_ : string) : unit := tt.

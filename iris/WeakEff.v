@@ -117,6 +117,16 @@ Proof. intros ->. reflexivity. Qed.
 Lemma exec_eff_returnm {X} (x : X) s : exec_eff (Defs.returnm x) s = Some (x, s, []).
 Proof. reflexivity. Qed.
 
+(* The SYMBOLIC model's announcements are silent for the instrumented
+   interpreter too (empty trace). *)
+Lemma exec_eff_instr_announce {n : Z} (w : SailStdpp.Values.mword n) s :
+  exec_eff (Defs.instr_announce w : M _) s = Some (tt, s, []).
+Proof. reflexivity. Qed.
+
+Lemma exec_eff_branch_announce sz (a : SailStdpp.Values.mword sz) s :
+  exec_eff (Defs.branch_announce sz a : M _) s = Some (tt, s, []).
+Proof. reflexivity. Qed.
+
 Lemma exec_eff_read_reg (r : register) s :
   exec_eff (Defs.read_reg r : M _) s = Some (register_lookup r s.(sregs), s, []).
 Proof. reflexivity. Qed.

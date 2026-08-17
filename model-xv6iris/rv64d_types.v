@@ -13405,6 +13405,8 @@ Instance Countable_register_bitvector_exp_8 : Countable register_bitvector_exp_8
 Defined.
 
 Variant register_bool :=
+  | __monomorphize_reads
+  | __monomorphize_writes
   | rvfi_int_data_present
   | rvfi_mem_data_present
   | minstret_increment
@@ -13413,18 +13415,22 @@ Variant register_bool :=
 
 Definition num_of_register_bool (r : register_bool) : Z :=
   match r with
-  | rvfi_int_data_present => 0
-  | rvfi_mem_data_present => 1
-  | minstret_increment => 2
-  | htif_done => 3
+  | __monomorphize_reads => 0
+  | __monomorphize_writes => 1
+  | rvfi_int_data_present => 2
+  | rvfi_mem_data_present => 3
+  | minstret_increment => 4
+  | htif_done => 5
   end.
 Definition register_bool_of_num (i : Z) : register_bool :=
   match i with
-  | 0 => rvfi_int_data_present
-  | 1 => rvfi_mem_data_present
-  | 2 => minstret_increment
-  | 3 => htif_done
-  | _ => rvfi_int_data_present
+  | 0 => __monomorphize_reads
+  | 1 => __monomorphize_writes
+  | 2 => rvfi_int_data_present
+  | 3 => rvfi_mem_data_present
+  | 4 => minstret_increment
+  | 5 => htif_done
+  | _ => __monomorphize_reads
   end.
 Lemma register_bool_num_of_roundtrip (x : register_bool) : register_bool_of_num (num_of_register_bool x) = x.
   destruct x; reflexivity.
@@ -13455,6 +13461,8 @@ Qed.
 Hint Rewrite register_bool_beq_iff : register_beq_iffs.
 Hint Rewrite register_bool_beq_refl : register_beq_refls.
 Definition register_bool_list : list (string * register_bool) := [
+  ("__monomorphize_reads", __monomorphize_reads);
+  ("__monomorphize_writes", __monomorphize_writes);
   ("rvfi_int_data_present", rvfi_int_data_present);
   ("rvfi_mem_data_present", rvfi_mem_data_present);
   ("minstret_increment", minstret_increment);
@@ -14533,6 +14541,10 @@ Definition vr31_ref : register_ref _ :=
   Build_register_ref register type_of_register _ "vr31" vr31 (fun x => x) (fun x => x).
 Instance dummy_register_bitvector_exp_8 : Inhabited (register_ref _) := populate vr0_ref.
 
+Definition __monomorphize_reads_ref : register_ref _ :=
+  Build_register_ref register type_of_register _ "__monomorphize_reads" __monomorphize_reads (fun x => x) (fun x => x).
+Definition __monomorphize_writes_ref : register_ref _ :=
+  Build_register_ref register type_of_register _ "__monomorphize_writes" __monomorphize_writes (fun x => x) (fun x => x).
 Definition rvfi_int_data_present_ref : register_ref _ :=
   Build_register_ref register type_of_register _ "rvfi_int_data_present" rvfi_int_data_present (fun x => x) (fun x => x).
 Definition rvfi_mem_data_present_ref : register_ref _ :=
@@ -14541,7 +14553,7 @@ Definition minstret_increment_ref : register_ref _ :=
   Build_register_ref register type_of_register _ "minstret_increment" minstret_increment (fun x => x) (fun x => x).
 Definition htif_done_ref : register_ref _ :=
   Build_register_ref register type_of_register _ "htif_done" htif_done (fun x => x) (fun x => x).
-Instance dummy_register_bool : Inhabited (register_ref _) := populate rvfi_int_data_present_ref.
+Instance dummy_register_bool : Inhabited (register_ref _) := populate __monomorphize_reads_ref.
 
 Definition pma_regions_ref : register_ref _ :=
   Build_register_ref register type_of_register _ "pma_regions" pma_regions (fun x => x) (fun x => x).

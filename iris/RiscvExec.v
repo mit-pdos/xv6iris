@@ -739,6 +739,18 @@ Proof.
 Qed.
 
 (* exec-leaves (functional twins of run_read_reg / run_write_reg). *)
+(* The concurrency interface's instruction/branch announcements are silent
+   for the interpreter (the [InstrAnnounce]/[BranchAnnounce] arms of [exec]
+   pass through): the SYMBOLIC model emits them at every fetch and at every
+   PC redirect. *)
+Lemma exec_instr_announce {n : Z} (w : mword n) s :
+  exec (Defs.instr_announce w : M _) s = Some (tt, s).
+Proof. reflexivity. Qed.
+
+Lemma exec_branch_announce sz (a : mword sz) s :
+  exec (Defs.branch_announce sz a : M _) s = Some (tt, s).
+Proof. reflexivity. Qed.
+
 Lemma exec_read_reg (r : register) s :
   exec (Defs.read_reg r : M _) s = Some (register_lookup r s.(sregs), s).
 Proof. reflexivity. Qed.

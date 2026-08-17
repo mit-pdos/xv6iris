@@ -685,6 +685,8 @@ Section HartActiveProgress.
     rewrite execR_liftR Hfetch. cbn match. cbn match.
     (* ext_fetch_hook (F_Base w) = F_Base w ; F_Base branch (announce/callback lets) *)
     unfold ext_fetch_hook. cbn match. cbn beta iota.
+    (* the SYMBOLIC model's instruction announcement: silent *)
+    rewrite execR_bind0 execR_liftR exec_instr_announce. cbn match.
     (* ext_decode w -> instr *)
     rewrite execR_bind execR_liftR Hdec. cbn match.
     (* (if print=false then.. else returnR tt) >> and_boolM(..) >>= fun w21 => ..

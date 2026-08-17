@@ -118,7 +118,15 @@ With `V(srcs) := ⊔ { w_regv r | DReg r ∈ srcs } ⊔ (w_ldv if DLdRes ∈ src
 - fences, promise arm, `LDev`: unchanged.
 The promise-free fragment (`wp_pf_step`) gets the same arms fused as today.
 
-### 2.4 Where the operand names come from — the ONE model change
+### 2.4 Where the operand names come from — the ONE model change (LANDED 2026-08-17: `-D SYMBOLIC`)
+
+**LANDED**: the model is regenerated with `-D SYMBOLIC` (the Sail library's
+own flag for wiring the announcements to the concurrency interface — no
+fork surgery), so `riscv_step` now emits `Interface.InstrAnnounce opcode`
+after every fetch and `Interface.BranchAnnounce` at every PC redirect.  Cost
+measured: 12 one-line proof fixes (bind-spine walks) + one node count in the
+spike + a `mark_register` no-op stub; the whole tree green, capstone still
+on the 5 axioms.  Original analysis follows.
 RVWMO's syntactic dependency is defined on the ISA ENCODING (which register
 fields an instruction reads/writes), not on the Sail node stream.  The
 node stream shows `RegRead`/`RegWrite`/`MemRead` but not WHICH register a

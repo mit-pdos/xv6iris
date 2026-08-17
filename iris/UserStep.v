@@ -648,6 +648,8 @@ Proof.
   rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
   rewrite execR_liftR Hfetch. cbn match. cbn match.
   unfold ext_fetch_hook. cbn match. cbn beta iota.
+  (* the SYMBOLIC model's instruction announcement: silent *)
+  rewrite execR_bind0 execR_liftR exec_instr_announce. cbn match.
   rewrite execR_bind execR_liftR Hdec. cbn match.
   unfold get_config_print_instr. cbn match.
   rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
@@ -691,6 +693,8 @@ Proof.
   rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.
   rewrite execR_liftR Hfetch. cbn match. cbn match.
   unfold ext_fetch_hook. cbn match. cbn beta iota.
+  (* the SYMBOLIC model's instruction announcement: silent *)
+  rewrite execR_bind0 execR_liftR exec_instr_announce. cbn match.
   rewrite execR_bind execR_liftR Hdec. cbn match.
   unfold get_config_print_instr. cbn match.
   rewrite execR_bind. rewrite execR_bind0 execR_returnR. cbn match.

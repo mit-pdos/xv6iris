@@ -164,7 +164,9 @@ Lemma exec_eff_set_next_pc (target : mword 64) s :
   exec_eff (set_next_pc target) s = Some (tt, set_reg s nextPC target, []).
 Proof.
   unfold set_next_pc. cbn match.
-  rewrite (exec_eff_bind0_nil _ _ _ _ _ (exec_eff_write_reg nextPC target s)).
+  (* the SYMBOLIC model's branch announcement: silent, empty trace *)
+  (* [>>] associates the announce and the [nextPC] write into one silent prefix here *)
+  erewrite exec_eff_bind0_nil; [|reflexivity].
   apply exec_eff_returnm.
 Qed.
 

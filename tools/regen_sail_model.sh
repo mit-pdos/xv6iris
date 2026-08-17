@@ -6,6 +6,18 @@
 #                                          with this project's deviations
 #   model-xv6iris/sail-modules.txt         the module subset to compile
 #
+# THE MODEL IS GENERATED WITH -D SYMBOLIC (2026-08-17): that is the Sail
+# library's flag under which the concurrency interface's announcements
+# (sail_instr_announce / sail_branch_announce, lib/concurrency_interface/
+# common.sail) are wired to the monadic builtins instead of being no-op stubs,
+# so [riscv_step] emits an [InstrAnnounce] node (the opcode) after every fetch
+# and a [BranchAnnounce] node at every PC redirect.  The weak-memory tier's
+# dependency tracking (claude-notes/design/weak-memory-deps.md) reads the
+# instruction's operand fields off the announced opcode.  SYMBOLIC also
+# declares the Isla-only extern `mark_register`, which has no Coq builtin, so
+# tools/riscv_extras_symbolic.v (a no-op stub) is appended to the fork's
+# handwritten riscv_extras.v on install.
+#
 # See root README.md "Regenerating the Sail model" for background.
 #
 # Usage:
@@ -95,6 +107,7 @@ trap 'rm -rf "$TMP_OUT" "$CHECK_DIR"' EXIT
     --require-version "$SAIL_REQUIRED_VER" \
     --memo-z3-path "$SAIL_RISCV_DIR/build/model/sail_smt_cache" \
     --dcoq-undef-axioms --coq --coq-lib riscv_extras \
+    -D SYMBOLIC \
     --coq-output-dir "$TMP_OUT" \
     -o rv64d \
     --config "$CONFIG_JSON" \
@@ -104,8 +117,9 @@ trap 'rm -rf "$TMP_OUT" "$CHECK_DIR"' EXIT
 
 echo "== Compile-checking the regenerated model =="
 if command -v coqc >/dev/null 2>&1; then
-  cp "$TMP_OUT/rv64d.v" "$TMP_OUT/rv64d_types.v" \
-     "$SAIL_RISCV_DIR/handwritten_support/riscv_extras.v" "$CHECK_DIR/"
+  cp "$TMP_OUT/rv64d.v" "$TMP_OUT/rv64d_types.v" "$CHECK_DIR/"
+  cp "$SAIL_RISCV_DIR/handwritten_support/riscv_extras.v" "$CHECK_DIR/"
+  cat "$SCRIPT_DIR/riscv_extras_symbolic.v" >> "$CHECK_DIR/riscv_extras.v"
   ( cd "$CHECK_DIR" && coqc -R . Riscv riscv_extras.v && coqc -R . Riscv rv64d_types.v && coqc -R . Riscv rv64d.v )
   echo "   OK: compiles clean under coqc"
 else
@@ -115,5 +129,6 @@ fi
 echo "== Installing into $OUT_DIR =="
 cp "$TMP_OUT/rv64d.v" "$TMP_OUT/rv64d_types.v" "$OUT_DIR/"
 cp "$SAIL_RISCV_DIR/handwritten_support/riscv_extras.v" "$OUT_DIR/"
+cat "$SCRIPT_DIR/riscv_extras_symbolic.v" >> "$OUT_DIR/riscv_extras.v"
 echo "Done.  Review 'git diff model-xv6iris/' and run 'make model'; every"
 echo "difference in rv64d.v is a change the iris/ proofs may have to absorb."

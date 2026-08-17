@@ -84,6 +84,8 @@ Lemma exec_set_next_pc (target : mword 64) s :
   exec (set_next_pc target) s = Some (tt, set_reg s nextPC target).
 Proof.
   unfold set_next_pc. cbn match.
+  (* the SYMBOLIC model's branch announcement: silent *)
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_branch_announce _ target s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg nextPC target s)).
   apply exec_returnm.
 Qed.

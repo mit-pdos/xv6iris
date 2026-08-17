@@ -98,6 +98,18 @@ Three files decide what comes out, all of them in `model-xv6iris/`:
   `SAIL_MODULES`, not `--all-modules`).
 - `_CoqProject` — the compile order: `rv64d_types.v → riscv_extras.v → rv64d.v`.
 
+The model is generated with **`-D SYMBOLIC`** (since 2026-08-17). That is the
+Sail library's flag under which the concurrency interface's announcements
+(`sail_instr_announce`, `sail_branch_announce`) are wired to the monadic
+builtins rather than being no-op stubs, so `riscv_step` emits an
+`InstrAnnounce` node (the opcode bits) after every fetch and a
+`BranchAnnounce` node at every PC redirect — every interpreter in `iris/`
+treats both as silent, and the weak-memory tier's dependency tracking reads
+the operand fields off the announced opcode. The flag also adds two inert
+`__monomorphize_*` registers and declares the Isla-only extern
+`mark_register`, for which `tools/riscv_extras_symbolic.v` (a no-op) is
+appended to the fork's `riscv_extras.v` on install.
+
 The regen needs no `cmake`: nothing in the model's `.sail` sources is generated
 by sail-riscv's build, so the source tree plus those files is everything `sail`
 needs.
