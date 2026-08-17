@@ -370,7 +370,10 @@ Definition lstore_post (S : lstate) (rl : bool) (a : Z) (t : nat) : lstate :=
      l_vrNew := l_vrNew S;
      l_vwNew := l_vwNew S;
      l_vRel  := if rl then l_vRel S ++ [t] else l_vRel S;
-     l_fwd   := <[a := (t, l_vwNew S)]> (l_fwd S) |}.
+     (* Mirrors [WeakMem.store_post]'s bank entry: PARM's dependency-free
+        [FwdItem] view, i.e. the EMPTY leaf list ([lval σ [] = 0]).  Not
+        [l_vwNew S] — see the D-7 note in [WeakMem]. *)
+     l_fwd   := <[a := (t, [])]> (l_fwd S) |}.
 
 Definition lfence_post (S : lstate) (pr pw sr sw : bool) : lstate :=
   let v1L := (if pr then l_vrOld S else []) ++ (if pw then l_vwOld S else []) in
@@ -746,7 +749,9 @@ Proof.
       by apply elem_of_list_singleton in H; right.
     + left. rewrite /lstate_leaf. naive_solver.
   - apply lookup_insert_Some in HL as [[-> [= <- <-]]|[Hne HL]].
-    + destruct H as [->|H]; [by right|]. left. rewrite /lstate_leaf. naive_solver.
+    (* The banked view is now the EMPTY leaf list (D-7), so the only leaf a
+       fresh bank entry contributes is the store's own timestamp. *)
+    + destruct H as [->|H]; [by right|by apply elem_of_nil in H].
     + left. rewrite /lstate_leaf. naive_solver.
 Qed.
 

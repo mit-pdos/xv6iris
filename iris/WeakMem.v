@@ -555,9 +555,24 @@ Definition load_vpre (ws : wstate) (aq : bool) : nat :=
 (** THE FORWARD BANK, wired into the read view at M1 (design doc, Decision 3).
 
     A load that reads the timestamp the agent's own last store to [a] left in
-    the bank is FORWARDED: it takes the view the bank recorded (the store's
-    fence floor at store time — the weakest sound choice) instead of the
+    the bank is FORWARDED: it takes the view the bank recorded instead of the
     timestamp itself.  Any other timestamp contributes [t] as before.
+
+    WHAT THE BANK RECORDS (corrected 2026-08-17, deps design §2.3′ D-7).
+    Promising-ARM/RISC-V banks [FwdItem.mk ts (join view_loc view_val) ex]:
+    the store's ADDRESS and DATA dependency views, which is RVWMO ppo 12 —
+    "a load that reads an intermediate store inherits that store's syntactic
+    dependencies", and nothing else.  In a machine with no register views
+    (today's) that join is [0], so [store_post] banks [0]; the dependency
+    track (D2) will replace it by [V(asrc) ⊔ V(dsrc)].
+    M1 banked [w_vwNew ws] — the store's FENCE FLOOR — instead, and described
+    it as "the weakest sound choice".  That was the wrong polarity: the fence
+    floor is ≥ PARM's value, so it makes the forwarded read's post-view LARGER
+    and hence REMOVES hardware behaviours (e.g. [fence rw,w; st x; ld x (fwd);
+    fence r,r; ld y] ordered [ld y] after the pre-fence accesses in our
+    machine but not in RVWMO).  Smaller is the sound direction here: a
+    forwarded read is the one place where the model deliberately declines to
+    inherit ordering, and [0] is exactly PARM's dependency-free value.
 
     Two notes on faithfulness to Promising-ARM's [read_view], which this
     mirrors:
@@ -634,7 +649,14 @@ Definition store_post (ws : wstate) (rl : bool) (a : Z) (t : nat) : wstate :=
      w_vrNew := w_vrNew ws;
      w_vwNew := w_vwNew ws;
      w_vRel  := if rl then Nat.max (w_vRel ws) t else w_vRel ws;
-     w_fwd   := <[a := (t, w_vwNew ws)]> (w_fwd ws);
+     (* THE FORWARD BANK.  The recorded view is PARM's [FwdItem] view, i.e.
+        the store's ADDRESS/DATA dependency views [V(asrc) ⊔ V(dsrc)] (RVWMO
+        ppo 12); today's machine has no register views, so that is [0].  D2
+        (the dependency track) replaces the [0] by [V(asrc) ⊔ V(dsrc)].
+        It is deliberately NOT [w_vwNew ws] (the store's fence floor): that
+        was the M1 choice and it is LARGER than PARM's, i.e. it REMOVES
+        hardware behaviours (design doc deps §2.3′ D-7, fixed 2026-08-17). *)
+     w_fwd   := <[a := (t, 0%nat)]> (w_fwd ws);
      w_pub   := if (w_relp ws || rl)%bool then Nat.max (w_pub ws) t
                 else w_pub ws;
      w_relp  := false |}.

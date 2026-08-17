@@ -161,14 +161,23 @@ needs the containment argument, "WEAKER" = adds behaviors, free):
   distinction (RCpc vs RCsc) is today's `aq` for the `vrn/vwn` raise and
   the `vrel` join — re-audit `load_vpre`/`load_post` against the two `ifc`s
   when D2 is written and record the outcome here.
-- **D-7 (THE FORWARD BANK — a genuine STRENGTHENING in today's machine, to be
-  fixed by D2; found 2026-08-17 while auditing containment).**
-  `WeakMem.store_post` records `w_fwd[a] := (t, w_vwNew ws)`, so a forwarded
+- **D-7 (THE FORWARD BANK — was a genuine STRENGTHENING; FIXED 2026-08-17,
+  found the same day while auditing containment).**
+  **STATUS: FIXED.** `WeakMem.store_post` now records `w_fwd[a] := (t, 0)` —
+  PARM's dependency-free `FwdItem` view; D2 will replace the `0` by
+  `V(asrc) ⊔ V(dsrc)`.  `WeakRobustProv.lstore_post` mirrors it (`(t, [])`),
+  `WeakCompose` §6(5) and `weak-memory.md` Decision 3 are corrected, and
+  `WeakAxiomatic3`'s argued counterexample (b) (the forward-bank leak, §14(1))
+  is DEAD as a result — its premise `cand_pub_clean` is now only a proof-side
+  premise, not one any known witness forces.  No litmus verdict changed
+  (`WeakLitmus`'s forward-bank witnesses run at `w_vwNew = 0`).  The original
+  finding follows.
+  `WeakMem.store_post` recorded `w_fwd[a] := (t, w_vwNew ws)`, so a forwarded
   read (a load reading the agent's own latest store to `a`) gets post-view
   `vpre ⊔ w_vwNew(at store time)`; PARM's `FwdItem` records
   `view_loc ⊔ view_val` (the store's ADDRESS/DATA dependency views — RVWMO
   ppo 12, "a load reading an intermediate store inherits that store's
-  dependencies"), which is `bot` in a dependency-free machine.  Ours is
+  dependencies"), which is `bot` in a dependency-free machine.  Ours was
   LARGER, i.e. STRONGER than PARM/RVWMO: `fence rw,w; st x; ld x (fwd);
   fence r,r; ld y` forces `ld y` above the pre-fence accesses in our machine
   but not in RVWMO (`fence rw,w` orders no later LOAD, and the forwarded

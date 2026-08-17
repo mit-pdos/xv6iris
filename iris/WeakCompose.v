@@ -849,6 +849,11 @@ Qed.
     hardware ⊆ native-full.  The PARM-side [vcap] arithmetic recorded in the
     worklist's §0 is background: it shows PARM pins even MORE promises than we
     assume, and Layer 1 deliberately does not rely on it.
+    D-7 ADDENDUM (2026-08-17) — THE CONTAINMENT NOW HOLDS ON THE FORWARD-BANK
+    AXIS TOO: [WeakMem.store_post] banks PARM's dependency-free [FwdItem] view
+    ([0], RVWMO ppo 12) instead of M1's [w_vwNew] (the store's fence floor),
+    which was the one component where our view arithmetic was LARGER than
+    PARM's and therefore removed hardware behaviours.
 
     Independently machine-checked in this tree, which is what makes the note
     auditable rather than a leap: [WeakAxiomatic.promise_free_sound]

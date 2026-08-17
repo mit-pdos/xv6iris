@@ -1505,8 +1505,12 @@ Qed.
 
     A hart that stores x = 1 and then loads x back reads its OWN message
     (timestamp 1, which coherence pins), but its read view rises only to the
-    view the store banked — [w_vwNew] at store time, i.e. 0 for a hart that
-    has issued no fence.  Coherence still records the real timestamp. *)
+    view the store banked — PARM's [FwdItem] view, i.e. the store's
+    address/data dependency views, which is 0 in this dependency-free machine
+    (D-7, 2026-08-17; M1 banked [w_vwNew] here, which was LARGER than PARM's
+    and therefore removed hardware behaviours).  Coherence still records the
+    real timestamp.  No verdict below depends on which of the two is banked:
+    every hart in this file reaches its store with [w_vwNew = 0]. *)
 
 Local Notation FWD_WS := (store_post ws_init false ax 1).
 
