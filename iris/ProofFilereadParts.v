@@ -417,12 +417,12 @@ Section ProofFilereadParts.
     sie_cap_gpr kt Mt (K - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FR + 0x58) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -592,8 +592,8 @@ Section ProofFilereadParts.
     instr (mword_of_int zb : mword 64) true
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs3, false, 8)) -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 6
@@ -602,8 +602,8 @@ Section ProofFilereadParts.
                 r <> Rs1 -> r <> Rs3 -> Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr kt Mr K b p -∗
         pc_is (mword_of_int zc : mword 64) -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -675,8 +675,8 @@ Section ProofFilereadParts.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs3, false, 8)) -∗
     instr (mword_of_int ze : mword 64) true (JAL (jimm, zreg)) -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 6
@@ -686,8 +686,8 @@ Section ProofFilereadParts.
                 r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr kt Mr K b p -∗
         pc_is (mword_of_int (FR + 0x58) : mword 64) -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) v1 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

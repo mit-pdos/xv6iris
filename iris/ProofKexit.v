@@ -476,7 +476,7 @@ Section KexitLoop.
       pc_is (mword_of_int (KX + 0x3e)) -∗
       proc_priv γf pj pid V -∗
       (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
-      (∃ usx : gset Z, fileclose_fs_env_nopid fn usx 0%nat eb pj) -∗
+      (∃ usx : gset Z, fileclose_fs_env_nopid (kt := kt) fn usx 0%nat eb pj) -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hfnj Hfndq Hfnpid Hav Hfresh.

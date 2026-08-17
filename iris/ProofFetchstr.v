@@ -151,12 +151,12 @@ Section ProofFetchstr.
     sie_cap_gpr kt Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fetchstr + 0x30) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) gap -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) gap -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -693,7 +693,7 @@ Section ProofFetchstr.
                       = p_sz p)
       by (rewrite HA3a0; reflexivity).
     iEval (rewrite -Hszaddr) in "Hszc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.fetchstr + 0x1e)) Ra1 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fetchstr + 0x1e)) Ra1 Ra0
               (mword_of_int 72 : mword 12) A3 (av - 6)%nat (pv_sz V) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e Hszc").
@@ -711,7 +711,7 @@ Section ProofFetchstr.
                       = p_pagetable p)
       by (rewrite HAza0; reflexivity).
     iEval (rewrite -Hptaddr) in "Hptc".
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.fetchstr + 0x20)) Ra0 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fetchstr + 0x20)) Ra0 Ra0
               (mword_of_int 80 : mword 12) Az (av - 6)%nat (page_base (ud_root (pv_upt V))) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 Hptc").

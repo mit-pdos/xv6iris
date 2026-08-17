@@ -357,14 +357,14 @@ Section ProofFilecloseParts.
     sie_cap_gpr kt Mt (K - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (FC + 0x8e) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf⌝ -∗
@@ -534,10 +534,10 @@ Section ProofFilecloseParts.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs5, false, 8)) -∗
     instr (mword_of_int ze : mword 64) true (JAL (jimm, zreg)) -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) v2 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) v4 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) v5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) v2 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) v5 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ Mr !!! Regidx csp_rs1 = pa_stk sp0 8
@@ -548,10 +548,10 @@ Section ProofFilecloseParts.
                 Mr !!! Regidx r = Mt !!! Regidx r) ⌝ -∗
         sie_cap_gpr kt Mr K b p -∗
         pc_is (mword_of_int (FC + 0x8e) : mword 64) -∗
-        word_pointsto (pa_stk sp0 4) (DfracOwn 1) v2 -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) v4 -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) v5 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) v2 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v3 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) v4 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) v5 -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

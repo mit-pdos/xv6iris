@@ -261,10 +261,10 @@ Section ProofFdalloc.
     sie_cap_gpr kt Mt (av - 4)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.fdalloc + 0x28) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) gapv -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) gapv -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -734,7 +734,7 @@ Section ProofFdalloc.
       iDestruct (proc_ofiles_owe_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
       assert (Haddr : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                       = p_ofile p fd) by (rewrite HMa5; apply addv_sext0).
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
                 M (av - 4)%nat w b (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a [Hcell]").
@@ -842,7 +842,7 @@ Section ProofFdalloc.
           as "(Hcell & Hfdslot & Hpvback)".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                           = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
-        iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
+        iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
                   G3 (av - 4)%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi3c [Hcell]").
         { iEval (rgne; rewrite Haddr3c). iExact "Hcell". }

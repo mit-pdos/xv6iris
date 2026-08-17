@@ -771,7 +771,7 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
     bo_loop (kt := kt) CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    bo_exit (kt := kt) CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
     pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -1037,8 +1037,8 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    ▷ bo_loop (kt := kt) CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    bo_exit (kt := kt) CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
     pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -1313,8 +1313,8 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
-    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
-    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    ▷ bo_loop (kt := kt) CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
+    bo_exit (kt := kt) CID0 j γ bn γfs cov logstart m pidv dq K eb spd sp0 lks -∗
     pa_stk sp0 1 ↦₈[kt] (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈[kt] (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈[kt] (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -1350,7 +1350,7 @@ Section BoBodies.
     assert (Hacmt : add_vec (rget M (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 32 : mword 12)) = l_cmt).
     { rgne. rewrite Hs1. exact bo_addr_cmt. }
     (* +0x2c c.lw a5,32(s1) : a5 := log.committing *)
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3a)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.begin_op + 0x3a)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 32 : mword 12) M (trap_res eb + (K - 4))%nat
               (mword_of_int (if cmt then 1 else 0) : mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1447,7 +1447,7 @@ Section BoBodies.
       (* +0x30 c.lw a4,28(s1) : a4 := log.outstanding *)
       assert (Haout : add_vec (rget E1 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 28 : mword 12)) = l_out).
       { rgne. rewrite HE1s1. exact bo_addr_out. }
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x3e)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.begin_op + 0x3e)) (mword_of_int 14 : mword 5) (mword_of_int 9 : mword 5)
                 (mword_of_int 28 : mword 12) E1 (trap_res eb + (K - 4))%nat
                 (mword_of_int (Z.of_nat out) : mword 32) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1558,7 +1558,7 @@ Section BoBodies.
       (* +0x3e c.lw a3,44(s1) : a3 := log.lh.n *)
       assert (Halhn : add_vec (rget E6 (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 44 : mword 12)) = lh_n_pa).
       { rgne. rewrite HE6s1. exact bo_addr_lhn. }
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x4c)) (mword_of_int 13 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.begin_op + 0x4c)) (mword_of_int 13 : mword 5) (mword_of_int 9 : mword 5)
                 (mword_of_int 44 : mword 12) E6 (trap_res eb + (K - 4))%nat
                 (mword_of_int (Z.of_nat n) : mword 32) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1663,7 +1663,7 @@ Section BoBodies.
         assert (Hsta : add_vec (rget E9 (mword_of_int 15 : mword 5))
                          (sign_extend' 64 (mword_of_int 1824 : mword 12)) = l_out).
         { rgne. rewrite HE9a5. exact bo_reloc_out_50. }
-        iApply (wp_sw_s_sconf (mword_of_int (KernelSyms.begin_op + 0x70)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
+        iApply (wp_sw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.begin_op + 0x70)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
                   (mword_of_int 1824 : mword 12) E9 (trap_res eb + (K - 4))%nat
                   (mword_of_int (Z.of_nat out) : mword 32) false
                   with "Hcg Hpc Hi54 [Hout]").

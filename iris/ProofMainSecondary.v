@@ -320,7 +320,7 @@ Section ProofMainSecondary.
     ( ∀ m' : regfile,
         sie_cap_gpr kt m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-        main_deposit γd γv -∗
+        main_deposit (kt := kt) γd γv -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

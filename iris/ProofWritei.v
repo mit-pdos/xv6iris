@@ -1055,7 +1055,7 @@ Section WriteiJoin.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    wi_fr8 m -∗
+    wi_fr8 (kt := kt) m -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
     inode_meta ip dn' -∗
@@ -1434,7 +1434,7 @@ Section WriteiSize.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    wi_fr13 m -∗
+    wi_fr13 (kt := kt) m -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
     inode_meta ip dn -∗
@@ -1496,7 +1496,7 @@ Section WriteiSize.
                      = i_size ip).
     { rgne. rewrite Hs5. reflexivity. }
     iEval (rewrite -Hszadr) in "Hmz".
-    iApply (wp_lw_s_sconf (mword_of_int (WI + 0xbc)) Ra5 Rs5
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (WI + 0xbc)) Ra5 Rs5
               (mword_of_int 76 : mword 12) M (K - 14)%nat (di_size dn : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib6 Hmz").
     iIntros (CIDz1 Hqz1) "Hcg Hpc Hmz".
@@ -2082,7 +2082,7 @@ Section WriteiLoop.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    wi_fr13 m -∗
+    wi_fr13 (kt := kt) m -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
     inode_meta ip dn -∗
@@ -2470,7 +2470,7 @@ Section WriteiLoop.
       assert (Hdadr : add_vec (rget B1 Rs5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                       = i_dev ip) by (rgne; rewrite HB1s5; reflexivity).
       iEval (rewrite -Hdadr) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (WI + 0x90)) Ra0 Rs5
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (WI + 0x90)) Ra0 Rs5
                 (mword_of_int 0 : mword 12) B1 (K - 14)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi90 Hidev").
       iIntros (CIDa7 Hqa7) "Hcg Hpc Hidev".
@@ -4090,7 +4090,7 @@ Section WriteiMain.
     assert (Hszadr : add_vec (rget m Ra0) (sign_extend' 64 (mword_of_int 76 : mword 12))
                      = i_size ip) by (rgne; rewrite Ha0; reflexivity).
     iEval (rewrite -Hszadr) in "Hmz".
-    iApply (wp_clw_s_sconf pcE Ra5 Ra0 (mword_of_int 76 : mword 12)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) pcE Ra5 Ra0 (mword_of_int 76 : mword 12)
               m K (di_size dn : mword 32) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi00 Hmz").
     iIntros (CIDp0 Hqp0) "Hcg Hpc Hmz".

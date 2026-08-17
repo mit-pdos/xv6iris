@@ -643,7 +643,7 @@ Section ReadiJoin.
     cpu_claim_ext eb (proc_addr j) -∗
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xd8) : mword 64) -∗
-    rd_fr8 m -∗
+    rd_fr8 (kt := kt) m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -806,7 +806,7 @@ Section ReadiExit.
       (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")),
              sp, Regidx Rs11, false, 8)) -∗
     instr (mword_of_int zf : mword 64) true (JAL (jimm, zreg)) -∗
-    rd_fr13 m -∗
+    rd_fr13 (kt := kt) m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -1089,7 +1089,7 @@ Section ReadiLoop.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    rd_fr13 m -∗
+    rd_fr13 (kt := kt) m -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -1315,7 +1315,7 @@ Section ReadiLoop.
     assert (Hdadr : add_vec (rget B1 Rs6) (sign_extend' 64 (mword_of_int 0 : mword 12))
                     = i_dev ip) by (rgne; rewrite HB1s6; reflexivity).
     iEval (rewrite -Hdadr) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (RI + 0x8a)) Ra0 Rs6
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (RI + 0x8a)) Ra0 Rs6
               (mword_of_int 0 : mword 12) B1 (K - 14)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8a Hidev").
     iIntros (CIDa7 Hqa7) "Hcg Hpc Hidev".

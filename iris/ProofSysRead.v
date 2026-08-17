@@ -177,12 +177,12 @@ Section ProofSysRead.
     sie_cap_gpr kt Mt (av - 6)%nat b pp -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_read + 0x40) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) w3 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) w3 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next (CID0 := CID0) b pp (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗

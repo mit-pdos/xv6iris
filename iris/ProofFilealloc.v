@@ -628,7 +628,7 @@ Section ProofFilealloc.
         iEval (rewrite /fslot HMj) in "Hslot".
         iDestruct "Hslot" as "(%Hcnt & Hcell & Hrest & Hfd)".
         iEval (rewrite -Hpa) in "Hcell".
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.filealloc + 0x26)) Ra5 Rs1 (mword_of_int 4 : mword 12)
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.filealloc + 0x26)) Ra5 Rs1 (mword_of_int 4 : mword 12)
                   M (trap_res b + (K - 4))%nat (mword_of_int (Z.pos cnt) : mword 32) false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi26 Hcell").
@@ -730,7 +730,7 @@ Section ProofFilealloc.
         iEval (rewrite /fslot HMj) in "Hslot".
         iDestruct "Hslot" as "[Hcell Hfree]".
         iEval (rewrite -Hpa) in "Hcell".
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.filealloc + 0x26)) Ra5 Rs1 (mword_of_int 4 : mword 12)
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.filealloc + 0x26)) Ra5 Rs1 (mword_of_int 4 : mword 12)
                   M (trap_res b + (K - 4))%nat (mword_of_int 0 : mword 32) false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi26 Hcell").

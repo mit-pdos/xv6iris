@@ -615,8 +615,8 @@ Section ProofSysPipe.
     instr (mword_of_int zd : mword 64) false (JAL (imm2, Regidx Rra)) -∗
     instr (mword_of_int ze : mword 64) true
       (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx Ra5, ADDI)) -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
     file_ref γf k0 q0 Cf0 -∗
     file_ref γf k1 q1 Cf1 -∗
     (* both closes run under ONE environment, threaded through: the first may
@@ -634,8 +634,8 @@ Section ProofSysPipe.
         trap_csrs_ext kt eb -∗
         cpu_claim_ext eb p -∗
         pc_is (mword_of_int zf : mword 64) -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
         fd_slot -∗ fd_slot -∗
         (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
         (∃ us', fileclose_fs_env (kt := kt) fn us' 0%nat eb p) -∗
@@ -792,14 +792,14 @@ Section ProofSysPipe.
     sie_cap_gpr kt Mt (av - 8)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_pipe + 0xda) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -1127,12 +1127,12 @@ Section ProofSysPipe.
         (∃ on', fileclose_pipe_env (kt := kt) fn on' 0%nat) -∗
         (∃ us', fileclose_fs_env (kt := kt) fn us' 0%nat eb p) -∗
         (∃ w5 w6 w7 : mword 64,
-           word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-           word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-           word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7) -∗
+           word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+           word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+           word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7) -∗
         (∃ lo hi : mword 32,
-           word4_pointsto (pa_stk sp0 8) (DfracOwn 1) lo ∗
-           word4_pointsto (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
+           word4_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) lo ∗
+           word4_pointsto (KTR := kt) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
         sys_pipe_post γf p pid (upd_upt V P') res -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
@@ -2267,12 +2267,12 @@ Section ProofSysPipe.
         proc_priv γf p pid
           (upd_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)) P') -∗
         fd_slot -∗ fd_slot -∗
-        word_pointsto (pa_stk sp0 5) (DfracOwn 1) v -∗
-        word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
-        word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
-        word4_pointsto (pa_stk sp0 8) (DfracOwn 1)
+        word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) v -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
+        word4_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) -∗
-        word4_pointsto (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
+        word4_pointsto (KTR := kt) (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) -∗
         WP (Loop : expr riscv_lang)))%I).
     (* EPI and T7C are offered as a CONJUNCTION, the pipealloc idiom: exactly

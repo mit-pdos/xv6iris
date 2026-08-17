@@ -183,8 +183,8 @@ Section ProofMemcmp.
     sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.memcmp + 0x2e) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -359,7 +359,7 @@ Section ProofMemcmp.
     (* ---- +0x12: lbu a5,0(a0) ---- *)
     iDestruct (bb_byte_acc s1 n t f dq1 Htn with "Hbuf1") as "[Hb1 Hback1]".
     assert (HMa0 : rget M Ra0 = pa_add s1 t) by (rgne; exact Ha0).
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.memcmp + 0x12)) Ra5 Ra0
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memcmp + 0x12)) Ra5 Ra0
               (mword_of_int 0 : mword 12) M (K - 2)%nat (f t : mword 8) b (dqm:=dq1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [Hb1]").
@@ -378,7 +378,7 @@ Section ProofMemcmp.
     assert (HM1a1 : M1 !!! Regidx Ra1 = pa_add s2 t)
       by (rewrite /M1 upd_ne; [exact Ha1 | reg_neq]).
     assert (HM1a1' : rget M1 Ra1 = pa_add s2 t) by (rgne; exact HM1a1).
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.memcmp + 0x16)) Ra4 Ra1
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.memcmp + 0x16)) Ra4 Ra1
               (mword_of_int 0 : mword 12) M1 (K - 2)%nat (g t : mword 8) b (dqm:=dq2)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [Hb2]").

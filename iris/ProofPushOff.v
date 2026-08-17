@@ -357,7 +357,7 @@ Section ProofPushOff.
     iEval (rewrite Hpc1c) in "Hpc".
     (* ---- 0x1c: c.lw a5,120(a0) : a5 := zext32(noff) ---- *)
     iPoseProof (poi_1c with "Htext") as "Hi1c".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.push_off + 0x1c)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.push_off + 0x1c)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) M1 av noff false
  ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hnoff]").
@@ -384,7 +384,7 @@ Section ProofPushOff.
     { rewrite /M3. rewrite upd_ne; [| vm_compute; discriminate].
       rewrite /M2. rewrite upd_ne; [| vm_compute; discriminate]. exact Hm110. }
     iPoseProof (poi_20 with "Htext") as "Hi20".
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.push_off + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.push_off + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) M3 av noff false
               with "Hcg Hpc Hi20 [Hnoff]").
     { iEval (rgne). iEval (rewrite Hm310). iExact "Hnoff". }
@@ -758,7 +758,7 @@ Section ProofPushOff.
     iEval (rewrite Hpc14) in "Hpc".
     (* ---- 0x14: c.lw a5,120(a0) : a5 := noff ---- *)
     iPoseProof (poi_14 with "Htext") as "Hi14".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.push_off + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.push_off + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) N4 (trap_res b + (av - 4))%nat noff false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [Hnoff]").
@@ -864,7 +864,7 @@ Section ProofPushOff.
       { rewrite /N8. rewrite upd_ne; [| vm_compute; discriminate].
         rewrite /N7. rewrite upd_ne; [| vm_compute; discriminate]. exact Ha0_2c. }
       iPoseProof (poi_36 with "Htext") as "Hi36".
-      iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.push_off + 0x36)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+      iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.push_off + 0x36)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
                 (mword_of_int 124 : mword 12) N8 (trap_res b + (av - 4))%nat iv0 false
                 with "Hcg Hpc Hi36 [Hintena]").
       { iEval (rgne). iEval (rewrite Hintaddr). iExact "Hintena". }
@@ -1393,7 +1393,7 @@ Section ProofPushOff.
     { rewrite /P4 upd_ne; [| vm_compute; discriminate].
       rewrite /P3 upd_ne; [| vm_compute; discriminate].
       exact Ha0C. }
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.pop_off + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pop_off + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) P4 (trap_res bexit + (av - 2))%nat noffv false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [Hnoff]").
@@ -1440,7 +1440,7 @@ Section ProofPushOff.
     { rewrite /P6 upd_ne; [| vm_compute; discriminate].
       rewrite /P5 upd_ne; [| vm_compute; discriminate].
       exact Ha0P4. }
-    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.pop_off + 0x1c)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_csw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pop_off + 0x1c)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
               (mword_of_int 120 : mword 12) P6 (trap_res bexit + (av - 2))%nat noffv false
               with "Hcg Hpc Hi1c [Hnoff]").
     { iEval (rgne). iEval (rewrite Ha0P6 -Ha0P4). iExact "Hnoff". }
@@ -1633,7 +1633,7 @@ Section ProofPushOff.
       (* ---- 0x20: c.lw a5,124(a0) : a5 := intena ---- *)
       iPoseProof (ppi_20 with "Htext") as "Hi20".
       iPoseProof (ppi_22 with "Htext") as "Hi22".
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.pop_off + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.pop_off + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 10 : mword 5)
                 (mword_of_int 124 : mword 12) P6 (trap_res bexit + (av - 2))%nat intenav false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi20 [Hint]").

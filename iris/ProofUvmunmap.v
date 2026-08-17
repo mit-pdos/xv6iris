@@ -851,7 +851,7 @@ Section ProofUvmunmap.
         (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
         with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.uvmunmap + 0x5e)) Ra5 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.uvmunmap + 0x5e)) Ra5 Ra0
               (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
               B1 (K - 8) w0 b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)

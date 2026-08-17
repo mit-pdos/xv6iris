@@ -891,10 +891,10 @@ Section SyscallVocab.
        M !!! Regidx r = m !!! Regidx r) ->
     (K_syscall <= av)%nat ->
     sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M (mword_of_int (sysc_target k)) us -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).
@@ -925,10 +925,10 @@ Section SyscallVocab.
     sie_cap_gpr kt E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots bn 3 -∗ fileclose_bm fn us' -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈[kt]{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
@@ -1276,10 +1276,10 @@ Section SyscallRet.
     sie_cap_gpr kt E (av - 4)%nat true pj -∗
     cpu_own 0%nat true pj true lks -∗
     kernel_text -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     bslots bn 3 -∗ fileclose_bm fn us' -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈[kt]{dqi} ip -∗
     fd_slots FDSPARE -∗ iref_slots IREFSPARE -∗
@@ -1993,10 +1993,10 @@ Section SyscallArms.
     (K_syscall <= av)%nat ->
     sysc_arm_pre γf pj γs bn fn dqi ip pid V lks (av - 4)%nat M
       (mword_of_int (KernelSyms.syscall + 0x40) : mword 64) us -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
-    word_pointsto (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 1) (DfracOwn 1) (m !!! Regidx Rra) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 2) (DfracOwn 1) (m !!! Regidx Rs0) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 3) (DfracOwn 1) (m !!! Regidx Rs1) -∗
+    word_pointsto (KTR := kt) (pa_stk (m !!! Regidx csp_rs1) 4) (DfracOwn 1) (m !!! Regidx Rs2) -∗
     kernel_data -∗
     sysc_hcont_ty γf pj bn fn dqi ip pid V lks av m (ret_pc (m !!! Regidx Rra)) -∗
     WP (Loop : expr riscv_lang).

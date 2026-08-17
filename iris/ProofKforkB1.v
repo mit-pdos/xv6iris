@@ -156,14 +156,14 @@ Section KforkB1Proof.
     arm_pay kt lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    (∃ w4, word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4) -∗
-    (∃ w5, word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5) -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    (∃ w8, word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    (∃ w4, word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4) -∗
+    (∃ w5, word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) (m !!! Regidx Rs4) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    (∃ w8, word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8) -∗
     proc_held cpu_id j γl USED ch -∗
     hart_at_any (proc_addr j) -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res (kt := kt) γs γl (proc_addr j)) -∗

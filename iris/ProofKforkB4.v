@@ -317,7 +317,7 @@ Section KforkB4Proof.
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
     iEval (rewrite -Hpa0a4) in "Hpcwd".
-    iApply (wp_ld_s_sconf (mword_of_int (KF + 0xa4)) Ra0 Rs5 (mword_of_int 336 : mword 12)
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0xa4)) Ra0 Rs5 (mword_of_int 336 : mword 12)
               m (rsv + (K - 8))%nat (pv_cwd Vp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a4 Hpcwd").
@@ -570,7 +570,7 @@ Section KforkB4Proof.
     (* +0xbe: lw s1,48(s4) -- s1 := np->pid, THE RETURN VALUE.        *)
     (* ------------------------------------------------------------- *)
     iDestruct (proc_priv_pid γf npa pid_c Vc3 with "Hchild3") as "[Hcpid Hcpidback]".
-    iApply (wp_lw_s_sconf (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
               mr2 (rsv + (K - 8))%nat pid_c false (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0be [Hcpid]").

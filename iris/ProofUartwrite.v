@@ -498,9 +498,9 @@ Section UwBodies.
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x76)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
     uart_sent_sub γu bs -∗
-    uw_saved (kt := kt) sp0 m0 -∗ uw_slot10 sp0 -∗
+    uw_saved (kt := kt) sp0 m0 -∗ uw_slot10 (kt := kt) sp0 -∗
     Rbuf -∗
-    uw_ret (CID0 := CID0) γu j m0 av eb bs Rbuf pidv dqp lks -∗
+    uw_ret (kt := kt) (CID0 := CID0) γu j m0 av eb bs Rbuf pidv dqp lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hregs Hsp0 Hav Heb Hanch. subst eb.
@@ -774,9 +774,9 @@ Section UwBodies.
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x4a)) -∗
     p_pid pj ↦₄{dqp} pidv -∗
     uart_sent_sub γu (uw_bytes f i) -∗
-    uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-    ( uw_next_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks
-      ∧ uw_exit_cont (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp lks ) -∗
+    uw_full (kt := kt) sp0 m0 -∗ uw_buf buf dq f n -∗
+    ( uw_next_cont (kt := kt) (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks
+      ∧ uw_exit_cont (kt := kt) (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp lks ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hin Hn31 Hj Hjlp Hav Heb Hanch Hregs Hfresh. subst eb.
@@ -1108,7 +1108,7 @@ Section UwBodies.
         assert (Haddrb : add_vec (rget G1 Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                          = pa_add buf i).
         { rgne. rewrite HG1a5. apply uw_addv_0. }
-        iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.uartwrite + 0x64)) Ra5 Ra5
+        iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.uartwrite + 0x64)) Ra5 Ra5
                   (mword_of_int 0 : mword 12) G1 (trap_res true + (av - 10))%nat (f i : mword 8) false
                   (dqm := dq) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi64 [Hbyte]").
         { iEval (rewrite Haddrb). iExact "Hbyte". }
@@ -1287,7 +1287,7 @@ Section UwBodies.
     forall i : nat, (i + S k)%nat = n ->
     ⊢ kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
       procs_inv (kt := kt) γs -∗
-      uw_head (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks.
+      uw_head (kt := kt) (CID0 := CID0) γu j m0 av eb sp0 buf n f dq pidv dqp i lks.
   Proof.
     intros Hn31 Hj Hjlp Hav Heb Hfresh.
     induction k as [|k IH].

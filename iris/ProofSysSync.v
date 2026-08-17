@@ -659,7 +659,7 @@ Section SsBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
     ▷ ss_loop (kt := kt) CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
-    ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+    ss_exit (kt := kt) CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
     pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
     pa_stk sp0 3 ↦₈[kt] (m !!! Regidx Rs1) -∗
@@ -889,7 +889,7 @@ Section SsBodies.
     assert (Hnca : add_vec (rget mfa Rs1) (sign_extend' 64 (mword_of_int 40 : mword 12)) = l_ncommit).
     { rgne. rewrite HAqs1. exact ss_addr_nc. }
     iEval (rewrite -Hnca) in "Hnc".
-    iApply (wp_clw_s_sconf (mword_of_int (SS + 0x54)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (SS + 0x54)) Ra5 Rs1
               (mword_of_int 40 : mword 12) mfa (trap_res eb + (K - 4))%nat nc2 false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1001,8 +1001,8 @@ Section SsBodies.
     add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = spd ->
     ss_regs0 m M spd ->
     kernel_text -∗
-    ss_loop CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
-    ss_exit CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+    ss_loop (kt := kt) CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
+    ss_exit (kt := kt) CID0 j γ bn γfs cov logstart m K eb lks spd sp0 -∗
     pa_stk sp0 1 ↦₈[kt] (m !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈[kt] (m !!! Regidx Rs0) -∗
     (∃ v : mword 64, pa_stk sp0 3 ↦₈[kt] v) -∗
@@ -1073,7 +1073,7 @@ Section SsBodies.
     assert (Hnca : add_vec (rget Y1 Rs2) (sign_extend' 64 (mword_of_int 1272 : mword 12)) = l_ncommit).
     { rgne. rewrite HY1s2. exact ss_reloc_nc_2e. }
     iEval (rewrite -Hnca) in "Hnc".
-    iApply (wp_lw_s_sconf (mword_of_int (SS + 0x32)) Rs2 Rs2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (SS + 0x32)) Rs2 Rs2
               (mword_of_int 1272 : mword 12) Y1 (trap_res eb + (K - 4))%nat nc false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1358,7 +1358,7 @@ Section ProofSysSync.
     assert (Hcmta : add_vec (rget G1 Ra5) (sign_extend' 64 (mword_of_int 1290 : mword 12)) = l_cmt).
     { rgne. rewrite HG1a5. exact ss_reloc_cmt_14. }
     iEval (rewrite -Hcmta) in "Hcmt".
-    iApply (wp_lw_s_sconf (mword_of_int (SS + 0x18)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (SS + 0x18)) Ra5 Ra5
               (mword_of_int 1290 : mword 12) G1 (trap_res eb + (K - 4))%nat
               (mword_of_int (if cmt then 1 else 0) : mword 32) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1432,7 +1432,7 @@ Section ProofSysSync.
       assert (Houta : add_vec (rget G3 Ra5) (sign_extend' 64 (mword_of_int 1276 : mword 12)) = l_out).
       { rgne. rewrite HG3a5. exact ss_reloc_out_1e. }
       iEval (rewrite -Houta) in "Hout".
-      iApply (wp_lw_s_sconf (mword_of_int (SS + 0x22)) Ra5 Ra5
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (SS + 0x22)) Ra5 Ra5
                 (mword_of_int 1276 : mword 12) G3 (trap_res eb + (K - 4))%nat
                 (mword_of_int (Z.of_nat out) : mword 32) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)

@@ -1341,7 +1341,7 @@ Section InstallTransBlocks.
                       = l_start).
     { rgne. rewrite HMs4. exact it_addr_start. }
     iEval (rewrite -Hastart) in "Hstc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
               M (K - 10)%nat (mword_of_int logstart : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi70 Hstc").
@@ -1407,7 +1407,7 @@ Section InstallTransBlocks.
                     = l_dev).
     { rgne. rewrite HA3s4. exact it_addr_dev. }
     iEval (rewrite -Hadev) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A3 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a Hdevc").
@@ -1492,7 +1492,7 @@ Section InstallTransBlocks.
                     = lh_block t).
     { rgne. rewrite HA6s5. exact (it_cursor_at t). }
     iEval (rewrite -Hacur) in "Hblk".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
               A6 (K - 10)%nat w eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi84 Hblk").
@@ -1515,7 +1515,7 @@ Section InstallTransBlocks.
                      = l_dev).
     { rgne. rewrite HA7s4. exact it_addr_dev. }
     iEval (rewrite -Hadev2) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A7 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi88 Hdevc").
@@ -2092,7 +2092,7 @@ Section InstallTransBlocks.
                     = lh_n_pa).
     { rgne. rewrite HB15s4. exact it_addr_lhn. }
     iEval (rewrite -Halhn) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
               B15 (K - 10)%nat (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64 Hncell").
@@ -2226,7 +2226,7 @@ Section ProofInstallTrans.
                   = lh_n_pa).
     { rgne. rewrite /R1 upd_eq. exact it_reloc_lhn. }
     iEval (rewrite -Hna) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
               (mword_of_int 2282 : mword 12) R1 K
               (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)

@@ -166,10 +166,10 @@ Section ProofGrowproc.
     sie_cap_gpr kt Mt (av - 4)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.growproc + 0x3c) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -382,7 +382,7 @@ Section ProofGrowproc.
     (* ---- +0x36: sd a1,72(s2) ---- *)
     assert (Haddr : add_vec (Ms !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 72 : mword 12))
                     = p_sz p) by (rewrite Hs2; reflexivity).
-    iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.growproc + 0x36))
+    iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x36))
               Ra1 Rs2 (mword_of_int 72 : mword 12) Ms (av - 4)%nat szold b
               with "Hcg Hpc Hi36 [Hsz]").
     { iEval (rgne; rewrite Haddr). iExact "Hsz". }
@@ -625,7 +625,7 @@ Section ProofGrowproc.
     (* ---- +0x14: c.ld a1,72(a0) -- a1 := p->sz ---- *)
     assert (Hszaddr : add_vec (A1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
       by (rewrite HA1a0; reflexivity).
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.growproc + 0x14)) Ra1 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x14)) Ra1 Ra0
               (mword_of_int 72 : mword 12) A1 (av - 4)%nat (pv_sz V) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [Hszc]").
@@ -673,10 +673,10 @@ Section ProofGrowproc.
         p_sz p ↦₈ szv' -∗
         p_pagetable p ↦₈ page_base (ud_root (pv_upt V)) -∗
         proc_pt P' -∗
-        word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-        word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-        word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-        word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
         WP (Loop : expr riscv_lang))%I
       with "[Hpback Hcont]" as "EXIT".
     { iIntros (CIDx Mf P' szv' rv)
@@ -907,7 +907,7 @@ Section ProofGrowproc.
       assert (HC1a0 : C1 !!! Regidx Ra0 = p) by (rewrite /C1 upd_ne; [exact HB4a0 | reg_neq]).
       assert (Hpta : add_vec (C1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                      = p_pagetable p) by (rewrite HC1a0; reflexivity).
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.growproc + 0x2c)) Ra0 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x2c)) Ra0 Ra0
                 (mword_of_int 80 : mword 12) C1 (av - 4)%nat (page_base (ud_root (pv_upt V))) b
                 (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1271,7 +1271,7 @@ Section ProofGrowproc.
     assert (HE1a0 : E1 !!! Regidx Ra0 = p) by (rewrite /E1 upd_ne; [exact HA2a0 | reg_neq]).
     assert (Hpta2 : add_vec (E1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                     = p_pagetable p) by (rewrite HE1a0; reflexivity).
-    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.growproc + 0x50)) Ra0 Ra0
+    iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.growproc + 0x50)) Ra0 Ra0
               (mword_of_int 80 : mword 12) E1 (av - 4)%nat (page_base (ud_root (pv_upt V))) b
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)

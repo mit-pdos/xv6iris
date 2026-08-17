@@ -267,19 +267,19 @@ Section ProofKexecParts.
     sie_cap_gpr kt Mt (K - 68)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KX + 0x72) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13 -∗
     stack_own (KTR := kt) (pa_stk sp0 13) 55 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
@@ -485,19 +485,19 @@ Section ProofKexecParts.
   (*  dead by the epilogue and travel as a plain [stack_own].              *)
   (* =================================================================== *)
   Definition kxc_frame (sp0 ra0 s00 s10 s20 : mword 64) : iProp Σ :=
-    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     (∃ w5, word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5) ∗
-     (∃ w6, word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6) ∗
-     (∃ w7, word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7) ∗
-     (∃ w8, word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8) ∗
-     (∃ w9, word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9) ∗
-     (∃ w10, word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10) ∗
-     (∃ w11, word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11) ∗
-     (∃ w12, word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12) ∗
-     (∃ w13, word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13) ∗
+    (word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     (∃ w5, word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5) ∗
+     (∃ w6, word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6) ∗
+     (∃ w7, word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7) ∗
+     (∃ w8, word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8) ∗
+     (∃ w9, word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9) ∗
+     (∃ w10, word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10) ∗
+     (∃ w11, word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11) ∗
+     (∃ w12, word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12) ∗
+     (∃ w13, word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13) ∗
      stack_own (KTR := kt) (pa_stk sp0 13) 55)%I.
 
   (* ... AND THE SAME FRAME WITH THE LAZY SLOTS PINNED.                    *)
@@ -510,19 +510,19 @@ Section ProofKexecParts.
   (* the exit that does not care.                                          *)
   Definition kxc_frame_at (sp0 ra0 s00 s10 s20 : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 : mword 64) : iProp Σ :=
-    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
-     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
-     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
-     word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 ∗
-     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
-     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
-     word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 ∗
-     word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 ∗
-     word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 ∗
-     word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 ∗
-     word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 ∗
-     word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 ∗
-     word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 ∗
+    (word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 ∗
+     word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13 ∗
      stack_own (KTR := kt) (pa_stk sp0 13) 55)%I.
 
   Lemma kxc_frame_at_weaken (sp0 ra0 s00 s10 s20 : mword 64)

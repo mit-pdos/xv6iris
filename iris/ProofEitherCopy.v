@@ -169,12 +169,12 @@ Section EitherCopyEpilogue.
     instr q36 true (ITYPE (caddi16sp_imm (mword_of_int 3 : mword 6), sp, sp, ADDI)) -∗
     instr q38 true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) -∗
     pc_is q2a -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -786,7 +786,7 @@ Section ProofEitherCopyout.
                         = p_sz p)
         by (rewrite HU3a0; reflexivity).
       iEval (rewrite -Hszaddr) in "Hszc".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x24)) Ra1 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.either_copyout + 0x24)) Ra1 Ra0
                 (mword_of_int 72 : mword 12) U3 (av - 6)%nat (pv_sz V) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi24 Hszc").
@@ -804,7 +804,7 @@ Section ProofEitherCopyout.
                         = p_pagetable p)
         by (rewrite HUza0; reflexivity).
       iEval (rewrite -Hptaddr) in "Hptc".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.either_copyout + 0x26)) Ra0 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.either_copyout + 0x26)) Ra0 Ra0
                 (mword_of_int 80 : mword 12) Uz (av - 6)%nat (page_base (ud_root (pv_upt V))) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi26 Hptc").
@@ -1499,7 +1499,7 @@ Section ProofEitherCopyin.
                         = p_sz p)
         by (rewrite HU3a0; reflexivity).
       iEval (rewrite -Hszaddr) in "Hszc".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x24)) Ra1 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.either_copyin + 0x24)) Ra1 Ra0
                 (mword_of_int 72 : mword 12) U3 (av - 6)%nat (pv_sz V) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi24 Hszc").
@@ -1517,7 +1517,7 @@ Section ProofEitherCopyin.
                         = p_pagetable p)
         by (rewrite HUza0; reflexivity).
       iEval (rewrite -Hptaddr) in "Hptc".
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.either_copyin + 0x26)) Ra0 Ra0
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.either_copyin + 0x26)) Ra0 Ra0
                 (mword_of_int 80 : mword 12) Uz (av - 6)%nat (page_base (ud_root (pv_upt V))) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi26 Hptc").

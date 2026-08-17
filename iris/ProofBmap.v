@@ -1018,7 +1018,7 @@ Section BmapRelease.
     pc_is (mword_of_int (KernelSyms.bmap + 0x82) : mword 64) -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv (kt := kt) γs -∗
-    bm_frame4 m -∗
+    bm_frame4 (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_map γfs ip bm' -∗
@@ -1216,8 +1216,8 @@ Section BmapTail.
        <= nI + bmap_cost cr true (bmap_ind fbn))%nat ->
     SbI ⊆ Sb ∪ bm_bmsset ak ∪ {[bv_unsigned (bm_ind bmI)]} ->
     (* the allocation arm's two callees, live only with a kit *)
-    (ak <> None -> balloc_contract) ->
-    (ak <> None -> log_write_contract) ->
+    (ak <> None -> balloc_contract (kt := kt)) ->
+    (ak <> None -> log_write_contract (kt := kt)) ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     bm_sp m M ->
@@ -1249,7 +1249,7 @@ Section BmapTail.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    bm_frame4 m -∗
+    bm_frame4 (kt := kt) m -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_addrs ip (bm_cells bmI) -∗
@@ -1319,7 +1319,7 @@ Section BmapTail.
                     = i_dev ip).
     { rgne. rewrite HI0s2. reflexivity. }
     iEval (rewrite -Hdadr) in "Hidev".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x64)) Ra0 Rs2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x64)) Ra0 Rs2
               (mword_of_int 0 : mword 12) I0 (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi64 Hidev").
     iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -1582,7 +1582,7 @@ Section BmapTail.
                     = pa_add (b_data (bnode kk)) (4 * q)%nat).
     { rgne. rewrite HB6a5. apply bm_off0. }
     iEval (rewrite -Hcadr) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bmap + 0x7e)) Rs1 Ra5
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x7e)) Rs1 Ra5
               (mword_of_int 0 : mword 12) B6 (K - 6)%nat
               (bb_mk (fun jj => ind_bytes (bm_ent bmI) !!! jj) (4 * q)%nat) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7e Hcell").
@@ -1647,7 +1647,7 @@ Section BmapTail.
                          (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
       { rgne. rewrite HB7s2. reflexivity. }
       iEval (rewrite -Hdadr2) in "Hidev".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x9a)) Ra0 Rs2
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x9a)) Ra0 Rs2
                 (mword_of_int 0 : mword 12) B7 (K - 6)%nat dev b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9a Hidev").
       iIntros (CID13 Hq13) "Hcg Hpc Hidev".
@@ -2177,14 +2177,14 @@ Section ProofBmapMain.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool)
       (b : bool) (lks : gset string)
-      (Hba : ak <> None -> balloc_contract)
-      (Hlw : ak <> None -> log_write_contract)
+      (Hba : ak <> None -> balloc_contract (kt := kt))
+      (Hlw : ak <> None -> log_write_contract (kt := kt))
       (* forwarded verbatim into [bm_indirect_tail]'s two lock premises --
          see that lemma's header for why the split is unconditional bcache
          / ak-gated log rather than one premise. *)
       (Hbc : locks_below lks "bcache")
       (Hlog : ak <> None -> locks_below lks "log")
-    : bm_gen_stmt γs j γl γu γd γk pd pav pu bn ak γfs
+    : bm_gen_stmt (kt := kt) γs j γl γu γd γk pd pav pu bn ak γfs
                   cov logstart dev ip bm data fbn n cr Sb pidv dq dqd m K eb b lks.
   Proof.
     cbv beta delta [bm_gen_stmt].
@@ -2493,7 +2493,7 @@ Section ProofBmapMain.
                         (sign_extend' 64 (mword_of_int 80 : mword 12)) = i_addr ip fbn).
       { rgne. rewrite HD2s3. symmetry. apply i_addr_indexed. }
       iEval (rewrite -Hcadr) in "Hcell".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x22)) Rs1 Rs3
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x22)) Rs1 Rs3
                 (mword_of_int 80 : mword 12) D2 (K - 6)%nat (blkmap_get bm fbn) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi22 Hcell").
       iIntros (CID14 Hq14) "Hcg Hpc Hcell".
@@ -2553,7 +2553,7 @@ Section ProofBmapMain.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
         { rgne. rewrite HD3a0. reflexivity. }
         iEval (rewrite -Hdadr) in "Hidev".
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bmap + 0x28)) Ra0 Ra0
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x28)) Ra0 Ra0
                   (mword_of_int 0 : mword 12) D3 (K - 6)%nat dev b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi28 Hidev").
         iIntros (CID16 Hq16) "Hcg Hpc Hidev".
@@ -3057,7 +3057,7 @@ Section ProofBmapMain.
                       = i_addr ip NDIRECT).
       { rgne. rewrite HJ3a0. symmetry. apply i_addr_ndirect. }
       iEval (rewrite -Hiadr) in "Hcell".
-      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.bmap + 0x48)) Rs1 Ra0
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x48)) Rs1 Ra0
                 (mword_of_int 128 : mword 12) J3 (K - 6)%nat (bm_ind bm) b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi48 Hcell").
       iIntros (CID16 Hq16) "Hcg Hpc Hcell".
@@ -3125,7 +3125,7 @@ Section ProofBmapMain.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
         { rgne. rewrite HJ4a0. reflexivity. }
         iEval (rewrite -Hdadr) in "Hidev".
-        iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.bmap + 0x4e)) Ra0 Ra0
+        iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.bmap + 0x4e)) Ra0 Ra0
                   (mword_of_int 0 : mword 12) J4 (K - 6)%nat dev b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4e Hidev").
         iIntros (CID18 Hq18) "Hcg Hpc Hidev".

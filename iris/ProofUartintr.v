@@ -366,7 +366,7 @@ Section ProofUartintr.
       sie_cap_gpr kt (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme b lks -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x2c)) -∗
-      ui_frame sp0 m0 -∗
+      ui_frame (kt := kt) sp0 m0 -∗
       ui_ret_cont (kt := kt) (CID0 := CIDe)  m0 av lvl eb pme b lks -∗
       WP (Loop : expr riscv_lang).
   Proof.
@@ -498,7 +498,7 @@ Section ProofUartintr.
     sie_cap_gpr kt M (av - 4)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x22)) -∗
-    ui_frame sp0 m0 -∗
+    ui_frame (kt := kt) sp0 m0 -∗
     ui_ret_cont (kt := kt) m0 av lvl eb pme b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.

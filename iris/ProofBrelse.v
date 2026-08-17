@@ -999,7 +999,7 @@ Section ProofBrelse.
     (* ================= the LAST reference: unlink + splice ============ *)
     - assert (Hq : q = qt) by (apply Hsole; reflexivity). subst qt.
       iEval (rewrite -Hpa) in "Hcell".
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.brelse + 0x2c)) Ra5 Rs1 (mword_of_int 64 : mword 12)
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x2c)) Ra5 Rs1 (mword_of_int 64 : mword 12)
                 mQ (trap_res b + (K - 4))%nat (mword_of_int (Z.pos 1) : mword 32) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2c Hcell").
@@ -1098,7 +1098,7 @@ Section ProofBrelse.
       iPoseProof (bri_3a with "Htext") as "Hi3a".
       iPoseProof (bri_3c with "Htext") as "Hi3c".
       (* +0x34 c.ld a4,80(s1) : a4 := b->next *)
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.brelse + 0x34)) Ra4 Rs1 (mword_of_int 80 : mword 12)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x34)) Ra4 Rs1 (mword_of_int 80 : mword 12)
                 D2 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o2)) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [Hbn]").
@@ -1115,7 +1115,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
       (* +0x36 c.ld a5,72(s1) : a5 := b->prev *)
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.brelse + 0x36)) Ra5 Rs1 (mword_of_int 72 : mword 12)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x36)) Ra5 Rs1 (mword_of_int 72 : mword 12)
                 E1 (trap_res b + (K - 4))%nat (List.last (map bnode o1) bhead) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 [Hbp]").
@@ -1134,7 +1134,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       (* +0x38 c.sd a5,72(a4) : b->next->prev = b->prev *)
-      iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.brelse + 0x38)) Ra5 Ra4 (mword_of_int 72 : mword 12)
+      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x38)) Ra5 Ra4 (mword_of_int 72 : mword 12)
                 E2 (trap_res b + (K - 4))%nat (bnode k) false with "Hcg Hpc Hi38 [Hsp]").
       { iEval (rgpeel; rewrite HE2a4). iExact "Hsp". }
       iApply wp_next_off_intro.
@@ -1145,7 +1145,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* +0x3a c.ld a4,80(s1) : a4 := b->next, again *)
-      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.brelse + 0x3a)) Ra4 Rs1 (mword_of_int 80 : mword 12)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x3a)) Ra4 Rs1 (mword_of_int 80 : mword 12)
                 E2 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o2)) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3a [Hbn]").
@@ -1164,7 +1164,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".
       (* +0x3c c.sd a4,80(a5) : b->prev->next = b->next *)
-      iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.brelse + 0x3c)) Ra4 Ra5 (mword_of_int 80 : mword 12)
+      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x3c)) Ra4 Ra5 (mword_of_int 80 : mword 12)
                 E3 (trap_res b + (K - 4))%nat (bnode k) false with "Hcg Hpc Hi3c [Hpn]").
       { iEval (rgpeel; rewrite HE3a5). iExact "Hpn". }
       iApply wp_next_off_intro.
@@ -1218,7 +1218,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp46) in "Hpc".
       (* +0x46 ld a4,696(a5) : a4 := bcache.head.next *)
-      iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.brelse + 0x46)) Ra4 Ra5 (mword_of_int 696 : mword 12)
+      iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x46)) Ra4 Ra5 (mword_of_int 696 : mword 12)
                 E5 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o1 ++ map bnode o2)%list) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi46 [Hhn]").
@@ -1239,7 +1239,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4a) in "Hpc".
       (* +0x4a c.sd a4,80(s1) : b->next = bcache.head.next *)
-      iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.brelse + 0x4a)) Ra4 Rs1 (mword_of_int 80 : mword 12)
+      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x4a)) Ra4 Rs1 (mword_of_int 80 : mword 12)
                 E6 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o2)) false
                 with "Hcg Hpc Hi4a [Hbn]").
       { iEval (rgpeel; rewrite HE6s1). iExact "Hbn". }
@@ -1283,7 +1283,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp54) in "Hpc".
       (* +0x54 c.sd a4,72(s1) : b->prev = &bcache.head *)
-      iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.brelse + 0x54)) Ra4 Rs1 (mword_of_int 72 : mword 12)
+      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x54)) Ra4 Rs1 (mword_of_int 72 : mword 12)
                 E8 (trap_res b + (K - 4))%nat (List.last (map bnode o1) bhead) false
                 with "Hcg Hpc Hi54 [Hbp]").
       { iEval (rgpeel; rewrite HE8s1). iExact "Hbp". }
@@ -1295,7 +1295,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp56) in "Hpc".
       (* +0x56 ld a4,696(a5) : a4 := bcache.head.next, again *)
-      iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.brelse + 0x56)) Ra4 Ra5 (mword_of_int 696 : mword 12)
+      iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x56)) Ra4 Ra5 (mword_of_int 696 : mword 12)
                 E8 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o1 ++ map bnode o2)%list) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi56 [Hhn]").
@@ -1316,7 +1316,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp5a) in "Hpc".
       (* +0x5a c.sd s1,72(a4) : bcache.head.next->prev = b *)
-      iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.brelse + 0x5a)) Rs1 Ra4 (mword_of_int 72 : mword 12)
+      iApply (wp_csd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x5a)) Rs1 Ra4 (mword_of_int 72 : mword 12)
                 E9 (trap_res b + (K - 4))%nat bhead false with "Hcg Hpc Hi5a [Hhp]").
       { iEval (rgpeel; rewrite HE9a4). iExact "Hhp". }
       iApply wp_next_off_intro.
@@ -1327,7 +1327,7 @@ Section ProofBrelse.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp5c) in "Hpc".
       (* +0x5c sd s1,696(a5) : bcache.head.next = b *)
-      iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.brelse + 0x5c)) Rs1 Ra5 (mword_of_int 696 : mword 12)
+      iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x5c)) Rs1 Ra5 (mword_of_int 696 : mword 12)
                 E9 (trap_res b + (K - 4))%nat (List.hd bhead (map bnode o1 ++ map bnode o2)%list) false
                 with "Hcg Hpc Hi5c [Hhn]").
       { iEval (rgpeel; rewrite HE9hn). iExact "Hhn". }
@@ -1400,7 +1400,7 @@ Section ProofBrelse.
       destruct Hsub as [qr' Hsub].
       assert (Hsub' : qt = (q + qr')%Qp) by (by apply Qp.sub_Some).
       iEval (rewrite -Hpa) in "Hcell".
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.brelse + 0x2c)) Ra5 Rs1 (mword_of_int 64 : mword 12)
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.brelse + 0x2c)) Ra5 Rs1 (mword_of_int 64 : mword 12)
                 mQ (trap_res b + (K - 4))%nat (mword_of_int (Z.pos (Pos.succ cnt')) : mword 32) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2c Hcell").

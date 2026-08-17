@@ -1076,7 +1076,7 @@ Section WriteHeadBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    wh_frame m -∗
+    wh_frame (kt := kt) m -∗
     wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f bsd0 -∗
     (logstart ↪[fs_L γfs]{#(1/2)} bs0) -∗
     (logstart ↪[fs_dirty γfs]{#(1/2)} d0) -∗
@@ -1117,7 +1117,7 @@ Section WriteHeadBlocks.
                    = lh_block i).
     { rgne. rewrite HMa4 wh_s0. apply wh_blk_at. }
     iEval (rewrite -Hsrc) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
               (mword_of_int 0 : mword 12) M (K - 4)%nat w b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a Hcell").
@@ -1518,7 +1518,7 @@ Section ProofWriteHead.
                      = l_start).
     { rgne. rewrite HR4s2 wh_s24. apply wh_l_start. }
     iEval (rewrite -Hstart) in "Hstc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
               (mword_of_int 24 : mword 12) R4 (K - 4)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1540,7 +1540,7 @@ Section ProofWriteHead.
                     = l_dev).
     { rgne. rewrite HR5s2 wh_s36. apply wh_l_dev. }
     iEval (rewrite -Hdvad) in "Hdevc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
               (mword_of_int 36 : mword 12) R5 (K - 4)%nat dev b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hdevc").
@@ -1678,7 +1678,7 @@ Section ProofWriteHead.
                    = lh_n_pa).
     { rgne. rewrite HB1s2 wh_s44. apply wh_l_lhn. }
     iEval (rewrite -Hlhn) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
               (mword_of_int 44 : mword 12) B1 (K - 4)%nat
               (mword_of_int (Z.of_nat n) : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)

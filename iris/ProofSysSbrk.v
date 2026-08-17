@@ -131,12 +131,12 @@ Section ProofSysSbrk.
     sie_cap_gpr kt Mt (av - 6)%nat b p -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) w4 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
     wp_next b p (fun (CID1 : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -328,7 +328,7 @@ Section ProofSysSbrk.
     pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x58) : mword 64) -∗
     proc_priv γf p pid V -∗
     kalloc_env γa None -∗
-    word4_pointsto (pa_stk sp0 5) (DfracOwn 1) nw -∗
+    word4_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) nw -∗
     wp_next (CID0 := CID0) b p (fun (CID1 : CpuId) =>
       ∀ (Mf : regfile) (P' : uptd) (szv' rv : mword 64),
         ⌜Mf !!! Regidx csp_rs1 = pa_stk sp0 6⌝ -∗
@@ -344,7 +344,7 @@ Section ProofSysSbrk.
         cpu_own 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
         proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
-        word4_pointsto (pa_stk sp0 5) (DfracOwn 1) nw -∗
+        word4_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) nw -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -960,7 +960,7 @@ Section ProofSysSbrk.
         cpu_own (CID := CIDx) 0%nat eb p b lks -∗
         pc_is (mword_of_int (KernelSyms.sys_sbrk + 0x64) : mword 64) -∗
         proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
-        (∃ w5 : mword 64, word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5) -∗
+        (∃ w5 : mword 64, word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5) -∗
         WP (Loop : expr riscv_lang))%I
       with "[Hcont Hs1 Hs2 Hs3 Hs4 Hs6]" as "EXIT".
     { iIntros (CIDx Mf P' szv' rv) "%Hsx %Hfsp %Hfs1 %Hfthr %Hok Hcg Hcpu Hpc Hpriv Hw5".

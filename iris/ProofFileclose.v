@@ -368,7 +368,7 @@ Section ProofFileclose.
                   = a_fref k).
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (FC + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FC + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
               macq (trap_res b + (K - 8))%nat (mword_of_int (Z.pos cnt) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell").
@@ -722,7 +722,7 @@ Section ProofFileclose.
       { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hat) in "Hcty".
-      iApply (wp_lw_s_sconf (mword_of_int (FC + 0x2e)) Rs2 Rs1
+      iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FC + 0x2e)) Rs2 Rs1
                 (mword_of_int 0 : mword 12) D2 (trap_res b + (K - 8))%nat (fc_type Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e Hcty").
@@ -740,7 +740,7 @@ Section ProofFileclose.
                     = a_fwritable k).
       { rewrite (rget_ne F1 Rs1 ltac:(vm_compute; discriminate)) HF1s1. reflexivity. }
       iEval (rewrite -Haw) in "Hcwr".
-      iApply (wp_lbu_s_sconf (mword_of_int (FC + 0x32)) Ra5 Rs1
+      iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FC + 0x32)) Ra5 Rs1
                 (mword_of_int 9 : mword 12) F1 (trap_res b + (K - 8))%nat (fc_writable Cf : mword 8) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi32 Hcwr").
@@ -770,7 +770,7 @@ Section ProofFileclose.
                     = a_fpipe k).
       { rewrite (rget_ne F3 Rs1 ltac:(vm_compute; discriminate)) HF3s1. reflexivity. }
       iEval (rewrite -Hap) in "Hcpp".
-      iApply (wp_cld_s_sconf (mword_of_int (FC + 0x38)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FC + 0x38)) Ra5 Rs1
                 (mword_of_int 16 : mword 12) F3 (trap_res b + (K - 8))%nat (fc_pipe Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 Hcpp").
@@ -797,7 +797,7 @@ Section ProofFileclose.
                     = a_fip k).
       { rewrite (rget_ne F5 Rs1 ltac:(vm_compute; discriminate)) HF5s1. reflexivity. }
       iEval (rewrite -Hai) in "Hcip".
-      iApply (wp_cld_s_sconf (mword_of_int (FC + 0x3c)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (FC + 0x3c)) Ra5 Rs1
                 (mword_of_int 24 : mword 12) F5 (trap_res b + (K - 8))%nat (fc_ip Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3c Hcip").

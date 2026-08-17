@@ -773,7 +773,7 @@ Section LogWriteBlocks.
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
     arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
-    lw_frame m -∗
+    lw_frame (kt := kt) m -∗
     bslot bn -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat nl) : mword 32) -∗
@@ -888,7 +888,7 @@ Section LogWriteBlocks.
                      = lh_n_pa).
     { rgne. rewrite HA4a4 lw_s44. reflexivity. }
     iEval (rewrite -Hnaddr) in "Hncell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.log_write + 0x74)) Ra5 Ra4 (mword_of_int 44 : mword 12)
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.log_write + 0x74)) Ra5 Ra4 (mword_of_int 44 : mword 12)
               A4 (trap_res b + (K - 4))%nat (mword_of_int (Z.of_nat nl) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi74 Hncell").
@@ -1016,7 +1016,7 @@ Section LogWriteBlocks.
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
     arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
-    lw_frame m -∗
+    lw_frame (kt := kt) m -∗
     bslot bn -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_block i ↦₄ wold -∗
@@ -1135,7 +1135,7 @@ Section LogWriteBlocks.
     { rgne. rewrite HB5s1 lw_s12.
       rewrite /b_blockno /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hbaddr) in "Hbnoc".
-    iApply (wp_clw_s_sconf (dqm := DfracOwn (1/2)) (mword_of_int (KernelSyms.log_write + 0xa6)) Ra3 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (dqm := DfracOwn (1/2)) (mword_of_int (KernelSyms.log_write + 0xa6)) Ra3 Rs1
               (mword_of_int 12 : mword 12) B5 (trap_res b + (K - 4))%nat bno false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hia6 Hbnoc").
@@ -1287,7 +1287,7 @@ Section LogWriteBlocks.
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
     arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
-    lw_frame m -∗
+    lw_frame (kt := kt) m -∗
     bslot bn -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     lh_block nl ↦₄ jk -∗
@@ -1403,7 +1403,7 @@ Section LogWriteBlocks.
     { rgne. rewrite HG5s1 lw_s12.
       rewrite /b_blockno /bpa /pa_add /add_vec_int. reflexivity. }
     iEval (rewrite -Hbaddr) in "Hbnoc".
-    iApply (wp_clw_s_sconf (dqm := DfracOwn (1/2)) (mword_of_int (KernelSyms.log_write + 0x62)) Ra4 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (dqm := DfracOwn (1/2)) (mword_of_int (KernelSyms.log_write + 0x62)) Ra4 Rs1
               (mword_of_int 12 : mword 12) G5 (trap_res b + (K - 4))%nat bno false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi62 Hbnoc").
@@ -1513,7 +1513,7 @@ Section LogWriteBlocks.
     cpu_own (S n) eb p false ({["log"]} ∪ lks) -∗
     arm_pay kt n eb p -∗
     locked (ln_lk γ) cpu_id -∗
-    lw_frame m -∗
+    lw_frame (kt := kt) m -∗
     bslot bn -∗
     b_blockno (bpa k) ↦₄{DfracOwn (1/2)} bno -∗
     ([∗ list] j ↦ w ∈ W, lh_block j ↦₄ w) -∗
@@ -1544,7 +1544,7 @@ Section LogWriteBlocks.
                     = lh_block i).
     { rgne. rewrite Ha4v lw_s0. apply lw_cursor_at. }
     iEval (rewrite -Haddr) in "Hcell".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.log_write + 0x44)) Ra3 Ra4
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.log_write + 0x44)) Ra3 Ra4
               (mword_of_int 0 : mword 12) M (trap_res b + (K - 4))%nat w false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi44 Hcell").
@@ -2266,7 +2266,7 @@ Section ProofLogWrite.
     { rgne. rewrite /T1 upd_eq /lh_n_pa /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hna) in "Hncell".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.log_write + 0x1c)) Ra2 Ra2
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.log_write + 0x1c)) Ra2 Ra2
               (mword_of_int 1494 : mword 12) T1 (trap_res b + (K - 4))%nat
               (mword_of_int (Z.of_nat nl) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2329,7 +2329,7 @@ Section ProofLogWrite.
     { rgne. rewrite /T4 upd_eq /l_out /log_pa /log_addr /pa_add /add_vec_int.
       apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hoa) in "Houtc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.log_write + 0x2a)) Ra5 Ra5
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.log_write + 0x2a)) Ra5 Ra5
               (mword_of_int 1464 : mword 12) T4 (trap_res b + (K - 4))%nat
               (mword_of_int (Z.of_nat out) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2643,7 +2643,7 @@ Section ProofLogWrite.
       { rgne. rewrite HT6s1 lw_s12.
         rewrite /b_blockno /bpa /pa_add /add_vec_int. reflexivity. }
       iEval (rewrite -Hbaddr) in "Hbnoc".
-      iApply (wp_clw_s_sconf (dqm := DfracOwn (1/2)) (mword_of_int (KernelSyms.log_write + 0x38)) Ra1 Rs1
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (dqm := DfracOwn (1/2)) (mword_of_int (KernelSyms.log_write + 0x38)) Ra1 Rs1
                 (mword_of_int 12 : mword 12) T6 (trap_res b + (K - 4))%nat bno false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 Hbnoc").

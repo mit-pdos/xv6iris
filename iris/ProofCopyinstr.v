@@ -302,18 +302,18 @@ Section ProofCopyinstr.
     sie_cap_gpr kt Mt (av - 12)%nat b pcur -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.copyinstr + 0x4e) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) s30 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) s40 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) s60 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) s70 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) s80 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) s90 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) gap -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) s30 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) s40 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) s50 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) s60 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) s70 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) s80 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) s90 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) gap -∗
     wp_next (CID0 := CID0) b pcur (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = res⌝ -∗
@@ -753,7 +753,7 @@ Section ProofCopyinstr.
     assert (HI2a4 : I2 !!! Regidx Ra4 = pa_add srcp i) by lkp.
     (* ---- +0x8e: lbu a4,0(a4) ---- *)
     iDestruct (bb_byte_acc srcp n i fsrc (DfracOwn 1) Hin with "Hsrc") as "[Hsb Hsback]".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xac)) Ra3 Ra4
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.copyinstr + 0xac)) Ra3 Ra4
               (mword_of_int 0 : mword 12) I2 Kv (fsrc i : mword 8) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hiac [Hsb]").
@@ -808,7 +808,7 @@ Section ProofCopyinstr.
         by apply pa_add_assoc.
       iDestruct (bb_byte_acc dst maxn (done + i) f (DfracOwn 1) Hdi with "Hdst")
         as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
+      iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.copyinstr + 0xb2)) Ra3 Ra5
                 (mword_of_int 0 : mword 12) I3 Kv (f (done + i)%nat) b
                 with "Hcg Hpc Hib2 [Hdb]").
       { iEval (rgne; rewrite HI3a5 addv_sext0 Hcur). iExact "Hdb". }
@@ -1283,7 +1283,7 @@ Section ProofCopyinstr.
                        with "Hcg") as "[%Hz0 Hcg]".
           iDestruct (bb_byte_acc dst maxn (done + i') g (DfracOwn 1) Hdi with "Hdst")
             as "[Hdb Hdback]".
-          iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
+          iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.copyinstr + 0x40)) Rx0 Ra5
                     (mword_of_int 0 : mword 12) Mn (K - 12)%nat (g (done + i')%nat) b
                     with "Hcg Hpc Hi40 [Hdb]").
           { iEval (rgne; rewrite Hna5 addv_sext0 Hcur). iExact "Hdb". }

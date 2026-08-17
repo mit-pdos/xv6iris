@@ -237,7 +237,7 @@ Section KexecDName.
         ∨ pc_is (mword_of_int (KXD + 0x2d2) : mword 64) ) -∗
         sie_cap_gpr kt M' n b pj -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-        word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -261,7 +261,7 @@ Section KexecDName.
     pc_is (mword_of_int (KXD + 0x2c0) : mword 64) -∗
     sie_cap_gpr kt M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -422,7 +422,7 @@ Section KexecDName.
     pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
     sie_cap_gpr kt M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     kxd_scan_out pj b n plen pfun sp0 pv vsp v1 v2 v4 v5 v6 v10 i -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -529,7 +529,7 @@ Section KexecDName.
     pc_is (mword_of_int (KXD + 0x2c8) : mword 64) -∗
     sie_cap_gpr kt M n b pj -∗
     ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q) -∗
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (M' : regfile) (q' : nat),
         ⌜(q' <= plen)%nat /\
@@ -540,7 +540,7 @@ Section KexecDName.
         pc_is (mword_of_int (KXD + 0x2d2) : mword 64) -∗
         sie_cap_gpr kt M' n b pj -∗
         ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ pfun k) -∗
-        word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
+        word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv q') -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1823,8 +1823,8 @@ Section KexecDMain.
      solved, and fails with "cannot instantiate ?b because pv is not in its
      scope". *)
   Lemma kxd_last_at0 (sp0 pv : mword 64) :
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) (pa_add pv 0).
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) (pa_add pv 0).
   Proof. rewrite pa_add_0. iIntros "H". iExact "H". Qed.
 
   (* [c.addi a5,a5,1] at +0x2b8 steps [path] to [path + 1] *)
@@ -2086,7 +2086,7 @@ Section KexecDMain.
     (* the resource bundle the commit takes, assembled once and used by both
        arms of the [beqz] below *)
     iAssert (∀ (last : mword 64),
-               word_pointsto (pa_stk sp0 66) (DfracOwn 1) last -∗
+               word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) last -∗
                ([∗ list] k ∈ seq 0 (S plen), pa_add pv k ↦ₘ[kt] pfun k) -∗
                kxd_res jp bn gfs ga gf cov logstart bmapstart inodestart size
                        used2 plen pfun na avf aslen afun pidv

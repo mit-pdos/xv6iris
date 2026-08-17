@@ -1807,28 +1807,28 @@ Section KexecCExitM1.
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 w65 w68 : mword 64)
       (c : nat) (sz1 : mword 64) (alen : nat -> nat) :
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13 -∗
     stack_own (KTR := kt) (pa_stk sp0 13) (33 - c) -∗
     ([∗ list] j ∈ seq 0 c,
        pa_stk sp0 (46 - j) ↦₈[kt] (mword_of_int (kxc_sp (uint sz1) alen (S j)) : mword 64)) -∗
     stack_own (KTR := kt) (pa_stk sp0 54) 9 -∗
-    word_pointsto (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) -∗
-    word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 -∗
-    word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 64) (DfracOwn 1) (pa_add av (8 * c)) -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 65) (DfracOwn 1) w65 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 67) (DfracOwn 1) w67 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 68) (DfracOwn 1) w68 -∗
     kxc_frameC sp0 ra0 s00 s10 s20 pv av
                w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 c sz1 alen.
   Proof.
@@ -3934,26 +3934,26 @@ Section KexecCClose.
   Local Lemma kxc_frameB_intro
       (sp0 ra0 s00 s10 s20 pv av : mword 64)
       (w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 w65 w68 : mword 64) :
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
-    word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 -∗
-    word_pointsto (pa_stk sp0 4) (DfracOwn 1) s20 -∗
-    word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 -∗
-    word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 -∗
-    word_pointsto (pa_stk sp0 7) (DfracOwn 1) w7 -∗
-    word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8 -∗
-    word_pointsto (pa_stk sp0 9) (DfracOwn 1) w9 -∗
-    word_pointsto (pa_stk sp0 10) (DfracOwn 1) w10 -∗
-    word_pointsto (pa_stk sp0 11) (DfracOwn 1) w11 -∗
-    word_pointsto (pa_stk sp0 12) (DfracOwn 1) w12 -∗
-    word_pointsto (pa_stk sp0 13) (DfracOwn 1) w13 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 3) (DfracOwn 1) s10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 4) (DfracOwn 1) s20 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 5) (DfracOwn 1) w5 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 6) (DfracOwn 1) w6 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 7) (DfracOwn 1) w7 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 8) (DfracOwn 1) w8 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 9) (DfracOwn 1) w9 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 10) (DfracOwn 1) w10 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 11) (DfracOwn 1) w11 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 12) (DfracOwn 1) w12 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 13) (DfracOwn 1) w13 -∗
     stack_own (KTR := kt) (pa_stk sp0 13) 33 -∗
     stack_own (KTR := kt) (pa_stk sp0 54) 9 -∗
-    word_pointsto (pa_stk sp0 64) (DfracOwn 1) av -∗
-    word_pointsto (pa_stk sp0 65) (DfracOwn 1) w65 -∗
-    word_pointsto (pa_stk sp0 66) (DfracOwn 1) pv -∗
-    word_pointsto (pa_stk sp0 67) (DfracOwn 1) w67 -∗
-    word_pointsto (pa_stk sp0 68) (DfracOwn 1) w68 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 64) (DfracOwn 1) av -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 65) (DfracOwn 1) w65 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 66) (DfracOwn 1) pv -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 67) (DfracOwn 1) w67 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 68) (DfracOwn 1) w68 -∗
     kxc_frameB sp0 ra0 s00 s10 s20 pv av w5 w6 w7 w8 w9 w10 w11 w12 w13 w67.
   Proof.
     iIntros "H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13

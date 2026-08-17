@@ -154,7 +154,7 @@ Section KforkB7.
     (* ---- +0x66: ld a5,88(s4) ---- *)
     assert (Htgt66 : add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
                      = p_trapframe npa) by (rewrite HM4; reflexivity).
-    iApply (wp_ld_s_sconf (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
+    iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x66) : mword 64) Ra5 Rs4 (mword_of_int 88 : mword 12)
               M n (page_base (ud_tfp (pv_upt V))) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi066 [Htf]").
@@ -175,7 +175,7 @@ Section KforkB7.
     assert (Htgt6a : add_vec (T1 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 112 : mword 12))
                      = tf_pa (ud_tfp (pv_upt V)) (8 * Z.of_nat 14))
       by (rewrite HT1a5; apply kfkb7_tf14_addr).
-    iApply (wp_sd_zero_s_sconf (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
+    iApply (wp_sd_zero_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x6a) : mword 64) Ra5 (mword_of_int 112 : mword 12)
               T1 n w14 false
               with "Hcg Hpc Hi06a [Hcell]").
     { iEval (rgne; rewrite Htgt6a). iExact "Hcell". }

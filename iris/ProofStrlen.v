@@ -159,8 +159,8 @@ Section ProofStrlen.
     sie_cap_gpr kt (CID := CID0) Mt (K - 2)%nat b p -∗
     kernel_text -∗
     pc_is (CID := CID0) (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
-    word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
-    word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 1) (DfracOwn 1) ra0 -∗
+    word_pointsto (KTR := kt) (pa_stk sp0 2) (DfracOwn 1) s00 -∗
     wp_next (CID0 := CID0) b p (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
@@ -358,7 +358,7 @@ Section ProofStrlen.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp16) in "Hpc".
     (* ---- +0x16: lbu a4,-1(a5) ---- *)
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.strlen + 0x16)) Ra4 Ra5
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.strlen + 0x16)) Ra4 Ra5
               (mword_of_int 4095 : mword 12) P2 Kv bt b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [Hbyte]").
@@ -628,7 +628,7 @@ Section ProofStrlen.
     assert (HR2a0' : rget R2 Ra0 = s) by (rgne; exact HR2a0).
     assert (H0n : (0 < n)%nat) by lia.
     iDestruct (bb_byte_acc s n 0%nat f dq H0n with "Hbuf") as "[Hbyte Hback]".
-    iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.strlen + 0x08)) Ra5 Ra0
+    iApply (wp_lbu_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.strlen + 0x08)) Ra5 Ra0
               (mword_of_int 0 : mword 12) R2 (K - 2)%nat (f 0%nat : mword 8) b (dqm:=dq)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [Hbyte]").

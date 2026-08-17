@@ -908,7 +908,7 @@ Section EndOpBlocks.
     pc_is (mword_of_int (KernelSyms.end_op + 0x92) : mword 64) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     eo_frame4 (kt := kt) m -∗
-    eo_frameJ m -∗
+    eo_frameJ (kt := kt) m -∗
     eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb b lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1167,8 +1167,8 @@ Section EndOpBlocks.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    eo_frame4 m -∗
-    eo_frameJ m -∗
+    eo_frame4 (kt := kt) m -∗
+    eo_frameJ (kt := kt) m -∗
     log_batch bn γfs cov logstart 0 ∅ -∗
     eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
     WP (Loop : expr riscv_lang).
@@ -1349,7 +1349,7 @@ Section EndOpBlocks.
     { rgne. rewrite Hqs1. exact eo_addr_nc. }
     iEval (rewrite -Hnca) in "Hncc".
     iPoseProof (eoi_54 with "Htext") as "Hi54".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.end_op + 0x54)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x54)) Ra5 Rs1
               (mword_of_int 40 : mword 12) macq (trap_res eb + (K - 8))%nat nc false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi54 Hncc").
@@ -1726,8 +1726,8 @@ Section EndOpBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    eo_frame4 m -∗
-    eo_frameS m -∗
+    eo_frame4 (kt := kt) m -∗
+    eo_frameS (kt := kt) m -∗
     log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
     eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
@@ -2257,8 +2257,8 @@ Section EndOpBlocks.
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    eo_frame4 m -∗
-    eo_frameS m -∗
+    eo_frame4 (kt := kt) m -∗
+    eo_frameS (kt := kt) m -∗
     log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
     eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
@@ -2321,7 +2321,7 @@ Section EndOpBlocks.
     { rgne. rewrite HMs4. exact eo_addr_start. }
     iEval (rewrite -Hastart) in "Hstc".
     iPoseProof (eoi_b4 with "Htext") as "Hib4".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.end_op + 0xb4)) Ra1 Rs4
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xb4)) Ra1 Rs4
               (mword_of_int 24 : mword 12) M (K - 8)%nat
               (mword_of_int logstart : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2407,7 +2407,7 @@ Section EndOpBlocks.
     { rgne. rewrite HA3s4. exact eo_addr_dev. }
     iEval (rewrite -Hadev) in "Hdevc".
     iPoseProof (eoi_be with "Htext") as "Hibe".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.end_op + 0xbe)) Ra0 Rs4
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xbe)) Ra0 Rs4
               (mword_of_int 36 : mword 12) A3 (K - 8)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hibe Hdevc").
@@ -2542,7 +2542,7 @@ Section EndOpBlocks.
     { rgne. rewrite HB1s5. exact (eo_cursor_at t). }
     iEval (rewrite -Hacur) in "Hblk".
     iPoseProof (eoi_c8 with "Htext") as "Hic8".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.end_op + 0xc8)) Ra1 Rs5
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xc8)) Ra1 Rs5
               (mword_of_int 0 : mword 12) B1 (K - 8)%nat w eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hic8 Hblk").
@@ -2576,7 +2576,7 @@ Section EndOpBlocks.
     { rgne. rewrite HB2s4. exact eo_addr_dev. }
     iEval (rewrite -Hadev2) in "Hdevc".
     iPoseProof (eoi_cc with "Htext") as "Hicc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.end_op + 0xcc)) Ra0 Rs4
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xcc)) Ra0 Rs4
               (mword_of_int 36 : mword 12) B2 (K - 8)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hicc Hdevc").
@@ -3307,7 +3307,7 @@ Section EndOpBlocks.
     { rgne. rewrite HJ2s4. exact eo_addr_lhn. }
     iEval (rewrite -Halhn) in "Hncell".
     iPoseProof (eoi_fc with "Htext") as "Hifc".
-    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.end_op + 0xfc)) Ra5 Rs4
+    iApply (wp_lw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0xfc)) Ra5 Rs4
               (mword_of_int 44 : mword 12) J2 (K - 8)%nat
               (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -3485,8 +3485,8 @@ Section EndOpBlocks.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv (kt := kt) γs -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    eo_frame4 m -∗
-    eo_frameJ m -∗
+    eo_frame4 (kt := kt) m -∗
+    eo_frameJ (kt := kt) m -∗
     eo_cont (kt := kt) (CID0 := CID0)  j pidv dq m K eb eb lks -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -4056,7 +4056,7 @@ Section ProofEndOp.
     { rgne. rewrite Hqs1. exact eo_addr_out. }
     iEval (rewrite -Houta) in "Houtc".
     iPoseProof (eoi_1a with "Htext") as "Hi1a".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.end_op + 0x1a)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x1a)) Ra5 Rs1
               (mword_of_int 28 : mword 12) macq (trap_res eb + (K - 8))%nat
               (mword_of_int (Z.of_nat out) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -4145,7 +4145,7 @@ Section ProofEndOp.
     { rgne. rewrite HT3s1. exact eo_addr_cmt. }
     iEval (rewrite -Hcmta) in "Hcmtc".
     iPoseProof (eoi_22 with "Htext") as "Hi22".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.end_op + 0x22)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x22)) Ra5 Rs1
               (mword_of_int 32 : mword 12) T3 (trap_res eb + (K - 8))%nat
               (mword_of_int 0 : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -4413,7 +4413,7 @@ Section ProofEndOp.
       { rgne. rewrite Hrs1. exact eo_addr_lhn. }
       iEval (rewrite -Hlhna) in "Hncell".
       iPoseProof (eoi_3c with "Htext") as "Hi3c".
-      iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.end_op + 0x3c)) Ra5 Rs1
+      iApply (wp_clw_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KernelSyms.end_op + 0x3c)) Ra5 Rs1
                 (mword_of_int 44 : mword 12) mr (K - 8)%nat
                 (mword_of_int (Z.of_nat nl) : mword 32) eb
                 ltac:(vm_compute; discriminate) ltac:(rdok)

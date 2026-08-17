@@ -287,7 +287,7 @@ Section KforkPrologue.
         cpu_own lvl eb pme b lks -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
-        kfk_frame sp0 ra0 s00 s10 s50 -∗
+        kfk_frame (kt := kt) sp0 ra0 s00 s10 s50 -∗
         proc_priv γf pme pid_p Vp -∗
         ( kalloc_env γa on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
@@ -339,7 +339,7 @@ Section KforkPrologue.
            at +0x30/+0x32, i.e. after uvmcopy has already SUCCEEDED, so on
            this path they were never written. *)
         (∃ w4 w5 : mword 64,
-           kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
+           kfk_frame_at (kt := kt) sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
         proc_priv γf pme pid_p Vp -∗
         proc_priv_nocwd γf npa pid_c Vc -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
@@ -391,7 +391,7 @@ Section KforkPrologue.
         pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
         (* all three lazy slots PINNED here: by +0x4a s2, s3 and s4 have all
            been spilled, and [ProofKfork.kfk_tail_succ] reloads all three. *)
-        kfk_frame_at sp0 ra0 s00 s10 s50
+        kfk_frame_at (kt := kt) sp0 ra0 s00 s10 s50
           (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
         proc_priv γf pme pid_p Vp -∗
         proc_priv_nocwd γf npa pid_c Vc' -∗
@@ -771,7 +771,7 @@ Section KforkPrologue.
       (* +0x01e ld a2,72(s5) -- a2 := p->sz *)
       assert (Hszaddr_p : add_vec (N1 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 72 : mword 12))
                           = p_sz pme) by (rewrite HN1s5; reflexivity).
-      iApply (wp_ld_s_sconf (mword_of_int (KF + 0x1e)) Ra2 Rs5 (mword_of_int 72 : mword 12)
+      iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x1e)) Ra2 Rs5 (mword_of_int 72 : mword 12)
                 N1 (trap_res b + K1)%nat (pv_sz Vp) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi01e [HPsz]").
@@ -801,7 +801,7 @@ Section KforkPrologue.
       (* +0x022 c.ld a1,80(a0) -- a1 := np->pagetable *)
       assert (Hpgaddr_c : add_vec (N2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable npa) by (rewrite HN2a0; reflexivity).
-      iApply (wp_cld_s_sconf (mword_of_int (KF + 0x22)) Ra1 Ra0 (mword_of_int 80 : mword 12)
+      iApply (wp_cld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x22)) Ra1 Ra0 (mword_of_int 80 : mword 12)
                 N2 (trap_res b + K1)%nat (page_base (ud_root (pv_upt Vc))) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi022 [HCpg]").
@@ -830,7 +830,7 @@ Section KforkPrologue.
       (* +0x024 ld a0,80(s5) -- a0 := p->pagetable *)
       assert (Hpgaddr_p : add_vec (N3 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable pme) by (rewrite HN3s5; reflexivity).
-      iApply (wp_ld_s_sconf (mword_of_int (KF + 0x24)) Ra0 Rs5 (mword_of_int 80 : mword 12)
+      iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x24)) Ra0 Rs5 (mword_of_int 80 : mword 12)
                 N3 (trap_res b + K1)%nat (page_base (ud_root (pv_upt Vp))) false (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi024 [HPpg]").
@@ -1073,7 +1073,7 @@ Section KforkPrologue.
         (* +0x034 ld a5,72(s5) -- a5 := p->sz (again) *)
         assert (Hszaddr_p2 : add_vec (mf9 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 72 : mword 12))
                             = p_sz pme) by (rewrite HDs5; reflexivity).
-        iApply (wp_ld_s_sconf (mword_of_int (KF + 0x34)) Ra5 Rs5 (mword_of_int 72 : mword 12)
+        iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x34)) Ra5 Rs5 (mword_of_int 72 : mword 12)
                   mf9 (trap_res b + K1)%nat (pv_sz Vp) false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi034 [HPsz]").
@@ -1093,7 +1093,7 @@ Section KforkPrologue.
         (* +0x038 sd a5,72(s4) -- np->sz := a5 *)
         assert (Hszaddr_c : add_vec (N6 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 72 : mword 12))
                             = p_sz npa) by (rewrite HN6s4; reflexivity).
-        iApply (wp_sd_s_sconf (mword_of_int (KF + 0x38)) Ra5 Rs4 (mword_of_int 72 : mword 12)
+        iApply (wp_sd_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x38)) Ra5 Rs4 (mword_of_int 72 : mword 12)
                   N6 (trap_res b + K1)%nat (pv_sz Vc) false
                   with "Hcg Hpc Hi038 [HCsz]").
         { iEval (rewrite Hszaddr_c). iExact "HCsz". }
@@ -1105,7 +1105,7 @@ Section KforkPrologue.
         (* +0x03c ld a3,88(s5) -- a3 := p->trapframe *)
         assert (Htfaddr_p : add_vec (N6 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 88 : mword 12))
                             = p_trapframe pme) by (rewrite HN6s5; reflexivity).
-        iApply (wp_ld_s_sconf (mword_of_int (KF + 0x3c)) Ra3 Rs5 (mword_of_int 88 : mword 12)
+        iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x3c)) Ra3 Rs5 (mword_of_int 88 : mword 12)
                   N6 (trap_res b + K1)%nat (page_base (ud_tfp (pv_upt Vp))) false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi03c [HPtf]").
@@ -1145,7 +1145,7 @@ Section KforkPrologue.
         (* +0x042 ld a4,88(s4) -- a4 := np->trapframe (the DEST cursor) *)
         assert (Htfaddr_c : add_vec (N8 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 88 : mword 12))
                             = p_trapframe npa) by (rewrite HN8s4; reflexivity).
-        iApply (wp_ld_s_sconf (mword_of_int (KF + 0x42)) Ra4 Rs4 (mword_of_int 88 : mword 12)
+        iApply (wp_ld_s_sconf (kt := kt) (ktd := KT0) (mword_of_int (KF + 0x42)) Ra4 Rs4 (mword_of_int 88 : mword 12)
                   N8 (trap_res b + K1)%nat (page_base (ud_tfp (pv_upt Vc))) false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi042 [HCtf]").
