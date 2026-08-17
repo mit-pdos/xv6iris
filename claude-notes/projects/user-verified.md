@@ -398,5 +398,10 @@ tower → concrete frame → `uv_sys_wp` with the caller's `Ψ` payload).
   `stvec_handler_wp`.
 - A/D write-backs during user translate are absorbed by `utlb_inv_pt` with
   `um` unchanged (same as safety tier); nothing new needed.
-- If a second program arrives, the per-program pieces (`UCode<P>`,
-  `Spec<P>Prog`, protocol) template off sync's.
+- The second program has arrived: see
+  [`user-echo.md`](user-echo.md).  Its per-program pieces templated off sync's
+  exactly as expected, and nothing in the engine, the funnel or the ecall
+  driver had to change — but the program-GENERIC layer grew a great deal
+  (the stack became a splittable budget, `uM_only`/`ucallee_saved` became the
+  postcondition of a call, and UmodeArith.v appeared), so read that file
+  before templating a third.

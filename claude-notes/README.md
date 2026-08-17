@@ -171,6 +171,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability, the concrete-image memory
   layer, the interrupt-absorbing step engine, and the sync program's proofs.
+- **[`user-echo.md`](projects/user-echo.md)** — the Umode tier's SECOND
+  program, `echo`: the first with loops, memory reads, an argv area and a
+  syscall with a real precondition. Read it for the pieces that grew to carry
+  it — the stack as a splittable BUDGET, `uM_only` as the image
+  postcondition of a call, the `mword_of_int` calculus, and the one generic
+  branch leaf that replaces an op cross-product.
 
 ## `completed/` — finished projects, archived for reference
 

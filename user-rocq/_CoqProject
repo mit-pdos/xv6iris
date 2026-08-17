@@ -2,3 +2,6 @@
 SyncInstrs.v
 SyncData.v
 SyncSyms.v
+EchoInstrs.v
+EchoData.v
+EchoSyms.v
