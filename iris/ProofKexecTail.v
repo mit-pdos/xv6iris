@@ -398,10 +398,10 @@ Section KexecAFrame.
   Lemma kxc_word4_of_named (a : Arch.pa) (g : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 4 = true ->
     ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j) ⊢
-    word4_pointsto a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)).
+    word4_pointsto (KTR := KT1) a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)).
   Proof.
     intro Hal. iIntros "H".
-    iApply (word4_pointsto_intro a (DfracOwn 1) _ Hal).
+    iApply (word4_pointsto_intro (KTR := KT1) a (DfracOwn 1) _ Hal).
     iApply (big_sepL_impl with "H"). iIntros "!>" (i j Hij) "Hb".
     assert (Hj : (j < 4)%nat).
     { apply lookup_seq in Hij. lia. }
@@ -410,10 +410,10 @@ Section KexecAFrame.
   Qed.
 
   Lemma kxc_named_of_word4 (a : Arch.pa) (g : nat -> bv 8) :
-    word4_pointsto a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)) ⊢
+    word4_pointsto (KTR := KT1) a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)) ⊢
     [∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j.
   Proof.
-    rewrite word4_pointsto_unfold. iIntros "[_ H]".
+    rewrite (word4_pointsto_unfold (KTR := KT1)). iIntros "[_ H]".
     iApply (big_sepL_impl with "H"). iIntros "!>" (i j Hij) "Hb".
     assert (Hj : (j < 4)%nat).
     { apply lookup_seq in Hij. lia. }

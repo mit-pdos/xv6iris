@@ -114,7 +114,7 @@ Definition wp_memset_setup_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
    keeps this file spelling the condition the same way the ~2173 leaf
    references do.  Costless for the real caller either way: memset's operands
    are a1 / a4 / a5. *)
-Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt ktb : ktier) (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64) :=
+Definition wp_memset_loop_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt ktb : ktier) `{!KtierLe ktb kt} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64) :=
   let pc0 := mword_of_int (KernelSyms.memset + 0x14) in
   let pc4 := add_vec_int pc0 4 in
   let pc6 := add_vec_int pc0 6 in
@@ -186,7 +186,7 @@ Module Type MEMSET_PARTS.
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (M : regfile) (n : nat) (shamt_l shamt_r : mword 6) (imm8_beqz : mword 8) (wval_add : mword 64) (b : bool) (pcur : mword 64),
       wp_memset_setup_sconf_body kt M n shamt_l shamt_r imm8_beqz wval_add b pcur.
   Parameter wp_memset_loop_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt ktb : ktier) (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64),
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt ktb : ktier) `{!KtierLe ktb kt} (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5) `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13) (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64),
       wp_memset_loop_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Parameter wp_memset_suffix_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (kt : ktier) (M : regfile) (n : nat) (ra0e s00e : mword 64) (b : bool) (pcur : mword 64),

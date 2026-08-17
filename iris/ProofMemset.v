@@ -51,6 +51,7 @@ Section ProofMemset.
 
   Context {kt : ktier}.
   Context {ktb : ktier}.
+  Context `{!KtierLe ktb kt}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
      whole-function proof already has.  Written name-free (durable-notes: an
@@ -145,7 +146,7 @@ Section ProofMemset.
     assert (Hm1' : forall H : CpuId, rget (CID := H) m ra1 = cval).
     { intro H. rewrite (rget_ne (CID := H) m ra1 Hra1tp). exact Hm1. }
     (* --- 0xce0: sb a1, 0(a5) : fill byte [off] --- *)
-    iApply (wp_sb_s_sconf (kt := kt) (ktd := KT0) pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
+    iApply (wp_sb_s_sconf (kt := kt) (ktd := ktb) pc0 ra1 ra5 (mword_of_int 0) m n (olds off) b
               with "Hcg Hpc Hi0 [Hb0]").
     { rewrite Hcur'. rewrite -ms_pa_sb_pa. iExact "Hb0". }
     iIntros (CID1 Hs1) "Hcg Hpc Hb0".
@@ -241,7 +242,7 @@ Section ProofMemset.
         (add_vec (M5 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))))]> M5).
     iIntros "Hcg Hi28 Hi2a Hi2c Hi2e Hpc Hp8 Hp0 Hcont".
     (* ---- 0x28: c.ldsp ra,8(sp) ---- *)
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.memset + 0x1e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_cldsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x1e)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               M n ra0e b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 Hp8").
@@ -253,7 +254,7 @@ Section ProofMemset.
     (* ---- 0x2a: c.ldsp s0,0(sp) ---- *)
     assert (Hsp4 : M4 !!! Regidx csp_rs1 = spd)
       by (rewrite /M4 upd_ne; [reflexivity | vm_compute; discriminate]).
-    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.memset + 0x20)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_cldsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x20)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               M4 n s00e b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hp0]").
@@ -346,13 +347,13 @@ Section ProofMemset.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.memset + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr8 b
+    iApply (wp_csdsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr8 b
               with "Hcg Hpc Hi02 Hbra").
     iIntros (CID2 Hs2) "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.memset + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.memset + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.memset + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs0 b
+    iApply (wp_csdsp_s_sconf (ktd := kt) (mword_of_int (KernelSyms.memset + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs0 b
               with "Hcg Hpc Hi04 Hbs0").
     iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.memset + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.memset + 0x06)) by (apply bv_eq; vm_compute; reflexivity).

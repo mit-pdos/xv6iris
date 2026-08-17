@@ -72,7 +72,7 @@ Section SpecEitherCopyin.
      and stays at the ambient tier. *)
 
   (* What comes back, keyed by the flag and by the returned a0. *)
-  Definition either_copyin_post (ktb : ktier) (user : bool) (γf : gname) (p : mword 64)
+  Definition either_copyin_post (ktb kts : ktier) (user : bool) (γf : gname) (p : mword 64)
       (pid : mword 32) (V : pprivate) (dst src : mword 64) (len : nat)
       (src_bytes : nat -> bv 8) (r : mword 64) : iProp Σ :=
     (if user
@@ -81,7 +81,7 @@ Section SpecEitherCopyin.
           (∃ dst_new : nat -> bv 8,
              [∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_new j)
      else ⌜r = (mword_of_int 0 : mword 64)⌝ ∗
-          ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) ∗
+          ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[kts] src_bytes j) ∗
           ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] src_bytes j))%I.
 
 End SpecEitherCopyin.
@@ -92,7 +92,7 @@ End SpecEitherCopyin.
    one caller and a KT0 page/bio window for the next, and one shared tier
    cannot state both.  See SpecMemmove.v's note. *)
 Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (γf : gname)
+    (ktb : ktier) `{!KtierLe ktb KT1} (kts : ktier) `{!KtierLe kts KT1} (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string) :=
@@ -118,14 +118,14 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
   ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ[ktb] dst_olds j) -∗
   (if user
    then proc_priv_core p pid V
-   else [∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
+   else [∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ[kts] src_bytes j) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr KT1 mf av b p -∗
       cpu_own lvl eb p b lks -∗
       pc_is ret_tgt -∗
-      either_copyin_post ktb user γf p pid V dst src len src_bytes
+      either_copyin_post ktb kts user γf p pid V dst src len src_bytes
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -133,9 +133,9 @@ Definition wp_either_copyin_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kall
 Module Type EITHER_COPYIN.
   Parameter wp_either_copyin_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (ktb : ktier) `{!KtierLe ktb KT1} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
+      (ktb : ktier) `{!KtierLe ktb KT1} (kts : ktier) `{!KtierLe kts KT1} (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string),
-      wp_either_copyin_sconf_body ktb γa γf m av lvl eb p pid V user len
+      wp_either_copyin_sconf_body ktb kts γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
 End EITHER_COPYIN.

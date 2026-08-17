@@ -1124,6 +1124,8 @@ Section ProofEitherCopyin.
      datum tier out loud (the blanket [(ktd := KT1)] below). *)
   Context {ktb : ktier}.
   Context `{!KtierLe ktb KT1}.
+  Context {kts : ktier}.
+  Context `{!KtierLe kts KT1}.
   Local Ltac reg_neq :=
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
@@ -1145,7 +1147,7 @@ Section ProofEitherCopyin.
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_either_copyin_sconf_body ktb γa γf m av lvl eb p pid V user len
+    : wp_either_copyin_sconf_body ktb kts γa γf m av lvl eb p pid V user len
         src_bytes dst_olds b lks.
   Proof.
     cbv beta delta [wp_either_copyin_sconf_body].
@@ -1755,7 +1757,7 @@ Section ProofEitherCopyin.
         rewrite /K1 upd_ne; [| congruence]. apply HthrA; assumption. }
       iEval (rewrite -HK4a1) in "Hres".
       iEval (rewrite -HK4a0) in "Hdst".
-      iApply (Memmove.wp_memmove_sconf KT1 KT0 ktb K4 (av - 6)%nat len src_bytes dst_olds b p
+      iApply (Memmove.wp_memmove_sconf KT1 kts ktb K4 (av - 6)%nat len src_bytes dst_olds b p
                 ltac:(lia) (ec_len32 len Hlen) HK4a2
                 with "Hcg Htext Hpc Hres Hdst").
       iIntros (CID20 Hs20 mfin) "Hcg Hpc Hsrc Hdst %Hmma0 %Hcsmm".

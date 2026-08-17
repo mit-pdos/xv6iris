@@ -1132,7 +1132,7 @@ Section CwBodies.
       iDestruct (bytes_own_name (KTR := KT1) nnN buf with "Hb1") as (fb) "Hb1".
      iDestruct (cpu_own_transport CIDb CIDc6 0%nat eb pj true 
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (EitherCopyin.wp_either_copyin_sconf KT1 γa γf B6 (av - 16)%nat 0%nat
+      iApply (EitherCopyin.wp_either_copyin_sconf KT1 KT1 γa γf B6 (av - 16)%nat 0%nat
                 eb pj pid V true nnN (fun _ => bv_0 8) fb true lks
                 ltac:(lia)
                 ltac:(rewrite HB6a1; vm_compute; reflexivity)

@@ -2931,7 +2931,7 @@ Section WriteiLoop.
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iEval (rewrite -HD8a0) in "Hwin".
         iEval (rewrite -HD8a2) in "Hsrcw".
-        iApply (EC.wp_either_copyin_sconf ktb γa γf D8 (K - 14)%nat 0%nat eb
+        iApply (EC.wp_either_copyin_sconf KT0 ktb γa γf D8 (K - 14)%nat 0%nat eb
                   (proc_addr j) pidv (upd_upt V PI) user mm
                   (fun jj => src_bytes (tot + jj)%nat)
                   (fun i => (data2 fbn) !!! (o + i)%nat) b lks
@@ -2989,7 +2989,7 @@ Section WriteiLoop.
             iSplitR; [iPureIntro; left; exact Hr|].
             iSplitL "Hdst"; [iExact "Hdst"|].
             iSplitR "Hppid"; [| iExact "Hppid"].
-            iApply (ProofWriteiParts.wi_join3 (m !!! Regidx Ra2 : mword 64)
+            iApply (ProofWriteiParts.wi_join3 (KTR := ktb) (m !!! Regidx Ra2 : mword 64)
                       tot mm (n - tot - mm)%nat n (fun i => src_bytes i)
                       ltac:(lia) with "Hp Hsb2 Hq"). }
         iDestruct "Hnorm" as (g P2) "(%Hext2 & %Hgk & %HrE & Hwin & Hsrc)".

@@ -43,6 +43,7 @@ Section WpMemsetArray.
 
   Context {kt : ktier}.
   Context {ktb : ktier}.
+  Context `{!KtierLe ktb kt}.
   (* ------------------------------------------------------------------ *)
   (*  The zero-count arm: the c.beqz at +0x08 is taken straight to the    *)
   (*  epilogue, so no byte is written and the (empty) buffer comes back   *)

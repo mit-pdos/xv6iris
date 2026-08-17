@@ -1823,7 +1823,7 @@ Section ProofKexit.
                      (sign_extend' 64 (mword_of_int 652 : mword 12))
                    = (mword_of_int KernelSyms.initproc : mword 64)).
     { rewrite Hrg4_15 /A2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_ld_s_sconf (CID := CID4) (mword_of_int (KX + 0x1c))
+    iApply (wp_ld_s_sconf (CID := CID4) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x1c))
               (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 652 : mword 12)
               A2 (av - 6)%nat ip b (dqm := dqi) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hinit]").

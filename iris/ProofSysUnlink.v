@@ -4461,7 +4461,7 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    iApply (Memset.wp_memset_sconf KT1 (CID := D5) A5 (K - 30)%nat 16
+    iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
               ltac:(rewrite HA5a2; pcw)
@@ -5906,7 +5906,7 @@ Section ProofSysUnlinkBody.
       by (rewrite /A5 upd_ne; [exact HA4a2 | nz]).
     assert (HA5regs : su_regs m sp0 (ientry kd) (ientry ks) (pa_stk sp0 8) A5)
       by (rewrite /A5; apply su_regs_caller; [exact Hcsra | exact HA4regs]).
-    iApply (Memset.wp_memset_sconf KT1 (CID := D5) A5 (K - 30)%nat 16
+    iApply (Memset.wp_memset_sconf KT1 KT1 (CID := D5) A5 (K - 30)%nat 16
               (mword_of_int 0 : mword 64) bd b (proc_addr jx)
               K2 ltac:(vm_compute; reflexivity) HA5a1
               ltac:(rewrite HA5a2; pcw)

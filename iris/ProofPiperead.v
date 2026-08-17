@@ -1963,7 +1963,7 @@ Section ProofPiperead.
            it keeps [psz] in s11 across its callees, so s11 is saved. *)
         assert (HK52 : (52 <= trap_res true + (av - 12))%nat)
           by (assert (trap_res true = 90%nat) as -> by reflexivity; lia).
-        iApply (Copyout.wp_copyout_sconf KT0 γa K10 P' (pv_sz V) 1%nat
+        iApply (Copyout.wp_copyout_sconf KT1 γa K10 P' (pv_sz V) 1%nat
                   (fun _ => trunc8 (K5 !!! Regidx Ra5)) (trap_res true + (av - 12))%nat 1%nat true pj
                   false ({["pipe"]} ∪ lks)
                   HK52 HK10a0 HK10a1 HK10a4 pr_len1_64 Hszb pr_lvl1
