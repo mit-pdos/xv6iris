@@ -155,7 +155,7 @@ Section ProofWakeup.
   (* the fuel-indexed scan invariant at the loop head [wakeup+0x38]; the
      [∀ fuel]/[wp_next] wrapper stays at each [iAssert] site (RULE 3), only
      what follows [fun CID : CpuId =>] is named here. *)
-  Definition wk_loop_body `{GEN : GenId} {kt : ktier}
+  Definition wk_loop_body `{GEN : GenId}
       (pme spF chan : mword 64) (vra vs0 vs1 vs2 vs3 vs4 vs5
        vs6 vs7 vs8 vs9 vs10 vs11 : mword 64)
       (av lvl : nat) (eb : bool) (b : bool) (lks : gset string)
@@ -177,7 +177,7 @@ Section ProofWakeup.
      release call runs at the FIXED hart [CID] (a held lock pins
      noff >= 1, file header), so unlike the two definitions above this one
      carries no [wp_next]/hart binder of its own. *)
-  Definition wk_rel_body `{GEN : GenId} {kt : ktier}
+  Definition wk_rel_body `{GEN : GenId}
       (γs : list gname) (γk : gname) (pme spF chan : mword 64)
       (av lvl k : nat) (eb b : bool)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (CID : CpuId) : iProp Σ :=

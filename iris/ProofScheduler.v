@@ -373,7 +373,7 @@ Section ProofScheduler.
   (* fuel-indexed: [av]/[γs] as above; [fuel] is the recursion measure --
      kept as an explicit trailing parameter so the CALL site can keep
      [∀ fuel] visible (RULE 3) and [iInduction] leaves the IH folded. *)
-  Definition sc_scan_body {kt : ktier} (γs : list gname) (av : nat) (fuel : nat) : iProp Σ :=
+  Definition sc_scan_body (γs : list gname) (av : nat) (fuel : nat) : iProp Σ :=
     (∀ (jj : nat) (M : regfile) (ebc : bool) (n : nat),
         ⌜(NPROC - jj <= fuel)%nat⌝ -∗ ⌜(jj < NPROC)%nat⌝ -∗
         (* the index that goes with this round's base enable over the fixed
@@ -411,7 +411,7 @@ Section ProofScheduler.
             WP (Loop : expr riscv_lang) ) -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Definition sc_outer_body {kt : ktier} (av : nat) : iProp Σ :=
+  Definition sc_outer_body (av : nat) : iProp Σ :=
     (∀ (M : regfile) (eb : bool) (n : nat),
         ⌜ add_vec (M !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
           /\ M !!! Regidx Rs6 = a_cpu_ctx cid_word

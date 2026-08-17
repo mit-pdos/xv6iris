@@ -365,8 +365,6 @@ Proof. lia. Qed.
 (*  and the NULL the [bad:] free loop stops at is memset's own.            *)
 (* ===================================================================== *)
 Section SysExecZeros.
-  (* tier-generic: these are byte-arithmetic facts about a stack region. *)
-  Context `{KTR : !CurKtier}.
   Context `{!riscvGS Σ}.
 
   Lemma sx_zero_slot (a : mword 64) (zb : bv 8) :
@@ -385,8 +383,8 @@ Section SysExecZeros.
     (n <= S k)%nat ->
     (forall i, (i < n)%nat ->
        is_aligned_paddr (Physaddr (pa_stk sp (k - i))) 8 = true) ->
-    ([∗ list] j ∈ seq 0 (8 * n), pa_add (pa_stk sp k) j ↦ₘ zb) ⊢
-    [∗ list] i ∈ seq 0 n, pa_stk sp (k - i) ↦₈ (mword_of_int 0 : mword 64).
+    ([∗ list] j ∈ seq 0 (8 * n), pa_add (pa_stk sp k) j ↦ₘ[kt] zb) ⊢
+    [∗ list] i ∈ seq 0 n, pa_stk sp (k - i) ↦₈[kt] (mword_of_int 0 : mword 64).
   Proof.
     intro Hzb. revert k. induction n as [| n IH]; intros k Hk Hal.
     - iIntros "_". by rewrite big_sepL_nil.

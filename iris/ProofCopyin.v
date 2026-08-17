@@ -524,7 +524,7 @@ Section ProofCopyin.
      continuations, named so the walk's proofmode steps stop re-embedding
      ~20 lines of ∀/wands per step.  Transparent on purpose; the ∀ binders
      stay visible at each [iAssert]. *)
-  Definition ci_copy_body {kt : ktier}
+  Definition ci_copy_body
       (b : bool) (p : mword 64) (CID0 : CpuId) (off rem : nat) (dst : mword 64)
       (done : nat) (P : uptd) (szv v11 : mword 64) (K : nat)
       (spr cur va0 pa0 : mword 64)

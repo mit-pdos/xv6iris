@@ -177,7 +177,7 @@ Section WpSmodeHalf.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen_u (ktd := KT0) 2 false true pc rd rs1 imm m n v (zero_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen_u 2 false true pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -206,7 +206,7 @@ Section WpSmodeHalf.
               add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
       by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen_u (ktd := KT0) 2 false false pc rd rs1 imm m n v (sign_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen_u 2 false false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -239,7 +239,7 @@ Section WpSmodeHalf.
     assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
       by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen (ktd := KT0) 2 false pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
+    iApply (wp_store_s_sconf_gen 2 false pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2 (store_ext_2 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
