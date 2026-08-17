@@ -282,11 +282,38 @@ how each step went, kept here because the shape recurs:
 
 - **the S-MODE DISPATCH** — `HartRunGen`'s other obligation and the last one
   open.  M-mode's (`HartMDispatch.swp_dispatchInterrupt_M`) short-circuits
-  before the PLIC wires; S-mode's must READ them, and they live in
-  `WireInv.wire_inv` rather than in any frame.  Its postcondition is the
-  match `HartRunGen` already expects (`Some (ii,pr) => Qi ii pr | None =>
-  frames`), so the shape is fixed — what is new is opening the wire invariant
-  around the read.
+  before the PLIC wires; S-mode's must READ them.
+
+  **THE WIRES ARE ∀-BOUND OFF-FRAME READS, and this is not a workaround.**
+  `sig_meip` / `sig_seip` are ordinary registers whose points-to's live in
+  `WireInv.wire_inv`, owned exclusively per CPU.  An Iris invariant opens
+  around ONE atomic step, and the dispatch is many nodes, so the caller
+  cannot hold them across it — and it should not want to: another hart may
+  move a wire between this dispatch's nodes, which is the whole reason the
+  cycle rule offers both arms.  So the wire reads are OFF-FRAME reads, which
+  peel to a ∀-binder (`WpMmodeCsrSwp.swp_read_reg_any`, which needs no
+  ownership at all), and the rule's postcondition is EXISTENTIAL in their
+  values:
+
+      swp (dispatchInterrupt Supervisor)
+        (fun r => ∃ meip seip, ⌜r = s_dispatch mip_v meip seip mie_v mdv_v ms_v⌝
+                               ∗ <frames, unchanged>)
+
+  with `s_dispatch` the pure function `WpIntrCore` already defines.  That
+  composes with `HartRunGen`'s match-shaped obligation exactly: the caller
+  cases on the answer, which is what "the machine picks the arm" means.
+
+  **THE BRIDGE CANNOT CARRY THIS ONE.**  `getPendingSet` is event-free (it
+  only reads registers), so `goodb` would seem to apply — but
+  `hval_of_goodb` requires every certified read to be IN THE FOOTPRINT, and
+  the wires are exactly the registers that cannot be.  So this rule is a
+  hand-peeled `swp` walk: framed reads by `swp_read_reg_pinned`, the two
+  wires by `swp_read_reg_any`.  `WpIntrCore.exec_getPendingSet_S_reduce` /
+  `exec_dispatchInterrupt_S_reduce` are the map to mirror.
+
+  It belongs IN `WpIntrCore`, beside those two, where `s_dispatch` lives.
+  That file is a red root, so it cannot be compiled clean — but `coqc` stops
+  at the FIRST error, so a lemma added above line 602 is still checked.
 - then the two obligations of `swp_run_hart_active_gen` are both discharged
   at Supervisor, and `wp_instr_s` / `s_cycle` are the wrapper work over
   `mm_cycle` / `wp_instr`'s pattern.
