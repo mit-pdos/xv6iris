@@ -1065,24 +1065,24 @@ the paid park FEEDABLE means flipping that cone to KT1.
     `⌜kt = KT1⌝` + intena-chain ghost) are all DEAD — do not revive.
   - Leaves/funnel: datum at `kt'` with `KtierLe kt' kt` against a
     `kt`-regime capability, witness from the fourth conjunct.
-  - **F1 (syntax, semantics-preserving, lands green):** the family
-    (`sie_cap`/`sie_cap_of`/`sie_cap_gpr`/`sie_cap_gpr_of`/`_at` + its
-    lemma suite + `sie_arm` and the fixpoint chain, which carry the
-    handler contract) takes `kt` as an explicit leading argument;
-    internals spell `stack_own (KTR := kt)` and
-    `sr_ktier_wit strans_regime kt`; EVERY existing use site gets the
-    literal `KT0` — stating exactly what today's tree states; the
-    fixpoint's definitions are parametric but every instantiation and
-    the handler proofs stay at literal KT0; the engine-triple widening
-    (the preserved k2b1-partial.diff: the witness must survive the
-    σ-callback crossing; retire the `sie_cap_wit_KT0` crutch sites)
-    folds in.
-  - **F2 (the flip, probe first):** flip ONE cone (sys_getpid + myproc)
-    end-to-end and measure; then sweep post-boot spellings KT0 → KT1
-    (trapinithart establishes the handler contract at KT1; the
-    scheduler seam does its one weakening; boot stays KT0; the
-    dual-regime ten go ∀ kt). Grep-auditable: every spec names its
-    regime.
+  - **F1 (THE EXPERIMENT, user-directed 2026-08-17): the family takes
+    `kt` explicitly, and every spec UNIVERSALLY QUANTIFIES it** — `∀ kt,
+    { sie_cap kt … } f { sie_cap kt … }`, the same `kt` returned — NOT
+    KT0 literals (rejected: a pointless intermediate state plus a mass
+    flip). There is then NO F2 flip at all: a ∀kt spec serves boot at
+    KT0 and post-boot at KT1 alike, mixed states cannot exist, and
+    concrete regimes appear only where a regime is a FACT —
+    `sie_cap_intro_bare` (KT0), the kvminithart upgrade (KT0→KT1), and
+    later the K3/K4 cone that handles a specific KT1 datum outside the
+    capability. "Same kt back" is sound across parking (post-boot
+    scheduling targets KPT harts; boot never parks). The family +
+    fixpoint chain go parametric; the engine-triple widening folds in.
+    EXECUTION: one landing (the arity change forces all use sites), done
+    in measured stages — the trap/scheduler cone + a few syscalls first,
+    recording what genericity uncovers (the `sie_cap_wit_KT0` crutch
+    sites, iFrame-with-variable-kt brittleness under `Typeclasses
+    Opaque cur_ktier`, any spec that genuinely cannot be tier-generic),
+    then the mechanical remainder.
   - `stack_own` and the datum family stay instance-implicit (the data
     side, all honestly KT0); loose stack carves in post-boot proofs
     spell `(KTR := KT1)` at the carve site.
