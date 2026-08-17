@@ -5,3 +5,6 @@ SyncSyms.v
 EchoInstrs.v
 EchoData.v
 EchoSyms.v
+ShInstrs.v
+ShData.v
+ShSyms.v

@@ -49,8 +49,18 @@
       need.
 
    §5 [wp_uv_load] -- ONE width- and signedness-generic leaf over all four
-      fetch geometries, plus the three [echo] instances [wp_uv_ld] /
-      [wp_uv_cldsp] / [wp_uv_lbu]. *)
+      fetch geometries, plus the [echo] instances [wp_uv_ld] /
+      [wp_uv_cldsp] / [wp_uv_lbu] and the [sh] instances [wp_uv_lw] /
+      [wp_uv_lwu] / [wp_uv_clw] / [wp_uv_cld].
+
+   [wp_uv_lw] is the tier's first SIGNED narrow load, and it needed nothing
+   from the generic leaf: [is_unsigned] is already a parameter and
+   [extend_value] is DEFINITIONALLY the branch on it, so [extend_value_w4_s]
+   / [extend_value_w4_u] are [reflexivity].  What the k = 4 call sites did
+   need is the arithmetic bridge ([uM_word_w4_val_s] / [_u] and
+   [sext32_moi] / [zext32_moi] in §1) that spells the loaded value as a
+   [mword_of_int] -- at k = 8 [extend_value_w8] made that question
+   disappear. *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -153,20 +163,40 @@ Qed.
    RELOCATION DEBT: both read naturally beside [uM_bytes] in UmodeMem.v,
    together with [uM_word] itself. *)
 
-(* two byte-window facts for the same window determine the same word *)
-Lemma uM_bytes_inj (M : gmap Z (bv 8)) (a : Z) (w1 w2 : mword 64) :
-  uM_bytes M a 8 w1 -> uM_bytes M a 8 w2 -> w1 = w2.
+(* two byte-window facts for the same window determine the same word, AT ANY
+   WIDTH ([uM_bytes] is already width-generic; only its two readings below
+   are not).  [uM_bytes] is therefore the ONE image premise a call site
+   should have to supply: [uM_bytes_exists] recovers [wp_uv_load]'s
+   byte-EXISTENCE premise from it and [uM_word_w8] / [uM_word_w4] its VALUE
+   premise. *)
+Lemma uM_bytes_inj_n {n : N} (M : gmap Z (bv 8)) (a : Z) (w1 w2 : bv (8 * n)) :
+  uM_bytes M a (N.to_nat n) w1 -> uM_bytes M a (N.to_nat n) w2 -> w1 = w2.
 Proof.
-  intros H1 H2. apply (bv_eq_of_bytes (n := 8)).
+  intros H1 H2. apply bv_eq_of_bytes.
   intros j Hj.
-  assert (Hj' : (j < 8)%nat) by lia.
-  (* stated at the [mword 64] index and closed at [bv (8*8)] by
+  assert (Hj' : (j < N.to_nat n)%nat) by lia.
+  (* stated at the [mword _] index and closed at [bv (8*n)] by
      conversion -- [congruence] is syntactic and the two indices are not *)
   assert (Hb : nth_byte w1 j = nth_byte w2 j).
   { pose proof (H1 j Hj') as E1. pose proof (H2 j Hj') as E2.
     rewrite E1 in E2. congruence. }
   exact Hb.
 Qed.
+
+(* two byte-window facts for the same window determine the same word *)
+Lemma uM_bytes_inj (M : gmap Z (bv 8)) (a : Z) (w1 w2 : mword 64) :
+  uM_bytes M a 8 w1 -> uM_bytes M a 8 w2 -> w1 = w2.
+Proof. exact (uM_bytes_inj_n (n := 8) M a w1 w2). Qed.
+
+Lemma uM_bytes4_inj (M : gmap Z (bv 8)) (a : Z) (w1 w2 : mword 32) :
+  uM_bytes M a 4 w1 -> uM_bytes M a 4 w2 -> w1 = w2.
+Proof. exact (uM_bytes_inj_n (n := 4) M a w1 w2). Qed.
+
+(* a known byte window says the bytes are THERE *)
+Lemma uM_bytes_exists {n : N} (M : gmap Z (bv 8)) (a : Z) (k : nat) (w : bv n) :
+  uM_bytes M a k w ->
+  forall j : nat, (j < k)%nat -> exists b : bv 8, M !! (a + Z.of_nat j) = Some b.
+Proof. intros H j Hj. exists (nth_byte w j). exact (H j Hj). Qed.
 
 (* THE round trip: an 8-byte slot reads back what was stored into it *)
 Lemma uM_word_store8 (M : gmap Z (bv 8)) (a : Z) (v : mword 64) :
@@ -218,6 +248,88 @@ Proof.
     [ apply zero_extend'_id | apply sign_extend'_id ].
 Qed.
 
+(* ---- k = 4: the two readings of the SIGN FLAG, and the [mword_of_int]
+   bridge ---------------------------------------------------------------
+   [extend_value] is definitionally the branch on [wp_uv_load]'s
+   [is_unsigned], so the flag costs a call site nothing to READ -- both
+   lemmas are [reflexivity].  What it costs is the ARITHMETIC: at k = 8
+   [extend_value_w8] made the extension vanish, while at k = 4 it is real
+   and a caller working in UmodeArith's [mword_of_int] calculus needs the
+   extension of a normalized 32-bit datum spelled as a normalized 64-bit
+   one.  That is [sext32_moi] / [zext32_moi] below.
+   RELOCATION DEBT: the two [*_moi] bridges read naturally beside
+   UmodeArith's [zext8_moi]; they live here so that this file's dependency
+   set is unchanged. *)
+Lemma extend_value_w4_s (w : mword (8 * 4)) : extend_value false w = sign_extend' 64 w.
+Proof. reflexivity. Qed.
+
+Lemma extend_value_w4_u (w : mword (8 * 4)) : extend_value true w = zero_extend' 64 w.
+Proof. reflexivity. Qed.
+
+(* the width-32 twin of UmodeArith's [zext8_unsigned] *)
+Lemma zext32_unsigned (w : mword 32) :
+  bv_unsigned (zero_extend' 64 w : mword 64) = bv_unsigned w.
+Proof.
+  unfold zero_extend'.
+  cbv [Operators_mwords.zero_extend Operators_mwords.extz_vec
+       Operators_mwords.with_word' to_word get_word
+       SailStdpp.Values.with_word autocast].
+  cbn.
+  unfold MachineWord.MachineWord.zero_extend, Values.to_word.
+  erewrite bv_zero_extend_unsigned by (cbn; lia).
+  reflexivity.
+Qed.
+
+(* [lw] at a value that fits the signed 32-bit range: the sign extension is
+   exact ([2 ^ 31] is UmodeArith's [Z31]). *)
+Lemma sext32_moi (z : Z) :
+  0 <= z < 2 ^ 31 ->
+  (sign_extend' 64 (mword_of_int z : mword 32) : mword 64) = mword_of_int z.
+Proof.
+  intro Hz. apply bv_eq.
+  rewrite (sext64_moi32_unsigned z Hz) moi64_unsigned.
+  symmetry. apply bv_wrap_small.
+  change (bv_modulus 64) with (2 ^ 64). lia.
+Qed.
+
+(* ... and [lwu] on the whole unsigned 32-bit range ([2 ^ 32] = [Z32]) *)
+Lemma zext32_moi (z : Z) :
+  0 <= z < 2 ^ 32 ->
+  (zero_extend' 64 (mword_of_int z : mword 32) : mword 64) = mword_of_int z.
+Proof.
+  intro Hz. apply bv_eq.
+  rewrite zext32_unsigned moi32_unsigned moi64_unsigned.
+  rewrite (bv_wrap_small 32 z ltac:(change (bv_modulus 32) with (2 ^ 32); lia)).
+  symmetry. apply bv_wrap_small.
+  change (bv_modulus 64) with (2 ^ 64). lia.
+Qed.
+
+(* ---- [uM_bytes] as the ONE image premise, at k = 8 and k = 4 ---------- *)
+
+Lemma uM_word_w8 (M : gmap Z (bv 8)) (a : Z) (w : mword 64) :
+  uM_bytes M a 8 w -> uM_word M a 8 = w.
+Proof.
+  intro Hw. apply (uM_bytes_inj M a); [ | exact Hw ].
+  exact (uM_word_bytes M a 8 ltac:(lia) (uM_bytes_exists M a 8 w Hw)).
+Qed.
+
+Lemma uM_word_w4 (M : gmap Z (bv 8)) (a : Z) (w : mword 32) :
+  uM_bytes M a 4 w -> uM_word M a 4 = w.
+Proof.
+  intro Hw. apply (uM_bytes4_inj M a); [ | exact Hw ].
+  exact (uM_word_bytes M a 4 ltac:(lia) (uM_bytes_exists M a 4 w Hw)).
+Qed.
+
+(* the k = 4 twins of [uM_word_byte_val]: the value a WORD load writes,
+   named off the four image bytes. *)
+Lemma uM_word_w4_val_s (M : gmap Z (bv 8)) (a : Z) (w : mword 32) :
+  uM_bytes M a 4 w -> extend_value false (uM_word M a 4) = sign_extend' 64 w.
+Proof. intro Hw. rewrite extend_value_w4_s (uM_word_w4 M a w Hw). reflexivity. Qed.
+
+Lemma uM_word_w4_val_u (M : gmap Z (bv 8)) (a : Z) (w : mword 32) :
+  uM_bytes M a 4 w -> extend_value true (uM_word M a 4) = zero_extend' 64 w.
+Proof. intro Hw. rewrite extend_value_w4_u (uM_word_w4 M a w Hw). reflexivity. Qed.
+
 (* ---- the per-width side conditions, as ONE premise ------------------- *)
 
 Lemma vmem_width_le8 (k : Z) : vmem_width k -> k <= 8.
@@ -248,6 +360,11 @@ Definition uload_width (k : Z) : Prop :=
 Lemma uload_width_8 : uload_width 8.
 Proof.
   split; [ right; right; right; reflexivity | exact exec_read_ram_plain_8 ].
+Qed.
+
+Lemma uload_width_4 : uload_width 4.
+Proof.
+  split; [ right; right; left; reflexivity | exact exec_read_ram_plain_4 ].
 Qed.
 
 Lemma uload_width_1 : uload_width 1.
@@ -1041,6 +1158,189 @@ Section WpUmodeLoad.
                     subst j; exists bb;
                     rewrite Z.add_0_r; exact Hbb)
               ltac:(rewrite (uM_word_byte_val M (uint va) bb Hbb); exact Hwval)
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* lw rd, imm(rs1) -- the base 4-byte SIGNED load, the tier's first     *)
+  (* narrow load whose extension is REAL.  The image premise is the byte  *)
+  (* WINDOW [uM_bytes M (uint va) 4 wv]: it carries both of               *)
+  (* [wp_uv_load]'s image premises at once (existence via                 *)
+  (* [uM_bytes_exists], value via [uM_word_w4]), so a call site states the *)
+  (* four bytes ONCE.  [wv] is the loaded halfword-pair as a [mword 32];  *)
+  (* [sext32_moi] turns [wval] into the call site's [mword_of_int].       *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_lw (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5)
+      (w_ld va wval : mword 64) (wv : mword 32) :
+    uinstr pt M pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) ->
+    uint rd <> 0 ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
+    ud_um pt !! svpn_of va = Some w_ld ->
+    uleaf_ok (Load Data) w_ld ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4092 ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    uM_bytes M (uint va) 4 wv ->
+    wval = sign_extend' 64 wv ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M
+         (<[Regidx rd := regval_into_reg wval]> m) -∗
+       pc_is (CID := CID0) (add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hrd Hva Hl Hchk Hcanon Hpg Hal Hbw Hwval.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_load Ψ M m pc false
+              (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) None
+              imm rs1 rd false 4 w_ld va wval
+              uload_width_4 Hui ltac:(intro s; exact I) eq_refl eq_refl Hrd
+              Hva Hl Hchk Hcanon Hpg Hal
+              (uM_bytes_exists M (uint va) 4 wv Hbw)
+              ltac:(rewrite (uM_word_w4_val_s M (uint va) wv Hbw); exact Hwval)
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* lwu rd, imm(rs1) -- the same load, UNSIGNED: the only difference is  *)
+  (* the flag [wp_uv_load] already carries, and [zext32_moi] on the way   *)
+  (* back out.                                                            *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_lwu (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (imm : mword 12) (rs1 rd : mword 5)
+      (w_ld va wval : mword 64) (wv : mword 32) :
+    uinstr pt M pc false (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) ->
+    uint rd <> 0 ->
+    va = add_vec (m !!! Regidx rs1) (sign_extend' 64 imm) ->
+    ud_um pt !! svpn_of va = Some w_ld ->
+    uleaf_ok (Load Data) w_ld ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4092 ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    uM_bytes M (uint va) 4 wv ->
+    wval = zero_extend' 64 wv ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M
+         (<[Regidx rd := regval_into_reg wval]> m) -∗
+       pc_is (CID := CID0) (add_vec_int pc 4) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hrd Hva Hl Hchk Hcanon Hpg Hal Hbw Hwval.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_load Ψ M m pc false
+              (LOAD (imm, Regidx rs1, Regidx rd, true, 4)) None
+              imm rs1 rd true 4 w_ld va wval
+              uload_width_4 Hui ltac:(intro s; exact I) eq_refl eq_refl Hrd
+              Hva Hl Hchk Hcanon Hpg Hal
+              (uM_bytes_exists M (uint va) 4 wv Hbw)
+              ltac:(rewrite (uM_word_w4_val_u M (uint va) wv Hbw); exact Hwval)
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* c.lw rd', uimm(rs1') -- the compressed 4-byte SIGNED load off a      *)
+  (* general register (NOT sp; that is c.lwsp).  Its [ExecuteAs]          *)
+  (* expansion is [LOAD (zext(uimm ++ 00), rs1', rd', false, 4)]          *)
+  (* ([exec_execute_C_LW_leaf]), and because the encoding names 3-bit     *)
+  (* register fields the EXPANDED indices are parameters with             *)
+  (* [creg2reg_idx] premises -- exactly as [wp_uv_caddi4spn] takes them.  *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_clw (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (uimm : mword 5) (crs1 crd : mword 3)
+      (rs1 rd : mword 5) (w_ld va wval : mword 64) (wv : mword 32) :
+    uinstr pt M pc true (C_LW (uimm, Cregidx crs1, Cregidx crd)) ->
+    creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
+    creg2reg_idx (Cregidx crd) = Regidx rd ->
+    uint rd <> 0 ->
+    va = add_vec (m !!! Regidx rs1)
+           (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"00")))) ->
+    ud_um pt !! svpn_of va = Some w_ld ->
+    uleaf_ok (Load Data) w_ld ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4092 ->
+    is_aligned_vaddr (Virtaddr va) 4 = true ->
+    uM_bytes M (uint va) 4 wv ->
+    wval = sign_extend' 64 wv ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M
+         (<[Regidx rd := regval_into_reg wval]> m) -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hcr1 Hcrd Hrd Hva Hl Hchk Hcanon Hpg Hal Hbw Hwval.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_load Ψ M m pc true (C_LW (uimm, Cregidx crs1, Cregidx crd))
+              (Some (LOAD (zero_extend' 12 (concat_vec uimm ('b"00")),
+                           Regidx rs1, Regidx rd, false, 4)))
+              (zero_extend' 12 (concat_vec uimm ('b"00")))
+              rs1 rd false 4 w_ld va wval
+              uload_width_4 Hui
+              ltac:(intro s;
+                    exact (exec_execute_C_LW_leaf uimm (Cregidx crs1) (Cregidx crd)
+                             _ rs1 rd s eq_refl Hcr1 Hcrd))
+              eq_refl eq_refl Hrd
+              Hva Hl Hchk Hcanon Hpg Hal
+              (uM_bytes_exists M (uint va) 4 wv Hbw)
+              ltac:(rewrite (uM_word_w4_val_s M (uint va) wv Hbw); exact Hwval)
+              with "Hcg Hpc Hcont").
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* c.ld rd', uimm(rs1') -- the compressed 8-byte load off a general     *)
+  (* register.  NOT [wp_uv_cldsp]: that is the sp-relative C_LDSP, a      *)
+  (* different instruction with a different immediate scaling and full    *)
+  (* 5-bit register fields.  At k = 8 the extension is the identity       *)
+  (* ([extend_value_w8]), so the register gets the image doubleword.      *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_uv_cld (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
+      (pc : mword 64) (uimm : mword 5) (crs1 crd : mword 3)
+      (rs1 rd : mword 5) (w_ld va wval : mword 64) :
+    uinstr pt M pc true (C_LD (uimm, Cregidx crs1, Cregidx crd)) ->
+    creg2reg_idx (Cregidx crs1) = Regidx rs1 ->
+    creg2reg_idx (Cregidx crd) = Regidx rd ->
+    uint rd <> 0 ->
+    va = add_vec (m !!! Regidx rs1)
+           (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
+    ud_um pt !! svpn_of va = Some w_ld ->
+    uleaf_ok (Load Data) w_ld ->
+    uva_canon va ->
+    Z.rem (uint va) 4096 <= 4088 ->
+    is_aligned_vaddr (Virtaddr va) 8 = true ->
+    uM_bytes M (uint va) 8 wval ->
+    uv_cap_gpr C pt Ψ M m -∗
+    pc_is pc -∗
+    (∀ CID0 : CpuId,
+       uv_cap_gpr (CID := CID0) C pt Ψ M
+         (<[Regidx rd := regval_into_reg wval]> m) -∗
+       pc_is (CID := CID0) (add_vec_int pc 2) -∗
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hui Hcr1 Hcrd Hrd Hva Hl Hchk Hcanon Hpg Hal Hbw.
+    iIntros "Hcg Hpc Hcont".
+    iApply (wp_uv_load Ψ M m pc true (C_LD (uimm, Cregidx crs1, Cregidx crd))
+              (Some (LOAD (zero_extend' 12 (concat_vec uimm ('b"000")),
+                           Regidx rs1, Regidx rd, false, 8)))
+              (zero_extend' 12 (concat_vec uimm ('b"000")))
+              rs1 rd false 8 w_ld va wval
+              uload_width_8 Hui
+              ltac:(intro s;
+                    exact (exec_execute_C_LD_leaf uimm (Cregidx crs1) (Cregidx crd)
+                             _ rs1 rd s eq_refl Hcr1 Hcrd))
+              eq_refl eq_refl Hrd
+              Hva Hl Hchk Hcanon Hpg Hal
+              (uM_bytes_exists M (uint va) 8 wval Hbw)
+              ltac:(rewrite extend_value_w8;
+                    symmetry; exact (uM_word_w8 M (uint va) wval Hbw))
               with "Hcg Hpc Hcont").
   Qed.
 

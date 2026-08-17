@@ -676,3 +676,68 @@ Proof.
   assert (Hrr : r' = r) by (injection He; trivial).
   rewrite Hrr in Hr'. rewrite Hr in Hr'. discriminate.
 Qed.
+
+(* ===================================================================== *)
+(* §10 WRITABLE windows, and the exec argument vector.                    *)
+(*                                                                        *)
+(* [uv_wr] is [uv_rd]'s store-side twin -- what a syscall that WRITES a    *)
+(* caller-supplied buffer (read, pipe, wait) needs about it.              *)
+(*                                                                        *)
+(* [ustr_at] / [uargv_at] / [uexec_args] describe a C string and an        *)
+(* argv vector by their CONTENTS, not just their shape: that is what lets  *)
+(* a syscall arm say WHICH program is being exec'd with WHICH arguments,   *)
+(* and hence what lets a verified process's theorem say what it DOES       *)
+(* rather than only that it steps.  ([ucstr] above says a string is        *)
+(* NUL-terminated of some length; [ustr_at] pins the bytes.)              *)
+(* ===================================================================== *)
+
+Record uv_wr (pt : uptd) (M : gmap Z (bv 8)) (a n : Z) : Prop := UvWr {
+  uwr_lo    : 0 <= a;
+  uwr_n0    : 0 <= n;
+  uwr_hi    : a + n <= 2 ^ 38;
+  uwr_leaf  : forall j : Z, 0 <= j < n ->
+                exists w : mword 64,
+                  ud_um pt !! svpn_of (mword_of_int (a + j) : mword 64) = Some w /\
+                  uleaf_ok (Store Data) w;
+  uwr_bytes : forall j : Z, 0 <= j < n -> exists b : bv 8, M !! (a + j) = Some b
+}.
+
+Lemma uv_wr_sub (pt : uptd) (M : gmap Z (bv 8)) (a n a' n' : Z) :
+  uv_wr pt M a n -> a <= a' -> 0 <= n' -> a' + n' <= a + n -> uv_wr pt M a' n'.
+Proof.
+  intros [Hlo Hn0 Hhi Hleaf Hb] Ha Hn' Hhi'.
+  constructor; try lia.
+  - intros j Hj. replace (a' + j) with (a + (a' - a + j)) by lia. apply Hleaf. lia.
+  - intros j Hj. replace (a' + j) with (a + (a' - a + j)) by lia. apply Hb. lia.
+Qed.
+
+Lemma uv_wr_dom (pt : uptd) (M M' : gmap Z (bv 8)) (a n : Z) :
+  (forall k : Z, is_Some (M !! k) -> is_Some (M' !! k)) ->
+  uv_wr pt M a n -> uv_wr pt M' a n.
+Proof.
+  intros Hdom [Hlo Hn0 Hhi Hleaf Hb]. constructor; try assumption.
+  intros j Hj. destruct (Hb j Hj) as [b HMb].
+  destruct (Hdom (a + j) (mk_is_Some _ _ HMb)) as [b' Hb']. eauto.
+Qed.
+
+(* a NUL-terminated string at [a] whose bytes are exactly [bs] *)
+Definition ustr_at (M : gmap Z (bv 8)) (a : Z) (bs : list (bv 8)) : Prop :=
+  (forall (j : nat) (b : bv 8), bs !! j = Some b -> M !! (a + Z.of_nat j) = Some b) /\
+  M !! (a + Z.of_nat (length bs)) = Some ubyte0.
+
+(* a NULL-terminated array of pointers at [pv], the i-th pointing at the
+   NUL-terminated string [args !!! i] -- exec's second argument *)
+Definition uargv_at (M : gmap Z (bv 8)) (pv : Z)
+    (args : list (list (bv 8))) : Prop :=
+  (forall (i : nat) (bs : list (bv 8)), args !! i = Some bs ->
+     exists p : Z,
+       uM_bytes M (pv + 8 * Z.of_nat i) 8 (mword_of_int p : mword 64) /\
+       ustr_at M p bs) /\
+  uM_bytes M (pv + 8 * Z.of_nat (length args)) 8 (mword_of_int 0 : mword 64).
+
+(* THE observable content of an [exec]: which program, with which
+   arguments.  A protocol's exec arm demands this of the process, so a
+   process's theorem states what it execs. *)
+Definition uexec_args (M : gmap Z (bv 8)) (pa pv : Z)
+    (path : list (bv 8)) (args : list (list (bv 8))) : Prop :=
+  ustr_at M pa path /\ uargv_at M pv args.
