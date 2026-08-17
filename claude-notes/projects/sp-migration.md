@@ -1951,19 +1951,18 @@ the general recipe for the remaining `_s_r` consumers: check the regime's
 
 ## State
 
-- DESIGN SETTLED 2026-08-16 (the section above), superseding the MemAcc
-  sketch. Phases A (`ca4946af`), B (`79affcd9`), C (`f9f7b7b5`) and D are
-  LANDED, and so is the `sie_cap` tier index on top of them. The KSTACK
-  campaign has K1 (the mint), K2a (the witness conjunct) and K2b (the cone,
-  via F1/F2/F3) LANDED on branch `f1-forall-kt`, which is GREEN: every
-  post-boot spec states `sie_cap KT1` literally, the Bare cone states KT0,
-  and only the measured dual cone keeps `∀ kt`. The trap contract's tier is
-  no longer an open question — its consumers are all post-boot, so it is
-  stated at KT1 while `IntrDefs`' definitions stay parametric. NEXT: K3
-  (the lifecycle), which now has a KT1 `forkret_park_pkg` to feed.
-- The `sp-migration-red` quarry branch is DELETED: the identity-pin
-  deviation (phase C findings) left nothing to mine from it.
-- `text_pointsto` (`↦ₓ`) still carries its own identity conjunct, so the fetch
-  path is untouched. It must eventually lose it too (TRAMPOLINE is
-  non-identity); the settled design covers it — same index, same witness —
-  as phase E.
+- Phases A-D, K1, K2a, and F1-F3 (the ∀kt experiment + THE PINNING) are
+  LANDED and pushed; `main` is GREEN at the F3 merge. The capability
+  names its regime explicitly (154 Spec files at literal KT1, 12 at KT0,
+  23 polymorphic); the leaves are generic under their original names;
+  `forkret_park_pkg`'s stack is `stack_own (KTR := KT1)` — SATISFIABLE
+  at a KSTACK va. The `f1-forall-kt` branch is merged and deleted.
+- NEXT: **K3 — the lifecycle**, as green increments on `main`: re-pin
+  `ProcDefs.kstack_free`/`kstack_closer` at KT1 (recorded debt), route
+  K1's bank into `proc_dormant` via procinit, allocproc's handout, the
+  kexit donation, kwait/freeproc restitution; then K4 (retire
+  `FORKRET_PARK` via the paid form) and K5 (text tier).
+- Cleanup debt, non-blocking: `VcGenS`'s blanket `Unshelve` (may be a
+  no-op now); `ProofFilestatParts`' ambient `CurKtier` pin (the only
+  file pinned by instance rather than literals).
+- `text_pointsto` (`↦ₓ`) still carries its own identity conjunct (K5).
