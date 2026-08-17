@@ -151,6 +151,13 @@ are working on that effort — the relevant `projects/` file.
   cone_liftable, the retag) are deleted by construction rather than
   proven.  Named fail criteria decide the pivot; the superseded
   machinery is retained side by side as the failure record.
+- **[`weak-memory-premise-discharge.md`](design/weak-memory-premise-discharge.md)** —
+  the ANALYSIS + PLAN (2026-08-17, nothing built) for discharging the
+  capstone's `main_premises`: what each clause says and why xv6 satisfies
+  it, the three tracks (generic Layer-1 coverage theory from site facts;
+  the site facts as projections of the TRACED program state + a
+  reader-discipline export; the composition), and the scope questions ⚑
+  for the user (user code; the static residue; ordering vs the M4 port).
 - **[`weak-memory-m5.md`](design/weak-memory-m5.md)** — M5, the disk as a
   weak-memory AGENT (LANDED 2026-08-17): the virtio device is a small
   program in a read/write/fence monad (`iris/VirtioProg.v`) that
