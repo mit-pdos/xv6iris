@@ -116,16 +116,16 @@ links that block after `base`; the rescan splits it, returning
 
 Proved and axiom-clean: `UmodeFrame.v` (the gcc 16-byte prologue/epilogue,
 protocol- and program-generic: `uv_slot16`, `wp_uv_prologue16`,
-`wp_uv_epilogue16`), and `UProofShLib.v` — the nine syscall stubs, `sbrk`,
-`strlen`, `strchr`.  `strlen` is instruction-for-instruction echo's and its
-proof replayed.
+`wp_uv_epilogue16`), `UProofShLib.v` (the nine syscall stubs, `sbrk`,
+`strlen`, `strchr`) and `UProofShMem.v` (`memset`, `free`).  `strlen` is
+instruction-for-instruction echo's and its proof replayed.
 
 Contracts written and compiling for all 21 functions: `USpecSh.v` (layout,
 stubs, library, heap, IO, `runcmd`, `main`, the top statement) and
 `USpecShParse.v` (the tokenization model, `peek`, `gettoken`, the four
 `parse*`, `nulterminate`).
 
-Left to prove: `memset`, `free` (in flight), then `malloc`, `execcmd`,
+Left to prove: `malloc`, `execcmd`,
 `peek`, `gettoken`, `parseredirs`, `parseexec`/`parsepipe`/`parseline`,
 `nulterminate`, `parsecmd`, `gets`, `getcmd`, `fork1`, `runcmd`, `main`,
 `start`.
