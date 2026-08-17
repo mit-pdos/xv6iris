@@ -8,6 +8,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec ExecCommon WpGpr.
 Require Import RegFile.
 Require Import InstrBytes.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 From iris.base_logic.lib Require Import invariants.
 From iris.bi.lib Require Import fractional.
 Local Open Scope Z_scope.

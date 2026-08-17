@@ -9,6 +9,7 @@ From iris.program_logic Require Import language.
 From iris.base_logic.lib Require Import gen_heap invariants.
 From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d SailStdpp.Base RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpGpr InstrBytes RiscvModelBytes RiscvTryStep RiscvExtras SailStdpp.TypeCasts SailStdpp.MachineWord SailStdpp.Values.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Import Defs.
 Import Defs.
 

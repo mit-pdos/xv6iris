@@ -29,6 +29,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RegFile WpGpr.
 Require Import MinstretInv InstrBytes.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import WpGprCsrwCommon WpGprCsrwA.
 Local Open Scope Z_scope.
 

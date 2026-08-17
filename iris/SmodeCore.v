@@ -44,6 +44,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetc
 (* [ret_pc] & the shared mword identities are used pervasively downstream. *)
 Require Export RiscvExtras.
 Require Import MinstretInv InstrBytes.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
 Require Import WpRvcBridge.

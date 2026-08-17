@@ -9,6 +9,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec ExecCommon WpGpr.
 Require Import RegFile.
 Require Import InstrBytes.
+Require Import WpInstr.   (* wp_instr / mm_cycle, split out of InstrBytes *)
 Local Open Scope Z_scope.
 Require Import WpGprCsrwCommon.
 Require Import RiscvExtras.   (* satp_ppn_mask_id: the PPN mask is a no-op here *)
