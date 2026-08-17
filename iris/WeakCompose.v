@@ -268,11 +268,11 @@ Qed.
       ([WeakRobustMain.bad_edge_violates]) produces exactly the restricted
       form, because [bad] bounds both ends of its edge.
 
-    - [cls_canonical lbl_class TS] PER TRACED BUNDLE — NEW WITH G6a, and the
+    - [cls_canonical lbl_class_p TS] PER TRACED BUNDLE — NEW WITH G6a, and the
       SECOND conjunct: every logged message carries the class its own
       author's pre-record [wstate] computes.  [WeakPromiseBridge]'s
       promise-free fragment no longer leaves a message's [wm_class] a free
-      binder — [PFStore]/[PFRmw] PIN it to [pcls l ws] — so
+      binder — [PFStore]/[PFRmw] PIN it to [pcls p l ws] — so
       [WeakRobustMain.robust_main]'s replay has to REBUILD the recorded
       classes, and it can only do that when the record's classes are the
       computable ones.  It is declared here for exactly the reason the first
@@ -301,9 +301,9 @@ Definition m6_side_conditions (next : bool → M unit) (img : image)
        wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
        rtc (wp_promise_step (P := pxv6) (D := unit)) (wp_init img tt ps) mid →
        ptraces_dev_of (pstep_unit (pstep_xv6 next)) xv6_pdev TS DS mid c →
-       cls_canonical lbl_class TS)
+       cls_canonical lbl_class_p TS)
   ∧ pf_violation_free_hart cls_of pub_of n_disk (pstep_unit (pstep_xv6 next))
-      lbl_class img tt ps.
+      lbl_class_p img tt ps.
 
 (* ====================================================================== *)
 (** ** 4. THE HEADLINE THEOREM
@@ -322,12 +322,12 @@ Theorem xv6_weak_robust (next : bool → M unit) (img : image) (ps : list pxv6)
     (c : wpcfg pxv6 unit) :
   m6_side_conditions next img ps →
   wp_behavior (pstep_unit (pstep_xv6 next)) img tt ps c →
-  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class)
+  ∃ cf, rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class_p)
           (wp_init img tt ps) cf ∧
         prog_of cf = prog_of c ∧ (∀ a, mem_of cf a = mem_of c a).
 Proof.
   intros (Hprem & Hcan & Hvf) Hbeh.
-  apply (robust_main (pstep_unit (pstep_xv6 next)) lbl_class xv6_pdev n_disk
+  apply (robust_main (pstep_unit (pstep_xv6 next)) lbl_class_p xv6_pdev n_disk
            img tt ps c (xv6_pdev_ok next)
            (xv6_lat_free next) (xv6_ts_oblivious next) lbl_class_obl Hbeh
            (λ mid TS DS, Hprem c mid TS DS Hbeh)
@@ -344,12 +344,12 @@ Corollary xv6_weak_robust_prefix (next : bool → M unit) (img : image)
   completable (pstep_unit (pstep_xv6 next)) img tt ps c →
   ∃ cend cf,
     rtc (wpstep (pstep_unit (pstep_xv6 next))) c cend ∧ no_promises cend ∧
-    rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class)
+    rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class_p)
       (wp_init img tt ps) cf ∧
     prog_of cf = prog_of cend ∧ (∀ a, mem_of cf a = mem_of cend a).
 Proof.
   intros (Hprem & Hcan & Hvf) Hc.
-  apply (robust_transport (pstep_unit (pstep_xv6 next)) lbl_class xv6_pdev
+  apply (robust_transport (pstep_unit (pstep_xv6 next)) lbl_class_p xv6_pdev
            n_disk img tt ps c (xv6_pdev_ok next)
            (xv6_lat_free next) (xv6_ts_oblivious next) lbl_class_obl Hc
            Hprem Hcan Hvf).
@@ -405,8 +405,8 @@ Qed.
 (** THE FRAME LEMMA, one pf step. *)
 Lemma pf_step_frame (next : bool → M unit) (dks : list (wpagent pxv6))
     (i : agent) (l : wlabel) (c c' : wpcfg psail unit) :
-  wp_pf_step (pstep_unit (sail_step next)) lbl_class i l c c' →
-  wp_pf_step (pstep_unit (pstep_xv6 next)) lbl_class i l (lift_cfg dks c) (lift_cfg dks c').
+  wp_pf_step (pstep_unit (sail_step next)) lbl_class_p i l c c' →
+  wp_pf_step (pstep_unit (pstep_xv6 next)) lbl_class_p i l (lift_cfg dks c) (lift_cfg dks c').
 Proof.
   intros Hst.
   destruct Hst as
@@ -420,20 +420,20 @@ Proof.
     (have Hlk := lift_ags_lookup dks (pc_ags cfg) i ag Hag);
     rewrite /lift_cfg; cbn [pc_img pc_log pc_ags];
     rewrite (lift_ags_insert dks (pc_ags cfg) i _ Hlt).
-  - exact (PFSilent (pstep_unit (pstep_xv6 next)) lbl_class i
+  - exact (PFSilent (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) (PHart st') tt Hlk Hps).
-  - exact (PFLoad (pstep_unit (pstep_xv6 next)) lbl_class i
+  - exact (PFLoad (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) aq lat base tvs (PHart st') tt Hlk Hps Hok).
-  - exact (PFStore (pstep_unit (pstep_xv6 next)) lbl_class i
+  - exact (PFStore (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) rl base data k (PHart st') tt Hlk Hps Hne Hkc).
-  - exact (PFRmw (pstep_unit (pstep_xv6 next)) lbl_class i
+  - exact (PFRmw (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) aq rl base tvs data k (PHart st') tt
              Hlk Hps Hne Hlen Hok Hex Hkc).
-  - exact (PFFence (pstep_unit (pstep_xv6 next)) lbl_class i
+  - exact (PFFence (pstep_unit (pstep_xv6 next)) lbl_class_p i
              (WPCfgU (pc_img cfg) (pc_log cfg) ((lift_ag <$> pc_ags cfg) ++ dks))
              (lift_ag ag) pr pw sr sw (PHart st') tt Hlk Hps).
 Qed.
@@ -442,8 +442,8 @@ Qed.
     untouched throughout. *)
 Lemma pf_run_frame (next : bool → M unit) (dks : list (wpagent pxv6))
     (c c' : wpcfg psail unit) :
-  rtc (wp_pf_run (pstep_unit (sail_step next)) lbl_class) c c' →
-  rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class) (lift_cfg dks c) (lift_cfg dks c').
+  rtc (wp_pf_run (pstep_unit (sail_step next)) lbl_class_p) c c' →
+  rtc (wp_pf_run (pstep_unit (pstep_xv6 next)) lbl_class_p) (lift_cfg dks c) (lift_cfg dks c').
 Proof.
   induction 1 as [|x y z Hxy _ IH]; [apply rtc_refl|].
   destruct Hxy as (i & l & Hst).
@@ -490,15 +490,15 @@ Corollary xv6_pf_instr (i : agent) (tick : bool) (s : wmstate) (x : unit)
   ∀ (iq : istream) (prom : gset nat) (ags : list (wpagent psail)),
     ags !! i = Some (WPAgent (PSail None (wm_regs s) (wm_dev s) None iq)
                        (wm_ws s) prom) →
-    rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)) lbl_class)
+    rtc (wp_pf_run (pstep_unit (pstep_xv6 riscv_step)) lbl_class_p)
       (WPCfgU (wimg s) (wm_log s) ((lift_ag <$> ags) ++ dks))
       (WPCfgU (wimg s) (wm_log s')
          (<[i := WPAgent (PHart (PSail None (wm_regs s') (wm_dev s') None iq))
                    (wm_ws s') prom]> ((lift_ag <$> ags) ++ dks))).
 Proof.
   intros Hsh Hrun Hpl.
-  pose proof (sail_instr_bracket i lbl_class
-                (λ ak ws base data Hlat, lbl_class_store ak ws base data Hlat)
+  pose proof (sail_instr_bracket i lbl_class_p
+                (λ p ak ws base data Hlat, lbl_class_store ak ws base data Hlat)
                 tick s x s' Hsh Hrun Hpl) as Hch.
   intros iq prom ags Hlk.
   have Hlt : (i < length ags)%nat by exact (lookup_lt_Some _ _ _ Hlk).
@@ -683,7 +683,7 @@ Qed.
     the reader/writer discipline exports of W3 are built.
 
     ------------------------------------------------------------------------
-    (3') [cls_canonical lbl_class TS] PER TRACED BUNDLE — DECLARED (the
+    (3') [cls_canonical lbl_class_p TS] PER TRACED BUNDLE — DECLARED (the
     second conjunct of [m6_side_conditions]), NEW WITH G6a.
 
     The promise-free fragment now PINS the class of every message it appends

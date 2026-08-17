@@ -46,10 +46,21 @@ arity (mechanical), the PLIC hart index (trivial) and THE DISK'S DMA READ.
 
 ## Phase B — the hart-side instance (unblocked; subagent work)
 
-- **B1** retype `pcls : P → wlabel → wstate → wm_class` (Bridge → Trace →
-  Sim → Cone/Blocks → Main → Retag → archive at `λ _, lbl_class`), pinned at
-  the FULFILLING agent's pre-step `pa_st`.  `cls_canonical`/`pcls_obl` gain
-  the argument; nothing else changes.
+- **B1 — DONE (2026-08-17).**  `pcls : P → wlabel → wstate → wm_class`,
+  pinned at the FULFILLING agent's pre-step `pa_st`: `PFStore`/`PFRmw` now
+  read `k = pcls (pa_st ag) l (pa_ws ag)`.  Threaded through Bridge →
+  Robust → Trace → Sim → Cone/Blocks/Graph → Main → Retag, and the archive
+  is instantiated at the program-blind wrapper `WeakSailLTS2.lbl_class_p`
+  (`lbl_class_p _ l ws := lbl_class l ws`), so the archive's coverage
+  restriction `wrun_plainw` is untouched.  `cls_canonical` /`pcls_obl` gained
+  the argument (`pcls_obl` quantifies it per fixed `p`).  Three places where
+  the argument was NOT merely carried, all recorded in the commit message:
+  `WeakSailLTS`'s ⇒-bracket premise `Hpcls` became `∀ p, …`;
+  `WeakSailComplete.wp_pf_step_inv`'s re-take clause gained
+  `pcls (pa_st agd) l (pa_ws agd) = pcls (pa_st ag) l (pa_ws ag)` (the
+  register-file twin `cfg_eqv` changes the program state); and the reverse
+  bridge's `exec_cls_ok` is now indexed by the initial program list `ps`.
+  Print Assumptions on the six capstones byte-identical; `lemma_diff` clean.
 - **B2** `WeakEvPf`: `pexv6.PHart` gains the CPU; `pstep_ev`/`pcls_ev`/
   `pdev_ev` over `D := dev_state`; `pcls_ev` reads the access kind off the
   `MemWrite` node (`wm_class_of (classify ak) ws`), `WCexcl` at `LRmw`,

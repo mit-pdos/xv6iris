@@ -805,7 +805,7 @@ End closure.
 Section cone.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
@@ -1076,7 +1076,7 @@ Proof.
 Qed.
 
 Corollary cone_Qinv_nil {P D : Type} (pstep : P → D → wlabel → P → D → Prop)
-    (pcls : wlabel → wstate → wm_class)
+    (pcls : P → wlabel → wstate → wm_class)
     (pdev : P → wlabel → P → bool)
     (TS : ptraces P D) (img : image) (d0 : D) (ps : list P) :
   ptraces_wf pstep TS → ptraces_ws_init TS → (∀ a, co_tc TS a) →
@@ -1112,7 +1112,7 @@ Qed.
 Section exhibit.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
@@ -1385,7 +1385,7 @@ Qed.
 Section main.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.

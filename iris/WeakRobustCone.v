@@ -211,7 +211,7 @@ Global Arguments blk_no {P D} _ {_} _ _.
 Section stepout.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
@@ -371,7 +371,7 @@ Section stepout.
                  rl base data kc st' dnew); [done| |done|].
         * simpl. exact Hpure.
         * (* THE PINNED CLASS (G6a) — as in [WeakRobustSim.Qinv_step] *)
-          have Hkc : kc = pcls (ae_lb ev) (pa_ws ag).
+          have Hkc : kc = pcls (pa_st ag) (ae_lb ev) (pa_ws ag).
           { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
                      HT Hev Hag Hts Hlog). }
           simpl. rewrite Hkc Hlbe.
@@ -425,7 +425,7 @@ Section stepout.
             [done|done|done|done|done|exact Hlbe|exact Hts|].
           by rewrite Hlbe.
         * (* THE PINNED CLASS (G6a) — as in [WeakRobustSim.Qinv_step] *)
-          have Hkc : kc = pcls (ae_lb ev) (pa_ws ag).
+          have Hkc : kc = pcls (pa_st ag) (ae_lb ev) (pa_ws ag).
           { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
                      HT Hev Hag Hts Hlog). }
           simpl. rewrite Hkc Hlbe.
@@ -459,7 +459,7 @@ End stepout.
 Section coneblocks.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
@@ -1685,7 +1685,7 @@ End coneblocks.
 Section main.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).

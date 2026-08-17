@@ -279,7 +279,7 @@ End astep.
 Section graph.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types TS : ptraces P D.

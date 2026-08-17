@@ -425,7 +425,7 @@ Definition ts_oblivious {P D : Type}
 Section sim.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
   Context (TS : ptraces P D) (DS : pdevs D) (img : image) (d0 : D) (ps : list P).
   Context (Hwf : ptraces_wf pstep TS).
@@ -435,7 +435,7 @@ Section sim.
   Context (Hlf : lat_free_prog pstep).
   Context (Hobl : ts_oblivious pstep).
   (** THE CLASS HALVES OF G6a.  [wp_pf_step] PINS the class of the message
-      a store/rmw appends to [pcls l ws] at the fulfilling agent's own
+      a store/rmw appends to [pcls p l ws] at the fulfilling agent's own
       [wstate], so the replay owes that equation at every store it
       rebuilds.  [Hcls] supplies the RECORDED side (the logged message
       already carries the class [pcls] computes at its fulfil event's
@@ -1270,7 +1270,7 @@ Section sim.
                  rl base data kc st' dnew); [done| |done|].
         * simpl. exact Hpure.
         * (* THE PINNED CLASS (G6a) *)
-          have Hkc : kc = pcls (ae_lb ev) (pa_ws ag).
+          have Hkc : kc = pcls (pa_st ag) (ae_lb ev) (pa_ws ag).
           { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
                      HT Hev Hag Hts Hlog). }
           simpl. rewrite Hkc Hlbe.
@@ -1322,7 +1322,7 @@ Section sim.
             [done|done|done|done|done|exact Hlbe|exact Hts|].
           by rewrite Hlbe.
         * (* THE PINNED CLASS (G6a) *)
-          have Hkc : kc = pcls (ae_lb ev) (pa_ws ag).
+          have Hkc : kc = pcls (pa_st ag) (ae_lb ev) (pa_ws ag).
           { exact (Hcls e.1 T e.2 ev ag ts (WMsg base data (Some e.1) kc)
                      HT Hev Hag Hts Hlog). }
           simpl. rewrite Hkc Hlbe.
@@ -1497,7 +1497,7 @@ End sim.
     wants the pf run and the per-agent picture; this is that projection. *)
 
 Lemma Qinv_run {P D} (pstep : P → D → wlabel → P → D → Prop)
-    (pcls : wlabel → wstate → wm_class) TS DS img d0 ps done :
+    (pcls : P → wlabel → wstate → wm_class) TS DS img d0 ps done :
   Qinv pstep pcls TS DS img d0 ps done →
   ∃ cf, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) cf ∧
         pc_img cf = img ∧ pc_log cf = pf_log TS done ∧
@@ -1512,7 +1512,7 @@ Lemma Qinv_run {P D} (pstep : P → D → wlabel → P → D → Prop)
 Proof. intros [_ (cf & Hc)]. by exists cf. Qed.
 
 Lemma Qinv_order {P D} (pstep : P → D → wlabel → P → D → Prop)
-    (pcls : wlabel → wstate → wm_class) TS DS img d0 ps done :
+    (pcls : P → wlabel → wstate → wm_class) TS DS img d0 ps done :
   Qinv pstep pcls TS DS img d0 ps done → qorder TS done.
 Proof. by intros [? _]. Qed.
 
@@ -1528,7 +1528,7 @@ Proof. by intros [? _]. Qed.
 Section wrapper.
   Context {P D : Type}.
   Context (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (pdev : P → wlabel → P → bool).
 
   Implicit Types c : wpcfg P D.

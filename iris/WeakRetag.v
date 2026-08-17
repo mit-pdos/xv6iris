@@ -51,8 +51,9 @@
     [WeakPromiseFact], [WeakRobust] (for [prog_of]/[mem_of]),
     [WeakRobustTrace].  In particular [WeakSailLTS2.lbl_class] is NOT
     imported — canonicity is stated against a PARAMETER
-    [clsf : wlabel → wstate → wm_class], which the consumer instantiates
-    at [lbl_class]; that keeps this file free of Sail and of the whole
+    [clsf : P → wlabel → wstate → wm_class], which the consumer
+    instantiates at [lbl_class_p]; that keeps this file free of Sail and of
+    the whole
     model tower. *)
 From Stdlib.ssr Require Import ssreflect.
 From stdpp Require Import gmap finite list.
@@ -560,8 +561,9 @@ Section machine.
 
       [cls_canonical] is [WeakComposeLang.xv6_cone_premises]'s [Hcls]
       conjunct verbatim, with [lbl_class] abstracted to the parameter
-      [clsf] (the consumer instantiates [clsf := WeakSailLTS2.lbl_class];
-      that definition is program-type-independent, so nothing is lost). *)
+      [clsf] (the consumer instantiates [clsf :=
+      WeakSailLTS2.lbl_class_p], the program-blind wrapper around
+      [WeakSailLTS2.lbl_class]). *)
 
   (** [cls_canonical] MOVED to [WeakRobustTrace] (G6a): the pinned pf
       fragment consumes it in the replay, so it is Layer-1 vocabulary now,
@@ -575,8 +577,8 @@ Section machine.
   Definition fulfil_at (T : atrace P D) (p : nat) : option (nat * aev D) :=
     list_find (λ ev, ae_ts ev = Some (S p)) (at_evs T).
 
-  Definition canon_f (clsf : wlabel → wstate → wm_class) (TS : ptraces P D)
-      (p : nat) : wm_class :=
+  Definition canon_f (clsf : P → wlabel → wstate → wm_class)
+      (TS : ptraces P D) (p : nat) : wm_class :=
     match pt_log TS !! p with
     | None => WCplain
     | Some m =>
@@ -591,7 +593,7 @@ Section machine.
                 | Some (k, ev) =>
                     match at_ags T !! k with
                     | None => WCplain
-                    | Some ag => clsf (ae_lb ev) (pa_ws ag)
+                    | Some ag => clsf (pa_st ag) (ae_lb ev) (pa_ws ag)
                     end
                 end
             end
@@ -608,7 +610,7 @@ Section machine.
     (∀ k1 k2 ev1 ev2,
        at_evs T !! k1 = Some ev1 → ae_ts ev1 = Some (S p) →
        at_evs T !! k2 = Some ev2 → ae_ts ev2 = Some (S p) → k1 = k2) →
-    canon_f clsf TS p = clsf (ae_lb ev) (pa_ws ag).
+    canon_f clsf TS p = clsf (pa_st ag) (ae_lb ev) (pa_ws ag).
   Proof.
     intros Hm Hi HT Hev Hts Hag Huniq.
     rewrite /canon_f Hm Hi HT.
@@ -713,7 +715,8 @@ Section machine.
   (* ---------------------------------------------------------------- *)
   (** ** THE DELIVERABLE: every behavior retags to a CANONICAL one *)
 
-  Theorem behavior_canonical (clsf : wlabel → wstate → wm_class) img d0 ps c :
+  Theorem behavior_canonical (clsf : P → wlabel → wstate → wm_class)
+      img d0 ps c :
     pdev_ok pstep pdev →
     lat_free_prog pstep →
     wp_behavior pstep img d0 ps c →
@@ -758,7 +761,8 @@ Global Arguments ts_pos {P D} _.
     - [behavior_canonical]: a lat-free behavior is matched by a behavior
       of the SAME program with the SAME [prog_of] and [mem_of], whose
       traced factorization satisfies [cls_canonical clsf] — i.e. the
-      capstone's [Hcls] premise, at [clsf := WeakSailLTS2.lbl_class].  So
+      capstone's [Hcls] premise, at [clsf := WeakSailLTS2.lbl_class_p].
+      So
       the capstone may quantify over canonical-class bundles and lose
       nothing: precompose with the retag, transport the conclusion back
       with [retag_conclusion].
@@ -768,5 +772,5 @@ Global Arguments ts_pos {P D} _.
       to [wmsg] later gets the same treatment by the same argument.
 
     - What is deliberately NOT here: the converse simulation (false — see
-      the header), and the instantiation at [lbl_class] (that belongs with
+      the header), and the instantiation at [lbl_class_p] (that belongs with
       the capstone, which already imports [WeakSailLTS2]). *)

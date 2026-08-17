@@ -250,17 +250,31 @@ Lemma lbl_class_rmw ak ws aq rl base tvs data :
   wm_class_of ak ws = lbl_class (WeakPromise.LRmw aq rl base tvs data) ws.
 Proof. intros H. by rewrite /wm_class_of /lbl_class H. Qed.
 
+(** THE PROGRAM-BLIND WRAPPER (G6a follow-up).  [pcls] is now indexed by
+    the fulfilling agent's PROGRAM STATE as well
+    ([WeakPromiseBridge]'s section header says why: the access kind is not
+    in the label).  [lbl_class] is what the ARCHIVE route uses, and it
+    reads only the label and [w_relp], so its instance is the constant
+    family — the program argument is discarded.  The archive therefore
+    keeps exactly the coverage restriction it had ([wrun_plainw]; this
+    change is the retype only).  Every [pcls] position on the archive
+    route is [lbl_class_p]; the bare [lbl_class] survives wherever the
+    class is spoken of as a VALUE (e.g. [cls_canon]). *)
+Definition lbl_class_p {P : Type} (_ : P) (l : wlabel) (ws : wstate)
+    : wm_class := lbl_class l ws.
+
 (** THE REPLAY-SIDE OBLIGATION (G6a).  [lbl_class] is the canonical [pcls]
     for the whole archive route, and the replay ([WeakRobustSim]) hands the
     same events back at PERMUTED timestamps — so the class function must look
     at no timestamp.  [lbl_class] looks at [rl] and at [w_relp ws] on the
     store arm and is constant on the rmw arm, so it does not.  Every archive
     consumer that owes [WeakRobustTrace.pcls_obl] discharges it with this. *)
-Lemma lbl_class_obl : pcls_obl lbl_class.
+Lemma lbl_class_obl {P : Type} : pcls_obl (P := P) lbl_class_p.
 Proof.
   split.
-  - intros rl base data ws ws' Hrel. by rewrite /lbl_class Hrel.
-  - intros aq rl base tvs tvs' data ws ws' _ _. reflexivity.
+  - intros p rl base data ws ws' Hrel.
+    by rewrite /lbl_class_p /lbl_class Hrel.
+  - intros p aq rl base tvs tvs' data ws ws' _ _. reflexivity.
 Qed.
 
 (** (a) the class the step appends is the computed one. *)
@@ -281,13 +295,13 @@ Definition rmw_tight (i : agent) (l : wlabel) (c : wpcfg psail unit) : Prop :=
 Definition pf_solo (next : bool → M unit) (i : agent)
     (c c' : wpcfg psail unit) : Prop :=
   ∃ l : wlabel,
-    wp_pf_step (pstep_unit (sail_step_ni next)) lbl_class i l c c' ∧
+    wp_pf_step (pstep_unit (sail_step_ni next)) lbl_class_p i l c c' ∧
     cls_canon i l c c' ∧ rmw_tight i l c.
 
 (** A block IS a promise-free run — the two brackets sandwich the same
     relation. *)
 Lemma pf_solo_run next i c c' :
-  pf_solo next i c c' → wp_pf_run (pstep_unit (sail_step next)) lbl_class c c'.
+  pf_solo next i c c' → wp_pf_run (pstep_unit (sail_step next)) lbl_class_p c c'.
 Proof.
   intros (l & Hstep & _ & _). exists i, l.
   destruct Hstep as
@@ -1291,7 +1305,7 @@ Theorem wprim_hart_block_fwd (cpu : CPU) (gen : nat) (g g' : wgstate) :
     ags !! (fin_to_nat cpu)
       = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq)
                 (wgws g cpu) prom) →
-    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) lbl_class)
+    rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) lbl_class_p)
       (WPCfgU (img_z (wgimg g)) (wglog g) ags)
       (WPCfgU (img_z (wgimg g)) (wglog g')
          (<[fin_to_nat cpu :=
@@ -1302,8 +1316,8 @@ Proof.
   apply wprim_step_loop_inv in Hstep as (_ & _ & _ & [(_ & tick & u & ss & Hrun & ->)|(Hnl & _)]);
     [|done].
   rewrite whart_write_log in Hpl. rewrite -(whart_view_log g cpu) in Hpl.
-  pose proof (sail_instr_bracket (fin_to_nat cpu) lbl_class
-                (λ ak ws base data Hlat, lbl_class_store ak ws base data Hlat)
+  pose proof (sail_instr_bracket (fin_to_nat cpu) lbl_class_p
+                (λ p ak ws base data Hlat, lbl_class_store ak ws base data Hlat)
                 tick (whart_view g cpu) u ss (Hsh tick) Hrun Hpl) as Hch.
   intros iq prom ags Hlk.
   rewrite whart_write_log whart_write_regs_eq whart_write_ws_eq
@@ -1339,7 +1353,7 @@ Theorem wprim_hart_block (cpu : CPU) (gen : nat) (g : wgstate)
        ags' !! (fin_to_nat cpu)
          = Some (WPAgent (PSail None (wgregs g cpu) (wgdev g) None iq')
                    (wgws g cpu) prom') →
-       rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) lbl_class)
+       rtc (wp_pf_run (pstep_unit (sail_step riscv_step)) lbl_class_p)
          (WPCfgU (img_z (wgimg g)) (wglog g) ags')
          (WPCfgU (img_z (wgimg g)) (wglog g')
             (<[fin_to_nat cpu :=

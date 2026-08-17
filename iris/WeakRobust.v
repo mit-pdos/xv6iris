@@ -133,13 +133,13 @@ Section violation.
       statements below and in [WeakRobustGraph]; [pf_violation_free_hart]
       is what [WeakRobustMain] and [WeakCompose] actually consume. *)
   Definition pf_violation_free (pstep : P → D → wlabel → P → D → Prop)
-      (pcls : wlabel → wstate → wm_class)
+      (pcls : P → wlabel → wstate → wm_class)
       (img : image) (d0 : D) (ps : list P) : Prop :=
     ∀ c, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c → ¬ violation c.
 
   Definition pf_violation_free_hart (nh : nat)
       (pstep : P → D → wlabel → P → D → Prop)
-      (pcls : wlabel → wstate → wm_class) (img : image) (d0 : D)
+      (pcls : P → wlabel → wstate → wm_class) (img : image) (d0 : D)
       (ps : list P) : Prop :=
     ∀ c, rtc (wp_pf_run pstep pcls) (wp_init img d0 ps) c → ¬ violation_hart nh c.
 
@@ -174,7 +174,7 @@ Definition prog_of {P D : Type} (c : wpcfg P D) : list P := pa_st <$> pc_ags c.
 
 Section goal.
   Context {P D : Type} (pstep : P → D → wlabel → P → D → Prop).
-  Context (pcls : wlabel → wstate → wm_class).
+  Context (pcls : P → wlabel → wstate → wm_class).
   Context (cls : wmsg → store_class).
   Context (pub : wpcfg P D → nat → Prop).
 

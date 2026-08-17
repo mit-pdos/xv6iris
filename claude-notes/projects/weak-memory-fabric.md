@@ -290,19 +290,19 @@ EXACTLY the five rv64d axioms: `rv64d.valid_reservation`,
 `WeakPromiseBridge.v`'s `Section bridge` gained a section parameter
 
 ```coq
-Context (pcls : wlabel → wstate → wm_class).
+Context (pcls : P → wlabel → wstate → wm_class).   (* retyped 2026-08-17 *)
 ```
 
 and the promise-free fragment's two appending arms PIN the class they
-stamp: `PFStore` gained `k = pcls (LStore rl base data) (pa_ws ag)` and
-`PFRmw` gained `k = pcls (LRmw aq rl base tvs data) (pa_ws ag)`, as the
-LAST premise of each.  So the applied forms are `wp_pf_step pstep pcls …`
-/ `wp_pf_run pstep pcls …`, with `pcls` in second position.  The archive
-instantiates it at `WeakSailLTS2.lbl_class` throughout.
+stamp: `PFStore` has `k = pcls (pa_st ag) (LStore rl base data) (pa_ws ag)`
+and `PFRmw` has `k = pcls (pa_st ag) (LRmw aq rl base tvs data) (pa_ws ag)`,
+as the LAST premise of each.  So the applied forms are `wp_pf_step pstep
+pcls …` / `wp_pf_run pstep pcls …`, with `pcls` in second position.  The
+archive instantiates it at `WeakSailLTS2.lbl_class_p` throughout.
 
-**THE SIGNATURE IS NOT FINISHED, AND THE NEXT STAGE MUST FIX IT — read
-this before touching the class again.**  `pcls` is indexed by the LABEL
-and the `wstate`, but `WeakInterp.wm_class_of` branches on the ACCESS
+**THE SIGNATURE AS FIRST LANDED WAS ONE ARGUMENT SHORT (the finding; the
+retype below fixed the TYPE, not yet the archive's class function).**
+`pcls` was indexed by the LABEL and the `wstate` alone, but `WeakInterp.wm_class_of` branches on the ACCESS
 KIND *first*, and the access kind is NOT in the label (`wlabel`'s
 `LStore` carries only `(rl, base, data)`).  `WeakSailLTS`'s deltas
 (e)/(e'') make an exclusive read open NO window and step an exclusive RAM
@@ -316,13 +316,45 @@ AMO.  **No capstone carries it** (the lift consumes the ⇐ direction), so
 it costs no theorem — it is a coverage restriction on an archived
 bracket, recorded at delta (e'').
 
-**THE FIX (do this first in the successor stage): index `pcls` by the
-PROGRAM STATE, `P → wlabel → wstate → wm_class`.**  The access kind lives
+**THE RETYPE LANDED (2026-08-17, follow-up commit).**  `pcls : P →
+wlabel → wstate → wm_class` everywhere, and the argument is applied at the
+FULFILLING agent's PRE-STEP program state: `PFStore` reads
+`k = pcls (pa_st ag) (LStore rl base data) (pa_ws ag)` and `PFRmw` reads
+`k = pcls (pa_st ag) (LRmw aq rl base tvs data) (pa_ws ag)`.
+`cls_canonical clsf TS` is now `wm_ak m = clsf (pa_st ag) (ae_lb ev)
+(pa_ws ag)` at the pre-record agent, and `pcls_obl` quantifies the program
+argument (the equations hold for each fixed `p`); the replay hands the
+acting agent its RECORDED `pa_st` verbatim, so `cls_canonical` +
+`pcls_obl` + `replay_ws_relp` discharge exactly as before.  The archive is
+instantiated at the PROGRAM-BLIND `WeakSailLTS2.lbl_class_p`
+(`lbl_class_p _ l ws := lbl_class l ws`), so **`wrun_plainw` and every
+other archive coverage restriction are unchanged** — the retype makes the
+exact class function EXPRESSIBLE; supplying one is the separate step below.
+Print Assumptions on the six capstones is byte-identical.
+
+THREE PLACES WHERE THE ARGUMENT WAS NOT MERELY CARRIED, all forced by the
+class now reading a state the surrounding lemma lets vary:
+`WeakSailLTS`'s ⇒-bracket premise `Hpcls` became `∀ p, …` (the bracket has
+no handle on the program state at the write node);
+`WeakSailComplete.wp_pf_step_inv`'s re-take clause gained
+`pcls (pa_st agd) l (pa_ws agd) = pcls (pa_st ag) l (pa_ws ag)`, because
+its consumer `cfg_eqv` twins two REGISTER FILES and so changes exactly the
+argument the class now reads (trivial at any program-blind class); and the
+reverse bridge's `exec_cls_ok` is now indexed by the initial program list
+`ps` (an `exec` records no program trace, and under `prog_free` no arm
+moves a program state — `mstep_wp_pf_step` now returns that invariant).
+
+**WHAT THE NEW ARGUMENT IS FOR (the SIGNATURE has landed; supplying the
+exact class function has NOT).**  The access kind lives
 there — the residual monad sits at the `MemWrite n req` node — so the
 class function returns `wm_class_of (classify (WriteReq.access_kind req))
 ws` at the `LStore` case (NOT by deferring to `lbl_class`, which
-reproduces the bug) and is then exact at EVERY write; `wrun_plainw`
-disappears.  The replay is unaffected: `qcfg` hands the acting agent the
+reproduces the bug — and which is exactly what the archive's
+program-blind `lbl_class_p` still does, deliberately) and is then exact at
+EVERY write; `wrun_plainw` disappears.  That is the remaining work, and it
+belongs with the event-language instance (`pcls_ev`, soundness worklist
+B2), not with the archive.  The replay is unaffected: `qcfg` hands the
+acting agent the
 RECORDED `pa_st` verbatim (only the `wstate` is retimed, and
 `nproc done e.1 = e.2` makes it the very record `cls_canonical` speaks
 about), so `cls_canonical` and `pcls_obl` merely carry the extra argument
