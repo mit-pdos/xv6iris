@@ -109,13 +109,10 @@ but `hw_config` holds elp at `DfracDiscarded`, so no leaf can own it, and
 on `r ∈ Drw` with no value-preserving exception, and adding one is not
 possible without making `hspan_stops` file-dependent (it is a bool on the
 term, and a term that both may step and is a stopping point makes `hval`
-unprovable).  So the walk must SPLIT at that node and use a `swp`-level rule:
-
-    swp_write_reg_same : hregwrite_val_at r m = Some v ->
-      gen_cert -* r |->r{dq} v -* (r |->r{dq} v -* swp (hregwrite_resume m) Φ)
-      -* swp m Φ
-
-proved from `HartRegNode.swp_hart_regwrite` plus `reg_interp_set_same`.  The
+unprovable).  So the walk must SPLIT at that node and use a `swp`-level rule, and
+**`HartRegNode.swp_write_reg_same` is that rule and is proved** (the trap
+handler's `reset_elp` needs it too, which is why it lives there and not in a
+leaf file).  The
 surrounding walk is ~15 nodes of reads/writes of cells the leaf holds; get
 their exact order by PRINTING the reduced term (see §"printing a model term"
 in the traps section) rather than guessing the bind structure.
@@ -282,6 +279,7 @@ Evidence:
 | `WpInstr.wp_instr` | THE leaf wrapper, all four fetch shapes | takes `npc` explicitly (the old one recovered it from `s_exec`); lends PC read-only for AUIPC/JAL |
 | `WpInstr.mm_cycle` | the M-mode instance of the cycle rule | adds only the two bundle↔frame bridges |
 | `HartMFrame.swp_rX_file` / `swp_wX_file` | GPR access at `gpr_file`, not at three cells | operand ALIASING is free this way; an instruction may name the same register twice |
+| `HartRegNode.swp_write_reg_same` | the WRITE THAT CHANGES NOTHING: write a register you do not own, with the value already there | the span CANNOT express this (its write case is gated on `r ∈ Drw`, and `hspan_stops` is a bool on the TERM, so a node that both steps and is a stopping point makes `hval` unprovable) -- so a walk that meets one SPLITS at it and takes this rule.  Both clients are the elp reset: MRET's, and the trap handler's.  Rests on `RiscvPtsto.reg_interp_set_same` |
 | `HartMFrame.swp_read_reg_cell` / `swp_write_reg_cell` | register nodes at ONE owned cell | `HartSpanChar`'s pair is frame-shaped, right for the wrapper, wrong for a leaf |
 | `HartMFrame.mm_rw_ext` / `mm_ro_ext` / `mm_rw_open` / `mm_rw_close` | DIRECTED frame bridges | a `⊣⊢` rewrite in a proofmode goal cost ~110 s at one site; these are free |
 | `HartMFrame.mm_rs_agree`, `mm_rs_ro_agree`, `mm_npc_agree`, `mm_ro_nPC` | tower transports | see the two-tower trap in `optimization.md` |

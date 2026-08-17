@@ -1661,6 +1661,27 @@ Section Bridge.
       by rewrite (irrelevant_register_set k r rs v' (register_beq_false k r Hne)).
   Qed.
 
+  (* A WRITE THAT CHANGES NOTHING needs no cell to update: the interpretation
+     absorbs it, because [register_set r (its own value) rs] has the same
+     lookups as [rs] and the agreement map is untouched.  This is what lets a
+     stretch write a PERSISTENTLY PINNED register with the value it already
+     holds -- MRET's elp reset and the trap handler's [reset_elp] both do
+     exactly that, and no full-ownership cell for elp exists to update. *)
+  Lemma reg_interp_set_same (rs : regstate) (r : register)
+      (v : type_of_register r) :
+    register_lookup r rs = v ->
+    reg_interp rs -∗ (reg_interp (register_set r v rs) : iProp Σ).
+  Proof.
+    iIntros (Hlk) "Hi". iDestruct "Hi" as (mp) "[Hm %Hag]".
+    iExists mp. iFrame "Hm". iPureIntro.
+    intros k dv Hk.
+    destruct (decide (k = r)) as [->|Hne].
+    - rewrite (Hag r dv Hk) register_lookup_set Hlk. reflexivity.
+    - rewrite (Hag k dv Hk)
+        (irrelevant_register_set k r rs v (register_beq_false k r Hne)).
+      reflexivity.
+  Qed.
+
   (* reading a register cell at ANY fraction -- in particular a persistent
      [r ↦ᵣ□ v].  ([reg_valid] is the [DfracOwn 1] special case.) *)
   Lemma reg_valid_dq rs r dq v :

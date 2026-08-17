@@ -1631,20 +1631,8 @@ Qed.
    (elp is persistently pinned, so no full-ownership cell exists to update). *)
 
 (* WpGprMretNew.v : reg_interp_set_same *)
-Lemma reg_interp_set_same `{!riscvGS Σ} `{CpuId} (rs : regstate) (r : register)
-    (v : type_of_register r) :
-  register_lookup r rs = v ->
-  reg_interp rs -∗ reg_interp (register_set r v rs).
-Proof.
-  iIntros (Hlk) "Hi". iDestruct "Hi" as (mp) "[Hm %Hag]".
-  iExists mp. iFrame "Hm". iPureIntro.
-  intros k dv Hk.
-  destruct (decide (k = r)) as [->|Hne].
-  - rewrite (Hag r dv Hk) register_lookup_set Hlk. reflexivity.
-  - rewrite (Hag k dv Hk)
-      (irrelevant_register_set k r rs v (register_beq_false k r Hne)).
-    reflexivity.
-Qed.
+(* [reg_interp_set_same] moved to RiscvPtsto, where [reg_interp] lives;
+   it had two identical copies. *)
 
 (* get_xLPE at Supervisor reads the menvcfg REGISTER; with menvcfg's value
    pinned by a points-to (and its LPE bit clear) the read reduces per-state.

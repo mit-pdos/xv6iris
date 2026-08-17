@@ -580,18 +580,7 @@ Section WpIntrEngine.
 
   (* mstate_interp absorbs a same-value register write (the trap's
      [reset_elp], whose cell is pinned ↦ᵣ□ by hw_config). *)
-  Lemma reg_interp_set_same (rs : regstate) (r : register) (v : type_of_register r) :
-    register_lookup r rs = v ->
-    reg_interp rs -∗ reg_interp (register_set r v rs).
-  Proof.
-    iIntros (Hv) "H". iDestruct "H" as (m) "[Hh %Hag]".
-    iExists m. iFrame "Hh". iPureIntro.
-    intros r0 dv Hm. rewrite (Hag r0 dv Hm).
-    destruct (register_beq r0 r) eqn:Hb.
-    - pose proof (register_beq_true _ _ Hb) as ->.
-      rewrite register_lookup_set. rewrite Hv. reflexivity.
-    - rewrite irrelevant_register_set; [reflexivity | exact Hb].
-  Qed.
+  (* [reg_interp_set_same] lives in RiscvPtsto, where [reg_interp] does. *)
 
 
   Lemma wp_exec_step_interrupt_inv {dq : dfrac} :

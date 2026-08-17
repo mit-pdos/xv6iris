@@ -258,4 +258,35 @@ Section regnode.
     iApply (swp_use _ Φ C HC with "Hswp Hcont").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (* THE WRITE THAT CHANGES NOTHING.  A stretch may write a register it     *)
+  (* does not own, provided it writes the value already there: the          *)
+  (* interpretation absorbs it ([RiscvPtsto.reg_interp_set_same]) and the    *)
+  (* pin is enough to know the value.  The SPAN cannot express this -- its   *)
+  (* write case is gated on [r ∈ Drw] and [hspan_stops] is a bool on the     *)
+  (* TERM, so a node that both steps and is a stopping point would make      *)
+  (* [hval] unprovable -- so a walk that meets such a write SPLITS here.     *)
+  (* Both clients are the elp reset: MRET's, and the trap handler's.        *)
+  (* ------------------------------------------------------------------ *)
+  Lemma swp_write_reg_same {X : Type} (r : register) (dq : dfrac)
+      (v : type_of_register r) (m : M X) (Φ : X -> iProp Σ) :
+    hregwrite_val_at r m = Some v ->
+    gen_cert -∗
+    reg_pointsto r dq v -∗
+    (reg_pointsto r dq v -∗ swp (hregwrite_resume m) Φ) -∗
+    swp m Φ.
+  Proof.
+    iIntros (Hat) "#Hcert Hpt Hcont".
+    iApply (swp_hart_regwrite r v m _ Hat with "Hcert").
+    iIntros (σ) "Hsi". rewrite /mstate_interp.
+    iDestruct "Hsi" as "(Hreg & Hmem & Hdev)".
+    iDestruct (reg_valid_dq with "Hreg Hpt") as %Lv.
+    iApply fupd_mask_intro; [apply empty_subseteq|].
+    iIntros "Hcl". iNext. iMod "Hcl" as "_". iModIntro.
+    iSplitL "Hreg Hmem Hdev".
+    { rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hmem Hdev".
+      iApply (reg_interp_set_same σ.(sregs) r v Lv with "Hreg"). }
+    iApply ("Hcont" with "Hpt").
+  Qed.
+
 End regnode.
