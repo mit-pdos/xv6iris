@@ -1950,7 +1950,7 @@ Section ProofDirlookupMain.
             iApply ("Hpoffst" with "Hcg Hpc Hpoff").
             iIntros (CIDB14 HqB14) "Hcg Hpc Hpoff".
             (* +0x86 lhu a1,-96(s0) : the inum again *)
-            iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x86)) Ra1 Rs0
+            iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (DL + 0x86)) Ra1 Rs0
                       (mword_of_int 4000 : mword 12) mnc (K - 12)%nat
                       (dir_inum data i) b ltac:(nz) ltac:(rdok)
                       with "Hcg Hpc Hi86 [Hdehi]").
@@ -1971,7 +1971,7 @@ Section ProofDirlookupMain.
             iEval (rewrite Hbb8a) in "Hpc".
             (* +0x8a lw a0,0(s2) : dp->dev *)
             iEval (rewrite /i_dev) in "Hidev".
-            iApply (wp_lw_s_sconf (mword_of_int (DL + 0x8a)) Ra0 Rs2
+            iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DL + 0x8a)) Ra0 Rs2
                       (mword_of_int 0 : mword 12) N5 (K - 12)%nat dev b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi8a [Hidev]").
             { iEval (rgne; rewrite HN5s2). iExact "Hidev". }

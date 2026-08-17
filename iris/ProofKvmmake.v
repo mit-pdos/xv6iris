@@ -928,7 +928,7 @@ Section KvmmakeBody.
   Hypothesis wp_memset :
     forall `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat)
       (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
-      wp_memset_sconf_body KT0 m0 n len cval olds b pcur.
+      wp_memset_sconf_body KT0 KT0 m0 n len cval olds b pcur.
   Hypothesis wp_kvmmap :
     forall `{CID : CpuId} (γa : gname) (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat)
@@ -2274,7 +2274,7 @@ Module KvmmakeProof (AK : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTAC
       : wp_kvmmake_sconf_body γa mm lvl K eb p on b lks :=
     wp_kvmmake_sconf_gen
       (fun (CID' : CpuId) => AK.wp_kalloc_sconf KT0 (CID := CID'))
-      (fun (CID' : CpuId) => MS.wp_memset_sconf KT0 (CID := CID'))
+      (fun (CID' : CpuId) => MS.wp_memset_sconf KT0 KT0 (CID := CID'))
       (fun (CID' : CpuId) => KM.wp_kvmmap_sconf (CID := CID'))
       (fun (CID' : CpuId) => PM.wp_proc_mapstacks_sconf (CID := CID'))
       γa mm lvl K eb p on b lks.

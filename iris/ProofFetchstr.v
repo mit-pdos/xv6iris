@@ -376,10 +376,10 @@ Section ProofFetchstr.
   (* =================================================================== *)
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
-  Lemma wp_fetchstr_sconf (γa : gname) (γf : gname)
+  Lemma wp_fetchstr_sconf (ktb : ktier) (γa : gname) (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) (lks : gset string)
-    : wp_fetchstr_sconf_body γa γf m av n eb p pid V maxn buf_olds b lks.
+    : wp_fetchstr_sconf_body ktb γa γf m av n eb p pid V maxn buf_olds b lks.
   Proof.
     cbv beta delta [wp_fetchstr_sconf_body].
     intros pcE buf ret_tgt Hn Hav Hmax Hmax31 Hlkbelow.
@@ -792,7 +792,7 @@ Section ProofFetchstr.
        back a descriptor P' EXTENDING the one it was given.  None of the four
        can be supplied from [wp_fetchstr_sconf_body] as it stands. *)
     iDestruct (cpu_own_transport CID12 CID17 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Copyinstr.wp_copyinstr_sconf γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
+    iApply (Copyinstr.wp_copyinstr_sconf ktb γa A5 (pv_upt V) (pv_sz V) maxn buf_olds
               (av - 6)%nat n eb p b lks
               HK50 HA5a0 HA5a1 HA5a4 Hmax64 Hszb Hn
               with "Hcg Hcpu Htext Hpc Hpt Henv Hbuf").
@@ -884,7 +884,7 @@ Section ProofFetchstr.
         apply Nat2Z.inj_lt. exact Hkmax. }
       iEval (rewrite -HB2a0) in "Hbuf".
       (* ---- strlen(buf) ---- *)
-      iApply (Strlen.wp_strlen_sconf KT1 B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
+      iApply (Strlen.wp_strlen_sconf ktb B2 maxn k dst_new (av - 6)%nat (DfracOwn 1) b p
                 ltac:(lia) Hkmax Hcstr Hk31
                 with "Hcg Htext Hpc Hbuf").
       iIntros (CID22 Hk22 msl) "Hcg Hpc Hbuf %Hcssl %Hsla0".

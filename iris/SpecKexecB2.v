@@ -618,7 +618,7 @@ Definition kxc_bad324_body
   kalloc_env ga None -∗
   proc_pt P -∗
   proc_priv gf (proc_addr jp) pidv V -∗
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -646,7 +646,7 @@ Definition kxc_bad324_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -758,7 +758,7 @@ Definition kxc_ls_body
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -803,7 +803,7 @@ Definition kxc_ls_body
             bitmap_res gfs bmapstart cov logstart size used' -∗
             kalloc_env ga None -∗
             proc_priv gf (proc_addr jp) pidv V' -∗
-            ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+            ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
             ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
             ([∗ list] i ∈ seq 0 na,
                [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗

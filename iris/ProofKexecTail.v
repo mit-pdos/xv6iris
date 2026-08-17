@@ -397,7 +397,7 @@ Section KexecAFrame.
 
   Lemma kxc_word4_of_named (a : Arch.pa) (g : nat -> bv 8) :
     is_aligned_paddr (Physaddr a) 4 = true ->
-    ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ g j) ⊢
+    ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j) ⊢
     word4_pointsto a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)).
   Proof.
     intro Hal. iIntros "H".
@@ -411,7 +411,7 @@ Section KexecAFrame.
 
   Lemma kxc_named_of_word4 (a : Arch.pa) (g : nat -> bv 8) :
     word4_pointsto a (DfracOwn 1) (Z_to_bv 32 (le_at g 0 4)) ⊢
-    [∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ g j.
+    [∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j.
   Proof.
     rewrite word4_pointsto_unfold. iIntros "[_ H]".
     iApply (big_sepL_impl with "H"). iIntros "!>" (i j Hij) "Hb".
@@ -455,18 +455,18 @@ Section KexecAFrame.
      [seq] under a [big_opL] and does not. *)
   Lemma kxc_named_split4 (a : Arch.pa) (g : nat -> bv 8) (N : nat) :
     (4 <= N)%nat ->
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ g j) ⊢
-    ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ g j) ∗
-    ([∗ list] j ∈ seq 4 (N - 4), pa_add a j ↦ₘ g j).
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] g j) ⊢
+    ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j) ∗
+    ([∗ list] j ∈ seq 4 (N - 4), pa_add a j ↦ₘ[KT1] g j).
   Proof.
     intro H. rewrite (kxc_seq_split_4 N H) big_sepL_app. iIntros "[$ $]".
   Qed.
 
   Lemma kxc_named_join4 (a : Arch.pa) (g : nat -> bv 8) (N : nat) :
     (4 <= N)%nat ->
-    ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ g j) -∗
-    ([∗ list] j ∈ seq 4 (N - 4), pa_add a j ↦ₘ g j) -∗
-    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ g j).
+    ([∗ list] j ∈ seq 0 4, pa_add a j ↦ₘ[KT1] g j) -∗
+    ([∗ list] j ∈ seq 4 (N - 4), pa_add a j ↦ₘ[KT1] g j) -∗
+    ([∗ list] j ∈ seq 0 N, pa_add a j ↦ₘ[KT1] g j).
   Proof.
     intro H. iIntros "A B".
     rewrite (kxc_seq_split_4 N H) big_sepL_app. iSplitL "A"; [iExact "A" | iExact "B"].
@@ -965,7 +965,7 @@ Section KexecASeam.
      (* ---- the process, WHOLE (convention 2) ---- *)
      proc_priv gf pj pidv V ∗
      (* ---- the caller's buffers.  THE PATH IS FULL; see the header. ---- *)
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) ∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) ∗
      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) ∗
      ([∗ list] i ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) ∗
@@ -1149,7 +1149,7 @@ Section KexecAExit.
     bitmap_res gfs bmapstart cov logstart size used' -∗
     kalloc_env ga None -∗
     proc_priv gf pj pidv V -∗
-    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1169,7 +1169,7 @@ Section KexecAExit.
           bitmap_res gfs bmapstart cov logstart size used2 -∗
           kalloc_env ga None -∗
           proc_priv gf pj pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1314,7 +1314,7 @@ Section KexecABad.
     bitmap_res gfs bmapstart cov logstart size used2 -∗
     kalloc_env ga None -∗
     proc_priv gf (proc_addr jp) pidv V -∗
-    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1336,7 +1336,7 @@ Section KexecABad.
           bitmap_res gfs bmapstart cov logstart size used' -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1684,7 +1684,7 @@ Section KexecCBad.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bitmap_res gfs bmapstart cov logstart size used' -∗
     proc_priv gf (proc_addr jp) pidv V -∗
-    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+    ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
     ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
     ([∗ list] i ∈ seq 0 na,
        [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1708,7 +1708,7 @@ Section KexecCBad.
           bitmap_res gfs bmapstart cov logstart size used2 -∗
           kalloc_env ga None -∗
           proc_priv gf (proc_addr jp) pidv V' -∗
-          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+          ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
           ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
           ([∗ list] i ∈ seq 0 na,
              [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗

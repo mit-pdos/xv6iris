@@ -7851,7 +7851,7 @@ Section ProofCreateMain.
         by (rewrite Hc1sz; exact cr_nrec_16).
       assert (Hc1k0 : dir_slot dat1 1 = 1%nat) by exact (cr_slot_1 dat1 Hd1live).
       (* ===== +0x10e c.lw a2,4(s1) : the PARENT's inum ================ *)
-      iApply (wp_clw_s_sconf (mword_of_int (CK + 0x10e)) Ra2 Rs1
+      iApply (wp_clw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x10e)) Ra2 Rs1
                 (mword_of_int 4 : mword 12) md1 (K - 10)%nat dind b
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10e [Hiinum]").
       { iEval (rgne; rewrite (proj1 (proj2 (proj2 Hmd1regs)))). iExact "Hiinum". }
@@ -8221,7 +8221,7 @@ Section ProofCreateMain.
           by exact (cr_mkdir_n5 n3 n4 n5 _ _ _ _ _ Hn3lo Hcorr' Hspend1
                       Hspend2 eq_refl).
         (* ===== +0x122 lw a2,4(s3) : the child's inum ================ *)
-        iApply (wp_lw_s_sconf (mword_of_int (CK + 0x122)) Ra2 Rs3
+        iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (CK + 0x122)) Ra2 Rs3
                   (mword_of_int 4 : mword 12) md2 (K - 10)%nat cinum b
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi122 [Hciinum]").
         { iEval (rgne; rewrite (proj1 (proj2 (proj2 (proj2 (proj2 Hmd2regs)))))).

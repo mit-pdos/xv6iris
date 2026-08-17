@@ -1843,7 +1843,7 @@ Section ProofAllocproc.
           assert (N1 : r <> mword_of_int 1) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
           rewrite /G4 upd_ne; [| congruence].
           exact (HG3rest r Hr Ncsp N8 N9 N18). }
-        iApply (MS.wp_memset_sconf KT1 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
+        iApply (MS.wp_memset_sconf KT1 KT0 (CID := CIDf) G4 (trap_res b + (K - 4))%nat 112 (zero_reg : mword 64) fb false pme
                   ltac:(pose proof (ap_K2 K HK); lia) ltac:(vm_compute; reflexivity) HG4a1 HG4a2
                   with "Hcg Htext Hpc [Hbw]").
         { iEval (rewrite HG4a0). iExact "Hbw". }

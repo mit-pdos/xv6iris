@@ -1769,7 +1769,7 @@ Section SysExecSetup.
       by (rewrite /N5 upd_ne; [exact HN4s0 | nz]).
     iDestruct (sx_bytes_name (pa_stk sp0 58) 256 with "Hab") as (af) "Haz".
     iEval (rewrite -HN5a0) in "Haz".
-    iApply (Memset.wp_memset_sconf KT1 N5 (K - 60)%nat 256%nat
+    iApply (Memset.wp_memset_sconf KT1 KT1 N5 (K - 60)%nat 256%nat
               (mword_of_int 0 : mword 64) af b pj
               K2 ltac:(lia) HN5a1 HN5a2 with "Hcg Htext Hpc Haz").
     iIntros (CIDa6 Hqa6 N6) "Hcg Hpc Haz %Hcsa6".
@@ -3486,7 +3486,7 @@ Section SysExecStep.
     iEval (rewrite -HQ6a1) in "Hpg".
     iDestruct (cpu_own_transport CID11 CID17 0%nat eb (proc_addr jp) b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (Fetchstr.wp_fetchstr_sconf γa γf Q6 (K - 60)%nat 0%nat eb
+    iApply (Fetchstr.wp_fetchstr_sconf KT0 γa γf Q6 (K - 60)%nat 0%nat eb
               (proc_addr jp) pid (upd_upt V Pa) 4096%nat fpg b lks
               sx_noff0 Kfs HQ6a2 sx_pgsize_lt Hlb
               with "Hcg Hcnt Htext Hpc Hpriv Hka Hpg").

@@ -42,6 +42,7 @@ Section WpMemsetArray.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
+  Context {ktb : ktier}.
   (* ------------------------------------------------------------------ *)
   (*  The zero-count arm: the c.beqz at +0x08 is taken straight to the    *)
   (*  epilogue, so no byte is written and the (empty) buffer comes back   *)
@@ -49,7 +50,7 @@ Section WpMemsetArray.
   (* ------------------------------------------------------------------ *)
   Lemma wp_memset_sconf_zero
       (m0 : regfile) (n : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memset_sconf_body kt m0 n 0 cval olds b pcur.
+    : wp_memset_sconf_body kt ktb m0 n 0 cval olds b pcur.
   Proof.
     cbv beta delta [wp_memset_sconf_body].
     intros a0_idx a1_idx a2_idx pcE ra0 p ret_tgt cbyte Hn Hlen32 Hcval Ha2.
@@ -120,7 +121,7 @@ Section WpMemsetArray.
   (* ------------------------------------------------------------------ *)
   Lemma wp_memset_sconf_pos
       (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : (0 < len)%nat -> wp_memset_sconf_body kt m0 n len cval olds b pcur.
+    : (0 < len)%nat -> wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
   Proof.
     intro Hlen0.
     cbv beta delta [wp_memset_sconf_body].
@@ -154,7 +155,7 @@ Section WpMemsetArray.
       unfold bv_modulus; simpl. split; [ lia | apply (Z.lt_trans _ (2 ^ 32)); [ lia | vm_compute; reflexivity ] ]. }
     iIntros "Hcg #Htext Hpc Hbuf0 Hcont".
     (* --- bridge the [pa_add]-indexed buffer to memset's [ms_pa (ms_addr)] one --- *)
-    iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ olds j)%I
+    iAssert ([∗ list] j ∈ seq 0 len, (ms_pa (ms_addr p j)) ↦ₘ[ktb] olds j)%I
       with "[Hbuf0]" as "Hbuf".
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
@@ -231,7 +232,7 @@ Section WpMemsetArray.
       repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       rewrite -Hcval. reflexivity. }
     (* --- LOOP: 0x14..0x1a --- *)
-    iApply (Memset.wp_memset_loop_sconf kt len p wval_add cval a1_idx a4_idx a5_idx imm_bne
+    iApply (Memset.wp_memset_loop_sconf kt ktb len p wval_add cval a1_idx a4_idx a5_idx imm_bne
               olds (n - 2)%nat b pcur
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
@@ -293,7 +294,7 @@ Section WpMemsetArray.
   (* the two count arms, dispatched on [len]. *)
   Lemma wp_memset_sconf
       (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64)
-    : wp_memset_sconf_body kt m0 n len cval olds b pcur.
+    : wp_memset_sconf_body kt ktb m0 n len cval olds b pcur.
   Proof.
     destruct len as [| len' ].
     - apply (wp_memset_sconf_zero).

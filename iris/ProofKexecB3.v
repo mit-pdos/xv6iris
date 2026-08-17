@@ -536,7 +536,7 @@ Section KexecB3Incr.
     { rewrite (rget_ne T3 Rs0 ltac:(inz)) HT3s0 kxc_elf_off56.
       apply kxc_phnum_slot. }
     iEval (rewrite -Hpa47) in "Hw2".
-    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXB + 0x124)) Ra5 Rs0
+    iApply (wp_lhu_s_sconf (kt := KT1) (ktd := KT1) (mword_of_int (KXB + 0x124)) Ra5 Rs0
               (mword_of_int 3720 : mword 12) T3 (K - 68)%nat
               (Z_to_bv 16 (le_at ef 56 2) : mword 16) true
               (dqm := DfracOwn 1) ltac:(inz) ltac:(rdok)

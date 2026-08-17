@@ -50,6 +50,7 @@ Section ProofMemset.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Context {kt : ktier}.
+  Context {ktb : ktier}.
   (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
      one-line bridge from a leaf's [rget] to the register-map facts a
      whole-function proof already has.  Written name-free (durable-notes: an
@@ -105,7 +106,7 @@ Section ProofMemset.
       (N : nat) (p e cval : mword 64) (ra1 ra4 ra5 : mword 5)
       `{!SrcOk ra1, !SrcOk ra4, !SrcOk ra5} (imm_bne : mword 13)
       (olds : nat -> bv 8) (n : nat) (b : bool) (pcur : mword 64)
-    : wp_memset_loop_sconf_body kt N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
+    : wp_memset_loop_sconf_body kt ktb N p e cval ra1 ra4 ra5 imm_bne olds n b pcur.
   Proof.
     cbv beta delta [wp_memset_loop_sconf_body].
     intros pc0 pc4 pc6 cbyte Hra1 Hra4 Hra5 Hback Hal0

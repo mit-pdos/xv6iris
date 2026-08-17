@@ -1307,7 +1307,7 @@ Section IallocClaim.
     { intros c Hcs N2 N8 N9 N18 N19 N20 N21 N22.
       rewrite /W3 upd_ne; [| regne]. exact (HW2thr c Hcs N2 N8 N9 N18 N19 N20 N21 N22). }
     iEval (rewrite -HW3a0) in "Hby".
-    iApply (MS.wp_memset_sconf KT1 W3 (K - 8)%nat 64%nat
+    iApply (MS.wp_memset_sconf KT1 KT0 W3 (K - 8)%nat 64%nat
               (mword_of_int 0 : mword 64)
               (fun jj => dinode_bytes (ds !!! DinodeEnc.islot inum) !!! jj)
               b (proc_addr j)

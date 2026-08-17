@@ -454,10 +454,10 @@ Section KexecBFrame.
   Lemma kxc_win4 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 4 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 4 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₄ (Z_to_bv 32 (le_at f o 4) : mword 32)) ∗
-    ((pa_add a o ↦₄ (Z_to_bv 32 (le_at f o 4) : mword 32)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢
+    (pa_add a o ↦₄[KT1] (Z_to_bv 32 (le_at f o 4) : mword 32)) ∗
+    ((pa_add a o ↦₄[KT1] (Z_to_bv 32 (le_at f o 4) : mword 32)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
     rewrite (bb_split3 a o 4 r n f Hn).
@@ -624,7 +624,7 @@ Section KexecBSeam.
      kalloc_env ga None ∗
      proc_pt P ∗
      proc_priv gf (proc_addr jp) pidv V ∗
-     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) ∗
+     ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) ∗
      ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) ∗
      ([∗ list] i ∈ seq 0 na,
         [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) ∗

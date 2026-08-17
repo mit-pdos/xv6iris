@@ -3305,7 +3305,7 @@ Section ProofDirlinkMain.
             (* +0x4a lw a5,76(s2) : the size is re-read every iteration *)
             iDestruct "Hmeta" as "(Hity & Himaj & Himin & Hinl & Hisz)".
             iEval (rewrite /i_size) in "Hisz".
-            iApply (wp_lw_s_sconf (mword_of_int (DK + 0x4a)) Ra5 Rs2
+            iApply (wp_lw_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (DK + 0x4a)) Ra5 Rs2
                       (mword_of_int 76 : mword 12) N2 (K - 10)%nat
                       (di_size dn : mword 32) b
                       ltac:(nz) ltac:(rdok) with "Hcg Hpc Hj4a [Hisz]").

@@ -308,7 +308,7 @@ Section KexecCSetup.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -352,7 +352,7 @@ Section KexecCSetup.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1949,7 +1949,7 @@ Section KexecCExitM1.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -2220,7 +2220,7 @@ Section KexecCLoop.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -2252,7 +2252,7 @@ Section KexecCLoop.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -2652,7 +2652,7 @@ Section KexecCLoop.
                         = pa_add av (8 * c)).
       { rewrite HT4s11 Hz0imm. exact (avi0 (pa_add av (8 * c))). }
       iEval (rewrite -Havcaddr) in "Hac".
-      iApply (wp_ld_s_sconf (mword_of_int (KXC + 0x232)) Rs3 Rs11
+      iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXC + 0x232)) Rs3 Rs11
                 (mword_of_int 0 : mword 12) T4 (K - 68)%nat (avf c) true
                 (dqm := dqa) ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi232 Hac").
       iIntros (CID9 Hs9) "Hcg Hpc Hac". iEval (rewrite Havcaddr) in "Hac".
@@ -3707,7 +3707,7 @@ Section KexecCArgvLoop.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -3734,7 +3734,7 @@ Section KexecCArgvLoop.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -4030,7 +4030,7 @@ Section KexecCClose.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -4057,7 +4057,7 @@ Section KexecCClose.
               bitmap_res gfs bmapstart cov logstart size used' -∗
               kalloc_env ga None -∗
               proc_priv gf (proc_addr jp) pidv V' -∗
-              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+              ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
               ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
               ([∗ list] i ∈ seq 0 na,
                  [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗

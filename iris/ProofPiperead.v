@@ -1885,7 +1885,7 @@ Section ProofPiperead.
         assert (Hsza : add_vec (K8 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 72 : mword 12))
                        = p_sz pj) by (rewrite HK8s4; reflexivity).
         iPoseProof (pri_b2 with "Htext") as "Hib2".
-        iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.piperead + 0xb2)) Ra1 Rs2 (mword_of_int 72 : mword 12)
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.piperead + 0xb2)) Ra1 Rs2 (mword_of_int 72 : mword 12)
                   K8 (trap_res true + (av - 12))%nat (pv_sz V) false ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hib2 [Hszc]").
         { rgall. iEval (rewrite Hsza). iExact "Hszc". }
@@ -1903,7 +1903,7 @@ Section ProofPiperead.
         (* 0xb6 ld a0,80(s2) : a0 := p->pagetable *)
         iEval (rewrite -Hroot) in "Hptc".
         iPoseProof (pri_b6 with "Htext") as "Hib6".
-        iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.piperead + 0xb6)) Ra0 Rs2 (mword_of_int 80 : mword 12)
+        iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KernelSyms.piperead + 0xb6)) Ra0 Rs2 (mword_of_int 80 : mword 12)
                   K8b (trap_res true + (av - 12))%nat (page_base (ud_root P')) false ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hib6 [Hptc]").
         { rgall. iEval (rewrite Hpta). iExact "Hptc". }

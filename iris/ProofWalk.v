@@ -683,7 +683,7 @@ Section ProofWalk.
       as (olds) "Hbuf".
     assert (Ha2' : m0 !!! Regidx a2_idx = (mword_of_int (Z.of_nat 4096) : mword 64))
       by (rewrite Ha2; f_equal; vm_compute; reflexivity).
-    iApply (MemsetArray.wp_memset_sconf kt m0 n 4096 cval olds b pcur
+    iApply (MemsetArray.wp_memset_sconf kt KT0 m0 n 4096 cval olds b pcur
               Hn ltac:(vm_compute; reflexivity) Hcval Ha2'
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". iExact "H". }

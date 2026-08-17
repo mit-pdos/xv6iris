@@ -543,7 +543,7 @@ Section ProofUvmcreate.
     { rewrite /M4 /M3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /M2 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite /page_own /byte_any) in "Hpage".
     iDestruct (bytes_choose 4096 0 (fun j b => ((pa_add root0 j) ↦ₘ b)%I) with "Hpage") as (olds) "Hbuf".
-    iApply (MS.wp_memset_sconf KT1 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
+    iApply (MS.wp_memset_sconf KT1 KT0 M4 (K - 4)%nat 4096 (M4 !!! Regidx (mword_of_int 11 : mword 5)) olds b p
               Hc2 ltac:(vm_compute; reflexivity) ltac:(reflexivity) HM4a2
               with "Hcg Htext Hpc [Hbuf]").
     { iApply (big_sepL_impl with "Hbuf"). iIntros "!>" (k j _) "H". rewrite HM4a0. iExact "H". }

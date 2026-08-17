@@ -516,7 +516,7 @@ Definition wp_kexec_sconf_body
      source to a fraction is the "right" shape and has no consumer; recorded in
      projects/kexec.md, not done.
        The pointer vector stays at [dqa] because kexec only loads from it. *)
-  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+  ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
   ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
   ([∗ list] i ∈ seq 0 na,
      [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -537,7 +537,7 @@ Definition wp_kexec_sconf_body
       bitmap_res gfs bmapstart cov logstart size used' -∗
       kalloc_env ga None -∗
       proc_priv gf pj pidv V' -∗
-      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+      ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
       ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
       ([∗ list] i ∈ seq 0 na,
          [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗

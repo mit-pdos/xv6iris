@@ -1539,7 +1539,7 @@ Section KexitRest.
     (* +0x50 ld a0,336(s3) : a0 := p->cwd *)
     assert (Hrgbo19 : rget (CID := CID2) mbo (mword_of_int 19 : mword 5)
                       = mbo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
-    iApply (wp_ld_s_sconf (CID := CID2) (mword_of_int (KX + 0x50))
+    iApply (wp_ld_s_sconf (CID := CID2) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x50))
               (mword_of_int 10 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 336 : mword 12)
               mbo av (pv_cwd V) b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi50 [Hcwd]").
@@ -1659,7 +1659,7 @@ Section KexitRest.
        the ZOMBIE park takes. *)
     assert (Hrgeo19 : rget (CID := CID7) meo (mword_of_int 19 : mword 5)
                       = meo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
-    iApply (wp_sd_zero_s_sconf (CID := CID7) (mword_of_int (KX + 0x5c))
+    iApply (wp_sd_zero_s_sconf (CID := CID7) (kt := KT1) (ktd := KT0) (mword_of_int (KX + 0x5c))
               (mword_of_int 19 : mword 5) (mword_of_int 336 : mword 12) meo av (pv_cwd V) b
               with "Hcg Hpc Hi5c [Hcwd]").
     { iEval (rewrite Hrgeo19 Heo_s3 p_cwd_sext). iExact "Hcwd". }

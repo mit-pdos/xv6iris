@@ -641,10 +641,10 @@ Section KexecDCommit.
   Lemma kxd_win8 (a : mword 64) (f : nat -> bv 8) (o r n : nat) :
     (o + 8 + r)%nat = n ->
     is_aligned_paddr (Physaddr (pa_add a o)) 8 = true ->
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j) ⊢
-    (pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
-    ((pa_add a o ↦₈ (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
-       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j).
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j) ⊢
+    (pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) ∗
+    ((pa_add a o ↦₈[KT1] (Z_to_bv 64 (le_at f o 8) : mword 64)) -∗
+       [∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ[KT1] f j).
   Proof.
     intros Hn Hal.
     rewrite (bb_split3 a o 8 r n f Hn).
@@ -926,7 +926,7 @@ Section KexecDCommit.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗
@@ -1266,7 +1266,7 @@ Section KexecDCommit.
                       = p_trapframe (proc_addr jp))
       by (rewrite HF1s5; reflexivity).
     iEval (rewrite -Htfaddr) in "Hptf".
-    iApply (wp_ld_s_sconf (mword_of_int (KXD + 0x2ec)) Ra5 Rs5
+    iApply (wp_ld_s_sconf (kt := KT1) (ktd := KT0) (mword_of_int (KXD + 0x2ec)) Ra5 Rs5
               (mword_of_int 88 : mword 12) F1 (K - 68)%nat
               (page_base (ud_tfp (pv_upt V))) true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2ec Hptf").
@@ -1887,7 +1887,7 @@ Section KexecDMain.
         bitmap_res gfs bmapstart cov logstart size used' -∗
         kalloc_env ga None -∗
         proc_priv gf (proc_addr jp) pidv V' -∗
-        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ pfun i) -∗
+        ([∗ list] i ∈ seq 0 (S plen), pa_add pv i ↦ₘ[KT1] pfun i) -∗
         ([∗ list] i ∈ seq 0 (S na), pa_add av (8 * i) ↦₈{dqa} avf i) -∗
         ([∗ list] i ∈ seq 0 na,
            [∗ list] j ∈ seq 0 (aslen i), pa_add (avf i) j ↦ₘ afun i j) -∗

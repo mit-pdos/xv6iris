@@ -3030,7 +3030,7 @@ Section ProofSysUnlinkBody.
       iEval (rewrite /inode_meta) in "Hmeta".
       iDestruct "Hmeta" as "(Hity & Hima & Himi & Hinl & Hisz)".
       iEval (rewrite /i_size) in "Hisz".
-      iApply (wp_lw_s_sconf (CID := CID12) (mword_of_int (SU + 0x124)) Ra5 Rs2
+      iApply (wp_lw_s_sconf (CID := CID12) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0x124)) Ra5 Rs2
                 (mword_of_int 76 : mword 12) N9 (K - 30)%nat
                 (di_size dni : mword 32) b ltac:(nz) ltac:(rdok)
                 with "Hcg Hpc Hi124 [Hisz]").
@@ -3246,7 +3246,7 @@ Section ProofSysUnlinkBody.
     iEval (rewrite /inode_meta) in "Hmeta".
     iDestruct "Hmeta" as "(Hity & Hima & Himi & Hinl & Hisz)".
     iEval (rewrite /i_size) in "Hisz".
-    iApply (wp_lw_s_sconf (CID := CID0) (mword_of_int (SU + 0xf8)) Ra4 Rs2
+    iApply (wp_lw_s_sconf (CID := CID0) (kt := KT1) (ktd := KT0) (mword_of_int (SU + 0xf8)) Ra4 Rs2
               (mword_of_int 76 : mword 12) M (K - 30)%nat
               (di_size dni : mword 32) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hif8 [Hisz]").
